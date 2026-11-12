@@ -105,9 +105,7 @@ lies outside this, by design, to show where each procedure's limit is -- but
 the aggregate over the whole grid is not a rate of anything the published
 method claims to detect."""
 
-SUMMARY_PATH = Path(
-    "docs/design/replay_detection_comparison/detection_sweep_summary.csv"
-)
+SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_sweep_summary.csv")
 """Aggregated results, small enough to keep in the repository.
 
 The raw sweep goes under ``Processed-Data``, which is not tracked. Quoted

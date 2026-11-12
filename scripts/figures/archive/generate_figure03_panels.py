@@ -25,7 +25,7 @@ import pandas as pd
 import seaborn as sns
 from scipy.stats import sem
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
     BINS_DISTANCE_CM,
     BINS_DURATION_MS,
@@ -38,7 +38,7 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_immobile_events,
     get_signal_windows,
 )
-from continuum_swr_replay.figure_utilities import (
+from continuum_swr_replay.visualization.figure_utilities import (
     FIGURE_TWO_PANEL_HORIZONTAL,
     PANEL_SINGLE,
     get_figure_size,

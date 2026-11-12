@@ -129,7 +129,7 @@ The main analysis workflow is in `scripts/decoding/run_decoding_bandit.py`, whic
 The discrete transitions are stationary: `--non_stationary` (speed as a transition
 covariate) is refused until non_local_detector can save such a model
 (`continuum_swr_replay.decoding.transitions.NON_STATIONARY_REFUSAL`).
-`tests/unit/test_documented_values.py` checks this table against the code.
+`tests/repository/test_documented_values.py` checks this table against the code.
 
 ### Command-Line Usage
 

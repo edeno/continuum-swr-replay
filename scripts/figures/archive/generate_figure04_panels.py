@@ -40,7 +40,7 @@ import pandas as pd
 import seaborn as sns
 from non_local_detector.likelihoods.common import get_spikecount_per_time_bin
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
@@ -56,7 +56,7 @@ from continuum_swr_replay.analysis.pfc import (
     make_design_matrices,
 )
 from continuum_swr_replay.data_loaders import load_data
-from continuum_swr_replay.figure_utilities import (
+from continuum_swr_replay.visualization.figure_utilities import (
     ONE_COLUMN,
     get_figure_size,
     save_figure,

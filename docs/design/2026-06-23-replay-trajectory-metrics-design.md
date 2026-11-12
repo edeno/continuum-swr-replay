@@ -19,7 +19,7 @@ The metrics apply to **both** event scenarios with **identical
 definitions** so the two are directly comparable:
 
 - **Non-Local** scenario — events from the non-local detector
-  (`build_event_table` in `analysis/replay/tables_event.py`)
+  (`build_event_table` in `analysis/behavior/tables/tables_event.py`)
 - **ContFrag** scenario — SWR/MUA-detected events
   (`build_contfrag_event_table` in `analysis/contfrag/tables.py`)
 
@@ -57,10 +57,10 @@ Two layers:
 | `get_ahead_behind_distance` | `non_local_detector.analysis.distance1D` | per-timebin | signed cm, animal→decoded along track |
 | `maximum_a_posteriori_estimate` | `non_local_detector.analysis.posterior` | per-timebin | decoded MAP linear position |
 | `get_HPD_spatial_coverage` | `non_local_detector.model_checking` | per-timebin | 95% HPD spatial coverage (cm) |
-| `map_estimate_to_arm` | `analysis/replay/spatial_mapping.py:60` | per-timebin | linear position → arm (junctions excluded) |
-| `path_continuity` | `analysis/replay/spatial.py:154` | per-event | arm-adjacency fraction (exists, not yet merged) |
-| `posterior_peak_mean` / `_entropy_mean` / `_hpd_width` | `analysis/replay/uncertainty.py:48-150` | per-event | confidence summaries |
-| retrospective metrics | `analysis/replay/retrospective.py` | per-event | `ends_at_next`, `contains_path_to_next`, `chosen_arm_fraction` (exist, not yet merged) |
+| `map_estimate_to_arm` | `analysis/behavior/spatial_mapping.py:60` | per-timebin | linear position → arm (junctions excluded) |
+| `path_continuity` | `analysis/behavior/covariates/spatial.py:154` | per-event | arm-adjacency fraction (exists, not yet merged) |
+| `posterior_peak_mean` / `_entropy_mean` / `_hpd_width` | `analysis/behavior/tables/uncertainty.py:48-150` | per-event | confidence summaries |
+| retrospective metrics | `analysis/behavior/choice/retrospective.py` | per-event | `ends_at_next`, `contains_path_to_next`, `chosen_arm_fraction` (exist, not yet merged) |
 
 `step_distance` and the track-graph shortest-path distance matrix are the
 only new per-timebin building blocks required.
@@ -228,11 +228,11 @@ Cost: adding Tier-1 columns requires regenerating the `data_over_time` pkls
 - Compute the new per-timebin signals (`step_distance`, per-bin state probs,
   ripple/MUA + z-scores) in Tier 1 alongside the existing per-timebin pipeline.
 - Add per-event rollup functions, mirroring the structure of
-  `analysis/replay/uncertainty.py`, returning scalar columns.
+  `analysis/behavior/tables/uncertainty.py`, returning scalar columns.
 - Merge `path_continuity` and the retrospective metrics into the canonical
   event tables (they exist but are currently standalone).
 - Apply identical definitions in both `build_event_table`
-  (`analysis/replay/tables_event.py`) and `build_contfrag_event_table`
+  (`analysis/behavior/tables/tables_event.py`) and `build_contfrag_event_table`
   (`analysis/contfrag/tables.py`); factor shared logic so the two scenarios
   cannot drift.
 

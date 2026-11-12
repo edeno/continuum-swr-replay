@@ -25,7 +25,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
+from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance_path
 
 __all__ = [
     "MAX_NONCONVERGED_UNIT_FRACTION",

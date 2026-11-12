@@ -380,7 +380,7 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
     import json
     from pathlib import Path
 
-    from continuum_swr_replay.analysis.replay import prepare_data as pdm
+    from continuum_swr_replay.analysis.behavior.tables import prepare_data as pdm
 
     spec = importlib.util.spec_from_file_location(
         "run_pfc_analysis_bandit",

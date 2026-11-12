@@ -20,7 +20,7 @@ known (no NWB file, or no run epoch in it). The register was generated once, on
 exclusions_table.csv``: 553 run epochs and 4 sessions with none, 557 rows) and
 the populate plan (``.claude/research/refresh_populate/populate_matrix.csv``);
 it is hand-maintained from then on. ``docs/epoch_register.md`` is generated from
-it (``scripts/qa/write_epoch_register_doc.py``), and a unit test holds the two
+it (``scripts/checks/write_epoch_register_doc.py``), and a unit test holds the two
 together.
 
 When several reasons hold for one epoch, the register records the first in the

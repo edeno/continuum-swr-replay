@@ -3,7 +3,7 @@
 
 Requires the derived tables from::
 
-    uv run python scripts/content/analyze_uncertainty_content.py
+    uv run python scripts/behavior/content/analyze_uncertainty_content.py
 
 Usage
 -----
@@ -28,13 +28,13 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
-from continuum_swr_replay.figure_utilities import (
+from continuum_swr_replay.paths import figure_dir, replay_content_dir
+from continuum_swr_replay.visualization.figure_utilities import (
     WONG,
     label_panels,
     save_figure,
     set_figure_defaults,
 )
-from continuum_swr_replay.paths import figure_dir, replay_content_dir
 
 ANIMAL_ORDER = list(analysed_animals())
 ANIMAL_COLORS = dict(zip(ANIMAL_ORDER, [WONG[i] for i in [1, 2, 3, 5, 7]], strict=True))
@@ -94,7 +94,7 @@ def _load_results(results_dir: Path) -> dict[str, pd.DataFrame | dict]:
     if "n_animals_positive" not in contrasts.columns:
         raise ValueError(
             f"{paths['contrasts']} predates the animals-positive count the figure "
-            "annotates; rerun scripts/content/analyze_uncertainty_content.py."
+            "annotates; rerun scripts/behavior/content/analyze_uncertainty_content.py."
         )
     return {
         "trial": pd.read_pickle(paths["trial"]),

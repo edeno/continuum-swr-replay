@@ -2,7 +2,7 @@
 """Build the four canonical replay-content tables across all sessions.
 
 Thin driver over the per-grain table builders in
-``continuum_swr_replay.analysis.replay.tables_event`` / ``tables_stop`` /
+``continuum_swr_replay.analysis.behavior.tables.tables_event`` / ``tables_stop`` /
 ``tables_arm_patch``. For
 each session it loads the pre-saved ``data_over_time.pkl``,
 ``environment.pkl``, and ``results.nc``, pulls ``trials`` +
@@ -25,7 +25,7 @@ Usage::
     uv run python scripts/tables/prepare_replay_content_data.py --test       # 2 per animal
     uv run python scripts/tables/prepare_replay_content_data.py --from-cache # covariate-only rebuild
 
-The run itself is :func:`continuum_swr_replay.analysis.replay.prepare_data.run_prepare_data`;
+The run itself is :func:`continuum_swr_replay.analysis.behavior.tables.prepare_data.run_prepare_data`;
 this file is its command line.
 
 **Skipping Spyglass for covariate-only changes** (``--from-cache``): the
@@ -56,8 +56,8 @@ from pathlib import Path
 # Imported as a module, not by name: ``run_prepare_data`` rebinds
 # ``prepare_data.OUTPUT_DIR`` from ``--output-dir``, so the flag's default is
 # read (``prepare_data.output_dir()``) when the parser is built.
-from continuum_swr_replay.analysis.replay import prepare_data
-from continuum_swr_replay.analysis.replay.prepare_data import run_prepare_data
+from continuum_swr_replay.analysis.behavior.tables import prepare_data
+from continuum_swr_replay.analysis.behavior.tables.prepare_data import run_prepare_data
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 
 

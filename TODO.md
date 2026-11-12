@@ -36,7 +36,7 @@ Work that is deferred on purpose. Each item says when it should be done.
   flags a stale one.)
   The builders read CSV inputs with pandas' default float parser, which is not
   exact and differs by machine: of the 1,492 float values in
-  `docs/design/replay_detection_comparison/detection_sweep_summary.csv`, 125 on
+  `paper/reported/inputs/detection/detection_sweep_summary.csv`, 125 on
   an arm64 laptop differ in the last digit from the exact parse
   (`float_precision="round_trip"`), and the cluster (x86_64) reads one of the
   detection summary's values differently from the laptop. So a summary is

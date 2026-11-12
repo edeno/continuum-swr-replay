@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.gridspec import GridSpec
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
@@ -67,17 +67,17 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.figure_utilities import (
-    PAGE_HEIGHT,
-    TWO_COLUMN,
-    label_panels,
-    save_figure,
-)
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.figure_panels import (
     plot_replay_position_by_swr,
     plot_replay_speed_by_swr,
     plot_swr_zscore_by_state,
+)
+from continuum_swr_replay.visualization.figure_utilities import (
+    PAGE_HEIGHT,
+    TWO_COLUMN,
+    label_panels,
+    save_figure,
 )
 from continuum_swr_replay.visualization.plots import (
     plot_acausal_probabilities,

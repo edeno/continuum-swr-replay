@@ -29,7 +29,7 @@ def _held_out_conditional_ll_loop(y, X, groups, params):
 
 
 def main():
-    from continuum_swr_replay.analysis.replay.model_checking import (
+    from continuum_swr_replay.analysis.behavior.content.model_checking import (
         _held_out_conditional_ll,
     )
 

@@ -18,7 +18,7 @@ The model is [edeno/statespacecheck-paper](https://github.com/edeno/statespacech
 - all rounding lives in one module (`reported_values.py` and `number_format.py`), and a value that cannot be
   printed at the requested precision without losing information raises (`_exact`).
 
-This repository already has a small version of the pattern: `scripts/qa/write_epoch_register_doc.py` fills the
+This repository already has a small version of the pattern: `scripts/checks/write_epoch_register_doc.py` fills the
 `<!-- BEGIN GENERATED: name -->` … `<!-- END GENERATED: name -->` blocks of `docs/epoch_register.md` from the
 register.
 
@@ -76,7 +76,7 @@ register.
 - **Location and committing:** builder's call (below). The lead's goal implies the manuscript and the docs can
   be regenerated from the summaries without `Processed-Data/`, as statespacecheck-paper commits its summaries.
 - **Who writes them:** one summarize step per part, reading existing outputs. Shared code goes in the package,
-  not in scripts (see the import rules in `scripts/README.md` and `tests/unit/test_import_layering.py`).
+  not in scripts (see the import rules in `scripts/README.md` and `tests/repository/test_import_layering.py`).
 
 ### 2. The emitter
 

@@ -19,7 +19,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
-from continuum_swr_replay.figure_utilities import save_figure  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 from continuum_swr_replay.paths import (  # noqa: E402
     REPLAY_CONTENT_DIR,  # noqa: E402
@@ -29,6 +28,9 @@ from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
+from continuum_swr_replay.visualization.figure_utilities import (  # noqa: E402
+    save_figure,  # noqa: E402
+)
 
 RC = REPLAY_CONTENT_DIR
 XMAX = 8.0

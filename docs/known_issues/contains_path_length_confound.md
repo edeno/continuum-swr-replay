@@ -8,7 +8,7 @@
 
 `contains_path_to_next` is all-or-nothing: every arm in
 `arm_path_well_to_well(current_arm, next_arm)` must appear in the event's
-MAP-arm trace ([`retrospective.py`](../../src/continuum_swr_replay/analysis/replay/retrospective.py),
+MAP-arm trace ([`retrospective.py`](../../src/continuum_swr_replay/analysis/behavior/choice/retrospective.py),
 `_contains_path`). On the spider track the required set has a different size
 depending on the trip:
 

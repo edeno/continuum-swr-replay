@@ -11,10 +11,10 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
     coefficient_family_statistics,
 )
-from continuum_swr_replay.analysis.replay.model_specs import (
+from continuum_swr_replay.analysis.behavior.model_specs import (
     MODEL_HIERARCHY,
 )
 from continuum_swr_replay.visualization.palettes import COLORS

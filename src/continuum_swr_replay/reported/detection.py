@@ -18,7 +18,7 @@ summaries, of the labeled recording and of the pilot's events are computed in
   from ``scripts/detection/sweep_memoryless_{detection,controls,heldout}.py``),
   for the memoryless-comparison caption's panels (g-q);
 - the one labeled recording of that caption's panels (a-f)
-  (``docs/design/replay_detection_comparison/memoryless_comparison_recording.json``:
+  (``paper/reported/inputs/detection/memoryless_comparison_recording.json``:
   ``memoryless_sequence.recording_statistics.recording_numbers``, written by
   ``scripts/figures/generate_memoryless_comparison.py``);
 - the sliding-window detector's first real-data pilot epoch (a
@@ -64,7 +64,7 @@ MEMORYLESS_PILOT_RUN = "0c2548cacf2d-seed20260922"
 
 MEMORYLESS_PILOT_EPOCH = "chimi20200225_02_r1_HPC"
 
-SWEEP_DIR = Path("docs/design/replay_detection_comparison")
+SWEEP_DIR = Path("paper/reported/inputs/detection")
 
 TAGS = {
     "state_evidence": Tags(("2c.3",)),

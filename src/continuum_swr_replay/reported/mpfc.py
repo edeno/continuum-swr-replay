@@ -53,6 +53,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.coefficient_statistics import group_range
 from continuum_swr_replay.analysis.pfc import population_statistics, timing
 from continuum_swr_replay.analysis.pfc.heldout import empirical_pvalue_floor
 from continuum_swr_replay.analysis.pfc.load_population import (
@@ -63,7 +64,6 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
 )
 from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
-from continuum_swr_replay.analysis.replay.coefficient_statistics import group_range
 from continuum_swr_replay.paths import (
     ROOT_DIR,
     processed_data_dir,

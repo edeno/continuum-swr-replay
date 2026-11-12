@@ -30,7 +30,7 @@ from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table, write_table
-from tests.unit._swr_inventory_fixtures import (
+from tests.support._swr_inventory_fixtures import (
     RUN_ID,
     use_swr_source,
     write_swr_inventory,

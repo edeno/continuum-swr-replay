@@ -4,7 +4,7 @@
 # These per-trial CSVs (choice=leaf, patch=stem, reward, contingency, date,
 # session, trial) were the input to the (now-retired) difflib nominal-value
 # pipeline. The canonical per-stop value covariates now come from the
-# DataJoint-exact `qvals_table` (analysis/behavior/qvals_table.py); these CSVs
+# DataJoint-exact `qvals_table` (analysis/behavior/covariates/qvals_table.py); these CSVs
 # are kept only as a raw reference / cross-check of the behavior parse.
 #
 # The data is gitignored (lives under Processed-Data/); this script makes the

@@ -128,7 +128,7 @@ agent in its own checkout and verified by a trial build on the cluster's
 data: detection's statistics are in
 `analysis/hippocampus/memoryless_sequence/sweep_statistics.py` and
 `event_table.py` (all 132 values identical), behavior's in
-`analysis/replay/coefficient_statistics.py`, `rate_fit_statistics.py`,
+`analysis/behavior/coefficient_statistics.py`, `rate_fit_statistics.py`,
 `stop_statistics.py`, `content_statistics.py`, `history_kernel_statistics.py`
 and `learning.py` (all 922 values identical). No builder computes a statistic
 now. Figure 4 and three `scripts/pfc/` reports call the mpfc functions: their
@@ -216,7 +216,7 @@ at the end.
    - `figure: 3, content occupancy`: 12 values, each tagged with claims 13 and 14 (`part2.py:1512`);
    - `figure: content_estimators`: 80 values, all claim 19a, 78 of them also 19f
      and 19g (`part3.py:2294`). A script draws it
-     (`scripts/content/compare_content_estimators.py`), but `figure-pipeline.md`
+     (`scripts/behavior/content/compare_content_estimators.py`), but `figure-pipeline.md`
      does not list it.
 2. **Figure 3's tags and its panel list disagree.** `figure-pipeline.md` gives
    Figure 3 four panels: a example, b SWR z-score (claim 24), c replay speed
@@ -392,7 +392,7 @@ SWRs; events outside SWRs). Its update waits until Figure 3 is settled.
 ### 1. The question list: `src/continuum_swr_replay/reported/questions.py`
 
 This is one hand-written module, the only place a question's text, figure and
-status are written. It follows the pattern of `analysis/replay/model_specs.py`.
+status are written. It follows the pattern of `analysis/behavior/model_specs.py`.
 
 Each question has:
 
@@ -664,7 +664,7 @@ confirms that every marker key arrives somewhere.
 **`docs/per_bin_rate_results.md`**: becomes a generated supplementary table.
 The prose at lines 1–56 goes to `docs/rate_models.md`, and section 5 (lines
 217–236, no values) goes to `TODO.md` if it is still pending. Its inbound links
-include `scripts/rate/plot_per_bin_rate_summary.py`,
+include `scripts/behavior/rate/plot_per_bin_rate_summary.py`,
 `src/continuum_swr_replay/reported/behavior.py` (then named part3.py) and
 `tests/unit/test_summarize_per_bin_rate_models.py`. These are code, so each is
 checked before the file is removed.
@@ -689,15 +689,15 @@ close:
 
 **`paper/reported/values_index.md`**: replaced by `questions.md`. Its links in
 `docs/reproduce.md`, `paper/README.md`, `scripts/reported/emit_reported_values.py`
-and `tests/unit/test_manuscript_macros.py` are updated.
+and `tests/reported/test_manuscript_macros.py` are updated.
 
 **Links.** These live files link to a retired document and are updated:
 - `README.md`, `docs/README.md`, `paper/README.md`, `paper/main.tex`;
 - `docs/figure-pipeline.md`, `docs/models_table.md`, `docs/rate_models.md`,
   `docs/behavior_models.md`;
-- `scripts/README.md`, `scripts/qa/run_refits.py`,
+- `scripts/README.md`, `scripts/workflows/run_refits.py`,
   `scripts/exploratory/_verify_content_models.py`;
-- `src/continuum_swr_replay/analysis/replay/model_specs.py`,
+- `src/continuum_swr_replay/analysis/behavior/model_specs.py`,
   `src/continuum_swr_replay/reported/__init__.py`, `src/continuum_swr_replay/reported/values.py`;
 - `src/continuum_swr_replay/reported/behavior.py` (then named part3.py). Its `docs: replay_rate_content_swr_synthesis`
   tags (`:1854`, `:2699`) are replaced per decision 4;

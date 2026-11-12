@@ -55,7 +55,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.gridspec import GridSpec
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
@@ -107,14 +107,14 @@ from continuum_swr_replay.analysis.pfc.modulation import (
     REPORT_HALF_WINDOW_S,
     curve_coefficients,
 )
-from continuum_swr_replay.figure_utilities import (
+from continuum_swr_replay.intervals import get_spikecount_per_time_bin
+from continuum_swr_replay.paths import processed_data_dir
+from continuum_swr_replay.visualization.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
     label_panels,
     save_figure,
 )
-from continuum_swr_replay.intervals import get_spikecount_per_time_bin
-from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 
 figure_utilities.set_figure_defaults(context="paper")

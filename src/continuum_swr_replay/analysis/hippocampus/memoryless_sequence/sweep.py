@@ -3,7 +3,7 @@
 The injected-replay sweep (``scripts/detection/sweep_memoryless_detection.py``),
 its controls (``sweep_memoryless_controls.py``), the held-out check
 (``sweep_memoryless_heldout.py``) and the reference check
-(``scripts/qa/compare_memoryless_to_reference.py``) read one simulated recording
+(``scripts/checks/compare_memoryless_to_reference.py``) read one simulated recording
 (:func:`build_recording`, sorted spikes on a linear track, both detectors fitted
 on its non-event data), one grid of injected replays (:data:`PATH_CM`,
 :data:`DURATION_S`, :data:`PEAK_RATE_HZ`, :data:`MIDPOINT_CM`), and run the

@@ -166,7 +166,7 @@ the error estimates the real-data held-out results will be read with.
   duration. Every existing summary row must be unchanged.
 - `scripts/detection/sweep_memoryless_controls.py` (new): runs the conditions above; raw table
   to `Processed-Data/replay_detection_comparison/memoryless_controls.parquet`,
-  aggregates and provenance to `detection_controls_summary.csv` beside this file.
+  aggregates and provenance to `paper/reported/inputs/detection/detection_controls_summary.csv`.
   About 580 injected cells plus every no-replay stretch; about a minute at the sweep's
   0.045 s per cell, measured on one seed before the full run. A condition that cannot
   be placed raises; nothing is dropped silently.
@@ -176,7 +176,7 @@ the error estimates the real-data held-out results will be read with.
   unchanged.
 - `scripts/detection/sweep_memoryless_heldout.py` (new): the three folds over the injected
   replays and the conditions above; raw table to `Processed-Data`, aggregates to
-  `detection_heldout_summary.csv` beside this file. About 3 x 5100 cells at the sweep's
+  `paper/reported/inputs/detection/detection_heldout_summary.csv`. About 3 x 5100 cells at the sweep's
   0.045 s per cell, near 12 minutes, measured on one seed of one fold first.
 - `scripts/figures/generate_memoryless_comparison.py`: reads all three summaries.
 

@@ -43,11 +43,11 @@ import numpy as np
 import pandas as pd
 from matplotlib.gridspec import GridSpec
 
-from continuum_swr_replay.analysis.replay.model_specs import (
+from continuum_swr_replay.analysis.behavior.model_specs import (
     MODEL_PER_STOP_RATE,
     N_REWARD_LAGS,
 )
-from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
+from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
     fit_per_stop_rate_model,
 )
 from continuum_swr_replay.parameters import ROOT_DIR

@@ -38,9 +38,9 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from continuum_swr_replay.figure_utilities import save_figure
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.visualization.figure_utilities import save_figure
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 warnings.filterwarnings("ignore")

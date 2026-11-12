@@ -24,6 +24,6 @@ analyses that use it:
   whole-unit complete-case selection.
 
 The package imports only the foundation modules, ``analysis.constants`` and
-itself (``tests/unit/test_import_layering.py``). Submodules are imported by
+itself (``tests/repository/test_import_layering.py``). Submodules are imported by
 name; nothing is re-exported here.
 """

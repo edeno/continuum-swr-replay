@@ -130,6 +130,7 @@ import pandas as pd
 from distributed.deploy import Cluster
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.behavior.fit_provenance import git_hash
 from continuum_swr_replay.analysis.events.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
@@ -178,7 +179,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     windows_holding,
 )
-from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.decoding.identifiers import (
     EpochKey,

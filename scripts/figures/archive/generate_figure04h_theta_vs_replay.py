@@ -18,9 +18,12 @@ import numpy as np
 import seaborn as sns
 from scipy.stats import spearmanr
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
-from continuum_swr_replay.figure_utilities import PANEL_SINGLE_SQUARE, save_figure
+from continuum_swr_replay.visualization.figure_utilities import (
+    PANEL_SINGLE_SQUARE,
+    save_figure,
+)
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 

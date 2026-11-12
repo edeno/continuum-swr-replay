@@ -27,7 +27,7 @@ the script checks it and stops rather than draw a figure the caption contradicts
 In both halves the two detectors read one encoding model, fitted once.
 The upper panels' simulation and its decode are
 ``memoryless_sequence.comparison_simulation``'s, which the reference check
-(``scripts/qa/compare_memoryless_to_reference.py``) shares.
+(``scripts/checks/compare_memoryless_to_reference.py``) shares.
 
 Usage:
     python scripts/figures/generate_memoryless_comparison.py
@@ -86,18 +86,16 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     DEFAULT_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
 )
-from continuum_swr_replay.figure_utilities import (
+from continuum_swr_replay.runs.device import default_jax_platforms
+from continuum_swr_replay.runs.provenance import described_commit, produced_by
+from continuum_swr_replay.visualization.figure_utilities import (
     TWO_COLUMN,
     WONG,
     save_figure,
     set_figure_defaults,
 )
-from continuum_swr_replay.runs.device import default_jax_platforms
-from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
-SUMMARY_PATH = Path(
-    "docs/design/replay_detection_comparison/detection_sweep_summary.csv"
-)
+SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_sweep_summary.csv")
 """Aggregates of the parameter sweep, drawn in the lower panels."""
 
 DISTANCE_ORDER = ("(0, 40]", "(40, 80]", "(80, 120]", "(120, 200]")
@@ -105,19 +103,19 @@ DISTANCE_ORDER = ("(0, 40]", "(40, 80]", "(80, 120]", "(120, 200]")
 ones the summary holds and refuses a summary holding any other."""
 
 CONTROLS_SUMMARY_PATH = Path(
-    "docs/design/replay_detection_comparison/detection_controls_summary.csv"
+    "paper/reported/inputs/detection/detection_controls_summary.csv"
 )
 """Aggregates of the controls sweep: no replay, bursts, jumps, chains."""
 
 RECORDING_NUMBERS_PATH = Path(
-    "docs/design/replay_detection_comparison/memoryless_comparison_recording.json"
+    "paper/reported/inputs/detection/memoryless_comparison_recording.json"
 )
 """The numbers the caption states about the one labeled recording (a-f)
 (``recording_statistics.recording_numbers``), which this script writes; Part 1's
 reported values read them."""
 
 HELDOUT_SUMMARY_PATH = Path(
-    "docs/design/replay_detection_comparison/detection_heldout_summary.csv"
+    "paper/reported/inputs/detection/detection_heldout_summary.csv"
 )
 """Aggregates of the held-out sweep: support by fold, estimator, class and truth."""
 

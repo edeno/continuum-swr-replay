@@ -100,7 +100,7 @@ def main() -> int:
             f"range [{v.min()},{v.max()}]",
         )
     try:
-        from continuum_swr_replay.analysis.replay.covariates import (
+        from continuum_swr_replay.analysis.behavior.covariates import (
             add_uncertainty_covariates,
         )
 

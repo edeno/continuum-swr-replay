@@ -21,9 +21,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import pearsonr
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
-from continuum_swr_replay.figure_utilities import PANEL_SINGLE_SQUARE, save_figure
+from continuum_swr_replay.visualization.figure_utilities import (
+    PANEL_SINGLE_SQUARE,
+    save_figure,
+)
 from continuum_swr_replay.paths import processed_data_dir
 
 figure_utilities.set_figure_defaults(context="paper")

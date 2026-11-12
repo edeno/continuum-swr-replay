@@ -176,7 +176,7 @@ is re-measured on a smoke run before its stage is launched.
   - non-local events per epoch under the 1.7.0 and 2.0 minimum-duration rules, segmented
     from the April `Non-Local` probabilities, with each epoch's minimum sample count (R9).
 - **Golden baseline.** Freeze the current tables and models read-only with
-  `scripts/qa/freeze_regression_baseline.py --label pre_redecode_YYYYMMDD`, for the
+  `scripts/checks/freeze_regression_baseline.py --label pre_redecode_YYYYMMDD`, for the
   before/after report.
 - **Other backups.** The golden baseline copies only the tables and 11 model folders
   (`freeze_regression_baseline.py:64-76`). Copy everything else the refresh overwrites into
@@ -754,7 +754,7 @@ The **before/after report** covers:
 
 Every change comes with the tests listed under its stage. Unit tests run offline: any module
 that imports Spyglass at import time is stubbed in `sys.modules`, as
-`tests/unit/test_events.py` does.
+`tests/data_loaders/test_events.py` does.
 
 ## Documentation
 

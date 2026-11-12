@@ -51,7 +51,7 @@ uses the locked versions and does not re-solve them.
   runs it (see `TODO.md`).
 
 ```bash
-uv run --frozen pytest tests/unit/test_epoch_register_doc.py
+uv run --frozen pytest tests/scripts/checks/test_epoch_register_doc.py
 uv run --frozen ruff check src scripts tests
 uv run --frozen mypy src/
 ```
@@ -62,19 +62,17 @@ uv run --frozen mypy src/
 src/continuum_swr_replay/
 ├── data_loaders/          # Data loading from Spyglass/NWB (load_data in bandit_task.py)
 ├── analysis/              # Analysis modules
-│   ├── behavior/          #   behavioral-model covariates (qvals_table)
+│   ├── behavior/          #   the events and the task: covariates/, tables/, rate/, content/, choice/, and the shared model ladders, fitters and fit statistics
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
 │   ├── events/            #   analysed-time rule, SWR source, event eligibility, classified event table, cohorts
 │   ├── hippocampus/       #   decode masks and aggregation, posterior/quality metrics, event statistics, SWR inventories, artifact detector
 │   ├── inventory_comparison/ # event inventories from different detectors compared
 │   ├── pfc/               #   mPFC/OFC unit analysis
-│   ├── replay/            #   replay content/rate tables, model ladders, fitters, statistics of the fits
 │   └── constants.py       #   analysis constants and defaults
 ├── decoding/              # decode configs and detector classes, transitions, identifiers and file names, the results.nc reader
 ├── runs/                  # run infrastructure: provenance, CLI, batch loops, BLAS thread pin (threads), JAX device choice (device)
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, atomic writes, parity
-├── visualization/         # Plotting utilities; palettes.py holds COLORS
-├── figure_utilities.py    # publication-figure helpers
+├── visualization/         # Plotting utilities; palettes.py holds COLORS, figure_utilities.py the publication-figure helpers
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
 ├── reported/              # reported numbers: the summary builders (survey, detection, events, behavior, mpfc), the question list, values, the code record, rounding, the macro emitter, Table S1
 ├── parameters.py          # global parameters
@@ -82,7 +80,7 @@ src/continuum_swr_replay/
 └── data_types.py          # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
-├── decoding/  detection/  tables/  rate/  coupling/  content/  behavior/  figures/  qa/  pfc/  reported/
+├── decoding/  detection/  tables/  behavior/{rate,content,coupling}/  figures/  workflows/  checks/  pfc/  reported/
 └── exploratory/           #   unsupported one-offs (_*.py)
 paper/                     # The manuscript — see paper/README.md
 ├── main.tex  main.pdf     #   LaTeX source and the built PDF (make manuscript)
@@ -105,9 +103,9 @@ tests/                     # pytest suite — see tests/README.md
 > docs live in `docs/` (incl. design specs in `docs/design/`); agent-process/scratch under `.claude/`.
 > The import layering rules and the 2026-10 old→new module map are in [docs/README.md](README.md) ("Code layout").
 > **All model ladders (rate, content, is_swr-contrast) are defined in one place —
-> `src/continuum_swr_replay/analysis/replay/model_specs.py`** (the single source of truth;
+> `src/continuum_swr_replay/analysis/behavior/model_specs.py`** (the single source of truth;
 > `docs/models_table.md` mirrors it, its rung sets enforced by
-> `tests/unit/test_models_table_mirrors_specs.py` — the formulas themselves are not
+> `tests/repository/test_models_table_mirrors_specs.py` — the formulas themselves are not
 > pinned by that test). Where fitted outputs / figures land is in
 > [docs/README.md](README.md) ("Where results live" / "Figure outputs").
 
@@ -179,7 +177,7 @@ from `edge_spacing > 0`, not real spatial positions). Any MAP-to-arm or
 posterior-to-arm computation MUST exclude these bins before argmax or
 normalization — otherwise the MAP can silently land on a junction bin and
 return NaN. See `map_estimate_to_arm` in
-`analysis/replay/spatial_mapping.py` for the canonical
+`analysis/behavior/spatial_mapping.py` for the canonical
 nearest-neighbor-over-real-bins pattern.
 
 ### Data Integration with Spyglass
@@ -201,7 +199,7 @@ other loaders fetch from Spyglass; nothing in `src/` or `scripts/` inserts, popu
 deletes, creates a schema or exports. Keep it that way. Never write to the lab's
 Spyglass database without the explicit approval, from the person who owns the data, of
 that specific step; a script that must write is a lab operation, documented on its own,
-not part of the analysis. `tests/unit/test_no_database_writes.py` fails when code here
+not part of the analysis. `tests/repository/test_no_database_writes.py` fails when code here
 calls a DataJoint write method.
 
 ### Spike Data Processing
@@ -259,7 +257,7 @@ The previously recorded Δ82/Δ250 magnitudes predate the unified speed
 gating and **must be re-derived** before being cited.
 
 The replay-content `build_event_table` in
-`analysis/replay/tables_event.py` builds on
+`analysis/behavior/tables/tables_event.py` builds on
 top of this. The classified columns are merged in on `event_id`
 (`_merge_classified_event_facts`). Event timing is derived once, by the
 classified pass: its `event_start` / `event_end` / `event_duration` /
@@ -309,8 +307,8 @@ the rate at which events start while none is ongoing; Family A's are events per
 second of stop. See
 [docs/rate_models.md](rate_models.md) for which family to cite for what,
 the M0–M9 ladder, and the point-process model-checking. Runners:
-`scripts/rate/fit_per_stop_rate_models.py`, `scripts/rate/fit_per_bin_rate_models.py`;
-plotter: `scripts/rate/plot_per_bin_rate_models.py`.
+`scripts/behavior/rate/fit_per_stop_rate_models.py`, `scripts/behavior/rate/fit_per_bin_rate_models.py`;
+plotter: `scripts/behavior/rate/plot_per_bin_rate_models.py`.
 
 ### Loading data for a session
 
@@ -382,7 +380,7 @@ macOS arm64, where `jax-cuda12-plugin` has no wheel).
 ## Animal and Session Information
 
 The dataset includes recordings from 5 animals. Each NWB file can contain multiple epochs (e.g., `02_r1`, `04_r2`, `06_r3`). The cohort is the epoch register's analysed epochs (`data_loaders/epoch_register.csv`, read by `analysed_epochs()`); `docs/epoch_register.md` gives each excluded epoch's reason. The register analyses 242 epochs in 45 NWB files; the table counts those, and its dates are
-the recording days of the analysed epochs (`tests/unit/test_documented_values.py` checks both).
+the recording days of the analysed epochs (`tests/repository/test_documented_values.py` checks both).
 
 | Animal | NWB Files | Epochs | Dates |
 |--------|-----------|--------|-------|
@@ -443,7 +441,7 @@ Each builder's statistics:
   `scripts/pfc/summarize_pfc_marked_family.py` writes);
 - detection: `analysis/hippocampus/memoryless_sequence/sweep_statistics.py`, `recording_statistics.py`
   and `event_table.py`;
-- behavior: `analysis/replay/coefficient_statistics.py` (a per-session fit summarized over sessions and
+- behavior: `analysis/behavior/coefficient_statistics.py` (a per-session fit summarized over sessions and
   animals; the other modules build on it), `rate_fit_statistics.py`, `stop_statistics.py`,
   `content_statistics.py`, `history_kernel_statistics.py`, and the stay/leave summaries in `learning.py`.
 

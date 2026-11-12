@@ -170,7 +170,7 @@ _LEGACY_ROOTS = {
 """The roots this module once bound at import, by the ``paths`` function now
 behind each. Kept for notebooks and research scripts: resolved at each read
 (``from ... import`` binds the value at that import). Library code and the
-supported scripts call ``paths``; ``tests/unit/test_paths.py`` keeps them out."""
+supported scripts call ``paths``; ``tests/test_paths.py`` keeps them out."""
 
 
 def __getattr__(name: str) -> Path:

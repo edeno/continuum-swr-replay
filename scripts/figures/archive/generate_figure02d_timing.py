@@ -32,8 +32,11 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-import continuum_swr_replay.figure_utilities as figure_utilities
-from continuum_swr_replay.figure_utilities import PANEL_SINGLE, save_figure
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
+from continuum_swr_replay.visualization.figure_utilities import (
+    PANEL_SINGLE,
+    save_figure,
+)
 from continuum_swr_replay.visualization.palettes import COLORS
 
 logging.basicConfig(

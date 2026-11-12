@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from continuum_swr_replay.figure_utilities import save_figure
+from continuum_swr_replay.visualization.figure_utilities import save_figure
 
 OUT = Path(__file__).resolve().parents[2] / ".claude/research/fig2b_outputs"
 s = pd.read_csv(OUT / "per_session_dated.csv")

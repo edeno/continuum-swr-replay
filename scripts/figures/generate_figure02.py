@@ -70,7 +70,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.gridspec import GridSpec
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.events.analysed_time import swr_intervals
 from continuum_swr_replay.analysis.events.classified_table import (
     assert_drawn_class_matches_ripples,
@@ -106,12 +106,6 @@ from continuum_swr_replay.decoding.identifiers import (
     format_epoch_identifier,
     parse_nwb_filename,
 )
-from continuum_swr_replay.figure_utilities import (
-    PAGE_HEIGHT,
-    TWO_COLUMN,
-    label_panels,
-    save_figure,
-)
 from continuum_swr_replay.paths import (
     processed_data_dir,
     replay_content_dir,
@@ -125,6 +119,12 @@ from continuum_swr_replay.visualization.figure_panels import (
     plot_event_timing_offsets,
     plot_swr_overlap_class_bar,
     plot_triggered_averages,
+)
+from continuum_swr_replay.visualization.figure_utilities import (
+    PAGE_HEIGHT,
+    TWO_COLUMN,
+    label_panels,
+    save_figure,
 )
 from continuum_swr_replay.visualization.plots import (
     plot_linear_track_graph_strip,

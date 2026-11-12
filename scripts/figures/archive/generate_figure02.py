@@ -16,7 +16,7 @@ import pandas as pd
 import seaborn as sns
 from scipy.ndimage import label
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.visualization.palettes import COLORS
 
 logging.basicConfig(

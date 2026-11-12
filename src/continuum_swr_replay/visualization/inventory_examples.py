@@ -61,11 +61,11 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.results import open_results
-from continuum_swr_replay.figure_utilities import WONG
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.device import xla_flags
 from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.visualization.figure_utilities import WONG
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import plot_linear_track_graph_strip
 

@@ -3,7 +3,7 @@
 This module produces event tables from externally-defined events (SWR or
 high-MUA times), using the ContFrag classifier's decoded posterior for
 content analysis. The key difference from the NonLocal tables
-(``analysis.replay.tables_*``) is that events come from external detectors,
+(``analysis.behavior.tables_*``) is that events come from external detectors,
 not from model-detected non-local probability thresholding.
 
 The ContFrag model has 2 states (Continuous, Fragmented), both of which
@@ -33,7 +33,7 @@ from continuum_swr_replay.tables.event_ids import hash_stop_id
 
 from ...data_loaders.constants import ALL_ARMS
 from ...parameters import PLACE_BIN_SIZE_1D
-from ..replay._helpers import (
+from ..behavior._helpers import (
     align_count_matrix,
     align_posterior_to_dot,
     arm_to_patch,
@@ -45,7 +45,23 @@ from ..replay._helpers import (
     single_arm_from_well,
     stay_indicator,
 )
-from ..replay.bouts import (
+from ..behavior.covariates import (
+    add_trial_context,
+    recent_trial_reward_rate,
+    reward_history_basis_features,
+    summarize_behavioral_location,
+)
+from ..behavior.covariates.candidate_arm import (
+    attach_candidate_arm_covariates,
+    broadcast_candidate_arms,
+)
+from ..behavior.covariates.interactions import attach_interactions
+from ..behavior.design_constants import (
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
+)
+from ..behavior.spatial_mapping import map_estimate_to_arm
+from ..behavior.tables.bouts import (
     assign_bout,
     bout_exposure_s,
     bout_start_context,
@@ -53,35 +69,19 @@ from ..replay.bouts import (
     nearest_well_distance_cm,
     time_since_stop,
 )
-from ..replay.covariates import (
-    add_trial_context,
-    recent_trial_reward_rate,
-    reward_history_basis_features,
-    summarize_behavioral_location,
-)
-from ..replay.covariates.candidate_arm import (
-    attach_candidate_arm_covariates,
-    broadcast_candidate_arms,
-)
-from ..replay.covariates.interactions import attach_interactions
-from ..replay.design_constants import (
-    REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_INCOMPLETE,
-)
-from ..replay.spatial_mapping import map_estimate_to_arm
-from ..replay.summaries import (
+from ..behavior.tables.summaries import (
     arm_count_hard,
     arm_count_soft,
     arm_fraction_from_event_total,
     arm_posterior_mass,
     posterior_to_arm_marginal,
 )
-from ..replay.table_contracts import validate_event_arm_table
-from ..replay.trajectory import (
+from ..behavior.tables.table_contracts import validate_event_arm_table
+from ..behavior.tables.trajectory import (
     SHARED_TRAJECTORY_COLUMNS,
     compute_trajectory_rollups,
 )
-from ..replay.uncertainty import (
+from ..behavior.tables.uncertainty import (
     posterior_entropy_mean,
     posterior_hpd_widths,
     posterior_peak_mean,

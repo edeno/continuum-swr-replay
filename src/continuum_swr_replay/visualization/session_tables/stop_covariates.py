@@ -9,7 +9,7 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection
 
-from continuum_swr_replay.analysis.replay.model_specs import N_REWARD_LAGS
+from continuum_swr_replay.analysis.behavior.model_specs import N_REWARD_LAGS
 
 from ._common import (
     _MISSING_CELL_COLOR,

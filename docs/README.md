@@ -19,7 +19,7 @@ it stops drifting; add new docs to the matching home.
 | review (code/methods output) | `.claude/docs/reviews/` | point-in-time review reports, and the dated audits (before/after refit comparisons, regeneration and parity checks) |
 | exploratory notes + figures | `.claude/research/` | scratch analyses; `*_outputs/` figures |
 | code map (generated) | `docs/regression_pipeline_map.md` | every pipeline module and the public symbols it defines, by stage |
-| model spec (code) | `src/continuum_swr_replay/analysis/replay/model_specs.py` | single source of truth for all model ladders |
+| model spec (code) | `src/continuum_swr_replay/analysis/behavior/model_specs.py` | single source of truth for all model ladders |
 
 Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.claude/`.**
 
@@ -49,19 +49,19 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 - [cached_trials_for_testing.md](cached_trials_for_testing.md) — *reference*: test-fixture trial cache.
 - [regression_pipeline_map.md](regression_pipeline_map.md) — *code map*: every module
   from decoded session to fitted regression, grouped by stage, with the public symbols
-  each defines. Generated — regenerate with `scripts/qa/write_pipeline_map.py`.
+  each defines. Generated — regenerate with `scripts/checks/write_pipeline_map.py`.
 - [design/](design/) — *design specs*: per-analysis design documents.
   - [design/model_history.md](design/model_history.md) — *design journal*: why each
     replay-content model rung carries the predictors it does (reversed reasoning
     and retracted numbers included). The machine-readable catalog is
-    `analysis/replay/model_specs.py`; this is the record of how it got that way.
+    `analysis/behavior/model_specs.py`; this is the record of how it got that way.
   - [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md) —
     *design spec*: the covariate causal-hygiene rules every fit runner enforces
     and the `<run>_cohort_audit.csv` schema (drop buckets + reconciliation
     invariant).
   - [design/builder_test_floor.md](design/builder_test_floor.md) — *reference*: the
     measured value-level test coverage of the covariate builders and the target,
-    kept honest by `scripts/qa/mutation_check.py`.
+    kept honest by `scripts/checks/mutation_check.py`.
   - [design/2026-05-27-figure01-revision-design.md](design/2026-05-27-figure01-revision-design.md)
     — the Figure 1 revision: the No-Spike-wins scenario, spikes shown entering the model,
     and the corrected transition labels.
@@ -108,7 +108,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     decisions.
   - [design/content_model_design.md](design/content_model_design.md) — the `is_swr`
     content ladder, parallel to the per-bin rate ladder, on the beta-Bernoulli covariates;
-    implemented in `scripts/content/fit_swr_contrast_content.py`.
+    implemented in `scripts/behavior/content/fit_swr_contrast_content.py`.
   - [design/content_estimator_comparison.md](design/content_estimator_comparison.md)
     — the retired count multinomial vs the shipped per-event fractions vs a
     Dirichlet-multinomial, on one 218-session cohort: what each assumes,
@@ -209,19 +209,108 @@ layers below it, never from a layer above:
    the statistics that know nothing of the task, for every `analysis/` package: the
    signed-rank test, the Benjamini-Hochberg correction and the animal-balanced
    summary over sessions. It imports nothing from the package.
-3. **The other `analysis/` packages** (`hippocampus/`, `replay/`, `pfc/`, `behavior/`,
+3. **The other `analysis/` packages** (`hippocampus/`, `behavior/`, `pfc/`,
    `contfrag/`, `inventory_comparison/`). `hippocampus/` never imports `pfc/` or
    `inventory_comparison/`. No `analysis/` code imports `visualization/`.
-4. **`visualization/`** (with `figure_utilities.py`) and **`reported/`** (the summary
+4. **`visualization/`** and **`reported/`** (the summary
    builders), side by side, then **`scripts/`** on top. `reported/` imports the
    foundation and `analysis/` (it names and describes the statistics that `analysis/`
    computes); nothing in `analysis/` or `visualization/` imports `reported/`, so the
    analysis does not depend on the reporting. Nothing in `src/` imports `scripts/`.
 
-There are no package cycles. `tests/unit/test_import_layering.py` enforces all of
+There are no package cycles. `tests/repository/test_import_layering.py` enforces all of
 this except the rules for `reported/`, which hold today but are not tested (it also keeps `data_loaders/` from importing `analysis/`, `hippocampus/` from
-importing `replay/`, and the covariate builders from importing `model_specs.py`). It
+importing `behavior/`, and the covariate builders from importing `model_specs.py`). It
 has no allowlist: any violation fails.
+
+Inside `analysis/behavior/` the subpackages import in one direction: `covariates/`,
+then `choice/`, then `tables/`, then `rate/` and `content/`, which do not import
+each other; each may import the modules at the package's top level, which hold
+what several subpackages share (the package docstring lists them). No test
+checks this direction; the package-cycle rule sees `analysis/behavior/` as one node.
+
+### Moved modules (2026-11)
+
+The replay and behavior packages of `analysis/` became one package,
+`analysis/behavior/`, with the subpackages `covariates/`, `tables/`, `rate/`,
+`content/` and `choice/`, and the publication-figure helpers moved into
+`visualization/`. Every module kept its file name. There are no compatibility
+shims. Paths are under `src/continuum_swr_replay/`.
+
+| Old module | New home |
+|---|---|
+| `analysis/behavior/_spatial_bandit_rl.py` (removed: moved) | `analysis/behavior/covariates/_spatial_bandit_rl.py` |
+| `analysis/behavior/qvals_table.py` (removed: moved) | `analysis/behavior/covariates/qvals_table.py` |
+| `analysis/replay/__init__.py` (removed: moved) | `analysis/behavior/__init__.py` |
+| `analysis/replay/_fit_diagnostics.py` (removed: moved) | `analysis/behavior/_fit_diagnostics.py` |
+| `analysis/replay/_helpers.py` (removed: moved) | `analysis/behavior/_helpers.py` |
+| `analysis/replay/_tables_common.py` (removed: moved) | `analysis/behavior/tables/_tables_common.py` |
+| `analysis/replay/bouts.py` (removed: moved) | `analysis/behavior/tables/bouts.py` |
+| `analysis/replay/choice_prediction.py` (removed: moved) | `analysis/behavior/choice/choice_prediction.py` |
+| `analysis/replay/coefficient_statistics.py` (removed: moved) | `analysis/behavior/coefficient_statistics.py` |
+| `analysis/replay/cohort_audit.py` (removed: moved) | `analysis/behavior/cohort_audit.py` |
+| `analysis/replay/content_response.py` (removed: moved) | `analysis/behavior/content_response.py` |
+| `analysis/replay/content_statistics.py` (removed: moved) | `analysis/behavior/content/content_statistics.py` |
+| `analysis/replay/contrast_aggregation.py` (removed: moved) | `analysis/behavior/contrast_aggregation.py` |
+| `analysis/replay/covariate_timing.py` (removed: moved) | `analysis/behavior/covariate_timing.py` |
+| `analysis/replay/covariates/__init__.py` (removed: moved) | `analysis/behavior/covariates/__init__.py` |
+| `analysis/replay/covariates/candidate_arm.py` (removed: moved) | `analysis/behavior/covariates/candidate_arm.py` |
+| `analysis/replay/covariates/clocks.py` (removed: moved) | `analysis/behavior/covariates/clocks.py` |
+| `analysis/replay/covariates/context.py` (removed: moved) | `analysis/behavior/covariates/context.py` |
+| `analysis/replay/covariates/definitions.py` (removed: moved) | `analysis/behavior/covariates/definitions.py` |
+| `analysis/replay/covariates/history/__init__.py` (removed: moved) | `analysis/behavior/covariates/history/__init__.py` |
+| `analysis/replay/covariates/history/_common.py` (removed: moved) | `analysis/behavior/covariates/history/_common.py` |
+| `analysis/replay/covariates/history/diagnostics.py` (removed: moved) | `analysis/behavior/covariates/history/diagnostics.py` |
+| `analysis/replay/covariates/history/reward_history.py` (removed: moved) | `analysis/behavior/covariates/history/reward_history.py` |
+| `analysis/replay/covariates/history/value_block.py` (removed: moved) | `analysis/behavior/covariates/history/value_block.py` |
+| `analysis/replay/covariates/history/value_uncertainty.py` (removed: moved) | `analysis/behavior/covariates/history/value_uncertainty.py` |
+| `analysis/replay/covariates/history/visit_recency.py` (removed: moved) | `analysis/behavior/covariates/history/visit_recency.py` |
+| `analysis/replay/covariates/interactions.py` (removed: moved) | `analysis/behavior/covariates/interactions.py` |
+| `analysis/replay/design_constants.py` (removed: moved) | `analysis/behavior/design_constants.py` |
+| `analysis/replay/dirichlet_multinomial.py` (removed: moved) | `analysis/behavior/content/dirichlet_multinomial.py` |
+| `analysis/replay/duration_aware_history.py` (removed: moved) | `analysis/behavior/rate/duration_aware_history.py` |
+| `analysis/replay/duration_history_simulation.py` (removed: moved) | `analysis/behavior/rate/duration_history_simulation.py` |
+| `analysis/replay/fit_outputs.py` (removed: moved) | `analysis/behavior/content/fit_outputs.py` |
+| `analysis/replay/fit_provenance.py` (removed: moved) | `analysis/behavior/fit_provenance.py` |
+| `analysis/replay/fitting.py` (removed: moved) | `analysis/behavior/fitting.py` |
+| `analysis/replay/history_kernel_statistics.py` (removed: moved) | `analysis/behavior/rate/history_kernel_statistics.py` |
+| `analysis/replay/learning.py` (removed: moved) | `analysis/behavior/choice/learning.py` |
+| `analysis/replay/model_checking.py` (removed: moved) | `analysis/behavior/content/model_checking.py` |
+| `analysis/replay/model_comparison.py` (removed: moved) | `analysis/behavior/content/model_comparison.py` |
+| `analysis/replay/model_specs.py` (removed: moved) | `analysis/behavior/model_specs.py` |
+| `analysis/replay/per_bin_design.py` (removed: moved) | `analysis/behavior/per_bin_design.py` |
+| `analysis/replay/per_bin_rate_model.py` (removed: moved) | `analysis/behavior/rate/per_bin_rate_model.py` |
+| `analysis/replay/per_stop_rate_model.py` (removed: moved) | `analysis/behavior/rate/per_stop_rate_model.py` |
+| `analysis/replay/prepare_data.py` (removed: moved) | `analysis/behavior/tables/prepare_data.py` |
+| `analysis/replay/rate_fit_statistics.py` (removed: moved) | `analysis/behavior/rate/rate_fit_statistics.py` |
+| `analysis/replay/retrospective.py` (removed: moved) | `analysis/behavior/choice/retrospective.py` |
+| `analysis/replay/ridge_history_cv.py` (removed: moved) | `analysis/behavior/rate/ridge_history_cv.py` |
+| `analysis/replay/shuffles.py` (removed: moved) | `analysis/behavior/choice/shuffles.py` |
+| `analysis/replay/simulation.py` (removed: moved) | `analysis/behavior/content/simulation.py` |
+| `analysis/replay/spatial.py` (removed: moved) | `analysis/behavior/covariates/spatial.py` |
+| `analysis/replay/spatial_mapping.py` (removed: moved) | `analysis/behavior/spatial_mapping.py` |
+| `analysis/replay/stop_statistics.py` (removed: moved) | `analysis/behavior/rate/stop_statistics.py` |
+| `analysis/replay/summaries.py` (removed: moved) | `analysis/behavior/tables/summaries.py` |
+| `analysis/replay/switch_analysis.py` (removed: moved) | `analysis/behavior/choice/switch_analysis.py` |
+| `analysis/replay/table_contracts.py` (removed: moved) | `analysis/behavior/tables/table_contracts.py` |
+| `analysis/replay/tables_arm_patch.py` (removed: moved) | `analysis/behavior/tables/tables_arm_patch.py` |
+| `analysis/replay/tables_event.py` (removed: moved) | `analysis/behavior/tables/tables_event.py` |
+| `analysis/replay/tables_stop.py` (removed: moved) | `analysis/behavior/tables/tables_stop.py` |
+| `analysis/replay/timebin_tables.py` (removed: moved) | `analysis/behavior/tables/timebin_tables.py` |
+| `analysis/replay/trajectory.py` (removed: moved) | `analysis/behavior/tables/trajectory.py` |
+| `analysis/replay/uncertainty.py` (removed: moved) | `analysis/behavior/tables/uncertainty.py` |
+| `analysis/replay/uncertainty_content.py` (removed: moved) | `analysis/behavior/content/uncertainty_content.py` |
+| `figure_utilities.py` (removed: moved) | `visualization/figure_utilities.py` |
+
+The sweep results the detection summary reads moved beside the summaries:
+
+| Old path | New path |
+|---|---|
+| `docs/design/replay_detection_comparison/detection_controls_summary.csv` (removed: moved) | `paper/reported/inputs/detection/detection_controls_summary.csv` |
+| `docs/design/replay_detection_comparison/detection_heldout_summary.csv` (removed: moved) | `paper/reported/inputs/detection/detection_heldout_summary.csv` |
+| `docs/design/replay_detection_comparison/detection_sweep_summary.csv` (removed: moved) | `paper/reported/inputs/detection/detection_sweep_summary.csv` |
+| `docs/design/replay_detection_comparison/memoryless_comparison_recording.json` (removed: moved) | `paper/reported/inputs/detection/memoryless_comparison_recording.json` |
+| `docs/design/replay_detection_comparison/reference_check_summary.csv` (removed: moved) | `paper/reported/inputs/detection/reference_check_summary.csv` |
 
 ### Moved modules (2026-10)
 
@@ -279,9 +368,9 @@ Renamed functions: `inventory_comparison.adapters.swr_inventory` is now
 `swr_detector_inventory` (it reads any one of the four SWR detectors' inventories).
 
 New `src/` modules that took code out of `scripts/`: `analysis/hippocampus/detection_inputs.py`
-(the detection runners' shared inputs), `analysis/replay/fit_outputs.py` (the content
-fitter's output naming), and functions added to `analysis/replay/learning.py` (Stage 6's
-role summary) and `analysis/replay/contrast_aggregation.py` (the contrast-content cohort
+(the detection runners' shared inputs), `analysis/behavior/content/fit_outputs.py` (the content
+fitter's output naming), and functions added to `analysis/behavior/choice/learning.py` (Stage 6's
+role summary) and `analysis/behavior/contrast_aggregation.py` (the contrast-content cohort
 assembly). Script moves are listed in [scripts/README.md](../scripts/README.md)
 ("Moved scripts (2026-10)").
 
@@ -334,13 +423,13 @@ Three tiers:
 
    | dir | producer | holds |
    |---|---|---|
-   | `models_per_bin_rate/` | `scripts/rate/fit_per_bin_rate_models.py`, `fit_swr_contrast_rate.py`, `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` | the per-bin rate fits: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `cross_history_models.pkl`; plus three exploratory one-offs nothing supported reads (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) |
-   | `models_per_event_swr_power/` | `scripts/coupling/fit_swr_power_model.py` | the per-event ripple-power model `swr_power_model.pkl`, its `.z_reference_by_session.json` and its two audits |
-   | `models_per_stop_rate/` | `scripts/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
-   | `models/`, `models_patch/` | `scripts/content/fit_replay_content_models.py` (arm / patch) | the default content ladders — arm `M0`, `M0a`, `M1`–`M6`; patch `P0`–`P3` — on the at-well events, plus the opt-in value/uncertainty rungs (`Mv`, `Mu`, `Mvu`, `Pv`) when named with `--models` |
+   | `models_per_bin_rate/` | `scripts/behavior/rate/fit_per_bin_rate_models.py`, `fit_swr_contrast_rate.py`, `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` | the per-bin rate fits: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `cross_history_models.pkl`; plus three exploratory one-offs nothing supported reads (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) |
+   | `models_per_event_swr_power/` | `scripts/behavior/coupling/fit_swr_power_model.py` | the per-event ripple-power model `swr_power_model.pkl`, its `.z_reference_by_session.json` and its two audits |
+   | `models_per_stop_rate/` | `scripts/behavior/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
+   | `models/`, `models_patch/` | `scripts/behavior/content/fit_replay_content_models.py` (arm / patch) | the default content ladders — arm `M0`, `M0a`, `M1`–`M6`; patch `P0`–`P3` — on the at-well events, plus the opt-in value/uncertainty rungs (`Mv`, `Mu`, `Mvu`, `Pv`) when named with `--models` |
    | `models_swr_{T,F}/`, `models_patch_swr_{T,F}/` | same, `--swr-subset T\|F` | content split by SWR (T) / non-SWR (F) |
    | `models_dm/` | same, `--estimator dirichlet_multinomial` | the M0–M6 arm ladder refit as a Dirichlet-multinomial (count response + fitted within-event concentration); the matching contrast bundles `swr_contrast_content_{arm,patch,audited}_dm{,_rewarded,_omitted,_len}.pkl` sit in `models_swr_contrast/` beside their conditional twins |
-   | `content_estimator_comparison/` | `scripts/content/compare_content_estimators.py` | the three-estimator comparison on one shared cohort — `content_estimator_comparison.parquet`, `_summary.csv`, `content_estimator_bootstrap.csv`, `_skips.csv`. Read with [design/content_estimator_comparison.md](design/content_estimator_comparison.md) |
+   | `content_estimator_comparison/` | `scripts/behavior/content/compare_content_estimators.py` | the three-estimator comparison on one shared cohort — `content_estimator_comparison.parquet`, `_summary.csv`, `content_estimator_bootstrap.csv`, `_skips.csv`. Read with [design/content_estimator_comparison.md](design/content_estimator_comparison.md) |
 
    Since 2026-10-23 `qvals_table` and its reference sit at the root and the power model in
    its own folder; nothing is left at the old `models_per_bin_rate/` paths (the move is the
@@ -385,7 +474,7 @@ Three tiers:
    mutually-exclusive drop buckets, reconciling `n_in − Σdrops == n_modeled`; coverage
    boundary in [models_table.md](models_table.md#cohort-audit-tables)) and the contrast
    runners a `<run>_term_diagnostics.csv`
-   (per-term quasi-separation counts). `scripts/qa/summarize_cohort_audits.py` stacks and
+   (per-term quasi-separation counts). `scripts/checks/summarize_cohort_audits.py` stacks and
    flags them; the schema is documented in [models_table.md](models_table.md#cohort-audit-tables).
 
    The **PFC** unit bundles and the two behaviour analyses (retrospective alignment and

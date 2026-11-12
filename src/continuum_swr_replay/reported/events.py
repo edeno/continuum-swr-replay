@@ -20,7 +20,7 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   the state-evidence run the detection summary reads, from
   ``scripts/detection/split_state_evidence_by_swr.py``);
 - the content-occupancy table (``Processed-Data/content_occupancy``, from
-  ``scripts/content/analyze_content_occupancy.py``);
+  ``scripts/behavior/content/analyze_content_occupancy.py``);
 - the one-class-or-two tests (``Processed-Data/ripple_class_structure``, from
   ``scripts/detection/measure_ripple_class_structure.py``);
 - each event's start distance and duration-matched quiet-rest theta

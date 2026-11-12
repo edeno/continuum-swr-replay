@@ -131,7 +131,7 @@ def fit_figure_parser(description: str | None) -> ArgumentParser:
     """The command line of a script that plots stored fits: ``--allow-stale`` only.
 
     ``--allow-stale`` is the opt-out of the provenance gate
-    (``analysis.replay.fit_provenance.require_fresh_inputs``), which refuses a
+    (``analysis.behavior.fit_provenance.require_fresh_inputs``), which refuses a
     fit whose input tables changed after it was written.
 
     Parameters

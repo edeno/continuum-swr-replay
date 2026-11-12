@@ -2,12 +2,12 @@
 
 Every value is read from an output a fit already wrote; nothing is refitted
 here. This module names and describes the values. The statistics are computed
-in ``analysis.replay`` (``coefficient_statistics``, ``rate_fit_statistics``,
+in ``analysis.behavior`` (``coefficient_statistics``, ``rate_fit_statistics``,
 ``history_kernel_statistics``, ``stop_statistics``, ``content_statistics`` and
 ``learning``); here only the size of an input is counted and a statistic an
 input already holds is copied. A value read from a fit made on other tables
 than the current ones is pending (:func:`fit_staleness`). The inputs
-(:class:`BehaviorInputs`), with their runs in ``scripts/qa/run_refits.py``:
+(:class:`BehaviorInputs`), with their runs in ``scripts/workflows/run_refits.py``:
 
 - the per-bin rate ladder, Family B (``models_per_bin_rate/all_models.pkl``,
   ``rate.per_bin.at_well``; ``all_models_allstops.pkl``,
@@ -41,7 +41,7 @@ Each aggregate is computed with the rule the producing script or its audit
 states, named in the value's description. The content-ladder, leaf-ladder and
 choice coefficients aggregated for this summary are read through the shipped
 per-term identifiability gate
-(:func:`~continuum_swr_replay.analysis.replay.contrast_aggregation.gate_term_sessions`).
+(:func:`~continuum_swr_replay.analysis.behavior.contrast_aggregation.gate_term_sessions`).
 The per-bin rate values pass the same per-term gate: a reward kernel is read
 over the sessions whose three reward-basis terms all pass it, and a single
 coefficient over the sessions where that term does; the counts left out, and
@@ -65,17 +65,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.cohort_selection import (
-    select_event_cohort,
-    select_stop_cohort,
+from continuum_swr_replay.analysis.behavior.choice.learning import (
+    cross_session_role_summary,
+    fit_status_counts,
+    pooled_gee_role_summary,
+    smallest_adjusted_p,
 )
-from continuum_swr_replay.analysis.replay import (
-    content_statistics,
-    history_kernel_statistics,
-    rate_fit_statistics,
-    stop_statistics,
-)
-from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
     aic_difference_statistics,
     audited_drop_statistics,
     coefficient_statistics,
@@ -90,21 +86,16 @@ from continuum_swr_replay.analysis.replay.coefficient_statistics import (
     separated_fraction,
     term_separation_statistics,
 )
-from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+from continuum_swr_replay.analysis.behavior.content import content_statistics
+from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     MAX_UNIDENTIFIED_SHARE,
     MIN_SESSIONS_PER_TERM,
 )
-from continuum_swr_replay.analysis.replay.fit_provenance import (
+from continuum_swr_replay.analysis.behavior.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
 )
-from continuum_swr_replay.analysis.replay.learning import (
-    cross_session_role_summary,
-    fit_status_counts,
-    pooled_gee_role_summary,
-    smallest_adjusted_p,
-)
-from continuum_swr_replay.analysis.replay.model_specs import (
+from continuum_swr_replay.analysis.behavior.model_specs import (
     BIN_S,
     PER_BIN_DESIGN,
     PER_BIN_HISTORY_COLUMNS,
@@ -112,6 +103,15 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     REWARD_HISTORY_N_LAGS,
     TMAX,
     TMAX_ARRIVAL,
+)
+from continuum_swr_replay.analysis.behavior.rate import (
+    history_kernel_statistics,
+    rate_fit_statistics,
+    stop_statistics,
+)
+from continuum_swr_replay.analysis.events.cohort_selection import (
+    select_event_cohort,
+    select_stop_cohort,
 )
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
@@ -380,7 +380,7 @@ def _gate_note(statistics: Mapping[str, Any], term: str) -> str | None:
 
     The per-term session gate refuses a term when it keeps too few sessions or
     leaves out too large a share of them
-    (:attr:`~continuum_swr_replay.analysis.replay.contrast_aggregation.TermSessionGate.refusal`),
+    (:attr:`~continuum_swr_replay.analysis.behavior.contrast_aggregation.TermSessionGate.refusal`),
     and the audited aggregates publish no row for such a term. The values read
     here over the kept sessions are then kept and marked pending.
     """
@@ -1318,7 +1318,7 @@ def stop_table_values(
     well-anchored cohort (the analysed immobility: the stop's span less the
     excluded time inside it), survival past 2 s and 4 s (from the stop's
     start, excluded time not taken out), the outcome-boundary shift
-    (:func:`~continuum_swr_replay.analysis.replay.stop_statistics.outcome_boundary_statistics`), and the share of onsets
+    (:func:`~continuum_swr_replay.analysis.behavior.rate.stop_statistics.outcome_boundary_statistics`), and the share of onsets
     inside the ``TMAX`` truncation."""
     make = value_factory(stop_table_values, source, TAGS["rate"])
     anchored, _ = select_stop_cohort(stops, cohort="at_well")
@@ -1827,7 +1827,7 @@ def cohort_audit_values(inputs: BehaviorInputs) -> list[Value]:
 
 def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
     """Question 3.3: the per-stop reward step ``R1 - R0`` on the well-anchored
-    cohort (:func:`~continuum_swr_replay.analysis.replay.coefficient_statistics.aic_difference_statistics`): a session counts
+    cohort (:func:`~continuum_swr_replay.analysis.behavior.coefficient_statistics.aic_difference_statistics`): a session counts
     only when both rungs saw the same stops; negative = child better."""
     make = value_factory(per_stop_values, source, TAGS["rate"])
     _require(
@@ -2528,7 +2528,7 @@ CROSS_DIRECTIONS = {
     "swr_from_non_swr": ("non_local_swr", "SWR-coupled rate after non-SWR events"),
 }
 CROSS_LAG_MS = 45
-#: The ridge cross-validated rungs (``analysis/replay/ridge_history_cv.py``).
+#: The ridge cross-validated rungs (``analysis/behavior/rate/ridge_history_cv.py``).
 RIDGE_SELF_RUNG = "Mself_long_dur"
 RIDGE_CROSS_RUNG = "Mselfcross_long_dur"
 

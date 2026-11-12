@@ -25,6 +25,18 @@ from prepare_contfrag_replay_content_data import (
     publish_contfrag_tables,
 )
 
+from continuum_swr_replay.analysis.behavior import build_event_patch_table
+from continuum_swr_replay.analysis.behavior.covariates import load_contingency
+from continuum_swr_replay.analysis.behavior.tables import (
+    prepare_data as replay_prepare_data,
+)
+from continuum_swr_replay.analysis.behavior.tables.summaries import (
+    arm_fraction_from_event_total,
+)
+from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
+    validate_event_arm_table,
+    validate_event_patch_table,
+)
 from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_arm_table,
     build_contfrag_event_table,
@@ -36,16 +48,6 @@ from continuum_swr_replay.analysis.events.analysed_time import (
 )
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
-)
-from continuum_swr_replay.analysis.replay import build_event_patch_table
-from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
-from continuum_swr_replay.analysis.replay.covariates import load_contingency
-from continuum_swr_replay.analysis.replay.summaries import (
-    arm_fraction_from_event_total,
-)
-from continuum_swr_replay.analysis.replay.table_contracts import (
-    validate_event_arm_table,
-    validate_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.decoding.identifiers import (

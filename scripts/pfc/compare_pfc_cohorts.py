@@ -76,7 +76,7 @@ from continuum_swr_replay.paths import processed_data_dir
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.qa._report import _invocation, _md  # noqa: E402
+from scripts.checks._report import _invocation, _md  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -2007,7 +2007,7 @@ def build_report(
         "trimmed, and adding the `alignment` block to `cohort_info`; "
         "`analysis/hippocampus/data_aggregation.py`, which is the new function "
         "and its budget constants; and `scripts/behavior/run_stay_leave.py` "
-        "plus `analysis/replay/retrospective.py`, which are the Stage 6 and "
+        "plus `analysis/behavior/choice/retrospective.py`, which are the Stage 6 and "
         "Stage 5B paths and are not imported by the unit runner. No estimation "
         "code moved. On matched axes the alignment step is the identity, which "
         "is what `tests/analysis/pfc/test_alignment.py::"

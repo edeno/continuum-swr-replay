@@ -18,8 +18,8 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay import prepare_data as pdm
-from continuum_swr_replay.analysis.replay.covariates import load_contingency
+from continuum_swr_replay.analysis.behavior.covariates import load_contingency
+from continuum_swr_replay.analysis.behavior.tables import prepare_data as pdm
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 

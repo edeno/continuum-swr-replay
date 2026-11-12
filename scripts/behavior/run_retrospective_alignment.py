@@ -41,16 +41,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
-from continuum_swr_replay.analysis.events.cohort_selection import STOP_COHORT_RULES
-from continuum_swr_replay.analysis.replay import (
+from continuum_swr_replay.analysis.behavior import (
     at_well_event_cohort,
     retrospective_alignment_with_shuffle,
 )
-from continuum_swr_replay.analysis.replay.fit_provenance import (
+from continuum_swr_replay.analysis.behavior.fit_provenance import (
     record_inputs,
     write_fit_provenance,
 )
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.events.cohort_selection import STOP_COHORT_RULES
 from continuum_swr_replay.analysis.shared_statistics import session_median_statistics
 from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (

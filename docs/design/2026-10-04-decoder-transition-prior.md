@@ -81,7 +81,7 @@ The starting matrix M, row = from, column = to:
 Each learned row's prior mode (the M-step's zero-data estimate, its normalized α − 1) equals
 its row of M, so the prior pulls EM toward these dwell times with the strength of 30 visits.
 The Dirichlet's mean, α/Σα, has slightly shorter stays: 2.7 s for Local (0.99927) and 91 ms
-for each non-local state (0.978). `tests/unit/test_decoding_transitions.py` pins all of the
+for each non-local state (0.978). `tests/decoding/test_decoding_transitions.py` pins all of the
 above.
 
 Against the P30-B pilot decodes (`Processed-Data/_ablation_prior_P30B_20261004/`), the

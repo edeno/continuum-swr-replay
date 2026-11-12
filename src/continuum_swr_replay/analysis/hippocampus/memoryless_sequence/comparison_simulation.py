@@ -2,7 +2,7 @@
 
 The supplemental memoryless comparison figure
 (``scripts/figures/generate_memoryless_comparison.py``) and the reference check
-(``scripts/qa/compare_memoryless_to_reference.py``) read one simulation
+(``scripts/checks/compare_memoryless_to_reference.py``) read one simulation
 (:func:`simulate_and_decode`): the package's Figure 1 simulation with a remote
 stationary event, a short path, a short replay and a stray window added
 (their rows of ``event_times`` are :data:`SHORT_PATH_EVENT` and the other

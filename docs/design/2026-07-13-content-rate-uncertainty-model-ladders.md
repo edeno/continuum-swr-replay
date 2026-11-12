@@ -566,5 +566,5 @@ causes exploration, or improves learning.
   interleaved with Aim 1.
 
 Once implemented, the exact production formulas belong in `docs/models_table.md`
-and `src/continuum_swr_replay/analysis/replay/model_specs.py`; this document
+and `src/continuum_swr_replay/analysis/behavior/model_specs.py`; this document
 remains the scientific design and claim contract.

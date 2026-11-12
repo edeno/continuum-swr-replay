@@ -28,8 +28,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.behavior.qvals_table import QVALS_STANDARDIZED_COLS
-from continuum_swr_replay.analysis.replay._tables_common import (
+from continuum_swr_replay.analysis.behavior.covariates.qvals_table import (
+    QVALS_STANDARDIZED_COLS,
+)
+from continuum_swr_replay.analysis.behavior.tables._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
 from continuum_swr_replay.paths import replay_content_dir, table_path

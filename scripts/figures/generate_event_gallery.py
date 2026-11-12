@@ -78,7 +78,18 @@ import numpy as np
 import pandas as pd
 from matplotlib.gridspec import GridSpec
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.behavior.covariates import (
+    trial_arrival_times,
+    trial_outcome_times,
+)
+from continuum_swr_replay.analysis.behavior.tables.bouts import (
+    immobility_bout_intervals,
+)
+from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
+    build_event_arm_table,
+)
+from continuum_swr_replay.analysis.behavior.tables.tables_event import build_event_table
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
@@ -104,15 +115,6 @@ from continuum_swr_replay.analysis.hippocampus import load_results
 from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     load_conditional_posterior,
 )
-from continuum_swr_replay.analysis.replay.bouts import (
-    immobility_bout_intervals,
-)
-from continuum_swr_replay.analysis.replay.covariates import (
-    trial_arrival_times,
-    trial_outcome_times,
-)
-from continuum_swr_replay.analysis.replay.tables_arm_patch import build_event_arm_table
-from continuum_swr_replay.analysis.replay.tables_event import build_event_table
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_decode_files,

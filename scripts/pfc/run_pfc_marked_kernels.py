@@ -51,6 +51,10 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 
 import numpy as np
 
+from continuum_swr_replay.analysis.behavior.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
+)
 from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_NULL_DESIGN_BATCH_SIZE,
     DEFAULT_PENALTY_SIGMA,
@@ -83,10 +87,6 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     matching_sidecar,
     remove_bundle,
     session_seed,
-)
-from continuum_swr_replay.analysis.replay.fit_provenance import (
-    record_inputs,
-    write_fit_provenance,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY

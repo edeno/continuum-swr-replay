@@ -21,7 +21,7 @@ sourcing everything from Alison's shared DataJoint schemas (read-only):
     model row.
 
 Beta values are enriched with the vendored decision-variable pipeline
-(`analysis.behavior._spatial_bandit_rl.make_full_beta_bernoulli_dv_df`: DeltaV,
+(`analysis.behavior.covariates._spatial_bandit_rl.make_full_beta_bernoulli_dv_df`: DeltaV,
 Stay/Switch value, value-update magnitudes, betadist_mu), the belief entropy
 `beta_reward_entropy` is derived from the Beta posterior (`betadist_α/β`), and RPE
 is derived; the curated COVARIATES are broadcast to stops. See docs/behavior_model_covariates.md for the data dictionary.
@@ -34,7 +34,7 @@ outcome is already observable.
 
 Usage: uv run python scripts/behavior/build_qvals_table.py [--animal A] [--write]
 The build itself is
-``continuum_swr_replay.analysis.behavior.qvals_table.run_build_qvals_table``;
+``continuum_swr_replay.analysis.behavior.covariates.qvals_table.run_build_qvals_table``;
 this file is its command line.
 Output: Processed-Data/replay_content/qvals_table.parquet and
 qvals_standardization_reference.json beside it.
@@ -46,7 +46,9 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from continuum_swr_replay.analysis.behavior.qvals_table import run_build_qvals_table
+from continuum_swr_replay.analysis.behavior.covariates.qvals_table import (
+    run_build_qvals_table,
+)
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.paths import replay_content_dir
 

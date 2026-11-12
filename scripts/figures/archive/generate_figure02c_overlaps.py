@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
     BINS_DURATION_MS,
     BINS_PROBABILITY,
@@ -40,7 +40,7 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_event_start_end_times,
     get_immobile_events,
 )
-from continuum_swr_replay.figure_utilities import (
+from continuum_swr_replay.visualization.figure_utilities import (
     FIGURE_TWO_PANEL_HORIZONTAL,
     PANEL_SINGLE,
     PANEL_SINGLE_SQUARE,

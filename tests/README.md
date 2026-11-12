@@ -11,7 +11,7 @@ uv sync --extra dev
 uv run pytest -q -p no:cacheprovider       # full suite; real-data tests skipped
 uv run pytest -m real_data                 # only the real-data tests
 uv run pytest -m "not slow"                # skip the slow tests
-uv run pytest tests/unit/test_spikes.py    # one file
+uv run pytest tests/data_loaders/test_spikes.py    # one file
 uv run pytest -k "coincident"              # by name pattern
 uv run pytest -vv                          # verbose, with full assertion diffs
 uv run pytest --lf                         # rerun only last-failed tests
@@ -52,7 +52,7 @@ The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
     reads a table through `analysed_time.with_swr_source` must set the run itself.
   - A test that reads only a small fixture committed under `tests/` is not real
     data. In a file that mixes the two, mark the real-data tests, not the file.
-  - The hook is pinned by [`unit/test_markers.py`](unit/test_markers.py).
+  - The hook is pinned by [`repository/test_markers.py`](repository/test_markers.py).
 - **`integration`**: every tracked file in `tests/integration/` sets it with
   `pytestmark`. These tests run a whole runner or pipeline path, mostly on
   synthetic inputs. Deselect them with `-m "not integration"`.
@@ -62,10 +62,10 @@ The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
 Markers combine as usual: `-m "real_data and not slow"`.
 
 The package roots (`continuum_swr_replay/__init__.py`,
-`continuum_swr_replay/data_loaders/__init__.py` and the `analysis.replay`,
+`continuum_swr_replay/data_loaders/__init__.py` and the `analysis.behavior`,
 `analysis.pfc` and `analysis.hippocampus` `__init__`s) re-export through PEP 562 `__getattr__`, and modules with Spyglass
 dependencies defer those imports into the functions that need them. The lazy
-contract is pinned by [`tests/unit/test_lazy_imports.py`](unit/test_lazy_imports.py).
+contract is pinned by [`tests/repository/test_lazy_imports.py`](repository/test_lazy_imports.py).
 A regression there brings back the import-time DataJoint hang on machines
 without the VPN.
 
@@ -81,24 +81,28 @@ The Spyglass-touching loader functions (`load_data`, `get_epoch_info`,
 ```
 tests/
 ├── conftest.py              # shared fixtures and the real_data hook
-├── unit/                    # the bulk of the suite, still mostly flat
+├── support/                 # shared helpers (_imports.py, the _*_fixtures.py) and data/
+├── repository/              # rules of the repository, not of one module (layering, docs, no DB writes)
 ├── analysis/                # tests that mirror src/continuum_swr_replay/analysis/
-│   ├── hippocampus/
-│   └── pfc/
-├── runs/                    # tests that mirror src/continuum_swr_replay/runs/
-├── visualization/           # plotting helpers (figure_panels, palettes, etc.)
+├── data_loaders/  decoding/  reported/  runs/  tables/  visualization/
+│                            # tests that mirror the other src/continuum_swr_replay/ packages
+├── test_*.py                # tests of the package's top-level modules (intervals.py, paths.py, ...)
+├── scripts/                 # tests that mirror scripts/
 ├── integration/             # whole-runner and pipeline tests (marker: integration)
 ├── property/                # hypothesis-based invariants
 ├── baselines/               # figure-baseline manifest (see its README)
 └── benchmarks/              # microbenchmarks (run manually)
 ```
 
-**Where a test goes.** New tests mirror `src`: the tests of
-`src/continuum_swr_replay/analysis/replay/<module>.py` go in
-`tests/analysis/replay/test_<module>.py`, and those of `data_loaders/` in
-`tests/data_loaders/`. Tests of `scripts/` modules go under `tests/scripts/`.
-Existing files in `tests/unit/` move to the mirrored place when their module is
-next touched. There is no big-bang move.
+**Where a test goes.** Tests mirror `src` and `scripts`: the tests of
+`src/continuum_swr_replay/analysis/behavior/rate/<module>.py` go in
+`tests/analysis/behavior/rate/test_<module>.py`, those of `data_loaders/` in
+`tests/data_loaders/`, and those of `scripts/<dir>/<script>.py` in
+`tests/scripts/<dir>/`. A test goes beside the module it tests, which is the one it
+imports for that purpose; a test of a rule several modules share (every SWR consumer
+reads one source) goes beside the rule's module (`tests/analysis/events/`). A test of
+the repository itself rather than of a module goes in `tests/repository/`. Shared
+helpers are in `tests/support/`, imported as `tests.support._name`.
 
 ## Fixtures
 
@@ -188,8 +192,8 @@ def test_parse(filename, animal):
 
 `scripts/tables/prepare_contfrag_replay_content_data.py` and similar prep scripts can't
 be unit-tested directly — they pull from Spyglass and run for hours. The pattern
-used in [`test_prep_event_sequence_always_written.py`](unit/test_prep_event_sequence_always_written.py)
-and [`test_contfrag_event_source_dispatch.py`](unit/test_contfrag_event_source_dispatch.py)
+used in [`test_prep_event_sequence_always_written.py`](../tests/analysis/behavior/tables/test_prep_event_sequence_always_written.py)
+and [`test_contfrag_event_source_dispatch.py`](../tests/scripts/tables/test_contfrag_event_source_dispatch.py)
 parses the script via `ast`, optionally `exec`s a single function definition
 into an isolated namespace, then exercises it with synthetic inputs. Brittle
 by design (any restructuring of the script breaks the test) but the only way

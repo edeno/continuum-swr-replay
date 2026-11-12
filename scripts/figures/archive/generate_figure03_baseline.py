@@ -14,8 +14,8 @@ import xarray as xr
 from scipy.ndimage import label
 from scipy.stats import sem
 
-import continuum_swr_replay.figure_utilities as figure_utilities
-from continuum_swr_replay.figure_utilities import save_figure
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
+from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS

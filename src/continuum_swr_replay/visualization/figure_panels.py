@@ -33,12 +33,12 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_event_start_end_times,
     get_signal_windows,
 )
-from continuum_swr_replay.figure_utilities import (
+from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D, SAMPLING_FREQUENCY
+from continuum_swr_replay.visualization.figure_utilities import (
     PANEL_SINGLE,
     get_figure_size,
     save_figure,
 )
-from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D, SAMPLING_FREQUENCY
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import (
     plot_acausal_probabilities,

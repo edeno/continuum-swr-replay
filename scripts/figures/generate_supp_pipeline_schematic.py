@@ -19,7 +19,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
-from continuum_swr_replay.figure_utilities import save_figure
+from continuum_swr_replay.visualization.figure_utilities import save_figure
 
 STEPS = [
     {

@@ -17,26 +17,28 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.covariates import load_contingency
+from continuum_swr_replay.analysis.behavior.tables._tables_common import (
+    EVENT_ARM_STANDARDIZED_COLS,
+)
+from continuum_swr_replay.analysis.behavior.tables.prepare_data import (
+    _assert_value_block_matches_source,
+)
+from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
+    validate_event_arm_table,
+    validate_event_patch_table,
+)
+from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
+    build_event_patch_table,
+)
+from continuum_swr_replay.analysis.behavior.tables.tables_stop import (
+    add_nonlocal_swr_split,
+)
 from continuum_swr_replay.analysis.events.analysed_time import (
     publish_swr_table,
     require_swr_source,
     stamp_swr_source,
 )
-from continuum_swr_replay.analysis.replay._tables_common import (
-    EVENT_ARM_STANDARDIZED_COLS,
-)
-from continuum_swr_replay.analysis.replay.covariates import load_contingency
-from continuum_swr_replay.analysis.replay.prepare_data import (
-    _assert_value_block_matches_source,
-)
-from continuum_swr_replay.analysis.replay.table_contracts import (
-    validate_event_arm_table,
-    validate_event_patch_table,
-)
-from continuum_swr_replay.analysis.replay.tables_arm_patch import (
-    build_event_patch_table,
-)
-from continuum_swr_replay.analysis.replay.tables_stop import add_nonlocal_swr_split
 from continuum_swr_replay.data_loaders.constants import WELL_ARMS
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.paths import (

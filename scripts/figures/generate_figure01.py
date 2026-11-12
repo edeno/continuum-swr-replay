@@ -45,17 +45,17 @@ from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
 
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
-from continuum_swr_replay.figure_utilities import (
+from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    LOCAL_POSITION_STD,
+)
+from continuum_swr_replay.visualization.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
     WONG,
     label_panels,
     save_figure,
     set_figure_defaults,
-)
-from continuum_swr_replay.parameters import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    LOCAL_POSITION_STD,
 )
 from continuum_swr_replay.visualization.palettes import COLORS
 

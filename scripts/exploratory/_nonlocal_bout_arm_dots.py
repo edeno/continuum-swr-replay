@@ -58,8 +58,8 @@ from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 
-from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
-from continuum_swr_replay.analysis.replay.model_specs import N_REWARD_LAGS
+from continuum_swr_replay.analysis.behavior.covariates import add_uncertainty_covariates
+from continuum_swr_replay.analysis.behavior.model_specs import N_REWARD_LAGS
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (

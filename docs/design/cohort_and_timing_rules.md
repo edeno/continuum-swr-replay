@@ -375,7 +375,7 @@ audits of them are kept as the record.
 ## Covariate causal hygiene
 
 Every ladder runner enforces covariate timing at model-build via
-`analysis.replay.covariate_timing.assert_predictor_timing`; a rung whose
+`analysis.behavior.covariate_timing.assert_predictor_timing`; a rung whose
 predictor is post-outcome or future-referencing must be **declared
 descriptive**, else the run fails.
 
@@ -413,7 +413,7 @@ Covered runners: `fit_replay_content_models.py` (content base ladder, common
 cohort), `fit_swr_contrast_content.py` and `fit_swr_contrast_rate.py` (the
 `is_swr`-contrast ladders), `fit_per_stop_rate_models.py` (Family A) and
 `fit_per_bin_rate_models.py` (Family B). The emitter is
-`analysis.replay.cohort_audit`. Counts are in the row's `grain` (`event` for
+`analysis.behavior.cohort_audit`. Counts are in the row's `grain` (`event` for
 content, `stop` for the rate families). Drops are **mutually exclusive**,
 assigned by priority:
 
@@ -449,7 +449,7 @@ does `fit_uncertainty_rate.py`.
 `n_in − Σ n_drop_* == n_modeled`. Convergence/separation counts
 (`n_sessions_flagged_*`) and the `|coef| >= 10` quasi-separation counts (the
 separate `<run>_term_diagnostics.csv`) are **session/term-level** and excluded
-from the reconciliation. `scripts/qa/summarize_cohort_audits.py` stacks every
+from the reconciliation. `scripts/checks/summarize_cohort_audits.py` stacks every
 audit CSV and flags low-retention (`n_modeled/n_in < 0.9`) or biased
 (mechanism-A early / mechanism-B qvals-tail) drops.
 

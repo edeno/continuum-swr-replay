@@ -20,8 +20,8 @@ from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
 from continuum_swr_replay.analysis.hippocampus import load_data_over_time
-from continuum_swr_replay.figure_utilities import save_figure
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.visualization.figure_utilities import save_figure
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"

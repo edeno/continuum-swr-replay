@@ -1,8 +1,8 @@
 # Content models — design spec (parallel to the is_swr per-bin RATE ladder)
 
 Design spec for the content ladder, now **implemented** in
-`scripts/content/fit_swr_contrast_content.py` (the RATE ladder is
-`scripts/rate/fit_swr_contrast_rate.py`; see `docs/models_table.md` "is_swr version").
+`scripts/behavior/content/fit_swr_contrast_content.py` (the RATE ladder is
+`scripts/behavior/rate/fit_swr_contrast_rate.py`; see `docs/models_table.md` "is_swr version").
 The goal: ask the SAME task-dimension questions of replay *content* (what an event
 represents) that the rate ladder asks of replay *rate* (how often events occur),
 using the beta-bernoulli covariates (the HMM was retired 2026-07-13).
@@ -248,7 +248,7 @@ CPS2 + swr_x_is_last_rewarded_noncurrent_patch
   identical to the rate side.
 
 (This doc holds the content model DESIGN only. Model specifications live in
-`docs/models_table.md` (R notation) and the runner `scripts/rate/fit_swr_contrast_rate.py`;
+`docs/models_table.md` (R notation) and the runner `scripts/behavior/rate/fit_swr_contrast_rate.py`;
 fitted rate output is `Processed-Data/replay_content/models_per_bin_rate/
 swr_contrast_rate.pkl`. Neither catalogs nor design docs hold analysis RESULTS.
 The only rate dependency here is the *decision* above that content is NOT pruned

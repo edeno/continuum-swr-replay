@@ -1,17 +1,17 @@
 # Scripts index
 
 Analysis scripts grouped by domain. Run from the repo root, e.g.
-`uv run python scripts/rate/fit_per_bin_rate_models.py`. Scripts import the package
+`uv run python scripts/behavior/rate/fit_per_bin_rate_models.py`. Scripts import the package
 (`continuum_swr_replay`) and read/write `Processed-Data/`. Run from the repo root so
 `scripts` is importable.
 
 **Only `_`-prefixed modules are importable by other scripts.** Shared code belongs in
 the package, or in a `_`-prefixed module beside the scripts that share it
-(`decoding/_decode_runner.py`, `detection/_report.py`, `qa/_report.py`, `qa/_memoryless_reference.py`). A script that is not `_`-prefixed is
+(`decoding/_decode_runner.py`, `detection/_report.py`, `checks/_report.py`, `checks/_memoryless_reference.py`). A script that is not `_`-prefixed is
 never imported by another script or by `src/`; tests may import any script.
-[`tests/unit/test_no_new_script_imports.py`](../tests/unit/test_no_new_script_imports.py)
+[`tests/repository/test_no_new_script_imports.py`](../tests/repository/test_no_new_script_imports.py)
 enforces this for scripts, and
-[`tests/unit/test_import_layering.py`](../tests/unit/test_import_layering.py) for `src/`.
+[`tests/repository/test_import_layering.py`](../tests/repository/test_import_layering.py) for `src/`.
 The first test's `ALLOWED` table is the current exception list, and it only
 shrinks. One entry is left: `exploratory/_content_cohort_control.py`, which runs
 `content/fit_swr_contrast_content.py` with its cohort rule bypassed.
@@ -162,7 +162,7 @@ them importable.
 - `sweep_memoryless_detection.py` — injects replays of chosen path, duration, rate and
   distance into a simulated recording and scores both detectors by one rule; writes the raw
   table to `Processed-Data/` and the aggregates to
-  `docs/design/replay_detection_comparison/detection_sweep_summary.csv` (about six minutes).
+  `paper/reported/inputs/detection/detection_sweep_summary.csv` (about six minutes).
 - `sweep_memoryless_controls.py`, `sweep_memoryless_heldout.py` — what each detector
   does with activity that is not one clean replay (no replay, place-less bursts,
   jumps and chains), and whether its content reproduces in held-out cells; they write
@@ -183,7 +183,7 @@ them importable.
 - `convert_tables_to_parquet.py` — the one-time pickle-to-parquet migration of the
   materialized tables.
 
-## `rate/` — event-rate models + their plots
+## `behavior/rate/` — event-rate models + their plots
 - `fit_per_bin_rate_models.py`, `fit_per_stop_rate_models.py` — Family B / A rate ladders.
 - `fit_swr_contrast_rate.py` — the `is_swr`-contrast per-bin ladder (G0–G8 / S0–S10).
 - `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` — MU / cross-history rate models.
@@ -193,13 +193,13 @@ them importable.
   `--mode pooled` stacks each animal's sessions with a session fixed effect, for kernels a session is too sparse
   to measure (`duration_aware_history_pooled.pkl`). Each output has its provenance sidecar.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures.
-  Each number they draw or print is a function of `analysis/replay/` (`rate_fit_statistics`, `stop_statistics`,
+  Each number they draw or print is a function of `analysis/behavior/` (`rate_fit_statistics`, `stop_statistics`,
   `coefficient_statistics`), read over the sessions and stops the behavior summary reads it over.
 
-## `coupling/` — SWR-coupling strength of the events
+## `behavior/coupling/` — SWR-coupling strength of the events
 - `fit_swr_power_model.py` — each non-local event's ripple power (`ripple_power_z`) against the behavioral covariates: how strongly an event is SWR-coupled, beside the rate (how often) and content (what) layers.
 
-## `content/` — replay content / choice models
+## `behavior/content/` — replay content / choice models
 - `fit_replay_content_models.py` — arm/patch content hierarchy (M0–M7 / P0–P4), per `is_swr` split.
 - `fit_swr_contrast_content.py` — the HMM-harmonized content `is_swr`-contrast ladder (C / CP).
 - `compare_event_source_models.py` — choice (clogit) model comparison.
@@ -242,7 +242,7 @@ them importable.
   sliding-window detector against the state-space detector on the Figure 1 simulation, with
   the sweep summary below; every verdict in its titles and caption is read from the data,
   the labeled recording's verdicts and numbers from `memoryless_sequence/recording_statistics.py`
-  (written to `docs/design/replay_detection_comparison/memoryless_comparison_recording.json`)
+  (written to `paper/reported/inputs/detection/memoryless_comparison_recording.json`)
   and the sweeps' panels and checks from `memoryless_sequence/sweep_statistics.py`, the
   functions the detection summary reports from → `paper/figures/memoryless_comparison/`.
 - `generate_inventory_examples.py` — seeded draws from each cell of one inventory comparison run
@@ -263,9 +263,9 @@ them importable.
   marked pending the Phase 2 pilot checks. Built and tested; not yet run on a real features run.
 - `archive/` — retired figure scripts (not linted; kept for provenance).
 
-## `qa/` — parity, audits, checks and doc writers
+## `checks/` — parity, audits, checks and doc writers (`workflows/` holds `run_refits.py`)
 - `_report.py` — not a script: the run's command line (`_invocation`) and the markdown
-  table (`_md`) that several QA and PFC reports share, imported as `scripts.qa._report`.
+  table (`_md`) that several QA and PFC reports share, imported as `scripts.checks._report`.
 - `run_refits.py` — reruns the CPU fits for Part 3 (the events relate to behavior) and the figures that read them,
   in dependency order. Each run is pinned to its own CPUs from `--cpus` (default: all this
   process may use), and OMP/MKL/OpenBLAS/numba threads are capped per run. Runs are named
@@ -287,12 +287,12 @@ them importable.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`.
 - `_memoryless_reference.py` — not a script: the Widloski & Foster reference's sorted-cell
-  arithmetic, re-implemented apart from the port, imported as `scripts.qa._memoryless_reference`.
+  arithmetic, re-implemented apart from the port, imported as `scripts.checks._memoryless_reference`.
 - `compare_memoryless_to_reference.py` — runs the memoryless port beside
   `_memoryless_reference.py`, an independent re-implementation of the Widloski & Foster
   reference's sorted-cell arithmetic, on the Figure 1 simulation step by step and on
   every sweep cell; writes
-  `docs/design/replay_detection_comparison/reference_check_summary.csv` (about ten
+  `paper/reported/inputs/detection/reference_check_summary.csv` (about ten
   minutes; `--n-seeds 1` for a one-minute check).
 - `check_fit_provenance.py` — sweeps the whole `models*/` tree and reports which
   fitted artifacts are stale for the tables they read, from the SHA-256 sidecars
@@ -317,7 +317,7 @@ them importable.
 - `write_pipeline_map.py` — regenerates `docs/regression_pipeline_map.md`, the
   symbol-anchored map of the modules carrying a decoded session to a fitted
   regression, read out of the source with `ast`; `--check` fails on drift, as
-  `tests/unit/test_pipeline_map_is_current.py` does.
+  `tests/scripts/checks/test_pipeline_map_is_current.py` does.
 - `summarize_stage6_fdr.py` — prints Stage 6's per-role cross-session FDR table for
   any saved `stage6_is_stay_logistic*.pkl`, using the runner's own statistic, so a
   before/after comparison across populations reads one implementation.
@@ -505,6 +505,54 @@ audited pipeline; outputs go to `.claude/research/*_outputs/`. May be stale. The
 exceptions are the five that unit tests pin (listed at the top of this file), which
 must keep passing their tests.
 
+## Moved scripts (2026-11)
+
+`rate/`, `content/` and `coupling/` moved under `behavior/`, and `qa/` split
+into `workflows/` (runners that run other scripts) and `checks/` (audits,
+parity checks and doc writers). Nothing is left at the old paths.
+
+| Old path | New path |
+|---|---|
+| `scripts/content/analyze_content_occupancy.py` (removed: moved) | `scripts/behavior/content/analyze_content_occupancy.py` |
+| `scripts/content/analyze_uncertainty_content.py` (removed: moved) | `scripts/behavior/content/analyze_uncertainty_content.py` |
+| `scripts/content/compare_content_estimators.py` (removed: moved) | `scripts/behavior/content/compare_content_estimators.py` |
+| `scripts/content/compare_event_source_models.py` (removed: moved) | `scripts/behavior/content/compare_event_source_models.py` |
+| `scripts/content/fit_replay_content_models.py` (removed: moved) | `scripts/behavior/content/fit_replay_content_models.py` |
+| `scripts/content/fit_swr_contrast_content.py` (removed: moved) | `scripts/behavior/content/fit_swr_contrast_content.py` |
+| `scripts/content/generate_replay_content_figures.py` (removed: moved) | `scripts/behavior/content/generate_replay_content_figures.py` |
+| `scripts/content/quantify_swr_overlap_geometry.py` (removed: moved) | `scripts/behavior/content/quantify_swr_overlap_geometry.py` |
+| `scripts/coupling/fit_swr_power_model.py` (removed: moved) | `scripts/behavior/coupling/fit_swr_power_model.py` |
+| `scripts/qa/_memoryless_reference.py` (removed: moved) | `scripts/checks/_memoryless_reference.py` |
+| `scripts/qa/_report.py` (removed: moved) | `scripts/checks/_report.py` |
+| `scripts/qa/audit_event_patch_fraction.py` (removed: moved) | `scripts/checks/audit_event_patch_fraction.py` |
+| `scripts/qa/audit_stop_table_reward_history.py` (removed: moved) | `scripts/checks/audit_stop_table_reward_history.py` |
+| `scripts/qa/check_data_availability.py` (removed: moved) | `scripts/checks/check_data_availability.py` |
+| `scripts/qa/check_fit_provenance.py` (removed: moved) | `scripts/checks/check_fit_provenance.py` |
+| `scripts/qa/compare_memoryless_to_reference.py` (removed: moved) | `scripts/checks/compare_memoryless_to_reference.py` |
+| `scripts/qa/compare_to_golden_baseline.py` (removed: moved) | `scripts/checks/compare_to_golden_baseline.py` |
+| `scripts/qa/compute_hpc_raw_stats.py` (removed: moved) | `scripts/checks/compute_hpc_raw_stats.py` |
+| `scripts/qa/diagnose_trial_detection.py` (removed: moved) | `scripts/checks/diagnose_trial_detection.py` |
+| `scripts/qa/freeze_regression_baseline.py` (removed: moved) | `scripts/checks/freeze_regression_baseline.py` |
+| `scripts/qa/mutation_check.py` (removed: moved) | `scripts/checks/mutation_check.py` |
+| `scripts/qa/run_quality_metrics.py` (removed: moved) | `scripts/checks/run_quality_metrics.py` |
+| `scripts/qa/run_refits.py` (removed: moved) | `scripts/workflows/run_refits.py` |
+| `scripts/qa/summarize_cohort_audits.py` (removed: moved) | `scripts/checks/summarize_cohort_audits.py` |
+| `scripts/qa/summarize_stage6_fdr.py` (removed: moved) | `scripts/checks/summarize_stage6_fdr.py` |
+| `scripts/qa/table_parity.py` (removed: moved) | `scripts/checks/table_parity.py` |
+| `scripts/qa/write_epoch_register_doc.py` (removed: moved) | `scripts/checks/write_epoch_register_doc.py` |
+| `scripts/qa/write_pipeline_map.py` (removed: moved) | `scripts/checks/write_pipeline_map.py` |
+| `scripts/rate/fit_cross_history_rate.py` (removed: moved) | `scripts/behavior/rate/fit_cross_history_rate.py` |
+| `scripts/rate/fit_cross_history_ridge_cv.py` (removed: moved) | `scripts/behavior/rate/fit_cross_history_ridge_cv.py` |
+| `scripts/rate/fit_duration_aware_history_rate.py` (removed: moved) | `scripts/behavior/rate/fit_duration_aware_history_rate.py` |
+| `scripts/rate/fit_per_bin_rate_models.py` (removed: moved) | `scripts/behavior/rate/fit_per_bin_rate_models.py` |
+| `scripts/rate/fit_per_stop_rate_models.py` (removed: moved) | `scripts/behavior/rate/fit_per_stop_rate_models.py` |
+| `scripts/rate/fit_swr_contrast_rate.py` (removed: moved) | `scripts/behavior/rate/fit_swr_contrast_rate.py` |
+| `scripts/rate/fit_uncertainty_rate.py` (removed: moved) | `scripts/behavior/rate/fit_uncertainty_rate.py` |
+| `scripts/rate/plot_model_checking.py` (removed: moved) | `scripts/behavior/rate/plot_model_checking.py` |
+| `scripts/rate/plot_per_bin_rate_models.py` (removed: moved) | `scripts/behavior/rate/plot_per_bin_rate_models.py` |
+| `scripts/rate/plot_per_bin_rate_summary.py` (removed: moved) | `scripts/behavior/rate/plot_per_bin_rate_summary.py` |
+| `scripts/rate/plot_uncertainty_rate.py` (removed: moved) | `scripts/behavior/rate/plot_uncertainty_rate.py` |
+
 ## Moved scripts (2026-10)
 
 `scripts/` was regrouped by pipeline on 2026-10-20. Nothing is left at the old paths;
@@ -529,7 +577,7 @@ An old path is marked "(removed: moved)" so the doc-path test does not look for 
 | `scripts/decoding/prepare_replay_content_data.py` (removed: moved) | `scripts/tables/prepare_replay_content_data.py` |
 | `scripts/decoding/prepare_contfrag_replay_content_data.py` (removed: moved) | `scripts/tables/prepare_contfrag_replay_content_data.py` |
 | `scripts/decoding/regenerate_stop_table.py` (removed: moved) | `scripts/tables/regenerate_stop_table.py` |
-| `scripts/rate/fit_swr_power_model.py` (removed: moved) | `scripts/coupling/fit_swr_power_model.py` |
+| `scripts/rate/fit_swr_power_model.py` (removed: moved) | `scripts/behavior/coupling/fit_swr_power_model.py` |
 | `scripts/decoding/build_timebin_tables.py` (removed: moved) | `scripts/tables/build_timebin_tables.py` |
 | `scripts/decoding/assemble_replay_content_shards.py` (removed: moved) | `scripts/tables/assemble_replay_content_shards.py` |
 | `scripts/decoding/assemble_contfrag_shards.py` (removed: moved) | `scripts/tables/assemble_contfrag_shards.py` |
@@ -541,4 +589,4 @@ An old path is marked "(removed: moved)" so the doc-path test does not look for 
 | `scripts/qa/check_pfc_ridge_lambda0.py` (removed: moved) | `scripts/pfc/check_pfc_ridge_lambda0.py` |
 | `scripts/qa/measure_pfc_null_geometry.py` (removed: moved) | `scripts/pfc/measure_pfc_null_geometry.py` |
 | `scripts/qa/diagnose_pfc_event_definition.py` (removed: moved) | `scripts/pfc/diagnose_pfc_event_definition.py` |
-| `scripts/qa/memoryless_reference.py` (removed: moved) | `scripts/qa/_memoryless_reference.py` (2026-10-25: a module, not a script) |
+| `scripts/qa/memoryless_reference.py` (removed: moved) | `scripts/checks/_memoryless_reference.py` (2026-10-25: a module, not a script) |

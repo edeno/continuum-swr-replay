@@ -3,7 +3,7 @@
 *2026-09-05; numbers converted to reported values 2026-10-31.* Which of the
 nine candidate arms an immobility non-local event represents has been asked
 with three different likelihoods on **one** cohort: the at-well candidate-arm
-cohort assembled by `scripts/content/fit_swr_contrast_content.py` (its cohort
+cohort assembled by `scripts/behavior/content/fit_swr_contrast_content.py` (its cohort
 rules are applied once per session for *both* response columns and
 intersected, so a per-(session, rung) event set is identical across the three
 estimators — a difference between them is a difference of likelihood and never
@@ -15,7 +15,7 @@ holds was taken out; each removal is listed in
 [`paper/reported/removed_part3.md`](../../paper/reported/removed_part3.md). The
 full tables (every rung, every term) are in the artifacts below.
 
-Runner: [`scripts/content/compare_content_estimators.py`](../../scripts/content/compare_content_estimators.py).
+Runner: [`scripts/behavior/content/compare_content_estimators.py`](../../scripts/behavior/content/compare_content_estimators.py).
 
 Artifacts (gitignored, under `Processed-Data/replay_content/content_estimator_comparison/`):
 
@@ -69,7 +69,7 @@ deliberately not tabulated.
 
 `simulate_dirichlet_multinomial_counts` simulates events at a known
 concentration (`β = {is_current_arm: +1.0, is_prev_arm: −0.5}`, 9 arms), and
-`tests/unit/test_dirichlet_multinomial.py` checks the estimators on it:
+`tests/analysis/behavior/content/test_dirichlet_multinomial.py` checks the estimators on it:
 
 - `::test_recovers_beta_and_phi` and `::test_recovers_beta_and_phi_many_replicates`:
   the DM recovers both coefficients within 3 SE and recovers the

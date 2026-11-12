@@ -155,7 +155,7 @@ and of the sessions left out of this list is not, is recorded in one place,
 the epoch register (``data_loaders/epoch_register.py``,
 ``epoch_register.csv``), which every stage reads. Its counts and its excluded
 and pending entries, with their evidence, are generated into
-``docs/epoch_register.md`` by ``scripts/qa/write_epoch_register_doc.py``; they
+``docs/epoch_register.md`` by ``scripts/checks/write_epoch_register_doc.py``; they
 are not repeated here, so they cannot go stale.
 """
 

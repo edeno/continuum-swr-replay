@@ -44,7 +44,7 @@ make manuscript
 ```
 
 `make manuscript` rebuilds when `reported_values.tex` changes, but does not
-regenerate it. `tests/unit/test_manuscript_macros.py` checks that every macro
+regenerate it. `tests/reported/test_manuscript_macros.py` checks that every macro
 `main.tex` uses is defined.
 
 ## Figures
@@ -76,8 +76,8 @@ uv run --frozen python scripts/figures/generate_supp_literature_table.py
 The introduction's literature numbers (modes, ranges and shares) are computed
 from the same survey into `reported/survey.json`; after regenerating the table, run
 `uv run --frozen python scripts/reported/summarize.py --summary survey` and
-`make reported-values`. `tests/unit/test_literature_table.py` and
-`tests/unit/test_reported_survey.py` fail when the committed table or summary no
+`make reported-values`. `tests/scripts/figures/test_literature_table.py` and
+`tests/reported/test_reported_survey.py` fail when the committed table or summary no
 longer matches the CSV.
 
 The lab's shared Google Sheet (`12mMgiYWO7tKRhs5qhMXMZ5RggGi1J24wxIkcs4knTUI`)

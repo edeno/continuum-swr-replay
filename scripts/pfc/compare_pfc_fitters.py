@@ -56,12 +56,12 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
+from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance_path
 
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.qa._report import _cell, _invocation  # noqa: E402
+from scripts.checks._report import _cell, _invocation  # noqa: E402
 
 #: Gate tolerances. Parameters and anything derived from them linearly (the
 #: modulation curves, the peak modulations, the theta statistics) are compared

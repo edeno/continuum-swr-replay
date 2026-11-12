@@ -8,7 +8,7 @@ against; the harmonization refactor brings the code to this spec.
 
 **Status: definitions implemented; canonical tables and model artifacts require
 regeneration before paper results are updated.** The covariate
-definitions live in the `analysis/replay/covariates/` package: `clocks.py`
+definitions live in the `analysis/behavior/covariates/` package: `clocks.py`
 owns arrival/outcome timing, `context.py` owns time-local trial and location
 labels, the `history/` subpackage owns reward, visit, switch, and local
 leaky-Q history (`reward_history.py`, `visit_recency.py`, `value_block.py`,
@@ -16,7 +16,7 @@ leaky-Q history (`reward_history.py`, `visit_recency.py`, `value_block.py`,
 and `candidate_arm.py` is the single shared Replay/ContFrag implementation of
 the nine-arm predictor block. `definitions.py` provides the machine-readable
 scientific catalog (units, grain, clock, support, missingness, and producer),
-while `analysis/replay/table_contracts.py` (one level above the `covariates/`
+while `analysis/behavior/tables/table_contracts.py` (one level above the `covariates/`
 package) validates complete candidate sets, response conservation, and
 all-or-none leaf support at producer/reducer boundaries. The
 package `__init__.py` is the stable public import surface. The candidate-arm
@@ -200,7 +200,7 @@ negative on 99.90% of rows (99 positive, max +0.755) because it carries the stay
 therefore means content sharpens onto the
 current arm when that arm's value is **low**. Earlier labels called it "Stay-vs-Switch",
 which inverts the reading; corrected 2026-08-19, though one stale label remains in
-`scripts/rate/fit_swr_contrast_rate.py:23`.
+`scripts/behavior/rate/fit_swr_contrast_rate.py:23`.
 
 **`in_transit` does not mean "moving".** It labels the trip interval. The
 modelled cohort is speed-gated immobility throughout, and off-well events have

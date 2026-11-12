@@ -11,18 +11,18 @@ import numpy as np
 import pandas as pd
 
 spec = importlib.util.spec_from_file_location(
-    "swrc", "scripts/content/fit_swr_contrast_content.py"
+    "swrc", "scripts/behavior/content/fit_swr_contrast_content.py"
 )
 m = importlib.util.module_from_spec(spec)
 sys.modules["swrc"] = m
 spec.loader.exec_module(m)
-from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
+from continuum_swr_replay.analysis.behavior.contrast_aggregation import (  # noqa: E402
     assemble_arm,
     assemble_patch,
     contrast_fit_inputs,
     prepare_cohorts,
 )
-from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
     _TSC,
     BASEc,
     BASEc_NT,

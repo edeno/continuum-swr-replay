@@ -23,12 +23,12 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from continuum_swr_replay.figure_utilities import save_figure
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.visualization.figure_utilities import save_figure
 
 RC = REPLAY_CONTENT_DIR
 OUT = Path(__file__).resolve().parents[2] / ".claude/research/peri_departure_outputs"

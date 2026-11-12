@@ -23,9 +23,9 @@ Part 4 fits.
 | Figure | Panels | Script | Reads | Tests |
 | --- | --- | --- | --- | --- |
 | 1. The switching state-space model | a: states and transitions; b: observation likelihoods; c: position transitions; d: a simulated decode | `scripts/figures/generate_figure01.py` | nothing: it simulates its data (`--seed`, `--n-neurons`) | — |
-| 2. Non-local events and SWRs | a: one example event per SWR-overlap class; b: events by overlap class; c: non-local probability and SWR z-score around event starts; d: event start and end against the matched SWR; e: decoding error in the Local state | `scripts/figures/generate_figure02.py` | one example session (`--nwb-file-name`, `--epoch-name`; default `wilbur20210329_.nwb`, `02_r1`) through `load_data` and its decode; every analysed epoch's `{epoch_id}_80_data_over_time.pkl` (panels a, c, e); the canonical event table `replay_content/event_table.parquet` (panels b, d: the counts and offsets the events summary cites, by the same functions) | `tests/unit/test_figure_script_fixes.py`, `tests/unit/test_swr_source_consumers.py` |
-| 3. Non-local events outside SWRs | a: an example event with no SWR; b: SWR z-score at Local and Non-Local times; c: replay speed by SWR overlap; d: replayed position by SWR overlap | `scripts/figures/generate_figure03.py` | as Figure 2 | `tests/unit/test_figure_script_fixes.py`, `tests/unit/test_swr_source_consumers.py` |
-| 4. mPFC responses to SWR and non-SWR events | a: one neuron's modulation by both event kinds; b: the population, both kinds, one sort order; c: population mean modulation; d: the share of neurons whose event term improves held-out deviance, and the best model per neuron | `scripts/figures/generate_figure04.py` | the example session's HPC decode, stops, events and SWRs; the mPFC modulation bundles, `{epoch_id}_mPFC_modulation.pkl` and their `.npy` arrays, from `scripts/pfc/run_pfc_analysis_bandit.py` | `tests/unit/test_generate_figure04.py` |
+| 2. Non-local events and SWRs | a: one example event per SWR-overlap class; b: events by overlap class; c: non-local probability and SWR z-score around event starts; d: event start and end against the matched SWR; e: decoding error in the Local state | `scripts/figures/generate_figure02.py` | one example session (`--nwb-file-name`, `--epoch-name`; default `wilbur20210329_.nwb`, `02_r1`) through `load_data` and its decode; every analysed epoch's `{epoch_id}_80_data_over_time.pkl` (panels a, c, e); the canonical event table `replay_content/event_table.parquet` (panels b, d: the counts and offsets the events summary cites, by the same functions) | `tests/scripts/figures/test_figure_script_fixes.py`, `tests/analysis/events/test_swr_source_consumers.py` |
+| 3. Non-local events outside SWRs | a: an example event with no SWR; b: SWR z-score at Local and Non-Local times; c: replay speed by SWR overlap; d: replayed position by SWR overlap | `scripts/figures/generate_figure03.py` | as Figure 2 | `tests/scripts/figures/test_figure_script_fixes.py`, `tests/analysis/events/test_swr_source_consumers.py` |
+| 4. mPFC responses to SWR and non-SWR events | a: one neuron's modulation by both event kinds; b: the population, both kinds, one sort order; c: population mean modulation; d: the share of neurons whose event term improves held-out deviance, and the best model per neuron | `scripts/figures/generate_figure04.py` | the example session's HPC decode, stops, events and SWRs; the mPFC modulation bundles, `{epoch_id}_mPFC_modulation.pkl` and their `.npy` arrays, from `scripts/pfc/run_pfc_analysis_bandit.py` | `tests/scripts/figures/test_generate_figure04.py` |
 
 Figure 1 needs no data. Figures 2–4 need the lab's Spyglass database and the
 processed-data root ([reproduce.md](reproduce.md#requirements)).
@@ -49,9 +49,9 @@ panels.
 | Comparator-only and ours-only events, with their spike evidence | `scripts/figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` |
 | Content against reward-belief uncertainty (run `content.fig.uncertainty`) | `scripts/figures/generate_uncertainty_content_figure.py` | `paper/figures/uncertainty_content/` |
 | SWR against non-SWR coefficients, rate and content (run `content.fig.swr_contrast_coefs`) | `scripts/figures/plot_swr_contrast_coefs.py` | `paper/figures/swr_contrast/` |
-| Content models under three estimators (conditional Poisson on counts, on fractions, Dirichlet-multinomial) on one cohort | `scripts/content/compare_content_estimators.py` | `paper/figures/content_estimators/` |
+| Content models under three estimators (conditional Poisson on counts, on fractions, Dirichlet-multinomial) on one cohort | `scripts/behavior/content/compare_content_estimators.py` | `paper/figures/content_estimators/` |
 
-The Part 3 figures that read the fits are drawn by `scripts/qa/run_refits.py`,
+The Part 3 figures that read the fits are drawn by `scripts/workflows/run_refits.py`,
 which names each by its run (`rate.fig.*`, `content.fig.*`; `--dry-run` lists
 them).
 
@@ -59,7 +59,7 @@ them).
 
 | Table | Script | Reads | Output | Tests |
 | --- | --- | --- | --- | --- |
-| S1. Detection and decoding parameters in <!--v:survey.papers-->57<!--/v--> replay studies | `scripts/figures/generate_supp_literature_table.py` | `paper/tables/table_s1_literature_parameters.csv`, the survey (Supplementary Data 1), via `continuum_swr_replay.reported.literature` | `paper/tables/table_s1_literature.tex` | `tests/unit/test_literature_table.py` |
+| S1. Detection and decoding parameters in <!--v:survey.papers-->57<!--/v--> replay studies | `scripts/figures/generate_supp_literature_table.py` | `paper/tables/table_s1_literature_parameters.csv`, the survey (Supplementary Data 1), via `continuum_swr_replay.reported.literature` | `paper/tables/table_s1_literature.tex` | `tests/scripts/figures/test_literature_table.py` |
 
 Table S1 needs no lab data. Its values are corrected in the survey CSV ([paper/README.md](../paper/README.md#supplementary-tables)).
 

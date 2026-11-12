@@ -3,7 +3,7 @@
 Answers one question that no comparison against an archived fit can: how much of
 the difference between a shipped at-well content bundle and its predecessor is
 the cohort rule, and how much is everything else that changed in between. It
-runs ``scripts/content/fit_swr_contrast_content.py`` under the CURRENT code and
+runs ``scripts/behavior/content/fit_swr_contrast_content.py`` under the CURRENT code and
 the CURRENT tables with :func:`select_event_cohort` replaced by an identity
 bypass, writing into a throwaway output root so no canonical artifact is
 touched.
@@ -126,8 +126,8 @@ def main() -> None:
     sys.path.insert(0, str(REPO))
     sys.argv = runner_argv
 
-    import scripts.content.fit_swr_contrast_content as runner
-    from continuum_swr_replay.analysis.replay import contrast_aggregation
+    import scripts.behavior.content.fit_swr_contrast_content as runner
+    from continuum_swr_replay.analysis.behavior import contrast_aggregation
 
     # The cohort rule is applied where the cohorts are assembled.
     contrast_aggregation.select_event_cohort = bypass_event_cohort

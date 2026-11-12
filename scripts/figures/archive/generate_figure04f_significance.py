@@ -17,9 +17,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
-from continuum_swr_replay.figure_utilities import (
+from continuum_swr_replay.visualization.figure_utilities import (
     FIGURE_TWO_PANEL_HORIZONTAL,
     save_figure,
 )

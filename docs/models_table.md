@@ -2,7 +2,7 @@
 
 The complete set of regression models across all families, written as R
 formulas. The **single source of truth is
-`src/continuum_swr_replay/analysis/replay/model_specs.py`** (plus the runner of
+`src/continuum_swr_replay/analysis/behavior/model_specs.py`** (plus the runner of
 the SWR-power model, the one auxiliary model instantiated in its runner); this
 file is the human-readable mirror. Covariate definitions live in
 [covariate_dictionary.md](covariate_dictionary.md) and
@@ -24,7 +24,7 @@ Every section that mirrors an executable ladder in `model_specs.py` carries
 - indented lines are continuations of the formula above them;
 - blank lines and `#` comment lines are ignored.
 
-`tests/unit/test_models_table_mirrors_specs.py` parses those blocks and asserts,
+`tests/repository/test_models_table_mirrors_specs.py` parses those blocks and asserts,
 per family, that the rung set equals the executable ladder's keys. Adding a rung
 to `model_specs.py` without adding it here fails that test. A section without a
 `rungs` block (the SWR-power model below) has no ladder to mirror.
@@ -184,7 +184,7 @@ comparison behind all of this is
 Every per-session fit carries `converged` / `separated` status flags, the
 `|`-joined `separated_terms` naming which coefficients are unidentified, one
 `sd_<term>` per coefficient, and an `n_convergence_warnings` count
-(`analysis.replay._fit_diagnostics`). Separation is judged **per term** — a term
+(`analysis.behavior._fit_diagnostics`). Separation is judged **per term** — a term
 is separated when its SE is non-finite or `> 1e3`, when `SE × the SD of its own
 predictor` reaches `1.0` (the SE read on the effect scale, i.e. `SE >= 1 / SD`),
 or — for a zero-SD column, which cannot be judged on that scale — when
@@ -212,7 +212,7 @@ schema are in
 membership lists those rules refer to are enumerated at the end of this file.
 
 ## Per-bin rate — Family B
-`scripts/rate/fit_per_bin_rate_models.py` → `models_per_bin_rate/all_models.pkl`
+`scripts/behavior/rate/fit_per_bin_rate_models.py` → `models_per_bin_rate/all_models.pkl`
 
 A point-process conditional-intensity ladder (Truccolo–Eden–Brown 2005), one row
 per (stop, 15 ms bin) with an equal-exposure offset, so the within-stop time
@@ -264,7 +264,7 @@ complete-case cohort and makes the design rank-deficient. See
 [design/model_history.md](design/model_history.md).
 
 ## MU uncertainty — per-bin Poisson (auxiliary)
-`scripts/rate/fit_uncertainty_rate.py` → `models_per_bin_rate/uncertainty_rate.pkl`
+`scripts/behavior/rate/fit_uncertainty_rate.py` → `models_per_bin_rate/uncertainty_rate.pkl`
 
 One model, `MODEL_UNCERTAINTY_RATE` in `model_specs.py`, kept out of the shipped
 `MODEL_PER_BIN_RATE` ladder so `all_models.pkl`'s schema is untouched.
@@ -285,7 +285,7 @@ MU_uncertainty  count ~ BS_TC + REWBASIS + OFFCOS
 ```
 
 ## Cross-history coupling — per-bin Poisson (auxiliary)
-`scripts/rate/fit_cross_history_rate.py` → `models_per_bin_rate/cross_history_models.pkl`
+`scripts/behavior/rate/fit_cross_history_rate.py` → `models_per_bin_rate/cross_history_models.pkl`
 (only with `--write`)
 
 `MODEL_CROSS_HISTORY_RATE` in `model_specs.py`. Fit per session in both
@@ -300,11 +300,11 @@ Mselfcross  count ~ BS_TC + REWBASIS + HISTCOS + CROSSCOS
 ```
 
 ## Cross-history coupling, duration-aware — per-bin Poisson (auxiliary)
-`scripts/rate/fit_duration_aware_history_rate.py` →
+`scripts/behavior/rate/fit_duration_aware_history_rate.py` →
 `models_per_bin_rate/duration_aware_history_models.pkl` (per session, `--mode session`) and
 `duration_aware_history_pooled.pkl` (each animal's sessions stacked with a session fixed effect,
 `--mode pooled`), each with its `.provenance.json`.
-Simulation behind it: `analysis/replay/duration_history_simulation.py`, review
+Simulation behind it: `analysis/behavior/rate/duration_history_simulation.py`, review
 `.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md`.
 
 `MODEL_CROSS_HISTORY_DURATION_RATE` in `model_specs.py`. Events have duration
@@ -330,8 +330,8 @@ Mselfcross_dur         count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + CROSSCOS + 
 ```
 
 ## Cross-history coupling, long window — ridge cross-validated (auxiliary)
-`scripts/rate/fit_cross_history_ridge_cv.py` → `cross_history_ridge_cv.pkl` in its `--out-dir`, with its
-`.provenance.json`. Module: `analysis/replay/ridge_history_cv.py`.
+`scripts/behavior/rate/fit_cross_history_ridge_cv.py` → `cross_history_ridge_cv.pkl` in its `--out-dir`, with its
+`.provenance.json`. Module: `analysis/behavior/rate/ridge_history_cv.py`.
 
 `MODEL_CROSS_HISTORY_LONG_RATE` in `model_specs.py`: `Mself_dur` and `Mselfcross_dur` with the cross
 block (onset- and end-locked) reaching 1 s after the other stream's event (`N_CROSS_LONG_LAGS` = 67
@@ -346,7 +346,7 @@ Mselfcross_long_dur    count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + CROSSCOS_1S
 ```
 
 ## Per-stop rate — Family A
-`scripts/rate/fit_per_stop_rate_models.py` → `models_per_stop_rate/`
+`scripts/behavior/rate/fit_per_stop_rate_models.py` → `models_per_stop_rate/`
 
 Ordinary Poisson on the per-stop event count with a `log(immobility_duration_s)`
 offset. It carries an intercept, so — unlike the conditional Poisson —
@@ -364,7 +364,7 @@ effect. Candidate-arm visit recency has no stop-level analog (every trial visits
 some arm), so the ladder stops at `R1`.
 
 ## Content — arm
-`scripts/content/fit_replay_content_models.py --hierarchy arm` (per `is_swr` split {all, T, F})
+`scripts/behavior/content/fit_replay_content_models.py --hierarchy arm` (per `is_swr` split {all, T, F})
 
 The runner accepts only the current canonical table schema and validates every
 requested rung before fitting. A stale/legacy table, or one missing any
@@ -419,7 +419,7 @@ events put more of their bins on the trunks. The bundle is
 "Bundle names and suffixes").
 
 ## Content — patch
-`scripts/content/fit_replay_content_models.py --hierarchy patch` (per {all, T, F})
+`scripts/behavior/content/fit_replay_content_models.py --hierarchy patch` (per {all, T, F})
 
 The nine arms collapsed to three patches (arm counts summed within patch). The
 conditional Poisson conditions on the event total as before, but over three
@@ -491,7 +491,7 @@ P2  patch_fraction ~ is_current_patch + reward_fraction_candidate_arm_last10_vis
 `MODEL_PATCH_SWR` and `MODEL_PATCH_MUA` are the same rung set.
 
 ## Choice
-`scripts/content/compare_event_source_models.py`
+`scripts/behavior/content/compare_event_source_models.py`
 (`clogit(chosen ~ …, strata(stop))`)
 
 Asks whether replay content predicts behaviour beyond a behavioural baseline.
@@ -519,7 +519,7 @@ replaces them. Trade-off: the replay coefficient is no longer cleanly controlled
 for distance.
 
 ## SWR power (auxiliary)
-`scripts/coupling/fit_swr_power_model.py` — per-session `lm`, predictors z-scored per
+`scripts/behavior/coupling/fit_swr_power_model.py` — per-session `lm`, predictors z-scored per
 session.
 
 ```r
@@ -538,8 +538,8 @@ The analysis of the **non-local event rate and content** and their
 SWR-vs-non-SWR dissociation. Specs: `SWR_CONTRAST_RATE_G_SPECS` /
 `SWR_CONTRAST_RATE_S_SPECS` (rate) and `SWR_CONTRAST_CONTENT_ARM_LADDER` /
 `SWR_CONTRAST_CONTENT_PATCH_LADDER` (content). Runners:
-`scripts/rate/fit_swr_contrast_rate.py`,
-`scripts/content/fit_swr_contrast_content.py` — they import the specs and keep
+`scripts/behavior/rate/fit_swr_contrast_rate.py`,
+`scripts/behavior/content/fit_swr_contrast_content.py` — they import the specs and keep
 only data-assembly and fitting.
 
 Covariate blocks for the rate ladders. The task dimensions are the paper's

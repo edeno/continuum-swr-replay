@@ -87,9 +87,7 @@ DETECTORS = (
     "state_space_canonical",
     "state_space_continuous",
 )
-SUMMARY_PATH = Path(
-    "docs/design/replay_detection_comparison/detection_controls_summary.csv"
-)
+SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_controls_summary.csv")
 
 
 def detector_events(sliding: sweep.SlidingWindowRun, state: sweep.StateSpaceRun):

@@ -13,7 +13,7 @@ read by people, not by code. Two roles keep *this* module live and permanent:
   persisted stamp certifies exactly those two layers -- not table-specific
   candidate support, dtypes, ranges, or fit eligibility.
 - **Vendored ingestion.** The behavioral-model adapter in
-  ``analysis.behavior.qvals_table`` translates the external model's native
+  ``analysis.behavior.covariates.qvals_table`` translates the external model's native
   vocabulary (``Q``/``betadist_mu``/``Qstem`` ...) into the canonical
   reward-belief schema. That translation still runs on every build, so the
   ``qvals`` rows of the ledger -- and only those -- stay here as executable

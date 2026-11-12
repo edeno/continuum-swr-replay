@@ -111,8 +111,8 @@ from tests.integration.test_run_inventory_comparison import (
     write_carey_run,
     write_decode,
 )
-from tests.unit._memoryless_clusterless_epoch import _StandInDetector
-from tests.unit._swr_inventory_fixtures import (
+from tests.support._memoryless_clusterless_epoch import _StandInDetector
+from tests.support._swr_inventory_fixtures import (
     use_swr_source,
     write_artifact_run,
     write_swr_inventory,

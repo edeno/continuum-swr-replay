@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance_path
 from continuum_swr_replay.analysis.pfc.runner_support import (
     filter_epoch_info,
     is_nonempty_file,
@@ -17,7 +18,6 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     remove_bundle,
     session_seed,
 )
-from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 
 
 def _epoch_info(keys: list[tuple[str, str]], **columns) -> pd.DataFrame:

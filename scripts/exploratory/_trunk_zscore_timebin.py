@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-from continuum_swr_replay.analysis.replay.spatial_mapping import map_estimate_to_arm
+from continuum_swr_replay.analysis.behavior.spatial_mapping import map_estimate_to_arm
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )

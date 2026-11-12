@@ -26,12 +26,12 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.figure_utilities import (
+from continuum_swr_replay.visualization.figure_utilities import (
     PANEL_SINGLE,
     TWO_COLUMN,
     get_figure_size,

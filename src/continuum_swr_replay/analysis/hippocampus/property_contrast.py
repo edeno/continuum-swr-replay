@@ -21,7 +21,7 @@ and of replicates with no estimate (NaN), is kept beside each interval. Stratifi
 on log duration because it keeps the medians the property contrasts report and
 makes no assumption about the shape of the duration effect; it removes any
 duration effect to within one stratum's width (checked on simulated data in
-``tests/unit/test_property_contrast.py``).
+``tests/analysis/hippocampus/test_property_contrast.py``).
 """
 
 from __future__ import annotations

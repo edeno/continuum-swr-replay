@@ -44,7 +44,7 @@ figures:
 	$(RUN) python scripts/figures/generate_all_figures.py
 
 refits:
-	$(RUN) python scripts/qa/run_refits.py $(ARGS)
+	$(RUN) python scripts/workflows/run_refits.py $(ARGS)
 
 summaries:
 	for summary in $(SUMMARIES); do \

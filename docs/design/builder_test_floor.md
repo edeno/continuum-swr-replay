@@ -1,12 +1,12 @@
 # Builder test floor
 
-The covariate builders in `analysis/replay/covariates/` compute the values that
+The covariate builders in `analysis/behavior/covariates/` compute the values that
 feed every replay regression. The schema/timing gates check a covariate's *name*
 and *availability window*, not its *value* — so a units error, a wrong window
 edge, or a flipped `searchsorted` side would ship silently unless a test pins the
 value. This doc records the measured floor and the target.
 
-The measurement tool is `scripts/qa/mutation_check.py`: it mechanically mutates
+The measurement tool is `scripts/checks/mutation_check.py`: it mechanically mutates
 value-critical operations (comparison operators, `searchsorted side=` and
 `merge how=` string literals, `+`/`-`) and reports which the covariate test
 subset catches ("killed") versus not ("survived"). Survivors are coverage gaps.
@@ -39,7 +39,7 @@ test set is unchanged. Two things account for
 the difference, and neither is a builder regression:
 
 1. **Six of the 35 survivors are measurement scope, not coverage.**
-   `tests/unit/test_value_block.py` exists and exercises the qvals-alignment
+   `tests/analysis/behavior/covariates/history/test_value_block.py` exists and exercises the qvals-alignment
    validator, but it is not in the tool's `_DEFAULT_TESTS`. Re-running those six
    mutants against it directly kills all six (`value_block.py:298`, `299`,
    `343`, `346`, `359`, `371`). Including that file would put the floor at
@@ -119,8 +119,8 @@ valid input. Worth a raise-test, lower priority than value gaps.
 ## Re-running
 
 ```bash
-uv run python scripts/qa/mutation_check.py           # ~42 min, 124 mutations
-uv run python scripts/qa/mutation_check.py \
+uv run python scripts/checks/mutation_check.py           # ~42 min, 124 mutations
+uv run python scripts/checks/mutation_check.py \
     --targets <files> --tests <test files>           # a narrower slice
 ```
 

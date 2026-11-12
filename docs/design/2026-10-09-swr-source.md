@@ -195,7 +195,7 @@ What the comparison shows:
 - **`plot_session_tables`**'s `swr_lfp` panel shades the `swr_intervals=` the caller
   passes and refuses to draw without them.
 
-`tests/unit/test_swr_source_consumers.py` runs each reader on a frame whose stored labels
+`tests/analysis/events/test_swr_source_consumers.py` runs each reader on a frame whose stored labels
 disagree with the source, under a configured artifact run that masks one source SWR. Two
 static checks there keep it that way: no module outside the figure archive and an
 explained list names the stored ripples, and none unpickles a decode frame without the

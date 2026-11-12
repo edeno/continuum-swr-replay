@@ -28,11 +28,11 @@ table of excluded and pending epochs sit between `<!-- BEGIN GENERATED -->` and
 `<!-- END GENERATED -->` markers. They are rewritten from the module and the CSV by:
 
 ```bash
-uv run python scripts/qa/write_epoch_register_doc.py           # rewrite them
-uv run python scripts/qa/write_epoch_register_doc.py --check   # fail if stale
+uv run python scripts/checks/write_epoch_register_doc.py           # rewrite them
+uv run python scripts/checks/write_epoch_register_doc.py --check   # fail if stale
 ```
 
-The rest is hand-written. `tests/unit/test_epoch_register_doc.py` fails when the
+The rest is hand-written. `tests/scripts/checks/test_epoch_register_doc.py` fails when the
 doc drifts from the register.
 
 ## The rule
@@ -153,7 +153,7 @@ once its decodes exist and its entry is changed to `analysed`.
 | replay table builders (`prepare_data.find_sessions`, used by `prepare_replay_content_data.py`, `build_timebin_tables.py`, `regenerate_stop_table.py`) | `analysed_epochs()`; an analysed epoch with no decode stops the build |
 | ContFrag table builders (`prepare_contfrag_replay_content_data.py`, `refresh_contfrag_behavioral_covariates.py`) | `analysed_epochs()`; for HPC an analysed epoch with no decode stops the build |
 | PFC runner (`run_pfc_analysis_bandit.py`) | `analysed_epochs()`, then the PFC-level condition below |
-| HPC raw stats (`scripts/qa/compute_hpc_raw_stats.py`) | `analysed_epochs()` |
+| HPC raw stats (`scripts/checks/compute_hpc_raw_stats.py`) | `analysed_epochs()` |
 | decode-folder readers (see below) | `analysed_decode_files()`, from the register alone |
 
 The decode-folder readers read decode files rather than Spyglass:
@@ -180,7 +180,7 @@ bundles, not the decode folder, so the `decode_folder` check does not cover it. 
 on the PFC runner, which writes bundles only for the analysed PFC cohort (see "PFC
 subset"). No check removes a bundle left in that folder from an earlier cohort.
 
-`scripts/qa/check_data_availability.py` still reads `get_epoch_info()` itself. It
+`scripts/checks/check_data_availability.py` still reads `get_epoch_info()` itself. It
 diagnoses which inputs load for every epoch Spyglass lists, pending ones included.
 
 The audit runs these checks on the register:
@@ -220,7 +220,7 @@ The audit runs these checks on the register:
    expected. It clears when step 4 sets their entries to `analysed`.
 4. Check the staged decodes. Then move them into the canonical folder in the same
    change that sets their entries to `analysed`, with an empty reason. In that
-   change, regenerate this doc with `scripts/qa/write_epoch_register_doc.py`.
+   change, regenerate this doc with `scripts/checks/write_epoch_register_doc.py`.
 5. Rebuild the tables and rerun the PFC runner and the audit. These read only
    analysed epochs, so they now include the new ones.
 

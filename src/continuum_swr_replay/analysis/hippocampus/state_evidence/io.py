@@ -9,7 +9,7 @@ It imports nothing that holds JAX to a device. The CPU state-evidence runner
 The module is named ``io`` like the standard-library module on purpose: the
 interpreter loads ``io`` at startup, so a tool run from inside this directory
 still gets the standard one, and ``<package>.io`` is a common name for a
-package's file handling (``tests/unit/test_package_dir_shadows_no_stdlib.py``
+package's file handling (``tests/repository/test_package_dir_shadows_no_stdlib.py``
 exempts the modules the interpreter preloads).
 """
 

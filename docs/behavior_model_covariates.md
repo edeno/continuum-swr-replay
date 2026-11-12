@@ -4,13 +4,13 @@ Per-stop table of the SpatialBanditTask behavioral-model latent variables (value
 decision variables, uncertainty, value updates, entropy), one row per stop,
 keyed by `stop_id` (joins to `stop_table.parquet`).
 
-- **Generator:** [`analysis/behavior/qvals_table.py`](../src/continuum_swr_replay/analysis/behavior/qvals_table.py)
+- **Generator:** [`analysis/behavior/covariates/qvals_table.py`](../src/continuum_swr_replay/analysis/behavior/covariates/qvals_table.py)
   — run `uv run python scripts/behavior/build_qvals_table.py --write`.
 - **Output:** `Processed-Data/replay_content/qvals_table.parquet`
   (gitignored data artifact; regenerate from the script).
 - **Decision-variable functions:** vendored, with six marked value-neutral edits, from Alison Comrie's
   `rl_helpers.py` →
-  [`src/continuum_swr_replay/analysis/behavior/_spatial_bandit_rl.py`](../src/continuum_swr_replay/analysis/behavior/_spatial_bandit_rl.py).
+  [`src/continuum_swr_replay/analysis/behavior/covariates/_spatial_bandit_rl.py`](../src/continuum_swr_replay/analysis/behavior/covariates/_spatial_bandit_rl.py).
 - **Paper:** Comrie et al., *Hippocampal representations of alternative
   possibilities are flexibly generated to meet cognitive demands* (bioRxiv
   2024.09.23.613567). No copy of that preprint version is in `references/`; the
@@ -116,7 +116,7 @@ Checked against `references/Spatial_bandit_manuscript_v3.2_biorxiv_figs.pdf`
   value is **low**. Earlier labels called this "Stay-vs-Switch", which inverts the
   reading; corrected 2026-08-19 in `model_specs.py` and the docs, and the manuscript
   independently confirms the direction. **One stale label remains** in
-  `scripts/rate/fit_swr_contrast_rate.py:23`.
+  `scripts/behavior/rate/fit_swr_contrast_rate.py:23`.
 - **Scale.** `reward_belief_mean_port_*` and
   `reward_belief_mean_chosen_arm_preoutcome` are probabilities in [0,1];
   `decision_value_patch_*` is the decision value `β·Q + b` and is **not**

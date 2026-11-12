@@ -151,7 +151,7 @@ _LEGACY_ROOTS: dict[str, Callable[[], Path]] = {
 
 Kept for notebooks and exploratory scripts. ``paths.REPLAY_CONTENT_DIR`` is
 resolved at each access; ``from ... import REPLAY_CONTENT_DIR`` binds the value
-at that import, as the constant did. ``tests/unit/test_paths.py`` keeps them out
+at that import, as the constant did. ``tests/test_paths.py`` keeps them out
 of ``src/`` and the supported scripts."""
 
 

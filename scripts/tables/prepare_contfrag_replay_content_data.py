@@ -43,6 +43,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior import build_event_patch_table
+from continuum_swr_replay.analysis.behavior.covariates import load_contingency
+from continuum_swr_replay.analysis.behavior.tables import (
+    prepare_data as replay_prepare_data,
+)
 from continuum_swr_replay.analysis.contfrag.posterior_analysis import (
     get_contfrag_posterior,
 )
@@ -59,9 +64,6 @@ from continuum_swr_replay.analysis.events.analysed_time import (
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
-from continuum_swr_replay.analysis.replay import build_event_patch_table
-from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
-from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import (
@@ -92,7 +94,7 @@ def contfrag_table_basenames(event_source: str, brain_area: str) -> dict[str, st
     """Return the canonical ContFrag table basenames for one (source, area).
 
     The fitter resolves its inputs through the matching helper
-    ``resolve_contfrag_paths`` in ``analysis/replay/fit_outputs.py``;
+    ``resolve_contfrag_paths`` in ``analysis/behavior/content/fit_outputs.py``;
     keeping the format string in one place lets a unit test pin the
     prep ↔ fitter contract.
     """
@@ -514,7 +516,7 @@ def main(argv: Sequence[str] | None = None):
             # Behavioral context / track graph unavailable. This is a failure,
             # not a benign skip: count it toward the fail-closed gate below so a
             # dropped session cannot leave a complete-looking table set (mirrors
-            # the Replay driver, analysis/replay/prepare_data.run_prepare_data).
+            # the Replay driver, analysis/behavior/prepare_data.run_prepare_data).
             reason = "behavioral context or track graph unavailable"
             logging.warning("skip %s %s: %s", nwb, epoch, reason)
             skipped.append((nwb, epoch, reason))

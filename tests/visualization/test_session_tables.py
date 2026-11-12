@@ -23,10 +23,10 @@ import xarray as xr
 from matplotlib.collections import LineCollection
 from matplotlib.colors import to_rgba
 
-from continuum_swr_replay.analysis.replay._helpers import (
+from continuum_swr_replay.analysis.behavior._helpers import (
     single_arm_from_well,
 )
-from continuum_swr_replay.analysis.replay.covariates import (
+from continuum_swr_replay.analysis.behavior.covariates import (
     add_trial_context as _add_trial_context,
 )
 from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palette
@@ -50,7 +50,7 @@ from continuum_swr_replay.visualization.session_tables.responses import (
     _plot_mismatch_pointers,
     _plot_trial_rail,
 )
-from tests.unit._port_experience_fixtures import port_experiences_from_trials
+from tests.support._port_experience_fixtures import port_experiences_from_trials
 
 
 def _experiences(trials: pd.DataFrame) -> pd.DataFrame:
@@ -1151,7 +1151,7 @@ class TestPatchPanels:
 class TestStopGrainPanels:
     @staticmethod
     def _stop_table(n_stops: int = 2) -> pd.DataFrame:
-        from continuum_swr_replay.analysis.replay.model_specs import N_REWARD_LAGS
+        from continuum_swr_replay.analysis.behavior.model_specs import N_REWARD_LAGS
 
         cols = {
             "stop_start": np.arange(n_stops, dtype=float),
@@ -1282,7 +1282,7 @@ class TestPanelGroupsAndRegistryIntegrity:
 
     def test_every_fitted_predictor_is_reachable(self):
         """Guard against a new model predictor landing with no way to see it."""
-        from continuum_swr_replay.analysis.replay import model_specs as ms
+        from continuum_swr_replay.analysis.behavior import model_specs as ms
         from continuum_swr_replay.visualization import session_tables as mod
 
         registries = [
@@ -1324,16 +1324,20 @@ class TestPublicPlotSessionTables:
         all plotted tables, and the resulting artists are checked against those
         tables' values and time intervals.
         """
-        from continuum_swr_replay.analysis.replay.tables_arm_patch import (
+        from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
             build_event_arm_table,
             build_event_patch_table,
         )
-        from continuum_swr_replay.analysis.replay.tables_event import build_event_table
-        from continuum_swr_replay.analysis.replay.tables_stop import build_stop_table
-        from tests.unit.test_replay_tables import (
+        from continuum_swr_replay.analysis.behavior.tables.tables_event import (
+            build_event_table,
+        )
+        from continuum_swr_replay.analysis.behavior.tables.tables_stop import (
+            build_stop_table,
+        )
+        from tests.analysis.behavior.tables.test_replay_tables import (
             _bandit_graph as production_test_graph,
         )
-        from tests.unit.test_replay_tables import (
+        from tests.analysis.behavior.tables.test_replay_tables import (
             _EnvStub,
             _tiny_dot_with_two_events,
         )

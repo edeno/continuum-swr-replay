@@ -45,7 +45,7 @@ from patsy import dmatrix
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.qa._report import _invocation  # noqa: E402
+from scripts.checks._report import _invocation  # noqa: E402
 
 #: Tolerances the batched fitter was accepted at against statsmodels on the
 #: three gate sessions. Reused unchanged: this is the same solver, with the

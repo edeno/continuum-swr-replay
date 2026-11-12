@@ -43,7 +43,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
-import continuum_swr_replay.figure_utilities as figure_utilities
+import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
@@ -53,18 +53,18 @@ from continuum_swr_replay.analysis.hippocampus import (
     get_event_types,
     load_data_over_time,
 )
-from continuum_swr_replay.figure_utilities import (
-    PAGE_HEIGHT,
-    TWO_COLUMN,
-    label_panels,
-    save_figure,
-)
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.figure_panels import (
     plot_calibration_curve,
     plot_event_duration_distribution,
     plot_state_fractions_by_movement,
     plot_triggered_averages,
+)
+from continuum_swr_replay.visualization.figure_utilities import (
+    PAGE_HEIGHT,
+    TWO_COLUMN,
+    label_panels,
+    save_figure,
 )
 from continuum_swr_replay.visualization.palettes import COLORS
 

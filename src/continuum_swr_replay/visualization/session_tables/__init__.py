@@ -81,7 +81,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import FixedFormatter, FixedLocator, MaxNLocator
 
-from continuum_swr_replay.analysis.replay.model_specs import RECENCY_SPLINE_COLUMNS
+from continuum_swr_replay.analysis.behavior.model_specs import RECENCY_SPLINE_COLUMNS
 
 from ..palettes import patch_grouped_arm_palette
 from ._common import (
@@ -654,11 +654,11 @@ def plot_session_tables(
         normal fitted-detector inputs.
     event_table, event_arm_table, event_sequence_table, stop_table
         Canonical tables produced by the per-grain builders in
-        ``continuum_swr_replay.analysis.replay.tables_event`` /
+        ``continuum_swr_replay.analysis.behavior.tables.tables_event`` /
         ``tables_stop`` / ``tables_arm_patch``.
     event_patch_table : pd.DataFrame, optional
         Patch-collapsed table from
-        :func:`~continuum_swr_replay.analysis.replay.tables_arm_patch.build_event_patch_table`.
+        :func:`~continuum_swr_replay.analysis.behavior.tables.tables_arm_patch.build_event_patch_table`.
         Required only by the patch-grain panels in
         :data:`PATCH_COVARIATE_PANELS`; every other panel ignores it.
     trials : pd.DataFrame, optional

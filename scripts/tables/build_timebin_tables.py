@@ -3,7 +3,7 @@
 
 Per session: load ``dot`` + pump-event times, build the sparse event-onset
 table and the dense 4 ms stop-timebin table (see
-``analysis.replay.timebin_tables``), concatenate, stamp with the canonical
+``analysis.behavior.tables.timebin_tables``), concatenate, stamp with the canonical
 covariate schema, and save:
 
 - ``event_onset_table.parquet``  (sparse, ~one row per onset)
@@ -25,16 +25,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.tables.prepare_data import find_sessions
+from continuum_swr_replay.analysis.behavior.tables.timebin_tables import (  # noqa: E402
+    ONSETS_IN_EXCLUDED_BINS_ATTR,
+    build_event_onset_table,
+    build_stop_timebin_table,
+)
 from continuum_swr_replay.analysis.events.analysed_time import (
     publish_swr_table,
     read_dot_with_swr_source,
     stamp_swr_source,
-)
-from continuum_swr_replay.analysis.replay.prepare_data import find_sessions
-from continuum_swr_replay.analysis.replay.timebin_tables import (  # noqa: E402
-    ONSETS_IN_EXCLUDED_BINS_ATTR,
-    build_event_onset_table,
-    build_stop_timebin_table,
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.data_types import SessionDataKeys  # noqa: E402

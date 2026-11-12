@@ -9,7 +9,7 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.patches import Rectangle
 
-from continuum_swr_replay.analysis.replay import (
+from continuum_swr_replay.analysis.behavior import (
     single_arm_from_well,
     trial_arrival_times,
     trial_context_at_times,

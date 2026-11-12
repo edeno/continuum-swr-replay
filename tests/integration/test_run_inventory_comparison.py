@@ -63,7 +63,7 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.runs import cli
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table
-from tests.unit._swr_inventory_fixtures import (
+from tests.support._swr_inventory_fixtures import (
     kay_events,
     use_swr_source,
     write_artifact_run,

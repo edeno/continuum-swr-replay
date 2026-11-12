@@ -77,9 +77,7 @@ N_PERMUTATIONS = 100
 COVERAGE_SENSITIVITY = (2.0, COVERAGE_FLOOR, 10.0)
 PLACEMENT_SEED = 2
 
-SUMMARY_PATH = Path(
-    "docs/design/replay_detection_comparison/detection_heldout_summary.csv"
-)
+SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_heldout_summary.csv")
 
 
 def folds() -> dict:

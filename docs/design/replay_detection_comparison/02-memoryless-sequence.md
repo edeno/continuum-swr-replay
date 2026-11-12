@@ -218,7 +218,7 @@ binned centers whose jumps are averaged.
   Over every sweep cell the port and the reference module set aside the same pairs in
   all 292072 window pairs of the tested candidates' observed decodes and in all but one
   of the 29.2 million pairs of their shuffled draws (`zero_jump_*` in
-  `reference_check_summary.csv`). The one was first seen on the 2026-10-03 rerun, on a
+  `paper/reported/inputs/detection/reference_check_summary.csv`). The one was first seen on the 2026-10-03 rerun, on a
   different machine from the 2026-09-25 run that found none, with every other sweep
   measure identical and no verdict count moved; it has not been traced.
 - **Clusterless marks: an approximation** (`unchanged_window_pairs`). On a track graph
@@ -305,7 +305,7 @@ are not topographic, so the second should matter less on real data than in that
 simulation, but how much position a tetrode's identity carries has to be measured, not
 assumed. Whether the reference's cell-ID shuffle shows the first behaviour on its own
 data is not known. Both are pinned in the tests
-(`tests/unit/test_memoryless_shuffle.py`,
+(`tests/analysis/hippocampus/memoryless_sequence/test_memoryless_shuffle.py`,
 `tests/integration/test_memoryless_simulated_replay.py`) so a change to either statistic
 has to confront them.
 
@@ -432,7 +432,7 @@ length, duration, firing rate and distance from the animal's own place that we
 choose. Because the right answer is known, what each detector reports can be
 scored against it. The text below calls these injected replays. 4536 cells, sorted
 spikes on a linear track. Every number below comes from
-[detection_sweep_summary.csv](detection_sweep_summary.csv), which that script
+[../../../paper/reported/inputs/detection/detection_sweep_summary.csv](../../../paper/reported/inputs/detection/detection_sweep_summary.csv), which that script
 writes; the full per-cell table goes to `Processed-Data` and is not tracked.
 The sweep takes about four minutes to reproduce, and
 `scripts/figures/generate_memoryless_comparison.py` draws the lower panels of
@@ -671,7 +671,7 @@ answers were the same either way.
 `scripts/detection/sweep_memoryless_controls.py` runs both detectors, through the sweep's own
 run steps, on activity designed in
 [memoryless_simulation_controls.md](memoryless_simulation_controls.md); every number is
-in `detection_controls_summary.csv`. Our detector is read two ways: its non-local events
+in `paper/reported/inputs/detection/detection_controls_summary.csv`. Our detector is read two ways: its non-local events
 (continuous and fragmented states together, the project's definition) and the
 continuous state alone.
 
@@ -718,7 +718,7 @@ truth is known: both detectors run on discovery cells alone, in three folds (two
 interleaved with the roles swapped, one whose evaluation cells cover half the track),
 over every injected replay and controls trial, and every event is scored on the
 evaluation cells by `inventory_comparison.heldout` under both content estimates, ours
-and the sliding window's. Numbers are in `detection_heldout_summary.csv`; the rule and
+and the sliding window's. Numbers are in `paper/reported/inputs/detection/detection_heldout_summary.csv`; the rule and
 its choices are in [memoryless_simulation_controls.md](memoryless_simulation_controls.md).
 
 Each event is counted once, as our detector bounds it; the sliding window's bounds on
@@ -749,15 +749,15 @@ shared events are in the summary under their own `detector`.
 ### Against the reference's own arithmetic
 
 Passing tests show the port is consistent with itself; they do not show it decides
-as the reference would. `scripts/qa/_memoryless_reference.py` re-implements the
+as the reference would. `scripts/checks/_memoryless_reference.py` re-implements the
 reference's sorted-cell path as its MATLAB computes it: a Poisson decode with `+1e-3`
 Hz on every rate map, a continuous center of mass, the 1D spread about it, forward
 jumps, zero jumps set aside by value in the significance test, the merge of
 `compute_allSequences_NaNseparated_merge.m`, and dispersion as the RMS distance of the
-retained centers from their mean. `scripts/qa/compare_memoryless_to_reference.py` runs
+retained centers from their mean. `scripts/checks/compare_memoryless_to_reference.py` runs
 it beside the port on the same place fields, window spike counts, thresholds and cell
 permutations, once as published and once without its floor. Results are in
-`reference_check_summary.csv`.
+`paper/reported/inputs/detection/reference_check_summary.csv`.
 
 - **The port decides as the reference does, apart from its binned center.** It decodes
   sorted cells with the reference's floor (`with_reference_rate_floor`), so the

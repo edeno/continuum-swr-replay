@@ -29,6 +29,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.fit_provenance import (
+    require_fresh_inputs,
+)
+from continuum_swr_replay.analysis.behavior.spatial_mapping import (
+    map_estimate_to_arm,
+)
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
@@ -36,12 +42,6 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.events.analysed_time import (
     read_dot_with_swr_source,
     require_swr_source,
-)
-from continuum_swr_replay.analysis.replay.fit_provenance import (
-    require_fresh_inputs,
-)
-from continuum_swr_replay.analysis.replay.spatial_mapping import (
-    map_estimate_to_arm,
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (

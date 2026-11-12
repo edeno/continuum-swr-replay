@@ -13,12 +13,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay import contrast_aggregation
-from continuum_swr_replay.analysis.replay.cohort_audit import (
+from continuum_swr_replay.analysis.behavior import contrast_aggregation
+from continuum_swr_replay.analysis.behavior.cohort_audit import (
     DROP_FIELDS,
     write_cohort_audit,
 )
-from scripts.content import fit_swr_contrast_content as mod
+from scripts.behavior.content import fit_swr_contrast_content as mod
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration]
 

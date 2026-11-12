@@ -47,7 +47,7 @@ they must be regenerated before analyses or figures are rerun.
   this document.
 - External behavioral-model code retains its native vocabulary. One qvals
   ingestion function (`canonicalize_behavior_model_columns` in
-  `analysis/behavior/qvals_table.py`) checks the numerical duplicates
+  `analysis/behavior/covariates/qvals_table.py`) checks the numerical duplicates
   (`Q{i+1}` vs `betadist_mu{i+1}`, and the global-variance pair) and renames
   the native columns to repository-owned names. Since 2026-10-25 the adapter no
   longer writes `q_port{i}` copies of `Q{i+1}`.
