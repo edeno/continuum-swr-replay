@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `cb5c16baa03a` | yes | 32 | 0 |
 | `detection.json` | `cb5c16baa03a` | yes | 132 | 0 |
-| `events.json` | `cb5c16baa03a` | yes | 331 | 0 |
+| `events.json` | `7eabc1b9c82a` | yes | 331 | 0 |
 | `behavior.json` | `cb5c16baa03a` | yes | 922 | 0 |
 | `mpfc.json` | `cb5c16baa03a` | yes | 604 | 0 |
 
@@ -386,7 +386,7 @@ Sources:
 
 ### 2b.5. How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?
 
-Status: computed. Figures: 3b. Values: 15.
+Status: computed. Figures: 3b, 3c. Values: 15.
 
 Sources:
 
@@ -395,17 +395,17 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3b |
-| `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3b |
-| `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3c |
+| `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3c |
+| `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3c |
 | `\EventsRipplePeakAnimalsUnimodal` | 5 |  | animals in which Hartigan's dip test does not reject one mode of the events' peak ripple power (p at or above 0.05) | `events.class_distribution_values` |  |
 | `\EventsRipplePeakModeAnimalMax` | 1.99 | z | highest per-animal location of that mode | `events.class_distribution_values` |  |
 | `\EventsRipplePeakModeAnimalMin` | 0.90 | z | lowest per-animal location of the main KDE mode of the events' peak ripple power | `events.class_distribution_values` |  |
-| `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3b |
-| `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3b |
+| `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3c |
+| `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3c |
 | `\EventsStepEvidenceCriterionAnimals` | 3 |  | animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error | `events.class_step_evidence_values` |  |
 | `\EventsStepEvidenceCriterionAnimalsSameSign` | 5 |  | animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval | `events.class_step_evidence_values` |  |
 | `\EventsStepEvidenceCriterionShareMedian` | +0.20 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | `events.class_step_evidence_values` |  |
@@ -425,7 +425,7 @@ Status: dropped; contradicted by the ripple-power bump at non-local onset; refra
 
 ### 2c.1. How do theta z-score and speed compare across SWR events, non-SWR events and running?
 
-Status: computed. Figures: 3b, decoder_validation. Values: 54.
+Status: computed. Figures: 3c, decoder_validation. Values: 54.
 
 Sources:
 
@@ -455,14 +455,14 @@ Sources:
 | `\EventsMuaMedianSwr` | 2.37 | z | median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
 | `\EventsMuaRestReference` | −0.84 | z | median over epochs of the epoch's median z-scored MUA rate in quiet rest | `events.brain_state_values` |  |
 | `\EventsMuaRunningReference` | 0.56 | z | median over epochs of the epoch's median z-scored MUA rate while running | `events.brain_state_values` |  |
-| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3b |
-| `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3b |
-| `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3b |
-| `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3b |
-| `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3c |
+| `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3c |
+| `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3c |
+| `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3c |
+| `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3c |
 | `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.gamma_z_values` |  |
 | `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.gamma_z_values` |  |
 | `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.gamma_z_values` |  |
@@ -724,7 +724,7 @@ Sources:
 
 ### 2d.2. How does replay speed differ between SWR and non-SWR events?
 
-Status: computed. Figures: 3c. Values: 9.
+Status: computed. Figures: 3d, 3e. Values: 9.
 
 Sources:
 
@@ -734,14 +734,14 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsSpeedAnimalsInDirection` | 5 |  | animals whose non-SWR median replay speed (median over the event) is lower than their SWR median | `events.property_values` | 3c |
-| `\EventsSpeedDifferenceHigh` | +230 | cm/s | upper bound of that interval | `events.property_interval_values` | 3c |
-| `\EventsSpeedDifferenceLow` | +110 | cm/s | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median replay speed (median over the event) | `events.property_interval_values` | 3c |
-| `\EventsSpeedMatchedDifference` | +180 | cm/s | SWR minus non-SWR difference of median replay speed (median over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3c |
-| `\EventsSpeedMatchedDifferenceHigh` | +250 | cm/s | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` | 3c |
-| `\EventsSpeedMatchedDifferenceLow` | +110 | cm/s | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3c |
-| `\EventsSpeedMedianNonSwr` | 320 | cm/s | median replay speed (median over the event) of immobile non-SWR non-local events | `events.property_values` | 3c |
-| `\EventsSpeedMedianSwr` | 490 | cm/s | median replay speed (median over the event) of immobile SWR-overlapping non-local events | `events.property_values` | 3c |
+| `\EventsSpeedAnimalsInDirection` | 5 |  | animals whose non-SWR median replay speed (median over the event) is lower than their SWR median | `events.property_values` | 3e |
+| `\EventsSpeedDifferenceHigh` | +230 | cm/s | upper bound of that interval | `events.property_interval_values` | 3e |
+| `\EventsSpeedDifferenceLow` | +110 | cm/s | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median replay speed (median over the event) | `events.property_interval_values` | 3e |
+| `\EventsSpeedMatchedDifference` | +180 | cm/s | SWR minus non-SWR difference of median replay speed (median over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3e |
+| `\EventsSpeedMatchedDifferenceHigh` | +250 | cm/s | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` | 3e |
+| `\EventsSpeedMatchedDifferenceLow` | +110 | cm/s | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3e |
+| `\EventsSpeedMedianNonSwr` | 320 | cm/s | median replay speed (median over the event) of immobile non-SWR non-local events | `events.property_values` | 3e |
+| `\EventsSpeedMedianSwr` | 490 | cm/s | median replay speed (median over the event) of immobile SWR-overlapping non-local events | `events.property_values` | 3e |
 | `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | `events.class_step_values` |  |
 
 ### 2d.3. How does spatial extent differ between SWR and non-SWR events?
@@ -2743,9 +2743,9 @@ Script: `scripts/figures/generate_figure03.py`. Questions: 2b.5, 2c.1, 2d.1, 2d.
 
 Unlettered: `\EventsArmsAnimalsInDirection`, `\EventsArmsDifferenceHigh`, `\EventsArmsDifferenceLow`, `\EventsArmsMatchedDifferenceHigh`, `\EventsArmsMatchedDifferenceLow`, `\EventsArmsMatchedDifference`, `\EventsArmsMedianNonSwr`, `\EventsArmsMedianSwr`, `\EventsExtentAnimalsInDirection`, `\EventsExtentDifferenceHigh`, `\EventsExtentDifferenceLow`, `\EventsExtentMatchedDifferenceHigh`, `\EventsExtentMatchedDifferenceLow`, `\EventsExtentMatchedDifference`, `\EventsExtentMedianNonSwr`, `\EventsExtentMedianSwr`, `\EventsMaxStepAnimalsInDirection`, `\EventsMaxStepDifferenceHigh`, `\EventsMaxStepDifferenceLow`, `\EventsMaxStepMatchedDifferenceHigh`, `\EventsMaxStepMatchedDifferenceLow`, `\EventsMaxStepMatchedDifference`, `\EventsMaxStepMedianNonSwr`, `\EventsMaxStepMedianSwr`, `\EventsPauseAnimalsInDirection`, `\EventsPauseDifferenceHigh`, `\EventsPauseDifferenceLow`, `\EventsPauseMatchedDifferenceHigh`, `\EventsPauseMatchedDifferenceLow`, `\EventsPauseMatchedDifference`, `\EventsPauseMedianNonSwr`, `\EventsPauseMedianSwr`, `\EventsReversalsAnimalsInDirection`, `\EventsReversalsDifferenceHigh`, `\EventsReversalsDifferenceLow`, `\EventsReversalsMatchedDifferenceHigh`, `\EventsReversalsMatchedDifferenceLow`, `\EventsReversalsMatchedDifference`, `\EventsReversalsMedianNonSwr`, `\EventsReversalsMedianSwr`, `\EventsStartDistanceAnimalsInDirection`, `\EventsStartDistanceDifferenceHigh`, `\EventsStartDistanceDifferenceLow`, `\EventsStartDistanceMatchedDifferenceHigh`, `\EventsStartDistanceMatchedDifferenceLow`, `\EventsStartDistanceMatchedDifference`, `\EventsStartDistanceMedianNonSwr`, `\EventsStartDistanceMedianSwr`
 
-Panel b: `\EventsRippleAnimalsAboveRestNonSwr`, `\EventsRippleAnimalsAboveRestSwr`, `\EventsRippleAnimalsBelowRunningNonSwr`, `\EventsRippleAnimalsBelowRunningSwr`, `\EventsRippleMedianNonSwr`, `\EventsRippleMedianSwr`, `\EventsRippleRestReference`, `\EventsRippleRunningReference`
+Panel c: `\EventsRippleAnimalsAboveRestNonSwr`, `\EventsRippleAnimalsAboveRestSwr`, `\EventsRippleAnimalsBelowRunningNonSwr`, `\EventsRippleAnimalsBelowRunningSwr`, `\EventsRippleMedianNonSwr`, `\EventsRippleMedianSwr`, `\EventsRippleRestReference`, `\EventsRippleRunningReference`
 
-Panel c: `\EventsSpeedAnimalsInDirection`, `\EventsSpeedDifferenceHigh`, `\EventsSpeedDifferenceLow`, `\EventsSpeedMatchedDifferenceHigh`, `\EventsSpeedMatchedDifferenceLow`, `\EventsSpeedMatchedDifference`, `\EventsSpeedMedianNonSwr`, `\EventsSpeedMedianSwr`
+Panel e: `\EventsSpeedAnimalsInDirection`, `\EventsSpeedDifferenceHigh`, `\EventsSpeedDifferenceLow`, `\EventsSpeedMatchedDifferenceHigh`, `\EventsSpeedMatchedDifferenceLow`, `\EventsSpeedMatchedDifference`, `\EventsSpeedMedianNonSwr`, `\EventsSpeedMedianSwr`
 
 ### Figure 4: mPFC responses to SWR and non-SWR events
 
