@@ -71,18 +71,21 @@ def test_coefficient_statistics_leave_out_sessions_without_the_coefficient():
     assert result["n_animals_positive"] == 2
     assert result["exp_median"] == pytest.approx(3.4903429574618414)  # e ** 1.25
     assert result["exp_animal_median"] == pytest.approx(3.4903429574618414)
-    # four sessions, all positive: the exact two-sided p is 2 / 2 ** 4
-    assert result["signed_rank_p"] == pytest.approx(0.125)
+    # four sessions are too few for a signed-rank p
+    assert np.isnan(result["signed_rank_p"])
 
 
 def test_the_signed_rank_p_is_of_the_sessions_against_zero():
-    fits = _coefficients(["a", "b", "c", "d", "e"], [1.0, -2.0, 3.0, 4.0, 5.0])
-    # The negative ranks sum to 2. Of the 32 sign patterns, three have a rank
-    # sum of at most 2 ({}, {1}, {2}): two-sided p = 2 * 3 / 32.
+    fits = _coefficients("abcdef", [1.0, -2.0, 3.0, 4.0, 5.0, 6.0])
+    # The negative ranks sum to 2. Of the 64 sign patterns, three have a rank
+    # sum of at most 2 ({}, {1}, {2}): two-sided p = 2 * 3 / 64.
     result = stats.coefficient_statistics(fits, "beta")
-    assert result["signed_rank_p"] == pytest.approx(0.1875)
-    assert result["exp_median"] == pytest.approx(20.085536923187668)  # e ** 3
-    assert result["exp_animal_median"] == pytest.approx(20.085536923187668)
+    assert result["signed_rank_p"] == pytest.approx(6 / 64)
+    assert result["exp_median"] == pytest.approx(33.11545195869231)  # e ** 3.5
+    assert result["exp_animal_median"] == pytest.approx(33.11545195869231)
+    # a sixth session of exactly zero leaves five to test: too few
+    fits.loc[5, "beta"] = 0.0
+    assert np.isnan(stats.coefficient_statistics(fits, "beta")["signed_rank_p"])
 
 
 def test_exp_of_the_two_medians_are_separate_numbers():
@@ -120,7 +123,7 @@ def test_the_gate_leaves_out_separated_runaway_and_missing_sessions():
     # z = 1, 2, 3, 5: three above 1.96
     assert result["significant_fraction"] == 0.75
     assert result["exp_median"] == pytest.approx(1.6487212707001282)  # e ** 0.5
-    assert result["signed_rank_p"] == pytest.approx(0.125)
+    assert np.isnan(result["signed_rank_p"])  # four kept sessions: too few
     # the separated and the runaway session; the missing one names no reason
     assert result["n_dropped"] == 2
     assert result["n_unidentified"] == 0

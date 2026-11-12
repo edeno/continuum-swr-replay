@@ -26,7 +26,6 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
 
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     gate_term_sessions,
@@ -34,7 +33,10 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     separated_for_term,
     session_se,
 )
-from continuum_swr_replay.analysis.statistics import session_median_statistics
+from continuum_swr_replay.analysis.statistics import (
+    session_median_statistics,
+    signed_rank_p,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 
@@ -139,15 +141,18 @@ def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
     Returns
     -------
     statistics : dict
-        The names of :func:`session_median_statistics`, and:
+        The names of
+        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`,
+        and:
 
         - ``exp_median``: ``exp`` of the median over sessions (a rate ratio for
           a log-rate coefficient, an odds ratio for a log-odds one).
         - ``exp_animal_median``: ``exp`` of the median over animals.
         - ``signed_rank_p``: the Wilcoxon signed-rank p of the sessions'
-          coefficients against zero. It is computed for any number of
-          sessions, with no minimum (one session gives 1.0); a coefficient of
-          exactly zero is left out of the test.
+          coefficients against zero
+          (:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`: a
+          coefficient of exactly zero is left out of the test, and the p is NaN
+          below six sessions with a non-zero coefficient).
     """
     require_one_fit_per_session(fits)
     known = fits.dropna(subset=[column])
@@ -157,7 +162,7 @@ def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
         **statistics,
         "exp_median": float(np.exp(statistics["median"])),
         "exp_animal_median": float(np.exp(statistics["animal_median"])),
-        "signed_rank_p": float(wilcoxon(values).pvalue),
+        "signed_rank_p": signed_rank_p(values),
     }
 
 
@@ -264,8 +269,9 @@ def gated_coefficient_difference_statistics(
     Returns
     -------
     statistics : dict
-        :func:`session_median_statistics` of the sessions' ``a - b``
-        differences, and for each of the two sets of fits (``a``, ``b``):
+        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`
+        of the sessions' ``a - b`` differences, and for each of the two sets of
+        fits (``a``, ``b``):
 
         - ``n_dropped_<fits>``: its sessions with a coefficient that the gate
           leaves out as separated or runaway.
@@ -305,8 +311,8 @@ def aic_difference_statistics(
     Returns
     -------
     statistics : dict
-        :func:`session_median_statistics` of ``AIC(child) - AIC(parent)`` over
-        the sessions with both fits and a difference that is not missing. An
+        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`
+        of ``AIC(child) - AIC(parent)`` over the sessions with both fits and a difference that is not missing. An
         infinite AIC is not missing: its session is kept, with an infinite
         difference, unless both AICs are infinite. Negative means the child is
         better, so ``negative_fraction`` is the share of sessions in which the
