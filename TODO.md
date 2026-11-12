@@ -60,8 +60,6 @@ Work that is deferred on purpose. Each item says when it should be done.
     calibration the summary reads (each rule's unit median, percentiles and bias,
     in `read_curves` and `simulate_and_fit`). Moving them splits the simulation's
     fit from its summary, and checking the move reruns the simulated fits.
-  - events: `scripts/detection/measure_event_start_and_rest_theta.py` (`measure_epoch`)
-    computes the per-event measures behind the start-distance and rest-theta values.
   - mpfc: `scripts/pfc/summarize_pfc_marked_family.py` (`plot_model` computes its
     own SEM over animals and its own null band, without the draw-count truncation
     `null_band_summary` applies); `scripts/figures/generate_figure04.py`

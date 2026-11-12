@@ -1,4 +1,6 @@
-"""``measure_event_start_and_rest_theta.measure_epoch`` on a 20-bin synthetic decode."""
+"""``measure_event_start_and_rest_theta.measure_epoch``: the frame it reads and the
+columns it adds. The measures are tested in
+``tests/analysis/hippocampus/test_start_and_rest_theta.py``."""
 
 from __future__ import annotations
 
@@ -12,8 +14,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.tables.trajectory import brain_state_means
+from continuum_swr_replay.analysis.hippocampus import start_and_rest_theta
 from continuum_swr_replay.decoding.files import decode_paths
+from tests.analysis.hippocampus.test_start_and_rest_theta import EVENTS, frame
 
 _SCRIPT = (
     Path(__file__).resolve().parents[3]
@@ -25,37 +28,15 @@ script = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(script)
 
 IDENTIFIER = "j1620210706_02_r1_HPC"
-RUNNING_THETA = 0.5
-
-
-def _frame() -> pd.DataFrame:
-    """Event 1 in bins 2-5, its first MAP NaN; event 2's label split over bins
-    9-10 and 13-14; one NaN theta bin inside each event; rest elsewhere (the
-    longest rest run, bins 15-19, holds a window of either length)."""
-    label = np.zeros(20, dtype=int)
-    label[2:6] = 1
-    label[[9, 10, 13, 14]] = 2
-    theta = np.linspace(-1.0, 1.0, 20)
-    theta[4] = np.nan
-    theta[14] = np.nan
-    map_estimate = np.arange(20, dtype=float) * 10.0 + 100.0
-    map_estimate[2] = np.nan
-    return pd.DataFrame(
-        {
-            "non_local_event": label,
-            "map_estimate": map_estimate,
-            "linear_position": np.full(20, 5.0),
-            "theta_power_zscore": theta,
-        },
-        index=pd.Index(np.arange(20) * 0.002, name="time"),
-    )
 
 
 @pytest.fixture
-def measured(processed_data_root, monkeypatch) -> tuple[pd.DataFrame, pd.DataFrame]:
-    frame = _frame()
+def stored(processed_data_root, monkeypatch) -> str:
+    """The synthetic decode frame and an environment, written where the script
+    reads them; its sha256. The SWR source and the measures' regimes, reference
+    and track graph are tested elsewhere and stubbed here."""
     paths = decode_paths(IDENTIFIER, processed_data_root)
-    raw = pickle.dumps(frame)
+    raw = pickle.dumps(frame())
     paths.data_over_time.write_bytes(raw)
     paths.environment.write_bytes(
         pickle.dumps(
@@ -64,69 +45,48 @@ def measured(processed_data_root, monkeypatch) -> tuple[pd.DataFrame, pd.DataFra
             )
         )
     )
-    # The SWR source, the regimes and the track graph are tested elsewhere:
-    # here the frame is used as is, rest is every bin outside an event, and the
-    # track distance is the absolute difference of linear positions.
     monkeypatch.setattr(script.analysed_time, "with_swr_source", lambda dot: dot)
     monkeypatch.setattr(
-        script,
+        start_and_rest_theta,
         "regime_masks",
         lambda dot: {"rest": dot["non_local_event"].to_numpy() == 0},
     )
     monkeypatch.setattr(
-        script,
+        start_and_rest_theta,
         "brain_state_reference",
-        lambda dot: {"theta_running_median": RUNNING_THETA, "theta_rest_median": 0.0},
+        lambda dot: {"theta_running_median": 0.5, "theta_rest_median": 0.0},
     )
     monkeypatch.setattr(
-        script,
+        start_and_rest_theta,
         "track_distance_cm",
         lambda animal, decoded, *_: np.abs(decoded - animal),
     )
-    events = pd.DataFrame({"event_id": ["e1", "e2"], "non_local_event": [1, 2]})
-    table = script.measure_epoch(
-        (IDENTIFIER, hashlib.sha256(raw).hexdigest(), events, 4)
-    )
-    return frame, table.set_index("event_id")
+    return hashlib.sha256(raw).hexdigest()
 
 
-def test_start_distance_reads_the_first_bin_with_a_finite_map(measured):
-    frame, table = measured
-    # event 1's first bin (2) has no MAP: its start is bin 3's MAP
-    assert table.loc["e1", "start_distance_cm"] == pytest.approx(130.0 - 5.0)
-    assert table.loc["e2", "start_distance_cm"] == pytest.approx(190.0 - 5.0)
+def test_each_event_carries_its_epoch_and_the_decode_hash(stored):
+    table = script.measure_epoch((IDENTIFIER, stored, EVENTS, 4))
+
+    assert list(table.columns[:3]) == ["event_id", "epoch_id", "decode_sha256"]
+    assert table.epoch_id.eq(IDENTIFIER).all()
+    assert table.decode_sha256.eq(stored).all()
+    assert table.event_id.tolist() == ["e1", "e2"]
 
 
-def test_a_split_label_counts_every_bin_and_is_flagged(measured):
-    _, table = measured
-    assert table.loc["e1", "n_bins"] == 4 and table.loc["e1", "bins_contiguous"]
-    assert table.loc["e2", "n_bins"] == 4
-    assert not table.loc["e2", "bins_contiguous"]
+def test_an_epochs_draws_are_seeded_by_its_identifier(stored):
+    first = script.measure_epoch((IDENTIFIER, stored, EVENTS, 4))
+    again = script.measure_epoch((IDENTIFIER, stored, EVENTS, 4))
+
+    pd.testing.assert_frame_equal(first, again)
 
 
-def test_theta_mean_is_the_event_table_theta_z(measured):
-    frame, table = measured
-    # the event table's theta_z: brain_state_means over the event's bins
-    in_event = frame["non_local_event"].to_numpy() > 0
-    ids, means = brain_state_means(
-        event_id=frame["non_local_event"].to_numpy()[in_event],
-        state_probs={},
-        extra_means={"theta_z": frame["theta_power_zscore"].to_numpy()[in_event]},
-    )
-    theta_z = dict(zip(ids, means["theta_z"], strict=True))
-    assert table.loc["e1", "theta_mean"] == pytest.approx(theta_z[1])
-    assert table.loc["e2", "theta_mean"] == pytest.approx(theta_z[2])
-    assert np.isfinite(table["theta_mean"]).all()
-
-
-def test_rest_windows_match_each_event_length(measured):
-    _, table = measured
-    assert (table["rest_windows"] == 4).all()
-    assert table["theta_running_median"].eq(RUNNING_THETA).all()
-    assert table["rest_theta_like_share"].between(0, 1).all()
-
-
-def test_a_decode_with_another_hash_is_refused(processed_data_root, measured):
+def test_a_decode_with_another_hash_is_refused(stored):
     events = pd.DataFrame({"event_id": ["e1"], "non_local_event": [1]})
     with pytest.raises(ValueError, match="is not the run's"):
         script.measure_epoch((IDENTIFIER, "0" * 64, events, 4))
+
+
+def test_a_refusal_of_the_measures_names_the_epoch(stored):
+    events = pd.DataFrame({"event_id": ["e9"], "non_local_event": [9]})
+    with pytest.raises(ValueError, match=f"{IDENTIFIER}: an event's label has no bin"):
+        script.measure_epoch((IDENTIFIER, stored, events, 4))

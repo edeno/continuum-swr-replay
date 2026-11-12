@@ -2,20 +2,12 @@
 
 For every immobile non-local event of the canonical event table, from its
 epoch's decode frame (read through the SWR source; the decode's sha256 must be
-the one the event features run recorded) and environment:
-
-- **start distance**: track-graph distance from the animal's position to the
-  event's first decoded position (the MAP at the event's first bin with a
-  finite MAP), both on real place bins, never a junction placeholder
-  (``posterior_analysis.track_distance_cm``);
-- **duration-matched quiet rest**: ``--n-windows`` windows of quiet rest
-  (below 4 cm/s, in no non-local, SWR or MUA event, outside excluded time:
-  ``brain_state_reference.regime_masks``) with as many bins as the event, drawn
-  uniformly over every such window of the epoch; each window's theta is the
-  mean of ``theta_power_zscore`` over its bins, as an event's ``theta_z`` is,
-  and it is theta-like when it reaches the epoch's median running theta
-  (``brain_state_reference``). The event's ``rest_theta_like_share`` is the
-  share of its windows that are theta-like.
+the one the event features run recorded) and environment: the start distance
+(track-graph distance from the animal to the event's first decoded position)
+and the share of ``--n-windows`` duration-matched windows of quiet rest whose
+theta is theta-like. The measures are
+``analysis/hippocampus/start_and_rest_theta.py``'s; this script selects the
+epochs, reads the frames and writes the tables.
 
 One table per epoch, ``Processed-Data/event_start_rest_theta/<epoch>.parquet``,
 and a ``manifest.json``.
@@ -38,13 +30,8 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events import analysed_time
-from continuum_swr_replay.analysis.hippocampus.brain_state_reference import (
-    brain_state_reference,
-    matched_window_means,
-    regime_masks,
-)
-from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
-    track_distance_cm,
+from continuum_swr_replay.analysis.hippocampus.start_and_rest_theta import (
+    start_and_rest_theta,
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
@@ -63,74 +50,27 @@ SEED = 20261028
 
 
 def measure_epoch(job: tuple[str, str, pd.DataFrame, int]) -> pd.DataFrame:
-    """One epoch's events: start distance and duration-matched rest theta."""
+    """One epoch's events: start distance and duration-matched rest theta.
+
+    The decode frame is read through the SWR source, refused unless its
+    sha256 is ``expected_sha256``; the measures are
+    ``start_and_rest_theta.start_and_rest_theta``'s, with the epoch and the
+    decode's hash beside each event.
+    """
     identifier, expected_sha256, events, n_windows = job
     paths = decode_paths(identifier, processed_data_dir())
     dot = analysed_time.read_verified_dot_with_swr_source(
         paths.data_over_time, expected_sha256
     )
     env = pd.read_pickle(paths.environment)
-
-    labels = dot["non_local_event"].to_numpy()
-    order = np.argsort(labels, kind="stable")
-    bounds = np.searchsorted(labels[order], events.non_local_event.to_numpy())
-    ends = np.searchsorted(
-        labels[order], events.non_local_event.to_numpy(), side="right"
-    )
-    n_rows = ends - bounds
-    if (n_rows == 0).any():
-        raise ValueError(f"{identifier}: an event's label has no bin in the frame")
-    map_estimate = dot["map_estimate"].to_numpy(dtype=np.float64)
-    animal = dot["linear_position"].to_numpy(dtype=np.float64)
-    theta = dot["theta_power_zscore"].to_numpy(dtype=np.float64)
-
-    first_decoded = np.full(len(events), -1, dtype=np.int64)
-    theta_mean = np.full(len(events), np.nan)
-    contiguous = np.zeros(len(events), dtype=bool)
-    for k, (a, b) in enumerate(zip(bounds, ends, strict=True)):
-        rows = np.sort(order[a:b])
-        contiguous[k] = rows[-1] - rows[0] + 1 == rows.size
-        finite = rows[np.isfinite(map_estimate[rows])]
-        if finite.size:
-            first_decoded[k] = finite[0]
-        theta_mean[k] = np.nanmean(theta[rows])
-    has_map = first_decoded >= 0
-    start = np.full(len(events), np.nan)
-    start[has_map] = track_distance_cm(
-        animal[first_decoded[has_map]],
-        map_estimate[first_decoded[has_map]],
-        env.place_bin_centers_nodes_df_,
-        env.distance_between_nodes_,
-    )
-
-    rest = regime_masks(dot)["rest"]
-    reference = brain_state_reference(dot)
     rng = np.random.default_rng([SEED, zlib.crc32(identifier.encode())])
-    windows = matched_window_means(theta, rest, n_rows, n_windows, rng)
-    valid = np.isfinite(windows)
-    above = windows >= reference["theta_running_median"]
-    with np.errstate(invalid="ignore"):
-        share = np.where(
-            valid.any(axis=1), (above & valid).sum(axis=1) / valid.sum(axis=1), np.nan
-        )
-    return pd.DataFrame(
-        {
-            "event_id": events.event_id.to_numpy(),
-            "epoch_id": identifier,
-            "decode_sha256": expected_sha256,
-            "n_bins": n_rows,
-            "bins_contiguous": contiguous,
-            "start_distance_cm": start,
-            "theta_mean": theta_mean,
-            "theta_running_median": reference["theta_running_median"],
-            "theta_rest_median": reference["theta_rest_median"],
-            "rest_windows": valid.sum(axis=1),
-            "rest_theta_like_share": share,
-            "rest_theta_mean": np.nanmean(np.where(valid, windows, np.nan), axis=1)
-            if valid.any()
-            else np.nan,
-        }
-    )
+    try:
+        table = start_and_rest_theta(dot, env, events, n_windows, rng)
+    except ValueError as error:
+        raise ValueError(f"{identifier}: {error}") from error
+    table.insert(1, "epoch_id", identifier)
+    table.insert(2, "decode_sha256", expected_sha256)
+    return table
 
 
 def main(argv: Sequence[str] | None = None) -> None:
