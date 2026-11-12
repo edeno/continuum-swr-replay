@@ -1406,12 +1406,8 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
             "The caption says the state-space detector, held to the published "
             "replay definition, reports nothing below 45 cm; the summary disagrees."
         )
-    passes = (
-        summary[summary["summary"] == "shuffle_pass_rate_by_duration"]
-        .pivot(index="duration_s", columns="measure", values="value")
-        .sort_index()
-    )
-    if not passes.sliding_jump_pass.iloc[0] < passes.sliding_jump_pass.iloc[-1]:
+    jump_pass = sweep_statistics.sweep_jump_pass_statistics(summary)
+    if not jump_pass["shortest_fraction"] < jump_pass["longest_fraction"]:
         raise RuntimeError(
             "The caption says the jump half passes fewer of the shortest replays "
             "than of the longest; the summary's pass rates by duration disagree."
