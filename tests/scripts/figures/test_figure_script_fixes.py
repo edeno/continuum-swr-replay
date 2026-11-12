@@ -1100,14 +1100,15 @@ def test_the_isi_autocorrelation_panel_draws_its_points_and_the_bounds():
 def _uncertainty_contrasts() -> pd.DataFrame:
     """Q4 - Q1 contrast rows of ``analyze_uncertainty_content``: the overall
     posterior unchosen-well row of each metric among rows of other responses,
-    scopes and levels, each with its own counts."""
+    scopes and levels, each with its own counts. The other rows come first, so
+    a reader that drops a filter reads one of them."""
     rows = [
         # (metric, response, scope, level, n_animals_positive, n_animals)
-        ("conditional_event_share", "posterior", "unchosen", "overall", 3, 5),
         ("conditional_event_share", "hard", "unchosen", "overall", 5, 5),
         ("conditional_event_share", "posterior", "all", "overall", 1, 5),
         ("conditional_event_share", "posterior", "unchosen", "animal", 1, 1),
         ("absolute_rate", "posterior", "unchosen", "overall", 4, 4),
+        ("conditional_event_share", "posterior", "unchosen", "overall", 3, 5),
     ]
     return pd.DataFrame(
         rows,
@@ -1120,6 +1121,44 @@ def _uncertainty_contrasts() -> pd.DataFrame:
             "n_animals",
         ],
     )
+
+
+def test_the_uncertainty_annotation_counts_the_overall_posterior_row():
+    figure = importlib.import_module(
+        "scripts.figures.generate_uncertainty_content_figure"
+    )
+    contrasts = _uncertainty_contrasts()
+    assert (
+        figure._positive_animals_note(contrasts, "conditional_event_share")
+        == "Q4 − Q1 > 0 in 3/5 animals"
+    )
+    assert (
+        figure._positive_animals_note(contrasts, "absolute_rate")
+        == "Q4 − Q1 > 0 in 4/4 animals"
+    )
+
+
+def test_the_uncertainty_figure_refuses_contrasts_without_the_animal_counts(tmp_path):
+    figure = importlib.import_module(
+        "scripts.figures.generate_uncertainty_content_figure"
+    )
+    for name in (
+        "trial_leaf_table.pkl",
+        "quartile_profiles.csv",
+        "mu_session_coefficients.csv",
+        "mu_animal_coefficients.csv",
+        "mu_overall_coefficients.csv",
+        "horserace_summary.csv",
+    ):
+        (tmp_path / name).touch()
+    (tmp_path / "cohort_audit.json").write_text(
+        json.dumps({"arm_standardization_support": "leaf_arms"})
+    )
+    _uncertainty_contrasts().drop(columns="n_animals_positive").to_csv(
+        tmp_path / "quartile_contrasts.csv", index=False
+    )
+    with pytest.raises(ValueError, match="animals-positive count"):
+        figure._load_results(tmp_path)
 
 
 def test_the_uncertainty_annotation_refuses_a_metric_without_an_overall_row():
