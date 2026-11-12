@@ -150,6 +150,14 @@ def test_the_family_corrects_only_the_terms_with_a_signed_rank_p():
     assert np.isnan(table.loc["w", "signed_rank_p_adjusted"])
 
 
+def test_the_family_s_standard_error_is_the_event_clustered_one_where_the_fit_wrote_it():
+    # Clustered 0.05 in five sessions; the third's is not finite, so its model
+    # 0.3 stands: 0.05 x 5 and 0.3, median 0.05 (the model SEs' is 0.35).
+    fits = _family_fits().assign(bse_cluster_x=[0.05, 0.05, NAN, 0.05, 0.05, 0.05])
+    x = stats.coefficient_family_statistics(fits, ["x"]).loc["x"]
+    assert x["bse_median"] == pytest.approx(0.05)
+
+
 def test_the_family_without_standard_errors_or_records_has_no_se_and_none_unidentified():
     fits = _family_fits().drop(columns=["bse_x", "unidentified_terms"])
     x = stats.coefficient_family_statistics(fits, ["x"]).loc["x"]

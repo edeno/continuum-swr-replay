@@ -31,6 +31,7 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     gate_term_sessions,
     gated_term_statistics,
     separated_for_term,
+    typical_session_se,
     unidentified_for_term,
 )
 from continuum_swr_replay.analysis.shared_statistics import (
@@ -187,7 +188,8 @@ def coefficient_family_statistics(
     ----------
     fits : pd.DataFrame, shape (n_sessions, n_columns)
         One row per session, with the session columns, ``coef_<term>`` and
-        optionally ``bse_<term>`` and ``unidentified_terms``.
+        optionally ``bse_<term>``, ``bse_cluster_<term>`` and
+        ``unidentified_terms``.
     terms : sequence of str
         The terms. A term without a ``coef_<term>`` column has no row.
 
@@ -200,8 +202,12 @@ def coefficient_family_statistics(
 
         - ``quartile_25``, ``quartile_75``: the sessions' 25th and 75th
           percentiles (linear interpolation).
-        - ``bse_median``: the median of ``bse_<term>`` over those sessions; NaN
-          when the fits carry no ``bse_<term>``.
+        - ``bse_median``: the median over those sessions of the session's
+          standard error of the coefficient, the event-clustered one
+          (``bse_cluster_<term>``) where the fit wrote a finite one and the
+          model ``bse_<term>`` otherwise
+          (:func:`~continuum_swr_replay.analysis.behavior.contrast_aggregation.typical_session_se`);
+          NaN when the fits carry neither.
         - ``n_unidentified``: sessions that, by the fit's own record, cannot
           inform the term (``unidentified_terms``); 0 when the fits do not
           record it.
@@ -216,14 +222,11 @@ def coefficient_family_statistics(
         if column not in fits.columns:
             continue
         known = fits[column].dropna()
-        bse = fits.get(f"bse_{term}")
         rows[term] = {
             **coefficient_statistics(fits, column),
             "quartile_25": float(known.quantile(0.25)),
             "quartile_75": float(known.quantile(0.75)),
-            "bse_median": float("nan")
-            if bse is None
-            else float(bse[known.index].median()),
+            "bse_median": typical_session_se(fits.loc[known.index], term)[0],
             "n_unidentified": int(unidentified_for_term(fits, term).sum()),
         }
     table = pd.DataFrame.from_dict(rows, orient="index").rename_axis("term")

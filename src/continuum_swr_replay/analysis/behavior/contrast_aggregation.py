@@ -603,8 +603,8 @@ def gated_term_statistics(
         - ``signed_rank_p``: the Wilcoxon signed-rank p of the coefficients
           against zero
           (:func:`~continuum_swr_replay.analysis.shared_statistics.signed_rank_p`).
-        - ``session_se_median``: the median of :func:`session_se`; NaN when the
-          fits carry no standard error.
+        - ``session_se_median``: :func:`typical_session_se`, the median of
+          :func:`session_se`; NaN when the fits carry no standard error.
         - ``se_source``: which standard error that is (:func:`session_se`).
         - ``significant_fraction``: :func:`pct_significant_sessions`, read on
           that same standard error.
@@ -612,11 +612,12 @@ def gated_term_statistics(
     gate = gate_term_sessions(fits, term)
     kept = fits[gate.kept]
     coef = kept[f"coef_{term}"]
-    se, se_source = session_se(kept, term)
+    se, _ = session_se(kept, term)
+    session_se_median, se_source = typical_session_se(kept, term)
     return gate, {
         **session_median_statistics(coef, kept["animal"]),
         "signed_rank_p": signed_rank_p(coef),
-        "session_se_median": np.nan if se is None else float(se.median()),
+        "session_se_median": session_se_median,
         "se_source": se_source,
         "significant_fraction": pct_significant_sessions(
             coef, se, kept.get(f"pval_{term}")
