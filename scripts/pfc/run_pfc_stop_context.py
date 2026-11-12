@@ -58,6 +58,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
+from continuum_swr_replay.analysis.pfc.population_statistics import called_units
 from continuum_swr_replay.analysis.pfc.stop_context import (
     ESTIMATORS,
     STOP_CONTEXT_CLASSES,
@@ -286,8 +287,10 @@ def select_units(
     units: pd.DataFrame, event_class: str, sign: str, unit_set: str
 ) -> np.ndarray:
     """Which units one fit uses: their peak for ``event_class`` has ``sign``
-    and, for ``unit_set == "called"``, their held-out p for ``event_class`` is
-    below :data:`CALLED_P`. Another class's peak or p never enters.
+    and, for ``unit_set == "called"``, they are called for ``event_class`` at
+    :data:`CALLED_P`
+    (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_units`).
+    Another class's peak or p never enters.
 
     Returns
     -------
@@ -297,7 +300,7 @@ def select_units(
     has_sign = peak > 0 if sign == "increase" else peak < 0
     if unit_set == "all":
         return has_sign
-    return has_sign & (units[HELDOUT_P_COLUMNS[event_class]].to_numpy() < CALLED_P)
+    return has_sign & called_units(units, event_class, CALLED_P)
 
 
 def fit(args: Namespace) -> None:
