@@ -467,12 +467,7 @@ def alignment_prose(sidecars: pd.DataFrame) -> str:
     )
 
 
-def gate_counts(
-    data_dir: Path,
-    min_firing_rate: float,
-    suffix: str = "",
-    inference: str = "legacy",
-) -> dict:
+def gate_counts(frame: pd.DataFrame, min_firing_rate: float) -> dict:
     """How many neurons survive the loader, and the firing-rate gate.
 
     The gate is the loader's
@@ -483,13 +478,15 @@ def gate_counts(
     the rate over every immobile bin. Both are counted here when the bundle has
     both, so the two sides can be compared on one quantity as well as on the
     shipped one.
+
+    Parameters
+    ----------
+    frame : pandas.DataFrame
+        One tree's population, from ``load_population_data`` with
+        ``min_firing_rate=0.0``: every unit with a usable fit.
+    min_firing_rate : float
+        The gate, in Hz.
     """
-    frame, _, _ = load_population_data(
-        data_dir,
-        min_firing_rate=0.0,
-        artifact_suffix=suffix,
-        inference=inference,
-    )
     counts = {
         "n_neurons_with_fit": int(len(frame)),
         "n_passing_fit_bin_rate": int(at_or_above_rate(frame, min_firing_rate).sum()),
@@ -2610,27 +2607,39 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     # Each tree is read as the estimator that produced it. The two generations
     # carry different statistics under the same file names, so reading one as
-    # the other would report a likelihood-ratio p-value as a held-out one.
-    before, _, _ = load_population_data(
-        args.before_dir, min_firing_rate=args.min_firing_rate, inference="legacy"
+    # the other would report a likelihood-ratio p-value as a held-out one. The
+    # gate counts are taken over every unit with a usable fit, a load at no
+    # cutoff.
+    after_inference = "heldout" if comparison == "estimator" else "legacy"
+    before_all, _, _ = load_population_data(
+        args.before_dir, min_firing_rate=0.0, inference="legacy"
     )
-    after, _, _ = load_population_data(
+    after_all, _, _ = load_population_data(
         args.after_dir,
-        min_firing_rate=args.min_firing_rate,
+        min_firing_rate=0.0,
         artifact_suffix=args.artifact_suffix,
-        inference="heldout" if comparison == "estimator" else "legacy",
+        inference=after_inference,
     )
+    if args.min_firing_rate == 0.0:
+        before, after = before_all, after_all
+    else:
+        # The loader applies its rate cutoff before its Benjamini-Hochberg
+        # correction, so the q-values depend on the cutoff: read again at it.
+        before, _, _ = load_population_data(
+            args.before_dir, min_firing_rate=args.min_firing_rate, inference="legacy"
+        )
+        after, _, _ = load_population_data(
+            args.after_dir,
+            min_firing_rate=args.min_firing_rate,
+            artifact_suffix=args.artifact_suffix,
+            inference=after_inference,
+        )
     common = {
         "sidecars": sidecars,
         "before": before,
         "after": after,
-        "before_gate": gate_counts(args.before_dir, args.min_firing_rate),
-        "after_gate": gate_counts(
-            args.after_dir,
-            args.min_firing_rate,
-            args.artifact_suffix,
-            inference="heldout" if comparison == "estimator" else "legacy",
-        ),
+        "before_gate": gate_counts(before_all, args.min_firing_rate),
+        "after_gate": gate_counts(after_all, args.min_firing_rate),
         "before_dir": args.before_dir,
         "after_dir": args.after_dir,
         "min_firing_rate": args.min_firing_rate,

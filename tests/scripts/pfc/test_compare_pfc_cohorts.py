@@ -27,6 +27,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
     HELDOUT_USABLE_DRAW_COLUMNS,
     MATCHED_NULL_OBSERVED_COLUMNS,
+    load_population_data,
 )
 from continuum_swr_replay.analysis.pfc.matched_control import (
     MATCHED_CONTROL_PLACEMENT_METHOD,
@@ -53,6 +54,7 @@ from scripts.pfc.compare_pfc_cohorts import (
     gate_counts,
     heldout_fraction_table,
     legacy_fdr_table,
+    main,
     matched_control_arrays,
     matched_control_significance,
     null_window_table,
@@ -75,6 +77,14 @@ N_LAG_TIMES = 201
 
 #: Repository root, for loading a sibling QA script by path.
 _REPO = Path(__file__).resolve().parents[3]
+
+
+def _gate(data_dir: Path, min_firing_rate: float, inference: str = "legacy") -> dict:
+    """:func:`gate_counts` of one tree loaded at no cutoff, as ``main`` does."""
+    frame, _, _ = load_population_data(
+        data_dir, min_firing_rate=0.0, inference=inference
+    )
+    return gate_counts(frame, min_firing_rate)
 
 
 def _write_bundle(
@@ -481,13 +491,13 @@ class TestPopulation:
     def test_gate_counts_separate_the_two_rate_columns(self, bundle_trees):
         before, after = bundle_trees
 
-        before_gate = gate_counts(before, min_firing_rate=1.0)
+        before_gate = _gate(before, min_firing_rate=1.0)
         assert before_gate["n_neurons_with_fit"] == 9
         assert before_gate["n_passing_fit_bin_rate"] == 9
         # The pre-cohort bundles do not carry the unrestricted twin.
         assert before_gate["n_passing_all_immobile_rate"] is None
 
-        after_gate = gate_counts(after, min_firing_rate=1.0)
+        after_gate = _gate(after, min_firing_rate=1.0)
         assert after_gate["n_neurons_with_fit"] == 5
         # The three chimi neurons fall below the gate on the fit-bin rate only.
         assert after_gate["n_passing_fit_bin_rate"] == 2
@@ -520,6 +530,26 @@ class TestPopulation:
         assert set(table.animal) == {"all", "chimi", "j16"}
         assert set(table.test) == set(FDR_TESTS)
 
+    @pytest.mark.parametrize(("rate", "n_after"), [("0", 5), ("1", 2)])
+    def test_main_gates_every_unit_and_reports_the_population_at_the_cutoff(
+        self, bundle_trees, tmp_path, rate, n_after
+    ):
+        """The gate counts every unit with a fit; the population is the units
+        at or above the cutoff (the three chimi units fall below 1 Hz)."""
+        before, after = bundle_trees
+        out = tmp_path / "report.md"
+
+        main(
+            [
+                *("--before", str(before), "--after", str(after)),
+                *("--min-firing-rate", rate, "--out", str(out)),
+            ]
+        )
+
+        report = out.read_text()
+        assert f"| after | 5 | {n_after} | 5 |" in report
+        assert f"| all | SWR vs. constant | 9 | 3 | 0.3333 | {n_after} |" in report
+
 
 class TestReport:
     def test_report_announces_a_session_only_one_tree_has(self, bundle_trees):
@@ -540,8 +570,8 @@ class TestReport:
             sidecars=read_sidecars(after),
             before=before_frame,
             after=after_frame,
-            before_gate=gate_counts(before, 1.0),
-            after_gate=gate_counts(after, 1.0),
+            before_gate=_gate(before, 1.0),
+            after_gate=_gate(after, 1.0),
             before_dir=before,
             after_dir=after,
             min_firing_rate=1.0,
@@ -1047,8 +1077,8 @@ class TestRerunReport:
             before_sidecars=before_sidecars,
             before=population_before,
             after=population_after,
-            before_gate=gate_counts(before, 1.0),
-            after_gate=gate_counts(after, 1.0),
+            before_gate=_gate(before, 1.0),
+            after_gate=_gate(after, 1.0),
             before_dir=before,
             after_dir=after,
             min_firing_rate=1.0,
@@ -1085,8 +1115,8 @@ class TestRerunReport:
             before_sidecars=try_read_sidecars(before),
             before=population_before,
             after=population_after,
-            before_gate=gate_counts(before, 1.0),
-            after_gate=gate_counts(after, 1.0),
+            before_gate=_gate(before, 1.0),
+            after_gate=_gate(after, 1.0),
             before_dir=before,
             after_dir=after,
             min_firing_rate=1.0,
@@ -1490,8 +1520,8 @@ class TestEstimatorReport:
             sidecars=read_sidecars(after),
             before=population_before,
             after=population_after,
-            before_gate=gate_counts(before, 1.0),
-            after_gate=gate_counts(after, 1.0, inference="heldout"),
+            before_gate=_gate(before, 1.0),
+            after_gate=_gate(after, 1.0, inference="heldout"),
             before_dir=before,
             after_dir=after,
             min_firing_rate=1.0,
@@ -1530,8 +1560,8 @@ class TestEstimatorReport:
             sidecars=read_sidecars(after),
             before=population_before,
             after=population_after.drop(columns="no_SWR: mle_converged"),
-            before_gate=gate_counts(before, 1.0),
-            after_gate=gate_counts(after, 1.0, inference="heldout"),
+            before_gate=_gate(before, 1.0),
+            after_gate=_gate(after, 1.0, inference="heldout"),
             before_dir=before,
             after_dir=after,
             min_firing_rate=1.0,
@@ -1601,8 +1631,8 @@ class TestEmpiricalBayesSigma:
             sidecars=read_sidecars(after),
             before=population_before,
             after=population_after,
-            before_gate=gate_counts(before, 1.0),
-            after_gate=gate_counts(after, 1.0, inference="heldout"),
+            before_gate=_gate(before, 1.0),
+            after_gate=_gate(after, 1.0, inference="heldout"),
             before_dir=before,
             after_dir=after,
             min_firing_rate=1.0,
@@ -1663,8 +1693,8 @@ class TestBeforeTreeIsPairedToTheAfterTree:
             sidecars=read_sidecars(after),
             before=population_before,
             after=population_after,
-            before_gate=gate_counts(before, 1.0),
-            after_gate=gate_counts(after, 1.0, inference="heldout"),
+            before_gate=_gate(before, 1.0),
+            after_gate=_gate(after, 1.0, inference="heldout"),
             before_dir=before,
             after_dir=after,
             min_firing_rate=1.0,
