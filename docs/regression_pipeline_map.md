@@ -498,7 +498,7 @@ Build trial-level reward-belief uncertainty/replay-content results.
 
 Fit three replay-CONTENT estimators on one at-well cohort and compare them.
 
-`se_ratio_column`, `RungSpec`, `log_phi_figure_rung`, `resolve_rungs`, `ComparisonResult`, `unidentified_rows`, `n_unpaired_triples`, `summarize`, `bootstrap_animals`, `run_comparison`, `plot_coefficient_agreement`, `plot_log_phi_by_session`, `write_caption`, `main`
+`RungSpec`, `log_phi_figure_rung`, `resolve_rungs`, `ComparisonResult`, `run_comparison`, `plot_coefficient_agreement`, `plot_log_phi_by_session`, `write_caption`, `main`
 
 ### `scripts/behavior/content/compare_event_source_models.py`
 
@@ -516,7 +516,7 @@ Fit the replay content model hierarchy on pre-computed data.
 
 Fit the beta-bernoulli replay-CONTENT ladder (arm + patch), is_swr version.
 
-`resolve_concentration_cols`, `main`
+`main`
 
 ### `scripts/behavior/content/generate_replay_content_figures.py`
 
@@ -736,7 +736,7 @@ Model checking utilities for the replay content model hierarchy.
 
 Compare nested models via AIC, BIC, and likelihood ratio tests.
 
-`compare_nested_models`, `summarize_comparison`, `run_full_hierarchy_comparison`
+`fit_metric_statistics`, `compare_nested_models`, `summarize_comparison`, `run_full_hierarchy_comparison`
 
 ### `src/continuum_swr_replay/analysis/behavior/contrast_aggregation.py`
 
@@ -1146,7 +1146,7 @@ Across-session summaries of what the per-session fits wrote.
 
 The events a content ladder is fit on, and where the others went.
 
-`prepare_canonical_fit_request`, `CohortSelection`, `select_content_cohort`, `zero_response_event_ids`, `content_cohort_record`
+`prepare_canonical_fit_request`, `CohortSelection`, `select_content_cohort`, `zero_response_event_ids`, `content_cohort_record`, `ContrastFitCohort`, `contrast_fit_cohort`
 
 ### `src/continuum_swr_replay/analysis/behavior/content/content_statistics.py`
 
@@ -1154,11 +1154,17 @@ Summary statistics of what the non-local events represent.
 
 `trunk_shares`, `trunk_share_statistics`, `current_patch_trunk_fraction`, `event_length_statistics`, `concentration_contrast_statistics`
 
+### `src/continuum_swr_replay/analysis/behavior/content/estimator_comparison.py`
+
+How three content estimators agree, fit on one shared event set per session.
+
+`se_ratio_column`, `estimator_rows`, `attach_delta_aic`, `unidentified_rows`, `identified_rows`, `n_unpaired_triples`, `wide_by_estimator`, `summarize_estimators`, `bootstrap_animals`
+
 ### `src/continuum_swr_replay/analysis/behavior/content/session_fits.py`
 
-Fit one content rung on every session of a cohort.
+Fit the content rungs on every session of a cohort.
 
-`fit_model_per_session`
+`fit_model_per_session`, `fit_conditional_logit_robustness`, `resolve_concentration_cols`, `fit_contrast_session`, `fit_contrast_ladder`
 
 ### `src/continuum_swr_replay/analysis/behavior/coupling/swr_power.py`
 
