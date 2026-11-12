@@ -17,7 +17,7 @@ it stops drifting; add new docs to the matching home.
 | **design spec** (scientific/methodological) | **`docs/design/`** | analysis designs — human-discoverable for collaborators/reviewers |
 | history | `docs/history/` | where moved code and data went, and the dated audits the docs once cited; not current instruction |
 | implementation plan (agent process) | `.claude/docs/plans/` | phased execution plans |
-| review (code/methods output) | `.claude/docs/reviews/` | point-in-time review reports, and the dated audits (before/after refit comparisons, regeneration and parity checks) |
+| review (code/methods output) | `.claude/docs/reviews/` | point-in-time review reports, and the dated audits (before/after refit comparisons, regeneration and parity checks). A decision, validation or limitation a reader needs is copied into `docs/design/` or `docs/known_issues/`, which may link back to the audit as its dated source |
 | exploratory notes + figures | `.claude/research/` | scratch analyses; `*_outputs/` figures |
 | code map (generated) | `docs/regression_pipeline_map.md` | every pipeline module and the public symbols it defines, by stage |
 | model spec (code) | `src/continuum_swr_replay/analysis/behavior/model_specs.py` | single source of truth for all model ladders |

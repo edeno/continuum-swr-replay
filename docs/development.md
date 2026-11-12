@@ -105,7 +105,7 @@ docs/                      # Published reference — see docs/README.md for the 
 ├── design/               #   scientific/methodological design specs (human-discoverable)
 ├── history/              #   where moved code and data went
 └── known_issues/
-.claude/docs/              # Agent-process docs (not scientific record)
+.claude/docs/              # Agent-process history (plans, reviews, dated audits); a reader's evidence is in docs/
 ├── plans/                #   phased implementation plans
 └── reviews/              #   code/methods review reports and point-in-time audits
 .claude/research/          # Exploratory scratch analyses + *_outputs/ figures
