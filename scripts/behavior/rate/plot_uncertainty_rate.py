@@ -50,6 +50,7 @@ from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
 from continuum_swr_replay.paths import figure_dir, model_dir
+from continuum_swr_replay.runs.cli import fit_figure_parser
 
 # Single source of truth: the curated covariate set is part of the MU_uncertainty
 # spec in model_specs and the populations are defined in the fitter; import them
@@ -164,17 +165,9 @@ def plot(models: pd.DataFrame, out_path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     """Command-line parser (also the provenance gate's opt-out)."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = fit_figure_parser(__doc__)
     parser.add_argument(
         "--smoke", action="store_true", help="Read the smoke fit output."
-    )
-    parser.add_argument(
-        "--allow-stale",
-        action="store_true",
-        help=(
-            "Plot the fit even if its input tables have changed since it was "
-            "fit (or carry no provenance sidecar at all)."
-        ),
     )
     return parser
 
