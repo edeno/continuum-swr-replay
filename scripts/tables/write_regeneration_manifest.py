@@ -148,7 +148,6 @@ def _validate_model_bundle(
     required_paths = {
         "all_models": directory / "all_models.pkl",
         "cohort_audit": directory / "all_models_cohort_audit.csv",
-        "comparisons": directory / "model_comparison.pkl",
     }
     missing = [name for name, path in required_paths.items() if not path.is_file()]
     if missing:
@@ -175,9 +174,7 @@ def _validate_model_bundle(
 
     models = sorted(results["model"].astype(str).unique())
     model_files = sorted(
-        path.stem
-        for path in directory.glob("*.pkl")
-        if path.name not in {"all_models.pkl", "model_comparison.pkl"}
+        path.stem for path in directory.glob("*.pkl") if path.name != "all_models.pkl"
     )
     if model_files != models:
         raise ValueError(
@@ -243,13 +240,6 @@ def _validate_model_bundle(
     if any(int(observed_events[model]) != expected_events[model] for model in models):
         raise ValueError(f"{directory} cohort audit has wrong modeled-event counts")
 
-    comparisons = pd.read_pickle(required_paths["comparisons"])
-    if not comparisons.empty:
-        if not set(comparisons["parent"]).union(comparisons["child"]).issubset(models):
-            raise ValueError(f"{directory} comparisons reference absent models")
-        if not comparisons["n_sessions"].eq(expected_n_sessions).all():
-            raise ValueError(f"{directory} comparisons use a different session block")
-
     excluded = expected_session_keys.difference(reference_sessions)
     return {
         "models": models,
@@ -257,7 +247,6 @@ def _validate_model_bundle(
         "sessions_modeled": expected_n_sessions,
         "sessions_excluded": _json_session_keys(excluded),
         "events_modeled_per_model": expected_events,
-        "comparison_edges": len(comparisons),
         "all_fit_statistics_finite": True,
         "all_reported_convergence_flags_pass": True,
     }

@@ -527,7 +527,6 @@ def test_count_run_headline_omits_the_per_session_win_counts() -> None:
     assert "180" not in text and "175" not in text
     assert "-12.5" in text and "-11.0" in text
     assert "ΔAIC = child − parent, negative = child better" in text
-    assert "model_comparison.pkl" in text
 
 
 def test_fraction_run_headline_labels_the_win_counts_event_scale() -> None:
@@ -572,7 +571,6 @@ def test_bundle_writes_a_provenance_sidecar_beside_every_pickle(tmp_path) -> Non
         model_results={"X": frame},
         combined=frame,
         cohort_audits=[],
-        comparison=frame,
         logit_results={"X": frame},
         fit_inputs=fit_inputs,
         estimator="conditional_poisson_fraction",
@@ -582,7 +580,6 @@ def test_bundle_writes_a_provenance_sidecar_beside_every_pickle(tmp_path) -> Non
     for artifact in (
         output_dir / "X.pkl",
         output_dir / "all_models.pkl",
-        output_dir / "model_comparison.pkl",
         output_dir / "logit" / "X_logit.pkl",
     ):
         assert check_fit_provenance(artifact, {"event_arm_table": table}) == []
@@ -824,7 +821,6 @@ def test_renormalized_leaf_bundles_say_so_in_their_provenance(tmp_path) -> None:
         model_results={"X": frame},
         combined=frame,
         cohort_audits=[],
-        comparison=pd.DataFrame(),
         logit_results={},
         fit_inputs=record_inputs({"event_arm_table": table}),
         estimator="conditional_poisson_fraction",

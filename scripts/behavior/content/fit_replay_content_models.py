@@ -654,7 +654,6 @@ def _write_complete_output_bundle(
     model_results: Mapping[str, pd.DataFrame],
     combined: pd.DataFrame,
     cohort_audits: list[dict],
-    comparison: pd.DataFrame,
     logit_results: Mapping[str, pd.DataFrame],
     fit_inputs: Mapping[str, object],
     logit_skips: pd.DataFrame | None = None,
@@ -693,8 +692,6 @@ def _write_complete_output_bundle(
             _write(result, staged_dir / f"{model_name}.pkl")
         _write(combined, staged_dir / "all_models.pkl")
         write_cohort_audit(cohort_audits, staged_dir / "all_models_cohort_audit.csv")
-        if not comparison.empty:
-            _write(comparison, staged_dir / "model_comparison.pkl")
         if logit_results:
             logit_dir = staged_dir / "logit"
             logit_dir.mkdir()
@@ -796,8 +793,8 @@ def format_comparison_table(comparison: pd.DataFrame) -> list[str]:
     count response every event contributes ~32 autocorrelated timebins as if
     they were independent draws, so the per-session counts of AIC wins and of
     significant likelihood-ratio tests are anticonservative by roughly that
-    factor: they are kept in ``model_comparison.pkl`` for auditing but are not
-    printed as a headline result. On the fraction (and on the dominant-choice
+    factor: they are columns of the comparison but are not printed as a
+    headline result. On the fraction (and on the dominant-choice
     logit) an event is one observation, so the same counts are printed, marked
     as the event-scale quasi-likelihood quantities they are.
 
@@ -857,8 +854,8 @@ def format_comparison_table(comparison: pd.DataFrame) -> list[str]:
     else:
         lines.append(
             "  Per-session child_better_aic / lrt_significant are timebin-scale "
-            "(events' bins counted as independent draws); they stay in "
-            "model_comparison.pkl and are not reported here."
+            "(events' bins counted as independent draws) and are not reported "
+            "here."
         )
     return lines
 
@@ -1806,8 +1803,8 @@ def _audit_compare_and_publish(
             f"{tuple(valid_model_names)}; no output will be published"
         )
 
-    # Compute comparisons before publication as part of the complete bundle.
-    comparison = pd.DataFrame()
+    # The nested comparison is printed, not written: the figure and the summary
+    # recompute it from the fits.
     if len(model_results) >= 2:
         logging.info("Running nested model comparisons...")
         comparison = run_full_hierarchy_comparison(combined, hierarchy=hierarchy)
@@ -1834,7 +1831,6 @@ def _audit_compare_and_publish(
         model_results=model_results,
         combined=combined,
         cohort_audits=cohort_audits,
-        comparison=comparison,
         logit_results=logit_outputs,
         logit_skips=logit_skips,
         fit_inputs=cohort.fit_inputs,

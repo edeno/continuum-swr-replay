@@ -47,9 +47,6 @@ def _write_bundle(directory: Path, results: pd.DataFrame) -> None:
             "n_modeled": [27, 27],
         }
     ).to_csv(directory / "all_models_cohort_audit.csv", index=False)
-    pd.DataFrame({"parent": ["M0"], "child": ["M1"], "n_sessions": [2]}).to_pickle(
-        directory / "model_comparison.pkl"
-    )
 
 
 def test_validate_model_bundle_requires_one_exact_common_session_block(

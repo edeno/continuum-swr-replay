@@ -113,7 +113,6 @@ def test_complete_bundle_creates_explicit_output_parent(tmp_path):
         model_results={"M0": result},
         combined=result,
         cohort_audits=[],
-        comparison=pd.DataFrame(),
         logit_results={},
         fit_inputs={},
         estimator="conditional_poisson_fraction",
