@@ -15,9 +15,10 @@ fit too, so the coupling is reported both ways.
 Per session, per direction (specs: ``model_specs.MODEL_CROSS_HISTORY_RATE``):
   Mself      = bs(tc) + reward kernel + self-history (raised cosine)
   Mselfcross = Mself + cross-history (raised cosine)
-We report the cross-history coefficients, the self->cross AIC drop, and the
-cross cv-bits/event gain; then aggregate across sessions (median, %+, per-animal
-sign consistency, Benjamini-Hochberg q of the signed-rank p).
+We report the cross-history coefficients, the self->cross AIC difference
+(``delta_aic`` = AIC(Mselfcross) - AIC(Mself); negative = cross history helps),
+and the cross cv-bits/event gain; then aggregate across sessions (median, %
+improved, per-animal sign consistency, Benjamini-Hochberg q of the signed-rank p).
 
 Usage: python scripts/behavior/rate/fit_cross_history_rate.py [--max-per-animal N] [--write]
 """
@@ -119,8 +120,8 @@ def _fit_direction(stops_g, onsets_g, resp_pop, cross_pop) -> dict | None:
     row = {
         "n_bins": fit_cross["n_bins"],
         "n_events": fit_cross["n_events"],
-        # self -> +cross improvement (positive = cross history helps)
-        "delta_aic": fit_self["aic"] - fit_cross["aic"],
+        # child minus parent: negative = cross history helps
+        "delta_aic": fit_cross["aic"] - fit_self["aic"],
         **{c: fit_cross.get(c, np.nan) for c in CROSS_COEFS},
     }
     if cv_self is not None and cv_cross is not None:
@@ -163,8 +164,9 @@ def _summary(models: pd.DataFrame) -> None:
         da = g.dropna(subset=["delta_aic"])
         aic = session_median_statistics(da["delta_aic"], da["animal"])
         print(
-            f"  self->+cross AIC drop: median {aic['median']:+.2f}  "
-            f"%improved {100 * aic['positive_fraction']:.0f}%  "
+            f"  self->+cross AIC difference (+cross minus self; negative = "
+            f"cross helps): median {aic['median']:+.2f}  "
+            f"%improved {100 * aic['negative_fraction']:.0f}%  "
             f"p={signed_rank_p(da['delta_aic']):.1e}"
         )
         if "delta_cv_bits" in g:
