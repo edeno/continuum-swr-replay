@@ -666,7 +666,8 @@ def _estimator_rows(
 def _attach_delta_aic(coefficients: pd.DataFrame) -> pd.DataFrame:
     """Add ``delta_aic_vs_parent`` per (session, rung, estimator).
 
-    The difference is only formed where the rung and its parent were fit on the
+    It is the rung's ``aic_equalized`` minus its parent's, child minus parent:
+    negative means the rung is better. The difference is only formed where the rung and its parent were fit on the
     same number of events in that session and estimator; an AIC difference
     across different rows is not a model comparison, so it is left NaN and
     counted (``n_delta_aic_row_mismatch``) rather than reported.
