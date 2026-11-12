@@ -66,3 +66,33 @@ def test_a_class_the_reference_dropped_is_not_compared(tmp_path):
     assert compared == set(CLASSES[:2])
     slope_rows = [row for row in rows if row["target"] == TARGET]
     assert all(row["slope_max_abs_diff"] == 0.5 for row in slope_rows)
+
+
+def test_the_csv_and_the_printout_state_the_rate_cutoff(
+    tmp_path, processed_data_root, capsys
+):
+    # unit 0 fires at 0.5 Hz, below the 1 Hz cutoff; unit 1 at 5 Hz
+    reference = _bundle(tmp_path / "reference", CLASSES, offset=0.0)
+    candidate = _bundle(tmp_path / "candidate", CLASSES, offset=0.5)
+    pd.DataFrame({"immobility_avg_firing_rate": [0.5, 5.0]}).to_pickle(
+        processed_data_root / "rat20200101_01_r1_mPFC_modulation.pkl"
+    )
+    out = tmp_path / "comparison.csv"
+
+    compare.main(
+        [
+            "--reference",
+            str(reference.parent),
+            "--candidate",
+            str(candidate.parent),
+            "--min-rate",
+            "1.0",
+            "--out",
+            str(out),
+        ]
+    )
+
+    table = pd.read_csv(out)
+    assert (table["min_rate_hz"] == 1.0).all()
+    assert (table["n_units_compared"] == 1).all()
+    assert "units at or above 1.0 Hz" in capsys.readouterr().out

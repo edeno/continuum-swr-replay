@@ -10,7 +10,8 @@ or above ``--min-rate`` Hz in the canonical Figure 4 bundle of the session
 ``load_population.MIN_FIRING_RATE_HZ``, none), and reports per model,
 class and target the largest absolute difference of the slope curves (log-rate
 per SD), of the typical curves, and of the held-out deltas, plus the median
-absolute difference of the slope curves.
+absolute difference of the slope curves. Every row records the cutoff
+(``min_rate_hz``), and the printout states it.
 
 Usage
 -----
@@ -52,7 +53,8 @@ def compare_pair(
     rates : NDArray, shape (n_units_recorded,)
         The session's units' rates over the fitted bins, in recorded order.
     min_rate : float
-        Units below this rate (Hz) are left out of the comparison.
+        Units below this rate (Hz) are left out of the comparison. Each row
+        records it (``min_rate_hz``).
     """
     ref_extra = _extra(reference.with_suffix(".provenance.json"))
     cand_extra = _extra(candidate.with_suffix(".provenance.json"))
@@ -105,6 +107,7 @@ def compare_pair(
                     "model": ref_extra["model_name"],
                     "event_class": event_class,
                     "target": target,
+                    "min_rate_hz": min_rate,
                     "n_units_compared": int(both.sum()),
                     "slope_max_abs_diff": float(diff.max()) if diff.size else np.nan,
                     "slope_median_abs_diff": float(np.median(diff))
@@ -134,6 +137,7 @@ def compare_pair(
                     "model": ref_extra["model_name"],
                     "event_class": event_class,
                     "target": "typical",
+                    "min_rate_hz": min_rate,
                     "n_units_compared": int(both.sum()),
                     "slope_max_abs_diff": float(diff.max()) if diff.size else np.nan,
                     "slope_median_abs_diff": float(np.median(diff))
@@ -169,6 +173,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     table = pd.DataFrame(rows)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     table.to_csv(args.out, index=False)
+    print(
+        f"units at or above {args.min_rate} Hz (immobility_avg_firing_rate of "
+        "the canonical bundle) are compared"
+    )
     with pd.option_context("display.width", 200):
         print(
             table.sort_values("slope_max_abs_diff", ascending=False)

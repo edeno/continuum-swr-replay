@@ -6,7 +6,13 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pandas as pd
 import pytest
+
+from continuum_swr_replay.analysis.pfc.load_population import (
+    HELDOUT_P_COLUMNS,
+    MATCHED_NULL_OBSERVED_COLUMNS,
+)
 
 _SPEC = importlib.util.spec_from_file_location(
     "measure_pfc_null_geometry",
@@ -72,3 +78,21 @@ def test_excluded_section_pools_classes_and_names_the_worst_session(data_dir):
     # the largest share, not the largest count (s2's 10 of 20); the session
     # with no event of the class has no share
     assert "s3 / non_local, which excludes 3 of 4 events (75.0 %)" in text
+
+
+def test_the_called_without_gain_section_states_the_rate_cutoff(tmp_path, monkeypatch):
+    # Two units, both called for every test; the second has no observed gain.
+    units = pd.DataFrame(
+        {
+            **{column: [0.01, 0.01] for column in HELDOUT_P_COLUMNS.values()},
+            **{column: [2.0, 0.0] for column in MATCHED_NULL_OBSERVED_COLUMNS.values()},
+        }
+    )
+    monkeypatch.setattr(
+        geometry, "load_population_data", lambda *args, **kwargs: (units, {}, None)
+    )
+
+    text, table = geometry.non_positive_section(tmp_path, 0.05, 1.0)
+
+    assert "Loaded with `load_population_data(min_firing_rate=1.0)`" in text
+    assert (table["n_called_with_non_positive_gain"] == 1).all()

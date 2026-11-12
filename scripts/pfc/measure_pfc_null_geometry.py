@@ -440,6 +440,9 @@ def non_positive_section(
         "than a constant rate. The statistic counted here is the one the "
         "p-value was read against -- the improvement on the fixed matchable "
         "event subset.\n\n"
+        f"Loaded with `load_population_data(min_firing_rate={min_firing_rate})`: "
+        "a unit enters when its fit exists and its firing rate on the fitted "
+        "bins (`immobility_avg_firing_rate`, Hz) reaches that cutoff.\n\n"
     )
     return text + _md(summary), summary
 
