@@ -436,6 +436,29 @@ def test_the_paired_difference_is_a_minus_b_over_sessions_and_animals():
     assert reverse["n_animals_positive"] == 1
 
 
+def test_the_paired_kernels_are_the_sessions_both_streams_keep():
+    # d1's reward term is separated in b, d5's in a; d6 is fit in b alone
+    a = _fits(
+        _first_bump([0.5, 0.2, 0.9, 0.6, -0.2, 0.3]),
+        separated=[""] * 5 + [REWARD_HISTORY_COLUMNS[1]],
+    )
+    b = _fits(
+        _first_bump([0.1, 0.4, 0.3, 0.1, 0.1, 0.0, 0.7]),
+        separated=["", REWARD_HISTORY_COLUMNS[2], "", "", "", "", ""],
+    )
+    paired = stats.paired_lag_one_reward_kernels(a, b)
+    assert list(paired["session_date"]) == ["d0", "d2", "d3", "d4"]
+    assert list(paired["animal"]) == ["a", "c", "d", "e"]
+    np.testing.assert_allclose(paired["lag_one_a"], [0.5, 0.9, 0.6, -0.2])
+    np.testing.assert_allclose(paired["lag_one_b"], [0.1, 0.3, 0.1, 0.1])
+    # the paired statistics read these sessions: differences 0.4, 0.6, 0.5, -0.3
+    result = stats.paired_lag_one_kernel_statistics(a, b)
+    assert result["n_sessions"] == 4
+    assert result["positive_fraction"] == 0.75
+    assert result["n_animals"] == 4
+    assert result["n_animals_positive"] == 3
+
+
 def test_the_reward_kernel_refuses_two_fits_of_one_session():
     one = _fits(_first_bump([0.5, 0.2, 0.9, 0.6, -0.2]))
     two = pd.concat([one, one])
@@ -443,6 +466,8 @@ def test_the_reward_kernel_refuses_two_fits_of_one_session():
         stats.reward_kernel_statistics(two)
     with pytest.raises(ValueError, match="more than one fit for a session"):
         stats.paired_lag_one_kernel_statistics(one, two)
+    with pytest.raises(ValueError, match="more than one fit for a session"):
+        stats.paired_lag_one_reward_kernels(two, one)
 
 
 # --- each rung's fits -----------------------------------------------------------------

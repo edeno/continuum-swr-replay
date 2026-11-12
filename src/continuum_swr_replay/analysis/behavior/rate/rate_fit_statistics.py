@@ -376,6 +376,32 @@ def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
     }
 
 
+def paired_lag_one_reward_kernels(
+    fits_a: pd.DataFrame, fits_b: pd.DataFrame
+) -> pd.DataFrame:
+    """Each session's lag-1 reward kernel in two populations, over the sessions
+    in which both populations' fits pass the reward gate.
+
+    Parameters
+    ----------
+    fits_a, fits_b : pd.DataFrame
+        Per-session fits of one rung, each of one population
+        (:func:`lag_one_reward_kernels`).
+
+    Returns
+    -------
+    kernels : pd.DataFrame, shape (n_paired_sessions, 5)
+        The session columns, ``lag_one_a`` and ``lag_one_b``: each
+        population's log rate ratio of a reward one trial back. These are the
+        sessions :func:`paired_lag_one_kernel_statistics` reads.
+    """
+    session = list(SESSION_COLUMNS)
+    kernels_a, kernels_b = (
+        lag_one_reward_kernels(fits)[[*session, "lag_one"]] for fits in (fits_a, fits_b)
+    )
+    return kernels_a.merge(kernels_b, on=session, suffixes=("_a", "_b"), validate="1:1")
+
+
 def paired_lag_one_kernel_statistics(
     fits_a: pd.DataFrame, fits_b: pd.DataFrame
 ) -> dict[str, float]:
@@ -390,14 +416,22 @@ def paired_lag_one_kernel_statistics(
     Returns
     -------
     statistics : dict
-        Over the sessions in which both populations' fits pass the reward gate:
-        ``n_sessions``; ``positive_fraction``, the share whose log lag-1 kernel
-        is larger in a than in b; ``n_animals``; ``n_animals_positive``, the
-        animals whose median a - b difference is positive; and
-        ``signed_rank_p``, the paired Wilcoxon signed-rank p.
+        Over the sessions in which both populations' fits pass the reward gate
+        (:func:`paired_lag_one_reward_kernels`): ``n_sessions``;
+        ``positive_fraction``, the share whose log lag-1 kernel is larger in a
+        than in b; ``n_animals``; ``n_animals_positive``, the animals whose
+        median a - b difference is positive; and ``signed_rank_p``, the paired
+        Wilcoxon signed-rank p.
     """
+    paired = paired_lag_one_reward_kernels(fits_a, fits_b)
     statistics = paired_coefficient_statistics(
-        lag_one_reward_kernels(fits_a), lag_one_reward_kernels(fits_b), "lag_one"
+        *(
+            paired[[*SESSION_COLUMNS, f"lag_one_{side}"]].rename(
+                columns={f"lag_one_{side}": "lag_one"}
+            )
+            for side in ("a", "b")
+        ),
+        "lag_one",
     )
     return {
         name: statistics[name]
