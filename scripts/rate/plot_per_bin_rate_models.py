@@ -71,6 +71,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.runs.cli import fit_figure_parser  # noqa: E402
 
 
 def all_models_path() -> Path:
@@ -256,16 +257,7 @@ def plot_selfhistory(m7: pd.DataFrame) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     """Command-line parser (also the provenance gate's opt-out)."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--allow-stale",
-        action="store_true",
-        help=(
-            "Plot the fit even if its input tables have changed since it was "
-            "fit (or carry no provenance sidecar at all)."
-        ),
-    )
-    return parser
+    return fit_figure_parser(__doc__)
 
 
 def main(argv: Sequence[str] | None = None) -> None:

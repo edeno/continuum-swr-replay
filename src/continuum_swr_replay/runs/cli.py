@@ -1,4 +1,5 @@
-"""The runners' shared command line: run ids, the decoders' options, epoch filters."""
+"""The runners' shared command line: run ids, the decoders' options, epoch filters,
+and the fit figures' ``--allow-stale``."""
 
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ __all__ = [
     "RUN_ID_PATTERN",
     "add_common_args",
     "filter_epoch_info",
+    "fit_figure_parser",
     "parse_run_id",
     "select_analysed_epochs",
 ]
@@ -123,6 +125,35 @@ def select_analysed_epochs(args: Namespace) -> list[str]:
         ):
             selected.append(identifier)
     return selected
+
+
+def fit_figure_parser(description: str | None) -> ArgumentParser:
+    """The command line of a script that plots stored fits: ``--allow-stale`` only.
+
+    ``--allow-stale`` is the opt-out of the provenance gate
+    (``analysis.replay.fit_provenance.require_fresh_inputs``), which refuses a
+    fit whose input tables changed after it was written.
+
+    Parameters
+    ----------
+    description : str or None
+        The parser's description; a script passes its ``__doc__``.
+
+    Returns
+    -------
+    ArgumentParser
+        A parser whose namespace has ``allow_stale`` (False unless given).
+    """
+    parser = ArgumentParser(description=description)
+    parser.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help=(
+            "Plot the fit even if its input tables have changed since it was "
+            "fit (or carry no provenance sidecar at all)."
+        ),
+    )
+    return parser
 
 
 def add_common_args(parser: ArgumentParser) -> ArgumentParser:

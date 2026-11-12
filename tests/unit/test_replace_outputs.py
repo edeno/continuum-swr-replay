@@ -2,7 +2,8 @@
 
 ``replace_outputs`` leaves an epoch's folder holding exactly the outputs it was
 given, or, when a write fails, none of them. ``parse_run_id`` is the argparse
-``type`` every runner's run-id option uses.
+``type`` every runner's run-id option uses; ``fit_figure_parser`` is the command
+line of the scripts that plot stored fits.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.runs import io as runs_io
-from continuum_swr_replay.runs.cli import parse_run_id
+from continuum_swr_replay.runs.cli import fit_figure_parser, parse_run_id
 from continuum_swr_replay.runs.io import replace_outputs, sha256_file
 from continuum_swr_replay.tables.io import read_table
 
@@ -138,6 +139,17 @@ def test_argparse_reports_a_bad_run_id_as_a_usage_error(capsys):
         capsys.readouterr().err
     )
     assert parser.parse_args([]).run_id is None
+
+
+def test_the_fit_figure_parser_holds_only_the_stale_opt_out():
+    parser = fit_figure_parser("Plots a fit.")
+
+    assert parser.description == "Plots a fit."
+    assert vars(parser.parse_args([])) == {"allow_stale": False}
+    assert parser.parse_args(["--allow-stale"]).allow_stale is True
+    with pytest.raises(SystemExit) as stopped:
+        parser.parse_args(["--smoke"])
+    assert stopped.value.code == 2
 
 
 def test_every_run_id_option_is_checked():

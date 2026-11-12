@@ -57,6 +57,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.runs.cli import fit_figure_parser
 
 
 def fit_artifact_paths() -> dict[str, Path]:
@@ -114,16 +115,7 @@ def content_input_paths() -> dict[str, Path]:
 
 def build_parser() -> argparse.ArgumentParser:
     """Command-line parser (also the provenance gate's opt-out)."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--allow-stale",
-        action="store_true",
-        help=(
-            "Plot the fit even if its input tables have changed since it was "
-            "fit (or carry no provenance sidecar at all)."
-        ),
-    )
-    return parser
+    return fit_figure_parser(__doc__)
 
 
 def _per_sd_units(artifacts: dict[str, Path]):

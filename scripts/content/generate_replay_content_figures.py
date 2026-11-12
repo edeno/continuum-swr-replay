@@ -45,6 +45,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.runs.cli import fit_figure_parser
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.replay_content_plots import (
     plot_behavior_prediction_results,
@@ -83,16 +84,7 @@ def output_dir() -> Path:
 
 def build_parser() -> argparse.ArgumentParser:
     """Command-line parser (also the provenance gate's opt-out)."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--allow-stale",
-        action="store_true",
-        help=(
-            "Plot the fit even if its input tables have changed since it was "
-            "fit (or carry no provenance sidecar at all)."
-        ),
-    )
-    return parser
+    return fit_figure_parser(__doc__)
 
 
 def main(argv: Sequence[str] | None = None):
