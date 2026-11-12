@@ -48,6 +48,20 @@ event ids, and the qvals table joins to them, so they are rebuilt together; a
 partial rebuild mis-joins silently
 ([development.md](development.md#canonical-per-event-classification-table)).
 
+The canonical tables sit at the root of `replay_content/`, beside their
+standardization references (`standardization_reference.json`,
+`qvals_standardization_reference.json`). They are parquet: read and write them
+through `continuum_swr_replay.tables.io` (`read_table` / `write_table`), never
+`pd.read_pickle`; `read_table`, `read_attrs` and `table_exists` refuse a `.pkl`
+path. Fitted-model artifacts (`all_models.pkl` and the others) hold live
+statsmodels objects and stay pickled. Superseded table pickles are kept under
+`_pickle_archive/`; nothing reads them. No library module or supported script binds
+a root at import. The old upper-case names (`parameters.PROCESSED_DATA_DIR`,
+`paths.REPLAY_CONTENT_DIR` and the rest) still resolve for notebooks and
+`scripts/exploratory/`, but assigning one moves nothing: to redirect a run, set
+`$CSR_PROCESSED_DATA_DIR`. A run folder's `manifest.json` names its inputs and
+settings.
+
 ## From results to the paper
 
 | Stage | Output (in the repository) | Written by |

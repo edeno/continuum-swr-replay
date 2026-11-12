@@ -206,7 +206,9 @@ moves exactly the SWR-vs-non-SWR contrast the two families are compared on.
 
 The all-stops fits remain available as a sensitivity bundle under `_allstops`,
 and in-transit stops may be fit as their own bundle under `_intransit`, but an
-in-transit population is never pooled with a well-anchored one.
+in-transit population is never pooled with a well-anchored one. The in-transit
+population is thin: 50 of the 218 sessions of September 2026 had any (a dated
+count, not computed by a summary).
 
 The restriction is not balanced across the SWR contrast (3.3% of SWR events are
 off-well against 13.0% of non-SWR events) — expected, since SWR events

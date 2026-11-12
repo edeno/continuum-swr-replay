@@ -360,4 +360,5 @@ contract-2 one; the follow-up corpus is written to its own directory
 explicit `--output-dir`), and
 `summarize_pfc_marked_family.py` refuses a directory that mixes contracts or
 event sets. It writes `summary.parquet` there, one row per model, tier,
-class, target and statistic.
+class, target and statistic, and its figures under
+`paper/figures/pfc_marked_family/` (`--figure-dir`).

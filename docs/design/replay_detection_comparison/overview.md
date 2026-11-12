@@ -268,4 +268,12 @@ Method-specific decisions live in the component specs. These apply across the co
 Vendored source for the Widloski method is at
 [reference/widloski_foster_2025/](../../../reference/widloski_foster_2025/), whose README
 records provenance, licenses, the pinned commit, and the functions absent from every
-published source.
+published source. The Frank-lab source of the Yu et al. (2017) detector is at
+[reference/yu_2017_franklab/](../../../reference/yu_2017_franklab/).
+
+The lab's <!--v:survey.papers-->57<!--/v-->-paper survey of detection and decoding
+settings is Supplementary Table S1,
+[paper/tables/table_s1_literature_parameters.csv](../../../paper/tables/table_s1_literature_parameters.csv),
+the paper's one copy, audited against each paper's methods, supplement and released code.
+[literature_parameter_corrections.md](literature_parameter_corrections.md) records the
+first round of corrections to it (2026-09-21).

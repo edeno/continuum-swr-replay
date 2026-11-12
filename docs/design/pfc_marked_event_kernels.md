@@ -185,13 +185,21 @@ python scripts/pfc/run_pfc_marked_kernels.py \
   --gpu 0 --sessions worker0.sessions --n-shuffles 100
 ```
 
-Each bundle contains:
+One bundle per session × mark (`current_arm_fraction`, or
+`current_arm_fraction_posterior` as a sensitivity), under
+`Processed-Data/pfc_marked_kernels/{epoch_identifier}_{mark}_marked_kernels.*`. **No bundle
+exists on disk yet.** Each bundle contains:
 
-- a per-neuron statistics pickle;
-- typical-event and content-slope arrays for both replay classes;
-- the reported lag axis;
-- compressed per-class label-shuffle reference improvements; and
-- a provenance sidecar containing input hashes, definitions, scaling
+- a per-neuron statistics pickle (`.pkl`): the held-out deviance of the joint full model
+  and of each class's reduced model, the class's held-out improvement, the label-shuffle
+  tail fraction and usable-shuffle count, and the convergence flags;
+- typical-event and content-slope arrays for both replay classes
+  (`.{class}.typical.npy`, `.{class}.mark_slope.npy`, class `non_local_SWR` or
+  `non_local_no_SWR`);
+- the reported lag axis (`.lag_time.npy`);
+- compressed per-class label-shuffle reference improvements
+  (`.mark_label_shuffle_reference.npz`); and
+- a provenance sidecar (`.provenance.json`) containing input hashes, definitions, scaling
   references, event counts, design-rank and fold-size diagnostics, device
   identity, usable shuffle counts, and stage timings. Per-unit convergence
   flags are not in the sidecar; they are columns of the per-neuron statistics
