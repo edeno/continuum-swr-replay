@@ -44,11 +44,8 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
-from continuum_swr_replay.analysis.events.analysed_time import analysed_bins
+from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.analysis.events.analysed_time import immobile_analysed_bins
 from continuum_swr_replay.analysis.hippocampus import (
     get_event_types,
     load_data_over_time,
@@ -88,9 +85,7 @@ def plot_non_local_prob_distribution(data_over_time, ax) -> None:
     Used to justify the 0.8 threshold applied throughout the paper. Bins in
     excluded time (``in_excluded_time``) are left out.
     """
-    is_immobile = (
-        data_over_time.head_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ) & analysed_bins(data_over_time)
+    is_immobile = immobile_analysed_bins(data_over_time)
     ax.hist(
         data_over_time.loc[is_immobile, "Non-Local_prob"],
         bins=50,

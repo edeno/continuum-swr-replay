@@ -98,7 +98,10 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
-from continuum_swr_replay.analysis.events.analysed_time import analysed_bins
+from continuum_swr_replay.analysis.events.analysed_time import (
+    analysed_bins,
+    immobile_analysed_bins,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 logger = logging.getLogger(__name__)
@@ -1406,7 +1409,7 @@ def state_fractions_by_movement(
         )
     ]
 
-    is_immobile = (data["head_speed"] < speed_threshold) & _analysed_rows(data)
+    is_immobile = immobile_analysed_bins(data, speed_threshold)
     immobile = data.loc[is_immobile].groupby(group_cols, sort=False)[prob_cols].mean()
     immobile_fractions = [immobile[col].median() for col in prob_cols]
 

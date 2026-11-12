@@ -125,6 +125,7 @@ __all__ = [
     "publish_swr_table",
     "excluded_intervals_by_session",
     "excluded_intervals_of",
+    "immobile_analysed_bins",
     "read_artifact_event_drops",
     "read_dot_with_swr_source",
     "read_verified_dot_with_swr_source",
@@ -991,6 +992,37 @@ def analysed_bins(frame: pd.DataFrame) -> NDArray[np.bool_]:
             "read every frame through analysed_time.read_dot_with_swr_source"
         )
     return ~column.to_numpy()
+
+
+def immobile_analysed_bins(
+    frame: pd.DataFrame,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+) -> NDArray[np.bool_]:
+    """The rows of a read frame that are immobile and outside excluded time.
+
+    Immobile is ``head_speed`` strictly below the threshold, the project's
+    immobility rule for a bin: a bin at the threshold, or without a speed, is
+    not immobile.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        A frame read through this source, with ``head_speed`` and
+        :data:`IN_EXCLUDED_TIME_COLUMN`.
+    speed_threshold : float, optional
+        Speed (cm/s) below which a bin is immobile.
+
+    Returns
+    -------
+    np.ndarray of bool, shape (n_rows,)
+        True where the row is immobile and analysed.
+
+    Raises
+    ------
+    KeyError, TypeError
+        As :func:`analysed_bins`.
+    """
+    return (frame["head_speed"].to_numpy() < speed_threshold) & analysed_bins(frame)
 
 
 def swr_intervals(

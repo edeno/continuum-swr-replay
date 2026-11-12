@@ -1155,6 +1155,26 @@ class TestTheAnalysedBins:
             analysed_time.analysed_bins(frame)
 
 
+def test_immobile_analysed_bins_are_strictly_below_the_threshold_outside_excluded_time():
+    """A bin at 4 cm/s, a bin with no speed and an excluded bin are not
+    immobile analysed bins; the bins below 4 cm/s outside excluded time are."""
+    frame = pd.DataFrame(
+        {
+            "head_speed": [0.0, 3.9, 4.0, np.nan, 1.0, 10.0],
+            "in_excluded_time": [False, False, False, False, True, False],
+        }
+    )
+
+    np.testing.assert_array_equal(
+        analysed_time.immobile_analysed_bins(frame),
+        [True, True, False, False, False, False],
+    )
+    np.testing.assert_array_equal(
+        analysed_time.immobile_analysed_bins(frame, speed_threshold=10.5),
+        [True, True, True, False, False, True],
+    )
+
+
 def _raw_theta_power() -> np.ndarray:
     """Theta power with an artifact's large values in the mask and a few
     untracked (NaN) samples outside it."""

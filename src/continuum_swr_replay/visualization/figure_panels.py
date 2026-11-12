@@ -20,7 +20,10 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.events.analysed_time import analysed_bins
+from continuum_swr_replay.analysis.events.analysed_time import (
+    analysed_bins,
+    immobile_analysed_bins,
+)
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
     nonlocal_event_bins_by_swr,
 )
@@ -288,9 +291,7 @@ def plot_swr_zscore_by_state(
 
     # Immobile bins outside excluded time. The mask bins have no SWR z-score,
     # but the bins in its 0.3-s reach do, and they are not analysed either.
-    is_immobile = (
-        data_over_time.head_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ) & analysed_bins(data_over_time)
+    is_immobile = immobile_analysed_bins(data_over_time)
 
     local_mask = is_immobile & (
         data_over_time["Local_prob"] > DEFAULT_NON_LOCAL_THRESHOLD
