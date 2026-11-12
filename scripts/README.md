@@ -393,7 +393,8 @@ them importable.
   slope kernels with pre- and post-onset means, all animal-balanced; when the
   bundles carry nulls, the max-statistic call against the shuffled-mark
   reference with its plus-one p, and the per-lag 95 % band, each joint target
-  beside its marginal fit, one figure per model); no per-unit p-values. It
+  beside its marginal fit, one figure per model); no per-unit p-values. The
+  statistics are `analysis/pfc/marked_family_statistics.py`'s. It
   refuses a directory that mixes bundle contracts, event sets or model sets. `--bundle-dir`,
   `--out <markdown>`, `--figure-dir`, `--blowup` (default 1000),
   `--summary-parquet` (default `<bundle-dir>/summary.parquet`, one row per
