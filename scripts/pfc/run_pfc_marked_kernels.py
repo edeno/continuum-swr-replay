@@ -35,7 +35,6 @@ its selected card and reuses compiled equal-width scorers within each session.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import sys
@@ -81,10 +80,11 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     filter_epoch_info,
     is_nonempty_file,
     json_safe,
+    matching_sidecar,
+    remove_bundle,
     session_seed,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
-    fit_provenance_path,
     record_inputs,
     write_fit_provenance,
 )
@@ -261,10 +261,10 @@ def _bundle_is_current(
 ) -> bool:
     """Return whether an existing bundle was fit under exactly `fit_contract`.
 
-    The sidecar is the bundle's commit marker: it is written last and removed
-    before a refit, so its presence plus a matching contract is what makes a
-    bundle skippable. A sidecar recording ``n_units == 0`` is a no-units
-    marker and has no companion files by construction.
+    The sidecar must record the contract (:func:`matching_sidecar`). A
+    sidecar recording ``n_units == 0`` is a no-units marker and has no
+    companion files by construction; any other needs the table and every
+    companion file.
 
     Parameters
     ----------
@@ -283,43 +283,14 @@ def _bundle_is_current(
     """
     if overwrite:
         return False
-    sidecar = fit_provenance_path(artifact)
-    if not is_nonempty_file(sidecar):
-        return False
-    try:
-        record = json.loads(sidecar.read_text())
-    except (OSError, json.JSONDecodeError, TypeError):
-        return False
-    if not isinstance(record, Mapping):
-        return False
-    if not all(record.get(key) == value for key, value in fit_contract.items()):
+    record = matching_sidecar(artifact, fit_contract)
+    if record is None:
         return False
     if record.get("n_units") == 0:
         return True
     return is_nonempty_file(artifact) and all(
         is_nonempty_file(path) for path in marked_companion_paths(artifact)
     )
-
-
-def _remove_stale_bundle(artifact: Path) -> None:
-    """Remove every component of a previous bundle before refitting.
-
-    Parameters
-    ----------
-    artifact : Path
-        The bundle's primary ``.pkl`` statistics table.
-
-    Returns
-    -------
-    None
-        The sidecar and all companions are unlinked, so an interrupted refit
-        can never leave a mixture of old and new components that looks
-        complete on the next run.
-    """
-    fit_provenance_path(artifact).unlink(missing_ok=True)
-    artifact.unlink(missing_ok=True)
-    for path in marked_companion_paths(artifact):
-        path.unlink(missing_ok=True)
 
 
 def _audit_marked_diagnostics(
@@ -521,7 +492,7 @@ def run_analysis(
         if _bundle_is_current(artifact, overwrite=overwrite, fit_contract=fit_contract):
             logger.info("Current marked-kernel bundle exists; skipping")
             return True
-        _remove_stale_bundle(artifact)
+        remove_bundle(artifact, marked_companion_paths(artifact))
         artifact.parent.mkdir(parents=True, exist_ok=True)
 
         preparation_started = time.perf_counter()

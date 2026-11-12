@@ -2,8 +2,9 @@
 
 The marked-kernel and marked-model-family runners are two entry points into
 the same corpus: they select sessions the same way, seed their random streams
-the same way, certify a bundle on the same immobile at-well stop cohort, and
-report the same peri-event window. Keeping one copy of those rules here is
+the same way, certify a bundle on the same immobile at-well stop cohort,
+read a bundle's sidecar against its fit contract and remove a stale bundle the
+same way, and report the same peri-event window. Keeping one copy of those rules here is
 what makes two bundles comparable -- a second copy of ``session_seed`` that
 drifts by a single character silently re-folds every session.
 
@@ -15,11 +16,14 @@ meant to differ.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+import json
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 
 __all__ = [
     "MAX_NONCONVERGED_UNIT_FRACTION",
@@ -28,7 +32,9 @@ __all__ = [
     "filter_epoch_info",
     "is_nonempty_file",
     "json_safe",
+    "matching_sidecar",
     "read_session_list",
+    "remove_bundle",
     "session_seed",
 ]
 
@@ -81,6 +87,65 @@ def is_nonempty_file(path: Path) -> bool:
         True when the path is a regular file of non-zero size.
     """
     return path.is_file() and path.stat().st_size > 0
+
+
+def matching_sidecar(
+    artifact: Path, fit_contract: Mapping[str, object]
+) -> Mapping[str, object] | None:
+    """A bundle's provenance sidecar, when it records exactly `fit_contract`.
+
+    The sidecar is the bundle's commit marker: it is written last and removed
+    before a refit. Whether the rest of the bundle is complete is each
+    runner's own rule.
+
+    Parameters
+    ----------
+    artifact : Path
+        The bundle's primary ``.pkl`` statistics table.
+    fit_contract : Mapping of str to object
+        Every key must be recorded with the same value in the sidecar.
+
+    Returns
+    -------
+    Mapping of str to object or None
+        The sidecar's record; None when the sidecar is missing, empty, not a
+        JSON mapping, or records another value for a contract key.
+    """
+    sidecar = fit_provenance_path(artifact)
+    if not is_nonempty_file(sidecar):
+        return None
+    try:
+        record = json.loads(sidecar.read_text())
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(record, Mapping):
+        return None
+    if not all(record.get(key) == value for key, value in fit_contract.items()):
+        return None
+    return record
+
+
+def remove_bundle(artifact: Path, companions: Iterable[Path]) -> None:
+    """Remove every component of a previous bundle before refitting.
+
+    Parameters
+    ----------
+    artifact : Path
+        The bundle's primary ``.pkl`` statistics table.
+    companions : iterable of Path
+        The bundle's other files.
+
+    Returns
+    -------
+    None
+        The sidecar, the table and the companions are unlinked, so an
+        interrupted refit can never leave a mixture of old and new components
+        that looks complete on the next run.
+    """
+    fit_provenance_path(artifact).unlink(missing_ok=True)
+    artifact.unlink(missing_ok=True)
+    for path in companions:
+        path.unlink(missing_ok=True)
 
 
 def json_safe(value: object) -> object:

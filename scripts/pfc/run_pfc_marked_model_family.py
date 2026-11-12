@@ -50,7 +50,6 @@ follow-up set needs an explicit output directory::
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import sys
@@ -115,10 +114,11 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     filter_epoch_info,
     is_nonempty_file,
     json_safe,
+    matching_sidecar,
+    remove_bundle,
     session_seed,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
-    fit_provenance_path,
     record_inputs,
     write_fit_provenance,
 )
@@ -393,10 +393,10 @@ def _bundle_is_current(
 ) -> bool:
     """Return whether a bundle or marker on disk matches `fit_contract` exactly.
 
-    The sidecar is the bundle's commit marker: it is written last and removed
-    before a refit, so its presence plus a matching contract is what makes a
-    bundle skippable. An ``ineligible`` or ``no_units`` sidecar marks a session
-    x model that intentionally has no primary artifact.
+    The sidecar must record the contract (:func:`matching_sidecar`). An
+    ``ineligible`` or ``no_units`` sidecar marks a session x model that
+    intentionally has no primary artifact; a ``complete`` one needs the table
+    and every companion file of the classes it fit.
 
     Parameters
     ----------
@@ -417,16 +417,8 @@ def _bundle_is_current(
     """
     if overwrite:
         return False
-    sidecar = fit_provenance_path(artifact)
-    if not is_nonempty_file(sidecar):
-        return False
-    try:
-        record = json.loads(sidecar.read_text())
-    except (OSError, json.JSONDecodeError, TypeError):
-        return False
-    if not isinstance(record, Mapping):
-        return False
-    if not all(record.get(key) == value for key, value in fit_contract.items()):
+    record = matching_sidecar(artifact, fit_contract)
+    if record is None:
         return False
     status = record.get("bundle_status")
     if status in {"ineligible", "no_units"}:
@@ -450,24 +442,12 @@ def _bundle_is_current(
 def _remove_stale_bundle(artifact: Path, spec: MarkedFamilySpec) -> None:
     """Remove every component of one session x model before refitting it.
 
-    Parameters
-    ----------
-    artifact : Path
-        The bundle's primary ``.pkl`` statistics table.
-    spec : MarkedFamilySpec
-        The model family, which fixes the set of companion files.
-
-    Returns
-    -------
-    None
-        The sidecar and all companions are unlinked, so an interrupted refit
-        can never leave a mixture of old and new components that looks
-        complete on the next run.
+    Every companion the family can write is removed, the slope nulls included
+    (:func:`~continuum_swr_replay.analysis.pfc.runner_support.remove_bundle`).
     """
-    fit_provenance_path(artifact).unlink(missing_ok=True)
-    artifact.unlink(missing_ok=True)
-    for path in family_companion_paths(artifact, spec, slope_permutations=1):
-        path.unlink(missing_ok=True)
+    remove_bundle(
+        artifact, family_companion_paths(artifact, spec, slope_permutations=1)
+    )
 
 
 def _write_marker(
@@ -1313,14 +1293,8 @@ def _written_bundle_status(artifact: Path) -> str:
     """
     if artifact.is_file():
         return "complete"
-    sidecar = fit_provenance_path(artifact)
-    if not is_nonempty_file(sidecar):
-        return "missing"
-    try:
-        record = json.loads(sidecar.read_text())
-    except (OSError, json.JSONDecodeError, TypeError):
-        return "missing"
-    status = record.get("bundle_status") if isinstance(record, Mapping) else None
+    record = matching_sidecar(artifact, {})
+    status = None if record is None else record.get("bundle_status")
     return str(status) if status in {"ineligible", "no_units"} else "missing"
 
 

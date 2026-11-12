@@ -12,9 +12,12 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     filter_epoch_info,
     is_nonempty_file,
     json_safe,
+    matching_sidecar,
     read_session_list,
+    remove_bundle,
     session_seed,
 )
+from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 
 
 def _epoch_info(keys: list[tuple[str, str]], **columns) -> pd.DataFrame:
@@ -161,3 +164,36 @@ class TestJsonSafe:
             "delta": None,
             "finite": 0.25,
         }
+
+
+def test_matching_sidecar_needs_a_mapping_that_records_the_contract(tmp_path):
+    artifact = tmp_path / "bundle.pkl"
+    sidecar = fit_provenance_path(artifact)
+    assert matching_sidecar(artifact, {}) is None  # no sidecar
+    sidecar.write_text("")
+    assert matching_sidecar(artifact, {}) is None  # empty
+    sidecar.write_text("{not json")
+    assert matching_sidecar(artifact, {}) is None
+    sidecar.write_text("[1, 2]")
+    assert matching_sidecar(artifact, {}) is None  # not a mapping
+    sidecar.write_text(json.dumps({"version": 3, "status": "complete"}))
+    assert matching_sidecar(artifact, {"version": 3}) == {
+        "version": 3,
+        "status": "complete",
+    }
+    assert matching_sidecar(artifact, {"version": 2}) is None
+    # an unrecorded key reads as None
+    assert matching_sidecar(artifact, {"version": 3, "absent": None}) is not None
+    assert matching_sidecar(artifact, {"absent": 0}) is None
+
+
+def test_remove_bundle_unlinks_sidecar_table_and_companions(tmp_path):
+    artifact = tmp_path / "bundle.pkl"
+    companions = [tmp_path / "bundle.a.npy", tmp_path / "bundle.b.npy"]
+    for path in (artifact, fit_provenance_path(artifact), companions[0]):
+        path.write_text("x")
+    (tmp_path / "other.pkl").write_text("x")
+
+    remove_bundle(artifact, companions)  # one companion was never written
+
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["other.pkl"]

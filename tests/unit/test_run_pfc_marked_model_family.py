@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.pfc.marked_model_family import MarkedFamilyResults
+from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 
 _SCRIPT = (
     Path(__file__).resolve().parents[2]
@@ -297,7 +298,7 @@ def test_fit_contract_pins_question_marks_and_no_selection_rule():
 
 def test_current_marker_requires_valid_mapping_and_exact_contract(tmp_path):
     artifact = runner.family_artifact_path(tmp_path, "rat_epoch_mPFC", MODEL)
-    sidecar = runner.fit_provenance_path(artifact)
+    sidecar = fit_provenance_path(artifact)
     contract = _contract()
     sidecar.write_text("[]")
     assert not runner._bundle_is_current(
@@ -325,7 +326,7 @@ def test_bundle_is_stale_when_the_window_or_one_input_hash_changes(tmp_path):
     for path in runner.family_companion_paths(artifact, SPEC):
         path.write_bytes(b"complete")
     contract = _contract()
-    runner.fit_provenance_path(artifact).write_text(
+    fit_provenance_path(artifact).write_text(
         json.dumps({**contract, "bundle_status": "complete"})
     )
 
@@ -361,7 +362,7 @@ def test_run_writes_only_target_curves_and_sidecar_last(tmp_path, monkeypatch):
     artifact = _artifact(tmp_path)
     assert artifact.is_file()
     assert all(path.is_file() for path in runner.family_companion_paths(artifact, SPEC))
-    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    record = json.loads(fit_provenance_path(artifact).read_text())
     assert record["bundle_status"] == "complete"
     assert record["neuron_inclusion"].startswith("all recorded units")
     assert not list(tmp_path.glob("*.label_shuffle*"))
@@ -379,7 +380,7 @@ def test_sidecar_is_strict_json_and_round_trips_into_the_skip_check(
     assert _run(tmp_path)
 
     artifact = _artifact(tmp_path)
-    text = runner.fit_provenance_path(artifact).read_text()
+    text = fit_provenance_path(artifact).read_text()
     record = json.loads(text, parse_constant=_refuse_non_json)
     assert record["estimator"] == runner.ESTIMATOR
     assert record["marked_family_diagnostics"]["mean_heldout_delta"] is None
@@ -448,7 +449,7 @@ def test_ineligible_model_writes_a_marker_that_is_not_re_prepared(
     assert not any(
         path.exists() for path in runner.family_companion_paths(artifact, SPEC)
     )
-    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    record = json.loads(fit_provenance_path(artifact).read_text())
     assert record["bundle_status"] == "ineligible"
     assert record["ineligibility_reason"] == "too few finite marked events"
     assert runner._bundle_is_current(
@@ -484,7 +485,7 @@ def test_session_without_units_writes_a_marker_per_pending_model(
     for model in (MODEL, OTHER_MODEL):
         artifact = _artifact(tmp_path, model)
         assert not artifact.exists()
-        record = json.loads(runner.fit_provenance_path(artifact).read_text())
+        record = json.loads(fit_provenance_path(artifact).read_text())
         assert record["bundle_status"] == "no_units"
         assert record["n_units"] == 0
         assert runner._bundle_is_current(
@@ -502,7 +503,7 @@ def _write_stale_bundle(tmp_path, model: str) -> Path:
     artifact.write_bytes(b"stale")
     for path in runner.family_companion_paths(artifact, spec):
         path.write_bytes(b"stale")
-    runner.fit_provenance_path(artifact).write_text(json.dumps({"bundle_status": "x"}))
+    fit_provenance_path(artifact).write_text(json.dumps({"bundle_status": "x"}))
     return artifact
 
 
@@ -523,7 +524,7 @@ def test_a_session_that_never_loads_keeps_the_bundles_it_did_not_reach(
     assert sink == [("RuntimeError", "stop table unreadable")]
     for artifact in stale:
         assert artifact.read_bytes() == b"stale"
-        assert runner.fit_provenance_path(artifact).is_file()
+        assert fit_provenance_path(artifact).is_file()
 
 
 def test_one_failed_model_is_recorded_and_the_next_model_still_runs(
@@ -544,7 +545,7 @@ def test_one_failed_model_is_recorded_and_the_next_model_still_runs(
 
     failed = _artifact(tmp_path, MODEL)
     assert not failed.exists()
-    assert not runner.fit_provenance_path(failed).exists()
+    assert not fit_provenance_path(failed).exists()
     assert not any(
         path.exists() for path in runner.family_companion_paths(failed, SPEC)
     )
@@ -554,7 +555,7 @@ def test_one_failed_model_is_recorded_and_the_next_model_still_runs(
 
     survivor = _artifact(tmp_path, OTHER_MODEL)
     assert survivor.is_file()
-    assert runner.fit_provenance_path(survivor).is_file()
+    assert fit_provenance_path(survivor).is_file()
 
 
 def test_convergence_gate_records_the_counts_and_writes_nothing(tmp_path, monkeypatch):
@@ -575,7 +576,7 @@ def test_convergence_gate_records_the_counts_and_writes_nothing(tmp_path, monkey
 
     artifact = _artifact(tmp_path)
     assert not artifact.exists()
-    assert not runner.fit_provenance_path(artifact).exists()
+    assert not fit_provenance_path(artifact).exists()
     assert sink == [
         ("NonconvergedFullFit", f"2 of 2 units did not converge in model {MODEL}")
     ]
@@ -631,7 +632,7 @@ def test_runner_contract_records_baseline_names_and_version_three(
     assert _run(tmp_path)
 
     artifact = _artifact(tmp_path)
-    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    record = json.loads(fit_provenance_path(artifact).read_text())
     assert record["bundle_contract_version"] == 3
     assert record["baseline_terms"] == "well_and_reward_outcome"
     assert record["baseline_column_names"] == ["well_2", "rewarded_outcome"]
@@ -643,7 +644,7 @@ def test_runner_contract_records_baseline_names_and_version_three(
     # An older sidecar (contract 1: no baseline; contract 2: no well_unknown)
     # never matches, so an old corpus is refit, not skipped.
     for old_version in (1, 2):
-        runner.fit_provenance_path(artifact).write_text(
+        fit_provenance_path(artifact).write_text(
             json.dumps({**record, "bundle_contract_version": old_version})
         )
         assert not runner._bundle_is_current(
@@ -739,7 +740,7 @@ def test_runner_writes_null_companions_and_requires_them(tmp_path, monkeypatch):
         null = np.load(path)
         assert null.dtype == np.float32
         assert null.shape == (2, 201, context.counts.shape[1])
-    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    record = json.loads(fit_provenance_path(artifact).read_text())
     assert record["slope_permutations"] == 2 and record["tier"] == "joint"
     # The context mark is a baseline column of this model; well and outcome
     # are constant here and dropped, and no stop has an unknown context.
@@ -784,7 +785,7 @@ def test_extended_event_set_adds_swrs_without_replay_to_ripple_power(
     assert seen["event_strength"][1] == runner.MARKED_EVENT_CLASSES
     pooled = _artifact(tmp_path, "ripple_power_pooled")
     assert pooled.with_suffix(".pooled.ripple_power_z.slope.npy").is_file()
-    record = json.loads(runner.fit_provenance_path(pooled).read_text())
+    record = json.loads(fit_provenance_path(pooled).read_text())
     assert record["event_set"] == "with_swr_without_replay"
     assert record["target_classes"] == ["pooled"]
 
@@ -810,7 +811,7 @@ def test_a_class_too_short_for_a_model_is_dropped_and_recorded(tmp_path, monkeyp
     assert _run(tmp_path, model_names=(model,), event_set="with_swr_without_replay")
 
     artifact = _artifact(tmp_path, model)
-    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    record = json.loads(fit_provenance_path(artifact).read_text())
     assert record["bundle_status"] == "complete"
     assert record["fitted_event_classes"] == list(runner.MARKED_EVENT_CLASSES)
     assert record["dropped_event_classes"] == {runner.SWR_NO_NON_LOCAL: reason}

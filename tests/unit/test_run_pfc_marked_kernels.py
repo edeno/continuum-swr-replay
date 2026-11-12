@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.pfc.marked_glm import MarkedKernelResults
+from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 
 _SCRIPT = (
     Path(__file__).resolve().parents[2]
@@ -251,9 +252,7 @@ def test_bundle_is_current_requires_every_companion_file(tmp_path):
     for path in runner.marked_companion_paths(artifact):
         path.write_bytes(b"complete")
     contract = _contract()
-    runner.fit_provenance_path(artifact).write_text(
-        json.dumps({**contract, "n_units": 7})
-    )
+    fit_provenance_path(artifact).write_text(json.dumps({**contract, "n_units": 7}))
 
     assert runner._bundle_is_current(artifact, overwrite=False, fit_contract=contract)
     assert not runner._bundle_is_current(
@@ -278,7 +277,7 @@ def test_bundle_is_current_rejects_empty_or_malformed_components(tmp_path):
     for path in runner.marked_companion_paths(artifact):
         path.write_bytes(b"complete")
     for sidecar_text in ("not json", "[]", '{"inputs": []}'):
-        runner.fit_provenance_path(artifact).write_text(sidecar_text)
+        fit_provenance_path(artifact).write_text(sidecar_text)
         assert not runner._bundle_is_current(
             artifact, overwrite=False, fit_contract=contract
         )
@@ -289,9 +288,7 @@ def test_bundle_is_stale_when_one_contract_value_changes(tmp_path):
     artifact.write_bytes(b"complete")
     for path in runner.marked_companion_paths(artifact):
         path.write_bytes(b"complete")
-    runner.fit_provenance_path(artifact).write_text(
-        json.dumps({**_contract(), "n_units": 7})
-    )
+    fit_provenance_path(artifact).write_text(json.dumps({**_contract(), "n_units": 7}))
 
     assert not runner._bundle_is_current(
         artifact, overwrite=False, fit_contract=_contract(penalty_sigma=1.0)
@@ -310,9 +307,7 @@ def test_current_bundle_skips_before_scientific_preparation(monkeypatch, tmp_pat
     artifact.write_bytes(b"complete")
     for path in runner.marked_companion_paths(artifact):
         path.write_bytes(b"complete")
-    runner.fit_provenance_path(artifact).write_text(
-        json.dumps({**_contract(), "n_units": 7})
-    )
+    fit_provenance_path(artifact).write_text(json.dumps({**_contract(), "n_units": 7}))
     context = _make_context()
 
     def fail_if_prepared(*args, **kwargs):
@@ -416,7 +411,7 @@ def test_sidecar_round_trips_into_the_skip_check(monkeypatch, tmp_path):
     assert _run(tmp_path, overwrite=True)
 
     artifact = _artifact(tmp_path)
-    sidecar = runner.fit_provenance_path(artifact)
+    sidecar = fit_provenance_path(artifact)
     record = json.loads(sidecar.read_text())
     assert record["estimator"] == runner.ESTIMATOR
     assert record["n_units"] == 2
@@ -445,7 +440,7 @@ def test_session_without_units_writes_a_marker_that_is_current(monkeypatch, tmp_
     artifact = _artifact(tmp_path)
     assert not artifact.exists()
     assert not any(path.exists() for path in runner.marked_companion_paths(artifact))
-    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    record = json.loads(fit_provenance_path(artifact).read_text())
     assert record["n_units"] == 0
     assert runner._bundle_is_current(
         artifact, overwrite=False, fit_contract=_contract()
@@ -465,7 +460,7 @@ def test_failed_fit_leaves_no_sidecar_or_stale_companion(monkeypatch, tmp_path):
     artifact.write_bytes(b"stale")
     for path in runner.marked_companion_paths(artifact):
         path.write_bytes(b"stale")
-    runner.fit_provenance_path(artifact).write_text(json.dumps({**_contract()}))
+    fit_provenance_path(artifact).write_text(json.dumps({**_contract()}))
     context = _make_context()
 
     def raise_on_fit(*args, **kwargs):
@@ -475,7 +470,7 @@ def test_failed_fit_leaves_no_sidecar_or_stale_companion(monkeypatch, tmp_path):
     failure_sink: list[tuple[str, str]] = []
 
     assert _run(tmp_path, overwrite=True, failure_sink=failure_sink) is False
-    assert not runner.fit_provenance_path(artifact).exists()
+    assert not fit_provenance_path(artifact).exists()
     assert not any(path.exists() for path in runner.marked_companion_paths(artifact))
     assert failure_sink == [("RuntimeError", "fit blew up")]
 
@@ -511,5 +506,5 @@ def test_too_many_nonconverged_units_refuses_the_bundle(monkeypatch, tmp_path, c
 
     artifact = _artifact(tmp_path)
     assert not artifact.exists()
-    assert not runner.fit_provenance_path(artifact).exists()
+    assert not fit_provenance_path(artifact).exists()
     assert failure_sink[0][0] == "NonconvergedFullFit"
