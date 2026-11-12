@@ -10,7 +10,7 @@ it stops drifting; add new docs to the matching home.
 | catalog | `docs/models_table.md` | every regression model in R notation (mirrors `model_specs.py`) |
 | definitions | `docs/covariate_dictionary.md`, `docs/behavior_model_covariates.md` | canonical covariate definitions; the `qvals_table` data dictionary |
 | reference (models) | `docs/behavior_models.md` | the SpatialBanditTask generative models (Beta-Bernoulli, HMM, Q-learners) that produce the behavioral covariates |
-| methods | `docs/rate_models.md` | how the model families work (not results) |
+| methods and results | `docs/rate_models.md` | how the two event-rate model families work, and what their fits show: the values it quotes are generated markers filled from `paper/reported/` |
 | results | `paper/reported/questions.md` (generated) | every reported value, under the question it answers, in the paper's outline |
 | reference | `docs/task_description.md`, `docs/cached_trials_for_testing.md`, `docs/known_issues/` | task/data background |
 | cohort | `docs/epoch_register.md` | which run epochs are analysed, and the reason for every other one (mirrors `data_loaders/epoch_register.py`) |
@@ -209,11 +209,14 @@ layers below it, never from a layer above:
 3. **The other `analysis/` packages** (`hippocampus/`, `replay/`, `pfc/`, `behavior/`,
    `contfrag/`, `inventory_comparison/`). `hippocampus/` never imports `pfc/` or
    `inventory_comparison/`. No `analysis/` code imports `visualization/`.
-4. **`visualization/`** (with `figure_utilities.py`), then **`scripts/`** on top.
-   Nothing in `src/` imports `scripts/`.
+4. **`visualization/`** (with `figure_utilities.py`) and **`reported/`** (the summary
+   builders), side by side, then **`scripts/`** on top. `reported/` imports the
+   foundation and `analysis/` (it names and describes the statistics that `analysis/`
+   computes); nothing in `analysis/` or `visualization/` imports `reported/`, so the
+   analysis does not depend on the reporting. Nothing in `src/` imports `scripts/`.
 
 There are no package cycles. `tests/unit/test_import_layering.py` enforces all of
-this (it also keeps `data_loaders/` from importing `analysis/`, `hippocampus/` from
+this except the rules for `reported/`, which hold today but are not tested (it also keeps `data_loaders/` from importing `analysis/`, `hippocampus/` from
 importing `replay/`, and the covariate builders from importing `model_specs.py`). It
 has no allowlist: any violation fails.
 
