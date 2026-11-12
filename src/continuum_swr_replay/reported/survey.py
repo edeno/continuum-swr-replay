@@ -3,7 +3,9 @@
 The introduction summarizes how published replay studies detect candidate
 events and decode them, from the survey in Supplementary Table S1
 (``continuum_swr_replay.reported.literature``). The values here are computed
-from that survey, so a correction to it reaches the text.
+from that survey, so a correction to it reaches the text. This module reads the
+survey's cells and names and describes the values; the statistics are computed
+in ``analysis.literature_survey``.
 
 A numeric parameter keeps a cell only when it is a bare number. The other forms
 a cell takes are listed in :data:`EXCLUDED_FORMS` -- a missing marker
@@ -24,6 +26,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis import literature_survey
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported import literature
 from continuum_swr_replay.reported.values import (
@@ -97,9 +100,6 @@ EXCLUDED_FORMS: dict[str, re.Pattern[str]] = {
 TRIGGERS = frozenset({"SWR", "MUA", "Decoding"})
 """The signals a Detection cell may name, comma-separated."""
 
-_BAYES = re.compile(r"(?<!\w)(?<!non-)bayes", re.IGNORECASE)
-"""``Bayes`` or ``Bayesian`` as a word (``naive-Bayes`` too); ``non-Bayesian`` does not match."""
-
 
 @dataclass(frozen=True)
 class SurveyInputs:
@@ -111,15 +111,6 @@ class SurveyInputs:
 def default_inputs() -> SurveyInputs:
     """The survey of Supplementary Table S1."""
     return SurveyInputs(survey=literature.SURVEY_PATH)
-
-
-def _mode(values: pd.Series, what: str) -> float:
-    """The single most common value; raises on a tie."""
-    counts = values.value_counts()
-    top = counts[counts == counts.max()]
-    if len(top) != 1:
-        raise ValueError(f"{what}: the mode is tied between {sorted(top.index)}")
-    return float(top.index[0])
 
 
 def _is_excluded(text: str) -> bool:
@@ -189,15 +180,14 @@ def parameter_values(numeric: pd.DataFrame, source: str) -> list[Value]:
     make = value_factory(parameter_values, source, TAGS["survey"])
     out: list[Value] = []
     for stem, (columns, unit, what) in PARAMETERS.items():
-        pooled = pd.concat([numeric[c] for c in columns]).dropna()
-        if pooled.empty:
-            raise ValueError(f"{stem}: no numeric cells in {list(columns)}")
-        where = f"over the {len(pooled)} numeric cells of {', '.join(columns)}"
-        for word, value, which in (
-            ("mode", _mode(pooled, stem), "Most common"),
-            ("min", pooled.min(), "Smallest"),
-            ("max", pooled.max(), "Largest"),
+        stats = literature_survey.parameter_statistics(numeric, columns, stem)
+        where = f"over the {stats['n_cells']} numeric cells of {', '.join(columns)}"
+        for word, which in (
+            ("mode", "Most common"),
+            ("min", "Smallest"),
+            ("max", "Largest"),
         ):
+            value = stats[word]
             out.append(
                 make(
                     f"{stem}_{word}",
@@ -252,34 +242,24 @@ def method_values(survey: pd.DataFrame, source: str) -> list[Value]:
     -------
     values : list of Value
     """
-    n = len(survey)
-    trigger = triggers(survey["Detection"])
-    shares: dict[str, tuple[pd.Series, str]] = {
-        "mua_only": (
-            trigger == frozenset({"MUA"}),
-            "whose candidate events are triggered by multiunit activity alone (Detection names MUA only)",
-        ),
-        "swr_only": (
-            trigger == frozenset({"SWR"}),
-            "whose candidate events are triggered by ripple power alone (Detection names SWR only)",
-        ),
-        "swr_and_mua": (
-            trigger == frozenset({"SWR", "MUA"}),
-            "that use both ripple power and multiunit activity (Detection names SWR and MUA only)",
-        ),
-        "bayes": (
-            survey["Decoding"].str.contains(_BAYES),
-            "whose decoding uses a Bayesian decoder, alone or with another method "
-            "(Decoding names 'Bayes' or 'Bayesian'; 'non-Bayesian' does not count)",
-        ),
+    shares = literature_survey.method_shares(
+        triggers(survey["Detection"]), survey["Decoding"]
+    )
+    n = shares["n_papers"]
+    described = {
+        "mua_only": "whose candidate events are triggered by multiunit activity alone (Detection names MUA only)",
+        "swr_only": "whose candidate events are triggered by ripple power alone (Detection names SWR only)",
+        "swr_and_mua": "that use both ripple power and multiunit activity (Detection names SWR and MUA only)",
+        "bayes": "whose decoding uses a Bayesian decoder, alone or with another method "
+        "(Decoding names 'Bayes' or 'Bayesian'; 'non-Bayesian' does not count)",
     }
     make = value_factory(method_values, source, TAGS["survey"])
     out = [make("papers", n, "count", "count", "Papers in the survey")]
-    for stem, (mask, what) in shares.items():
+    for stem, what in described.items():
         out.append(
             make(
                 f"{stem}_fraction",
-                float(mask.sum()) / n,
+                shares[f"{stem}_fraction"],
                 "fraction",
                 "pctnum",
                 f"Share of the {n} surveyed papers {what}",

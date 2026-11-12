@@ -449,6 +449,8 @@ signed-rank p (NaN below six non-zero differences), the Benjamini-Hochberg corre
 left out of the family) and the animal-balanced summary over sessions; every other module calls those.
 Each builder's statistics:
 
+- survey: `analysis/literature_survey.py` (the builder reads the survey's cells into numbers and trigger
+  sets; the modes, ranges and shares are computed there);
 - events: `analysis/hippocampus/event_statistics.py`, `analysis/inventory_comparison/nonlocal_comparison.py`;
 - mpfc: `analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`, and
   `analysis/pfc/marked_family_statistics.py` (through the marked-family summary

@@ -73,12 +73,6 @@ def test_a_cell_of_an_unlisted_form_is_an_error(cell):
         builder.numeric(survey)
 
 
-def test_tied_mode_is_an_error():
-    with pytest.raises(ValueError, match="tied"):
-        builder._mode(pd.Series([2.0, 2.0, 3.0, 3.0]), "threshold")
-    assert builder._mode(pd.Series([2.0, 3.0, 3.0]), "threshold") == 3.0
-
-
 def test_a_parameter_with_no_numeric_cell_is_an_error():
     numbers = pd.DataFrame({c: [1.0, 1.0, 2.0] for c in builder.PARAMETER_COLUMNS})
     numbers["Animal Speed (cm/s)"] = float("nan")
@@ -91,36 +85,31 @@ def test_whole_values_print_whole_and_others_keep_figures():
     assert builder._whole_or_two_figures(2.5) == "sig2"
 
 
-def test_trigger_and_decoder_shares():
+def test_a_detection_cell_is_read_as_a_set_of_signals():
+    read = builder.triggers(pd.Series(["SWR, MUA", "MUA,SWR", " MUA ", "Decoding"]))
+    assert list(read) == [
+        frozenset({"SWR", "MUA"}),
+        frozenset({"SWR", "MUA"}),
+        frozenset({"MUA"}),
+        frozenset({"Decoding"}),
+    ]
+
+
+def test_each_share_is_named_for_its_own_statistic():
     survey = pd.DataFrame(
         {
-            "Detection": [
-                "MUA",
-                "MUA",
-                "SWR",
-                "SWR, MUA",
-                "MUA,SWR",
-                "Decoding",
-                "SWR, MUA, Decoding",
-            ],
-            "Decoding": [
-                "Bayes",
-                "UMAP\nBayes",
-                "Rank order correlation",
-                "bayes",
-                "Bayesian decoder",
-                "non-Bayesian state space",
-                "naive-Bayes",
-            ],
+            "Detection": ["MUA", "MUA", "MUA", "SWR", "SWR, MUA"],
+            "Decoding": ["Bayes", "Bayes", "x", "x", "x"],
         }
     )
     shares = {v.key: v.value for v in builder.method_values(survey, "s")}
-    assert shares["papers"] == 7
-    assert shares["mua_only_fraction"] == pytest.approx(2 / 7)
-    assert shares["swr_only_fraction"] == pytest.approx(1 / 7)
-    # "SWR, MUA, Decoding" names a third signal, so it is in none of the shares.
-    assert shares["swr_and_mua_fraction"] == pytest.approx(2 / 7)
-    assert shares["bayes_fraction"] == pytest.approx(5 / 7)
+    assert shares == {
+        "papers": 5,
+        "mua_only_fraction": 3 / 5,
+        "swr_only_fraction": 1 / 5,
+        "swr_and_mua_fraction": 1 / 5,
+        "bayes_fraction": 2 / 5,
+    }
 
 
 @pytest.mark.parametrize("cell", ["SWR + MUA", "LFP", ""])
