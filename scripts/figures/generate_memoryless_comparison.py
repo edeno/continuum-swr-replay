@@ -862,27 +862,30 @@ def plot_detection(ax, grid: pd.DataFrame, title: str, show_y: bool):
     return image
 
 
-def timing_series(
-    summary: pd.DataFrame, detector: str, edge: str, statistic: str
-) -> tuple[np.ndarray, np.ndarray]:
-    """One timing curve: true duration in ms, and the error statistic in ms."""
-    rows = summary[
-        (summary["summary"] == "timing_by_duration")
-        & (summary.measure == f"{detector}_{edge}_error_ms_{statistic}")
-    ].sort_values("duration_s")
-    return 1000 * rows.duration_s.to_numpy(), rows.value.to_numpy()
+TIMING_MEASURES = tuple(
+    f"{detector}_{edge}_error_ms_{statistic}"
+    for detector in ("sliding", "state_space")
+    for edge in ("start", "end")
+    for statistic in ("median", "q25", "q75")
+)
+"""The timing errors the onset and offset panels draw, in ms, by true duration."""
 
 
 def plot_edge_error(ax, summary: pd.DataFrame, edge: str) -> None:
     """Reported minus true start or end, for replays both procedures found."""
+    timing = sweep_statistics.sweep_by_duration(
+        summary, "timing_by_duration", TIMING_MEASURES
+    )
+    duration_ms = 1000 * timing.index.to_numpy()
     ax.axhline(0.0, color="0.6", lw=0.7, ls=":")
     for detector, color, label in (
         ("sliding", VERMILION, SLIDING),
         ("state_space", BLUE, STATE_SPACE),
     ):
-        duration_ms, median = timing_series(summary, detector, edge, "median")
-        _, low = timing_series(summary, detector, edge, "q25")
-        _, high = timing_series(summary, detector, edge, "q75")
+        median, low, high = (
+            timing[f"{detector}_{edge}_error_ms_{statistic}"].to_numpy()
+            for statistic in ("median", "q25", "q75")
+        )
         ax.fill_between(duration_ms, low, high, color=color, alpha=0.2, lw=0)
         ax.plot(
             duration_ms, median, color=color, lw=1.0, marker="o", ms=2.5, label=label
@@ -1413,17 +1416,25 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
             "The caption says the jump half passes fewer of the shortest replays "
             "than of the longest; the summary's pass rates by duration disagree."
         )
-    _, sliding_onset = timing_series(summary, "sliding", "start", "median")
-    _, state_space_onset = timing_series(summary, "state_space", "start", "median")
-    _, sliding_offset = timing_series(summary, "sliding", "end", "median")
-    _, state_space_offset = timing_series(summary, "state_space", "end", "median")
-    if not ((sliding_onset < 0).all() and (sliding_offset > 0).all()):
+    timing = sweep_statistics.sweep_timing_statistics(summary)
+    if not (
+        timing["sliding_start_early_min_ms"] > 0
+        and timing["sliding_end_late_min_ms"] > 0
+    ):
         raise RuntimeError(
             "The caption says the sliding window starts early and ends late at "
             "every duration; the summary's median timing errors disagree."
         )
-    _, sliding_offset_q25 = timing_series(summary, "sliding", "end", "q25")
-    _, sliding_offset_q75 = timing_series(summary, "sliding", "end", "q75")
+    errors = sweep_statistics.sweep_by_duration(
+        summary, "timing_by_duration", TIMING_MEASURES
+    )
+    sliding_onset, state_space_onset, sliding_offset, state_space_offset = (
+        errors[f"{detector}_{edge}_error_ms_median"].to_numpy()
+        for edge in ("start", "end")
+        for detector in ("sliding", "state_space")
+    )
+    sliding_offset_q25 = errors["sliding_end_error_ms_q25"].to_numpy()
+    sliding_offset_q75 = errors["sliding_end_error_ms_q75"].to_numpy()
     if not (
         sliding_offset_q75 - sliding_offset > sliding_offset - sliding_offset_q25
     ).all():

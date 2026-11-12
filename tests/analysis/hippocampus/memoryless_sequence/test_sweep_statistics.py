@@ -137,6 +137,41 @@ def test_sweep_jump_pass_statistics_refuse_a_summary_without_the_block():
         stats.sweep_jump_pass_statistics(SWEEP[SWEEP["summary"] == "overall"])
 
 
+def test_sweep_by_duration_sets_measures_side_by_side_shortest_first():
+    result = stats.sweep_by_duration(
+        SWEEP,
+        "timing_by_duration",
+        ["sliding_end_error_ms_q25", "sliding_end_error_ms_median"],
+    )
+    assert list(result.columns) == [
+        "sliding_end_error_ms_q25",
+        "sliding_end_error_ms_median",
+    ]
+    assert list(result.index) == [0.04, 0.1, 0.2]
+    assert result["sliding_end_error_ms_q25"].tolist() == [5.0, 6.0, 7.0]
+    assert result["sliding_end_error_ms_median"].tolist() == [40.0, 18.0, 55.0]
+
+
+def test_sweep_by_duration_refuses_measures_at_different_durations():
+    changed = _without("timing_by_duration", "sliding_end_error_ms_q25", 0.1)
+    with pytest.raises(ValueError, match="not all at the same durations"):
+        stats.sweep_by_duration(
+            changed,
+            "timing_by_duration",
+            ["sliding_end_error_ms_median", "sliding_end_error_ms_q25"],
+        )
+    # one measure alone is at the durations it has
+    alone = stats.sweep_by_duration(
+        changed, "timing_by_duration", ["sliding_end_error_ms_q25"]
+    )
+    assert list(alone.index) == [0.04, 0.2]
+
+
+def test_sweep_by_duration_refuses_a_measure_with_no_row():
+    with pytest.raises(ValueError, match="has no row"):
+        stats.sweep_by_duration(SWEEP, "timing_by_duration", ["no_such_measure"])
+
+
 def test_sweep_timing_statistics_are_in_ms_and_signed_as_early_and_late():
     result = stats.sweep_timing_statistics(SWEEP)
     assert result["shortest_duration_s"] == 0.04

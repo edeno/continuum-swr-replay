@@ -5,10 +5,13 @@ long-format summary, one value per row: the injected-replay sweep
 (``scripts/detection/sweep_memoryless_detection.py``), its controls
 (``sweep_memoryless_controls.py``) and the held-out check
 (``sweep_memoryless_heldout.py``). Each function here takes one of those
-summaries and returns named numbers: one value, a dict, or a series with one
-value per measure (:func:`heldout_event_classes` returns the names of the
-classes of event instead). They are the statistics the detection summary
-reports (``continuum_swr_replay.reported.detection`` names and describes them).
+summaries and returns named numbers: one value, a dict, a series with one
+value per measure, or a table with one row per true duration
+(:func:`heldout_event_classes` returns the names of the classes of event
+instead). They are the statistics the detection summary reports
+(``continuum_swr_replay.reported.detection`` names and describes them) and the
+memoryless comparison figure draws
+(``scripts/figures/generate_memoryless_comparison.py``).
 
 A share is a fraction in [0, 1]. Durations are in seconds; the replay sweep
 stores its timing errors in milliseconds, and the statistics of them stay in
@@ -30,6 +33,7 @@ __all__ = [
     "no_replay_statistics",
     "part_recovery_statistics",
     "pooled_heldout_rate",
+    "sweep_by_duration",
     "sweep_grid_statistics",
     "sweep_jump_pass_statistics",
     "sweep_measures",
@@ -76,6 +80,46 @@ def _by_duration(summary: pd.DataFrame, block: str, measure: str) -> pd.Series:
             "no duration_s"
         )
     return rows.sort_values("duration_s").set_index("duration_s")["value"]
+
+
+def sweep_by_duration(
+    summary: pd.DataFrame, block: str, measures: Sequence[str]
+) -> pd.DataFrame:
+    """Measures of one by-duration block of the replay sweep's summary, side by
+    side.
+
+    Parameters
+    ----------
+    summary : pd.DataFrame, shape (n_rows, n_columns)
+        The replay sweep's summary (:func:`sweep_measures`), with ``duration_s``
+        on the rows of ``block``.
+    block : str
+        A block with one row per measure and true duration, such as
+        ``"timing_by_duration"``.
+    measures : sequence of str
+        The measures read, such as ``"sliding_start_error_ms_median"``.
+
+    Returns
+    -------
+    values : pd.DataFrame, shape (n_durations, n_measures)
+        One column per measure, in the order given, indexed by the true
+        duration in seconds, shortest first; in the units the summary stores
+        (the timing errors in milliseconds).
+
+    Raises
+    ------
+    ValueError
+        If a measure has no row or a row with no ``duration_s``, or the
+        measures are not all at the same durations.
+    """
+    columns = {measure: _by_duration(summary, block, measure) for measure in measures}
+    durations = columns[measures[0]].index
+    if not all(column.index.equals(durations) for column in columns.values()):
+        raise ValueError(
+            f"replay sweep summary: the {block} measures are not all at the same "
+            "durations"
+        )
+    return pd.DataFrame(columns)
 
 
 def _whole_count(share: float, n: float) -> int:
@@ -209,42 +253,42 @@ def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
         If a measure has no row or a row with no ``duration_s``, or the
         measures are not all at the same durations.
     """
-
-    def errors(detector: str, edge: str, statistic: str) -> pd.Series:
-        return _by_duration(
-            summary, "timing_by_duration", f"{detector}_{edge}_error_ms_{statistic}"
-        )
-
-    sliding_start = errors("sliding", "start", "median")
-    sliding_end = errors("sliding", "end", "median")
-    sliding_end_upper_quartile = errors("sliding", "end", "q75")
-    state_space = [errors("state_space", edge, "median") for edge in ("start", "end")]
+    errors = sweep_by_duration(
+        summary,
+        "timing_by_duration",
+        [
+            "sliding_start_error_ms_median",
+            "sliding_end_error_ms_median",
+            "sliding_end_error_ms_q75",
+            "state_space_start_error_ms_median",
+            "state_space_end_error_ms_median",
+        ],
+    )
     ratio = _by_duration(
         summary, "median_duration_ratio_by_duration", "sliding_duration_ratio"
     )
-    durations = sliding_start.index
-    if not all(
-        measure.index.equals(durations)
-        for measure in (sliding_end, sliding_end_upper_quartile, *state_space, ratio)
-    ):
+    durations = errors.index
+    if not ratio.index.equals(durations):
         raise ValueError(
             "replay sweep summary: the timing errors and the duration ratio are "
             "not all at the same durations"
         )
     # as arrays, so that a missing value is NaN in the result and not skipped
-    start, end = sliding_start.to_numpy(), sliding_end.to_numpy()
+    start = errors["sliding_start_error_ms_median"].to_numpy()
+    end = errors["sliding_end_error_ms_median"].to_numpy()
+    state_space = errors[
+        ["state_space_start_error_ms_median", "state_space_end_error_ms_median"]
+    ].to_numpy()
     return {
         "shortest_duration_s": float(durations[0]),
         "longest_duration_s": float(durations[-1]),
-        "state_space_edge_error_max_ms": float(
-            np.abs(np.concatenate(state_space)).max()
-        ),
+        "state_space_edge_error_max_ms": float(np.abs(state_space).max()),
         "sliding_start_early_min_ms": float(-start.max()),
         "sliding_start_early_max_ms": float(-start.min()),
         "sliding_end_late_min_ms": float(end.min()),
         "sliding_end_late_max_ms": float(end.max()),
         "sliding_end_late_upper_quartile_max_ms": float(
-            sliding_end_upper_quartile.to_numpy().max()
+            errors["sliding_end_error_ms_q75"].to_numpy().max()
         ),
         "shortest_start_early_ms": float(-start[0]),
         "shortest_end_late_ms": float(end[0]),
