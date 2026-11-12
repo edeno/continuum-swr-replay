@@ -3,11 +3,14 @@
 What ``scripts/detection/run_event_features.py`` writes for each epoch
 (:data:`TABLE_DTYPES`: ``features``, :data:`FEATURE_DTYPES`; ``pair_membership``;
 ``rejection``) and where (:func:`output_path`), which the event features report
-and its example figures read; and the inventory comparison's and the
-memoryless run's tables those two read beside a run (:func:`read_inputs`).
+and its example figures read; the run's manifest and the epochs it marks
+``ok``, the only ones read (:func:`read_manifest`, :func:`ok_epochs`); and the
+inventory comparison's and the memoryless run's tables those two read beside a
+run (:func:`read_inputs`).
 Design: ``docs/design/replay_detection_comparison/04-event-features.md``.
 """
 
+import json
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
@@ -37,9 +40,11 @@ __all__ = [
     "FEATURE_DTYPES",
     "MS_DTYPES",
     "TABLE_DTYPES",
+    "ok_epochs",
     "output_path",
     "output_paths",
     "read_inputs",
+    "read_manifest",
 ]
 
 MS_DTYPES: Mapping[str, object] = MappingProxyType(
@@ -139,11 +144,38 @@ CANDIDATE_COLUMNS: Mapping[str, object] = MappingProxyType(
 """The columns of the memoryless run's candidate tables the report reads."""
 
 
+def read_manifest(run_dir: Path) -> dict:
+    """The run's ``manifest.json``, with its record of each epoch.
+
+    Raises
+    ------
+    ValueError
+        If the run has no manifest, it cannot be read as JSON, or it holds no
+        ``epochs`` record.
+    """
+    path = run_dir / "manifest.json"
+    try:
+        manifest = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"no readable run manifest at {path}: {error}") from error
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("epochs"), dict):
+        raise ValueError(f"no readable run manifest at {path}: no epochs record")
+    return manifest
+
+
+def ok_epochs(manifest: Mapping) -> list[str]:
+    """The epochs the run's manifest marks ``ok``, sorted: the only epochs of a
+    run that are read. A failed epoch's tables, or tables a manifest does not
+    know, may still be in the run folder."""
+    return sorted(i for i, r in manifest["epochs"].items() if r["status"] == "ok")
+
+
 def read_inputs(
     manifest: Mapping, inventory_root: Path, memoryless_root: Path
 ) -> dict[str, pd.DataFrame]:
     """The comparison's ``cells`` and ``directional`` tables and the memoryless
-    run's candidates, for the run's ``ok`` epochs, concatenated.
+    run's candidates, for the run's ``ok`` epochs (:func:`ok_epochs`),
+    concatenated.
 
     The runs are the ones the manifest's ``input_runs`` name. Candidates are
     read for the epochs the memoryless run observed.
@@ -151,7 +183,7 @@ def read_inputs(
     runs = manifest["settings"]["input_runs"]
     inventory_dir = inventory_root / runs["inventory"]
     memoryless_dir = memoryless_root / runs["memoryless"]
-    ok = sorted(i for i, r in manifest["epochs"].items() if r["status"] == "ok")
+    ok = ok_epochs(manifest)
     tables = {
         name: typed_table(
             (

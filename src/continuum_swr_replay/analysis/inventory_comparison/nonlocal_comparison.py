@@ -1,9 +1,11 @@
 """The other detectors' events against the non-local detector's.
 
-Read from an event features run (``paths.event_features_root()``): every
-inventory's compared events (``*_features.parquet``), each event's membership
-against every other inventory (``*_pair_membership.parquet``) and its state
-shares (``*_state_shares.parquet``, from ``scripts/detection/add_state_shares.py``).
+Read from an event features run (``paths.event_features_root()``), for the
+epochs its manifest marks ``ok`` and no others (``feature_run.ok_epochs``):
+every inventory's compared events (``*_features.parquet``), each event's
+membership against every other inventory (``*_pair_membership.parquet``) and
+its state shares (``*_state_shares.parquet``, from
+``scripts/detection/add_state_shares.py``).
 The non-local detector's inventory is ``state_space``. An event's membership
 against another inventory is known (``matched`` or ``unmatched``) only when the
 event lies wholly inside the pair's shared exposure.
@@ -21,6 +23,11 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay import intervals
+from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
+    ok_epochs,
+    output_path,
+    read_manifest,
+)
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     STATE_SHARE_COLUMNS,
 )
@@ -46,11 +53,25 @@ Widloski detector's events."""
 _KNOWN = ["matched", "unmatched"]
 
 
+def _epoch_paths(run_dir: Path, name: str) -> list[Path]:
+    """Table ``name`` of each epoch the run's manifest marks ``ok``.
+
+    Raises
+    ------
+    ValueError
+        If the run has no readable manifest, or it marks no epoch ``ok``.
+    """
+    ok = ok_epochs(read_manifest(run_dir))
+    if not ok:
+        raise ValueError(f"the manifest of {run_dir} marks no epoch ok")
+    return [output_path(identifier, run_dir, name) for identifier in ok]
+
+
 def _read_epochs(run_dir: Path, name: str, **kwargs) -> pd.DataFrame:
-    paths = sorted(run_dir.glob(f"*_{name}.parquet"))
-    if not paths:
-        raise FileNotFoundError(f"no {name} tables in {run_dir}")
-    return pd.concat((pd.read_parquet(p, **kwargs) for p in paths), ignore_index=True)
+    return pd.concat(
+        (pd.read_parquet(path, **kwargs) for path in _epoch_paths(run_dir, name)),
+        ignore_index=True,
+    )
 
 
 def other_detector_events(run_dir: Path) -> pd.DataFrame:
@@ -153,7 +174,8 @@ def _intervals(table: pd.DataFrame, detectors: tuple[str, ...]) -> np.ndarray:
 
 
 def left_out_seconds(run_dir: Path) -> dict[str, float]:
-    """Seconds of non-local event time outside each other inventory, summed over epochs.
+    """Seconds of non-local event time outside each other inventory, summed over
+    the run's ``ok`` epochs.
 
     Each epoch's compared events (``*_features.parquet``: every inventory's
     whole-event-immobile events): the non-local detector's event time
@@ -163,16 +185,13 @@ def left_out_seconds(run_dir: Path) -> dict[str, float]:
 
     Raises
     ------
-    FileNotFoundError
-        If the run holds no features table.
+    ValueError
+        If the run has no readable manifest, or it marks no epoch ``ok``.
     """
     totals = dict.fromkeys(
         ("nonlocal", "kay", *(f"outside_{name}" for name in COVERINGS)), 0.0
     )
-    paths = sorted(run_dir.glob("*_features.parquet"))
-    if not paths:
-        raise FileNotFoundError(f"no features tables in {run_dir}")
-    for path in paths:
+    for path in _epoch_paths(run_dir, "features"):
         table = pd.read_parquet(
             path, columns=["detector", "event_start_s", "event_end_s"]
         )

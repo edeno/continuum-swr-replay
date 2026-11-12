@@ -3,6 +3,8 @@ to check by hand."""
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -71,11 +73,46 @@ def test_other_detector_statistics_split_events_by_overlap_and_state():
     assert result["overlap_all_nonlocal_fraction"] == pytest.approx(1 / 5)
 
 
+def _write_manifest(run_dir) -> None:
+    """A manifest marking epoch ``a`` ok and ``b`` failed; it does not know ``c``."""
+    (run_dir / "manifest.json").write_text(
+        json.dumps({"epochs": {"a": {"status": "ok"}, "b": {"status": "failed"}}})
+    )
+
+
+def _write_unread_epochs(run_dir, tables: dict[str, pd.DataFrame]) -> None:
+    """The tables, as epochs ``b`` (failed) and ``c`` (not in the manifest)."""
+    for identifier in ("b", "c"):
+        for name, table in tables.items():
+            table.to_parquet(run_dir / f"{identifier}_{name}.parquet")
+
+
 def _write_memberships(run_dir) -> None:
-    """One epoch's state shares and memberships: Kay events k1 (overlaps a
+    """One ok epoch's state shares and memberships: Kay events k1 (overlaps a
     non-local event), k2 (overlaps none) and k3 (unknown), and MUA event m1
-    (overlaps one)."""
+    (overlaps one). Two epochs that are not ok hold Kay event k9."""
     run_dir.mkdir()
+    _write_manifest(run_dir)
+    unread = pd.DataFrame(
+        {
+            "animal": "a",
+            "day": 1,
+            "epoch": "04_r2",
+            "detector": ["kay"],
+            "event_key": ["k9"],
+        }
+    )
+    _write_unread_epochs(
+        run_dir,
+        {
+            "state_shares": unread.assign(
+                **{LOCAL: 1.0, NO_SPIKE: 0.0, NON_LOCAL: 0.0, UNCERTAIN: 0.0}
+            ),
+            "pair_membership": unread.assign(
+                other_detector="state_space", membership="unmatched"
+            ),
+        },
+    )
     keys = pd.DataFrame(
         {
             "animal": "a",
@@ -108,8 +145,29 @@ def test_other_detector_events_keep_the_known_memberships_against_the_nonlocal_e
     assert list(events["event_key"]) == ["k1", "k2", "m1"]
     assert list(events["matched"]) == [True, False, True]
     assert list(events[LOCAL]) == [0.0, 0.7, 0.1]
-    with pytest.raises(FileNotFoundError, match="no state_shares tables"):
-        comparison.other_detector_events(tmp_path)
+
+
+def test_a_run_without_a_readable_manifest_is_refused(tmp_path):
+    _write_memberships(tmp_path / "run")
+    manifest = tmp_path / "run" / "manifest.json"
+    for text in ("{not json", '{"settings": {}}'):
+        manifest.write_text(text)
+        with pytest.raises(ValueError, match="no readable run manifest"):
+            comparison.other_detector_events(tmp_path / "run")
+    manifest.unlink()
+    with pytest.raises(ValueError, match="no readable run manifest"):
+        comparison.other_detector_events(tmp_path / "run")
+    with pytest.raises(ValueError, match="no readable run manifest"):
+        comparison.left_out_seconds(tmp_path / "run")
+
+
+def test_a_run_with_no_ok_epoch_is_refused(tmp_path):
+    _write_memberships(tmp_path / "run")
+    (tmp_path / "run" / "manifest.json").write_text(
+        json.dumps({"epochs": {"a": {"status": "failed"}}})
+    )
+    with pytest.raises(ValueError, match="marks no epoch ok"):
+        comparison.other_detector_events(tmp_path / "run")
 
 
 def test_check_against_directional_refuses_other_counts(tmp_path):
@@ -137,11 +195,28 @@ def test_check_against_directional_refuses_other_counts(tmp_path):
 
 
 def _write_run(run_dir, report_dir) -> None:
-    """One epoch: non-local events [0, 1] and [2, 3]; Kay covers [0.5, 1] and
+    """One ok epoch: non-local events [0, 1] and [2, 3]; Kay covers [0.5, 1] and
     [10, 11]; Yu covers [0, 0.25]; MUA covers [2, 2.25]; the Widloski detector
-    covers [2.75, 3]."""
+    covers [2.75, 3]. Two epochs that are not ok each hold a non-local event of
+    5 s that no Kay SWR overlaps."""
     run_dir.mkdir()
     report_dir.mkdir()
+    _write_manifest(run_dir)
+    _write_unread_epochs(
+        run_dir,
+        {
+            "features": pd.DataFrame(
+                {"detector": ["state_space"], "event_start_s": 0.0, "event_end_s": 5.0}
+            ),
+            "pair_membership": pd.DataFrame(
+                {
+                    "detector": ["state_space"],
+                    "other_detector": "kay",
+                    "membership": "unmatched",
+                }
+            ),
+        },
+    )
     features = pd.DataFrame(
         {
             "detector": [
@@ -200,9 +275,11 @@ def test_left_out_seconds_subtract_each_covering_from_the_nonlocal_time(tmp_path
     }
 
 
-def test_left_out_seconds_refuse_a_run_without_features_tables(tmp_path):
-    with pytest.raises(FileNotFoundError, match="no features tables"):
-        comparison.left_out_seconds(tmp_path)
+def test_left_out_seconds_refuse_an_ok_epoch_without_its_features_table(tmp_path):
+    _write_run(tmp_path / "run", tmp_path / "report")
+    (tmp_path / "run" / "a_features.parquet").unlink()
+    with pytest.raises(FileNotFoundError, match="a_features.parquet"):
+        comparison.left_out_seconds(tmp_path / "run")
 
 
 def test_left_out_statistics_count_events_time_and_rates(tmp_path):
