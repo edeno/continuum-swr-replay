@@ -15,6 +15,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.behavior.model_specs import (
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
+)
+from continuum_swr_replay.analysis.behavior.rate import per_stop_rate_model as mod
 from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
     cross_validate_per_stop_rate_model,
     fit_per_stop_rate_model,
@@ -429,7 +434,6 @@ def test_hierarchy_shares_cohort():
         run_full_hierarchy_comparison,
     )
     from continuum_swr_replay.analysis.behavior.model_specs import MODEL_PER_STOP_RATE
-    from scripts.behavior.rate import fit_per_stop_rate_models as mod
 
     rng = np.random.default_rng(3)
     frames = []
@@ -484,3 +488,70 @@ def test_hierarchy_shares_cohort():
     assert r1_rec["n_drop_own_predictor_missing"] == 20
     assert r1_rec["n_drop_common_cohort_other"] == 0
     assert r0_rec["n_modeled"] == r1_rec["n_modeled"] == 220
+
+
+def _flag_stop_table() -> pd.DataFrame:
+    """Six stops of one session, every predictor and outcome complete."""
+    return pd.DataFrame(
+        {
+            "animal": ["a"] * 6,
+            "session_date": [1] * 6,
+            "epoch": ["02_r1"] * 6,
+            "stop_id": [f"s{i}" for i in range(6)],
+            "immobility_duration_s": [1.0] * 6,
+            **{col: [0.0] * 6 for col in mod.PER_STOP_RATE_OUTCOMES.values()},
+            **{col: [0.0] * 6 for col in REWARD_HISTORY_COLUMNS},
+            REWARD_HISTORY_INCOMPLETE: [0.0] * 6,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("converged", "n_flagged"), [(True, 0), (False, 1), (None, 1), ("absent", 1)]
+)
+def test_a_fit_without_a_true_convergence_flag_counts_as_not_converged(
+    monkeypatch, converged, n_flagged
+):
+    """The cohort audit counts a fit as converged only when its flag is True:
+    a flag that is missing or None has not shown convergence."""
+
+    def _fit(cohort, predictors, *, response_col):
+        fit = {"n_stops": len(cohort), "converged": converged, "separated": False}
+        if converged == "absent":
+            del fit["converged"]
+        return fit
+
+    monkeypatch.setattr(mod, "fit_per_stop_rate_model", _fit)
+
+    _rows, records = mod.fit_per_stop_rate_hierarchy(_flag_stop_table(), run_cv=False)
+
+    assert len(records) == len(mod.MODEL_PER_STOP_RATE) * len(
+        mod.PER_STOP_RATE_OUTCOMES
+    )
+    assert {r["n_sessions_flagged_nonconverged"] for r in records} == {n_flagged}
+
+
+@pytest.mark.parametrize(
+    ("separated", "n_flagged"),
+    [(True, 1), (False, 0), (None, 0), (np.nan, 0), ("absent", 0)],
+)
+def test_a_fit_counts_as_separated_only_when_its_flag_is_true(
+    monkeypatch, separated, n_flagged
+):
+    """The cohort audit counts a fit as separated only when its flag is True:
+    a flag that is missing, None or NaN is not separated."""
+
+    def _fit(cohort, predictors, *, response_col):
+        fit = {"n_stops": len(cohort), "converged": True, "separated": separated}
+        if separated == "absent":
+            del fit["separated"]
+        return fit
+
+    monkeypatch.setattr(mod, "fit_per_stop_rate_model", _fit)
+
+    _rows, records = mod.fit_per_stop_rate_hierarchy(_flag_stop_table(), run_cv=False)
+
+    assert len(records) == len(mod.MODEL_PER_STOP_RATE) * len(
+        mod.PER_STOP_RATE_OUTCOMES
+    )
+    assert {r["n_sessions_flagged_separated"] for r in records} == {n_flagged}

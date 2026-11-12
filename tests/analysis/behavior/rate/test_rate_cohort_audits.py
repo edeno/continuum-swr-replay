@@ -187,7 +187,9 @@ def test_uncertainty_records_reconcile_and_sessions_in_is_pre_exposure_drop():
 
 
 def test_per_stop_hierarchy_records_reconcile():
-    from scripts.behavior.rate import fit_per_stop_rate_models as mod
+    from continuum_swr_replay.analysis.behavior.rate import (
+        per_stop_rate_model as mod,
+    )
 
     rng = np.random.default_rng(1)
     frames = []
