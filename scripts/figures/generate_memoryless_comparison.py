@@ -958,38 +958,11 @@ def output_color(detector: str) -> str:
     return VERMILION if detector.startswith("sliding") else BLUE
 
 
-def paired_part_changes(controls: pd.DataFrame, detector: str) -> tuple[int, int, int]:
-    """Trials, over every jump and chain, where a detector recovers fewer and more
-    parts inside the event than alone, and all trials."""
-    return tuple(
-        int(
-            sum(
-                sweep_statistics.controls_value(
-                    controls, "parts", measure, condition, None, detector
-                )
-                for condition in MULTIPART_CONDITIONS
-            )
-        )
-        for measure in (
-            "n_trials_fewer_in_context",
-            "n_trials_more_in_context",
-            "n_trials",
-        )
-    )
-
-
 def no_replay_minutes(controls: pd.DataFrame) -> float:
     rows = controls[
         (controls["summary"] == "no_replay") & (controls.measure == "immobile_minutes")
     ]
     return float(rows.value.iloc[0])
-
-
-def controls_levels(controls: pd.DataFrame, condition: str) -> list[float]:
-    rows = controls[
-        (controls["summary"] == "parts") & (controls.condition == condition)
-    ]
-    return sorted(rows.level.dropna().unique())
 
 
 def plot_bursts(ax, controls: pd.DataFrame) -> None:
@@ -1505,25 +1478,15 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
                 "the shortest gap; the controls summary disagrees."
             )
     for detector in ("sliding_published", "state_space_canonical"):
-        within, alone = (
-            np.mean(
-                [
-                    sweep_statistics.controls_value(
-                        controls, "parts", measure, c, level, detector
-                    )
-                    for c in MULTIPART_CONDITIONS
-                    for level in controls_levels(controls, c)
-                ]
-            )
-            for measure in ("part_recovery", "part_recovery_alone")
+        recovery = sweep_statistics.part_recovery_statistics(
+            controls, MULTIPART_CONDITIONS, detector
         )
-        if within <= alone:
+        if recovery["recovery_in_event"] <= recovery["recovery_alone"]:
             raise RuntimeError(
                 "The caption says pooled recovery is higher inside the event than "
                 "alone; the controls summary disagrees."
             )
-        fewer, more, _ = paired_part_changes(controls, detector)
-        if more <= fewer:
+        if recovery["n_trials_more_in_event"] <= recovery["n_trials_fewer_in_event"]:
             raise RuntimeError(
                 "The caption says more trials gain parts inside the event than "
                 "lose them; the controls summary disagrees."
