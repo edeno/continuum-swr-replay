@@ -25,7 +25,9 @@ spike, and it is kept as the reference the stored path was checked against
 (rows ``s..e`` of the stored likelihood equal the rebuild over ``s..e+1`` to
 float32 rounding).
 
-Per-event metrics (all bin lookups use native track-graph distance):
+Per-event metrics, computed by ``analysis.hippocampus.spike_evidence`` (which
+also builds the event groups and quiet windows; all bin lookups use native
+track-graph distance):
 
 - ``dll_animal`` = mean_t [ logL_t(MAP_t) - logL_t(animal_t) ]: does the spike
   likelihood favor the decoded position over the animal's? Real > 0.
@@ -69,29 +71,29 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-import xarray as xr
 
 for _cat in (UserWarning, FutureWarning, DeprecationWarning):
     warnings.filterwarnings("ignore", category=_cat)
 
 from continuum_swr_replay.analysis.constants import (  # noqa: E402
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
-    REMOTE_CM,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
-    excluded_intervals_of,
     read_dot_with_swr_source,
 )
 from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
     EventDefinitionError,
 )
-from continuum_swr_replay.analysis.events.nonlocal_detection import (  # noqa: E402
-    event_strict_overlap_mask,
-)
 from continuum_swr_replay.analysis.hippocampus import event_statistics  # noqa: E402
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,
+)
+from continuum_swr_replay.analysis.hippocampus.spike_evidence import (  # noqa: E402
+    build_session_events,
+    event_metrics,
+    stored_event_likelihood,
+    stored_likelihood_columns,
+    window_spike_counts,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: E402
     UNDERFLOW_OCCUPANCY_FLOOR,
@@ -114,21 +116,11 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,
 )
 from continuum_swr_replay.decoding.results import open_results  # noqa: E402
-from continuum_swr_replay.intervals import (  # noqa: E402
-    interval_mask,
-)
 from continuum_swr_replay.paths import processed_data_dir  # noqa: E402
 
-# --- Parameters (provisional; see spec) ---------------------------------------
+# --- Parameters ---------------------------------------------------------------
 # the data_over_time file the threshold names (``_80_``)
 THRESHOLD_PERCENT = non_local_threshold_percent(DEFAULT_NON_LOCAL_THRESHOLD)
-NON_EVENT_THRESHOLD = 0.2  # non-local prob below this = clearly local (baseline)
-IMMOBILITY_CM_PER_S = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-CLOSE_CM = 40.0  # mean |ahead-behind| below this = "close" subset
-# REMOTE_CM (analysis.constants): mean |ahead-behind| above this = "remote" subset
-GPI_REMOTE_CM = 100.0  # random-reference bins must be this far from the animal
-MIN_EVENT_BINS = 3
-MAX_BASELINE_BINS = 40
 N_SAMPLE_PER_GROUP = 30
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -164,98 +156,6 @@ def find_sessions(animal: str | None) -> list[str]:
     return out
 
 
-def _contiguous_spans(mask: np.ndarray) -> list[tuple[int, int]]:
-    """Start/end index pairs (inclusive) of contiguous True runs in ``mask``."""
-    idx = np.flatnonzero(mask)
-    if len(idx) == 0:
-        return []
-    brk = np.flatnonzero(np.diff(idx) > 1)
-    starts = np.r_[idx[0], idx[brk + 1]]
-    ends = np.r_[idx[brk], idx[-1]]
-    return list(zip(starts, ends, strict=True))
-
-
-def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
-    """Classify non-local events and matched non-event baseline windows.
-
-    Parameters
-    ----------
-    dot : pd.DataFrame
-        Per-timebin ``data_over_time`` (decode time axis), with the state-prob,
-        ``SWR_event``, ``head_speed`` and ``ahead_behind_distance`` columns.
-
-    Returns
-    -------
-    pd.DataFrame
-        One row per window: ``s, e`` (bin indices), ``mean_abs_ab``, ``is_swr``,
-        ``n_bins``, ``group``.
-    """
-    # Business-logic boundary: direct callers get the same fail-closed input
-    # contract as the file-loading entry point.
-    validate_dot_event_contract(dot)
-    nlp = (
-        dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
-    ).to_numpy()
-    immobile = dot["head_speed"].to_numpy() < IMMOBILITY_CM_PER_S
-    ab = dot["ahead_behind_distance"].to_numpy()
-    # The read holds the labels to the speed rule and the probability contract.
-    nonlocal_labels = dot["non_local_event"].to_numpy()
-    is_swr_event = event_strict_overlap_mask(
-        dot, "non_local_event", "SWR_event"
-    ).to_numpy()
-
-    rows = []
-    for event_label in pd.unique(nonlocal_labels[nonlocal_labels > 0]):
-        event_bins = np.flatnonzero(nonlocal_labels == event_label)
-        n_bins = len(event_bins)
-        if n_bins < MIN_EVENT_BINS:
-            continue
-        if n_bins > 1 and not (np.diff(event_bins) == 1).all():
-            raise ValueError(f"non_local_event {event_label} is not one contiguous run")
-        s, e = int(event_bins[0]), int(event_bins[-1])
-        mab = float(np.nanmean(np.abs(ab[event_bins])))
-        is_swr = bool(is_swr_event[event_bins[0]])
-        if is_swr and mab > REMOTE_CM:
-            group = "SWR-remote"
-        elif not is_swr and mab > REMOTE_CM:
-            group = "nonSWR-remote"
-        elif not is_swr and mab < CLOSE_CM:
-            group = "nonSWR-close"
-        else:
-            continue  # 40-100 cm middle band, or SWR-close: excluded for clarity
-        rows.append(
-            {
-                "s": s,
-                "e": e,
-                "mean_abs_ab": mab,
-                "is_swr": is_swr,
-                "n_bins": n_bins,
-                "group": group,
-            }
-        )
-
-    # the null is analysed time too: no baseline window touches excluded time
-    # (the artifact mask widened by 0.3 s; the low-non-local label is decoded)
-    time = dot.index.to_numpy()
-    observed = ~interval_mask(time, excluded_intervals_of(dot))
-    for s, e in _contiguous_spans((nlp < NON_EVENT_THRESHOLD) & immobile & observed):
-        n_bins = e - s + 1
-        if n_bins < MIN_EVENT_BINS or n_bins > MAX_BASELINE_BINS:
-            continue
-        rows.append(
-            {
-                "s": s,
-                "e": e,
-                "mean_abs_ab": 0.0,
-                "is_swr": False,
-                "n_bins": n_bins,
-                "group": "baseline",
-            }
-        )
-
-    return pd.DataFrame(rows)
-
-
 # --- Encoding model + marks ---------------------------------------------------
 def load_marks(epoch_id: str, cache_dir: Path) -> tuple[list, list]:
     """Load (and cache) HPC clusterless marks: spike_times, waveform_features.
@@ -277,60 +177,6 @@ def load_marks(epoch_id: str, cache_dir: Path) -> tuple[list, list]:
     )
     joblib.dump(marks, cache)
     return marks
-
-
-# --- Likelihood + metrics -----------------------------------------------------
-def stored_likelihood_columns(results: xr.Dataset, env) -> np.ndarray:
-    """Columns of the stored ``log_likelihood`` holding the non-local likelihood.
-
-    Parameters
-    ----------
-    results : xr.Dataset
-        The decode's ``results.nc``, with ``state`` and ``position`` per state bin.
-    env : Environment
-        Fitted; its place bins are the Non-Local Continuous state's bins.
-
-    Returns
-    -------
-    ndarray of int, shape (n_interior_bins,)
-        The Non-Local Continuous columns at the interior bins, in
-        ``is_track_interior_`` order (the order ``nearest_interior_bins`` indexes).
-
-    Raises
-    ------
-    ValueError
-        The state's bins are not the environment's place bins.
-    """
-    cols = np.flatnonzero(results["state"].values == "Non-Local Continuous")
-    centers = np.asarray(env.place_bin_centers_).ravel()
-    if len(cols) != len(centers) or not np.allclose(
-        results["position"].values[cols], centers
-    ):
-        raise ValueError(
-            "the stored Non-Local Continuous bins are not the environment's place bins"
-        )
-    return cols[np.asarray(env.is_track_interior_).ravel()]
-
-
-def stored_event_likelihood(
-    log_likelihood: xr.DataArray, cols: np.ndarray, s: int, e: int
-) -> np.ndarray:
-    """The stored non-local log-likelihood of bins ``s..e``.
-
-    Returns
-    -------
-    ndarray, shape (e - s + 1, n_interior_bins)
-    """
-    rows = log_likelihood.isel(time=slice(s, e + 1)).values
-    return np.asarray(rows[:, cols], dtype=float)
-
-
-def window_spike_counts(
-    spike_times: Sequence[np.ndarray], start: float, stop: float
-) -> tuple[int, int]:
-    """Spikes in ``[start, stop)`` over all tetrodes, and the tetrodes with any."""
-    counts = [int(np.count_nonzero((x >= start) & (x < stop))) for x in spike_times]
-    return sum(counts), sum(c > 0 for c in counts)
 
 
 def events_with_map_in_left_out_bins(
@@ -368,49 +214,6 @@ def events_with_map_in_left_out_bins(
         if valid.any():
             hit[k] = left_out[nearest_interior_bins(env, mt[valid])].any()
     return hit
-
-
-def event_metrics(
-    s: int,
-    e: int,
-    L: np.ndarray,
-    n_spikes: int,
-    mape: np.ndarray,
-    lin: np.ndarray,
-    env,
-    pos: np.ndarray,
-    gpi_peak_pos: float,
-) -> dict | None:
-    """Compute the per-event reality metrics (track-distance bins).
-
-    Returns None for a window with fewer than two valid bins or with no spikes: the
-    evidence is per spike, so a window without spikes has none to score. This is
-    deliberate for quiet (baseline) windows too, so the quiet-window reference is the
-    windows with at least one spike (2026-11-12: 5,280 of 30,447 quiet windows have none;
-    no event window does).
-    """
-    mt, at = mape[s : e + 1], lin[s : e + 1]
-    valid = np.isfinite(mt) & np.isfinite(at)
-    if valid.sum() < 2 or n_spikes == 0:
-        return None
-    Lv = L[valid]
-    i_map = nearest_interior_bins(env, mt[valid])
-    i_animal = nearest_interior_bins(env, at[valid])
-    n = len(i_map)
-    delta = Lv[np.arange(n), i_map] - Lv[np.arange(n), i_animal]
-    map_mean = float(np.nanmean(mt))
-    dist_gpi = float(
-        np.asarray(env.get_distances_to_interior_bins(np.array([[map_mean]]))).ravel()[
-            np.argmin(np.abs(pos - gpi_peak_pos))
-        ]
-    )
-    return {
-        "dll_animal": float(np.nanmean(delta)),
-        "dll_per_spike": float(np.nansum(delta) / n_spikes),
-        "n_spikes": int(n_spikes),
-        "map_mean": map_mean,
-        "dist_to_gpi_peak": dist_gpi,
-    }
 
 
 def analyze_session(

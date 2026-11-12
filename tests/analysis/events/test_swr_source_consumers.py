@@ -885,7 +885,7 @@ def test_the_spike_evidence_baseline_lies_outside_excluded_time(source):
     """The null's matched non-event windows are analysed time too: none may
     touch excluded time [101.75, 102.55] (the configured mask widened by
     0.3 s)."""
-    from scripts.detection import analyze_event_spike_evidence as spike_evidence
+    from continuum_swr_replay.analysis.hippocampus import spike_evidence
 
     probability = np.full(TIME.size, 0.5)
     windows = [(100.20, 100.24), (101.72, 101.76), (102.20, 102.24), (103.00, 103.04)]

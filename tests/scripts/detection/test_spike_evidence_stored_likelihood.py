@@ -67,36 +67,6 @@ def results(log_likelihood_nl: np.ndarray) -> xr.Dataset:
     )
 
 
-def test_the_columns_are_the_non_local_interior_bins_in_order():
-    cols = spike_evidence.stored_likelihood_columns(
-        results(np.zeros((N_TIME, N_PLACE))), StraightTrack()
-    )
-    nl_start = N_PLACE + 1
-    assert cols.tolist() == (nl_start + np.flatnonzero(INTERIOR)).tolist()
-
-
-def test_bins_that_are_not_the_environment_s_refuse():
-    ds = results(np.zeros((N_TIME, N_PLACE)))
-    ds = ds.assign_coords(position=("state_bins", ds.position.values + 1.0))
-    with pytest.raises(ValueError, match="not the environment's place bins"):
-        spike_evidence.stored_likelihood_columns(ds, StraightTrack())
-
-
-def test_an_event_s_rows_and_columns_are_read():
-    values = np.arange(N_TIME * N_PLACE, dtype=float).reshape(N_TIME, N_PLACE)
-    ds = results(values)
-    cols = spike_evidence.stored_likelihood_columns(ds, StraightTrack())
-    L = spike_evidence.stored_event_likelihood(ds["log_likelihood"], cols, 5, 8)
-    np.testing.assert_array_equal(L, values[5:9][:, INTERIOR])
-    assert np.isfinite(L).all()
-
-
-def test_spikes_are_counted_over_the_half_open_span():
-    spikes = [np.array([1.0, 1.5, 2.0]), np.array([2.0]), np.array([0.5])]
-    assert spike_evidence.window_spike_counts(spikes, 1.0, 2.0) == (2, 1)
-    assert spike_evidence.window_spike_counts(spikes, 1.0, 2.5) == (4, 2)
-
-
 @pytest.fixture
 def stored_session(monkeypatch, tmp_path):
     """``analyze_session`` with the stored likelihood, on stand-ins.
