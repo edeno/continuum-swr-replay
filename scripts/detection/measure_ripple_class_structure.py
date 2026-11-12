@@ -64,6 +64,9 @@ from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
 from continuum_swr_replay.analysis.inventory_comparison.features import (  # noqa: E402
     interval_rows,
 )
+from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
+    format_epoch_identifier,
+)
 from continuum_swr_replay.paths import (  # noqa: E402
     event_features_root,
     event_spike_evidence_dir,
@@ -177,7 +180,9 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
 
 
 def epoch_identifier(row: pd.Series) -> str:
-    return f"{row.animal}{row.session_date}_{row.epoch}_HPC"
+    return format_epoch_identifier(
+        f"{row.animal}{row.session_date}_.nwb", row.epoch, "HPC"
+    )
 
 
 def run_measure(args: argparse.Namespace) -> None:

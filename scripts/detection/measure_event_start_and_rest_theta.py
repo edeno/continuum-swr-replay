@@ -50,6 +50,7 @@ from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     track_distance_cm,
 )
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.paths import (
     event_features_root,
     processed_data_dir,
@@ -150,9 +151,12 @@ def main(argv: Sequence[str] | None = None) -> None:
         event_table,
         columns=["event_id", "animal", "session_date", "epoch", "non_local_event"],
     )
-    events["epoch_id"] = (
-        events.animal + events.session_date.astype(str) + "_" + events.epoch + "_HPC"
-    )
+    events["epoch_id"] = [
+        format_epoch_identifier(f"{animal}{day}_.nwb", epoch, "HPC")
+        for animal, day, epoch in zip(
+            events.animal, events.session_date, events.epoch, strict=True
+        )
+    ]
     by_epoch = dict(tuple(events.groupby("epoch_id")))
     identifiers = sorted(by_epoch)
     if args.epochs:
