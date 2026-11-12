@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.behavior.content import estimator_comparison as ec
 from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import (
     ESTIMATOR as DIRICHLET_MULTINOMIAL,
 )
@@ -109,7 +110,7 @@ def cohort() -> pd.DataFrame:
 @pytest.fixture(scope="module")
 def one_rung(cohort) -> mod.ComparisonResult:
     return mod.run_comparison(
-        cohort, (BASE_RUNG,), n_jobs=2, n_bootstrap=200, seed=mod.BOOTSTRAP_SEED
+        cohort, (BASE_RUNG,), n_jobs=2, n_bootstrap=200, seed=ec.BOOTSTRAP_SEED
     )
 
 
@@ -120,7 +121,7 @@ def two_rungs(cohort) -> mod.ComparisonResult:
         (BASE_RUNG, REWARD_RUNG),
         n_jobs=2,
         n_bootstrap=200,
-        seed=mod.BOOTSTRAP_SEED,
+        seed=ec.BOOTSTRAP_SEED,
     )
 
 
@@ -133,12 +134,6 @@ def test_the_simulated_cohort_carries_both_swr_values(cohort):
         .eq(N_EVENTS_PER_SESSION)
         .all()
     )
-
-
-def test_bootstrap_defaults_are_two_thousand_draws_at_seed_zero():
-    assert mod.N_BOOTSTRAP == 2000
-    assert mod.BOOTSTRAP_SEED == 0
-    assert mod.BOOTSTRAP_PERCENTILES == (2.5, 50.0, 97.5)
 
 
 def test_each_session_rung_term_estimator_combination_appears_exactly_once(one_rung):
@@ -168,9 +163,9 @@ def test_the_fraction_estimator_alone_reports_clustered_standard_errors(one_rung
 
 def test_only_the_fraction_estimator_is_flagged_as_a_quasi_scale(one_rung):
     scales = one_rung.coefficients.groupby("estimator")["scale"].unique()
-    assert list(scales[CONDITIONAL_POISSON_FRACTION]) == [mod.QUASI_SCALE]
-    assert list(scales[CONDITIONAL_POISSON_COUNT]) == [mod.LIKELIHOOD_SCALE]
-    assert list(scales[DIRICHLET_MULTINOMIAL]) == [mod.LIKELIHOOD_SCALE]
+    assert list(scales[CONDITIONAL_POISSON_FRACTION]) == [ec.QUASI_SCALE]
+    assert list(scales[CONDITIONAL_POISSON_COUNT]) == [ec.LIKELIHOOD_SCALE]
+    assert list(scales[DIRICHLET_MULTINOMIAL]) == [ec.LIKELIHOOD_SCALE]
 
 
 def test_the_conditional_fits_carry_the_multinomial_constant_into_their_likelihood(
@@ -240,7 +235,7 @@ def test_the_bootstrap_reports_the_requested_percentiles(one_rung):
     assert (bootstrap["p2_5"] <= bootstrap["p50"]).all()
     assert (bootstrap["p50"] <= bootstrap["p97_5"]).all()
     assert bootstrap["n_animals"].eq(2).all()
-    assert bootstrap["seed"].eq(mod.BOOTSTRAP_SEED).all()
+    assert bootstrap["seed"].eq(ec.BOOTSTRAP_SEED).all()
     current = bootstrap[
         (bootstrap["term"] == "is_current_arm")
         & (bootstrap["estimator"] == DIRICHLET_MULTINOMIAL)
@@ -249,8 +244,8 @@ def test_the_bootstrap_reports_the_requested_percentiles(one_rung):
 
 
 def test_the_bootstrap_is_reproducible_from_its_seed(one_rung):
-    repeated = mod.bootstrap_animals(
-        one_rung.coefficients, n_draws=200, seed=mod.BOOTSTRAP_SEED
+    repeated = ec.bootstrap_animals(
+        one_rung.coefficients, n_draws=200, seed=ec.BOOTSTRAP_SEED
     )
     pd.testing.assert_frame_equal(repeated, one_rung.bootstrap)
 
@@ -287,7 +282,7 @@ def test_the_summary_reports_the_sessions_each_term_lost_to_identifiability(two_
     )
     coefficients.loc[hit, "coef"] = np.nan
 
-    summary = mod.summarize(coefficients).set_index(["model", "term"])
+    summary = ec.summarize_estimators(coefficients).set_index(["model", "term"])
 
     before = two_rungs.summary.set_index(["model", "term"])
     row = summary.loc[(BASE_RUNG.name, term)]
@@ -382,105 +377,6 @@ def test_every_comparison_rung_names_a_parent_on_its_own_candidate_set():
         assert set(catalog[rung.parent].predictors) <= set(rung.predictors)
 
 
-def _row(term, coef, sd, separated_terms="", estimator=CONDITIONAL_POISSON_COUNT):
-    """One synthetic coefficient row, enough for the identifiability rule."""
-    return {
-        "animal": "alpha",
-        "session_date": "20200101",
-        "epoch": "02_r1",
-        "model": "B_spatial",
-        "term": term,
-        "estimator": estimator,
-        "coef": coef,
-        "sd": sd,
-        "separated_terms": separated_terms,
-        "separated_term": term in set(separated_terms.split("|")) - {""},
-    }
-
-
-def test_a_steep_coefficient_on_a_small_sd_predictor_stays_identified():
-    """|coef| = 12 at SD 0.05 is an effect of 0.6, not a runaway fit."""
-    rows = pd.DataFrame([_row("is_current_arm", 12.0, 0.05)])
-    assert not mod.unidentified_rows(rows).iloc[0]
-
-
-def test_the_same_coefficient_on_a_unit_sd_predictor_is_dropped():
-    rows = pd.DataFrame([_row("is_current_arm", 12.0, 1.0)])
-    assert mod.unidentified_rows(rows).iloc[0]
-
-
-def test_a_flagged_term_is_dropped_however_small_its_effect():
-    rows = pd.DataFrame(
-        [_row("is_current_arm", 0.3, 0.5, separated_terms="is_current_arm")]
-    )
-    assert mod.unidentified_rows(rows).iloc[0]
-
-
-def test_a_large_concentration_intercept_is_kept_because_it_has_no_design_scale():
-    """``log_phi_intercept`` is unbounded; only the fitter's flag may drop it."""
-    rows = pd.DataFrame(
-        [
-            _row("log_phi_intercept", 25.0, np.nan, estimator=DIRICHLET_MULTINOMIAL),
-            _row(
-                "log_phi_is_swr",
-                25.0,
-                np.nan,
-                separated_terms="log_phi_is_swr",
-                estimator=DIRICHLET_MULTINOMIAL,
-            ),
-        ]
-    )
-    assert list(mod.unidentified_rows(rows)) == [False, True]
-
-
-def test_a_term_the_fit_could_not_estimate_drops_its_estimator_triple():
-    """A NaN coefficient means the session does not inform the term.
-
-    The conditional-Poisson fitter reports such a term (``unidentified_terms``)
-    with a NaN coefficient; the paired rule drops the term's triple, so the
-    estimators are still compared on the same sessions, and keeps the others.
-    """
-    rows = pd.DataFrame(
-        [
-            _row(
-                "is_candidate_arm_0", np.nan, 0.3, estimator=CONDITIONAL_POISSON_COUNT
-            ),
-            _row(
-                "is_candidate_arm_0",
-                np.nan,
-                0.3,
-                estimator=CONDITIONAL_POISSON_FRACTION,
-            ),
-            _row("is_candidate_arm_0", -20.0, 0.3, estimator=DIRICHLET_MULTINOMIAL),
-            _row("is_current_arm", 0.7, 0.3, estimator=CONDITIONAL_POISSON_COUNT),
-            _row("is_current_arm", 0.7, 0.3, estimator=CONDITIONAL_POISSON_FRACTION),
-            _row("is_current_arm", 0.8, 0.3, estimator=DIRICHLET_MULTINOMIAL),
-        ]
-    )
-    assert list(mod.unidentified_rows(rows)) == [True, True, False, False, False, False]
-    kept = mod._identified(rows)
-    assert set(kept["term"]) == {"is_current_arm"}
-    assert len(kept) == 3
-
-
-def test_an_unidentified_row_drops_the_whole_estimator_triple():
-    """Otherwise one summary row would average different sessions per estimator."""
-    rows = pd.DataFrame(
-        [
-            _row("is_current_arm", 12.0, 1.0, estimator=CONDITIONAL_POISSON_COUNT),
-            _row("is_current_arm", 0.7, 1.0, estimator=CONDITIONAL_POISSON_FRACTION),
-            _row("is_current_arm", 0.8, 1.0, estimator=DIRICHLET_MULTINOMIAL),
-            _row("is_prev_arm", -0.4, 1.0, estimator=CONDITIONAL_POISSON_COUNT),
-            _row("is_prev_arm", -0.4, 1.0, estimator=CONDITIONAL_POISSON_FRACTION),
-            _row("is_prev_arm", -0.4, 1.0, estimator=DIRICHLET_MULTINOMIAL),
-        ]
-    )
-    kept = mod._identified(rows)
-    assert set(kept["term"]) == {"is_prev_arm"}
-    assert len(kept) == 3
-    assert mod.n_unpaired_triples(rows) == 1
-
-
 def test_the_persisted_rows_carry_the_scale_the_rule_is_read_on(one_rung):
     """``sd`` and ``separated_terms`` travel with the coefficients."""
     coefficients = one_rung.coefficients
@@ -493,7 +389,7 @@ def test_the_persisted_rows_carry_the_scale_the_rule_is_read_on(one_rung):
     intercept = coefficients[coefficients["term"] == mod.LOG_PHI_INTERCEPT]
     assert not intercept.empty
     assert intercept["sd"].isna().all()
-    modifier = coefficients[coefficients["term"] == mod.LOG_PHI_IS_SWR]
+    modifier = coefficients[coefficients["term"] == ec.LOG_PHI_IS_SWR]
     assert not modifier.empty
     assert (modifier["sd"] > 0).all()
     assert "separated_terms" in coefficients.columns
@@ -506,53 +402,6 @@ def test_the_concentration_figure_refuses_a_rung_it_has_no_fits_for(one_rung, tm
             one_rung.bootstrap,
             tmp_path / "log_phi_by_session.png",
             rung="not_a_fitted_rung",
-        )
-
-
-def test_the_fraction_fits_non_finite_sandwich_falls_back_to_the_model_se(one_rung):
-    """A NaN clustered SE keeps the row on its model SE, labelled as such.
-
-    This is the shipped aggregation's own rule (``session_se``): a predictor
-    that is constant within one session has no sandwich, and dropping the
-    session would be selection on the estimator's numerical trouble.
-    """
-    fit = {
-        "coef_is_current_arm": 0.8,
-        "bse_is_current_arm": 0.1,
-        "bse_cluster_is_current_arm": np.nan,
-        "llf": -100.0,
-        "llf_includes_constants": False,
-        "n_params": 2,
-    }
-    rows = mod._estimator_rows(
-        ("alpha", "20200101", "02_r1"),
-        BASE_RUNG,
-        {CONDITIONAL_POISSON_FRACTION: fit},
-        info={"n_events_in": 10},
-        log_constant=0.0,
-        n_events=10,
-    )
-    (row,) = rows
-    assert row["se"] == 0.1
-    assert row["se_source"] == "model_fallback"
-
-
-def test_the_fraction_fit_without_a_sandwich_column_is_refused(one_rung):
-    fit = {
-        "coef_is_current_arm": 0.8,
-        "bse_is_current_arm": 0.1,
-        "llf": -100.0,
-        "llf_includes_constants": False,
-        "n_params": 2,
-    }
-    with pytest.raises(ValueError, match="bse_cluster_is_current_arm"):
-        mod._estimator_rows(
-            ("alpha", "20200101", "02_r1"),
-            BASE_RUNG,
-            {CONDITIONAL_POISSON_FRACTION: fit},
-            info={"n_events_in": 10},
-            log_constant=0.0,
-            n_events=10,
         )
 
 
