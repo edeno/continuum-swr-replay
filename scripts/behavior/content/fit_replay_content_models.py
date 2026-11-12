@@ -765,13 +765,13 @@ def print_model_results(
         f"\nCoefficients (animal-level primary, n={mdf['animal'].nunique()} animals; "
         "session median/p descriptive):"
     )
-    # ``agree``: animals whose own median has the sign of the session median.
+    # ``anim>0``: animals whose own median is positive, of the animals.
     # ``SE``: the median model SE over the sessions with a coefficient (a session
     # that cannot inform the term reports a NaN coefficient and an infinite SE).
     # ``unident``: sessions that cannot inform the predictor at all (NaN
     # coefficient, named in ``unidentified_terms``); they are in no median here.
     header = (
-        f"  {'Predictor':<25} {'AnimalMed':>10} {'agree':>7} {'SessMed':>9} "
+        f"  {'Predictor':<25} {'AnimalMed':>10} {'anim>0':>7} {'SessMed':>9} "
         f"{'SE':>8} {'sess p':>10} {'unident':>7}"
     )
     print(header)
@@ -779,9 +779,9 @@ def print_model_results(
     for pred, row in coefficient_family_statistics(mdf, predictors).iterrows():
         p = row["signed_rank_p_adjusted"]
         p_str = f"{p:.2e}" if np.isfinite(p) else "—"
-        agree = f"{int(row['n_animals_same_sign'])}/{int(row['n_animals'])}"
+        positive = f"{int(row['n_animals_positive'])}/{int(row['n_animals'])}"
         print(
-            f"  {pred:<25} {row['animal_median']:10.3f} {agree:>7} "
+            f"  {pred:<25} {row['animal_median']:10.3f} {positive:>7} "
             f"{row['median']:9.3f} {row['bse_median']:8.3f} {p_str:>10} "
             f"{int(row['n_unidentified']):>7d}"
         )

@@ -456,10 +456,41 @@ def test_the_printed_se_skips_a_session_that_cannot_inform_the_term(capsys) -> N
         for text in capsys.readouterr().out.splitlines()
         if text.strip().startswith("is_candidate_arm_0")
     )
-    # Columns: name, animal median, agree, session median, SE, p, unidentified.
+    # Columns: name, animal median, animals positive, session median, SE, p,
+    # unidentified.
     assert float(line.split()[4]) == pytest.approx(0.2)
     # The sessions that cannot inform the term are reported, not just skipped.
     assert line.split()[6] == "2"
+
+
+def test_the_animal_column_counts_animals_with_a_positive_median(capsys) -> None:
+    """Animal a has five negative sessions, b and c one positive each.
+
+    The session median is negative (5 of 7 sessions), the animal median is
+    positive (2 of 3 animals): the column prints 2/3 animals positive, not
+    the 1/3 that share the session median's sign.
+    """
+    mdf = pd.DataFrame(
+        {
+            "animal": ["a"] * 5 + ["b", "c"],
+            "session_date": list(range(7)),
+            "epoch": "02_r1",
+            "coef_is_candidate_arm_0": [-1.0, -1.1, -1.2, -1.3, -1.4, 0.5, 0.7],
+            "bse_is_candidate_arm_0": [0.1] * 7,
+        }
+    )
+    hierarchy = {"X": argparse.Namespace(description="test rung")}
+
+    mod.print_model_results("X", mdf, ["is_candidate_arm_0"], hierarchy=hierarchy)
+
+    lines = capsys.readouterr().out.splitlines()
+    header = next(text for text in lines if text.strip().startswith("Predictor"))
+    line = next(t for t in lines if t.strip().startswith("is_candidate_arm_0"))
+    assert header.split()[2] == "anim>0"
+    # Columns: name, animal median, animals positive, session median, ...
+    assert float(line.split()[1]) == pytest.approx(0.5)
+    assert float(line.split()[3]) == pytest.approx(-1.1)
+    assert line.split()[2] == "2/3"
 
 
 # ── Event-scale reporting ──
