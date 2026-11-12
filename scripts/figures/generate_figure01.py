@@ -45,6 +45,7 @@ from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
 
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     LOCAL_POSITION_STD,
@@ -744,13 +745,10 @@ def get_threshold_crossing_intervals(time, mask):
     if mask.size == 0 or not mask.any():
         return []
 
-    changes = np.diff(mask.astype(int), prepend=0, append=0)
-    starts = np.flatnonzero(changes == 1)
-    stops = np.flatnonzero(changes == -1)
     dt = float(np.nanmedian(np.diff(time))) if time.size > 1 else 0.0
 
     intervals = []
-    for start, stop in zip(starts, stops, strict=True):
+    for start, stop in contiguous_true_runs(mask):
         left = max(time[0], time[start] - dt / 2)
         right = min(time[-1], time[stop - 1] + dt / 2)
         intervals.append((left, right))

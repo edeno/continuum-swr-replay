@@ -32,6 +32,7 @@ from continuum_swr_replay.analysis.inventory_comparison.example_windows import (
     recompute_windows,
 )
 from continuum_swr_replay.analysis.inventory_comparison.selection import EXAMPLE_SEED
+from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.visualization.figure_utilities import WONG
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import plot_linear_track_graph_strip
@@ -147,10 +148,8 @@ def _spans(time: NDArray, mask: NDArray) -> list[tuple[float, float]]:
     if not mask.any():
         return []
     step = float(np.median(np.diff(time))) if time.size > 1 else 0.0
-    edges = np.diff(np.concatenate(([0], mask.astype(np.int8), [0])))
-    starts, stops = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1
     return [
-        (time[a], time[b] - time[a] + step) for a, b in zip(starts, stops, strict=True)
+        (time[a], time[b - 1] - time[a] + step) for a, b in contiguous_true_runs(mask)
     ]
 
 
