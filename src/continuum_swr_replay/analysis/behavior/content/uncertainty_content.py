@@ -886,17 +886,336 @@ def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+#: The populations the analysis may be read on: the sessions the Mu fit
+#: summarizes (``mu``), or every mapped session (``all``).
+ANALYSIS_COHORTS: tuple[str, ...] = ("mu", "all")
+
+
+def restrict_to_analysis_cohort(
+    trial_leaf: pd.DataFrame,
+    horserace: pd.DataFrame,
+    mu_summary: Mapping[str, pd.DataFrame],
+    cohort: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Keep the sessions of one analysis cohort.
+
+    ``mu`` keeps the sessions present in the Mu fit's per-session summary
+    (``summarize_mu_coefficients(...)["session"]``), so the model-light
+    profiles and the within-arm horse race are read on the sessions the
+    adjusted model was fit on; ``all`` keeps every session.
+
+    Parameters
+    ----------
+    trial_leaf : pd.DataFrame
+        :func:`build_trial_leaf_table` output, with ``session_id``.
+    horserace : pd.DataFrame
+        :func:`within_arm_horserace` output, with ``session_id``.
+    mu_summary : mapping of str to pd.DataFrame
+        :func:`summarize_mu_coefficients` output.
+    cohort : {"mu", "all"}
+        The cohort.
+
+    Returns
+    -------
+    (trial_leaf, horserace)
+        The two tables restricted to the cohort's sessions.
+
+    Raises
+    ------
+    ValueError
+        If ``cohort`` is not one of :data:`ANALYSIS_COHORTS`.
+    """
+    if cohort not in ANALYSIS_COHORTS:
+        raise ValueError(f"cohort must be one of {ANALYSIS_COHORTS}, not {cohort!r}")
+    if cohort == "mu":
+        valid_sessions = set(mu_summary["session"]["session_id"])
+        trial_leaf = trial_leaf[trial_leaf["session_id"].isin(valid_sessions)].copy()
+        horserace = horserace[horserace["session_id"].isin(valid_sessions)].copy()
+    return trial_leaf, horserace
+
+
+def analysis_cohort_counts(trial_leaf: pd.DataFrame) -> dict[str, int]:
+    """Sessions, trials, replay-bearing trials and rows of the analysed table.
+
+    Parameters
+    ----------
+    trial_leaf : pd.DataFrame
+        The trial x reward-well table after :func:`restrict_to_analysis_cohort`.
+
+    Returns
+    -------
+    dict
+        ``n_analysis_sessions``, ``n_analysis_trials`` (distinct session x
+        trial), ``n_analysis_replay_trials`` (those with ``has_replay``) and
+        ``n_analysis_trial_leaf_rows``.
+    """
+    return {
+        "n_analysis_sessions": int(trial_leaf["session_id"].nunique()),
+        "n_analysis_trials": int(
+            trial_leaf[["session_id", "trial_number_by_epoch"]]
+            .drop_duplicates()
+            .shape[0]
+        ),
+        "n_analysis_replay_trials": int(
+            trial_leaf.drop_duplicates(["session_id", "trial_number_by_epoch"])[
+                "has_replay"
+            ].sum()
+        ),
+        "n_analysis_trial_leaf_rows": int(len(trial_leaf)),
+    }
+
+
+#: The session the representative-session panel shows when the cohort holds it.
+DEFAULT_EXAMPLE_SESSION = ("wilbur", "20210329", "08_r4")
+
+
+def select_example_session(trial_leaf: pd.DataFrame) -> dict[str, str]:
+    """The representative session, chosen without looking at the association.
+
+    :data:`DEFAULT_EXAMPLE_SESSION` when the table holds it; otherwise the
+    robust medoid of the sessions on trial count, event count and the median
+    within-well uncertainty range (each feature centred on its median and
+    scaled by 1.4826 x MAD, or by its SD when the MAD is zero; a feature with
+    no spread is left out).
+
+    Parameters
+    ----------
+    trial_leaf : pd.DataFrame
+        The trial x reward-well table.
+
+    Returns
+    -------
+    dict of str to str
+        ``animal``, ``session_date``, ``epoch`` and the ``selection`` rule used.
+    """
+    animal, session_date, epoch = DEFAULT_EXAMPLE_SESSION
+    present = (
+        trial_leaf["animal"].astype(str).eq(animal)
+        & trial_leaf["session_date"].astype(str).eq(session_date)
+        & trial_leaf["epoch"].astype(str).eq(epoch)
+    )
+    if present.any():
+        return {
+            "animal": animal,
+            "session_date": session_date,
+            "epoch": epoch,
+            "selection": "association-blind cohort medoid selected before plotting",
+        }
+
+    # Portable fallback for alternate input cohorts: select the robust medoid on
+    # trial count, event count, and within-well uncertainty range.  No
+    # uncertainty-content association enters this rule.
+    trial = trial_leaf.drop_duplicates(["session_id", "trial_number_by_epoch"])
+    counts = trial.groupby(
+        ["animal", "session_date", "epoch", "session_id"], as_index=False
+    ).agg(
+        n_trials=("trial_number_by_epoch", "nunique"),
+        n_events=("n_events", "sum"),
+    )
+    uncertainty_range = (
+        trial_leaf.groupby(["session_id", "candidate_arm"], observed=True)[
+            "reward_belief_variance_candidate_arm_preoutcome"
+        ]
+        .agg(lambda x: x.max() - x.min())
+        .groupby("session_id")
+        .median()
+        .rename("uncertainty_range")
+    )
+    counts = counts.merge(uncertainty_range, on="session_id", validate="one_to_one")
+    features = ["n_trials", "n_events", "uncertainty_range"]
+    distance = np.zeros(len(counts), dtype=float)
+    for feature in features:
+        values = counts[feature].to_numpy(dtype=float)
+        median = np.nanmedian(values)
+        mad = np.nanmedian(np.abs(values - median))
+        scale = 1.4826 * mad if mad > 0 else np.nanstd(values)
+        if not np.isfinite(scale) or scale == 0:
+            continue
+        distance += ((values - median) / scale) ** 2
+    counts["distance"] = np.sqrt(distance)
+    selected = counts.sort_values(["distance", "session_id"]).iloc[0]
+    return {
+        "animal": str(selected["animal"]),
+        "session_date": str(selected["session_date"]),
+        "epoch": str(selected["epoch"]),
+        "selection": "fallback robust medoid; association not used",
+    }
+
+
+def _profile_configurations() -> tuple[dict[str, str | None], ...]:
+    configurations: list[dict[str, str | None]] = []
+    for metric, response_columns in [
+        (
+            "conditional_event_share",
+            [
+                ("hard", "hard_event_share"),
+                ("soft", "soft_event_share"),
+                ("posterior", "posterior_event_share"),
+            ],
+        ),
+        (
+            "conditional_leaf_share",
+            [
+                ("hard", "hard_leaf_share"),
+                ("soft", "soft_leaf_share"),
+                ("posterior", "posterior_leaf_share"),
+            ],
+        ),
+    ]:
+        for response, share in response_columns:
+            for scope in ["all", "unchosen"]:
+                configurations.append(
+                    {
+                        "metric": metric,
+                        "response": response,
+                        "scope": scope,
+                        "numerator": share,
+                        "denominator": None,
+                    }
+                )
+    for response, mass in [
+        ("hard", "hard_count"),
+        ("soft", "soft_count"),
+        ("posterior", "posterior_mass"),
+    ]:
+        for scope in ["all", "unchosen"]:
+            configurations.append(
+                {
+                    "metric": "absolute_rate",
+                    "response": response,
+                    "scope": scope,
+                    "numerator": mass,
+                    "denominator": "immobility_duration_s",
+                }
+            )
+    return tuple(configurations)
+
+
+#: The quartile profiles the analysis reports, one per (metric, response,
+#: scope): the conditional event share and leaf share of the hard, soft and
+#: posterior responses, and the absolute rate (response mass per immobility
+#: second), each over all wells and over the unchosen wells.
+QUARTILE_PROFILE_CONFIGURATIONS = _profile_configurations()
+
+
+def _add_result_metadata(
+    frame: pd.DataFrame,
+    *,
+    metric: str,
+    response: str,
+    scope: str,
+    level: str,
+) -> pd.DataFrame:
+    return frame.assign(
+        metric=metric,
+        response=response,
+        scope=scope,
+        level=level,
+    )
+
+
+def quartile_profiles_and_contrasts(
+    trial_leaf: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Every reported quartile profile and its high-minus-low contrasts.
+
+    For each of :data:`QUARTILE_PROFILE_CONFIGURATIONS`, the
+    :func:`hierarchical_quartile_profile` at every level and the
+    :func:`paired_quartile_contrasts` of its per-arm level; then the prevalence
+    of the chosen well (``chosen_prevalence``, over all wells) as a profile only.
+
+    Parameters
+    ----------
+    trial_leaf : pd.DataFrame
+        The trial x reward-well table of the analysis cohort.
+
+    Returns
+    -------
+    (profiles, contrasts)
+        Long tables with ``metric``, ``response``, ``scope`` and ``level``
+        columns; levels with no rows are left out.
+    """
+    profile_frames = []
+    contrast_frames = []
+    for config in QUARTILE_PROFILE_CONFIGURATIONS:
+        profile = hierarchical_quartile_profile(
+            trial_leaf,
+            numerator_col=config["numerator"],
+            denominator_col=config["denominator"],
+            scope=config["scope"],
+        )
+        for level, frame in profile.items():
+            if frame.empty:
+                continue
+            profile_frames.append(
+                _add_result_metadata(
+                    frame,
+                    metric=config["metric"],
+                    response=config["response"],
+                    scope=config["scope"],
+                    level=level,
+                )
+            )
+        contrasts = paired_quartile_contrasts(profile["candidate_arm"])
+        for level, frame in contrasts.items():
+            if frame.empty:
+                continue
+            contrast_frames.append(
+                _add_result_metadata(
+                    frame,
+                    metric=config["metric"],
+                    response=config["response"],
+                    scope=config["scope"],
+                    level=level,
+                )
+            )
+
+    profiles = pd.concat(profile_frames, ignore_index=True, sort=False)
+    contrasts = pd.concat(contrast_frames, ignore_index=True, sort=False)
+
+    chosen_profile = hierarchical_quartile_profile(
+        trial_leaf.assign(is_chosen_value=trial_leaf["is_chosen"].astype(float)),
+        numerator_col="is_chosen_value",
+        scope="all",
+    )
+    for level, frame in chosen_profile.items():
+        if frame.empty:
+            continue
+        profiles = pd.concat(
+            [
+                profiles,
+                _add_result_metadata(
+                    frame,
+                    metric="chosen_prevalence",
+                    response="binary",
+                    scope="all",
+                    level=level,
+                ),
+            ],
+            ignore_index=True,
+            sort=False,
+        )
+    return profiles, contrasts
+
+
 __all__ = [
+    "ANALYSIS_COHORTS",
+    "DEFAULT_EXAMPLE_SESSION",
     "EVENT_SHARE_COLUMNS",
     "HORSERACE_PREDICTORS",
     "LEAF_FRACTION_COLUMNS",
+    "QUARTILE_PROFILE_CONFIGURATIONS",
     "RESPONSE_COLUMNS",
     "SHARE_COLUMNS",
     "UNCERTAINTY_COLUMNS",
+    "analysis_cohort_counts",
     "assign_within_arm_quantiles",
     "build_trial_leaf_table",
     "hierarchical_quartile_profile",
     "paired_quartile_contrasts",
+    "quartile_profiles_and_contrasts",
+    "restrict_to_analysis_cohort",
+    "select_example_session",
     "summarize_horserace",
     "summarize_mu_coefficients",
     "within_arm_horserace",

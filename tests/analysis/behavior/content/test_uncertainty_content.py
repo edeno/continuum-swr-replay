@@ -9,10 +9,16 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
+    DEFAULT_EXAMPLE_SESSION,
+    QUARTILE_PROFILE_CONFIGURATIONS,
+    analysis_cohort_counts,
     assign_within_arm_quantiles,
     build_trial_leaf_table,
     hierarchical_quartile_profile,
     paired_quartile_contrasts,
+    quartile_profiles_and_contrasts,
+    restrict_to_analysis_cohort,
+    select_example_session,
     summarize_horserace,
     summarize_mu_coefficients,
     within_arm_horserace,
@@ -554,3 +560,131 @@ def test_figure_loader_rejects_pre_leaf_support_result_bundle(tmp_path):
 
     with pytest.raises(ValueError, match="predate leaf-support"):
         figure_script._load_results(tmp_path)
+
+
+def test_the_mu_cohort_keeps_the_sessions_the_mu_fit_summarizes():
+    trial_leaf = pd.DataFrame({"session_id": ["s1", "s1", "s2", "s3"], "x": range(4)})
+    horserace = pd.DataFrame({"session_id": ["s1", "s3"], "coef_x": [1.0, 2.0]})
+    mu_summary = {"session": pd.DataFrame({"session_id": ["s1", "s2"]})}
+
+    kept_leaf, kept_race = restrict_to_analysis_cohort(
+        trial_leaf, horserace, mu_summary, "mu"
+    )
+    assert list(kept_leaf["x"]) == [0, 1, 2]
+    assert list(kept_race["session_id"]) == ["s1"]
+
+    all_leaf, all_race = restrict_to_analysis_cohort(
+        trial_leaf, horserace, mu_summary, "all"
+    )
+    pd.testing.assert_frame_equal(all_leaf, trial_leaf)
+    pd.testing.assert_frame_equal(all_race, horserace)
+
+    with pytest.raises(ValueError, match="cohort must be one of"):
+        restrict_to_analysis_cohort(trial_leaf, horserace, mu_summary, "M4")
+
+
+def test_the_cohort_counts_count_a_trial_once_per_session():
+    # Session A: trial 0 (replay, two wells) and trial 1 (no replay, two wells);
+    # session B: trial 0 again by number, a different trial, with replay.
+    trial_leaf = pd.DataFrame(
+        {
+            "session_id": ["A", "A", "A", "A", "B"],
+            "trial_number_by_epoch": [0, 0, 1, 1, 0],
+            "has_replay": [True, True, False, False, True],
+        }
+    )
+    assert analysis_cohort_counts(trial_leaf) == {
+        "n_analysis_sessions": 2,
+        "n_analysis_trials": 3,
+        "n_analysis_replay_trials": 2,
+        "n_analysis_trial_leaf_rows": 5,
+    }
+
+
+def _example_table(sessions) -> pd.DataFrame:
+    """One row per (session, trial, well): ``(animal, epoch, n_trials,
+    events per trial, uncertainty range)`` per session."""
+    rows = []
+    for animal, epoch, n_trials, events, spread in sessions:
+        session_id = f"{animal}_{epoch}"
+        for trial in range(n_trials):
+            for arm, uncertainty in ((0, 0.0), (1, spread)):
+                rows.append(
+                    {
+                        "animal": animal,
+                        "session_date": "20210329",
+                        "epoch": epoch,
+                        "session_id": session_id,
+                        "trial_number_by_epoch": trial,
+                        "n_events": events,
+                        "candidate_arm": arm,
+                        "reward_belief_variance_candidate_arm_preoutcome": (
+                            uncertainty if trial == 0 else 0.0
+                        ),
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
+def test_the_example_session_is_the_default_when_the_cohort_holds_it():
+    animal, session_date, epoch = DEFAULT_EXAMPLE_SESSION
+    table = _example_table([(animal, epoch, 1, 1, 0.1), ("chimi", "02_r1", 5, 5, 0.5)])
+    assert table["session_date"].eq(session_date).all()
+    example = select_example_session(table)
+    assert (example["animal"], example["session_date"], example["epoch"]) == (
+        DEFAULT_EXAMPLE_SESSION
+    )
+    assert example["selection"].startswith("association-blind")
+
+
+def test_without_the_default_the_example_is_the_robust_medoid():
+    # Trials 1, 2, 3; events 1, 2*2=4, 9*3=27; median well ranges 0, 0.1, 0.15
+    # (a one-trial session has no spread). The middle session sits at every
+    # feature's median, so its distance is zero.
+    table = _example_table(
+        [
+            ("chimi", "02_r1", 1, 1, 0.1),
+            ("chimi", "04_r2", 2, 2, 0.2),
+            ("chimi", "06_r3", 3, 9, 0.3),
+        ]
+    )
+    example = select_example_session(table)
+    assert example["epoch"] == "04_r2"
+    assert example["selection"].startswith("fallback robust medoid")
+
+
+def test_the_profiles_cover_every_configuration_and_the_chosen_prevalence():
+    event_arm, stops, qvals = _synthetic_inputs()
+    trial_leaf, _ = build_trial_leaf_table(event_arm, stops, qvals)
+
+    profiles, contrasts = quartile_profiles_and_contrasts(trial_leaf)
+
+    configured = {
+        (c["metric"], c["response"], c["scope"])
+        for c in QUARTILE_PROFILE_CONFIGURATIONS
+    }
+    assert len(configured) == len(QUARTILE_PROFILE_CONFIGURATIONS) == 18
+    profiled = set(map(tuple, profiles[["metric", "response", "scope"]].values))
+    assert profiled == configured | {("chosen_prevalence", "binary", "all")}
+    contrasted = set(map(tuple, contrasts[["metric", "response", "scope"]].values))
+    assert contrasted == configured
+
+    # One configuration, read back, is the profile function's own output.
+    direct = hierarchical_quartile_profile(
+        trial_leaf,
+        numerator_col="posterior_mass",
+        denominator_col="immobility_duration_s",
+        scope="unchosen",
+    )["overall"]
+    stored = profiles[
+        profiles["metric"].eq("absolute_rate")
+        & profiles["response"].eq("posterior")
+        & profiles["scope"].eq("unchosen")
+        & profiles["level"].eq("overall")
+    ]
+    # The long table holds every level, so its count columns are float.
+    pd.testing.assert_frame_equal(
+        stored[direct.columns].reset_index(drop=True),
+        direct.reset_index(drop=True),
+        check_dtype=False,
+    )

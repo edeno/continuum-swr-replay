@@ -22,16 +22,18 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
     belief_chain_output_subdir,
 )
 from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
+    ANALYSIS_COHORTS,
+    analysis_cohort_counts,
     build_trial_leaf_table,
-    hierarchical_quartile_profile,
-    paired_quartile_contrasts,
+    quartile_profiles_and_contrasts,
+    restrict_to_analysis_cohort,
+    select_example_session,
     summarize_horserace,
     summarize_mu_coefficients,
     within_arm_horserace,
@@ -58,7 +60,6 @@ from continuum_swr_replay.tables.standardization import (
 )
 
 LOGGER = logging.getLogger(__name__)
-DEFAULT_EXAMPLE_SESSION = ("wilbur", "20210329", "08_r4")
 
 
 def mu_inputs(data_dir: Path) -> dict[str, Path]:
@@ -102,7 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--cohort",
-        choices=["mu", "all"],
+        choices=list(ANALYSIS_COHORTS),
         default="mu",
         help="Use sessions represented in Mu.pkl (default) or all mapped sessions.",
     )
@@ -144,77 +145,6 @@ def resolve_models_dir(data_dir: Path, models_dir: Path | None = None) -> Path:
     if models_dir is not None:
         return models_dir
     return data_dir / belief_chain_output_subdir()
-
-
-def _add_result_metadata(
-    frame: pd.DataFrame,
-    *,
-    metric: str,
-    response: str,
-    scope: str,
-    level: str,
-) -> pd.DataFrame:
-    return frame.assign(
-        metric=metric,
-        response=response,
-        scope=scope,
-        level=level,
-    )
-
-
-def _select_example_session(trial_leaf: pd.DataFrame) -> dict[str, str]:
-    animal, session_date, epoch = DEFAULT_EXAMPLE_SESSION
-    present = (
-        trial_leaf["animal"].astype(str).eq(animal)
-        & trial_leaf["session_date"].astype(str).eq(session_date)
-        & trial_leaf["epoch"].astype(str).eq(epoch)
-    )
-    if present.any():
-        return {
-            "animal": animal,
-            "session_date": session_date,
-            "epoch": epoch,
-            "selection": "association-blind cohort medoid selected before plotting",
-        }
-
-    # Portable fallback for alternate input cohorts: select the robust medoid on
-    # trial count, event count, and within-well uncertainty range.  No
-    # uncertainty-content association enters this rule.
-    trial = trial_leaf.drop_duplicates(["session_id", "trial_number_by_epoch"])
-    counts = trial.groupby(
-        ["animal", "session_date", "epoch", "session_id"], as_index=False
-    ).agg(
-        n_trials=("trial_number_by_epoch", "nunique"),
-        n_events=("n_events", "sum"),
-    )
-    uncertainty_range = (
-        trial_leaf.groupby(["session_id", "candidate_arm"], observed=True)[
-            "reward_belief_variance_candidate_arm_preoutcome"
-        ]
-        .agg(lambda x: x.max() - x.min())
-        .groupby("session_id")
-        .median()
-        .rename("uncertainty_range")
-    )
-    counts = counts.merge(uncertainty_range, on="session_id", validate="one_to_one")
-    features = ["n_trials", "n_events", "uncertainty_range"]
-    distance = np.zeros(len(counts), dtype=float)
-    for feature in features:
-        values = counts[feature].to_numpy(dtype=float)
-        median = np.nanmedian(values)
-        mad = np.nanmedian(np.abs(values - median))
-        scale = 1.4826 * mad if mad > 0 else np.nanstd(values)
-        if not np.isfinite(scale) or scale == 0:
-            continue
-        distance += ((values - median) / scale) ** 2
-    counts["distance"] = np.sqrt(distance)
-    selected = counts.sort_values(["distance", "session_id"]).iloc[0]
-    return {
-        "animal": str(selected["animal"]),
-        "session_date": str(selected["session_date"]),
-        "epoch": str(selected["epoch"]),
-        "selection": "fallback robust medoid; association not used",
-    }
 
 
 def _format_profile(values: pd.DataFrame) -> str:
@@ -387,10 +317,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     LOGGER.info("Within-arm value x uncertainty horse-race (exploit vs explore)")
     horserace = within_arm_horserace(event_arm)
 
-    if args.cohort == "mu":
-        valid_sessions = set(mu_summary["session"]["session_id"])
-        trial_leaf = trial_leaf[trial_leaf["session_id"].isin(valid_sessions)].copy()
-        horserace = horserace[horserace["session_id"].isin(valid_sessions)].copy()
+    trial_leaf, horserace = restrict_to_analysis_cohort(
+        trial_leaf, horserace, mu_summary, args.cohort
+    )
     horserace_summary = summarize_horserace(horserace)
 
     audit.update(
@@ -403,130 +332,14 @@ def main(argv: Sequence[str] | None = None) -> None:
             "mu_bundle": str(models_dir),
             "mu_n_categories": LEAF_ONLY_N_CATEGORIES,
             "mu_response_renormalized": True,
-            "n_analysis_sessions": int(trial_leaf["session_id"].nunique()),
-            "n_analysis_trials": int(
-                trial_leaf[["session_id", "trial_number_by_epoch"]]
-                .drop_duplicates()
-                .shape[0]
-            ),
-            "n_analysis_replay_trials": int(
-                trial_leaf.drop_duplicates(["session_id", "trial_number_by_epoch"])[
-                    "has_replay"
-                ].sum()
-            ),
-            "n_analysis_trial_leaf_rows": int(len(trial_leaf)),
+            **analysis_cohort_counts(trial_leaf),
         }
     )
-    example = _select_example_session(trial_leaf)
+    example = select_example_session(trial_leaf)
     audit.update({f"example_{key}": value for key, value in example.items()})
 
-    configurations = []
-    for metric, response_columns in [
-        (
-            "conditional_event_share",
-            [
-                ("hard", "hard_event_share"),
-                ("soft", "soft_event_share"),
-                ("posterior", "posterior_event_share"),
-            ],
-        ),
-        (
-            "conditional_leaf_share",
-            [
-                ("hard", "hard_leaf_share"),
-                ("soft", "soft_leaf_share"),
-                ("posterior", "posterior_leaf_share"),
-            ],
-        ),
-    ]:
-        for response, share in response_columns:
-            for scope in ["all", "unchosen"]:
-                configurations.append(
-                    {
-                        "metric": metric,
-                        "response": response,
-                        "scope": scope,
-                        "numerator": share,
-                        "denominator": None,
-                    }
-                )
-    for response, mass in [
-        ("hard", "hard_count"),
-        ("soft", "soft_count"),
-        ("posterior", "posterior_mass"),
-    ]:
-        for scope in ["all", "unchosen"]:
-            configurations.append(
-                {
-                    "metric": "absolute_rate",
-                    "response": response,
-                    "scope": scope,
-                    "numerator": mass,
-                    "denominator": "immobility_duration_s",
-                }
-            )
-
-    profile_frames = []
-    contrast_frames = []
     LOGGER.info("Computing hierarchical quartile profiles")
-    for config in configurations:
-        profile = hierarchical_quartile_profile(
-            trial_leaf,
-            numerator_col=config["numerator"],
-            denominator_col=config["denominator"],
-            scope=config["scope"],
-        )
-        for level, frame in profile.items():
-            if frame.empty:
-                continue
-            profile_frames.append(
-                _add_result_metadata(
-                    frame,
-                    metric=config["metric"],
-                    response=config["response"],
-                    scope=config["scope"],
-                    level=level,
-                )
-            )
-        contrasts = paired_quartile_contrasts(profile["candidate_arm"])
-        for level, frame in contrasts.items():
-            if frame.empty:
-                continue
-            contrast_frames.append(
-                _add_result_metadata(
-                    frame,
-                    metric=config["metric"],
-                    response=config["response"],
-                    scope=config["scope"],
-                    level=level,
-                )
-            )
-
-    profiles = pd.concat(profile_frames, ignore_index=True, sort=False)
-    contrasts = pd.concat(contrast_frames, ignore_index=True, sort=False)
-
-    chosen_profile = hierarchical_quartile_profile(
-        trial_leaf.assign(is_chosen_value=trial_leaf["is_chosen"].astype(float)),
-        numerator_col="is_chosen_value",
-        scope="all",
-    )
-    for level, frame in chosen_profile.items():
-        if frame.empty:
-            continue
-        profiles = pd.concat(
-            [
-                profiles,
-                _add_result_metadata(
-                    frame,
-                    metric="chosen_prevalence",
-                    response="binary",
-                    scope="all",
-                    level=level,
-                ),
-            ],
-            ignore_index=True,
-            sort=False,
-        )
+    profiles, contrasts = quartile_profiles_and_contrasts(trial_leaf)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     trial_leaf.to_pickle(args.output_dir / "trial_leaf_table.pkl")
