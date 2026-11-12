@@ -504,8 +504,9 @@ def _comparison_row(estimator: str) -> pd.DataFrame:
                 "child": "M1",
                 "estimator": estimator,
                 "n_sessions": 200,
-                "delta_aic_median": 12.5,
-                "delta_aic_animal_median": 11.0,
+                # a child better in most sessions: AIC(child) - AIC(parent) < 0
+                "delta_aic_median": -12.5,
+                "delta_aic_animal_median": -11.0,
                 "n_animals": 5,
                 "n_animals_child_better": 5,
                 "child_better_aic": 180,
@@ -524,7 +525,8 @@ def test_count_run_headline_omits_the_per_session_win_counts() -> None:
     assert "Child wins" not in text
     assert "LRT sig" not in text
     assert "180" not in text and "175" not in text
-    assert "12.5" in text
+    assert "-12.5" in text and "-11.0" in text
+    assert "ΔAIC = child − parent, negative = child better" in text
     assert "model_comparison.pkl" in text
 
 

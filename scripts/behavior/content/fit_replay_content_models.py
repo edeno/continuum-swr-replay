@@ -818,7 +818,7 @@ def format_comparison_table(comparison: pd.DataFrame) -> list[str]:
 
     lines = [
         "=" * 60,
-        f"MODEL COMPARISON (positive ΔAIC = child better; {label})",
+        f"MODEL COMPARISON (ΔAIC = child − parent, negative = child better; {label})",
         "=" * 60,
         "",
     ]
