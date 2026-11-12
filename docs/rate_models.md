@@ -321,9 +321,10 @@ on the arrival window) and `M7ra_time_arrival_histcos_rew` against
 disagree on `n_bins`, so a cross-clock difference cannot be taken by accident.
 Every fitted row carries a `time_clock` column (`"stop"` / `"arrival"`) so the
 constraint travels with the artifact. The two ladders are read **side by side**,
-never differenced; the scale-free comparison the audit publishes is the peak
-position of each fitted time course and the KS distance between the two curves
-normalized on their own windows. Both are read on each rung's
+never differenced; the scale-free comparison the summary reports
+(`rate_fit_statistics.clock_shape_statistics`) is the peak position of each
+fitted time course and the KS distance between the two curves normalized on
+their own windows. Both are read on each rung's
 **supported interior** — **between the outermost interior knots**, so `tc` is
 read on [1, 3] s (knots 1/2/3) and the arrival clock on [1, 6] s (knots
 1/2/4/6) — because a cubic B-spline extrapolating past its outermost interior
