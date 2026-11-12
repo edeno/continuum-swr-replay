@@ -4,9 +4,12 @@
 Reads the persisted per-session coefficients in
 ``models_per_bin_rate/all_models.pkl`` (produced by
 ``fit_per_bin_rate_models.py``) and renders the two headline figures -- no
-re-fitting happens here. The summaries drawn (medians, IQR, per-animal medians,
-the paired signed-rank test) are ``rate_fit_statistics``' and
-``coefficient_statistics``', over the sessions the summary reads them over.
+re-fitting happens here. Every number drawn (medians, IQR, per-animal medians,
+the paired signed-rank test) is a ``rate_fit_statistics`` function's; the
+reward kernel is read over the reward-gated sessions, as the summary reads it.
+Of these the behavior summary reports the reward kernel's median at each lag
+and the paired lag-1 test; the kernel's quartiles, the per-animal kernels and
+the self-history kernel are drawn but not reported.
 
 Both figures read the full model ``M7r_time_histcos_rew`` (time spline +
 raised-cosine self-history + reward kernel), so every effect is shown
