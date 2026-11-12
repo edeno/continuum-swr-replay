@@ -80,7 +80,7 @@ Within-stop time-binned tables (Part B).
 
 The analysed-time read point: a decode frame held to the one analysed-time rule.
 
-`stamp_swr_source`, `require_swr_source`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `analysed_bins`, `swr_intervals`
+`stamp_swr_source`, `require_swr_source`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot_with_swr_source`, `analysed_bins`, `swr_intervals`
 
 ### `src/continuum_swr_replay/analysis/events/artifact_intervals.py`
 
@@ -390,9 +390,9 @@ Estimators and the per-session fit machinery each runner calls.
 
 ### `src/continuum_swr_replay/analysis/behavior/_fit_diagnostics.py`
 
-Shared fit-diagnostics helpers: convergence, separation, warning capture.
+Shared fit-diagnostics helpers: convergence, separation, warning capture, flag counts.
 
-`fit_status`, `separated_terms`, `capture_fit_warnings`, `count_fit_quality_warnings`
+`fit_status`, `separated_terms`, `capture_fit_warnings`, `count_fit_quality_warnings`, `fit_flag_counts`
 
 ### `src/continuum_swr_replay/analysis/behavior/_helpers.py`
 
@@ -480,7 +480,7 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 Content occupancy of non-local events — where the decoded activity represents.
 
-`animal_from_epoch_id`, `find_sessions`, `session_content_distances`, `arm_occupancy`, `analyze`, `group_shares`, `non_swr_shares_by_animal`, `render`, `main`
+`find_sessions`, `session_content_distances`, `arm_occupancy`, `analyze`, `group_shares`, `non_swr_shares_by_animal`, `render`, `main`
 
 ### `scripts/behavior/content/analyze_uncertainty_content.py`
 
@@ -718,7 +718,7 @@ Switch-aligned timing analysis for patch-switch prediction.
 
 Per-model cohort / drop-profile audit records.
 
-`fit_flag_counts`, `is_qvals_sourced_column`, `is_qvals_gap_column`, `attach_has_qvals_row`, `qvals_gap_event_ids`, `cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
+`is_qvals_sourced_column`, `is_qvals_gap_column`, `attach_has_qvals_row`, `qvals_gap_event_ids`, `cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
 
 ### `src/continuum_swr_replay/analysis/behavior/content/model_checking.py`
 
@@ -730,7 +730,7 @@ Model checking utilities for the replay content model hierarchy.
 
 Compare nested models via AIC, BIC, and likelihood ratio tests.
 
-`compare_nested_models`, `summarize_comparison`, `run_full_hierarchy_comparison`
+`why_not_comparable`, `compare_nested_models`, `summarize_comparison`, `run_full_hierarchy_comparison`
 
 ### `src/continuum_swr_replay/analysis/behavior/contrast_aggregation.py`
 
@@ -878,7 +878,7 @@ Add each compared event's Local, No-Spike, non-local and uncertain shares to an 
 
 Spike-evidence reality analysis for non-SWR non-local events.
 
-`animal_from_epoch_id`, `find_sessions`, `build_session_events`, `load_marks`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `events_with_map_in_left_out_bins`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
+`find_sessions`, `build_session_events`, `load_marks`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `events_with_map_in_left_out_bins`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
 
 ### `scripts/detection/bootstrap_event_properties.py`
 
