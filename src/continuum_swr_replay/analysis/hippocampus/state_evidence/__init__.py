@@ -78,7 +78,7 @@ Every window is scored under three encodings, the column prefixes:
   bin, so it includes non-ripple windows' own spikes.
 
 Running bins within two bins of a non-local event bin are left out of every
-running-only fit, so no event spike enters one even through the library's
+running-only fit (:func:`running_only_masks`), so no event spike enters one even through the library's
 padding (one bin width either side, with its float rounding).
 
 What is and is not held out (properties, not defects)
@@ -172,6 +172,8 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
 from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
     CV_BLOCK_S,
     ENCODING_KEY,
+    EVENT_MARGIN_BINS,
+    RUNNING_ENCODING_MIN_SPEED_CM_S,
     UNDERFLOW_OCCUPANCY_FLOOR,
     TetrodeTerms,
     encoding_comparison,
@@ -182,6 +184,8 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
     load_encoding,
     nearest_interior_bins,
     per_tetrode_terms,
+    running_only_masks,
+    spikes_in_bins,
     subnormal_occupancy_bin_mask,
     time_folds,
     training_spike_bins,
@@ -190,6 +194,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
     HALVES_SEED,
     REGIMES,
     STATES,
+    analysed_regimes,
     build_windows,
     calibration_windows,
     keyed_rng,
@@ -208,6 +213,7 @@ __all__ = [
     "ENCODING_HELD_OUT",
     "ENCODING_KEY",
     "ENCODING_LABELS",
+    "EVENT_MARGIN_BINS",
     "EPOCH_SUMMARY",
     "HALVES_SEED",
     "MIN_BIN_WINDOWS",
@@ -215,11 +221,13 @@ __all__ = [
     "PRIMARY_METRICS",
     "PROBABILITY_BIN_LABELS",
     "REGIMES",
+    "RUNNING_ENCODING_MIN_SPEED_CM_S",
     "SECONDARY_METRICS",
     "SPLIT_COLUMN",
     "STATES",
     "UNDERFLOW_OCCUPANCY_FLOOR",
     "TetrodeTerms",
+    "analysed_regimes",
     "animal_t_test",
     "bout_animal_summaries",
     "bout_statistics",
@@ -248,8 +256,10 @@ __all__ = [
     "per_tetrode_terms",
     "rate_calibration",
     "regimes",
+    "running_only_masks",
     "saved_decode_masks",
     "sign_flip_p",
+    "spikes_in_bins",
     "split_non_local_by_swr",
     "state_bouts",
     "stratified_bootstrap_ci",

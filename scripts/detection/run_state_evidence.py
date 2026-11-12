@@ -30,7 +30,7 @@ Per epoch (a dask CPU worker each):
    must be the decode's, and refitting the encoding model on it with those
    training bins must reproduce the stored one exactly, so the marks are the
    decode's.
-4. **Encodings** (``running_only_masks``): running-only refits (head speed
+4. **Encodings** (``state_evidence.running_only_masks``): running-only refits (head speed
    >= 4 cm/s), on every running bin and on each fold of alternating 30 s
    blocks (``time_folds``), leaving out running bins within two bins of a
    decoded non-local event bin (one the analysed-time rule drops included) and
@@ -134,12 +134,15 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     ENCODING_HELD_OUT,
     ENCODING_KEY,
     ENCODING_LABELS,
+    EVENT_MARGIN_BINS,
     HALVES_SEED,
     MIN_BIN_WINDOWS,
     PRIMARY_ENCODING,
     PROBABILITY_BIN_LABELS,
+    RUNNING_ENCODING_MIN_SPEED_CM_S,
     STATES,
     UNDERFLOW_OCCUPANCY_FLOOR,
+    analysed_regimes,
     bout_animal_summaries,
     build_windows,
     code_version,
@@ -153,8 +156,9 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     nearest_interior_bins,
     paired_bouts,
     per_tetrode_terms,
-    regimes,
+    running_only_masks,
     saved_decode_masks,
+    spikes_in_bins,
     subnormal_occupancy_bin_mask,
     summarize_state_evidence,
     tetrode_halves,
@@ -171,9 +175,6 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,
 )
 from continuum_swr_replay.decoding.results import open_results  # noqa: E402
-from continuum_swr_replay.intervals import (  # noqa: E402
-    interval_mask,
-)
 from continuum_swr_replay.parameters import ROOT_DIR  # noqa: E402
 from continuum_swr_replay.paths import processed_data_dir  # noqa: E402
 from continuum_swr_replay.runs.batch import (  # noqa: E402
@@ -200,13 +201,6 @@ from continuum_swr_replay.tables.io import (  # noqa: E402
 PRODUCED_BY = produced_by(__file__)
 SEED = 20261004
 """Names every window and partner draw, with the epoch id."""
-RUNNING_ENCODING_MIN_SPEED_CM_S = 4.0
-EVENT_MARGIN_BINS = 2
-"""Running bins this close to a non-local event bin are left out of every
-running-only fit. The library pads each training run by one bin width, the
-first two bins' spacing; at epoch timestamps (~1.6e9 s) a bin can be an ulp
-narrower, so one bin of margin can leave a sliver of the event bin in the
-span (one j16 pilot epoch did); two cannot."""
 N_STORED_CHECK_BINS = 2000
 LIBRARY_CHECK_BINS = 200
 STORED_MAX_REL = 1e-3
@@ -496,20 +490,6 @@ def refit_encoding(
     return encoding
 
 
-def spikes_in_bins(
-    spike_times: list[NDArray], marks: list[NDArray], time: NDArray, keep: NDArray
-) -> tuple[list[NDArray], list[NDArray]]:
-    """Only the spikes the decoder bins into a kept bin (``keep``, per bin)."""
-    kept_times, kept_marks = [], []
-    for st, mk in zip(spike_times, marks, strict=True):
-        st = np.asarray(st)
-        inside = np.flatnonzero((st >= time[0]) & (st <= time[-1]))
-        mine = inside[keep[np.digitize(st[inside], time[1:-1])]]
-        kept_times.append(st[mine])
-        kept_marks.append(np.asarray(mk)[mine])
-    return kept_times, kept_marks
-
-
 def relative_error(mine: NDArray, reference: NDArray) -> dict:
     """Max absolute and relative (to max(1, |reference|)) difference."""
     diff = np.abs(mine - reference)
@@ -684,10 +664,7 @@ def epoch_table(
     }
 
     # windows: a bin with no finite position, or in excluded time, is in no regime
-    regime = regimes(speed)
-    regime[~np.isfinite(linear)] = ""
-    in_excluded = interval_mask(time, excluded)
-    regime[in_excluded] = ""
+    regime, in_excluded = analysed_regimes(time, speed, linear, excluded)
     checks["decode"]["excluded_bins"] = int(in_excluded.sum())
     windows: dict[str, pd.DataFrame] = {}
     for label_set in sets:
@@ -986,92 +963,6 @@ def label_set_table(
                 "bouts": int((marked & (table.kind == "bout")).sum()),
             }
     return table, record
-
-
-def running_only_masks(
-    time: NDArray,
-    speed: NDArray,
-    position: NDArray,
-    in_event: NDArray,
-    folds: NDArray,
-    *,
-    is_missing: NDArray,
-) -> tuple[dict[str, NDArray], dict]:
-    """The running-only encodings' training masks, and their record.
-
-    ``run`` is every running bin (head speed >= 4 cm/s); ``runcv0`` and
-    ``runcv1`` are the running bins of each fold (:func:`time_folds`). Running
-    bins within :data:`EVENT_MARGIN_BINS` of a non-local event bin are left
-    out: the library pads every training run by about one bin on each side and
-    bridges bins without a position (:func:`training_spike_bins`), and no
-    event spike may enter a running-only encoding. The decode's missing bins
-    (its artifact mask) are left out too, as its own encoding leaves them out.
-
-    Parameters
-    ----------
-    time, speed : ndarray, shape (n_time,)
-    position : ndarray, shape (n_time, n_dims)
-        What the encoding is fit with.
-    in_event : ndarray of bool, shape (n_time,)
-        Non-local event bins, every event the decoder labelled (the ones the
-        analysed-time rule drops included).
-    folds : ndarray of int, shape (n_time,)
-    is_missing : ndarray of bool, shape (n_time,)
-        The decode's missing bins (``hpc_decode_masks``).
-
-    Returns
-    -------
-    masks : dict
-        ``run``, ``runcv0`` and ``runcv1``: bool, shape (n_time,).
-    record : dict
-        The counts: event bins, those at running speed, the running bins left
-        out near them, the missing bins at running speed (all left out), and
-        per mask its training bins, the event and missing bins among them and
-        the event bins in the library's padded span (0, or it raises). The
-        missing bins are counted on the bin mask; the library's padding of
-        each training run by about one bin is not counted (the canonical
-        encoding is padded the same way).
-
-    Raises
-    ------
-    ValueError
-        An event bin is in a mask's library span, or a mask is empty.
-    """
-    at_speed = speed >= RUNNING_ENCODING_MIN_SPEED_CM_S
-    near_event = in_event.copy()
-    for shift in range(1, EVENT_MARGIN_BINS + 1):
-        near_event[:-shift] |= in_event[shift:]
-        near_event[shift:] |= in_event[:-shift]
-    is_missing = np.asarray(is_missing, dtype=bool)
-    running = at_speed & ~near_event & ~is_missing
-    masks = {
-        "run": running,
-        "runcv0": running & (folds == 0),
-        "runcv1": running & (folds == 1),
-    }
-    record: dict[str, Any] = {
-        "min_speed_cm_s": RUNNING_ENCODING_MIN_SPEED_CM_S,
-        "event_bins": int(in_event.sum()),
-        "event_bins_at_running_speed": int((in_event & at_speed).sum()),
-        "running_bins_left_out_near_events": int((near_event & at_speed).sum()),
-        "missing_bins_at_running_speed": int((is_missing & at_speed).sum()),
-    }
-    for name, mask in masks.items():
-        if not mask.any():
-            raise ValueError(f"the {name} encoding has no training bin")
-        in_span = int((in_event & training_spike_bins(time, position, mask)).sum())
-        record[name] = {
-            "training_bins": int(mask.sum()),
-            "event_bins_in_training_bins": int((in_event & mask).sum()),
-            "missing_bins_in_training_bins": int((is_missing & mask).sum()),
-            "event_bins_in_library_span": in_span,
-        }
-        if in_span:
-            raise ValueError(
-                f"{in_span} non-local event bins are in the {name} encoding's "
-                "training spikes (the library's padded span)"
-            )
-    return masks, record
 
 
 def run_settings() -> dict:

@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.intervals import interval_mask
+
 STATES = ("Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented")
 """The decoder's states, in its own order."""
 
@@ -69,6 +71,34 @@ def regimes(head_speed: NDArray) -> NDArray:
     out[speed < IMMOBILE_BELOW_CM_S] = "immobile"
     out[speed > RUNNING_ABOVE_CM_S] = "running"
     return out
+
+
+def analysed_regimes(
+    time: NDArray, head_speed: NDArray, linear_position: NDArray, excluded: pd.DataFrame
+) -> tuple[NDArray, NDArray[np.bool_]]:
+    """Each bin's :func:`regimes`, with no regime where it is not analysed.
+
+    A bin whose linear position is not finite, or that lies in excluded time,
+    is in no regime (``""``), so no window built on the regimes holds one.
+
+    Parameters
+    ----------
+    time, head_speed, linear_position : ndarray, shape (n_time,)
+        The decode grid (s), head speed (cm/s) and linear position (cm).
+    excluded : pd.DataFrame
+        The epoch's excluded time: ``start_time`` and ``end_time``, closed.
+
+    Returns
+    -------
+    regime : ndarray of str, shape (n_time,)
+    in_excluded : ndarray of bool, shape (n_time,)
+        The bins in excluded time.
+    """
+    regime = regimes(head_speed)
+    regime[~np.isfinite(linear_position)] = ""
+    in_excluded = interval_mask(time, excluded)
+    regime[in_excluded] = ""
+    return regime, in_excluded
 
 
 def _runs(mask: NDArray) -> NDArray[np.int64]:
