@@ -419,3 +419,20 @@ class TestNextArmCircularShift:
         out = next_arm_circular_shift(events, rng=_PinnedRng())
         # Row 1 has current_patch=NaN → is_stay=NaN.
         assert np.isnan(out["is_stay"].iloc[1])
+
+
+@pytest.mark.parametrize(
+    "shuffle_without_rng",
+    [
+        lambda: circular_time_shuffle(np.array([0, 1, 2]), np.array([0, 0, 0])),
+        lambda: stop_label_shuffle(pd.DataFrame({"is_rewarded_outcome": [0, 1]})),
+        lambda: next_arm_circular_shift(
+            pd.DataFrame({"event_midpoint_s": [0.0, 1.0], "next_arm": [0, 1]})
+        ),
+    ],
+    ids=["circular_time_shuffle", "stop_label_shuffle", "next_arm_circular_shift"],
+)
+def test_a_shuffle_needs_the_callers_generator(shuffle_without_rng):
+    """No shuffle draws from an unseeded generator of its own."""
+    with pytest.raises(TypeError, match="rng"):
+        shuffle_without_rng()

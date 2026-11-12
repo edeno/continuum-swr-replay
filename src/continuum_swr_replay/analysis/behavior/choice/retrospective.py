@@ -1200,7 +1200,7 @@ def retrospective_alignment_with_shuffle(
     *,
     n_shuffles: int = 100,
     metrics: tuple[str, ...] = _DEFAULT_METRICS,
-    rng: np.random.Generator | None = None,
+    rng: np.random.Generator,
 ) -> dict[str, float | int | bool | str]:
     """Real vs. shuffled alignment for one session.
 
@@ -1224,7 +1224,9 @@ def retrospective_alignment_with_shuffle(
     metrics : tuple of str
         Subset of :data:`_DEFAULT_METRICS`. Useful in tests for
         skipping the sequence-table-dependent metrics.
-    rng : numpy Generator, optional
+    rng : numpy Generator
+        The caller's generator for the shifts; required, so a run is
+        reproducible.
 
     Returns
     -------
@@ -1245,8 +1247,6 @@ def retrospective_alignment_with_shuffle(
         If a metric's observed count disagrees with the frozen cohort
         size, which would mean the common-cohort guarantee was broken.
     """
-    if rng is None:
-        rng = np.random.default_rng()
     metrics = _validate_requested_metrics(metrics)
     if n_shuffles < 0:
         raise ValueError("n_shuffles must be nonnegative")

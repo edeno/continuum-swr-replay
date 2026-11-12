@@ -14,7 +14,7 @@ Three shuffles:
    geometry or block-drift correlations.
 
 All three return a NEW DataFrame (or array) — the input is never
-modified in place. Each accepts a ``seed`` or ``rng`` for
+modified in place. Each takes the caller's ``rng`` (required) for
 reproducibility.
 """
 
@@ -34,7 +34,7 @@ def circular_time_shuffle(
     decoded_arms: np.ndarray,
     event_ids: np.ndarray,
     *,
-    rng: np.random.Generator | None = None,
+    rng: np.random.Generator,
 ) -> np.ndarray:
     """Circularly permute timebin order within each event.
 
@@ -50,8 +50,8 @@ def circular_time_shuffle(
         (``event_sequence_table.decoded_arm_map``).
     event_ids : np.ndarray, shape (T_total,)
         Event label per timebin (same length as ``decoded_arms``).
-    rng : numpy Generator, optional
-        For reproducibility. Default: fresh generator.
+    rng : numpy Generator
+        The caller's generator; required, so a run is reproducible.
 
     Returns
     -------
@@ -59,8 +59,6 @@ def circular_time_shuffle(
         Shuffled ``decoded_arms`` — same length, same per-event
         marginal arm distribution, different sequential order.
     """
-    if rng is None:
-        rng = np.random.default_rng()
     decoded_arms = np.asarray(decoded_arms).copy()
     unique_events = np.unique(event_ids)
     for ev in unique_events:
@@ -88,7 +86,7 @@ def stop_label_shuffle(
         "current_patch",
         "prev_patch",
     ),
-    rng: np.random.Generator | None = None,
+    rng: np.random.Generator,
 ) -> pd.DataFrame:
     """Randomly permute behavioral labels across stops within a session.
 
@@ -105,7 +103,8 @@ def stop_label_shuffle(
     columns : tuple of str
         Which columns to shuffle. The default covers the behavioral
         context and arm labels the hurdle / rate models use.
-    rng : numpy Generator, optional
+    rng : numpy Generator
+        The caller's generator; required, so a run is reproducible.
 
     Returns
     -------
@@ -113,8 +112,6 @@ def stop_label_shuffle(
         Copy of ``stop_table`` with the specified columns permuted
         across rows (stops).
     """
-    if rng is None:
-        rng = np.random.default_rng()
     # Guard: stop_table must be a single session. Cross-session
     # shuffle would swap labels between sessions, which is never
     # the intent (reviewer flag #10).
@@ -150,7 +147,7 @@ def next_arm_circular_shift(
     strata_cols: tuple[str, ...] = (),
     variation_cols: tuple[str, ...] | None = None,
     require_movement: bool = False,
-    rng: np.random.Generator | None = None,
+    rng: np.random.Generator,
 ) -> pd.DataFrame:
     """Circularly shift future-choice labels at the stop/visit grain.
 
@@ -200,7 +197,8 @@ def next_arm_circular_shift(
         every present member of ``columns``.
     require_movement : bool, default False
         Raise when no stratum admits a non-identity label shift.
-    rng : numpy Generator, optional
+    rng : numpy Generator
+        The caller's generator; required, so a run is reproducible.
 
     Returns
     -------
@@ -209,8 +207,6 @@ def next_arm_circular_shift(
         shifted and ``is_stay`` (when present) recomputed against the
         destination row's ``current_patch``.
     """
-    if rng is None:
-        rng = np.random.default_rng()
     session_cols = list(SESSION_COLUMNS)
     available = [c for c in session_cols if c in event_table.columns]
     if available:

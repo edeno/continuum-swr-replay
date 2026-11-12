@@ -1476,3 +1476,10 @@ class TestPrevArmMirror:
         out = ends_at_prev(ev, es).set_index("event_id")
         assert out["ends_at_prev"].dtype == bool
         assert bool(out.loc[1, "ends_at_prev"]) is False
+
+
+def test_the_shuffle_null_needs_the_callers_generator():
+    """The null draws its shifts from the caller's generator, never an unseeded one."""
+    empty = pd.DataFrame()
+    with pytest.raises(TypeError, match="rng"):
+        retrospective_alignment_with_shuffle(empty, empty, empty, n_shuffles=1)
