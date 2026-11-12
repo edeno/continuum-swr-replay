@@ -4,7 +4,8 @@ Each function takes a table an analysis wrote (the canonical event table, a
 reference table, a run's per-event metrics), except :func:`quadrant_fractions`,
 which takes one session's per-time-bin content distances. Most return named
 numbers: a dict,
-or a table with one row per group. :func:`boundary_offsets` returns one row per
+or a table with one row per group (per animal, for
+:func:`animal_occupancy_shares`). :func:`boundary_offsets` returns one row per
 event (what a histogram draws), :func:`most_steps` a count with the properties
 that attain it, and :func:`n_animals_in_direction` and
 :func:`n_animals_non_swr_more_at_well` one count. They are the statistics the
@@ -823,14 +824,55 @@ def content_occupancy_shares(occupancy: pd.DataFrame) -> pd.DataFrame:
     return _weighted_shares(occupancy, ["group"])
 
 
+def animal_occupancy_shares(occupancy: pd.DataFrame, group: str) -> pd.DataFrame:
+    """Each animal's share of a group's content at each place.
+
+    An animal's share is session -> animal: the mean over its sessions with
+    time bins of the group of each session's share, each session weighing the
+    same however many time bins it holds (``at_well`` is a session's
+    ``remote_well`` plus ``own_well``).
+
+    Parameters
+    ----------
+    occupancy : pd.DataFrame, shape (n_sessions * n_groups, n_columns)
+        The content-occupancy table (:func:`content_occupancy_shares`), with
+        ``animal`` and ``epoch_id``.
+    group : str
+        ``"SWR"`` or ``"nonSWR"``.
+
+    Returns
+    -------
+    shares : pd.DataFrame, shape (n_animals, 5)
+        Indexed by ``animal`` in sorted order, one column per place of
+        :data:`OCCUPANCY_PLACES`. An animal with no session of the group with
+        time bins is not in it.
+
+    Raises
+    ------
+    ValueError
+        If a session with time bins has no share at a place.
+    """
+    with_bins = _sessions_with_bins(occupancy)
+    rows = with_bins[with_bins["group"] == group]
+    rows = rows.assign(at_well=rows["remote_well"] + rows["own_well"])
+    return pd.DataFrame(
+        {
+            place: animal_session_values(
+                rows[place], rows["animal"], rows["epoch_id"], "mean"
+            )
+            for place in OCCUPANCY_PLACES
+        },
+        columns=list(OCCUPANCY_PLACES),
+    ).rename_axis("animal")
+
+
 def n_animals_non_swr_more_at_well(occupancy: pd.DataFrame) -> int:
     """The animals whose non-SWR content is at a well more often than their SWR
     content.
 
-    An animal's share at a well of a group is session -> animal: the mean over
-    its sessions with time bins of the group of each session's share (the
-    table's ``remote_well`` plus ``own_well``), each session weighing the same
-    however many time bins it holds.
+    An animal's share at a well of a group is its ``at_well`` of
+    :func:`animal_occupancy_shares`: the mean over its sessions of each
+    session's share.
 
     Parameters
     ----------
@@ -851,13 +893,8 @@ def n_animals_non_swr_more_at_well(occupancy: pd.DataFrame) -> int:
     with_bins = _sessions_with_bins(occupancy)
     at_well = pd.DataFrame(
         {
-            group: animal_session_values(
-                rows["remote_well"] + rows["own_well"],
-                rows["animal"],
-                rows["epoch_id"],
-                "mean",
-            )
-            for group, rows in with_bins.groupby("group")
+            group: animal_occupancy_shares(with_bins, group)["at_well"]
+            for group in sorted(with_bins["group"].unique())
         }
     )
     return int((at_well["nonSWR"] > at_well["SWR"]).sum())

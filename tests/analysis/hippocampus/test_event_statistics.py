@@ -618,6 +618,34 @@ def test_n_animals_non_swr_more_at_well_weighs_an_animal_s_sessions_alike():
         stats.n_animals_non_swr_more_at_well(occupancy)
 
 
+def test_animal_occupancy_shares_average_an_animal_s_sessions():
+    # a: two non-SWR sessions of 10 and 90 bins, 0.9 and 0.1 at a remote well:
+    # 0.5 over the sessions (0.18 weighted by bins); b: one session, and a
+    # session with no time bin that weighs nothing; c: SWR content only
+    occupancy = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b", "b", "c"],
+            "epoch_id": ["a1", "a2", "b1", "b2", "c1"],
+            "group": ["nonSWR", "nonSWR", "nonSWR", "nonSWR", "SWR"],
+            "n": [10, 90, 20, 0, 5],
+            "remote_well": [0.9, 0.1, 0.25, np.nan, 1.0],
+            "own_well": [0.0, 0.3, 0.25, np.nan, 0.0],
+            "remote_path": [0.1, 0.4, 0.5, np.nan, 0.0],
+            "near_off": [0.0, 0.2, 0.0, np.nan, 0.0],
+        }
+    )
+    shares = stats.animal_occupancy_shares(occupancy, "nonSWR")
+
+    assert list(shares.index) == ["a", "b"]
+    assert list(shares.columns) == list(stats.OCCUPANCY_PLACES)
+    assert shares.loc["a", "remote_well"] == pytest.approx(0.5)
+    assert shares.loc["a", "own_well"] == pytest.approx(0.15)
+    assert shares.loc["a", "at_well"] == pytest.approx(0.65)
+    assert shares.loc["a", "near_off"] == pytest.approx(0.1)
+    assert shares.loc["b", "at_well"] == pytest.approx(0.5)
+    assert list(stats.animal_occupancy_shares(occupancy, "SWR").index) == ["c"]
+
+
 def test_content_occupancy_shares_refuse_a_session_with_time_bins_and_no_share():
     occupancy = pd.DataFrame(
         {

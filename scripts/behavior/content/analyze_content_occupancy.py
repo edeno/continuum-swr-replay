@@ -68,8 +68,8 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa
 from continuum_swr_replay.analysis.hippocampus.event_statistics import (  # noqa: E402
     AT_WELL_CM,
     FAR_CM,
-    OCCUPANCY_PLACES,
     OCCUPANCY_QUADRANTS,
+    animal_occupancy_shares,
     arm_occupancy_shares,
     content_occupancy_shares,
     quadrant_fractions,
@@ -284,23 +284,6 @@ def group_shares(metrics: pd.DataFrame) -> pd.DataFrame:
     return content_occupancy_shares(metrics).reindex(list(GROUPS))
 
 
-def non_swr_shares_by_animal(metrics: pd.DataFrame) -> pd.DataFrame:
-    """Each animal's timebin-weighted non-SWR share at each place: the
-    :func:`content_occupancy_shares` of its own sessions.
-
-    Returns
-    -------
-    shares : pd.DataFrame, shape (n_animals, len(OCCUPANCY_PLACES))
-        Indexed by ``animal``, in sorted order.
-    """
-    non_swr = metrics[metrics.group == "nonSWR"]
-    rows = {
-        animal: content_occupancy_shares(sessions).loc["nonSWR"]
-        for animal, sessions in non_swr.groupby("animal")
-    }
-    return pd.DataFrame(rows, index=list(OCCUPANCY_PLACES)).T.rename_axis("animal")
-
-
 # --- Figures ------------------------------------------------------------------
 def render(
     metrics: pd.DataFrame, hist2d: dict, dwell_hist: dict, output_dir: Path
@@ -326,7 +309,7 @@ def render(
             label=group,
             color=GROUP_COLORS[group],
         )
-    pa = non_swr_shares_by_animal(metrics)
+    pa = animal_occupancy_shares(metrics, "nonSWR")
     for j, q in enumerate(OCCUPANCY_QUADRANTS):  # per-animal non-SWR dots
         ax.scatter(
             [x[j] - 0.5 * width] * len(pa), pa[q].to_numpy(), color="k", s=14, zorder=3
@@ -457,8 +440,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             f"  {group}: "
             + ", ".join(f"{q}={shares.loc[group, q]:.2f}" for q in OCCUPANCY_QUADRANTS)
         )
-    print("\nPer-animal non-SWR (within-animal):")
-    pa = non_swr_shares_by_animal(metrics)[list(OCCUPANCY_QUADRANTS)]
+    print("\nPer-animal non-SWR (mean over each animal's sessions):")
+    pa = animal_occupancy_shares(metrics, "nonSWR")[list(OCCUPANCY_QUADRANTS)]
     print(pa.round(2).to_string())
 
 
