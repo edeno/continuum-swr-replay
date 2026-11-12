@@ -3,6 +3,7 @@
 
 The visual companion to the per-bin ladder's reported values (question 3.3) — reads
 ``models_per_bin_rate/all_models.pkl`` and renders, per event-type population:
+the descriptive and the fitted (M5_time) within-stop time course,
 baseline rate (M0), the recent-reward dissociation on the first reward-history
 basis coefficient (M7), the
 reconstructed reward kernel and the self-history kernel (M7), the
@@ -22,7 +23,6 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import pandas as pd
-from patsy import dmatrix
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -46,10 +46,9 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MODEL_PER_BIN_RATE,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
-    SPLINE_KNOTS,
-    TMAX,
 )
 from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
+    fitted_time_course,
     reward_kernel_by_lag,
     self_history_kernel_by_lag,
 )
@@ -102,6 +101,8 @@ POPS4 = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
 POPS3 = ["swr", "non_local_swr", "non_local_no_swr"]
 SHORT = ["SWR", "NL\nw/SWR", "NL\nno-SWR"]
 FULL = "M7r_time_histcos_rew"
+# The stop-clock time rung whose fitted time course the summary reads its peak from.
+TIME_RUNG = "M5_time"
 # First reward-history basis coefficient (a recent-reward fraction weighted
 # toward the newest outcomes, not lag 1 alone); the "IMMEDIATE" name is legacy.
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
@@ -204,45 +205,21 @@ def _panel_timecourse(ax, stop, onsets):
     ax2.tick_params(axis="y", colors="0.5")
 
 
-def _spline_basis(tc_grid):
-    """Fixed-knot spline basis at tc_grid (same basis used in the fits)."""
-    f = f"bs(tc, knots={SPLINE_KNOTS}, lower_bound=0.0, upper_bound={TMAX}) - 1"
-    return np.asarray(dmatrix(f, {"tc": tc_grid}, return_type="dataframe"))
-
-
 def _panel_fitted_timecourse(ax, df, stop):
-    """Reconstructed M7 spline time course (reward/history at reference), per pop.
+    """The median fitted time course of the stop-clock time rung, per population.
 
-    Now reconstructable because the spline knots are fixed (data-independent):
-    rate(tc) = exp(intercept + B(tc) @ spline_coef), averaged across sessions.
+    ``rate_fit_statistics.fitted_time_course``: the curve whose peak the
+    summary reports, on the same grid over the spline's interior knots, with
+    separated sessions left out.
     """
-    grid = np.linspace(0, TMAX, 81)
-    B = _spline_basis(grid)
-    scols = sorted(
-        c
-        for c in df.columns
-        if c.startswith("coef_bs(tc, knots=")
-        and c.endswith("]")
-        and f"{REWARD_HISTORY_COLUMNS[0]}:" not in c
-    )
     for oc in POPS4:
-        s = df[(df.model == FULL) & (df.outcome == oc)]
-        beta = s[scols].to_numpy(float)
-        b0 = s["coef_Intercept"].to_numpy(float)
-        ok = ~np.isnan(beta).any(axis=1) & ~np.isnan(b0)
-        if ok.sum() == 0:
-            continue
-        curves = np.exp(b0[ok, None] + beta[ok] @ B.T)  # (n_sess, n_grid)
-        ax.plot(
-            grid,
-            np.median(curves, axis=0),
-            color=STYLE[oc][1],
-            label=STYLE[oc][0],
-            lw=1.8,
+        grid, curve, _ = fitted_time_course(
+            fit_rows(df, model=TIME_RUNG, outcome=oc), "stop"
         )
+        ax.plot(grid, curve, color=STYLE[oc][1], label=STYLE[oc][0], lw=1.8)
     ax.set_xlabel("time since stop onset (s)")
     ax.set_ylabel("fitted rate (events / s)")
-    ax.set_title("A1. Fitted time course (M7r spline, reward/history at ref)")
+    ax.set_title(f"A1. Fitted time course ({TIME_RUNG}, between its interior knots)")
     ax.set_xlim(0, 4)
     ax.legend(frameon=False, fontsize=7, loc="lower right")
     _shade_low_support(ax, stop)
