@@ -89,6 +89,7 @@ from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
 from continuum_swr_replay.analysis.events.nonlocal_detection import (  # noqa: E402
     event_strict_overlap_mask,
 )
+from continuum_swr_replay.analysis.hippocampus import event_statistics  # noqa: E402
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,
 )
@@ -666,7 +667,10 @@ def per_animal_medians(metrics_df: pd.DataFrame) -> pd.DataFrame:
 
     This is the primary inferential grain (avoid event-level pseudoreplication):
     each animal contributes one value per group, and the headline check is how
-    many animals show each event group exceeding their own non-event baseline.
+    many animals show each event group exceeding their own non-event baseline
+    (``n_animals_above_baseline`` of
+    ``event_statistics.spike_evidence_statistics``, which compares these
+    medians).
     """
     return (
         metrics_df.groupby(["animal", "group"])["dll_per_spike"]
@@ -765,29 +769,26 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.output_dir / "event_spike_evidence_left_out.csv", index=False
     )
     print(f"\nWrote metrics ({len(metrics)} events) and summary to {args.output_dir}")
-    print(
-        "\nPooled per-group medians (NOT the inferential statistic — see per-animal below):"
-    )
-    print(
-        metrics.groupby("group")[
-            ["dll_animal", "dll_per_spike", "n_spikes", "dist_to_gpi_peak"]
-        ]
-        .median()
-        .to_string()
-    )
 
     pam = per_animal_medians(metrics)
     pam.to_csv(args.output_dir / "event_spike_evidence_per_animal.csv")
     print("\nPer-animal median dLL/spike (within-animal summary):")
     print(pam.to_string())
-    if "baseline" in pam.columns:
-        print(
-            "\nWithin-animal direction test: event group median > that animal's baseline"
-        )
-        for grp in [g for g in GROUP_ORDER if g != "baseline" and g in pam.columns]:
-            valid = pam[grp].notna() & pam["baseline"].notna()
-            n_exceed = int((pam.loc[valid, grp] > pam.loc[valid, "baseline"]).sum())
-            print(f"  {grp}: {n_exceed}/{int(valid.sum())} animals")
+    if "baseline" not in set(metrics["group"]):
+        return
+    # the statistics the events summary reports from these metrics; they refuse
+    # a run in which an epoch has no quiet window to compare with
+    statistics = event_statistics.spike_evidence_statistics(metrics, "baseline")
+    print(
+        "\nEach group against the matched quiet windows: pooled medians, and the "
+        "epochs and animals whose median dLL/spike is above their own baseline's "
+        "(event_statistics.spike_evidence_statistics):"
+    )
+    print(
+        statistics.assign(
+            n_animals_scored=metrics.groupby("group")["animal"].nunique()
+        ).to_string()
+    )
 
 
 if __name__ == "__main__":
