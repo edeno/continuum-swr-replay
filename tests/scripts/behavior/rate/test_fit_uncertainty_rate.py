@@ -16,17 +16,70 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
+from continuum_swr_replay.data_loaders import epoch_register
 from scripts.behavior.rate import fit_uncertainty_rate as mod
 
 _STATES = ("at_well", "at_well", "in_transit", "in_transit", "mixed", "at_well")
 
 
+def _register(path, rows: list[tuple[str, str, str, str, bool]]) -> None:
+    """``REGISTER_PATH`` contents: (nwb_file_name, epoch, status, reason,
+    first_exposure) per entry, with evidence wherever a reason needs it."""
+    pd.DataFrame(
+        [
+            [name, epoch, status, reason, "x" if reason else "", str(flag)]
+            for name, epoch, status, reason, flag in rows
+        ],
+        columns=list(epoch_register.COLUMNS),
+    ).to_csv(path, index=False)
+
+
+def test_the_register_s_first_exposure_sessions_are_dropped_and_no_other(
+    tmp_path, monkeypatch
+):
+    """The register names the session, not its place in the stop table.
+
+    ``a``'s exposure (20200101 02_r1) goes and its same-day 04_r2 stays; ``b``'s
+    exposure is excluded from the register, so the stop table lacks it and
+    ``b``'s first stop-table session (20200105) stays, as peanut's does.
+    """
+    path = tmp_path / "epoch_register.csv"
+    _register(
+        path,
+        [
+            ("a20200101_.nwb", "02_r1", "analysed", "", True),
+            ("a20200101_.nwb", "04_r2", "analysed", "", False),
+            ("a20200102_.nwb", "02_r1", "analysed", "", False),
+            ("b20200104_.nwb", "02_r1", "excluded", "NO_TRIAL_INTERVALS", True),
+            ("b20200105_.nwb", "02_r1", "analysed", "", False),
+            ("b20200106_.nwb", "02_r1", "analysed", "", False),
+        ],
+    )
+    monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
+    sessions = [
+        ("a", 20200101, "02_r1"),
+        ("a", 20200101, "04_r2"),
+        ("a", 20200102, "02_r1"),
+        ("b", 20200105, "02_r1"),
+        ("b", 20200106, "02_r1"),
+    ]
+    stop = pd.DataFrame(
+        [(*session, stop_id) for stop_id, session in enumerate(sessions * 2)],
+        columns=["animal", "session_date", "epoch", "stop_id"],
+    )
+
+    out = mod._drop_exposure_sessions(stop)
+
+    assert out["stop_id"].tolist() == [1, 2, 3, 4, 6, 7, 8, 9]
+    assert out.columns.equals(stop.columns)
+
+
 def _cohort_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Two sessions of one animal, each spanning the three occupancy states.
 
-    The runner drops each animal's first session before fitting, so the same
-    six-state pattern appears in both: whichever cohort is selected, session 1
-    is the exposure session that goes and session 2 is the one fit.
+    The register marks session 1 as the animal's first exposure, and the runner
+    drops it before fitting, so the same six-state pattern appears in both:
+    whichever cohort is selected, session 1 goes and session 2 is the one fit.
     """
     rows = [
         {
@@ -36,7 +89,7 @@ def _cohort_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
             "stop_id": f"{prefix}{i}",
             "occupancy_state": state,
         }
-        for session_date, prefix in ((1, "p"), (2, "s"))
+        for session_date, prefix in ((20200101, "p"), (20200102, "s"))
         for i, state in enumerate(_STATES)
     ]
     stops = pd.DataFrame(rows)
@@ -60,10 +113,19 @@ def _cohort_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 @pytest.fixture()
-def stubbed_run(monkeypatch, replay_content_root):
+def stubbed_run(monkeypatch, replay_content_root, tmp_path):
     """Run ``main`` without fitting: record what the fitter was handed."""
     seen: dict = {}
     stops, qvals = _cohort_tables()
+    register = tmp_path / "epoch_register.csv"
+    _register(
+        register,
+        [
+            ("a20200101_.nwb", "02_r1", "analysed", "", True),
+            ("a20200102_.nwb", "02_r1", "analysed", "", False),
+        ],
+    )
+    monkeypatch.setattr(epoch_register, "REGISTER_PATH", register)
 
     def _read_table(path):
         if "qvals" in str(path):
@@ -78,7 +140,7 @@ def stubbed_run(monkeypatch, replay_content_root):
         models = pd.DataFrame(
             {
                 "animal": ["a"],
-                "session_date": [2],
+                "session_date": [20200102],
                 "epoch": ["02_r1"],
                 "outcome": ["swr"],
                 "model": [mod.MU_UNCERTAINTY.name],
@@ -97,7 +159,12 @@ def stubbed_run(monkeypatch, replay_content_root):
     )
     monkeypatch.setattr(mod, "attach_event_ends", lambda onsets, events: onsets)
     monkeypatch.setattr(mod, "fit_uncertainty_rate", _fit)
-    monkeypatch.setattr(mod, "_cohort_records", lambda *a, **k: [])
+
+    def _records(models, stop_fitted, **counts):
+        seen["n_sessions_postjoin"] = counts["n_sessions_postjoin"]
+        return []
+
+    monkeypatch.setattr(mod, "_cohort_records", _records)
     return seen, replay_content_root
 
 
@@ -110,6 +177,8 @@ def test_default_cohort_is_at_well_and_publishes_the_canonical_names(stubbed_run
     # fitter -- the 'mixed' stop s4 is one of them (an at-well bout whose first
     # settling samples read as in-transit).
     assert seen["stop_ids"] == ["s0", "s1", "s4", "s5"]
+    # The audit's sessions_in counts the exposure session it then drops.
+    assert seen["n_sessions_postjoin"] == 2
     out = tmp_path / "models_per_bin_rate" / "uncertainty_rate.pkl"
     assert list(pd.read_pickle(out)["stop_cohort"]) == ["at_well"]
     provenance = json.loads(

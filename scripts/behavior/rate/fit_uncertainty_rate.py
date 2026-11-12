@@ -12,8 +12,9 @@ Per session: load ``stop_table``; validate its canonical
 and derive stop-local summaries (:func:`add_uncertainty_covariates`); inner-merge
 the nominal value + real
 behavioral-model covariates from ``qvals_table`` on ``stop_id`` (one exactly
-stop-start-aligned source -- no difflib CSV); drop the first (exposure) session per
-animal; attach the canonical ``is_swr`` to the onsets.
+stop-start-aligned source -- no difflib CSV); drop the epoch register's
+first-exposure sessions (``epoch_register.first_exposure_epochs``); attach the
+canonical ``is_swr`` to the onsets.
 Because the fitted block contains current-trip RPE/value updates, retain only
 physical response bins whose left edge is at or after ``outcome_known_time``
 (reward onset for rewarded trials; latest possible pump latency, capped at
@@ -120,6 +121,12 @@ from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E40
 from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     swr_source_name,
 )
+from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
+    first_exposure_epochs,
+)
+from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
+    parse_nwb_filename,
+)
 from continuum_swr_replay.paths import (  # noqa: E402
     model_dir,
     replay_content_dir,
@@ -184,19 +191,18 @@ POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
 MU_UNCERTAINTY = MODEL_UNCERTAINTY_RATE["MU_uncertainty"]
 
 
-def _drop_first_session_per_animal(stop_table: pd.DataFrame) -> pd.DataFrame:
-    """Drop each animal's first (exposure) session by (session_date, epoch) order."""
-    first = (
-        stop_table[list(SESSION_COLUMNS)]
-        .drop_duplicates()
-        .sort_values(list(SESSION_COLUMNS))
-        .groupby("animal", sort=False)
-        .head(1)
+def _drop_exposure_sessions(stop_table: pd.DataFrame) -> pd.DataFrame:
+    """Drop the epoch register's first-exposure sessions (``first_exposure_epochs``).
+
+    All six ports share one p(R) there (1.0, then 0.5), so the value covariates
+    have no contrast between ports.
+    """
+    exposure = pd.MultiIndex.from_tuples(
+        [(*parse_nwb_filename(name), epoch) for name, epoch in first_exposure_epochs()],
+        names=list(SESSION_COLUMNS),
     )
-    merged = stop_table.merge(
-        first, on=list(SESSION_COLUMNS), how="left", indicator=True
-    )
-    return stop_table[merged["_merge"].to_numpy() == "left_only"]
+    sessions = pd.MultiIndex.from_frame(stop_table[list(SESSION_COLUMNS)])
+    return stop_table[~sessions.isin(exposure)]
 
 
 def fit_uncertainty_rate(
@@ -323,9 +329,10 @@ def _cohort_records(
     ``n_in = n_postjoin + qvals_gap`` (== pre-join stops on a full run); the inner
     qvals-join drop is the mechanism-B ``n_drop_qvals_gap``; ``immobility<=0`` / NaN
     stop-level predictors on ``stop_fitted`` are ``n_drop_own_predictor_missing``; the
-    first-session-per-animal drop, subset, and per-bin gates fall into
-    ``n_excluded_session``. ``sessions_in`` is the post-join (pre-first-drop) session
-    count so it matches ``n_in``'s stop population. Reconciles by construction.
+    first-exposure drop, subset, and per-bin gates fall into
+    ``n_excluded_session``. ``sessions_in`` is the post-join (pre-exposure-drop)
+    session count so it matches ``n_in``'s stop population. Reconciles by
+    construction.
     """
     stop_level = [
         c for c in _design_columns(MU_UNCERTAINTY) if c in stop_fitted.columns
@@ -351,7 +358,7 @@ def _cohort_records(
                 n_qvals_gap=int(qvals_gap),
                 drop_notes=(
                     "qvals inner-join -> qvals_gap (mechanism B); immobility<=0 / NaN "
-                    "stop-level predictor -> own; first-session/subset/physical "
+                    "stop-level predictor -> own; first-exposure/subset/physical "
                     "post-outcome bin gate -> excluded"
                 ),
             )
@@ -498,9 +505,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     n_before = len(stop)
     stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
     n_postjoin = len(stop)  # inner-join (qvals-gap, mechanism B) drop = n_before - this
-    # Session count BEFORE the first-session-per-animal drop, so the audit's
-    # sessions_in matches n_in's stop population (n_in includes the first-session
-    # stops as excluded, not removed).
+    # Session count BEFORE the first-exposure drop, so the audit's sessions_in
+    # matches n_in's stop population (n_in includes the first-exposure stops as
+    # excluded, not removed).
     n_sessions_postjoin = stop.groupby(list(SESSION_COLUMNS)).ngroups
     frac = len(stop) / n_before
     if frac < 0.5:
@@ -510,7 +517,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     logger.info(
         "qvals join: %d -> %d stops (%.0f%% kept)", n_before, len(stop), 100 * frac
     )
-    stop = _drop_first_session_per_animal(stop)
+    stop = _drop_exposure_sessions(stop)
     if args.max_per_animal is not None:
         stop = subset_max_per_animal(stop, args.max_per_animal, sort_sessions=True)
     # z-score the RL decision variables AFTER the drop/subset so the per-SD scale
@@ -554,7 +561,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     # Cohort audit (stop grain). The inner qvals join is the mechanism-B qvals-gap;
     # immobility<=0 / NaN stop-level predictors on the fitted frame -> own; the
-    # first-session-per-animal drop, subset, and per-bin gates -> excluded.
+    # first-exposure drop, subset, and per-bin gates -> excluded.
     audit_qvals = 0 if smoke else (n_before - n_postjoin)  # smoke: N/A
     audit_records = _cohort_records(
         models,

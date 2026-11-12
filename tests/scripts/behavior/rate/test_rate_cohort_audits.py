@@ -124,12 +124,12 @@ def test_contrast_records_attribute_qvals_and_own():
     assert by[("G0_base", "all", "common_post_outcome")]["n_modeled"] == 0
 
 
-def test_uncertainty_records_reconcile_and_sessions_in_is_prefirstdrop():
-    """The uncertainty audit must report sessions_in for the post-join (pre-first-drop)
+def test_uncertainty_records_reconcile_and_sessions_in_is_pre_exposure_drop():
+    """The uncertainty audit must report sessions_in for the post-join (pre-exposure-drop)
     population so it matches n_in, and attribute the qvals-join drop to qvals_gap."""
     from scripts.behavior.rate import fit_uncertainty_rate as mod
 
-    # Fitted frame = 2 sessions (one animal's first session already dropped upstream).
+    # Fitted frame = 2 sessions (one first-exposure session already dropped upstream).
     rng = np.random.default_rng(0)
     stop_fitted = pd.concat(
         [
@@ -177,7 +177,7 @@ def test_uncertainty_records_reconcile_and_sessions_in_is_prefirstdrop():
     )
     assert recs and all(_reconciles(r) for r in recs)
     r0 = recs[0]
-    # sessions_in is the pre-first-drop count (3), NOT the fitted frame's 2.
+    # sessions_in is the pre-exposure-drop count (3), NOT the fitted frame's 2.
     assert r0["n_sessions_in"] == 3
     assert r0["n_drop_qvals_gap"] == 8
     assert r0["n_drop_own_predictor_missing"] == 2  # immobility<=0

@@ -719,20 +719,6 @@ def test_visit_context_is_validated_per_session_not_pooled():
         assert got == [0.0, 0.5], epoch
 
 
-def test_drop_first_session_per_animal():
-    st = pd.DataFrame(
-        {
-            "animal": ["a", "a", "b"],
-            "session_date": [1, 2, 1],
-            "epoch": ["02_r1", "02_r1", "02_r1"],
-            "stop_id": [0, 1, 2],
-        }
-    )
-    out = fur._drop_first_session_per_animal(st)
-    # a's first session (session_date 1) and b's only session (session_date 1) dropped.
-    assert set(out["stop_id"]) == {1}
-
-
 @pytest.mark.parametrize("invalid_value", [np.nan, np.inf, -np.inf])
 def test_complete_case_gate_blocks_rewarded_only_uncertainty_fit(
     monkeypatch, invalid_value
@@ -865,7 +851,7 @@ def test_runner_smoke():
         ]
     ]
     stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
-    stop = fur._drop_first_session_per_animal(stop)
+    stop = fur._drop_exposure_sessions(stop)
     stop = subset_max_per_animal(stop, 1, sort_sessions=True)
 
     models = fur.fit_uncertainty_rate(stop, onsets)
