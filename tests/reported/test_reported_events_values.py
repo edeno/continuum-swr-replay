@@ -81,6 +81,8 @@ def test_event_cohort_values_name_each_class_and_each_animal_count():
         "nonlocal_events_swr_contained": 2,
         "nonlocal_events_swr_partial": 4,
         "non_swr_fraction": pytest.approx(7 / 13),
+        "swr_contained_fraction": pytest.approx(2 / 13),
+        "swr_partial_fraction": pytest.approx(4 / 13),
         "non_swr_fraction_animal_min": pytest.approx(0.4),
         "non_swr_fraction_animal_max": pytest.approx(0.75),
         "animals": 3,

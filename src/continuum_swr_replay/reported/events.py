@@ -273,6 +273,22 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
             "share of immobile non-local events overlapping no SWR, pooled over animals",
         ),
         make(
+            "swr_contained_fraction",
+            stats["swr_contained_fraction"],
+            "fraction",
+            "pct",
+            "share of immobile non-local events lying inside an SWR, pooled over "
+            "animals",
+        ),
+        make(
+            "swr_partial_fraction",
+            stats["swr_partial_fraction"],
+            "fraction",
+            "pct",
+            "share of immobile non-local events partly overlapping an SWR, pooled "
+            "over animals",
+        ),
+        make(
             "non_swr_fraction_animal_min",
             stats["non_swr_fraction_animal_min"],
             "fraction",
