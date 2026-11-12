@@ -1006,3 +1006,46 @@ def test_a_refused_dm_session_is_named_in_the_run_audit():
     assert record["n_drop_own_predictor_missing"] == 0
     assert record["n_excluded_session"] == 60
     assert record["n_modeled"] == 60
+
+
+def test_the_summary_prints_a_refused_term_with_the_gates_reason(capsys) -> None:
+    """Four sessions are below the gate's five, so the term is refused; six
+    are not, and the term gets its numbers."""
+
+    def fits(model: str, n: int) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "model": model,
+                "population": "all",
+                "animal": [("a", "b", "c", "d", "e")[i % 5] for i in range(n)],
+                "session_date": [f"d{i}" for i in range(n)],
+                "epoch": "02_r1",
+                "separated_terms": "",
+                "coef_is_swr": np.linspace(0.1, 0.6, n),
+            }
+        )
+
+    ladder = {"few": ([], "pooled"), "enough": ([], "pooled")}
+    res = pd.concat([fits("few", 4), fits("enough", 6)], ignore_index=True)
+
+    mod._summ(res, ladder, {"few": "is_swr", "enough": "is_swr"})
+
+    lines = capsys.readouterr().out.splitlines()
+    refused = next(line for line in lines if line.startswith("few"))
+    assert refused.split()[1:] == [
+        "all",
+        "is_swr",
+        "(not",
+        "reported:",
+        "too_few_sessions)",
+    ]
+    kept = next(line for line in lines if line.startswith("enough"))
+    assert kept.split()[3] == "6"
+    # a term longer than its 30-character column stays apart from the reason
+    long_term = "is_swr_x_" + "a" * 30
+    mod._summ(
+        fits("few", 4).rename(columns={"coef_is_swr": f"coef_{long_term}"}),
+        {"few": ([], "pooled")},
+        {"few": long_term},
+    )
+    assert f"{long_term} (not reported: too_few_sessions)" in capsys.readouterr().out

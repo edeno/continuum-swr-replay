@@ -113,6 +113,7 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     assemble_arm,
     assemble_patch,
     contrast_fit_inputs,
+    gate_term_sessions,
     prepare_cohorts,
     prepare_session,
     specs_from_ladder,
@@ -562,7 +563,7 @@ def _run(
 def _summ(res: pd.DataFrame, ladder: dict, key_term: dict) -> None:
     """One line per rung and population: the key term over the sessions the
     per-term gate keeps (``gated_coefficient_statistics``); a term the gate
-    refuses has no line."""
+    refuses is printed with the gate's reason and no numbers."""
     print(
         f"\n{'model':18s}{'pop':8s}{'term':30s}{'n':>4}{'medCoef':>9}"
         f"{'%pos':>6}{'anim':>6}{'signed-rank p':>14}"
@@ -578,6 +579,8 @@ def _summ(res: pd.DataFrame, ladder: dict, key_term: dict) -> None:
                 continue
             stats = gated_coefficient_statistics(s, term)
             if stats["gate_refuses"]:
+                refusal = gate_term_sessions(s, term).refusal
+                print(f"{name:18s}{pop:8s}{term:30s} (not reported: {refusal})")
                 continue
             p = stats["signed_rank_p"]
             star = "***" if p < 1e-3 else "**" if p < 1e-2 else "*" if p < 0.05 else ""
