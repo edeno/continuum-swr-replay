@@ -16,7 +16,8 @@ The shipped curves are ridge-penalised B-spline kernels on the report window
 
 A smooth kernel moves a response's apparent start by an amount that depends
 on the basis and the prior; ``scripts/pfc/calibrate_pfc_kernel_timing.py``
-measures it on simulated responses of known onset. Read onsets beside it.
+measures it on simulated responses of known onset, read by
+:func:`timing_rule_calibration`. Read onsets beside it.
 
 The population curve is the mean over units of each curve multiplied by the
 sign of its own peak (so a suppression counts as a response of the same
@@ -872,3 +873,145 @@ def peak_before_onset_fraction(curves: NDArray, lag_time: NDArray) -> float:
     timing = peak_and_onset(curves, lag_time)
     usable = np.isfinite(timing.peak_lag)
     return float((timing.peak_lag[usable] < 0).mean())
+
+
+# --- what the estimator does to a response of known timing ---------------------------
+
+
+def timing_rule_readings(
+    curves: NDArray,
+    lag_time: NDArray,
+    reference_lags: tuple[float, float] | None = None,
+) -> dict[str, NDArray]:
+    """Every timing and size rule of this module, read on each curve.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_lags,) or (n_lags, n_units)
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each row, in seconds, ascending.
+    reference_lags : (float, float), optional
+        Lags, in seconds, of a pre-event reference level (a window wide enough
+        to hold one); adds the rules measured from it.
+
+    Returns
+    -------
+    readings : dict of str to NDArray, each shape (n_units,)
+        Lags in ms, sizes on the log-rate scale:
+
+        - ``peak``: the peak lag (:func:`peak_and_onset`).
+        - ``onset_zero``, ``onset_rise``: the half-maximum onset measured from
+          zero and from the value at the first lag.
+        - ``onset_reference``: from the mean over ``reference_lags`` (only
+          with ``reference_lags``).
+        - ``steepest``: the steepest approach to the peak
+          (:func:`steepest_approach_lag`).
+        - ``size_zero``, ``size_rise``, ``size_reference``: the size
+          (:func:`response_size`) from the same three references.
+    """
+    onsets: dict[str, str | tuple[float, float]] = {
+        "onset_zero": "zero",
+        "onset_rise": "window_start",
+    }
+    sizes: dict[str, str | tuple[float, float]] = {
+        "size_zero": "zero",
+        "size_rise": "window_start",
+    }
+    if reference_lags is not None:
+        onsets["onset_reference"] = reference_lags
+        sizes["size_reference"] = reference_lags
+    readings = {"peak": peak_and_onset(curves, lag_time).peak_lag * _MS}
+    for name, baseline in onsets.items():
+        readings[name] = (
+            peak_and_onset(curves, lag_time, baseline=baseline).onset_lag * _MS
+        )
+    readings["steepest"] = steepest_approach_lag(curves, lag_time) * _MS
+    for name, baseline in sizes.items():
+        readings[name] = response_size(curves, lag_time, baseline=baseline)
+    return readings
+
+
+def timing_rule_calibration(
+    curves: NDArray,
+    lag_time: NDArray,
+    truth: NDArray | None,
+    reference_lags: tuple[float, float] | None = None,
+) -> dict:
+    """How each timing rule reads fitted curves of a response of known shape.
+
+    Each rule of :func:`timing_rule_readings` is read on every curve and on
+    their sign-aligned mean (:func:`sign_aligned_mean`, each curve signed by
+    its own peak), and compared with the same rule read on the truth's
+    sign-aligned curve on the same lags, so a bias is the estimator's
+    displacement and not the shape's own rise.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_lags, n_units)
+        The fitted curves.
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each row, in seconds, ascending.
+    truth : NDArray, shape (n_lags,), or None
+        The planted response on the same lags; None when nothing was planted,
+        in which case a size's truth is 0 and a lag's has none.
+    reference_lags : (float, float), optional
+        As in :func:`timing_rule_readings`.
+
+    Returns
+    -------
+    calibration : dict
+        - ``fraction_onset_before_zero``, ``fraction_peak_before_zero``: the
+          share of curves whose half-maximum onset from zero, or peak lag, is
+          negative (a curve with no peak counts as not negative).
+        - ``fraction_peak_sign_negative``: the share whose peak is a decrease.
+        - ``rules``: per rule, ``truth`` (the rule on the truth; None for a lag
+          with no truth), ``unit_median``, ``unit_p2_5`` and ``unit_p97_5``
+          (the median and the 2.5th and 97.5th percentiles over curves, NaN
+          left out), ``population`` (the rule on the sign-aligned mean curve),
+          and ``unit_bias`` and ``population_bias`` (``unit_median`` and
+          ``population`` less the truth; None without one). The truth is read
+          sign-aligned, so for a planted decrease a size's truth is positive
+          and ``unit_bias`` compares it with the curves' own, negative, sizes.
+    """
+    curves = np.asarray(curves, dtype=float)
+    units = timing_rule_readings(curves, lag_time, reference_lags)
+    peaks = peak_and_onset(curves, lag_time).peak
+    population = {
+        name: float(value[0])
+        for name, value in timing_rule_readings(
+            sign_aligned_mean(curves, peaks), lag_time, reference_lags
+        ).items()
+    }
+    if truth is None:
+        truth_read: dict[str, float] = {}
+    else:
+        truth_curve = np.asarray(truth, dtype=float)[:, None]
+        truth_read = {
+            name: float(value[0])
+            for name, value in timing_rule_readings(
+                sign_aligned_mean(
+                    truth_curve, peak_and_onset(truth_curve, lag_time).peak
+                ),
+                lag_time,
+                reference_lags,
+            ).items()
+        }
+    rules = {}
+    for name, values in units.items():
+        low, mid, high = np.nanpercentile(values, [2.5, 50, 97.5])
+        true = truth_read.get(name, 0.0 if name.startswith("size") else None)
+        rules[name] = {
+            "truth": true,
+            "unit_median": float(mid),
+            "unit_p2_5": float(low),
+            "unit_p97_5": float(high),
+            "population": population[name],
+            "unit_bias": None if true is None else float(mid - true),
+            "population_bias": None if true is None else float(population[name] - true),
+        }
+    return {
+        "fraction_onset_before_zero": float(np.mean(units["onset_zero"] < 0)),
+        "fraction_peak_before_zero": float(np.mean(units["peak"] < 0)),
+        "fraction_peak_sign_negative": float(np.mean(peaks < 0)),
+        "rules": rules,
+    }

@@ -9,6 +9,7 @@ from continuum_swr_replay.analysis.pfc.timing import (
     response_size,
     sign_aligned_mean,
     steepest_approach_lag,
+    timing_rule_calibration,
 )
 
 # The report window: +/-200 ms at 500 Hz.
@@ -158,3 +159,93 @@ def test_steepest_approach_ignores_a_constant_offset():
 
     assert first[0] == pytest.approx(0.055, abs=0.002)
     assert first[0] == second[0]
+
+
+# Five lags, 2 ms apart: -4, -2, 0, +2, +4 ms.
+CALIBRATION_LAGS = np.array([-0.004, -0.002, 0.0, 0.002, 0.004])
+# Peak +2 ms, onset -2 ms; a decrease at -2 ms off a positive first lag; a
+# peak at -2 ms whose first-maximum tie picks the earlier lag.
+CALIBRATION_CURVES = np.column_stack(
+    [
+        [0.0, 1.0, 1.0, 2.0, 0.0],
+        [0.5, -1.0, -1.0, 0.0, 0.0],
+        [0.0, 1.0, 1.0, 0.0, 0.0],
+    ]
+)
+# Half-maximum onset from zero at 0 ms, from the first lag at +2 ms.
+CALIBRATION_TRUTH = np.array([0.4, 0.4, 0.6, 1.0, 0.0])
+
+
+def test_timing_rule_calibration_reads_units_population_and_truth():
+    calibration = timing_rule_calibration(
+        CALIBRATION_CURVES, CALIBRATION_LAGS, CALIBRATION_TRUTH
+    )
+
+    assert calibration["fraction_onset_before_zero"] == pytest.approx(1.0)
+    assert calibration["fraction_peak_before_zero"] == pytest.approx(2 / 3)
+    assert calibration["fraction_peak_sign_negative"] == pytest.approx(1 / 3)
+    rules = calibration["rules"]
+    assert list(rules) == [
+        "peak",
+        "onset_zero",
+        "onset_rise",
+        "steepest",
+        "size_zero",
+        "size_rise",
+    ]
+    # Over units: peaks +2, -2, -2 ms; sizes 2, -1, 1 (from zero) and 2,
+    # -1.5, 1 (from the first lag).
+    assert rules["peak"]["unit_median"] == pytest.approx(-2.0)
+    assert rules["peak"]["unit_p2_5"] == pytest.approx(-2.0)
+    assert rules["peak"]["unit_p97_5"] == pytest.approx(1.8)
+    assert rules["size_zero"]["unit_median"] == pytest.approx(1.0)
+    assert rules["size_zero"]["unit_p2_5"] == pytest.approx(-0.9)
+    assert rules["size_rise"]["unit_p2_5"] == pytest.approx(-1.375)
+    assert rules["steepest"]["unit_median"] == pytest.approx(-3.0)
+    # The sign-aligned mean is [-1/6, 1, 1, 2/3, 0]: peak -2 ms, size 1 from
+    # zero and 7/6 from its first lag.
+    expected = {
+        "peak": (-2.0, 2.0),
+        "onset_zero": (-2.0, 0.0),
+        "onset_rise": (-2.0, 2.0),
+        "steepest": (-3.0, 1.0),
+        "size_zero": (1.0, 1.0),
+        "size_rise": (7 / 6, 0.6),
+    }
+    for name, (population, truth) in expected.items():
+        assert rules[name]["population"] == pytest.approx(population), name
+        assert rules[name]["truth"] == pytest.approx(truth), name
+        assert rules[name]["population_bias"] == pytest.approx(population - truth)
+        assert rules[name]["unit_bias"] == pytest.approx(
+            rules[name]["unit_median"] - truth
+        )
+
+
+def test_timing_rule_calibration_without_truth_and_with_a_reference():
+    calibration = timing_rule_calibration(
+        CALIBRATION_CURVES,
+        CALIBRATION_LAGS,
+        None,
+        reference_lags=(-0.004, -0.002),
+    )
+
+    rules = calibration["rules"]
+    # Nothing planted: a size's truth is zero, a lag has none.
+    assert rules["onset_zero"]["truth"] is None
+    assert rules["onset_zero"]["population_bias"] is None
+    assert rules["size_zero"]["truth"] == 0.0
+    assert rules["size_zero"]["population_bias"] == pytest.approx(1.0)
+    # Reference level (-1/6 + 1) / 2 = 5/12 under the mean curve's peak of 1.
+    assert rules["size_reference"]["population"] == pytest.approx(7 / 12)
+    assert rules["onset_reference"]["population"] == pytest.approx(-2.0)
+
+
+def test_timing_rule_calibration_reads_a_planted_decrease_sign_aligned():
+    rules = timing_rule_calibration(
+        -CALIBRATION_CURVES[:, [0]], CALIBRATION_LAGS, -CALIBRATION_TRUTH
+    )["rules"]
+
+    assert rules["size_zero"]["truth"] == pytest.approx(1.0)
+    assert rules["size_zero"]["population"] == pytest.approx(2.0)
+    assert rules["size_zero"]["unit_median"] == pytest.approx(-2.0)
+    assert rules["size_zero"]["unit_bias"] == pytest.approx(-3.0)

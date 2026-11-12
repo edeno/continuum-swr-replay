@@ -18,7 +18,8 @@ with every rule in ``analysis/pfc/timing.py``:
 Each rule is read on every unit (median over units) and on the population
 curve (the mean of the curves signed by their own peaks), and compared with
 the same rule applied to the planted truth on the same lags, so a bias is the
-estimator's displacement and not the shape's own rise.
+estimator's displacement and not the shape's own rise. Those statistics are
+``timing.timing_rule_calibration``'s; this script simulates and fits.
 
 Scenarios, crossed over two windows (``canonical``: fit +/-0.25 s, read
 +/-0.2 s; ``wide``: fit +/-1.05 s, read +/-1.0 s):
@@ -143,51 +144,6 @@ def stretch_offset_and_onsets(
     return log_offset, np.sort(np.asarray(onsets))
 
 
-def read_curves(
-    curves: NDArray, lag_time: NDArray, window: str
-) -> dict[str, NDArray | float]:
-    """Every rule on every unit, and on the sign-aligned population curve."""
-    from continuum_swr_replay.analysis.pfc.timing import (
-        peak_and_onset,
-        response_size,
-        sign_aligned_mean,
-        steepest_approach_lag,
-    )
-
-    rules: dict[str, dict] = {
-        "onset_zero": {"baseline": "zero"},
-        "onset_rise": {"baseline": "window_start"},
-    }
-    sizes: dict[str, str | tuple[float, float]] = {
-        "size_zero": "zero",
-        "size_rise": "window_start",
-    }
-    if window == "wide":
-        rules["onset_reference"] = {"baseline": REFERENCE_LAGS_S}
-        sizes["size_reference"] = REFERENCE_LAGS_S
-
-    def read(values: NDArray) -> dict[str, NDArray]:
-        timing = peak_and_onset(values, lag_time)
-        out = {"peak": timing.peak_lag * 1e3}
-        for name, kwargs in rules.items():
-            out[name] = peak_and_onset(values, lag_time, **kwargs).onset_lag * 1e3
-        out["steepest"] = steepest_approach_lag(values, lag_time) * 1e3
-        for name, baseline in sizes.items():
-            out[name] = response_size(values, lag_time, baseline=baseline)
-        return out
-
-    units = read(curves)
-    peaks = peak_and_onset(curves, lag_time).peak
-    population = read(sign_aligned_mean(curves, peaks))
-    units["_fraction_onset_before_zero"] = float(np.mean(units["onset_zero"] < 0))
-    units["_fraction_peak_before_zero"] = float(np.mean(units["peak"] < 0))
-    units["_fraction_peak_sign_negative"] = float(np.mean(peaks < 0))
-    return {
-        "units": units,
-        "population": {k: float(v[0]) for k, v in population.items()},
-    }
-
-
 def simulate_and_fit(
     *,
     window: str,
@@ -202,7 +158,8 @@ def simulate_and_fit(
     sigma: float,
     seed: int,
 ) -> dict:
-    """One scenario: plant, simulate, fit, read every rule."""
+    """One scenario: plant, simulate, fit, and read every rule
+    (:func:`~continuum_swr_replay.analysis.pfc.timing.timing_rule_calibration`)."""
     from continuum_swr_replay.analysis.pfc.batched_glm import (
         fit_poisson_glms,
         make_ridge_penalty,
@@ -212,6 +169,7 @@ def simulate_and_fit(
         event_basis_functions,
         symmetric_lags,
     )
+    from continuum_swr_replay.analysis.pfc.timing import timing_rule_calibration
 
     rng = np.random.default_rng(seed)
     if scenario == "response":
@@ -248,9 +206,18 @@ def simulate_and_fit(
     report = np.abs(lag_time) <= read_half + 1e-12
     report_lags = lag_time[report]
     curves = basis[report] @ np.asarray(fit.params)[:, 1:].T  # (n_lags, n_units)
-    read = read_curves(curves, report_lags, window)
-
-    record: dict = {
+    truth_curve = (
+        planted_gain * response_shape(shape, report_lags, onset_ms / 1e3)
+        if planted_gain != 0.0
+        else None
+    )
+    calibration = timing_rule_calibration(
+        curves,
+        report_lags,
+        truth_curve,
+        reference_lags=REFERENCE_LAGS_S if window == "wide" else None,
+    )
+    return {
         "window": window,
         "scenario": scenario,
         "shape": shape,
@@ -258,34 +225,8 @@ def simulate_and_fit(
         "true_onset_ms": float(onset_ms),
         "n_units": int(n_units),
         "fraction_converged": float(np.mean(np.asarray(fit.converged))),
-        "fraction_onset_before_zero": read["units"].pop("_fraction_onset_before_zero"),
-        "fraction_peak_before_zero": read["units"].pop("_fraction_peak_before_zero"),
-        "fraction_peak_sign_negative": read["units"].pop(
-            "_fraction_peak_sign_negative"
-        ),
-        "rules": {},
+        **calibration,
     }
-    if planted_gain != 0.0:
-        truth_curve = planted_gain * response_shape(shape, report_lags, onset_ms / 1e3)
-        truth_read = read_curves(truth_curve[:, None], report_lags, window)[
-            "population"
-        ]
-    else:
-        truth_read = {}
-    for name, values in read["units"].items():
-        low, mid, high = np.nanpercentile(values, [2.5, 50, 97.5])
-        population = read["population"][name]
-        true = truth_read.get(name, 0.0 if name.startswith("size") else None)
-        record["rules"][name] = {
-            "truth": true,
-            "unit_median": float(mid),
-            "unit_p2_5": float(low),
-            "unit_p97_5": float(high),
-            "population": population,
-            "unit_bias": None if true is None else float(mid - true),
-            "population_bias": None if true is None else float(population - true),
-        }
-    return record
 
 
 def scenario_list(quick: bool) -> list[dict]:

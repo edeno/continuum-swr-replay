@@ -56,10 +56,6 @@ Work that is deferred on purpose. Each item says when it should be done.
   audit-only tables are still computed in the scripts.
   These still hold their own copy; make each call the function, comparing its
   output before and after on the cluster:
-  - mpfc: `scripts/pfc/calibrate_pfc_kernel_timing.py` computes the timing
-    calibration the summary reads (each rule's unit median, percentiles and bias,
-    in `read_curves` and `simulate_and_fit`). Moving them splits the simulation's
-    fit from its summary, and checking the move reruns the simulated fits.
   - mpfc: `scripts/pfc/summarize_pfc_marked_family.py` (`plot_model` computes its
     own SEM over animals and its own null band, without the draw-count truncation
     `null_band_summary` applies); `scripts/figures/generate_figure04.py`
