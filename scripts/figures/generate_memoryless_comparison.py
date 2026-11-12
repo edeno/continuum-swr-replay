@@ -1071,54 +1071,17 @@ def plot_carving(
         )
 
 
-def heldout_rate(
-    heldout: pd.DataFrame,
-    fold: str,
-    estimator: str,
-    classes: tuple[str, ...],
-    truth: str,
-    measure: str = "support_rate",
-    suffix: str = "",
-) -> tuple[float, int]:
-    """A held-out rate over our detector's events, pooled over event classes.
-
-    Each event is counted once, as our detector bounds it: a shared event is
-    also scored as the sliding window bounds it, and pooling both would count
-    it twice. A rate over informative events is weighted by how many are
-    informative, a share of all events by how many there are.
-
-    Returns
-    -------
-    rate : float
-        NaN when no event counts.
-    n : int
-        The events the rate rests on.
-    """
-    rows = heldout[
-        (heldout["summary"] == "by_class")
-        & (heldout.fold == fold)
-        & (heldout.estimator == estimator)
-        & (heldout.detector == "state_space")
-        & heldout.event_class.isin(classes)
-        & (heldout.truth == truth)
-    ].pivot_table(index="event_class", columns="measure", values="value")
-    weight = "n_events_all" if measure == "informative_share" else f"n_events{suffix}"
-    if rows.empty or weight not in rows or rows[weight].sum() == 0:
-        return float("nan"), 0
-    n = rows[weight].fillna(0)
-    return float((rows[f"{measure}{suffix}"].fillna(0) * n).sum() / n.sum()), int(
-        n.sum()
-    )
-
-
 def plot_heldout_support(ax, heldout: pd.DataFrame) -> None:
     """Share of informative events with held-out support, by kind and fold."""
     width = 0.26
     for group, (_, classes, truth) in enumerate(HELDOUT_GROUPS):
         for offset, (fold, hatch) in enumerate(FOLD_HATCH.items()):
             x = group + (offset - 1) * width
-            rate, n = heldout_rate(heldout, fold, "state_space", classes, truth)
-            other, _ = heldout_rate(heldout, fold, "sliding_window", classes, truth)
+            ours = sweep_statistics.pooled_heldout_rate(heldout, fold, classes, truth)
+            rate, n = ours["rate"], ours["n_events"]
+            other = sweep_statistics.pooled_heldout_rate(
+                heldout, fold, classes, truth, estimator="sliding_window"
+            )["rate"]
             if not n:
                 ax.text(x, 3, "-", ha="center", va="bottom", fontsize=4.5, color="0.5")
                 continue
@@ -1158,9 +1121,9 @@ def plot_heldout_coverage(ax, heldout: pd.DataFrame) -> None:
     width = 0.26
     for group, (_, classes, truth) in enumerate(HELDOUT_GROUPS[:2]):
         for offset, (fold, hatch) in enumerate(FOLD_HATCH.items()):
-            share, _ = heldout_rate(
-                heldout, fold, "state_space", classes, truth, "informative_share"
-            )
+            share = sweep_statistics.pooled_heldout_rate(
+                heldout, fold, classes, truth, measure="informative_share"
+            )["rate"]
             ax.bar(
                 group + (offset - 1) * width,
                 100 * share,
@@ -1510,44 +1473,48 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
 
 def check_heldout_claims(heldout: pd.DataFrame) -> None:
     """The caption's claims about held-out evidence, checked against its summary."""
-    by_class = heldout[heldout["summary"] == "by_class"]
-    if (by_class.event_class == "comparator_only").any():
+    if "comparator_only" in sweep_statistics.heldout_event_classes(heldout):
         raise RuntimeError(
             "The caption says the sliding window reported no event our detector "
             "missed; the held-out summary holds comparator-only events."
         )
-    for fold in FOLD_HATCH:
-        for estimator in ("state_space", "sliding_window"):
-            rate, n = heldout_rate(
-                heldout, fold, estimator, ("ours_only", "shared"), "no_content"
-            )
-            if n and rate > 0:
-                raise RuntimeError(
-                    "The caption says no informative place-less burst event has "
-                    "held-out support; the held-out summary disagrees."
-                )
+    placeless = {
+        estimator: sweep_statistics.heldout_fold_statistics(
+            heldout,
+            tuple(FOLD_HATCH),
+            ("ours_only", "shared"),
+            "no_content",
+            estimator=estimator,
+        )
+        for estimator in ("state_space", "sliding_window")
+    }
+    if any(statistics["n_folds_with_support"] for statistics in placeless.values()):
+        raise RuntimeError(
+            "The caption says no informative place-less burst event has "
+            "held-out support; the held-out summary disagrees."
+        )
+    by_class = heldout[heldout["summary"] == "by_class"]
     local = by_class[(by_class.truth == "local") & (by_class.measure == "n_events_all")]
     if local.value.sum() > 0:
         raise RuntimeError(
             "The caption says no event of pure local coding reached the held-out "
             "test; the held-out summary holds some."
         )
-    if not sum(
-        heldout_rate(
-            heldout, fold, "state_space", ("ours_only", "shared"), "no_content"
-        )[1]
-        for fold in FOLD_HATCH
-    ):
+    if not placeless["state_space"]["n_events"]:
         raise RuntimeError(
             "The caption states a place-less burst result; no place-less burst "
             "event is informative, so there is none to state."
         )
     for fold in FOLD_HATCH:
         for estimator in ("state_space", "sliding_window"):
-            rate, n = heldout_rate(
-                heldout, fold, estimator, ("ours_only",), "continuous_replay"
+            ours_only = sweep_statistics.pooled_heldout_rate(
+                heldout,
+                fold,
+                ("ours_only",),
+                "continuous_replay",
+                estimator=estimator,
             )
-            if n and rate < 0.8:
+            if ours_only["n_events"] and ours_only["rate"] < 0.8:
                 raise RuntimeError(
                     "The caption says most informative replays only our detector "
                     "reported have held-out support in every fold; the summary "
