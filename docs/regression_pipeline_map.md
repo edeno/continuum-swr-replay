@@ -44,7 +44,7 @@ Immobility bouts: where a stop begins and ends, and what falls inside one.
 
 Build the four canonical replay-content tables across all sessions.
 
-`output_dir`, `session_cache_dir`, `find_sessions`, `behavioral_context_cache_path`, `load_behavioral_context`, `populate_behavioral_context_cache`, `build_stop_table_scope`, `run_prepare_data`
+`output_dir`, `session_cache_dir`, `find_sessions`, `behavioral_context_cache_path`, `load_behavioral_context`, `populate_behavioral_context_cache`, `build_stop_table_scope`, `run_prepare_data`, `read_disjoint_shards`, `assemble_replay_content_shards`, `assemble_replay_stop_shards`
 
 ### `src/continuum_swr_replay/analysis/behavior/tables/table_contracts.py`
 
@@ -74,7 +74,7 @@ Canonical stop-grain builder: one row per stopping period.
 
 Within-stop time-binned tables (Part B).
 
-`build_event_onset_table`, `build_stop_timebin_table`
+`build_event_onset_table`, `build_stop_timebin_table`, `concat_session_timebin_tables`
 
 ### `src/continuum_swr_replay/analysis/events/analysed_time.py`
 
@@ -158,7 +158,13 @@ Theta, ripple and MUA levels of running and of quiet rest, the references for an
 
 One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
-`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`
+`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
+
+### `src/continuum_swr_replay/analysis/hippocampus/content_occupancy.py`
+
+Where non-local content sits: each content time bin's track distance to the animal and to the nearest reward well.
+
+`well_positions`, `content_distances`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py`
 
@@ -188,13 +194,13 @@ Analysis functions for manipulating and characterizing detected events.
 
 Summary statistics of the immobile non-local events.
 
-`compute_swr_overlap_class_counts`, `overlap_class_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `n_animals_non_swr_more_at_well`
+`compute_swr_overlap_class_counts`, `overlap_class_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/gamma_power.py`
 
 Slow- and fast-gamma power of CA1 on the decode grid: z-scored per epoch, and its change against quiet rest in dB (``power_change_db``).
 
-`band_power`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`
+`band_power`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`, `epoch_gamma`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/hpc_raw_stats.py`
 
@@ -231,6 +237,12 @@ Loading and managing saved decoding results.
 Rule R-T: per epoch, keep the CA1 band tetrodes that ripple with the rest.
 
 `TetrodeSelection`, `TetrodeSelectionError`, `check_one_channel_per_tetrode`, `select_ripple_tetrodes`
+
+### `src/continuum_swr_replay/analysis/hippocampus/spike_evidence.py`
+
+Spike evidence of non-local events: does the prior-excluded spike likelihood favour the decoded location over the animal's?
+
+`build_session_events`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `event_metrics`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/start_and_rest_theta.py`
 
@@ -486,7 +498,7 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 Content occupancy of non-local events — where the decoded activity represents.
 
-`find_sessions`, `session_content_distances`, `arm_occupancy`, `analyze`, `group_shares`, `non_swr_shares_by_animal`, `render`, `main`
+`find_sessions`, `session_content_distances`, `arm_occupancy`, `analyze`, `group_shares`, `render`, `main`
 
 ### `scripts/behavior/content/analyze_uncertainty_content.py`
 
@@ -636,13 +648,13 @@ Run Carey's candidate detector on every epoch's CA1 LFP and multiunit spikes.
 
 Assemble disjoint per-animal ContFrag shards into one canonical bundle.
 
-`assemble_contfrag_shards`, `main`
+`main`
 
 ### `scripts/tables/assemble_replay_content_shards.py`
 
 Assemble disjoint Replay table shards into one canonical candidate bundle.
 
-`assemble_replay_content_shards`, `assemble_replay_stop_shards`, `main`
+`main`
 
 ### `scripts/tables/build_timebin_tables.py`
 
@@ -660,7 +672,7 @@ Convert the materialized canonical tables from pickle to parquet.
 
 Build canonical replay-content tables from ContFrag decoding results.
 
-`contfrag_table_basenames`, `publish_contfrag_tables`, `find_sessions`, `build_parser`, `configure_paths`, `main`
+`build_parser`, `configure_paths`, `main`
 
 ### `scripts/tables/prepare_replay_content_data.py`
 
@@ -672,7 +684,7 @@ Build the four canonical replay-content tables across all sessions.
 
 Rebuild ContFrag tables while reusing immutable posterior aggregates.
 
-`refresh_contfrag_behavioral_covariates`, `main`
+`main`
 
 ### `scripts/tables/regenerate_stop_table.py`
 
@@ -872,7 +884,7 @@ Add each compared event's Local, No-Spike, non-local and uncertain shares to an 
 
 Spike-evidence reality analysis for non-SWR non-local events.
 
-`find_sessions`, `build_session_events`, `load_marks`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `events_with_map_in_left_out_bins`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
+`find_sessions`, `load_marks`, `events_with_map_in_left_out_bins`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
 
 ### `scripts/detection/bootstrap_event_properties.py`
 
@@ -902,7 +914,7 @@ Measure each event's start distance and the theta-like share of duration-matched
 
 One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
-`out_dir`, `measure_epoch`, `epoch_identifier`, `run_measure`, `load_events`, `distribution_table`, `distribution_simulation`, `plot_distributions`, `property_frame`, `design_rows`, `step_table`, `step_simulation`, `plot_property`, `spot_check_events`, `plot_spot_checks`, `run_analyze`, `main`
+`out_dir`, `measure_epoch`, `epoch_identifier`, `run_measure`, `load_events`, `distribution_simulation`, `plot_distributions`, `step_simulation`, `plot_property`, `spot_check_events`, `plot_spot_checks`, `run_analyze`, `main`
 
 ### `scripts/detection/report_event_features.py`
 
@@ -914,25 +926,25 @@ Report one event features run: its features per session and per animal.
 
 Report one inventory comparison run: its counts per session and per animal.
 
-`epoch_status`, `directional_by_animal`, `oriented_pairs`, `match_strength_by_session`, `match_strength_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
+`epoch_status`, `oriented_pairs`, `match_strength_by_session`, `match_strength_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
 
 ### `scripts/detection/run_event_features.py`
 
 Event features of every compared event, one epoch per task.
 
-`evidence_rows`, `memoryless_input_mismatch`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+`memoryless_input_mismatch`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
 
 ### `scripts/detection/run_inventory_comparison.py`
 
 Compare the replay-detection inventories, one epoch at a time.
 
-`epoch_inventories`, `compare_epoch`, `bounds_mismatch`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+`bounds_mismatch`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
 
 ### `scripts/detection/run_state_evidence.py`
 
 Held-out spike evidence for each decoder state, on every canonical HPC decode.
 
-`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `running_only_masks`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
+`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `refit_encoding`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
 
 ### `scripts/detection/split_state_evidence_by_swr.py`
 
@@ -944,19 +956,19 @@ Held-out spike evidence of Non-Local bouts, split by SWR coupling.
 
 What each detector does with activity that is not one clean replay.
 
-`detector_events`, `score_trial`, `run_detectors`, `part_alone_spikes`, `condition_rng`, `run_trials`, `run_no_replay`, `main`
+`main`
 
 ### `scripts/detection/sweep_memoryless_heldout.py`
 
 Does each detector's content reproduce in cells it never saw?
 
-`folds`, `fold_models`, `trials`, `event_truth`, `matches_injection`, `permutations_for`, `score_events`, `run_fold`, `run_no_replay_fold`, `main`
+`main`
 
 ### `scripts/pfc/calibrate_pfc_kernel_timing.py`
 
 What the mPFC kernel estimator does to the timing and size of a known response.
 
-`response_shape`, `event_onsets`, `stretch_offset_and_onsets`, `simulate_and_fit`, `scenario_list`, `parse_arguments`, `main`
+`parse_arguments`, `main`
 
 ### `scripts/pfc/check_pfc_ridge_lambda0.py`
 
@@ -1028,13 +1040,13 @@ Fit the recommended descriptive mPFC marked-kernel model family.
 
 Stop-level context of the mPFC replay response, pooled across sessions (Part 4).
 
-`default_output_dir`, `bundle_path`, `pfc_left_out`, `selected_sessions`, `current_table_hashes`, `cached_is_current`, `assemble`, `unit_table`, `select_units`, `fit`, `get_command_line_arguments`, `main`
+`default_output_dir`, `bundle_path`, `pfc_left_out`, `selected_sessions`, `current_table_hashes`, `cached_is_current`, `assemble`, `unit_table`, `fit`, `get_command_line_arguments`, `main`
 
 ### `scripts/pfc/summarize_pfc_marked_family.py`
 
 Population summary of the mPFC marked-model family bundles.
 
-`MixedContractError`, `load_bundles`, `summary_table`, `joint_versus_marginal`, `plot_model`, `build_report`, `main`
+`MixedContractError`, `load_bundles`, `joint_versus_marginal`, `plot_model`, `build_report`, `main`
 
 ### `scripts/workflows/run_refits.py`
 
@@ -1076,13 +1088,13 @@ Summary statistics of the per-window table, over epochs nested in animals.
 
 Per-tetrode likelihood terms, and the encodings and decode files they come from.
 
-`load_detector`, `encoding_inputs`, `load_encoding`, `encoding_comparison`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `subnormal_occupancy_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `time_folds`, `training_spike_bins`
+`load_detector`, `encoding_inputs`, `load_encoding`, `encoding_comparison`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `subnormal_occupancy_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `time_folds`, `training_spike_bins`, `running_only_masks`, `spikes_in_bins`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/windows.py`
 
 Speed regimes and the windows scored: bouts, matched windows, calibration windows.
 
-`keyed_rng`, `regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `tetrode_halves`, `null_partners`, `window_folds`
+`keyed_rng`, `regimes`, `analysed_regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `tetrode_halves`, `null_partners`, `window_folds`
 
 ### `src/continuum_swr_replay/decoding/files.py`
 
