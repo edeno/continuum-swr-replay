@@ -48,7 +48,8 @@ them importable.
 ## `detection/` — event detectors and the detection comparison
 - `_report.py` — not a script: what the two detection-comparison reports share (the
   pending marking of the memoryless inventories, caption and quantile wording,
-  `read_run`, pooling sessions within an animal), imported as `scripts.detection._report`.
+  `read_run`, which reads a run's `ok` epochs through `feature_run.read_manifest` and
+  `ok_epochs`, pooling sessions within an animal), imported as `scripts.detection._report`.
 - `run_artifact_detection.py` — the artifact mask: LFP and spike artifacts in every
   epoch's CA1 data, on CPU (S blocks, reference and CA1 steps, synchronous spike
   lines; `docs/design/2026-10-09-artifact-detection.md`).
@@ -150,7 +151,9 @@ them importable.
   settings and decode files (size, mtime) all match, unless `--overwrite`.
 - `analyze_event_spike_evidence.py` — the spike-evidence reality check: does each
   non-SWR non-local event's prior-excluded spike likelihood favour its decoded
-  location over the animal's, above a matched immobility baseline.
+  location over the animal's, above a matched immobility baseline. Its closing
+  summary prints `event_statistics.spike_evidence_statistics`, the function the
+  events summary reports from.
 - `run_event_spike_evidence.sh [NJOBS]` — the run of it that the events summary and
   `measure_ripple_class_structure.py` read: every event of every analysed epoch
   (`--n-sample 1000000 --likelihood stored`), one process per epoch, written to
