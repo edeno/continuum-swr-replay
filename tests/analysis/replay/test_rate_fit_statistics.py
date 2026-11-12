@@ -171,43 +171,6 @@ def test_the_baseline_ratio_is_within_session():
     )
 
 
-def _coefficients(values, animals) -> pd.DataFrame:
-    n = len(values)
-    return pd.DataFrame(
-        {
-            "animal": animals,
-            "session_date": list(range(n)),
-            "epoch": ["02_r1"] * n,
-            "coef_x": values,
-        }
-    )
-
-
-def test_the_paired_coefficient_is_a_minus_b_within_session():
-    animals = ["a", "a", "b", "b", "c", "c", "c"]
-    # differences 0.4, -0.2, 0.6, 0.0, 1.0, 0.3 in the six sessions both have:
-    # median 0.35; animal medians 0.1, 0.3, 0.65
-    a = _coefficients([1.4, 0.8, 1.6, 2.0, 3.0, 0.3, 5.0], animals)
-    b = _coefficients([1.0, 1.0, 1.0, 2.0, 2.0, 0.0, NAN], animals)
-    result = stats.paired_coefficient_statistics(a, b, "coef_x")
-    assert result["n_sessions"] == 6
-    assert result["median"] == pytest.approx(0.35)
-    assert result["positive_fraction"] == pytest.approx(4 / 6)  # a zero is not
-    assert result["n_animals"] == 3
-    assert result["n_animals_positive"] == 3
-    assert result["animal_median"] == pytest.approx(0.3)
-    # the zero is not a difference: five remain, too few for a signed-rank p
-    assert np.isnan(result["signed_rank_p"])
-    # now six non-zero differences; the one negative, -0.2, has rank 2 of |0.1|,
-    # |-0.2|, 0.3, 0.4, 0.6, 1.0
-    b.loc[3, "coef_x"] = 1.9
-    p = stats.paired_coefficient_statistics(a, b, "coef_x")["signed_rank_p"]
-    # three of the 64 sign patterns have a negative rank sum of at most 2
-    assert p == pytest.approx(2 * 3 / 64)
-    with pytest.raises(pd.errors.MergeError):
-        stats.paired_coefficient_statistics(pd.concat([a, a]), b, "coef_x")
-
-
 # --- the reward kernel ----------------------------------------------------------------
 
 

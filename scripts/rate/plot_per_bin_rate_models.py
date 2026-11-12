@@ -47,6 +47,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (  # noqa: E402
     fit_rows,
     gated_coefficient_statistics,
+    paired_coefficient_statistics,
 )
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
     gate_term_sessions,
@@ -60,7 +61,6 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     REWARD_HISTORY_N_LAGS,
 )
 from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
-    paired_coefficient_statistics,
     reward_kernel_animal_medians,
     reward_kernel_by_lag,
     self_history_kernel_by_lag,

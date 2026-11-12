@@ -328,6 +328,31 @@ def test_the_exp_median_ratio_divides_each_fit_s_own_gated_session_median():
 # --- one coefficient in two fits of the same sessions ---------------------------------
 
 
+def test_the_paired_coefficient_is_a_minus_b_within_session():
+    animals = ["a", "a", "b", "b", "c", "c", "c"]
+    # differences 0.4, -0.2, 0.6, 0.0, 1.0, 0.3 in the six sessions both have:
+    # median 0.35; animal medians 0.1, 0.3, 0.65
+    a = _fits([1.4, 0.8, 1.6, 2.0, 3.0, 0.3, 5.0], animals)
+    b = _fits([1.0, 1.0, 1.0, 2.0, 2.0, 0.0, NAN], animals)
+    result = stats.paired_coefficient_statistics(a, b, "coef_x")
+    assert result["n_sessions"] == 6
+    assert result["median"] == pytest.approx(0.35)
+    assert result["positive_fraction"] == pytest.approx(4 / 6)  # a zero is not
+    assert result["n_animals"] == 3
+    assert result["n_animals_positive"] == 3
+    assert result["animal_median"] == pytest.approx(0.3)
+    # the zero is not a difference: five remain, too few for a signed-rank p
+    assert np.isnan(result["signed_rank_p"])
+    # now six non-zero differences; the one negative, -0.2, has rank 2 of |0.1|,
+    # |-0.2|, 0.3, 0.4, 0.6, 1.0
+    b.loc[3, "coef_x"] = 1.9
+    p = stats.paired_coefficient_statistics(a, b, "coef_x")["signed_rank_p"]
+    # three of the 64 sign patterns have a negative rank sum of at most 2
+    assert p == pytest.approx(2 * 3 / 64)
+    with pytest.raises(pd.errors.MergeError):
+        stats.paired_coefficient_statistics(pd.concat([a, a]), b, "coef_x")
+
+
 def _split_fits(
     differences: dict[str, list[float]],
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -389,6 +414,21 @@ def test_the_difference_drops_a_session_missing_or_gated_in_either_fit():
     # each count is of its own fits: nothing is left out of a
     assert result["n_dropped_a"] == 0 and result["n_unidentified_a"] == 0
     assert result["n_dropped_b"] == 1 and result["n_unidentified_b"] == 1
+
+
+def test_the_difference_s_signed_rank_p_is_over_the_sessions_kept_in_both():
+    animals = ["a", "b", "c", "a", "b", "c", "a"]
+    a = _fits([1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7], animals)
+    b = _fits([1.0] * 7, animals, separated_terms=["x", "", "", "", "", "", ""])
+    # six sessions kept in both, differences 0.2 ... 0.7, all positive
+    result = stats.gated_coefficient_difference_statistics(a, b, "x")
+    assert result["n_sessions"] == 6
+    assert result["signed_rank_p"] == pytest.approx(2 / 64)
+    # one more session left out, now of fit a: five remain, too few for a p
+    a.loc[1, "separated_terms"] = "x"
+    assert np.isnan(
+        stats.gated_coefficient_difference_statistics(a, b, "x")["signed_rank_p"]
+    )
 
 
 def test_the_difference_refuses_two_fits_of_one_session():

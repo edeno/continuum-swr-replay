@@ -3,8 +3,8 @@
 Each function takes per-session fits of the per-bin conditional-intensity
 ladder (``MODEL_PER_BIN_RATE``; one row per session, rung and population, as
 ``scripts/rate/fit_per_bin_rate_models.py`` writes them) and returns named
-numbers: the frozen cohort, the baseline rate, one coefficient of two
-populations within session, the reconstructed reward and self-history kernels
+numbers: the frozen cohort, the baseline rate, the reconstructed reward and
+self-history kernels
 (summarized and lag by lag), each rung's fit quality, and the fitted time
 course on the stop and arrival clocks. The rate figures draw these functions'
 numbers, so a figure shows what the summary reports.
@@ -17,7 +17,8 @@ a single basis coefficient is not the effect of a reward at any lag. Rates are
 events per at-risk second, kernels are rate ratios, times are in seconds.
 Every signed-rank p is
 :func:`~continuum_swr_replay.analysis.statistics.signed_rank_p` (NaN below six
-non-zero differences). Summaries of one coefficient, and of one rung against another, are in
+non-zero differences). Summaries of one coefficient, of one coefficient of two
+populations within session, and of one rung against another, are in
 :mod:`~continuum_swr_replay.analysis.replay.coefficient_statistics`.
 """
 
@@ -30,7 +31,7 @@ import pandas as pd
 from patsy import dmatrix
 
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (
-    _paired_difference,
+    paired_coefficient_statistics,
     require_one_fit_per_session,
     separated_fraction,
 )
@@ -159,44 +160,6 @@ def baseline_rate_ratio_statistics(
         "n_sessions": paired["n_sessions"],
         "median_ratio": float(np.exp(paired["median"])),
         "signed_rank_p": paired["signed_rank_p"],
-    }
-
-
-def paired_coefficient_statistics(
-    fits_a: pd.DataFrame, fits_b: pd.DataFrame, column: str
-) -> dict[str, float]:
-    """One coefficient of two populations' fits, a minus b within session.
-
-    Parameters
-    ----------
-    fits_a, fits_b : pd.DataFrame
-        Per-session fits of one rung, each of one population, with the session
-        columns and ``column``; at most one row per session. A session whose
-        ``column`` is missing in either is left out. Pass the gated fits where
-        the coefficient is read over a gate's sessions.
-    column : str
-        The coefficient's column.
-
-    Returns
-    -------
-    statistics : dict
-        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`
-        of the sessions' ``a - b`` differences (``n_sessions``, ``median``,
-        ``positive_fraction``, ``n_animals``, ``n_animals_positive``, ...), and
-        ``signed_rank_p``, their Wilcoxon signed-rank p
-        (:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`: NaN
-        below six non-zero differences).
-
-    Raises
-    ------
-    pandas.errors.MergeError
-        If either set of fits holds two rows for one session.
-    """
-    known_a, known_b = (fits.dropna(subset=[column]) for fits in (fits_a, fits_b))
-    difference, animal = _paired_difference(known_a, known_b, column)
-    return {
-        **session_median_statistics(difference, animal),
-        "signed_rank_p": signed_rank_p(difference),
     }
 
 
@@ -432,16 +395,18 @@ def paired_lag_one_kernel_statistics(
         animals whose median a - b difference is positive; and
         ``signed_rank_p``, the paired Wilcoxon signed-rank p.
     """
-    difference, animal = _paired_difference(
+    statistics = paired_coefficient_statistics(
         lag_one_reward_kernels(fits_a), lag_one_reward_kernels(fits_b), "lag_one"
     )
-    statistics = session_median_statistics(difference, animal)
     return {
-        "n_sessions": statistics["n_sessions"],
-        "positive_fraction": statistics["positive_fraction"],
-        "n_animals": statistics["n_animals"],
-        "n_animals_positive": statistics["n_animals_positive"],
-        "signed_rank_p": signed_rank_p(difference),
+        name: statistics[name]
+        for name in (
+            "n_sessions",
+            "positive_fraction",
+            "n_animals",
+            "n_animals_positive",
+            "signed_rank_p",
+        )
     }
 
 

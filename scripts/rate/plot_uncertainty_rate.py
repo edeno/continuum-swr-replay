@@ -10,7 +10,7 @@ paired dissociation tests annotated:
 
 * ``non_local_no_swr`` vs ``swr`` and vs ``non_local_swr`` (paired signed-rank
   test over the sessions present in both,
-  ``rate_fit_statistics.paired_coefficient_statistics``).
+  ``coefficient_statistics.paired_coefficient_statistics``).
 
 Results are *reported*, not asserted to a magnitude -- a null is a valid result.
 Also plots the peri-block-change latency anchor: per-population mean coefficient
@@ -41,15 +41,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (  # noqa: E402
     coefficient_statistics,
     fit_rows,
+    paired_coefficient_statistics,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MU_UNCERTAINTY_CURATED_COVARIATES,
-)
-from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
-    paired_coefficient_statistics,
 )
 from continuum_swr_replay.paths import figure_dir, model_dir
 
@@ -76,7 +74,7 @@ def _paired_test(
     """Paired signed-rank test of ``coef_{covariate}`` between two populations.
 
     Over the sessions both populations' fits have the coefficient
-    (``rate_fit_statistics.paired_coefficient_statistics``). Returns ``(p,
+    (``coefficient_statistics.paired_coefficient_statistics``). Returns ``(p,
     n_pairs)``; the p is NaN below six non-zero differences.
     """
     paired = paired_coefficient_statistics(

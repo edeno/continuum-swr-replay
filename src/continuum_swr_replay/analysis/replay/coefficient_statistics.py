@@ -387,6 +387,44 @@ def gated_exp_median_ratio(
     )
 
 
+def paired_coefficient_statistics(
+    fits_a: pd.DataFrame, fits_b: pd.DataFrame, column: str
+) -> dict[str, float]:
+    """One coefficient of two populations' fits, a minus b within session.
+
+    Parameters
+    ----------
+    fits_a, fits_b : pd.DataFrame
+        Per-session fits of one rung, each of one population, with the session
+        columns and ``column``; at most one row per session. A session whose
+        ``column`` is missing in either is left out. Pass the gated fits where
+        the coefficient is read over a gate's sessions.
+    column : str
+        The coefficient's column.
+
+    Returns
+    -------
+    statistics : dict
+        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`
+        of the sessions' ``a - b`` differences (``n_sessions``, ``median``,
+        ``positive_fraction``, ``n_animals``, ``n_animals_positive``, ...), and
+        ``signed_rank_p``, their Wilcoxon signed-rank p
+        (:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`: NaN
+        below six non-zero differences).
+
+    Raises
+    ------
+    pandas.errors.MergeError
+        If either set of fits holds two rows for one session.
+    """
+    known_a, known_b = (fits.dropna(subset=[column]) for fits in (fits_a, fits_b))
+    difference, animal = _paired_difference(known_a, known_b, column)
+    return {
+        **session_median_statistics(difference, animal),
+        "signed_rank_p": signed_rank_p(difference),
+    }
+
+
 def gated_coefficient_difference_statistics(
     fits_a: pd.DataFrame, fits_b: pd.DataFrame, term: str
 ) -> dict[str, float]:
@@ -408,9 +446,9 @@ def gated_coefficient_difference_statistics(
     Returns
     -------
     statistics : dict
-        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`
-        of the sessions' ``a - b`` differences, and for each of the two sets of
-        fits (``a``, ``b``):
+        :func:`paired_coefficient_statistics` of the kept sessions (the
+        statistics of their ``a - b`` differences and ``signed_rank_p``), and
+        for each of the two sets of fits (``a``, ``b``):
 
         - ``n_dropped_<fits>``: its sessions with a coefficient that the gate
           leaves out as separated or runaway.
@@ -420,11 +458,10 @@ def gated_coefficient_difference_statistics(
         and ``gate_refuses``: whether the gate refuses the term in either set.
     """
     gate_a, gate_b = gate_term_sessions(fits_a, term), gate_term_sessions(fits_b, term)
-    difference, animal = _paired_difference(
-        fits_a[gate_a.kept], fits_b[gate_b.kept], f"coef_{term}"
-    )
     return {
-        **session_median_statistics(difference, animal),
+        **paired_coefficient_statistics(
+            fits_a[gate_a.kept], fits_b[gate_b.kept], f"coef_{term}"
+        ),
         "n_dropped_a": gate_a.n_dropped,
         "n_unidentified_a": gate_a.n_unidentified,
         "n_dropped_b": gate_b.n_dropped,
