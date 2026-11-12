@@ -173,8 +173,12 @@ def _validate_model_bundle(
         raise ValueError(f"{directory} has duplicate session/model rows")
 
     models = sorted(results["model"].astype(str).unique())
+    # A bundle fit before the runner stopped writing model_comparison.pkl still holds
+    # it; it is not a model file.
     model_files = sorted(
-        path.stem for path in directory.glob("*.pkl") if path.name != "all_models.pkl"
+        path.stem
+        for path in directory.glob("*.pkl")
+        if path.name not in {"all_models.pkl", "model_comparison.pkl"}
     )
     if model_files != models:
         raise ValueError(

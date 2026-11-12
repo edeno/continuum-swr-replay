@@ -64,6 +64,22 @@ def test_validate_model_bundle_requires_one_exact_common_session_block(
     assert audit["events_modeled_per_model"] == {"M0": 27, "M1": 27}
 
 
+def test_a_bundle_holding_an_old_model_comparison_file_still_validates(
+    tmp_path: Path,
+) -> None:
+    results = _fit_rows()
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, results)
+    pd.DataFrame({"parent": ["M0"], "child": ["M1"]}).to_pickle(
+        bundle / "model_comparison.pkl"
+    )
+    keys = {("a", 20200101, "02_r1"), ("b", 20200102, "02_r1")}
+
+    audit = _validate_model_bundle(bundle, expected_session_keys=keys)
+
+    assert audit["models"] == ["M0", "M1"]
+
+
 def test_validate_model_bundle_rejects_rung_specific_session_loss(
     tmp_path: Path,
 ) -> None:
