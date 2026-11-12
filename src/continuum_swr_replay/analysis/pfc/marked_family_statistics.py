@@ -291,7 +291,6 @@ def animal_balanced_curve(
 def null_band_summary(
     curves: dict,
     nulls: dict,
-    lag_time: np.ndarray,
     animal_of: dict[str, str],
 ) -> pd.DataFrame:
     """Observed population slope kernels against their shuffled-mark bands.
@@ -322,8 +321,6 @@ def null_band_summary(
         keyed as in :func:`population_curve_summary`, as
         ``scripts/pfc/summarize_pfc_marked_family.py`` reads them from the
         marked-family bundles.
-    lag_time : NDArray, shape (n_lags,)
-        Lag axis in seconds.
     animal_of : dict
         ``session -> animal``.
 

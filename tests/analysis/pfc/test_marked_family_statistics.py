@@ -113,7 +113,6 @@ def test_post_onset_sign_count_reads_the_fixed_window_not_the_peak():
 
 
 def test_summary_band_and_peak_call():
-    lag = np.linspace(-0.2, 0.2, 5)
     bump = np.array([0.0, 0.0, 1.0, 0.0, 0.0])
     key = ("m", "non_local_no_SWR", "t")
     # Draws r = 0..99 put r/100 - 0.495 at every lag: the band is known.
@@ -122,7 +121,7 @@ def test_summary_band_and_peak_call():
     nulls = {key: {"a1": draws, "a2": draws, "b1": draws}}
     animal_of = {"a1": "a", "a2": "a", "b1": "b"}
 
-    out = stats.null_band_summary(curves, nulls, lag, animal_of).iloc[0]
+    out = stats.null_band_summary(curves, nulls, animal_of).iloc[0]
 
     expected_low, expected_high = np.percentile(draws[:, 0], [2.5, 97.5])
     assert out.band_low_at_peak == pytest.approx(expected_low)
@@ -142,7 +141,7 @@ def test_summary_band_and_peak_call():
     assert out.n_draws == 100
 
     inside = stats.null_band_summary(
-        {key: dict.fromkeys(animal_of, 0.3 * bump)}, nulls, lag, animal_of
+        {key: dict.fromkeys(animal_of, 0.3 * bump)}, nulls, animal_of
     ).iloc[0]
     assert not inside.peak_outside_band
 
@@ -165,7 +164,7 @@ def test_observed_curve_and_reference_share_the_animal_weighting():
     }
 
     peaks = stats.population_curve_summary(curves, lag, animal_of).iloc[0]
-    band = stats.null_band_summary(curves, nulls, lag, animal_of).iloc[0]
+    band = stats.null_band_summary(curves, nulls, animal_of).iloc[0]
 
     assert peaks.peak_value == pytest.approx(0.3)
     assert band.band_low_at_peak == pytest.approx(0.3)
@@ -180,7 +179,6 @@ def test_observed_curve_and_reference_share_the_animal_weighting():
 
 
 def test_max_statistic_call_is_the_plus_one_p_not_the_interpolated_percentile():
-    lag = np.linspace(-0.2, 0.2, 5)
     key = ("m", "non_local_no_SWR", "t")
     animal_of = {"a1": "a"}
     # 20 draws whose largest |curve| is 0.05, 0.10, ..., 1.00.
@@ -189,7 +187,7 @@ def test_max_statistic_call_is_the_plus_one_p_not_the_interpolated_percentile():
 
     def call(observed_peak):
         curves = {key: {"a1": observed_peak * np.array([0.0, 0.0, 1.0, 0.0, 0.0])}}
-        return stats.null_band_summary(curves, nulls, lag, animal_of).iloc[0]
+        return stats.null_band_summary(curves, nulls, animal_of).iloc[0]
 
     # 0.97 is above the interpolated 95th percentile (0.9525) but one draw
     # (1.00) is at least as large: p = 2/21, inside.

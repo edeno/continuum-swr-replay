@@ -569,7 +569,7 @@ def main() -> None:
     animal_of = dict(units.drop_duplicates("session")[["session", "animal"]].to_numpy())
     fractions = animal_balanced_fraction_positive(units, args.blowup)
     peaks = population_curve_summary(curves, lag_time, animal_of)
-    bands = null_band_summary(curves, nulls, lag_time, animal_of)
+    bands = null_band_summary(curves, nulls, animal_of)
     tiers = units[["model", "tier"]].drop_duplicates()
     merged = fractions.merge(peaks, on=["model", "event_class", "target"]).merge(
         tiers, on="model"
