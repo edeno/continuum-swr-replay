@@ -26,11 +26,27 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.choice.choice_prediction import (
+    CHOICE_MODELS,
     build_choice_dataset,
     build_residualized_choice_dataset,
+    choice_swr_split_models_for_source,
     fit_choice_model,
     predict_arm_fractions,
 )
+
+
+def test_choice_swr_split_is_separate_and_skipped_for_swr_source():
+    assert tuple(CHOICE_MODELS) == (
+        "C_replay_only",
+        "C_behavior",
+        "C_full",
+    )
+    assert choice_swr_split_models_for_source("SWR") == {}
+    assert tuple(choice_swr_split_models_for_source("non_local")) == (
+        "C_behavior",
+        "C_full_swr_split",
+    )
+
 
 # ── Shared fixture builder ──
 

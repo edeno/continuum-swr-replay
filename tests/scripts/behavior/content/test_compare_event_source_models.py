@@ -1,10 +1,14 @@
-"""Regression tests for event-source comparison fairness rules."""
+"""The event-source comparison runner: its rate block, paths and metadata.
+
+The patch and choice blocks and the common-cohort fit they share are tested in
+``tests/analysis/behavior/`` (``test_common_cohort.py``, ``content/test_session_fits.py``,
+``choice/test_choice_prediction.py``).
+"""
 
 from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
-from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -32,34 +36,6 @@ def _load_compare_script():
     return module
 
 
-def test_source_restricted_patch_models_drop_swr_interactions():
-    compare = _load_compare_script()
-
-    assert tuple(compare._patch_models_for_source("SWR")) == ("P0", "P1", "P2")
-    assert tuple(compare._patch_models_for_source("MUA")) == ("P0", "P1", "P2")
-    # P3 is the swr_x_is_current_patch rung; under an event-source restriction
-    # is_swr is constant, so it collapses onto the main effect.
-    assert "P3" not in compare._patch_models_for_source("SWR")
-    assert "P3" in compare._patch_models_for_source("non_local")
-
-
-def test_source_restricted_switch_models_drop_swr_interactions():
-    compare = _load_compare_script()
-
-    assert tuple(compare._patch_switch_models_for_source("SWR")) == (
-        "PS0",
-        "PS1",
-        "PS2",
-    )
-    assert tuple(compare._patch_switch_models_for_source("MUA")) == (
-        "PS0",
-        "PS1",
-        "PS2",
-    )
-    assert "PS3" not in compare._patch_switch_models_for_source("SWR")
-    assert "PS3" in compare._patch_switch_models_for_source("non_local")
-
-
 def test_rate_models_drop_response_leaking_is_swr_stop():
     # The is_swr_stop term (R3) is dropped from MODEL_PER_STOP_RATE for every source:
     # it is tautological with a per-stop event count that overlaps SWRs.
@@ -69,21 +45,6 @@ def test_rate_models_drop_response_leaking_is_swr_stop():
     # is_swr_stop term (R3) stays dropped for every source.
     assert tuple(compare._RATE_MODELS) == ("R0", "R1")
     assert "R3" not in compare._RATE_MODELS
-
-
-def test_choice_swr_split_is_separate_and_skipped_for_swr_source():
-    compare = _load_compare_script()
-
-    assert tuple(compare._CHOICE_MODELS) == (
-        "C_replay_only",
-        "C_behavior",
-        "C_full",
-    )
-    assert compare._choice_swr_split_models_for_source("SWR") == {}
-    assert tuple(compare._choice_swr_split_models_for_source("non_local")) == (
-        "C_behavior",
-        "C_full_swr_split",
-    )
 
 
 def test_non_local_uses_effective_hpc_area_for_outputs(tmp_path):
@@ -102,126 +63,6 @@ def test_comparison_metadata_records_event_definition_semantics():
     assert metadata["brain_area"] == "mPFC"
     assert metadata["same_identified_events"] is False
     assert metadata["rate_models"] == ("R0", "R1")
-
-
-def test_common_cohort_drops_whole_units_for_union_predictors_and_zero_response():
-    compare = _load_compare_script()
-    models = {
-        "M0": SimpleNamespace(predictors=()),
-        "M1": SimpleNamespace(predictors=("x",)),
-    }
-    table = pd.DataFrame(
-        {
-            "animal": ["a"] * 9,
-            "session_date": [1] * 9,
-            "epoch": ["e"] * 9,
-            "event_id": [1, 1, 1, 2, 2, 2, 3, 3, 3],
-            "patch_count_hard": [1, 0, 0, 0, 0, 0, 1, 0, 0],
-            "x": [0.0, 1.0, 2.0, 0.0, 1.0, 2.0, 0.0, float("nan"), 2.0],
-        }
-    )
-
-    cohort, provenance = compare._freeze_common_cohort(
-        table,
-        keys=("a", 1, "e"),
-        analysis="test",
-        models=models,
-        unit_col="event_id",
-        required_base=["patch_count_hard"],
-        response_col="patch_count_hard",
-        drop_zero_response=True,
-        min_units=1,
-    )
-
-    assert tuple(cohort["event_id"].unique()) == (1,)
-    assert provenance["included_ids"] == (1,)
-    assert provenance["n_missing_units"] == 1
-    assert provenance["n_zero_response_units"] == 1
-    assert provenance["n_units_after"] == 1
-    assert provenance["n_rows_after"] == 3
-
-
-def test_common_cohort_success_tags_all_models_with_same_hash():
-    compare = _load_compare_script()
-    models = {
-        "M0": SimpleNamespace(predictors=()),
-        "M1": SimpleNamespace(predictors=("x",)),
-    }
-    table = pd.DataFrame(
-        {
-            "animal": ["a"] * 6,
-            "session_date": [1] * 6,
-            "epoch": ["e"] * 6,
-            "event_id": [1, 1, 1, 2, 2, 2],
-            "patch_count_hard": [1, 0, 0, 0, 1, 0],
-            "x": [0.0, 1.0, 2.0, 0.0, 1.0, 2.0],
-        }
-    )
-
-    def fake_fit(group, spec):
-        return {
-            "n_events": group["event_id"].nunique(),
-            "n_params": len(spec.predictors),
-        }
-
-    fits, provenance = compare._fit_per_session_common_cohort(
-        table,
-        models,
-        fake_fit,
-        analysis="test",
-        unit_col="event_id",
-        required_base=["patch_count_hard"],
-        response_col="patch_count_hard",
-        drop_zero_response=True,
-        min_units=1,
-    )
-
-    hash0 = fits["M0"].loc[0, "cohort_included_ids_hash"]
-    hash1 = fits["M1"].loc[0, "cohort_included_ids_hash"]
-    assert hash0 == hash1 == provenance.loc[0, "included_ids_hash"]
-    assert fits["M0"].loc[0, "cohort_n_units"] == 2
-    assert fits["M1"].loc[0, "cohort_n_units"] == 2
-    assert provenance.loc[0, "status"] == "fit"
-
-
-def test_common_cohort_drops_session_if_any_model_fails():
-    compare = _load_compare_script()
-    models = {
-        "M0": SimpleNamespace(predictors=()),
-        "M1": SimpleNamespace(predictors=("x",)),
-    }
-    table = pd.DataFrame(
-        {
-            "animal": ["a"] * 6,
-            "session_date": [1] * 6,
-            "epoch": ["e"] * 6,
-            "event_id": [1, 1, 1, 2, 2, 2],
-            "patch_count_hard": [1, 0, 0, 0, 1, 0],
-            "x": [0.0, 1.0, 2.0, 0.0, 1.0, 2.0],
-        }
-    )
-
-    def fake_fit(group, spec):  # noqa: ARG001
-        if spec.predictors:
-            return None
-        return {"n_events": group["event_id"].nunique()}
-
-    fits, provenance = compare._fit_per_session_common_cohort(
-        table,
-        models,
-        fake_fit,
-        analysis="test",
-        unit_col="event_id",
-        required_base=["patch_count_hard"],
-        response_col="patch_count_hard",
-        drop_zero_response=True,
-        min_units=1,
-    )
-
-    assert fits["M0"].empty
-    assert fits["M1"].empty
-    assert provenance.loc[0, "status"] == "fit_failed"
-    assert provenance.loc[0, "failed_models"] == ("M1",)
 
 
 def _rate_stop_table(n_stops: int = 40, seed: int = 0) -> pd.DataFrame:
@@ -274,39 +115,3 @@ def test_rate_block_refuses_a_stop_table_without_a_ladder_column():
 
     assert "reward_history_rcos_0" in str(raised.value)
     assert "'SWR'" in str(raised.value)
-
-
-def test_a_missing_column_stops_the_block_before_any_session_is_fit():
-    compare = _load_compare_script()
-    models = {
-        "M0": SimpleNamespace(predictors=()),
-        "M1": SimpleNamespace(predictors=("x",)),
-    }
-    table = pd.DataFrame(
-        {
-            "animal": ["a"] * 6,
-            "session_date": [1] * 6,
-            "epoch": ["e1"] * 3 + ["e2"] * 3,
-            "event_id": [1, 1, 1, 2, 2, 2],
-            "patch_count_hard": [1, 0, 0, 0, 1, 0],
-        }
-    )
-    calls = []
-
-    def fake_fit(group, spec):
-        calls.append(spec)
-        return {"n_events": group["event_id"].nunique()}
-
-    with pytest.raises(ValueError, match=r"test.*\['x'\]"):
-        compare._fit_per_session_common_cohort(
-            table,
-            models,
-            fake_fit,
-            analysis="test",
-            unit_col="event_id",
-            required_base=["patch_count_hard"],
-            response_col="patch_count_hard",
-            drop_zero_response=True,
-            min_units=1,
-        )
-    assert calls == []

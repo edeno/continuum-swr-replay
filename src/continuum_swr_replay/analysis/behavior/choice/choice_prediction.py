@@ -15,6 +15,9 @@ during immobility, before the next trip begins).
 ``is_next`` / ``next_arm`` do NOT enter as predictors — they're the
 response variable. The model is strictly predictive, not
 retrospective (:mod:`retrospective` handles the retrospective alignment).
+
+:func:`fit_choice_blocks` fits one event source's choice models per session,
+each block on one frozen stop cohort.
 """
 
 from __future__ import annotations
@@ -35,11 +38,13 @@ from .._fit_diagnostics import (
     fit_status,
 )
 from .._helpers import strict_mean
+from ..common_cohort import assert_ladder_timing, fit_per_session_common_cohort
 from ..fitting import (
     CONDITIONAL_FIT_MAXITER,
     conditional_linear_predictor,
     within_group_full_rank,
 )
+from ..model_specs import MODEL_CHOICE
 
 logger = logging.getLogger(__name__)
 
@@ -550,3 +555,85 @@ def fit_choice_model(
         "separated_terms": "|".join(status["separated_terms"]),
         "n_convergence_warnings": count_fit_quality_warnings(caught),
     }
+
+
+# ── Choice blocks of one event source ──
+
+#: Primary choice models, the same for every event source, fit on one common
+#: stop cohort.
+CHOICE_MODELS = {
+    name: MODEL_CHOICE[name] for name in ("C_replay_only", "C_behavior", "C_full")
+}
+
+#: Stops a session needs for a choice block.
+MIN_CHOICE_STOPS = 10
+
+
+def choice_swr_split_models_for_source(event_source: str) -> dict:
+    """SWR-split choice variant, skipped when SWR defines every event."""
+    if event_source == "SWR":
+        return {}
+    return {name: MODEL_CHOICE[name] for name in ("C_behavior", "C_full_swr_split")}
+
+
+def _fit_choice_block(
+    choice: pd.DataFrame, models, analysis: str, event_source: str
+) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
+    """Fit a choice model block on one common stop cohort."""
+    return fit_per_session_common_cohort(
+        choice,
+        models,
+        lambda g, spec: fit_choice_model(g, list(spec.predictors)),
+        analysis=analysis,
+        unit_col="stop_id",
+        required_base=["chosen"],
+        choice_response_col="chosen",
+        min_units=MIN_CHOICE_STOPS,
+        event_source=event_source,
+    )
+
+
+def fit_choice_blocks(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
+    stop_table: pd.DataFrame,
+    event_source: str,
+) -> tuple[dict[str, dict[str, pd.DataFrame]], dict[str, pd.DataFrame]]:
+    """Fit the primary and the optional SWR-split choice blocks of one source.
+
+    The choice dataset is :func:`build_choice_dataset`; each block's models are
+    fit per session on one frozen stop cohort of at least
+    :data:`MIN_CHOICE_STOPS` stops
+    (:func:`~continuum_swr_replay.analysis.behavior.common_cohort.fit_per_session_common_cohort`).
+    The SWR-split block is left out for the SWR source, where every event is
+    an SWR event (:func:`choice_swr_split_models_for_source`).
+
+    Returns
+    -------
+    (blocks, provenance)
+        ``blocks["choice"]`` (and ``blocks["choice_swr_split"]``): one frame
+        per model, one row per fitted session; ``provenance`` the per-session
+        cohort provenance of each block.
+    """
+    choice = build_choice_dataset(event_table, event_arm_table, stop_table)
+    blocks: dict[str, dict[str, pd.DataFrame]] = {}
+    provenance: dict[str, pd.DataFrame] = {}
+
+    choice_models = CHOICE_MODELS
+    assert_ladder_timing(choice_models, ladder="choice")
+    primary, primary_prov = _fit_choice_block(
+        choice, choice_models, "choice", event_source
+    )
+    blocks["choice"] = primary
+    provenance["choice"] = primary_prov
+
+    split_models = choice_swr_split_models_for_source(event_source)
+    if split_models:
+        assert_ladder_timing(split_models, ladder="choice_swr_split")
+        split, split_prov = _fit_choice_block(
+            choice, split_models, "choice_swr_split", event_source
+        )
+        blocks["choice_swr_split"] = split
+        provenance["choice_swr_split"] = split_prov
+
+    return blocks, provenance

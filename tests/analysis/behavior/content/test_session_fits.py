@@ -13,10 +13,14 @@ from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import
 )
 from continuum_swr_replay.analysis.behavior.content.session_fits import (
     LOGIT_SKIP_COLUMNS,
+    MIN_PATCH_EVENTS,
     fit_conditional_logit_robustness,
     fit_contrast_ladder,
     fit_contrast_session,
     fit_model_per_session,
+    fit_patch_switch,
+    patch_models_for_source,
+    patch_switch_models_for_source,
     resolve_concentration_cols,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import (
@@ -841,3 +845,57 @@ def test_a_refused_dm_contrast_session_is_named_in_the_audit():
     assert record["n_drop_own_predictor_missing"] == 0
     assert record["n_excluded_session"] == 60
     assert record["n_modeled"] == 60
+
+
+def test_source_restricted_patch_models_drop_swr_interactions():
+    assert tuple(patch_models_for_source("SWR")) == ("P0", "P1", "P2")
+    assert tuple(patch_models_for_source("MUA")) == ("P0", "P1", "P2")
+    # P3 is the swr_x_is_current_patch rung; under an event-source restriction
+    # is_swr is constant, so it collapses onto the main effect.
+    assert "P3" not in patch_models_for_source("SWR")
+    assert "P3" in patch_models_for_source("non_local")
+
+
+def test_source_restricted_switch_models_drop_swr_interactions():
+    for source in ("SWR", "MUA"):
+        assert tuple(patch_switch_models_for_source(source)) == ("PS0", "PS1", "PS2")
+    assert "PS3" not in patch_switch_models_for_source("SWR")
+    assert "PS3" in patch_switch_models_for_source("non_local")
+
+
+def test_the_switch_block_sees_only_the_switch_events():
+    """Events 1 and 3 follow a patch switch; 2 does not, 4 has no flag."""
+    models = patch_switch_models_for_source("SWR")
+    predictors = sorted({p for spec in models.values() for p in spec.predictors})
+    patch = pd.DataFrame(
+        [
+            {
+                "animal": "a",
+                "session_date": "d",
+                "epoch": "e",
+                "event_id": event_id,
+                "candidate_patch": patch,
+                "patch_count_hard": float(patch == 1),
+                **dict.fromkeys(predictors, 0.0),
+            }
+            for event_id in (1, 2, 3, 4)
+            for patch in (1, 2, 3)
+        ]
+    )
+    event_arm = pd.DataFrame(
+        {
+            "event_id": [1, 1, 2, 3, 4],
+            "did_last_completed_trip_switch_patch": [1, 0, 0, 1, np.nan],
+        }
+    )
+
+    fits, provenance = fit_patch_switch(patch, event_arm, "SWR")
+
+    (record,) = provenance.to_dict("records")
+    # The first row of an event carries its flag.
+    assert record["n_units_before"] == 2
+    assert record["selection_filter"] == "did_last_completed_trip_switch_patch == 1"
+    # Two events are fewer than a patch fit needs.
+    assert MIN_PATCH_EVENTS > 2
+    assert record["status"] == "too_few_units"
+    assert all(frame.empty for frame in fits.values())

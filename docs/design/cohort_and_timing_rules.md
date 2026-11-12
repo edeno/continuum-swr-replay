@@ -489,7 +489,7 @@ audit CSV and flags low-retention (`n_modeled/n_in < 0.9`) or biased
 (mechanism-A early / mechanism-B qvals-tail) drops.
 
 Also covered: `compare_event_source_models.py` maps its native
-`_freeze_common_cohort` provenance (the content / patch / rate / **choice**
+`common_cohort.freeze_session_cohort` provenance (the content / patch / rate / **choice**
 blocks) onto the standardized schema via
 `records_from_common_cohort_provenance`, writing
 `*_comparison_fits_cohort_audit.csv`. **This audit is block-grained, not

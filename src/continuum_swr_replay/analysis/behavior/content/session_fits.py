@@ -8,7 +8,10 @@ runner and any check of its fits produce the same rows:
 - :func:`fit_conditional_logit_robustness` refits the content ladder's rungs as
   a conditional logit on each event's dominant candidate;
 - :func:`fit_contrast_ladder` fits the is_swr-contrast ladder, per rung and
-  population, and books each one's cohort audit.
+  population, and books each one's cohort audit;
+- :func:`fit_patch_hierarchy` and :func:`fit_patch_switch` fit one event
+  source's patch hierarchy, on all its events and on its switch events, each
+  session's rungs on one frozen cohort.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .._fit_diagnostics import fit_flag_counts
 from ..cohort_audit import cohort_record, drop_profile, estimator_skip_note
+from ..common_cohort import assert_ladder_timing, fit_per_session_common_cohort
 from ..contrast_aggregation import LOG_EVENT_LENGTH, prepare_session
 from ..fitting import (
     conditional_logit_or_reason,
@@ -29,7 +33,13 @@ from ..fitting import (
     fit_conditional_poisson,
     fit_null_model_conditional_logit,
 )
-from ..model_specs import rung_predictors
+from ..model_specs import (
+    MODEL_PATCH,
+    MODEL_PATCH_MUA,
+    MODEL_PATCH_SWITCH,
+    MODEL_PATCH_SWR,
+    rung_predictors,
+)
 from ..tables.table_contracts import CV_RESULT_COLUMNS, validate_and_match_fit_results
 from .cohort import CONTRAST_POPULATIONS, contrast_fit_cohort
 from .dirichlet_multinomial import (
@@ -785,3 +795,115 @@ def fit_contrast_ladder(
                 )
             )
     return pd.DataFrame(rows), audits
+
+
+# ── patch hierarchy of one event source ─────────────────────────────────────
+
+#: Events (and units of the frozen cohort) a session needs for a patch fit.
+MIN_PATCH_EVENTS = 10
+
+
+def patch_models_for_source(event_source: str) -> dict:
+    """Patch hierarchy valid for the event-source definition.
+
+    Source-restricted SWR / MUA events are all SWR or all MUA, so the SWR
+    interaction rungs are not identifiable there: those sources fit P0-P2.
+    """
+    if event_source == "SWR":
+        return MODEL_PATCH_SWR
+    if event_source == "MUA":
+        return MODEL_PATCH_MUA
+    return MODEL_PATCH
+
+
+def patch_switch_models_for_source(event_source: str) -> dict:
+    """Switch hierarchy valid for the event-source definition (PS0-PS2 for SWR/MUA)."""
+    if event_source in {"SWR", "MUA"}:
+        return {name: MODEL_PATCH_SWITCH[name] for name in ("PS0", "PS1", "PS2")}
+    return MODEL_PATCH_SWITCH
+
+
+def _fit_patch_conditional(g: pd.DataFrame, spec) -> dict | None:
+    """Patch conditional Poisson on one session; skip if < 10 events."""
+    if g["event_id"].nunique() < MIN_PATCH_EVENTS:
+        return None
+    return fit_conditional_poisson(
+        g,
+        list(spec.predictors),
+        response_col="patch_count_hard",
+        event_col="event_id",
+        n_categories=3,
+    )
+
+
+def fit_patch_hierarchy(
+    patch_table: pd.DataFrame, event_source: str
+) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
+    """Fit the source-appropriate patch hierarchy per session.
+
+    Every rung of a session is fit on one complete-case cohort of events with
+    patch mass (:func:`~continuum_swr_replay.analysis.behavior.common_cohort.fit_per_session_common_cohort`),
+    of at least :data:`MIN_PATCH_EVENTS` events.
+
+    Returns
+    -------
+    (fits, provenance)
+        One frame per rung, one row per fitted session; and the per-session
+        cohort provenance.
+    """
+    models = patch_models_for_source(event_source)
+    assert_ladder_timing(models, ladder="patch hierarchy")
+    return fit_per_session_common_cohort(
+        patch_table,
+        models,
+        _fit_patch_conditional,
+        analysis="patch_hierarchy",
+        unit_col="event_id",
+        required_base=["patch_count_hard"],
+        response_col="patch_count_hard",
+        drop_zero_response=True,
+        min_units=MIN_PATCH_EVENTS,
+        event_source=event_source,
+    )
+
+
+def fit_patch_switch(
+    patch_table: pd.DataFrame, event_arm_table: pd.DataFrame, event_source: str
+) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
+    """Fit source-appropriate switch patch models on switch events only.
+
+    A switch event is one whose ``did_last_completed_trip_switch_patch`` (its
+    first row in ``event_arm_table``) is 1.
+
+    Returns
+    -------
+    (fits, provenance)
+        As :func:`fit_patch_hierarchy`, on the switch events.
+    """
+    sw = event_arm_table.groupby("event_id")[
+        "did_last_completed_trip_switch_patch"
+    ].first()
+    switch_patch = patch_table.merge(
+        sw.rename("did_last_completed_trip_switch_patch"),
+        left_on="event_id",
+        right_index=True,
+        how="left",
+    )
+    switch_patch = switch_patch[
+        switch_patch["did_last_completed_trip_switch_patch"] == 1
+    ]
+    switch_models = patch_switch_models_for_source(event_source)
+    assert_ladder_timing(switch_models, ladder="patch switch")
+    return fit_per_session_common_cohort(
+        switch_patch,
+        switch_models,
+        _fit_patch_conditional,
+        analysis="patch_switch",
+        unit_col="event_id",
+        required_base=["patch_count_hard"],
+        response_col="patch_count_hard",
+        drop_zero_response=True,
+        min_units=MIN_PATCH_EVENTS,
+        selection_filter="did_last_completed_trip_switch_patch == 1",
+        event_source=event_source,
+    )

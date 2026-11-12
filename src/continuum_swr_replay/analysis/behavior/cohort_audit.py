@@ -646,10 +646,12 @@ def estimator_skip_note(
 def records_from_common_cohort_provenance(
     prov, model: str, population: str, *, grain="stop"
 ):
-    """Standardized cohort record from a ``_freeze_common_cohort`` provenance frame.
+    """Standardized cohort record from a ``common_cohort.freeze_session_cohort`` provenance frame.
 
     ``compare_event_source_models.py`` fits its patch/rate/**choice** blocks on a frozen
-    per-session complete-case cohort and records rich per-session provenance
+    per-session complete-case cohort
+    (:func:`~continuum_swr_replay.analysis.behavior.common_cohort.fit_per_session_common_cohort`)
+    and records rich per-session provenance
     (``n_units_before``/``n_units_after``/``n_missing_units``/
     ``n_nonfinite_units``/``n_invalid_choice_units``/
     ``n_nonpositive_offset_units``/``n_zero_response_units``/``status``). This maps that
