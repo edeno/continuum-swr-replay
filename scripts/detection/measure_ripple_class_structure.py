@@ -37,10 +37,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import hashlib
-import io
 import json
-import pickle
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -147,11 +144,9 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
     """One epoch's events: peak, mean and criterion of the ripple power, and
     whether their rows hold an SWR label of the frame."""
     identifier, expected_sha256, events = job
-    raw = inventory_run.decode_path(identifier).read_bytes()
-    sha256 = hashlib.sha256(raw).hexdigest()
-    if sha256 != expected_sha256:
-        raise ValueError(f"{identifier}: decode sha256 {sha256} is not the run's")
-    dot = analysed_time.with_swr_source(pickle.load(io.BytesIO(raw)))
+    dot = analysed_time.read_verified_dot_with_swr_source(
+        inventory_run.decode_path(identifier), expected_sha256
+    )
     time = dot.index.to_numpy(dtype=np.float64)
     z = dot["SWR_zscore"].to_numpy(dtype=np.float64)
     swr = dot["SWR_event"].to_numpy() > 0
@@ -168,7 +163,7 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
         {
             "event_id": events.event_id.to_numpy(),
             "epoch_id": identifier,
-            "decode_sha256": sha256,
+            "decode_sha256": expected_sha256,
             "first_row": first,
             "n_rows": n_rows,
             "ripple_z_max": peak,

@@ -28,10 +28,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import hashlib
-import io
 import json
-import pickle
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -71,14 +68,9 @@ def epoch_state_shares(
         The decode is not the one the run read, its grid is not the run's, or
         the recomputed non-local share differs from the stored one.
     """
-    raw = inventory_run.decode_path(identifier).read_bytes()
-    sha256 = hashlib.sha256(raw).hexdigest()
-    if sha256 != record["decode"]["sha256"]:
-        raise ValueError(
-            f"decode sha256 {sha256} is not the run's {record['decode']['sha256']}"
-        )
-    dot = analysed_time.with_swr_source(pickle.load(io.BytesIO(raw)))
-    del raw
+    dot = analysed_time.read_verified_dot_with_swr_source(
+        inventory_run.decode_path(identifier), record["decode"]["sha256"]
+    )
     if len(dot) != record["n_grid_rows"]:
         raise ValueError(
             f"the decode grid has {len(dot)} rows; the run read {record['n_grid_rows']}"

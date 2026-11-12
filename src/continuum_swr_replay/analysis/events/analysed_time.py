@@ -59,7 +59,10 @@ reaches an analysis, and neither do the decode's stored-ripple counts
 
 from __future__ import annotations
 
+import hashlib
+import io
 import logging
+import pickle
 from pathlib import Path
 from typing import Any
 
@@ -124,6 +127,7 @@ __all__ = [
     "excluded_intervals_of",
     "read_artifact_event_drops",
     "read_dot_with_swr_source",
+    "read_verified_dot_with_swr_source",
     "require_swr_source",
     "sampled_bounds",
     "stamp_swr_source",
@@ -912,6 +916,38 @@ def read_dot_with_swr_source(
     """
     frame: Any = pd.read_pickle(path)
     return with_swr_source(frame, non_local_threshold=non_local_threshold)
+
+
+def read_verified_dot_with_swr_source(
+    path: str | Path,
+    expected_sha256: str,
+) -> pd.DataFrame:
+    """:func:`read_dot_with_swr_source` of a decode whose bytes are the run's.
+
+    The file is read once; the same bytes are hashed and unpickled, so the frame
+    is the one the hash vouches for.
+
+    Parameters
+    ----------
+    path : str or Path
+        A decode's ``data_over_time`` pickle.
+    expected_sha256 : str
+        The hex sha256 the run that used the decode recorded for it.
+
+    Raises
+    ------
+    ValueError
+        The file's sha256 is not `expected_sha256`.
+    """
+    raw = Path(path).read_bytes()
+    sha256 = hashlib.sha256(raw).hexdigest()
+    if sha256 != expected_sha256:
+        raise ValueError(
+            f"{Path(path).name}: decode sha256 {sha256} is not the run's "
+            f"{expected_sha256}"
+        )
+    frame: Any = pickle.load(io.BytesIO(raw))
+    return with_swr_source(frame)
 
 
 def analysed_bins(frame: pd.DataFrame) -> NDArray[np.bool_]:

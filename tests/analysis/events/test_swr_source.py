@@ -23,6 +23,7 @@ import pytest
 from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.events.analysed_time import (
     read_dot_with_swr_source,
+    read_verified_dot_with_swr_source,
     require_swr_source,
     stamp_swr_source,
     swr_event_labels,
@@ -1339,3 +1340,26 @@ def test_session_epoch_id_is_the_one_built_from_a_file_name():
     assert swr_source.swr_epoch_id_of_session("chimi", 20200225, "02_r1") == (
         "chimi20200225_02_r1_HPC"
     )
+
+
+class TestTheVerifiedRead:
+    def test_it_reads_the_frame_the_unverified_read_gives(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        path = tmp_path / f"{EPOCH}_80_data_over_time.pkl"
+        _dot().to_pickle(path)
+
+        verified = read_verified_dot_with_swr_source(path, sha256_file(path))
+
+        pd.testing.assert_frame_equal(verified, read_dot_with_swr_source(path))
+
+    def test_a_decode_with_another_hash_is_refused(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        path = tmp_path / f"{EPOCH}_80_data_over_time.pkl"
+        _dot().to_pickle(path)
+
+        with pytest.raises(ValueError, match="is not the run's"):
+            read_verified_dot_with_swr_source(path, "0" * 64)

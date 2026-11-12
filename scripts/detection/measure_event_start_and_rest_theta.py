@@ -29,10 +29,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import hashlib
-import io
 import json
-import pickle
 import zlib
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
@@ -58,7 +55,7 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.reported.events import EVENT_FEATURES_RUN
-from continuum_swr_replay.runs.io import read_manifest
+from continuum_swr_replay.runs.io import read_manifest, sha256_file
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 OUT_NAME = "event_start_rest_theta"
@@ -69,11 +66,9 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame, int]) -> pd.DataFrame:
     """One epoch's events: start distance and duration-matched rest theta."""
     identifier, expected_sha256, events, n_windows = job
     paths = decode_paths(identifier, processed_data_dir())
-    raw = paths.data_over_time.read_bytes()
-    sha256 = hashlib.sha256(raw).hexdigest()
-    if sha256 != expected_sha256:
-        raise ValueError(f"{identifier}: decode sha256 {sha256} is not the run's")
-    dot = analysed_time.with_swr_source(pickle.load(io.BytesIO(raw)))
+    dot = analysed_time.read_verified_dot_with_swr_source(
+        paths.data_over_time, expected_sha256
+    )
     env = pd.read_pickle(paths.environment)
 
     labels = dot["non_local_event"].to_numpy()
@@ -122,7 +117,7 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame, int]) -> pd.DataFrame:
         {
             "event_id": events.event_id.to_numpy(),
             "epoch_id": identifier,
-            "decode_sha256": sha256,
+            "decode_sha256": expected_sha256,
             "n_bins": n_rows,
             "bins_contiguous": contiguous,
             "start_distance_cm": start,
@@ -191,7 +186,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                     "event_features_run": EVENT_FEATURES_RUN,
                     "event_table": {
                         "path": str(event_table),
-                        "sha256": hashlib.sha256(event_table.read_bytes()).hexdigest(),
+                        "sha256": sha256_file(event_table),
                     },
                     "n_epochs": len(jobs),
                     "n_windows": args.n_windows,

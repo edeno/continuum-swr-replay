@@ -17,10 +17,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import hashlib
-import io
 import json
-import pickle
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any
@@ -39,18 +36,16 @@ from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 def _epoch(job: tuple[str, str]) -> dict[str, Any]:
     identifier, expected_sha256 = job
-    raw = inventory_run.decode_path(identifier).read_bytes()
-    sha256 = hashlib.sha256(raw).hexdigest()
-    if sha256 != expected_sha256:
-        raise ValueError(f"{identifier}: decode sha256 {sha256} is not the run's")
-    dot = analysed_time.with_swr_source(pickle.load(io.BytesIO(raw)))
+    dot = analysed_time.read_verified_dot_with_swr_source(
+        inventory_run.decode_path(identifier), expected_sha256
+    )
     animal, day, epoch = (dot[c].iloc[0] for c in ("animal", "day", "epoch"))
     return {
         "epoch_id": identifier,
         "animal": str(animal),
         "session_date": int(day),
         "epoch": str(epoch),
-        "decode_sha256": sha256,
+        "decode_sha256": expected_sha256,
         **brain_state_reference(dot),
     }
 
