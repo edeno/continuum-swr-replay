@@ -326,6 +326,49 @@ def test_cv_folds_over_events():
     held_out = [set(events[test]) for _, test in splitter.split(events, groups=events)]
     assert set().union(*held_out) == set(events)
     assert sum(len(fold) for fold in held_out) == len(events)
+    assert cv["cv_n_nonconverged_folds"] == cv["cv_n_separated_folds"] == 0
+
+
+def test_a_cv_fold_that_did_not_converge_voids_the_metric(monkeypatch):
+    """As in the conditional-Poisson CV: the fold is kept and counted, and the
+    metric is NaN rather than a mean over the folds that converged."""
+    from continuum_swr_replay.analysis.behavior.content import dirichlet_multinomial
+
+    real_optimize = dirichlet_multinomial._optimize
+    calls = {"n": 0}
+
+    def optimize_first_fold_fails(*args, **kwargs):
+        res = real_optimize(*args, **kwargs)
+        calls["n"] += 1
+        if calls["n"] == 1:
+            res.success = False
+        return res
+
+    monkeypatch.setattr(dirichlet_multinomial, "_optimize", optimize_first_fold_fails)
+    cv = cross_validate_dirichlet_multinomial(
+        _simulate(3.0, seed=3, n_events=120), PREDICTORS, n_folds=5, seed=0
+    )
+
+    assert cv["n_folds"] == 5
+    assert cv["cv_n_nonconverged_folds"] == 1
+    assert np.isnan(cv["cv_ll_per_event_mean"])
+    assert np.isnan(cv["cv_ll_per_event_null_mean"])
+    assert np.isnan(cv["cv_bits_per_event_vs_null"])
+
+
+def test_a_cv_fold_with_a_separated_term_voids_the_metric():
+    """A predictor that marks exactly the candidates holding the counts runs to
+    +inf in every fold: the folds are counted separated and the metric is NaN."""
+    df = _simulate(3.0, seed=3, n_events=120)
+    df["holds_counts"] = (df["arm_count_hard"] > 0).astype(float)
+
+    cv = cross_validate_dirichlet_multinomial(
+        df, [*PREDICTORS, "holds_counts"], n_folds=5, seed=0
+    )
+
+    assert cv["cv_n_separated_folds"] == 5
+    assert np.isnan(cv["cv_ll_per_event_mean"])
+    assert np.isnan(cv["cv_bits_per_event_vs_null"])
 
 
 def test_result_matches_estimator_schema():

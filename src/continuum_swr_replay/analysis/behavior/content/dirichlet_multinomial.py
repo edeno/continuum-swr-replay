@@ -478,6 +478,68 @@ def _standard_errors(
     return se
 
 
+def _identification(
+    theta: np.ndarray,
+    X: np.ndarray,
+    Y: np.ndarray,
+    Z: np.ndarray,
+    *,
+    predictors: Sequence[str],
+    concentration_cols: tuple[str, ...],
+    pinned_index: int | None,
+) -> tuple[np.ndarray, list[str], np.ndarray, tuple[str, ...]]:
+    """A fit's standard errors and the terms it does not identify.
+
+    Parameters
+    ----------
+    theta : np.ndarray, shape (n_beta + 1 + n_concentration,)
+        Fitted ``beta``, the concentration intercept, then its modifiers.
+    X : np.ndarray, shape (n_events, n_categories, n_beta)
+    Y : np.ndarray, shape (n_events, n_categories)
+    Z : np.ndarray, shape (n_events, n_concentration)
+        The packed design, counts and concentration columns the fit used.
+    predictors : sequence of str
+        Names of the ``beta`` terms, in ``X``'s last-axis order.
+    concentration_cols : tuple of str
+        Names of the concentration modifiers, in ``Z``'s column order.
+    pinned_index : int, optional
+        Index of a pinned concentration intercept (see :func:`_standard_errors`).
+
+    Returns
+    -------
+    se : np.ndarray, shape (n_theta,)
+        Standard errors (:func:`_standard_errors`).
+    names : list of str, length n_theta
+        Term names in ``theta`` order.
+    term_sd : np.ndarray, shape (n_theta,)
+        Each term's design-column SD: the predictors', 0 for the concentration
+        intercept, the modifiers'.
+    separated : tuple of str
+        The non-nuisance terms not identified, by the effect-scale rule of
+        :func:`~._fit_diagnostics.separated_terms`.
+    """
+    n_beta = len(predictors)
+    se = _standard_errors(theta, X, Y, Z, pinned_index=pinned_index)
+    names = [
+        *predictors,
+        LOG_PHI_INTERCEPT,
+        *[f"log_phi_{c}" for c in concentration_cols],
+    ]
+    predictor_sd = X.reshape(-1, n_beta).std(axis=0) if n_beta else np.zeros(0)
+    # Effect-scale SDs for the concentration terms too: the intercept's design
+    # column is a constant (SD 0, so it falls back to the absolute-coefficient
+    # rule and is a nuisance term anyway), the modifiers' are their own columns.
+    term_sd = np.concatenate([predictor_sd, np.zeros(1), Z.std(axis=0)])
+    separated = separated_terms(
+        theta,
+        se,
+        predictor_sd=term_sd,
+        term_names=names,
+        nuisance_terms=_DM_NUISANCE_TERMS,
+    )
+    return se, names, term_sd, separated
+
+
 def _null_loglik(packed: _Packed, *, fixed_log_phi: float | None) -> float:
     """Log-likelihood of the DM model with ``beta = 0`` and the concentration free.
 
@@ -587,36 +649,20 @@ def fit_dirichlet_multinomial(
         )
         return None
 
-    se = _standard_errors(
+    se, names, term_sd, separated = _identification(
         res.x,
         packed.X,
         packed.Y,
         packed.Z,
+        predictors=predictors,
+        concentration_cols=concentration_cols,
         pinned_index=None if fixed_log_phi is None else n_beta,
     )
-
-    names = [
-        *predictors,
-        LOG_PHI_INTERCEPT,
-        *[f"log_phi_{c}" for c in concentration_cols],
-    ]
-    predictor_sd = packed.X.reshape(-1, n_beta).std(axis=0) if n_beta else np.zeros(0)
-    # Effect-scale SDs for the concentration terms too: the intercept's design
-    # column is a constant (SD 0, so it falls back to the absolute-coefficient
-    # rule and is a nuisance term anyway), the modifiers' are their own columns.
-    term_sd = np.concatenate([predictor_sd, np.zeros(1), packed.Z.std(axis=0)])
+    predictor_sd = term_sd[:n_beta]
 
     with np.errstate(invalid="ignore", divide="ignore"):
         z = np.where(se > 0, res.x / se, np.nan)
     pvals = 2.0 * norm.sf(np.abs(z))
-
-    separated = separated_terms(
-        res.x,
-        se,
-        predictor_sd=term_sd,
-        term_names=names,
-        nuisance_terms=_DM_NUISANCE_TERMS,
-    )
 
     llf_null = _null_loglik(packed, fixed_log_phi=fixed_log_phi)
     n_params = n_free
@@ -708,9 +754,10 @@ def cross_validate_dirichlet_multinomial(
     -------
     dict | None
         ``cv_ll_per_event_mean``, ``cv_ll_per_event_null_mean``,
-        ``cv_bits_per_event_vs_null``, ``n_folds``, ``n_events_cv``, and
-        ``cv_n_nonconverged_folds``. ``None`` when there are too few events to
-        split.
+        ``cv_bits_per_event_vs_null``, ``n_folds``, ``n_events_cv``,
+        ``cv_n_nonconverged_folds`` and ``cv_n_separated_folds``. A fold whose
+        full or null fit did not converge, or leaves a term unidentified, makes
+        the three metrics NaN. ``None`` when there are too few events to split.
     """
     from sklearn.model_selection import GroupKFold
 
@@ -730,6 +777,7 @@ def cross_validate_dirichlet_multinomial(
     ll_full: list[float] = []
     ll_null: list[float] = []
     n_nonconverged = 0
+    n_separated = 0
     for train, test in splitter.split(event_index, groups=packed.ids):
         res = _optimize(
             packed.X[train], packed.Y[train], packed.Z[train], fixed_log_phi=None
@@ -741,6 +789,25 @@ def cross_validate_dirichlet_multinomial(
             fixed_log_phi=None,
         )
         n_nonconverged += int(not (res.success and res_null.success))
+        *_, separated_full = _identification(
+            res.x,
+            packed.X[train],
+            packed.Y[train],
+            packed.Z[train],
+            predictors=predictors,
+            concentration_cols=concentration_cols,
+            pinned_index=None,
+        )
+        *_, separated_null = _identification(
+            res_null.x,
+            packed.X[train][:, :, :0],
+            packed.Y[train],
+            packed.Z[train],
+            predictors=[],
+            concentration_cols=concentration_cols,
+            pinned_index=None,
+        )
+        n_separated += int(bool(separated_full or separated_null))
         ll_full.extend(
             event_loglik(res.x, packed.X[test], packed.Y[test], packed.Z[test]).tolist()
         )
@@ -753,8 +820,12 @@ def cross_validate_dirichlet_multinomial(
             ).tolist()
         )
 
-    mean_full = float(np.mean(ll_full))
-    mean_null = float(np.mean(ll_null))
+    # Any nonconverged/separated fold invalidates the metric (NaN) rather than
+    # dropping the fold, as in the conditional-Poisson and rate CVs; the counts
+    # are reported alongside.
+    invalid = (n_nonconverged > 0) or (n_separated > 0)
+    mean_full = np.nan if invalid else float(np.mean(ll_full))
+    mean_null = np.nan if invalid else float(np.mean(ll_null))
     return {
         "cv_ll_per_event_mean": mean_full,
         "cv_ll_per_event_null_mean": mean_null,
@@ -762,6 +833,7 @@ def cross_validate_dirichlet_multinomial(
         "n_folds": int(n_folds),
         "n_events_cv": int(len(ll_full)),
         "cv_n_nonconverged_folds": int(n_nonconverged),
+        "cv_n_separated_folds": int(n_separated),
     }
 
 
