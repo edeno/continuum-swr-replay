@@ -55,7 +55,9 @@ def build_old_event_sets(
     This is the block ``build_session_event_sets`` used to run: confident
     non-local windows from the decode posterior, the whole-event immobility
     rule on both populations, and the SWR split taken as overlap with
-    ``data["ripple_times"]``.
+    ``data["ripple_times"]``. It predates the analysed-time rule and applies none
+    on purpose, so an event that rule drops counts as an old event without a new
+    match.
     """
     from continuum_swr_replay.analysis.events.immobility import (
         build_speed_eligible_event_cohort,
