@@ -116,7 +116,9 @@ def animal_balanced_fraction_positive(
     Parameters
     ----------
     units : pandas.DataFrame
-        The unit-level table from :func:`load_bundles`.
+        The unit-level table, one row per unit x model x class x target, as
+        ``scripts/pfc/summarize_pfc_marked_family.py`` reads it from the
+        marked-family bundles.
     blowup : float
         Absolute delta above which a unit is excluded as a blow-up.
 
@@ -182,8 +184,9 @@ def population_curve_summary(
     Parameters
     ----------
     curves : dict
-        ``(model, event_class, target) -> {session: curve}`` from
-        :func:`load_bundles`.
+        ``(model, event_class, target) -> {session: curve}``, the per-session
+        mean curves ``scripts/pfc/summarize_pfc_marked_family.py`` reads from
+        the marked-family bundles.
     lag_time : NDArray, shape (n_lags,)
         Lag axis in seconds.
     animal_of : dict
@@ -315,7 +318,10 @@ def null_band_summary(
     Parameters
     ----------
     curves, nulls : dict
-        From :func:`load_bundles`.
+        The per-session observed curves and per-draw shuffled-mark curves,
+        keyed as in :func:`population_curve_summary`, as
+        ``scripts/pfc/summarize_pfc_marked_family.py`` reads them from the
+        marked-family bundles.
     lag_time : NDArray, shape (n_lags,)
         Lag axis in seconds.
     animal_of : dict
