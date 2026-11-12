@@ -6,10 +6,12 @@ list (`src/continuum_swr_replay/reported/questions.py`) and the summaries
 `paper/main.tex` by its macro. A value marked *pending* may not be quoted
 as a finding. A summary file is named for what it holds; a question's part
 is where the paper reports it. *Builder function* names the function in
-`src/continuum_swr_replay/reported/<summary>.py` that names and describes
-a value. The statistic is computed by the `analysis/` function it calls,
-or copied from an input file; the builder itself only counts the size of
-an input.
+`src/continuum_swr_replay/reported/<summary>.py`, or in a module of the
+package `reported/<summary>/`, that names and describes a value. The
+statistic is computed by the `analysis/` function it calls, or copied from
+an input file; the builder itself only counts the size of an input. The
+last section lists, for each builder function, the `analysis/` functions
+it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
@@ -2778,3 +2780,69 @@ Unlettered: `\BehaviorLeafStepBothAnimals`, `\BehaviorLeafStepBothClear`, `\Beha
 ### Figure swr_contrast: SWR against non-SWR coefficients, rate and content
 
 Script: `scripts/figures/plot_swr_contrast_coefs.py`. Questions: 3.1, 3.2, 3.3, 3.6, 3.7.
+
+## Builder functions and the analysis code they call
+
+Read from the builders' source: the `analysis/` functions each builder
+function calls, itself or through a helper of its builder that makes no
+value. *Through* names the other builder functions it calls, whose own
+calls are in their rows. A constant read, or a function passed along
+without being called, is not listed.
+
+| Builder function | File | Analysis functions | Through |
+|---|---|---|---|
+| `survey.method_values` | `reported/survey.py` | `analysis.literature_survey.method_shares` |  |
+| `survey.parameter_values` | `reported/survey.py` | `analysis.literature_survey.parameter_statistics` |  |
+| `detection.controls_values` | `reported/detection.py` | `analysis.hippocampus.memoryless_sequence.sweep_statistics.burst_share_range`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.carving_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.controls_value`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.no_replay_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.part_recovery_statistics` |  |
+| `detection.heldout_values` | `reported/detection.py` | `analysis.hippocampus.memoryless_sequence.sweep_statistics.heldout_event_classes`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.heldout_fold_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.lowest_estimator_agreement`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.placeless_burst_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.pooled_heldout_rate` |  |
+| `detection.pilot_stray_window_values` | `reported/detection.py` | `analysis.hippocampus.memoryless_sequence.event_table.outside_window_call_statistics` |  |
+| `detection.recording_values` | `reported/detection.py` | none |  |
+| `detection.state_evidence_values` | `reported/detection.py` | none |  |
+| `detection.sweep_values` | `reported/detection.py` | `analysis.hippocampus.memoryless_sequence.sweep_statistics.sweep_grid_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.sweep_jump_pass_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.sweep_measures`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.sweep_timing_statistics` |  |
+| `events.boundary_offset_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.boundary_offset_statistics`, `analysis.hippocampus.event_statistics.boundary_offsets` |  |
+| `events.brain_state_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.event_signal_statistics`, `analysis.hippocampus.event_statistics.reference_medians` |  |
+| `events.class_distribution_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.peak_ripple_mode_statistics` |  |
+| `events.class_step_evidence_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.threshold_step_statistics` |  |
+| `events.class_step_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.most_steps`, `analysis.hippocampus.event_statistics.threshold_step_statistics` |  |
+| `events.content_occupancy_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.content_occupancy_shares`, `analysis.hippocampus.event_statistics.n_animals_non_swr_more_at_well` |  |
+| `events.event_cohort_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.overlap_class_statistics` |  |
+| `events.gamma_db_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.power_change_statistics` |  |
+| `events.gamma_z_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.event_signal_statistics`, `analysis.hippocampus.event_statistics.reference_medians` |  |
+| `events.heldout_by_swr_values` | `reported/events.py` | none |  |
+| `events.left_out_values` | `reported/events.py` | `analysis.inventory_comparison.nonlocal_comparison.left_out_statistics` |  |
+| `events.other_detector_values` | `reported/events.py` | `analysis.inventory_comparison.nonlocal_comparison.other_detector_statistics` |  |
+| `events.property_interval_values` | `reported/events.py` | none |  |
+| `events.property_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.class_medians` |  |
+| `events.rest_theta_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.rest_matched_theta_statistics` |  |
+| `events.spike_evidence_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.spike_evidence_statistics` |  |
+| `events.start_distance_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.class_medians` |  |
+| `behavior.breadth_derived_values` | `reported/behavior/content.py` | `analysis.behavior.content.content_statistics.concentration_contrast_statistics`, `analysis.behavior.content.content_statistics.event_length_statistics` |  |
+| `behavior.choice_values` | `reported/behavior/choice.py` | `analysis.behavior.coefficient_statistics.gated_coefficient_statistics` |  |
+| `behavior.cohort_audit_values` | `reported/behavior/rate.py` | none |  |
+| `behavior.content_contrast_values` | `reported/behavior/content.py` | none |  |
+| `behavior.current_arm_paired_values` | `reported/behavior/content.py` | `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.behavior.coefficient_statistics.gated_coefficient_difference_statistics` |  |
+| `behavior.duration_aware_history_values` | `reported/behavior/history.py` | `analysis.behavior.rate.history_kernel_statistics.cross_history_statistics`, `analysis.behavior.rate.history_kernel_statistics.lag_ms`, `analysis.behavior.rate.history_kernel_statistics.self_history_range_statistics`, `analysis.behavior.rate.history_kernel_statistics.self_history_statistics` |  |
+| `behavior.estimator_values` | `reported/behavior/content.py` | none |  |
+| `behavior.horserace_values` | `reported/behavior/content.py` | none |  |
+| `behavior.leaf_values` | `reported/behavior/content.py` | `analysis.behavior.coefficient_statistics.gated_coefficient_statistics`, `analysis.behavior.content.model_comparison.compare_nested_models`, `analysis.behavior.content.model_comparison.summarize_comparison` |  |
+| `behavior.per_bin_detail_values` | `reported/behavior/rate.py` | `analysis.behavior.coefficient_statistics.aic_difference_statistics`, `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.behavior.coefficient_statistics.fits_carrying`, `analysis.behavior.coefficient_statistics.gated_coefficient_statistics`, `analysis.behavior.coefficient_statistics.group_range`, `analysis.behavior.coefficient_statistics.term_separation_statistics`, `analysis.behavior.rate.rate_fit_statistics.arrival_window_statistics`, `analysis.behavior.rate.rate_fit_statistics.baseline_rate_ratio_statistics`, `analysis.behavior.rate.rate_fit_statistics.baseline_rate_statistics`, `analysis.behavior.rate.rate_fit_statistics.ladder_fit_statistics`, `analysis.behavior.rate.rate_fit_statistics.reward_kernel_statistics` |  |
+| `behavior.per_bin_values` | `reported/behavior/rate.py` | `analysis.behavior.coefficient_statistics.aic_difference_statistics`, `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.behavior.coefficient_statistics.gated_coefficient_statistics`, `analysis.behavior.coefficient_statistics.gated_exp_median_ratio`, `analysis.behavior.coefficient_statistics.group_range`, `analysis.behavior.rate.rate_fit_statistics.arrival_window_statistics`, `analysis.behavior.rate.rate_fit_statistics.baseline_rate_statistics`, `analysis.behavior.rate.rate_fit_statistics.clock_shape_statistics`, `analysis.behavior.rate.rate_fit_statistics.frozen_cohort_statistics`, `analysis.behavior.rate.rate_fit_statistics.ladder_fit_statistics`, `analysis.behavior.rate.rate_fit_statistics.paired_lag_one_kernel_statistics`, `analysis.behavior.rate.rate_fit_statistics.paired_lag_one_reward_kernels`, `analysis.behavior.rate.rate_fit_statistics.reward_kernel_statistics` |  |
+| `behavior.per_stop_values` | `reported/behavior/rate.py` | `analysis.behavior.coefficient_statistics.aic_difference_statistics`, `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.behavior.coefficient_statistics.known_fraction` |  |
+| `behavior.power_values` | `reported/behavior/coupling.py` | `analysis.behavior.coefficient_statistics.coefficient_statistics` |  |
+| `behavior.rate_contrast_audit_values` | `reported/behavior/rate.py` | `analysis.behavior.coefficient_statistics.audited_drop_statistics`, `analysis.behavior.coefficient_statistics.fit_rows` |  |
+| `behavior.rate_contrast_separation_values` | `reported/behavior/rate.py` | `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.behavior.coefficient_statistics.fits_carrying`, `analysis.behavior.coefficient_statistics.rung_separation_range`, `analysis.behavior.coefficient_statistics.separated_fraction`, `analysis.behavior.coefficient_statistics.term_separation_statistics` |  |
+| `behavior.stay_leave_values` | `reported/behavior/choice.py` | `analysis.behavior.choice.learning.cross_session_role_summary`, `analysis.behavior.choice.learning.fit_status_counts`, `analysis.behavior.choice.learning.pooled_gee_role_summary`, `analysis.behavior.choice.learning.smallest_adjusted_p`, `analysis.behavior.rate.stop_statistics.stop_cohort_counts` |  |
+| `behavior.stop_table_values` | `reported/behavior/stops.py` | `analysis.behavior.rate.stop_statistics.dwell_statistics`, `analysis.behavior.rate.stop_statistics.onset_time_statistics`, `analysis.behavior.rate.stop_statistics.outcome_boundary_statistics`, `analysis.behavior.rate.stop_statistics.reward_history_incomplete_statistics`, `analysis.behavior.rate.stop_statistics.still_immobile_fraction`, `analysis.behavior.rate.stop_statistics.stop_cohort_counts`, `analysis.events.cohort_selection.select_stop_cohort` |  |
+| `behavior.summarize` | `reported/behavior/__init__.py` | `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.behavior.fit_provenance.check_fit_provenance`, `analysis.behavior.fit_provenance.fit_provenance_path`, `analysis.events.cohort_selection.select_event_cohort` | `behavior.breadth_derived_values`, `behavior.choice_values`, `behavior.cohort_audit_values`, `behavior.content_contrast_values`, `behavior.current_arm_paired_values`, `behavior.duration_aware_history_values`, `behavior.estimator_values`, `behavior.horserace_values`, `behavior.leaf_values`, `behavior.per_bin_detail_values`, `behavior.per_bin_values`, `behavior.per_stop_values`, `behavior.power_values`, `behavior.rate_contrast_audit_values`, `behavior.rate_contrast_separation_values`, `behavior.stay_leave_values`, `behavior.stop_table_values`, `behavior.trunk_values` |
+| `behavior.trunk_values` | `reported/behavior/content.py` | `analysis.behavior.content.content_statistics.current_patch_trunk_fraction`, `analysis.behavior.content.content_statistics.trunk_share_statistics`, `analysis.behavior.content.content_statistics.trunk_shares` |  |
+| `mpfc.called_fraction_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.best_model_fractions`, `analysis.pfc.population_statistics.bh_called_fraction`, `analysis.pfc.population_statistics.called_fraction_by_animal`, `analysis.pfc.population_statistics.called_fractions` |  |
+| `mpfc.cohort_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.cohort_count_statistics` |  |
+| `mpfc.estimator_values` | `reported/mpfc/population.py` | `analysis.pfc.heldout.empirical_pvalue_floor`, `analysis.pfc.population_statistics.fit_count_statistics` |  |
+| `mpfc.marked_family_values` | `reported/mpfc/followups.py` | none |  |
+| `mpfc.null_geometry_values` | `reported/mpfc/population.py` | `analysis.behavior.coefficient_statistics.group_range`, `analysis.pfc.population_statistics.called_without_improvement`, `analysis.pfc.population_statistics.session_value_statistics`, `analysis.pfc.population_statistics.unmatchable_event_statistics` |  |
+| `mpfc.overlap_and_effect_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.peak_modulation_statistics`, `analysis.pfc.population_statistics.replay_class_overlap_statistics`, `analysis.pfc.population_statistics.replay_split_statistics` |  |
+| `mpfc.prior_binding_values` | `reported/mpfc/population.py` | `analysis.behavior.coefficient_statistics.group_range`, `analysis.pfc.population_statistics.prior_binding_percent` |  |
+| `mpfc.rate_cutoff_check_values` | `reported/mpfc/rate_cutoff.py` | `analysis.pfc.population_statistics.units_at_or_above_rate` | `mpfc.called_fraction_values`, `mpfc.overlap_and_effect_values`, `mpfc.swr_without_replay_values` |
+| `mpfc.stop_context_values` | `reported/mpfc/followups.py` | none |  |
+| `mpfc.swr_without_replay_values` | `reported/mpfc/swr_without_replay.py` | `analysis.pfc.population_statistics.swr_without_replay_called_by_animal`, `analysis.pfc.population_statistics.swr_without_replay_event_statistics`, `analysis.pfc.population_statistics.swr_without_replay_timing_statistics`, `analysis.pfc.population_statistics.swr_without_replay_unit_statistics` |  |
+| `mpfc.timing_values` | `reported/mpfc/timing.py` | `analysis.pfc.population_statistics.called_units`, `analysis.pfc.timing.called_response_timing`, `analysis.pfc.timing.paired_peak_lag_statistics`, `analysis.pfc.timing.peak_before_onset_fraction` |  |

@@ -31,6 +31,12 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from continuum_swr_replay.reported.builder_calls import (
+    BUILDERS,
+    PACKAGE,
+    builder_calls,
+    builder_files,
+)
 from continuum_swr_replay.reported.formatting import formatted
 from continuum_swr_replay.reported.questions import (
     FIGURES,
@@ -221,12 +227,47 @@ def _value_rows(values: Iterable[tuple[str, Value]]) -> list[str]:
     return rows
 
 
-def questions_view(summaries: Mapping[str, Summary]) -> str:
+def _code_rows(summaries: Mapping[str, Summary], builders: Path) -> list[str]:
+    """Markdown table rows: each builder function a value names, its file, the
+    ``analysis`` functions it calls and the other builder functions it calls
+    (:func:`~continuum_swr_replay.reported.builder_calls.builder_calls`)."""
+    rows = [
+        "| Builder function | File | Analysis functions | Through |",
+        "|---|---|---|---|",
+    ]
+    for name, summary in summaries.items():
+        functions = sorted({value.function for value in summary.values.values()})
+        if not functions:
+            continue
+        calls = builder_calls(
+            builder_files(name, builders),
+            f"{PACKAGE}.reported.{name}",
+            functions,
+            builders,
+        )
+        for function in functions:
+            found = calls.get(function)
+            cells = (
+                [f"`{name}.{function}`", "not in the builder's source", "", ""]
+                if found is None
+                else [
+                    f"`{name}.{function}`",
+                    f"`{found.file}`",
+                    ", ".join(f"`{a}`" for a in found.analysis) or "none",
+                    ", ".join(f"`{name}.{t}`" for t in found.through),
+                ]
+            )
+            rows.append("| " + " | ".join(_cell(c) for c in cells) + " |")
+    return rows
+
+
+def questions_view(summaries: Mapping[str, Summary], builders: Path = BUILDERS) -> str:
     """``paper/reported/questions.md``: a table of the summaries (build commit,
     code record, values, values with tag problems); every question of the question
     list in the paper's order, with the values that answer it; the values with any
     tag problem (:func:`~continuum_swr_replay.reported.questions.tag_problems`);
-    and the values by figure.
+    the values by figure; and each builder function with the ``analysis``
+    functions it calls, read from the builders' source under ``builders``.
 
     A value answering several questions is listed under each. A question need not
     have a figure: the parts organize the writing. Generated in full on every emit,
@@ -246,10 +287,12 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
         "`paper/main.tex` by its macro. A value marked *pending* may not be quoted",
         "as a finding. A summary file is named for what it holds; a question's part",
         "is where the paper reports it. *Builder function* names the function in",
-        "`src/continuum_swr_replay/reported/<summary>.py` that names and describes",
-        "a value. The statistic is computed by the `analysis/` function it calls,",
-        "or copied from an input file; the builder itself only counts the size of",
-        "an input.",
+        "`src/continuum_swr_replay/reported/<summary>.py`, or in a module of the",
+        "package `reported/<summary>/`, that names and describes a value. The",
+        "statistic is computed by the `analysis/` function it calls, or copied from",
+        "an input file; the builder itself only counts the size of an input. The",
+        "last section lists, for each builder function, the `analysis/` functions",
+        "it calls.",
         "",
         "| Summary | Built at | Code record | Values | Values with tag problems |",
         "|---|---|---|---|---|",
@@ -341,6 +384,18 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
         for panel in sorted(shown):
             label = f"Panel {panel}" if panel else "Unlettered"
             lines += ["", f"{label}: {', '.join(sorted(shown[panel]))}"]
+    lines += [
+        "",
+        "## Builder functions and the analysis code they call",
+        "",
+        "Read from the builders' source: the `analysis/` functions each builder",
+        "function calls, itself or through a helper of its builder that makes no",
+        "value. *Through* names the other builder functions it calls, whose own",
+        "calls are in their rows. A constant read, or a function passed along",
+        "without being called, is not listed.",
+        "",
+        *_code_rows(summaries, builders),
+    ]
     return "\n".join(lines) + "\n"
 
 

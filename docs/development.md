@@ -430,7 +430,9 @@ question in the paper's outline, with the values that answer it, their macros, a
 Each value records the builder function that made it (`function`; "Builder function" in `questions.md`),
 so a macro leads to its code in two steps: `\EventsRippleMedianNonSwr` is made in `brain_state_values` of
 `reported/events.py`, which reads it from the `analysis/` function that computes it
-(`event_statistics.event_signal_statistics`). A builder makes its values through
+(`event_statistics.event_signal_statistics`). The last section of `questions.md` takes the second step for
+every builder function: the `analysis/` functions it calls, read from the builders' source
+(`reported/builder_calls.py`). A builder makes its values through
 `reported.values.value_factory`, which is given that function. Whether the manuscript cites a value is not recorded anywhere: it is read from the macros
 `paper/main.tex` and the other `.tex` files under `paper/` use. `make reported-values` prints how many
 values are cited, and `make release-check` fails when a cited value is pending.
