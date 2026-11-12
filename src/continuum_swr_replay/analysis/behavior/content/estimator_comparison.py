@@ -5,7 +5,11 @@ three likelihoods: the conditional Poisson on the timebin counts, the
 conditional Poisson on the per-event fractions, and the Dirichlet-multinomial on
 the counts. One row per (session, rung, term, estimator) holds a coefficient,
 its standard error and the fit's AIC with the likelihood constants equalized
-(:func:`estimator_rows`). From that table:
+(:func:`estimator_rows`). :func:`run_comparison` fits the rungs of
+:data:`~continuum_swr_replay.analysis.behavior.model_specs.CONTENT_ESTIMATOR_COMPARISON_RUNGS`
+on one event set per (session, rung) that all three can use
+(:func:`shared_session_rows`, :func:`drop_undefined_concentration`). From that
+table:
 
 - :func:`attach_delta_aic` differences each rung's AIC against its parent's,
   within session and estimator, where the two fits can be compared;
@@ -19,7 +23,9 @@ its standard error and the fit's AIC with the likelihood constants equalized
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -29,11 +35,31 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from ...shared_statistics import session_median_statistics
 from .._fit_diagnostics import SEPARATION_COEF_ABS
 from ..coefficient_statistics import animal_median_bootstrap
+from ..contrast_aggregation import MIN_EVENTS, prepare_session
 from ..fit_comparability import COMPARABILITY_COLUMNS, why_not_comparable
-from ..fitting import CONDITIONAL_POISSON_COUNT, CONDITIONAL_POISSON_FRACTION
+from ..fitting import (
+    CONDITIONAL_POISSON_COUNT,
+    CONDITIONAL_POISSON_FRACTION,
+    fit_conditional_poisson,
+)
+from ..model_specs import ComparisonRung, leaf_only_cohort
+from .dirichlet_multinomial import (
+    DEFAULT_MIN_EVENTS_SESSION_PHI,
+    concentration_cols_for_cohort,
+    fit_sessions_dirichlet_multinomial,
+    multinomial_log_constant,
+)
 from .dirichlet_multinomial import ESTIMATOR as DIRICHLET_MULTINOMIAL
 
+logger = logging.getLogger(__name__)
+
 SC = list(SESSION_COLUMNS)
+
+#: The two response columns the comparison is fit on: the per-event allocation
+#: fraction (the shipped model) and the per-arm timebin counts (the retired count
+#: model and the Dirichlet-multinomial).
+FRACTION_RESPONSE = "arm_fraction"
+COUNT_RESPONSE = "arm_count_hard"
 
 #: Short labels used in the summary/bootstrap column names.
 ESTIMATOR_LABELS = {
@@ -476,3 +502,372 @@ def bootstrap_animals(
             }
         )
     return pd.DataFrame(records, columns=columns)
+
+
+def n_fits_delta_aic_row_mismatch(coefficients: pd.DataFrame) -> int:
+    """(session, rung, estimator) fits whose ΔAIC was not formed.
+
+    Their parent landed on a different number of events
+    (``delta_aic_row_mismatch`` from :func:`attach_delta_aic`), so the two AICs
+    were not differenced.
+    """
+    if coefficients.empty:
+        return 0
+    return int(
+        coefficients.loc[coefficients["delta_aic_row_mismatch"]]
+        .drop_duplicates([*SC, "model", "estimator"])
+        .shape[0]
+    )
+
+
+# ── one shared event set per (session, rung) ────────────────────────────────
+
+
+@dataclass(frozen=True)
+class ComparisonResult:
+    """Everything one comparison run produces.
+
+    Attributes
+    ----------
+    coefficients : pandas.DataFrame
+        One row per (session, rung, term, estimator).
+    summary : pandas.DataFrame
+        One row per (rung, term).
+    bootstrap : pandas.DataFrame
+        One row per (rung, term, estimator) with the animal-bootstrap
+        percentiles.
+    skips : pandas.DataFrame
+        One row per (session, rung) that produced no comparable triple.
+    """
+
+    coefficients: pd.DataFrame
+    summary: pd.DataFrame
+    bootstrap: pd.DataFrame
+    skips: pd.DataFrame
+
+
+def _rung_frame(
+    cohort: pd.DataFrame, rung: ComparisonRung, *, fraction_col: str
+) -> pd.DataFrame:
+    """Restrict and rescale the cohort to what one rung is fit on.
+
+    A leaf-only rung drops the three trunk arms and renormalizes the fraction
+    response to unit mass over the six retained leaves
+    (:func:`~continuum_swr_replay.analysis.behavior.model_specs.leaf_only_cohort`);
+    an event with no leaf mass renormalizes to NaN and is then dropped from all
+    three estimators by :func:`shared_session_rows`. The counts keep their
+    timebin weighting, which is also the ``L_e`` the Dirichlet-multinomial and
+    the multinomial constant are stated on.
+    """
+    if not rung.leaf_only:
+        return cohort
+    frame, _renormalized = leaf_only_cohort(
+        cohort, response_col=fraction_col, response="fraction"
+    )
+    return frame
+
+
+def shared_session_rows(
+    frame: pd.DataFrame,
+    predictors: Sequence[str],
+    *,
+    fraction_col: str,
+    count_col: str,
+) -> tuple[pd.DataFrame | None, dict]:
+    """Freeze one event set that both responses (hence all three fits) can use.
+
+    The shipped contrast runner's cohort rules
+    (:func:`~continuum_swr_replay.analysis.behavior.contrast_aggregation.prepare_session`)
+    are applied twice -- once per response column -- and intersected. A
+    difference between the estimators is then a difference of likelihood and
+    never of which events they saw.
+
+    Parameters
+    ----------
+    frame : pandas.DataFrame
+        One session's event-grain arm rows.
+    predictors : sequence of str
+        The rung's predictor columns.
+    fraction_col, count_col : str
+        The per-event allocation fraction and the timebin counts.
+
+    Returns
+    -------
+    (rows_or_None, info)
+        The rows of the shared events, or ``None`` when there is nothing to fit.
+        ``info`` carries ``n_events_in``, the per-response survivor counts, the
+        shared count, and a skip ``reason`` (``too_few_shared`` below
+        :data:`~continuum_swr_replay.analysis.behavior.contrast_aggregation.MIN_EVENTS`
+        shared events).
+    """
+    predictors = list(predictors)
+    fraction_rows, fraction_prep = prepare_session(
+        frame, predictors, response_col=fraction_col
+    )
+    count_rows, count_prep = prepare_session(frame, predictors, response_col=count_col)
+    info = {
+        "n_events_in": int(fraction_prep["n_in"]),
+        "n_events_fraction": int(fraction_prep["n_surv"]),
+        "n_events_count": int(count_prep["n_surv"]),
+        "n_events_shared": 0,
+        "reason": "",
+    }
+    if fraction_rows is None or count_rows is None:
+        info["reason"] = fraction_prep["reason"] or count_prep["reason"] or "no_rows"
+        return None, info
+
+    shared = set(fraction_rows["event_id"]) & set(count_rows["event_id"])
+    info["n_events_shared"] = len(shared)
+    if len(shared) < MIN_EVENTS:
+        info["reason"] = "too_few_shared"
+        return None, info
+    return frame[frame["event_id"].isin(shared)], info
+
+
+def drop_undefined_concentration(
+    frame: pd.DataFrame, concentration_cols: Sequence[str]
+) -> tuple[pd.DataFrame, int]:
+    """Drop events whose concentration covariate is missing, for every estimator.
+
+    The Dirichlet-multinomial drops an event with a NaN ``is_swr`` (it is a
+    required column of its pack) while the conditional fits never look at it, so
+    leaving such an event in would desynchronize the three event sets. Removing
+    it up front keeps them identical.
+
+    Parameters
+    ----------
+    frame : pandas.DataFrame
+        Event-grain arm rows with ``event_id``.
+    concentration_cols : sequence of str
+        The event-level columns entering ``log phi``.
+
+    Returns
+    -------
+    (frame, n_dropped)
+        Every row of each event with a NaN in any concentration column removed,
+        and the number of events removed.
+    """
+    if not concentration_cols:
+        return frame, 0
+    missing = frame[list(concentration_cols)].isna().any(axis=1)
+    if not missing.any():
+        return frame, 0
+    bad = set(frame.loc[missing, "event_id"])
+    return frame[~frame["event_id"].isin(bad)], len(bad)
+
+
+def _skip_record(key: tuple, rung: ComparisonRung, info: dict, reason: str) -> dict:
+    """One audited (session, rung) that produced no comparable estimator triple."""
+    return {
+        **dict(zip(SC, key, strict=True)),
+        "model": rung.name,
+        **{name: value for name, value in info.items() if name != "reason"},
+        "reason": reason,
+    }
+
+
+def _fit_rung(
+    cohort: pd.DataFrame,
+    rung: ComparisonRung,
+    *,
+    fraction_col: str,
+    count_col: str,
+    n_jobs: int,
+    min_events_session_phi: int,
+) -> tuple[list[dict], list[dict]]:
+    """Fit one rung with all three estimators on one shared event set per session.
+
+    Returns
+    -------
+    (rows, skips)
+        ``rows`` is one dict per (session, term, estimator); ``skips`` is one
+        dict per session that produced no complete triple.
+
+    Raises
+    ------
+    ValueError
+        If the three estimators report different ``n_events`` for a session --
+        the shared cohort is the contract this comparison rests on.
+    """
+    predictors = list(rung.predictors)
+    frame = _rung_frame(cohort, rung, fraction_col=fraction_col)
+    concentration_cols = concentration_cols_for_cohort(frame)
+    frame, n_drop_concentration = drop_undefined_concentration(
+        frame, concentration_cols
+    )
+    if n_drop_concentration:
+        logger.info(
+            "%s: dropped %d event(s) with a missing concentration covariate",
+            rung.name,
+            n_drop_concentration,
+        )
+
+    prepared: list[tuple[tuple, pd.DataFrame, dict]] = []
+    skips: list[dict] = []
+    for keys, group in frame.groupby(SC, sort=False):
+        rows, info = shared_session_rows(
+            group,
+            predictors,
+            fraction_col=fraction_col,
+            count_col=count_col,
+        )
+        key = tuple(keys)
+        if rows is None:
+            skips.append(_skip_record(key, rung, info, info["reason"]))
+            continue
+        prepared.append((key, rows, info))
+
+    if not prepared:
+        return [], skips
+
+    count_fits = {
+        key: fit_conditional_poisson(
+            rows,
+            predictors=predictors,
+            response_col=count_col,
+            event_col="event_id",
+            n_categories=rung.n_categories,
+        )
+        for key, rows, _info in prepared
+    }
+    fraction_fits = {
+        key: fit_conditional_poisson(
+            rows,
+            predictors=predictors,
+            response_col=fraction_col,
+            event_col="event_id",
+            n_categories=rung.n_categories,
+        )
+        for key, rows, _info in prepared
+    }
+    animal_position = SC.index("animal")
+    dm_fitted, dm_skipped = fit_sessions_dirichlet_multinomial(
+        [(key, key[animal_position], rows) for key, rows, _info in prepared],
+        predictors,
+        min_events=min_events_session_phi,
+        n_jobs=n_jobs,
+        response_col=count_col,
+        event_col="event_id",
+        concentration_cols=concentration_cols,
+        n_categories=rung.n_categories,
+    )
+    dm_fits = dict(dm_fitted)
+    dm_reasons = dict(dm_skipped)
+
+    rows_out: list[dict] = []
+    for key, session_rows, info in prepared:
+        fits = {
+            CONDITIONAL_POISSON_COUNT: count_fits.get(key),
+            CONDITIONAL_POISSON_FRACTION: fraction_fits.get(key),
+            DIRICHLET_MULTINOMIAL: dm_fits.get(key),
+        }
+        absent = [name for name, fit in fits.items() if fit is None]
+        if absent:
+            reason = "no_fit:" + ",".join(ESTIMATOR_LABELS[name] for name in absent)
+            dm_reason = dm_reasons.get(key, "")
+            skips.append(
+                _skip_record(
+                    key,
+                    rung,
+                    info,
+                    f"{reason} ({dm_reason})" if dm_reason else reason,
+                )
+            )
+            continue
+
+        n_events = {name: int(fit["n_events"]) for name, fit in fits.items()}
+        if len(set(n_events.values())) != 1:
+            raise ValueError(
+                f"{rung.name} {key}: the three estimators were fit on different "
+                f"event sets ({n_events}); the comparison requires one shared "
+                "cohort per (session, rung)"
+            )
+        log_constant = multinomial_log_constant(
+            session_rows[count_col], session_rows["event_id"]
+        )
+        rows_out.extend(
+            estimator_rows(
+                key,
+                model=rung.name,
+                parent=rung.parent,
+                leaf_only=rung.leaf_only,
+                fits=fits,
+                info=info,
+                log_constant=log_constant,
+                n_events=next(iter(n_events.values())),
+            )
+        )
+    n_compared = len({tuple(row[column] for column in SC) for row in rows_out})
+    logger.info(
+        "%s: %d session(s) compared, %d skipped", rung.name, n_compared, len(skips)
+    )
+    return rows_out, skips
+
+
+def run_comparison(
+    cohort: pd.DataFrame,
+    rungs: Sequence[ComparisonRung],
+    *,
+    fraction_col: str = FRACTION_RESPONSE,
+    count_col: str = COUNT_RESPONSE,
+    n_jobs: int = 1,
+    min_events_session_phi: int = DEFAULT_MIN_EVENTS_SESSION_PHI,
+    n_bootstrap: int = N_BOOTSTRAP,
+    seed: int = BOOTSTRAP_SEED,
+) -> ComparisonResult:
+    """Fit every rung with all three estimators and summarize their agreement.
+
+    Parameters
+    ----------
+    cohort : pandas.DataFrame
+        Event-grain arm cohort, one row per (event x candidate arm), carrying
+        the session key columns, ``event_id``, ``candidate_arm``, ``is_swr``,
+        both response columns, and every rung's predictors.
+    rungs : sequence of ComparisonRung
+        Models to fit, parents first.
+    fraction_col, count_col : str, optional
+        The per-event allocation fraction and the timebin counts.
+    n_jobs : int, optional
+        Worker processes for the Dirichlet-multinomial session fits.
+    min_events_session_phi : int, optional
+        Sessions below this many modelled events have their concentration
+        intercept pinned to the animal-pooled median.
+    n_bootstrap, seed : int, optional
+        Animal-bootstrap draws and RNG seed.
+
+    Returns
+    -------
+    ComparisonResult
+
+    Raises
+    ------
+    ValueError
+        If a (session, rung, term, estimator) row is duplicated.
+    """
+    all_rows: list[dict] = []
+    all_skips: list[dict] = []
+    for rung in rungs:
+        rows, skips = _fit_rung(
+            cohort,
+            rung,
+            fraction_col=fraction_col,
+            count_col=count_col,
+            n_jobs=n_jobs,
+            min_events_session_phi=min_events_session_phi,
+        )
+        all_rows.extend(rows)
+        all_skips.extend(skips)
+
+    coefficients = attach_delta_aic(pd.DataFrame(all_rows))
+    duplicated = coefficients.duplicated([*SC, "model", "term", "estimator"])
+    if duplicated.any():
+        raise ValueError(
+            f"{int(duplicated.sum())} duplicated (session, rung, term, estimator) "
+            "row(s); the comparison table must be one row per combination"
+        )
+    return ComparisonResult(
+        coefficients=coefficients,
+        summary=summarize_estimators(coefficients),
+        bootstrap=bootstrap_animals(coefficients, n_draws=n_bootstrap, seed=seed),
+        skips=pd.DataFrame(all_skips),
+    )

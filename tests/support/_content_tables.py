@@ -279,3 +279,49 @@ def with_event_length(cohort: pd.DataFrame, *, seed: int) -> pd.DataFrame:
     )
     values = (values - values.mean()) / values.std(ddof=0)
     return cohort.assign(log_n_nonlocal_bins_z=cohort["event_id"].map(values))
+
+
+#: The estimator comparison's simulated cohort. The planted concentration is
+#: small enough that each event's timebins are strongly correlated, so an
+#: estimator that treats them as independent understates its uncertainty.
+COMPARISON_PHI_TRUE = 3.0
+COMPARISON_LOG_PHI_IS_SWR_TRUE = -0.5
+COMPARISON_N_EVENTS_PER_SESSION = 60
+COMPARISON_BINS_PER_EVENT = 32
+COMPARISON_BETA_TRUE = {
+    "is_current_arm": 1.0,
+    "is_prev_arm": -0.5,
+    "reward_fraction_candidate_arm_last10_visits": 0.4,
+}
+
+
+def _comparison_session(
+    animal: str, session_date: str, seed: int, offset: int
+) -> pd.DataFrame:
+    frame = simulate_dirichlet_multinomial_counts(
+        COMPARISON_BETA_TRUE,
+        log_phi_intercept=float(np.log(COMPARISON_PHI_TRUE)),
+        log_phi_is_swr=COMPARISON_LOG_PHI_IS_SWR_TRUE,
+        n_events=COMPARISON_N_EVENTS_PER_SESSION,
+        L_e=COMPARISON_BINS_PER_EVENT,
+        seed=seed,
+    ).copy()
+    # ``attrs["p_true"]`` is an array and pandas compares attrs element-wise on
+    # concat; drop it rather than work around the comparison.
+    frame.attrs = {}
+    frame["event_id"] = frame["event_id"] + offset
+    frame["animal"] = animal
+    frame["session_date"] = session_date
+    frame["epoch"] = "02_r1"
+    return frame
+
+
+def estimator_comparison_cohort() -> pd.DataFrame:
+    """Two simulated sessions from two animals, both with SWR and non-SWR events."""
+    return pd.concat(
+        [
+            _comparison_session("alpha", "20200101", seed=11, offset=0),
+            _comparison_session("bravo", "20200102", seed=22, offset=10_000),
+        ],
+        ignore_index=True,
+    )
