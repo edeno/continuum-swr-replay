@@ -11,7 +11,7 @@ SWR runner's `KNOWN_NO_INPUT_EPOCHS`) and the exclusion notes in the `NWB_FILES`
 docstring.
 
 The register has one row per `(nwb_file_name, epoch)`: its `status`, its `reason`
-(empty for an analysed epoch) and its `evidence`. An `epoch` of `*` covers every
+(empty for an analysed epoch), its `evidence` and its `first_exposure` flag. An `epoch` of `*` covers every
 epoch of a session none of whose run epochs is known (no NWB file, or no run epoch
 in it). It was generated once, on 2026-10-05, from the exclusion audit (557 rows:
 553 run epochs and 4 sessions with none) and the populate plan. Their working files
