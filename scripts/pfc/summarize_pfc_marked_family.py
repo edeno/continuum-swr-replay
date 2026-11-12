@@ -73,6 +73,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.pfc.marked_family_statistics import (
+    DEFAULT_BLOWUP,
     MAX_P_THRESHOLD,
     animal_balanced_fraction_positive,
     complete_bundle_records,
@@ -98,7 +99,6 @@ from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import processed_data_dir
 
 BUNDLE_SUBDIR = "pfc_marked_model_family"
-DEFAULT_BLOWUP = 1000.0
 CLASS_LABEL = {
     "non_local_no_SWR": "non-SWR replay",
     "non_local_SWR": "SWR-coupled replay",

@@ -45,6 +45,10 @@ MAX_P_THRESHOLD = 0.05
 #: Lags of the pre-onset, post-onset and whole-window means, seconds.
 PRE_ONSET_MAX_S = -0.1
 POST_ONSET_WINDOW_S = (0.0, 0.15)
+#: Absolute held-out delta above which a unit's comparison is a blow-up (a
+#: held-out prediction that exploded on one fold) and left out of
+#: :func:`animal_balanced_fraction_positive`'s denominator.
+DEFAULT_BLOWUP = 1000.0
 
 
 def complete_bundle_records(bundle_dir: Path) -> list[tuple[Path, dict]]:
