@@ -30,6 +30,7 @@ from continuum_swr_replay.analysis.behavior.tables.timebin_tables import (  # no
     ONSETS_IN_EXCLUDED_BINS_ATTR,
     build_event_onset_table,
     build_stop_timebin_table,
+    concat_session_timebin_tables,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (
     publish_swr_table,
@@ -121,8 +122,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     sessions = find_sessions(max_per_animal=args.max_per_animal)
     logger.info("building time-binned tables for %d sessions...", len(sessions))
-    onsets, denses, failures, t0 = [], [], [], time.time()
-    in_excluded: dict[str, int] = {}
+    session_tables, failures, t0 = [], [], time.time()
     for i, s in enumerate(sessions):
         try:
             o, d = build_one(s)
@@ -132,12 +132,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         if not len(d):
             failures.append((s["nwb_file_name"], s["epoch_name"], "no stop bins"))
             continue
-        onsets.append(o)
-        denses.append(d)
-        # Taken off each frame so the frames' attrs stay equal and the concat
-        # keeps the schema stamp; the sum is set on the concatenated table.
-        for etype, n in d.attrs.pop(ONSETS_IN_EXCLUDED_BINS_ATTR, {}).items():
-            in_excluded[etype] = in_excluded.get(etype, 0) + n
+        session_tables.append((o, d))
         if (i + 1) % 20 == 0:
             logger.info("  %d/%d (%.0fs)", i + 1, len(sessions), time.time() - t0)
 
@@ -153,9 +148,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             f"{len(failures)} of {len(sessions)} session(s) failed to build a "
             f"timebin table; sample={failures[:10]}. Nothing was written."
         )
-    onset = pd.concat(onsets, ignore_index=True)
-    dense = pd.concat(denses, ignore_index=True)
-    dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] = in_excluded
+    onset, dense = concat_session_timebin_tables(session_tables)
+    in_excluded = dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR]
     for label, frame in (("event_onset", onset), ("stop_timebin", dense)):
         n = n_sessions(frame)
         if n != len(sessions):

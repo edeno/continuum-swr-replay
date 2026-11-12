@@ -27,6 +27,8 @@ mask widened by 0.3 s) has no row.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import numpy as np
 import pandas as pd
 
@@ -254,3 +256,39 @@ def build_stop_timebin_table(
     out = stamp_covariate_schema(out, table="stop_timebin")
     out.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] = in_excluded_bins
     return out
+
+
+def concat_session_timebin_tables(
+    session_tables: Sequence[tuple[pd.DataFrame, pd.DataFrame]],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Concatenate the sessions' onset and dense tables into one pair.
+
+    Each dense table's ``attrs[ONSETS_IN_EXCLUDED_BINS_ATTR]`` is taken off it
+    (unequal attrs would make ``pd.concat`` drop every attr, the schema stamp
+    included) and the dense table of all sessions carries their sum, per event
+    type.
+
+    Parameters
+    ----------
+    session_tables : sequence of (pd.DataFrame, pd.DataFrame)
+        Per session, its :func:`build_event_onset_table` and
+        :func:`build_stop_timebin_table`, in session order. The dense tables'
+        count attrs are removed.
+
+    Returns
+    -------
+    onset : pd.DataFrame
+        The sessions' onset tables, concatenated.
+    dense : pd.DataFrame
+        The sessions' dense tables, concatenated, with
+        ``attrs[ONSETS_IN_EXCLUDED_BINS_ATTR]`` the summed counts (an event type
+        no session counted is absent).
+    """
+    in_excluded: dict[str, int] = {}
+    for _, dense in session_tables:
+        for etype, n in dense.attrs.pop(ONSETS_IN_EXCLUDED_BINS_ATTR, {}).items():
+            in_excluded[etype] = in_excluded.get(etype, 0) + n
+    onset = pd.concat([onset for onset, _ in session_tables], ignore_index=True)
+    dense = pd.concat([dense for _, dense in session_tables], ignore_index=True)
+    dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] = in_excluded
+    return onset, dense

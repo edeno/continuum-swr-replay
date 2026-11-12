@@ -30,8 +30,10 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.tables.timebin_tables import (
+    ONSETS_IN_EXCLUDED_BINS_ATTR,
     build_event_onset_table,
     build_stop_timebin_table,
+    concat_session_timebin_tables,
 )
 from continuum_swr_replay.paths import replay_content_dir
 
@@ -204,6 +206,34 @@ def test_validate_counts_onsets_in_excluded_bins(timebin_script):
     timebin_script.validate(onset, dense, {"SWR": 1, "non_local": 0, "MUA": 0})
     with pytest.raises(AssertionError, match="SWR"):
         timebin_script.validate(onset, dense, {"SWR": 0, "non_local": 0, "MUA": 0})
+
+
+def test_concatenated_dense_table_sums_the_sessions_excluded_onsets():
+    """Two sessions with different counts: the stamp survives the concat, the
+    counts add per event type (one type counted by one session only), and each
+    session's frame gives its count up."""
+
+    def session(epoch: str, n_bins: int, counts: dict[str, int]):
+        onset = pd.DataFrame({"epoch": [epoch], "event_type": ["SWR"]})
+        dense = pd.DataFrame({"epoch": [epoch] * n_bins, "n_swr_events": 0})
+        dense.attrs["covariate_schema_table"] = "stop_timebin"
+        dense.attrs[ONSETS_IN_EXCLUDED_BINS_ATTR] = counts
+        return onset, dense
+
+    first = session("02_r1", 2, {"SWR": 1, "non_local": 0})
+    second = session("04_r2", 3, {"SWR": 2, "non_local": 0, "MUA": 1})
+
+    onset, dense = concat_session_timebin_tables([first, second])
+
+    assert dense.attrs == {
+        "covariate_schema_table": "stop_timebin",
+        ONSETS_IN_EXCLUDED_BINS_ATTR: {"SWR": 3, "non_local": 0, "MUA": 1},
+    }
+    assert dense["epoch"].tolist() == ["02_r1"] * 2 + ["04_r2"] * 3
+    assert dense.index.tolist() == list(range(5))
+    assert onset["epoch"].tolist() == ["02_r1", "04_r2"]
+    assert ONSETS_IN_EXCLUDED_BINS_ATTR not in first[1].attrs
+    assert ONSETS_IN_EXCLUDED_BINS_ATTR not in second[1].attrs
 
 
 def test_empty_session_returns_schema(two_bout_dot):
