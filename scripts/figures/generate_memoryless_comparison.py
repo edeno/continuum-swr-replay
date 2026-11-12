@@ -45,6 +45,9 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+    sweep_statistics,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
     CONTINUOUS_INBOUND_EVENT,
     CONTINUOUS_OUTBOUND_EVENT,
@@ -958,7 +961,9 @@ def paired_part_changes(controls: pd.DataFrame, detector: str) -> tuple[int, int
     return tuple(
         int(
             sum(
-                controls_value(controls, "parts", measure, condition, None, detector)
+                sweep_statistics.controls_value(
+                    controls, "parts", measure, condition, None, detector
+                )
                 for condition in MULTIPART_CONDITIONS
             )
         )
@@ -968,34 +973,6 @@ def paired_part_changes(controls: pd.DataFrame, detector: str) -> tuple[int, int
             "n_trials",
         )
     )
-
-
-def controls_value(
-    controls: pd.DataFrame,
-    summary: str,
-    measure: str,
-    condition: str,
-    level: float | None,
-    detector: str,
-) -> float:
-    """One value of the controls summary, refusing to guess between several."""
-    rows = controls[
-        (controls["summary"] == summary)
-        & (controls.measure == measure)
-        & (controls.condition == condition)
-        & (controls.detector == detector)
-    ]
-    rows = (
-        rows[rows.level.isna()]
-        if level is None
-        else rows[np.isclose(rows.level, level)]
-    )
-    if len(rows) != 1:
-        raise RuntimeError(
-            f"The controls summary holds {len(rows)} rows for {summary}, {measure}, "
-            f"{condition}, {level}, {detector}; expected one."
-        )
-    return float(rows.value.iloc[0])
 
 
 def no_replay_minutes(controls: pd.DataFrame) -> float:
@@ -1017,7 +994,7 @@ def plot_bursts(ax, controls: pd.DataFrame) -> None:
     width = 0.2
     for group, condition in enumerate(("placeless_burst", "jumping_burst")):
         for offset, (detector, label, alpha) in enumerate(OUTPUTS):
-            share = controls_value(
+            share = sweep_statistics.controls_value(
                 controls, "bursts", "called_rate", condition, None, detector
             )
             ax.bar(
@@ -1070,7 +1047,7 @@ def plot_carving(
             for label, shade, name in SEGMENTATION_STYLE:
                 share = np.mean(
                     [
-                        controls_value(
+                        sweep_statistics.controls_value(
                             controls,
                             "parts",
                             f"segmentation_{label}",
@@ -1094,7 +1071,7 @@ def plot_carving(
                 bottom += share
             recovery = np.mean(
                 [
-                    controls_value(
+                    sweep_statistics.controls_value(
                         controls, "parts", "part_recovery", c, level, detector
                     )
                     for c in conditions
@@ -1498,7 +1475,7 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
             "replay; the controls summary disagrees."
         )
     for condition in ("jump_120ms", "jump_200ms"):
-        if controls_value(
+        if sweep_statistics.controls_value(
             controls,
             "parts",
             "segmentation_spanning",
@@ -1512,7 +1489,7 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
             )
         for level in controls_levels(controls, condition):
             if (
-                controls_value(
+                sweep_statistics.controls_value(
                     controls,
                     "parts",
                     "segmentation_spanning",
@@ -1529,7 +1506,7 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
     shortest = controls_levels(controls, "chain_continuing")[0]
     for detector in ("sliding_published", "state_space_canonical"):
         if (
-            controls_value(
+            sweep_statistics.controls_value(
                 controls,
                 "parts",
                 "segmentation_spanning",
@@ -1547,7 +1524,9 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
         within, alone = (
             np.mean(
                 [
-                    controls_value(controls, "parts", measure, c, level, detector)
+                    sweep_statistics.controls_value(
+                        controls, "parts", measure, c, level, detector
+                    )
                     for c in MULTIPART_CONDITIONS
                     for level in controls_levels(controls, c)
                 ]
@@ -1567,7 +1546,7 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
             )
     longest = controls_levels(controls, "chain_continuing")[-1]
     for detector in ("sliding_published", "state_space_canonical"):
-        if controls_value(
+        if sweep_statistics.controls_value(
             controls,
             "parts",
             "segmentation_spanning",
@@ -1580,7 +1559,7 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
                 "at the longest gap; the controls summary disagrees."
             )
     for level in controls_levels(controls, "chain_elsewhere"):
-        if controls_value(
+        if sweep_statistics.controls_value(
             controls,
             "parts",
             "segmentation_spanning",
