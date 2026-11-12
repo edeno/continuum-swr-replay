@@ -30,9 +30,12 @@ inventory. Each figure is one drawn event, its panels on one time axis
 - every inventory's events as bars: compared events solid, moving events
   light, events set aside outlined.
 
-The draw, an epoch's inputs, the recomputation (on a GPU, under the memoryless
-run's XLA flags) and the figure are ``visualization.inventory_examples``'s, which
-``generate_event_feature_examples.py`` shares.
+The draw is ``analysis.inventory_comparison.selection.draw_examples``; an
+epoch's inputs and the recomputation are
+``analysis.inventory_comparison.example_windows``'s, run on a GPU under the
+memoryless run's XLA flags (``runs.device.use_memoryless_device``); the figure
+is ``visualization.inventory_examples``'s. ``generate_event_feature_examples.py``
+shares all four.
 
 Figures, ``captions.md`` and ``manifest.json`` (the rule, the seed, every draw
 and its memoryless check) go to
@@ -55,12 +58,27 @@ import pandas as pd
 
 matplotlib.use("Agg")
 
+from continuum_swr_replay.analysis.inventory_comparison.example_windows import (  # noqa: E402
+    CENTER_TIE_RTOL,
+    SPREAD_RTOL,
+    EpochInputs,
+    load_epoch,
+)
+from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
+    EXAMPLE_SEED,
+    N_PER_SIDE,
+    draw_examples,
+)
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.paths import (  # noqa: E402
     inventory_comparison_root,
     memoryless_root,
 )
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
+from continuum_swr_replay.runs.device import (  # noqa: E402
+    recompute_device,
+    use_memoryless_device,
+)
 from continuum_swr_replay.runs.io import (  # noqa: E402
     json_ready,
     ok_epochs,
@@ -70,20 +88,11 @@ from continuum_swr_replay.runs.io import (  # noqa: E402
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.visualization.inventory_examples import (  # noqa: E402
-    CENTER_TIE_RTOL,
-    EXAMPLE_SEED,
-    N_PER_SIDE,
     PAD_S,
     PANELS_CAPTION,
     PENDING,
-    SPREAD_RTOL,
-    EpochInputs,
     draw_example,
-    draw_examples,
     figure_name,
-    load_epoch,
-    recompute_device,
-    use_memoryless_device,
 )
 
 PRODUCED_BY = produced_by(__file__)

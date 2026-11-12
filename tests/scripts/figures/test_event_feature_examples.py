@@ -312,7 +312,7 @@ def test_an_epoch_without_its_inputs_is_recorded_and_the_run_goes_on(
         path.write_bytes(b"png")
         return {**drawn.to_dict(), "against": against, "path": str(path)}
 
-    monkeypatch.setattr(examples.inventory_examples, "load_epoch", load_epoch)
+    monkeypatch.setattr(examples.example_windows, "load_epoch", load_epoch)
     monkeypatch.setattr(examples.inventory_examples, "draw_example", draw_example)
 
     records = examples.write_examples(

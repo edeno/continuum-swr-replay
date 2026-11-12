@@ -12,6 +12,7 @@ import os
 import jax
 import pytest
 
+from continuum_swr_replay.runs import device
 from continuum_swr_replay.runs.device import default_jax_platforms
 
 
@@ -41,3 +42,21 @@ def test_platforms_the_environment_names_are_kept(monkeypatch, updates):
 
     assert updates == [("jax_platforms", "cuda")]
     assert os.environ["JAX_PLATFORMS"] == "cuda"
+
+
+def test_the_recompute_runs_on_the_gpu_even_when_the_cpu_was_pinned(
+    monkeypatch,
+) -> None:
+    """A shell or a caller may pin JAX_PLATFORMS to the CPU; the recompute still
+    asks JAX for the GPU, under the memoryless run's XLA flags."""
+    monkeypatch.setenv("JAX_PLATFORMS", "cpu")
+    monkeypatch.setenv("XLA_FLAGS", "")
+    updates = []
+    monkeypatch.setattr(jax.config, "update", lambda *args: updates.append(args))
+
+    device.use_memoryless_device()
+
+    assert updates == [("jax_platforms", "cuda")]
+    assert os.environ["JAX_PLATFORMS"] == "cuda"
+    for flag in device.REQUIRED_XLA_FLAGS:
+        assert flag in os.environ["XLA_FLAGS"].split()

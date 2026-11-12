@@ -16,6 +16,8 @@ __all__ = [
     "REQUIRED_XLA_FLAGS",
     "TRITON_GEMM_OFF_XLA_FLAG",
     "default_jax_platforms",
+    "recompute_device",
+    "use_memoryless_device",
     "xla_flags",
 ]
 
@@ -93,3 +95,29 @@ def default_jax_platforms(platforms: str = "cpu") -> str:
     chosen = os.environ.setdefault("JAX_PLATFORMS", platforms)
     jax.config.update("jax_platforms", chosen)
     return chosen
+
+
+def use_memoryless_device() -> None:
+    """Recompute where the memoryless run computed: a GPU, under its XLA flags.
+
+    Near-tied window centers are broken by the device's rounding, so a CPU
+    moves more of them than the check allows. The GPU is set over any
+    ``JAX_PLATFORMS`` the shell or a caller chose; with no GPU, JAX raises. Call
+    before JAX starts its backend, which reads ``XLA_FLAGS`` once.
+    """
+    import jax
+
+    os.environ["XLA_FLAGS"] = xla_flags()
+    os.environ["JAX_PLATFORMS"] = "cuda"
+    jax.config.update("jax_platforms", "cuda")
+
+
+def recompute_device() -> dict[str, str]:
+    """The device the windows are recomputed on and its XLA flags, for the
+    manifest."""
+    import jax
+
+    return {
+        "device": str(jax.devices()[0]),
+        "xla_flags": os.environ.get("XLA_FLAGS", ""),
+    }

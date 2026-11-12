@@ -58,6 +58,7 @@ not separately validated; the lead dropped the Phase 2 pilot checks
 (2026-10-28).
 """
 
+import hashlib
 from collections.abc import Collection, Mapping
 from functools import reduce
 from types import MappingProxyType
@@ -110,17 +111,20 @@ __all__ = [
     "BASELINE_DTYPES",
     "BASELINE_SEED",
     "DURATION_ONLY",
+    "EXAMPLE_SEED",
     "FAILED",
     "LOCATION",
     "LOCATION_TOLERANCE_CM",
     "MIN_MATCHED",
     "N_BASELINES",
+    "N_PER_SIDE",
     "REJECTION_COHORTS",
     "REJECTION_DTYPES",
     "REJECTION_STAGES",
     "WINDOW_DTYPES",
     "baseline_draws",
     "baseline_pool",
+    "draw_examples",
     "matched_baselines",
     "rejection_stages",
     "window_room",
@@ -867,3 +871,78 @@ def rejection_stages(
         columns[name] = values.where(pd.Series(known)).astype(dtype).to_numpy()
     result = pd.DataFrame(columns, index=events.index)
     return result[list(REJECTION_DTYPES)].astype(dict(REJECTION_DTYPES))
+
+
+EXAMPLE_SEED = 20261017
+"""The run seed every draw is seeded from, with its cell, detector and animal."""
+N_PER_SIDE = 2
+ROLES: Mapping[str, str] = MappingProxyType(
+    {UNMATCHED: "example", MATCHED: "counterexample"}
+)
+"""What a drawn event of each membership is; ``unknown`` events are never drawn."""
+UNIT = ("cell", "detector", "animal")
+"""What each draw is made within."""
+
+
+def _unit_rng(seed: int, unit: tuple[str, ...]) -> np.random.Generator:
+    """A generator for one (cell, detector, animal), from the run seed.
+
+    A keyed digest, not ``hash()``, which changes between interpreters.
+    """
+    digest = hashlib.blake2b("/".join(unit).encode("utf-8"), digest_size=8).digest()
+    spawn_key = (
+        int.from_bytes(digest[:4], "little"),
+        int.from_bytes(digest[4:], "little"),
+    )
+    return np.random.default_rng(np.random.SeedSequence(seed, spawn_key=spawn_key))
+
+
+def draw_examples(
+    cells: pd.DataFrame,
+    *,
+    seed: int = EXAMPLE_SEED,
+    n: int = N_PER_SIDE,
+    column: str = "membership",
+    roles: Mapping[str, str] = ROLES,
+) -> pd.DataFrame:
+    """The events the examples' sampling rule draws from a run's ``cells`` table.
+
+    Parameters
+    ----------
+    cells : DataFrame
+        The runner's ``cells`` table, over any number of epochs, or any
+        table with its ``cell``, ``detector``, ``animal``, ``day``, ``epoch``
+        and ``event_key`` columns and ``column``.
+    seed : int
+        The run seed.
+    n : int
+        Events drawn of each value of ``column``, at most.
+    column : str
+        The column the events are drawn by.
+    roles : mapping
+        Each value of ``column`` drawn -> the role of its events, in the
+        order drawn; events of any other value are never drawn.
+
+    Returns
+    -------
+    DataFrame
+        The drawn rows of ``cells`` with ``role`` (by default ``example`` for
+        an ``unmatched`` event, ``counterexample`` for a ``matched`` one) and
+        ``draw`` (1 to ``n``, in the order drawn), ordered by cell, detector
+        and animal, then by ``roles``' order, each in draw order.
+    """
+    out = []
+    for unit, events in cells.groupby(list(UNIT), sort=True):
+        rng = _unit_rng(seed, tuple(str(value) for value in unit))
+        for value, role in roles.items():
+            pool = events[events[column] == value].sort_values(
+                ["day", "epoch", "event_key"], kind="stable"
+            )
+            picks = rng.choice(len(pool), size=min(n, len(pool)), replace=False)
+            out.append(
+                pool.iloc[picks].assign(role=role, draw=np.arange(1, len(picks) + 1))
+            )
+    columns = [*cells.columns, "role", "draw"]
+    if not out:
+        return pd.DataFrame(columns=columns)
+    return pd.concat(out, ignore_index=True)[columns]

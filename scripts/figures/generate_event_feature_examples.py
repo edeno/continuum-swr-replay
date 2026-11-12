@@ -48,8 +48,10 @@ matplotlib.use("Agg")
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
+from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402  # noqa: E402
+    example_windows,
     feature_run,
+    selection,
 )
 from continuum_swr_replay.analysis.inventory_comparison.feature_run import (  # noqa: E402
     read_inputs,
@@ -79,6 +81,10 @@ from continuum_swr_replay.paths import (  # noqa: E402
     memoryless_root as memoryless_runs_root,
 )
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
+from continuum_swr_replay.runs.device import (  # noqa: E402
+    recompute_device,
+    use_memoryless_device,
+)
 from continuum_swr_replay.runs.io import json_ready, read_manifest  # noqa: E402
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
@@ -95,7 +101,7 @@ EXAMPLES_DIR = "examples"
 EXAMPLE_SEED = 20261018
 """The run seed every draw is seeded from, with its population, detector and
 animal."""
-N_PER_SIDE = inventory_examples.N_PER_SIDE
+N_PER_SIDE = selection.N_PER_SIDE
 
 HIGH = "high evidence"
 LOW = "low evidence"
@@ -265,7 +271,7 @@ def draw_population_examples(
 ) -> pd.DataFrame:
     """The events :data:`SAMPLING_RULE` draws from :func:`sampler_events`.
 
-    Each population is drawn by ``inventory_examples.draw_examples``
+    Each population is drawn by ``selection.draw_examples``
     by :data:`SUBSET_COLUMN`, with that population's :data:`ROLES`.
 
     Parameters
@@ -284,7 +290,7 @@ def draw_population_examples(
         The drawn rows with ``role`` and ``draw``, comparator-only first.
     """
     drawn = [
-        inventory_examples.draw_examples(
+        selection.draw_examples(
             events[(events.cell == name).to_numpy()],
             seed=seed,
             n=n,
@@ -432,10 +438,8 @@ def write_examples(
     records = []
     for identifier, group in drawn.groupby("epoch_id", sort=True):
         try:
-            inputs: inventory_examples.EpochInputs | None = (
-                inventory_examples.load_epoch(
-                    identifier, run_dir=inventory_dir, memoryless_dir=memoryless_dir
-                )
+            inputs: example_windows.EpochInputs | None = example_windows.load_epoch(
+                identifier, run_dir=inventory_dir, memoryless_dir=memoryless_dir
             )
             epoch_error: str | None = None
         except (ValueError, FileNotFoundError) as error:
@@ -505,9 +509,9 @@ def write_examples(
                     "not_calibrated": NOT_CALIBRATED,
                     "pad_s": inventory_examples.PAD_S,
                     "memoryless_check": {
-                        "spread_rtol": inventory_examples.SPREAD_RTOL,
-                        "center_tie_rtol": inventory_examples.CENTER_TIE_RTOL,
-                        **inventory_examples.recompute_device(),
+                        "spread_rtol": example_windows.SPREAD_RTOL,
+                        "center_tie_rtol": example_windows.CENTER_TIE_RTOL,
+                        **recompute_device(),
                     },
                     "pending": inventory_examples.PENDING,
                     "figures": records,
@@ -549,7 +553,7 @@ def main(argv: list[str] | None = None) -> None:
         "replay_detection_comparison/event_features/.",
     )
     args = parser.parse_args(argv)
-    inventory_examples.use_memoryless_device()
+    use_memoryless_device()
     run_dir = event_features_root() / args.run_id
     if not (run_dir / "manifest.json").exists():
         sys.exit(f"No event features run manifest at {run_dir}.")
