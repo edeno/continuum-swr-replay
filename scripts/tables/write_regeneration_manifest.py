@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,7 +32,7 @@ from continuum_swr_replay.paths import (
     STANDARDIZATION_REFERENCE,
     table_path,
 )
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file, write_json
 from continuum_swr_replay.runs.provenance import git, git_commit, git_dirty
 from continuum_swr_replay.tables.io import (
     SWR_SOURCE_ATTR,
@@ -582,7 +581,7 @@ def write_manifest(
         "files": files,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    write_json(output, manifest, indent=2, sort_keys=True, final_newline=True)
     return manifest
 
 

@@ -48,7 +48,6 @@ Usage:
 """
 
 import argparse
-import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -84,6 +83,7 @@ from continuum_swr_replay.runs.io import (  # noqa: E402
     ok_epochs,
     output_path,
     read_manifest,
+    write_json,
 )
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
@@ -178,29 +178,27 @@ def write_examples(run_dir: Path, figure_dir: Path) -> list[dict[str, Any]]:
         if inputs is not None:
             inputs.results.close()
     figure_dir.mkdir(parents=True, exist_ok=True)
-    (figure_dir / "manifest.json").write_text(
-        json.dumps(
-            json_ready(
-                {
-                    "produced_by": PRODUCED_BY,
-                    "inventory_run_id": run_id,
-                    "input_runs": settings["input_runs"],
-                    "seed": EXAMPLE_SEED,
-                    "n_per_side": N_PER_SIDE,
-                    "sampling_rule": SAMPLING_RULE,
-                    "pad_s": PAD_S,
-                    "memoryless_check": {
-                        "spread_rtol": SPREAD_RTOL,
-                        "center_tie_rtol": CENTER_TIE_RTOL,
-                        **recompute_device(),
-                    },
-                    "pending": PENDING,
-                    "figures": records,
-                }
-            ),
-            indent=2,
-            allow_nan=False,
-        )
+    write_json(
+        figure_dir / "manifest.json",
+        json_ready(
+            {
+                "produced_by": PRODUCED_BY,
+                "inventory_run_id": run_id,
+                "input_runs": settings["input_runs"],
+                "seed": EXAMPLE_SEED,
+                "n_per_side": N_PER_SIDE,
+                "sampling_rule": SAMPLING_RULE,
+                "pad_s": PAD_S,
+                "memoryless_check": {
+                    "spread_rtol": SPREAD_RTOL,
+                    "center_tie_rtol": CENTER_TIE_RTOL,
+                    **recompute_device(),
+                },
+                "pending": PENDING,
+                "figures": records,
+            }
+        ),
+        indent=2,
     )
     lines = [f"# Inventory comparison examples: run {run_id}", "", CAPTION, ""]
     lines += [

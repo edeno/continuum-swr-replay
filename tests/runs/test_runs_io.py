@@ -117,6 +117,18 @@ def test_write_json_writes_what_json_dumps_does(tmp_path, kwargs, dumps_kwargs):
     assert path.read_text() == json.dumps(content, allow_nan=False, **dumps_kwargs)
 
 
+def test_write_json_sorts_keys_and_ends_the_line_when_asked(tmp_path):
+    """The measurement manifests' own format: sorted keys for some, a final
+    newline for most."""
+    content = {"b": 1, "a": {"d": 2, "c": 3}}
+    path = tmp_path / "manifest.json"
+
+    write_json(path, content, indent=2, sort_keys=True, final_newline=True)
+    assert path.read_text() == json.dumps(content, indent=2, sort_keys=True) + "\n"
+    write_json(path, content, indent=1, final_newline=True)
+    assert path.read_text() == json.dumps(content, indent=1) + "\n"
+
+
 def test_write_json_refuses_non_finite_floats_and_unknown_objects(tmp_path):
     with pytest.raises(ValueError):
         write_json(tmp_path / "a.json", {"x": math.nan})

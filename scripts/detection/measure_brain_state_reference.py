@@ -17,7 +17,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import json
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any
@@ -30,7 +29,7 @@ from continuum_swr_replay.analysis.hippocampus.brain_state_reference import (
 )
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.paths import event_features_root, processed_data_dir
-from continuum_swr_replay.runs.io import ok_epochs, read_manifest
+from continuum_swr_replay.runs.io import ok_epochs, read_manifest, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 
@@ -68,20 +67,19 @@ def main(argv: Sequence[str] | None = None) -> None:
     tmp = out_dir / "reference.parquet.tmp"
     table.to_parquet(tmp, index=False)
     tmp.replace(out_dir / "reference.parquet")
-    (out_dir / "manifest.json").write_text(
-        json.dumps(
-            {
-                "produced_by": produced_by(__file__),
-                "commit": described_commit(),
-                "event_features_run": args.event_features_run,
-                "n_epochs": len(table),
-                "running": "head_speed above 10 cm/s, outside excluded time",
-                "rest": "head_speed below 4 cm/s, in no non-local, SWR or MUA event, "
-                "outside excluded time",
-            },
-            indent=1,
-        )
-        + "\n"
+    write_json(
+        out_dir / "manifest.json",
+        {
+            "produced_by": produced_by(__file__),
+            "commit": described_commit(),
+            "event_features_run": args.event_features_run,
+            "n_epochs": len(table),
+            "running": "head_speed above 10 cm/s, outside excluded time",
+            "rest": "head_speed below 4 cm/s, in no non-local, SWR or MUA event, "
+            "outside excluded time",
+        },
+        indent=1,
+        final_newline=True,
     )
     print(f"wrote {len(table)} epochs to {out_dir / 'reference.parquet'}")
 

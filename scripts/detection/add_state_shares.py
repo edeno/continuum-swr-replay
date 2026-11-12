@@ -45,7 +45,12 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
     state_row_shares,
 )
 from continuum_swr_replay.paths import event_features_root
-from continuum_swr_replay.runs.io import ok_epochs, output_path, read_manifest
+from continuum_swr_replay.runs.io import (
+    ok_epochs,
+    output_path,
+    read_manifest,
+    write_json,
+)
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 MANIFEST_NAME = "state_shares_manifest.json"
@@ -162,7 +167,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "uncertain when none is",
         "epochs": dict(sorted(epochs.items())),
     }
-    manifest_path.write_text(json.dumps(manifest, indent=1, sort_keys=False) + "\n")
+    write_json(manifest_path, manifest, indent=1, final_newline=True)
     n_failed = sum(r["status"] != "ok" for r in epochs.values())
     print(f"done: {len(epochs) - n_failed} ok, {n_failed} failed -> {manifest_path}")
     if n_failed:

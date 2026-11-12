@@ -21,7 +21,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import json
 import zlib
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
@@ -44,7 +43,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.runs.io import read_manifest, sha256_file
+from continuum_swr_replay.runs.io import read_manifest, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 OUT_NAME = "event_start_rest_theta"
@@ -120,31 +119,30 @@ def main(argv: Sequence[str] | None = None) -> None:
             tmp.replace(folder / f"{identifier}.parquet")
             print(f"{identifier}: {len(table)} events", flush=True)
     if not args.epochs:
-        (folder / "manifest.json").write_text(
-            json.dumps(
-                {
-                    "produced_by": produced_by(__file__),
-                    "commit": described_commit(),
-                    "event_features_run": EVENT_FEATURES_RUN,
-                    "event_table": {
-                        "path": str(event_table),
-                        "sha256": sha256_file(event_table),
-                    },
-                    "n_epochs": len(jobs),
-                    "n_windows": args.n_windows,
-                    "seed": SEED,
-                    "start_distance": "track-graph distance (env.distance_between_nodes_) "
-                    "from the animal's linear position to the MAP at the event's first "
-                    "bin with a finite MAP, both on their nearest real place bins",
-                    "rest": "head_speed below 4 cm/s, in no non-local, SWR or MUA event, "
-                    "outside excluded time; windows of the event's number of bins, "
-                    "uniform over every such window of the epoch",
-                    "theta_like": "window mean of theta_power_zscore at or above the "
-                    "epoch's median running theta (above 10 cm/s)",
+        write_json(
+            folder / "manifest.json",
+            {
+                "produced_by": produced_by(__file__),
+                "commit": described_commit(),
+                "event_features_run": EVENT_FEATURES_RUN,
+                "event_table": {
+                    "path": str(event_table),
+                    "sha256": sha256_file(event_table),
                 },
-                indent=1,
-            )
-            + "\n"
+                "n_epochs": len(jobs),
+                "n_windows": args.n_windows,
+                "seed": SEED,
+                "start_distance": "track-graph distance (env.distance_between_nodes_) "
+                "from the animal's linear position to the MAP at the event's first "
+                "bin with a finite MAP, both on their nearest real place bins",
+                "rest": "head_speed below 4 cm/s, in no non-local, SWR or MUA event, "
+                "outside excluded time; windows of the event's number of bins, "
+                "uniform over every such window of the epoch",
+                "theta_like": "window mean of theta_power_zscore at or above the "
+                "epoch's median running theta (above 10 cm/s)",
+            },
+            indent=1,
+            final_newline=True,
         )
 
 

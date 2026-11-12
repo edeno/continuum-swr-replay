@@ -26,7 +26,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import json
 import time
 from collections.abc import Sequence
 from pathlib import Path
@@ -44,7 +43,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.runs.io import files_sha256, sha256_file
+from continuum_swr_replay.runs.io import files_sha256, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 SEED = 20261028
@@ -114,40 +113,39 @@ def main(argv: Sequence[str] | None = None) -> None:
     replicates.to_parquet(folder / "replicates.parquet", index=False)
     intervals.to_csv(folder / "intervals.csv")
     event_table = table_path("event_table", replay_content_dir())
-    (folder / "manifest.json").write_text(
-        json.dumps(
-            {
-                "produced_by": produced_by(__file__),
-                "commit": described_commit(),
-                "event_table": {
-                    "path": str(event_table),
-                    "sha256": sha256_file(event_table),
-                },
-                "start_distance": {
-                    "folder": START_DIR,
-                    "n_files": len(start_paths),
-                    "sha256": files_sha256(start_paths),
-                },
-                "n_events": len(events),
-                "n_replicates": args.n_replicates,
-                "seed": SEED,
-                "levels": "animals, then epochs within animal, then events within "
-                "epoch, each with replacement",
-                "duration_strata": f"{N_STRATA} quantiles of the pooled event durations "
-                f"in whole {DECODE_SAMPLE_S * 1e3:g} ms decode samples; a stratum with "
-                f"fewer than {MIN_PER_CLASS} events of a class is left out, and a "
-                "replicate drawing no event of a class in a stratum leaves it out "
-                "(counted in intervals.csv)",
-                "max_nan_replicate_share": MAX_NAN_REPLICATE_SHARE,
-                "interval": "95 %: the estimate +/- t(0.975, n_animals - 1) "
-                "sqrt(n_animals / (n_animals - 1)) SD(replicates)",
-                "n_animals": int(events.animal.nunique()),
-                "properties": {w: list(PROPERTIES[w]) for w in args.properties},
-                "cpu_seconds": cpu_s,
+    write_json(
+        folder / "manifest.json",
+        {
+            "produced_by": produced_by(__file__),
+            "commit": described_commit(),
+            "event_table": {
+                "path": str(event_table),
+                "sha256": sha256_file(event_table),
             },
-            indent=1,
-        )
-        + "\n"
+            "start_distance": {
+                "folder": START_DIR,
+                "n_files": len(start_paths),
+                "sha256": files_sha256(start_paths),
+            },
+            "n_events": len(events),
+            "n_replicates": args.n_replicates,
+            "seed": SEED,
+            "levels": "animals, then epochs within animal, then events within "
+            "epoch, each with replacement",
+            "duration_strata": f"{N_STRATA} quantiles of the pooled event durations "
+            f"in whole {DECODE_SAMPLE_S * 1e3:g} ms decode samples; a stratum with "
+            f"fewer than {MIN_PER_CLASS} events of a class is left out, and a "
+            "replicate drawing no event of a class in a stratum leaves it out "
+            "(counted in intervals.csv)",
+            "max_nan_replicate_share": MAX_NAN_REPLICATE_SHARE,
+            "interval": "95 %: the estimate +/- t(0.975, n_animals - 1) "
+            "sqrt(n_animals / (n_animals - 1)) SD(replicates)",
+            "n_animals": int(events.animal.nunique()),
+            "properties": {w: list(PROPERTIES[w]) for w in args.properties},
+            "cpu_seconds": cpu_s,
+        },
+        indent=1,
+        final_newline=True,
     )
     print(intervals.to_string())
     print(

@@ -16,7 +16,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import shutil
 from collections.abc import Sequence
@@ -33,7 +32,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file, write_json
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -113,7 +112,7 @@ def freeze(label: str) -> Path:
         manifest["model_dirs"].append(model_dir)
         logger.info("froze model dir %s", model_dir)
 
-    (out / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
+    write_json(out / "manifest.json", manifest, indent=2, sort_keys=True)
     # Make the baseline read-only so a stray regeneration cannot overwrite it.
     for path in out.rglob("*"):
         if path.is_file():

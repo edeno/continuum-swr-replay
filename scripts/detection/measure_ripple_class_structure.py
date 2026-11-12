@@ -82,6 +82,7 @@ from continuum_swr_replay.runs.io import (  # noqa: E402
     ok_table_paths,
     read_manifest,
     sha256_file,
+    write_json,
 )
 from continuum_swr_replay.runs.provenance import (  # noqa: E402
     described_commit,
@@ -732,7 +733,7 @@ def run_analyze(args: argparse.Namespace) -> None:
             },
         },
     }
-    (folder / "manifest.json").write_text(json.dumps(manifest, indent=1) + "\n")
+    write_json(folder / "manifest.json", manifest, indent=1, final_newline=True)
     print(f"wrote {folder}")
 
 

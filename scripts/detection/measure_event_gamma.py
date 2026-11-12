@@ -56,7 +56,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -171,7 +171,7 @@ def _run(
         }
     table.to_parquet(path, index=False)
     reference["event_table_sha256"] = event_table_sha256
-    ref_path.write_text(json.dumps(reference, default=float) + "\n")
+    write_json(ref_path, reference, default=float, final_newline=True)
     return identifier, {"status": "ok", "wall_clock_s": time.perf_counter() - started}
 
 
@@ -219,25 +219,24 @@ def main(argv: Sequence[str] | None = None) -> None:
     pd.DataFrame(references).to_parquet(
         out_dir(args.out_name) / "reference.parquet", index=False
     )
-    (out_dir(args.out_name) / "manifest.json").write_text(
-        json.dumps(
-            {
-                "produced_by": produced_by(__file__),
-                "commit": described_commit(),
-                "swr_run": swr_source.SWR_INVENTORY_RUN_ID,
-                "event_table": {"path": str(event_table), "sha256": event_table_sha256},
-                "bands_hz": GAMMA_BANDS,
-                "filter": f"Butterworth order {FILTER_ORDER}, zero phase (sosfiltfilt)",
-                "power": "squared Hilbert envelope, mean over the kept CA1 tetrodes",
-                "zscore": "over the decode span outside excluded time",
-                "change_db": "10 log10 of the mean band power over each class's event "
-                "samples over the mean over quiet rest (below 4 cm/s, in no non-local, "
-                "SWR or MUA event, outside excluded time), on the decode grid",
-                "epochs": epochs,
-            },
-            indent=1,
-        )
-        + "\n"
+    write_json(
+        out_dir(args.out_name) / "manifest.json",
+        {
+            "produced_by": produced_by(__file__),
+            "commit": described_commit(),
+            "swr_run": swr_source.SWR_INVENTORY_RUN_ID,
+            "event_table": {"path": str(event_table), "sha256": event_table_sha256},
+            "bands_hz": GAMMA_BANDS,
+            "filter": f"Butterworth order {FILTER_ORDER}, zero phase (sosfiltfilt)",
+            "power": "squared Hilbert envelope, mean over the kept CA1 tetrodes",
+            "zscore": "over the decode span outside excluded time",
+            "change_db": "10 log10 of the mean band power over each class's event "
+            "samples over the mean over quiet rest (below 4 cm/s, in no non-local, "
+            "SWR or MUA event, outside excluded time), on the decode grid",
+            "epochs": epochs,
+        },
+        indent=1,
+        final_newline=True,
     )
     n_failed = sum(r["status"] != "ok" for r in epochs.values())
     print(f"done: {len(epochs) - n_failed} ok, {n_failed} failed")

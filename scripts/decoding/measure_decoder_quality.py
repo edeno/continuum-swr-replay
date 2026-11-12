@@ -23,7 +23,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import json
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -38,7 +37,7 @@ from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.paths import processed_data_dir
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 OUT_NAME = "decoder_quality"
@@ -93,25 +92,24 @@ def main(argv: Sequence[str] | None = None) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     _write_parquet(sessions, out_dir / "sessions.parquet")
     _write_parquet(calibration, out_dir / "calibration.parquet")
-    (out_dir / "manifest.json").write_text(
-        json.dumps(
-            {
-                "produced_by": produced_by(__file__),
-                "commit": described_commit(),
-                "n_epochs": len(sessions),
-                "decodes": dict(
-                    zip(sessions["epoch_id"], sessions["decode_sha256"], strict=True)
-                ),
-                "local_error": "time bins with Local_prob above 0.5 outside "
-                "excluded time; abs(ahead_behind_distance), cm",
-                "state_fractions": "mean state probability over bins faster "
-                "(moving) or slower (immobile) than 4 cm/s, outside excluded time",
-                "calibration": "median abs(ahead_behind_distance) per 0.1-wide "
-                "Local_prob bin, outside excluded time",
-            },
-            indent=1,
-        )
-        + "\n"
+    write_json(
+        out_dir / "manifest.json",
+        {
+            "produced_by": produced_by(__file__),
+            "commit": described_commit(),
+            "n_epochs": len(sessions),
+            "decodes": dict(
+                zip(sessions["epoch_id"], sessions["decode_sha256"], strict=True)
+            ),
+            "local_error": "time bins with Local_prob above 0.5 outside "
+            "excluded time; abs(ahead_behind_distance), cm",
+            "state_fractions": "mean state probability over bins faster "
+            "(moving) or slower (immobile) than 4 cm/s, outside excluded time",
+            "calibration": "median abs(ahead_behind_distance) per 0.1-wide "
+            "Local_prob bin, outside excluded time",
+        },
+        indent=1,
+        final_newline=True,
     )
     print(f"wrote {len(sessions)} epochs to {out_dir}")
 

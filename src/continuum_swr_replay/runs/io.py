@@ -104,6 +104,8 @@ def write_json(
     *,
     indent: int | None = None,
     default: Callable[[Any], Any] | None = None,
+    sort_keys: bool = False,
+    final_newline: bool = False,
 ) -> None:
     """Write `content` as strict JSON (no NaN or infinity), atomically.
 
@@ -118,6 +120,10 @@ def write_json(
     default : callable, optional
         ``json.dumps``' ``default``, for an object JSON cannot hold; None
         (the default) refuses one. The state-evidence runner passes ``str``.
+    sort_keys : bool, optional
+        ``json.dumps``' ``sort_keys``.
+    final_newline : bool, optional
+        End the file with a newline.
 
     Raises
     ------
@@ -126,7 +132,9 @@ def write_json(
     TypeError
         If `content` holds an object JSON cannot hold and `default` is None.
     """
-    text = json.dumps(content, indent=indent, allow_nan=False, default=default)
+    text = json.dumps(
+        content, indent=indent, allow_nan=False, default=default, sort_keys=sort_keys
+    ) + ("\n" if final_newline else "")
     path.parent.mkdir(parents=True, exist_ok=True)
     write_atomically(path, lambda temporary: temporary.write_text(text))
 

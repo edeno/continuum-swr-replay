@@ -32,7 +32,6 @@ Usage:
 """
 
 import argparse
-import json
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -90,7 +89,11 @@ from continuum_swr_replay.runs.device import (  # noqa: E402
     recompute_device,
     use_memoryless_device,
 )
-from continuum_swr_replay.runs.io import json_ready, read_manifest  # noqa: E402
+from continuum_swr_replay.runs.io import (  # noqa: E402
+    json_ready,
+    read_manifest,
+    write_json,
+)
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from continuum_swr_replay.visualization import (  # noqa: E402
@@ -457,38 +460,36 @@ def write_examples(
         if inputs is not None:
             inputs.results.close()
     figure_dir.mkdir(parents=True, exist_ok=True)
-    (figure_dir / "manifest.json").write_text(
-        json.dumps(
-            json_ready(
-                {
-                    "produced_by": PRODUCED_BY,
-                    "event_features_run_id": run_id,
-                    "input_runs": runs,
-                    "seed": EXAMPLE_SEED,
-                    "n_per_side": N_PER_SIDE,
-                    "sampling_rule": SAMPLING_RULE,
-                    "populations": {
-                        name: {"label": label, "roles": ROLES[name]}
-                        for name, label in POPULATIONS.items()
-                    },
-                    "comparator_detectors": COMPARATOR_DETECTORS,
-                    "cell_column": CELL_NOTE,
-                    "empty_subsets": empty,
-                    "subsets": SUBSETS,
-                    "not_calibrated": NOT_CALIBRATED,
-                    "pad_s": inventory_examples.PAD_S,
-                    "memoryless_check": {
-                        "spread_rtol": example_windows.SPREAD_RTOL,
-                        "center_tie_rtol": example_windows.CENTER_TIE_RTOL,
-                        **recompute_device(),
-                    },
-                    "pending": inventory_examples.PENDING,
-                    "figures": records,
-                }
-            ),
-            indent=2,
-            allow_nan=False,
-        )
+    write_json(
+        figure_dir / "manifest.json",
+        json_ready(
+            {
+                "produced_by": PRODUCED_BY,
+                "event_features_run_id": run_id,
+                "input_runs": runs,
+                "seed": EXAMPLE_SEED,
+                "n_per_side": N_PER_SIDE,
+                "sampling_rule": SAMPLING_RULE,
+                "populations": {
+                    name: {"label": label, "roles": ROLES[name]}
+                    for name, label in POPULATIONS.items()
+                },
+                "comparator_detectors": COMPARATOR_DETECTORS,
+                "cell_column": CELL_NOTE,
+                "empty_subsets": empty,
+                "subsets": SUBSETS,
+                "not_calibrated": NOT_CALIBRATED,
+                "pad_s": inventory_examples.PAD_S,
+                "memoryless_check": {
+                    "spread_rtol": example_windows.SPREAD_RTOL,
+                    "center_tie_rtol": example_windows.CENTER_TIE_RTOL,
+                    **recompute_device(),
+                },
+                "pending": inventory_examples.PENDING,
+                "figures": records,
+            }
+        ),
+        indent=2,
     )
     lines = [f"# Event features examples: run {run_id}", "", CAPTION, ""]
     if empty:
