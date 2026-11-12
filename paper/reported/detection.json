@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "342d9d43da1f",
+ "commit": "ffa1ceafb7cc",
  "code": {
-  "head": "342d9d43da1fd033655100ad70d0fc81ea15b793",
+  "head": "ffa1ceafb7cc93640cbacf9d957e029afb2a0b3a",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -15,7 +15,7 @@
     "code_sha256": "ab61ce34f3e1d62d6bbc8a3f9f48bb8dc9cdfc70aa5a23490c1d444ecb3a90cb"
    },
    "src/continuum_swr_replay/__init__.py": {
-    "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
+    "sha256": "6abe095d4750bc5bfe3756b4fdca8a2f2db3ee2e2da968d429adca68295b5314",
     "code_sha256": "da55fd01482a16ea3f485e7731f53606ebbb1a994b8b2bfe6d6bc2f7dde20d3a"
    },
    "src/continuum_swr_replay/analysis/__init__.py": {
@@ -27,11 +27,11 @@
     "code_sha256": "017e87339e0c9e3e05841e649c277c6deab7ae4509a0660f2f0720de061caebd"
    },
    "src/continuum_swr_replay/analysis/events/__init__.py": {
-    "sha256": "7b187fa5fd1a0b7634f9ea00bdbd2c1dd65de8561fb015f3664b4f82c682a5b2",
+    "sha256": "12f5946fb717d7fbcc6b803d775ce28baf3e5245c16581aa3428d2e760e51ebc",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/events/classified_table.py": {
-    "sha256": "a5196304acc5eacacdd951e6185e2ffc0c3cdb6562bb3dd7b3c7c9d05f3dc84a",
+    "sha256": "2fa44278332b2f02b5254ac1ac8b181d61338601acb3e98cee0bf0e1d765ac31",
     "code_sha256": "7e8a4b58b4d3c30df19b1e0733eaf41b0e16d0c10934b6d7d6eb4eb2a52fc2df"
    },
    "src/continuum_swr_replay/analysis/events/eligibility.py": {
@@ -79,8 +79,8 @@
     "code_sha256": "b1b1c3f934d17a7c694b7b18ac7209f4ca782788ccfa0cc3735fed6aa85aacd8"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/sweep_statistics.py": {
-    "sha256": "0dfeb0ff83859fdb77057d4043e80b29aa9925b643b7c90c908922a3ebd7d1f4",
-    "code_sha256": "198d0e670ee3114d43ee34b10949cfffb379f65ea1208083d9496607de3ce238"
+    "sha256": "770d5f102f9429ef8d2df5ccd4c315eb03a83b5656604f4ee5946f5241e53092",
+    "code_sha256": "98e379f7fa27902effde54b9ea189d5766d5344cfa33faef977443f98333f77a"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/window_statistics.py": {
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
@@ -91,7 +91,7 @@
     "code_sha256": "c3b3d414ebf9ae3bf3b9ac658182312806f76afb2eaaf81f16f61338895323e9"
    },
    "src/continuum_swr_replay/data_loaders/constants.py": {
-    "sha256": "17fffe227de0b66078d7952ac98ad4c886cf089d4614bd402e1b7b5a424315ad",
+    "sha256": "c21110fad5164d9869ea040e48913c3afe2f5debc7f52731d56f2b98a1270436",
     "code_sha256": "09c11436725a16c73cd9faf504a3ee37d71aa570917b5802e4d655865d2b295c"
    },
    "src/continuum_swr_replay/data_loaders/epoch_register.csv": {
@@ -119,7 +119,7 @@
     "code_sha256": "338068b33f6638598496ff6c8b1c83b29f18de54cea9d84833f7dbb7f4e61c77"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "bb70e9381257b0a341d5676cd41192562cd079ae210304e72c864ee1041f3ee5",
+    "sha256": "f18a58c8be501553ced90ef886d9a83c2b0921bafd84e562384d4765706fa0a4",
     "code_sha256": "c618c1c0a792d7431e8a6af680a8b3fff1009892418c36175ea4a22d1a4124c4"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
@@ -127,20 +127,20 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "2c1dfec78f887c1ceb6b197f75adab890a0f16dd48b287196515003821b21cb7",
-    "code_sha256": "6f6b1b40c64f8f2aeb37accd1960e10c515406418ada9bd96d52d9ee1faea370"
+    "sha256": "5993c9115a42eb68852f3fe279aae7ab3119391c5f540554c8823779c49bb6a5",
+    "code_sha256": "c7716a28226699b2539fd24eba997b4dc08d181903aee9b116e26434a06bd398"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "253391bf28f9d88cfc9d3375d3dd810f062e0ed9db6ee46b1f9ec2b6937cb8a9",
-    "code_sha256": "a4990a7727203d9f6864f7461b7cb6624f8fc926cd89d5fbeab92ae3eccd5de4"
+    "sha256": "cd7c960d9f1dd609ae3ce40ff46d065eb4ea6f0983b7f0e645e8ffc2a90f69a8",
+    "code_sha256": "b42cf7db9de97a92d47fca6ad77c0b01666df8bbddaa2e8a6e045a6224f30b45"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/runs/io.py": {
-    "sha256": "3a05e9c1bcdcf85ccae04ea7e29d7eb8ed1ba5b76490ecdc039d92f2d211b935",
-    "code_sha256": "1c55cd094982955de66a26a570df73c22ecfc25660e98985787bd973b893d3f1"
+    "sha256": "87e79ce1d88152dc4d57fa43574f78f88ea719281bc6919387ee34e045e2d8f0",
+    "code_sha256": "7f33457ee1dd4d6eb9f6822107d7e903e09ba12775aa0abdcdeb4c82eb8e7e45"
    },
    "src/continuum_swr_replay/runs/provenance.py": {
     "sha256": "0517671a2cd647305bd9f067de18ce9af20c57664d96d3537fface7c19dc38e5",
@@ -151,7 +151,7 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/tables/covariate_registry.py": {
-    "sha256": "6ede5a02c1b6ccb801755f8cc407776714665f1d1d2118fd58cc6be04f888d3d",
+    "sha256": "c733feba112569836bb2666c7b96b611ff2a8f42098f6dcbdf7e4b2f7d26a85b",
     "code_sha256": "0d3ccc246085b3b01b07217fa15c92f81e1de167ba5cb67d8d3b559ac3bb619d"
    },
    "src/continuum_swr_replay/tables/event_ids.py": {
@@ -159,30 +159,30 @@
     "code_sha256": "b9e96960eaf5aeddf470b97b17eafcba991a1a890d767a811648c811c5f46b6a"
    },
    "src/continuum_swr_replay/tables/io.py": {
-    "sha256": "6350b05f312355bc782e4cdb1577b8a69408ffc58e99f76a27d9fabcabef3eb9",
+    "sha256": "676df26ab4c376c0bb6eb60a63c792d2ef29695fc689deabc0198d73be629f11",
     "code_sha256": "068f7c9e29e6600614801562847e8e59c86c83e45173b0711a285ed8e516c4c9"
    },
    "src/continuum_swr_replay/tables/session_keys.py": {
-    "sha256": "af0c4f23a03b2374087f422371a3f0c5ced2bbf03c173ab7419f9b0cbc1fd015",
-    "code_sha256": "b9dbbf51a10fb5c54f61b15c26fcd02ab2a21be6402d530b32e716a6ebec3427"
+    "sha256": "a16f0383660f9ca8f6f7fb116312ca1f3a0f1d80a9bb5c0b6f319a3669a1f391",
+    "code_sha256": "7e44c6ea06c8b64cb6214626f3c1ce59bd0fe1d9d156b9674e53b9c078214060"
    },
    "src/continuum_swr_replay/tables/versions.py": {
     "sha256": "e4389862b4f0992453506d860b21fb44a8d4ae24ce8341a8aefe0953f137eba2",
     "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
    },
-   "docs/design/replay_detection_comparison/memoryless_comparison_recording.json": {
+   "paper/reported/inputs/detection/memoryless_comparison_recording.json": {
     "sha256": "7d4ad5263497e07ebb529319eeef4dac87b29e5fa76dccd4973cb6eb0cb7fe09",
     "code_sha256": "7d4ad5263497e07ebb529319eeef4dac87b29e5fa76dccd4973cb6eb0cb7fe09"
    },
-   "docs/design/replay_detection_comparison/detection_sweep_summary.csv": {
+   "paper/reported/inputs/detection/detection_sweep_summary.csv": {
     "sha256": "008e03c479c120ffbb298a7de058f905d6d97500c0b930abfb1071788c5a4362",
     "code_sha256": "008e03c479c120ffbb298a7de058f905d6d97500c0b930abfb1071788c5a4362"
    },
-   "docs/design/replay_detection_comparison/detection_controls_summary.csv": {
+   "paper/reported/inputs/detection/detection_controls_summary.csv": {
     "sha256": "b8c16c04c0a365b91a1af61dfb57a0369633db3e68c3414192dd09d0397d5b3d",
     "code_sha256": "b8c16c04c0a365b91a1af61dfb57a0369633db3e68c3414192dd09d0397d5b3d"
    },
-   "docs/design/replay_detection_comparison/detection_heldout_summary.csv": {
+   "paper/reported/inputs/detection/detection_heldout_summary.csv": {
     "sha256": "f41a5358c5fa87994538616414f18cde3d0cc2c1f894335b9ab64676e500e2c4",
     "code_sha256": "f41a5358c5fa87994538616414f18cde3d0cc2c1f894335b9ab64676e500e2c4"
    }
@@ -206,19 +206,19 @@
    "sha256": "5538d333d003c1959e73503938ae63cf48c937bd0673e742a79f43dae27c39bd"
   },
   {
-   "path": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json",
+   "path": "paper/reported/inputs/detection/memoryless_comparison_recording.json",
    "sha256": "7d4ad5263497e07ebb529319eeef4dac87b29e5fa76dccd4973cb6eb0cb7fe09"
   },
   {
-   "path": "docs/design/replay_detection_comparison/detection_sweep_summary.csv",
+   "path": "paper/reported/inputs/detection/detection_sweep_summary.csv",
    "sha256": "008e03c479c120ffbb298a7de058f905d6d97500c0b930abfb1071788c5a4362"
   },
   {
-   "path": "docs/design/replay_detection_comparison/detection_controls_summary.csv",
+   "path": "paper/reported/inputs/detection/detection_controls_summary.csv",
    "sha256": "b8c16c04c0a365b91a1af61dfb57a0369633db3e68c3414192dd09d0397d5b3d"
   },
   {
-   "path": "docs/design/replay_detection_comparison/detection_heldout_summary.csv",
+   "path": "paper/reported/inputs/detection/detection_heldout_summary.csv",
    "sha256": "f41a5358c5fa87994538616414f18cde3d0cc2c1f894335b9ab64676e500e2c4"
   }
  ],
@@ -235,7 +235,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -251,7 +251,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -267,7 +267,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -283,7 +283,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -299,7 +299,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -315,7 +315,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -331,7 +331,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -347,7 +347,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -363,7 +363,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -379,7 +379,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -395,7 +395,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -411,7 +411,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -427,7 +427,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -443,7 +443,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -459,7 +459,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -475,7 +475,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -491,7 +491,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -507,7 +507,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -523,7 +523,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -539,7 +539,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -555,7 +555,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -571,7 +571,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -587,7 +587,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -603,7 +603,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -619,7 +619,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -635,7 +635,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -651,7 +651,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -667,7 +667,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -683,7 +683,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -699,7 +699,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -715,7 +715,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -731,7 +731,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -747,7 +747,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -763,7 +763,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "function": "controls_values",
    "pending": null
   },
@@ -947,7 +947,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1047,7 +1047,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1063,7 +1063,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1247,7 +1247,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1263,7 +1263,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1279,7 +1279,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1295,7 +1295,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1311,7 +1311,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1327,7 +1327,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1343,7 +1343,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1359,7 +1359,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1375,7 +1375,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1391,7 +1391,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1407,7 +1407,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "function": "heldout_values",
    "pending": null
   },
@@ -1455,7 +1455,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1471,7 +1471,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1487,7 +1487,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1503,7 +1503,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1519,7 +1519,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1535,7 +1535,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1551,7 +1551,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1567,7 +1567,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1583,7 +1583,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1599,7 +1599,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1615,7 +1615,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1631,7 +1631,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1647,7 +1647,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1663,7 +1663,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1679,7 +1679,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1695,7 +1695,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1711,7 +1711,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1727,7 +1727,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1743,7 +1743,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1759,7 +1759,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1775,7 +1775,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "function": "recording_values",
    "pending": null
   },
@@ -1833,7 +1833,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -1849,7 +1849,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -1865,7 +1865,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -1881,7 +1881,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -1897,7 +1897,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -1913,7 +1913,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -1929,7 +1929,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -1945,7 +1945,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -1961,7 +1961,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -1977,7 +1977,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -1993,7 +1993,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2009,7 +2009,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2025,7 +2025,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2041,7 +2041,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2057,7 +2057,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2073,7 +2073,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2089,7 +2089,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2105,7 +2105,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2121,7 +2121,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2137,7 +2137,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2153,7 +2153,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2169,7 +2169,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2185,7 +2185,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2201,7 +2201,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2217,7 +2217,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2233,7 +2233,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2249,7 +2249,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   },
@@ -2265,7 +2265,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "function": "sweep_values",
    "pending": null
   }

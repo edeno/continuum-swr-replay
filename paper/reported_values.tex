@@ -2,7 +2,7 @@
 % Every value is read from a summary file, paper/reported/<summary>.json;
 % each macro's comment names its key and what it is.
 
-% --- survey (commit 342d9d43da1f)
+% --- survey (commit ffa1ceafb7cc)
 \newcommand{\SurveyBandHighMax}{300}  % survey.band_high_max: Largest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
 \newcommand{\SurveyBandHighMin}{200}  % survey.band_high_min: Smallest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
 \newcommand{\SurveyBandHighMode}{250}  % survey.band_high_mode: Most common upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
@@ -36,7 +36,7 @@
 \newcommand{\SurveyTimeBinMin}{2}  % survey.time_bin_min: Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)
 \newcommand{\SurveyTimeBinMode}{20}  % survey.time_bin_mode: Most common decoding time bin, over the 46 numeric cells of Time bin (ms)
 
-% --- detection (commit 342d9d43da1f)
+% --- detection (commit ffa1ceafb7cc)
 \newcommand{\DetectionControlsContinuingOursOnePerPartLongestFraction}{79}  % detection.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingOursSpanningShortestFraction}{88}  % detection.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingSlidingOnePerPartLongestFraction}{54}  % detection.controls_continuing_sliding_one_per_part_longest_fraction: continuing chains at the longest gap: share of trials the sliding window reports as one event per part
@@ -170,7 +170,7 @@
 \newcommand{\DetectionSweepStateSpaceFraction}{91}  % detection.sweep_state_space_fraction: over the whole grid, share the state-space detector reports under its own criteria
 \newcommand{\DetectionSweepStateSpaceOnlyFraction}{73}  % detection.sweep_state_space_only_fraction: share of the swept replays reported by the state-space detector and not by the sliding-window detector
 
-% --- events (commit 342d9d43da1f)
+% --- events (commit ffa1ceafb7cc)
 \newcommand{\EventsAnimals}{5}  % events.animals: animals in the event table
 \newcommand{\EventsAnimalsNonSwrMajority}{4}  % events.animals_non_swr_majority: animals in which more than half the events are non-SWR
 \newcommand{\EventsAnimalsNonSwrMoreAtWell}{5}  % events.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content
@@ -424,7 +424,7 @@
 \newcommand{\EventsStartOffsetMedianMs}{4}  % events.start_offset_median_ms: median of event start minus matched SWR start
 \newcommand{\EventsStepEvidenceCriterionAnimals}{3}  % events.step_evidence_criterion_animals: animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error
 \newcommand{\EventsStepEvidenceCriterionAnimalsSameSign}{5}  % events.step_evidence_criterion_animals_same_sign: animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval
-\newcommand{\EventsStepEvidenceCriterionShareMedian}{+0.19}  % events.step_evidence_criterion_share_median: median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference
+\newcommand{\EventsStepEvidenceCriterionShareMedian}{+0.20}  % events.step_evidence_criterion_share_median: median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference
 \newcommand{\EventsStepOtherPropertiesCriterionAnimalsMax}{1}  % events.step_other_properties_criterion_animals_max: the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count
 \newcommand{\EventsSwrContentAtWellFraction}{26}  % events.swr_content_at_well_fraction: share of SWR non-local time bins whose content is at well, weighted by time bins over sessions
 \newcommand{\EventsSwrContentNearOffFraction}{0}  % events.swr_content_near_off_fraction: share of SWR non-local time bins whose content is near off, weighted by time bins over sessions
@@ -503,7 +503,7 @@
 \newcommand{\EventsZugaroOverlapNonlocalShareMedian}{100}  % events.zugaro_overlap_nonlocal_share_median: median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\EventsZugaroOverlapUncertainShareMedian}{0}  % events.zugaro_overlap_uncertain_share_median: median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8
 
-% --- behavior (commit 342d9d43da1f)
+% --- behavior (commit ffa1ceafb7cc)
 \newcommand{\BehaviorArmrewardAll}{\ensuremath{-}0.082}  % behavior.armreward_all: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient
 \newcommand{\BehaviorArmrewardAllAnimalsPositive}{2}  % behavior.armreward_all_animals_positive: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median
 \newcommand{\BehaviorArmrewardAllQ}{0.34}  % behavior.armreward_all_q: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
@@ -802,16 +802,16 @@
 \newcommand{\BehaviorHorseraceValueNonSwrAnimals}{2}  % behavior.horserace_value_non_swr_animals: non_SWR events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median
 \newcommand{\BehaviorHorseraceValueSwr}{\ensuremath{-}0.0018}  % behavior.horserace_value_swr: SWR events: within-arm coefficient of reward-belief mean (value), the four predictors entered together; median over sessions
 \newcommand{\BehaviorHorseraceValueSwrAnimals}{5}  % behavior.horserace_value_swr_animals: SWR events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median
-\newcommand{\BehaviorLeafStepBoth}{\ensuremath{-}1.5}  % behavior.leaf_step_both: leaf ladder Mu to Mvu: median per-session AIC(parent) - AIC(child); positive = child better
-\newcommand{\BehaviorLeafStepBothAnimals}{0}  % behavior.leaf_step_both_animals: leaf ladder Mu to Mvu: animals whose median step favours the child
+\newcommand{\BehaviorLeafStepBoth}{+1.5}  % behavior.leaf_step_both: leaf ladder Mu to Mvu: median per-session AIC(child) - AIC(parent); negative = child better
+\newcommand{\BehaviorLeafStepBothAnimals}{0}  % behavior.leaf_step_both_animals: leaf ladder Mu to Mvu: animals whose median step is negative (favours the child)
 \newcommand{\BehaviorLeafStepBothClear}{12}  % behavior.leaf_step_both_clear: leaf ladder Mu to Mvu: sessions in which the child's AIC is lower by more than 2
 \newcommand{\BehaviorLeafStepBothSessions}{242}  % behavior.leaf_step_both_sessions: leaf ladder Mu to Mvu: sessions compared
-\newcommand{\BehaviorLeafStepUncertainty}{+1.3}  % behavior.leaf_step_uncertainty: leaf ladder M4 to Mu: median per-session AIC(parent) - AIC(child); positive = child better
-\newcommand{\BehaviorLeafStepUncertaintyAnimals}{5}  % behavior.leaf_step_uncertainty_animals: leaf ladder M4 to Mu: animals whose median step favours the child
+\newcommand{\BehaviorLeafStepUncertainty}{\ensuremath{-}1.3}  % behavior.leaf_step_uncertainty: leaf ladder M4 to Mu: median per-session AIC(child) - AIC(parent); negative = child better
+\newcommand{\BehaviorLeafStepUncertaintyAnimals}{5}  % behavior.leaf_step_uncertainty_animals: leaf ladder M4 to Mu: animals whose median step is negative (favours the child)
 \newcommand{\BehaviorLeafStepUncertaintyClear}{112}  % behavior.leaf_step_uncertainty_clear: leaf ladder M4 to Mu: sessions in which the child's AIC is lower by more than 2
 \newcommand{\BehaviorLeafStepUncertaintySessions}{242}  % behavior.leaf_step_uncertainty_sessions: leaf ladder M4 to Mu: sessions compared
-\newcommand{\BehaviorLeafStepValue}{\ensuremath{-}2.4}  % behavior.leaf_step_value: leaf ladder M4 to Mv: median per-session AIC(parent) - AIC(child); positive = child better
-\newcommand{\BehaviorLeafStepValueAnimals}{0}  % behavior.leaf_step_value_animals: leaf ladder M4 to Mv: animals whose median step favours the child
+\newcommand{\BehaviorLeafStepValue}{+2.4}  % behavior.leaf_step_value: leaf ladder M4 to Mv: median per-session AIC(child) - AIC(parent); negative = child better
+\newcommand{\BehaviorLeafStepValueAnimals}{0}  % behavior.leaf_step_value_animals: leaf ladder M4 to Mv: animals whose median step is negative (favours the child)
 \newcommand{\BehaviorLeafStepValueClear}{22}  % behavior.leaf_step_value_clear: leaf ladder M4 to Mv: sessions in which the child's AIC is lower by more than 2
 \newcommand{\BehaviorLeafStepValueSessions}{242}  % behavior.leaf_step_value_sessions: leaf ladder M4 to Mv: sessions compared
 \newcommand{\BehaviorLeafUncertainty}{+0.31}  % behavior.leaf_uncertainty: leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: session median coefficient
@@ -1301,7 +1301,7 @@
 \newcommand{\BehaviorStayFitsNonSwr}{1{,}936}  % behavior.stay_fits_non_swr: stratum non_swr: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included
 \newcommand{\BehaviorStayFitsSwr}{1{,}936}  % behavior.stay_fits_swr: stratum swr: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included
 \newcommand{\BehaviorStayMinQGee}{0.52}  % behavior.stay_min_q_gee: smallest FDR-adjusted pooled-GEE p over roles and strata (role best, stratum all)
-\newcommand{\BehaviorStayMinQSignrank}{0.44}  % behavior.stay_min_q_signrank: smallest FDR-adjusted per-session Wilcoxon p over roles and strata (role last_rewarded, stratum non_swr)
+\newcommand{\BehaviorStayMinQSignrank}{0.60}  % behavior.stay_min_q_signrank: smallest FDR-adjusted per-session Wilcoxon p over roles and strata (role best, stratum non_swr)
 \newcommand{\BehaviorStopDurationMeanRatio}{3.6}  % behavior.stop_duration_mean_ratio: ratio of those means
 \newcommand{\BehaviorStopDurationMeanRewarded}{2.2}  % behavior.stop_duration_mean_rewarded: well-anchored stops with a rewarded outcome: mean analysed immobility (the stop's span less the excluded time inside it)
 \newcommand{\BehaviorStopDurationMeanUnrewarded}{0.60}  % behavior.stop_duration_mean_unrewarded: well-anchored stops with an omitted outcome: mean analysed immobility (the stop's span less the excluded time inside it)
@@ -1427,7 +1427,7 @@
 \newcommand{\BehaviorUpdateCurrentSwrQ}{\ensuremath{1.3\times10^{-19}}}  % behavior.update_current_swr_q: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
 \newcommand{\BehaviorUpdateCurrentSwrSessions}{241}  % behavior.update_current_swr_sessions: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps
 
-% --- mpfc (commit 342d9d43da1f)
+% --- mpfc (commit ffa1ceafb7cc)
 \newcommand{\MpfcAnalysedEpochs}{242}  % mpfc.analysed_epochs: analysed epochs the PFC cohort is drawn from
 \newcommand{\MpfcAnimals}{5}  % mpfc.animals: animals in the mPFC population
 \newcommand{\MpfcBestModelConstantFraction}{52}  % mpfc.best_model_constant_fraction: share of units whose best model by held-out deviance is constant
@@ -1460,7 +1460,7 @@
 \newcommand{\MpfcEffectSuppressedFractionNonSwrReplay}{66}  % mpfc.effect_suppressed_fraction_non_swr_replay: share of units whose peak modulation for non-SWR replay is a decrease
 \newcommand{\MpfcEffectSuppressedFractionSwr}{62}  % mpfc.effect_suppressed_fraction_swr: share of units whose peak modulation for SWRs is a decrease
 \newcommand{\MpfcEffectSuppressedFractionSwrReplay}{63}  % mpfc.effect_suppressed_fraction_swr_replay: share of units whose peak modulation for SWR-coupled replay is a decrease
-\newcommand{\MpfcEngagementBhFraction}{6}  % mpfc.engagement_bh_fraction: share of the tested units with a Benjamini-Hochberg q below 0.05 for the engagement test, BH applied once over the pooled plus-one empirical p-values of every tested unit (scipy.stats.false_discovery_control). For reference only: the units are not independent, and the p-values sit on a 1/(R + 1) grid
+\newcommand{\MpfcEngagementBhFraction}{6}  % mpfc.engagement_bh_fraction: share of the tested units with a Benjamini-Hochberg q below 0.05 for the engagement test, BH applied once over the pooled plus-one empirical p-values of every tested unit (analysis.shared_statistics.benjamini_hochberg). For reference only: the units are not independent, and the p-values sit on a 1/(R + 1) grid
 \newcommand{\MpfcEngagementCalledFlat}{259}  % mpfc.engagement_called_flat: units called by the engagement test with no positive observed improvement
 \newcommand{\MpfcEngagementCalledFlatFraction}{7}  % mpfc.engagement_called_flat_fraction: of the units called by the engagement test, the share whose own observed held-out improvement is not positive
 \newcommand{\MpfcEngagementCalledFraction}{19}  % mpfc.engagement_called_fraction: share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive)

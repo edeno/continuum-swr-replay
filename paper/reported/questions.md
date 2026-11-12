@@ -13,11 +13,11 @@ an input.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `342d9d43da1f` | yes | 32 | 0 |
-| `detection.json` | `342d9d43da1f` | yes | 132 | 0 |
-| `events.json` | `342d9d43da1f` | yes | 331 | 0 |
-| `behavior.json` | `342d9d43da1f` | yes | 922 | 0 |
-| `mpfc.json` | `342d9d43da1f` | yes | 604 | 0 |
+| `survey.json` | `ffa1ceafb7cc` | yes | 32 | 0 |
+| `detection.json` | `ffa1ceafb7cc` | yes | 132 | 0 |
+| `events.json` | `ffa1ceafb7cc` | yes | 331 | 0 |
+| `behavior.json` | `ffa1ceafb7cc` | yes | 922 | 0 |
+| `mpfc.json` | `ffa1ceafb7cc` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -72,10 +72,10 @@ Status: computed. Figures: 1, memoryless_comparison. Values: 97.
 
 Sources:
 
-- docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)
-- docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)
-- docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
-- docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)
+- paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)
+- paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)
+- paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
+- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -404,9 +404,9 @@ Sources:
 | `\EventsRipplePeakModeAnimalMin` | 0.90 | z | lowest per-animal location of the main KDE mode of the events' peak ripple power | `events.class_distribution_values` |  |
 | `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3b |
 | `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3b |
-| `\EventsStepEvidenceCriterionAnimals` | 3 |  | animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error | `events.class_step_values` |  |
-| `\EventsStepEvidenceCriterionAnimalsSameSign` | 5 |  | animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval | `events.class_step_values` |  |
-| `\EventsStepEvidenceCriterionShareMedian` | +0.19 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | `events.class_step_values` |  |
+| `\EventsStepEvidenceCriterionAnimals` | 3 |  | animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error | `events.class_step_evidence_values` |  |
+| `\EventsStepEvidenceCriterionAnimalsSameSign` | 5 |  | animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval | `events.class_step_evidence_values` |  |
+| `\EventsStepEvidenceCriterionShareMedian` | +0.20 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | `events.class_step_evidence_values` |  |
 | `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | `events.class_step_values` |  |
 
 ### 2b.6. Does the detector target the represented content rather than an LFP proxy?
@@ -585,9 +585,9 @@ Sources:
 | `\EventsNonSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteEpochsScored` | 242 |  | epochs with a scored nonSWR-remote event | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
-| `\EventsStepEvidenceCriterionAnimals` | 3 |  | animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error | `events.class_step_values` |  |
-| `\EventsStepEvidenceCriterionAnimalsSameSign` | 5 |  | animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval | `events.class_step_values` |  |
-| `\EventsStepEvidenceCriterionShareMedian` | +0.19 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | `events.class_step_values` |  |
+| `\EventsStepEvidenceCriterionAnimals` | 3 |  | animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error | `events.class_step_evidence_values` |  |
+| `\EventsStepEvidenceCriterionAnimalsSameSign` | 5 |  | animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval | `events.class_step_evidence_values` |  |
+| `\EventsStepEvidenceCriterionShareMedian` | +0.20 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | `events.class_step_evidence_values` |  |
 | `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteDllPerSpikeMedian` | 1.18 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
@@ -1729,7 +1729,7 @@ Sources:
 | `\BehaviorStayFitsNonSwr` | 1,936 |  | stratum non_swr: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included | `behavior.stay_leave_values` |  |
 | `\BehaviorStayFitsSwr` | 1,936 |  | stratum swr: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included | `behavior.stay_leave_values` |  |
 | `\BehaviorStayMinQGee` | 0.52 |  | smallest FDR-adjusted pooled-GEE p over roles and strata (role best, stratum all) | `behavior.stay_leave_values` |  |
-| `\BehaviorStayMinQSignrank` | 0.44 |  | smallest FDR-adjusted per-session Wilcoxon p over roles and strata (role last_rewarded, stratum non_swr) | `behavior.stay_leave_values` |  |
+| `\BehaviorStayMinQSignrank` | 0.60 |  | smallest FDR-adjusted per-session Wilcoxon p over roles and strata (role best, stratum non_swr) | `behavior.stay_leave_values` |  |
 | `\BehaviorStopsAtWellWithStay` | 75,785 |  | at_well stops carrying an is_stay (Stage 6's population) | `behavior.stay_leave_values` |  |
 | `\BehaviorStopsDropped` | 26,760 |  | stops the well-anchored cohort leaves out | `behavior.stay_leave_values` |  |
 | `\BehaviorStopsDroppedWithStay` | 0 |  | of those, stops carrying an is_stay | `behavior.stay_leave_values` |  |
@@ -2041,16 +2041,16 @@ Sources:
 | `\BehaviorHorseraceValueNonSwrAnimals` | 2 |  | non_SWR events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median | `behavior.horserace_values` |  |
 | `\BehaviorHorseraceValueSwr` | −0.0018 | arm fraction per SD | SWR events: within-arm coefficient of reward-belief mean (value), the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
 | `\BehaviorHorseraceValueSwrAnimals` | 5 |  | SWR events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median | `behavior.horserace_values` |  |
-| `\BehaviorLeafStepBoth` | −1.5 | AIC | leaf ladder Mu to Mvu: median per-session AIC(parent) - AIC(child); positive = child better | `behavior.leaf_values` | uncertainty_content |
-| `\BehaviorLeafStepBothAnimals` | 0 |  | leaf ladder Mu to Mvu: animals whose median step favours the child | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepBoth` | +1.5 | AIC | leaf ladder Mu to Mvu: median per-session AIC(child) - AIC(parent); negative = child better | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepBothAnimals` | 0 |  | leaf ladder Mu to Mvu: animals whose median step is negative (favours the child) | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepBothClear` | 12 |  | leaf ladder Mu to Mvu: sessions in which the child's AIC is lower by more than 2 | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepBothSessions` | 242 |  | leaf ladder Mu to Mvu: sessions compared | `behavior.leaf_values` | uncertainty_content |
-| `\BehaviorLeafStepUncertainty` | +1.3 | AIC | leaf ladder M4 to Mu: median per-session AIC(parent) - AIC(child); positive = child better | `behavior.leaf_values` | uncertainty_content |
-| `\BehaviorLeafStepUncertaintyAnimals` | 5 |  | leaf ladder M4 to Mu: animals whose median step favours the child | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepUncertainty` | −1.3 | AIC | leaf ladder M4 to Mu: median per-session AIC(child) - AIC(parent); negative = child better | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepUncertaintyAnimals` | 5 |  | leaf ladder M4 to Mu: animals whose median step is negative (favours the child) | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepUncertaintyClear` | 112 |  | leaf ladder M4 to Mu: sessions in which the child's AIC is lower by more than 2 | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepUncertaintySessions` | 242 |  | leaf ladder M4 to Mu: sessions compared | `behavior.leaf_values` | uncertainty_content |
-| `\BehaviorLeafStepValue` | −2.4 | AIC | leaf ladder M4 to Mv: median per-session AIC(parent) - AIC(child); positive = child better | `behavior.leaf_values` | uncertainty_content |
-| `\BehaviorLeafStepValueAnimals` | 0 |  | leaf ladder M4 to Mv: animals whose median step favours the child | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepValue` | +2.4 | AIC | leaf ladder M4 to Mv: median per-session AIC(child) - AIC(parent); negative = child better | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepValueAnimals` | 0 |  | leaf ladder M4 to Mv: animals whose median step is negative (favours the child) | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepValueClear` | 22 |  | leaf ladder M4 to Mv: sessions in which the child's AIC is lower by more than 2 | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepValueSessions` | 242 |  | leaf ladder M4 to Mv: sessions compared | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafUncertainty` | +0.31 | log weight | leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: session median coefficient | `behavior.leaf_values` | uncertainty_content |
@@ -2146,7 +2146,7 @@ Sources:
 | `\MpfcEffectSuppressedFractionNonSwrReplay` | 66 % |  | share of units whose peak modulation for non-SWR replay is a decrease | `mpfc.overlap_and_effect_values` |  |
 | `\MpfcEffectSuppressedFractionSwr` | 62 % |  | share of units whose peak modulation for SWRs is a decrease | `mpfc.overlap_and_effect_values` |  |
 | `\MpfcEffectSuppressedFractionSwrReplay` | 63 % |  | share of units whose peak modulation for SWR-coupled replay is a decrease | `mpfc.overlap_and_effect_values` |  |
-| `\MpfcEngagementBhFraction` | 6 % |  | share of the tested units with a Benjamini-Hochberg q below 0.05 for the engagement test, BH applied once over the pooled plus-one empirical p-values of every tested unit (scipy.stats.false_discovery_control). For reference only: the units are not independent, and the p-values sit on a 1/(R + 1) grid | `mpfc.called_fraction_values` |  |
+| `\MpfcEngagementBhFraction` | 6 % |  | share of the tested units with a Benjamini-Hochberg q below 0.05 for the engagement test, BH applied once over the pooled plus-one empirical p-values of every tested unit (analysis.shared_statistics.benjamini_hochberg). For reference only: the units are not independent, and the p-values sit on a 1/(R + 1) grid | `mpfc.called_fraction_values` |  |
 | `\MpfcEngagementCalledFlat` | 259 |  | units called by the engagement test with no positive observed improvement | `mpfc.null_geometry_values` |  |
 | `\MpfcEngagementCalledFlatFraction` | 7 % |  | of the units called by the engagement test, the share whose own observed held-out improvement is not positive | `mpfc.null_geometry_values` |  |
 | `\MpfcEngagementCalledFraction` | 19 % |  | share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive) | `mpfc.called_fraction_values` | 4d |
