@@ -60,6 +60,10 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     longest_history_window_s,
 )
+from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
+    arrival_window_statistics,
+    ladder_fit_statistics,
+)
 from continuum_swr_replay.figure_utilities import save_figure  # noqa: E402
 from continuum_swr_replay.paths import (
     figure_dir,
@@ -130,7 +134,8 @@ def arrival_retention_note(fits: pd.DataFrame) -> str:
     ----------
     fits : pd.DataFrame
         ``all_models.pkl``; ``attrs["arrival_clock_cohort"]`` holds, per
-        population, ``n_event_bins_arrival_window`` and ``n_event_bins_frozen``.
+        population, the arrival-clock tallies
+        ``rate_fit_statistics.arrival_window_statistics`` reads.
 
     Returns
     -------
@@ -145,9 +150,7 @@ def arrival_retention_note(fits: pd.DataFrame) -> str:
     if not cohort:
         return ARRIVAL_RETENTION_NOTE
     share = {
-        population: 100
-        * cohort[population]["n_event_bins_arrival_window"]
-        / cohort[population]["n_event_bins_frozen"]
+        population: 100 * arrival_window_statistics(cohort[population])["event_share"]
         for population in ("swr", "non_local_no_swr")
     }
     return _ARRIVAL_RETENTION_TEMPLATE.format(
@@ -173,26 +176,26 @@ def plot_gof_ladder(df: pd.DataFrame) -> None:
 
     The stop-clock and arrival-clock rungs are drawn as two SEPARATE line
     segments either side of a labelled gap: they are fit to different rows, so a
-    line joining them would assert a ladder step that does not exist.
+    line joining them would assert a ladder step that does not exist. Each
+    point is ``rate_fit_statistics.ladder_fit_statistics``' summary of the
+    rung's fits.
     """
     fig, axes = plt.subplots(2, 2, figsize=(13, 8))
     stop_x, arrival_x, boundary = _ladder_positions()
+    ladder = ladder_fit_statistics(df)
     metrics = [
-        ("ks_within_band", "fraction KS within band", "mean"),
-        ("ks_statistic", "median KS statistic", "median"),
-        ("dispersion", "median dispersion (Poisson=1)", "median"),
-        ("cv_bits_per_event", "median CV bits/event vs M0", "median"),
+        ("ks_band_fraction", "fraction KS within band"),
+        ("ks_statistic_median", "median KS statistic"),
+        ("dispersion_median", "median dispersion (Poisson=1)"),
+        ("cv_bits_median", "median CV bits/event vs M0 (finite scores)"),
     ]
-    for ax, (col, label, agg) in zip(axes.flat, metrics, strict=True):
+    for ax, (col, label) in zip(axes.flat, metrics, strict=True):
         for i, oc in enumerate(
             ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
         ):
-            d = df[df.outcome == oc]
             for rungs, xs in ((STOP_LADDER, stop_x), (ARRIVAL_LADDER, arrival_x)):
                 vals = [
-                    getattr(d[d.model == m][col], agg)()
-                    if (d.model == m).any()
-                    else np.nan
+                    ladder.loc[(m, oc), col] if (m, oc) in ladder.index else np.nan
                     for m in rungs
                 ]
                 ax.plot(
@@ -228,9 +231,9 @@ def plot_gof_ladder(df: pd.DataFrame) -> None:
                 color="0.4",
                 clip_on=False,
             )
-        if col == "dispersion":
+        if col == "dispersion_median":
             ax.axhline(1, color="0.5", ls=":")
-        if col == "cv_bits_per_event":
+        if col == "cv_bits_median":
             ax.axhline(0, color="0.5", ls=":")
     axes.flat[0].legend(frameon=False, fontsize=8)
     fig.suptitle(
@@ -378,9 +381,8 @@ def plot_example_quartet(
     print(f"saved {out}")
 
 
-def _print_ladder_table(df: pd.DataFrame) -> None:
+def _print_ladder_table(ladder: pd.DataFrame) -> None:
     print("\n=== GOF up the ladder (outcome=non_local) ===")
-    g = df[df.outcome == "non_local"]
     for header, rungs in (
         ("stop clock", STOP_LADDER),
         (
@@ -395,13 +397,13 @@ def _print_ladder_table(df: pd.DataFrame) -> None:
             f"{'disp_med':>9s} {'bits_med':>9s}"
         )
         for m in rungs:
-            s = g[g.model == m]
-            if len(s):
+            if (m, "non_local") in ladder.index:
+                row = ladder.loc[(m, "non_local")]
                 print(
-                    f"{m:30s} {s.ks_within_band.mean():8.2f} "
-                    f"{s.ks_statistic.median():8.3f} "
-                    f"{s.dispersion.median():9.3f} "
-                    f"{s.cv_bits_per_event.median():9.3f}"
+                    f"{m:30s} {row.ks_band_fraction:8.2f} "
+                    f"{row.ks_statistic_median:8.3f} "
+                    f"{row.dispersion_median:9.3f} "
+                    f"{row.cv_bits_median:9.3f}"
                 )
 
 
@@ -427,39 +429,38 @@ def main(argv: Sequence[str] | None = None) -> None:
     figure_dir("rate").mkdir(parents=True, exist_ok=True)
 
     plot_gof_ladder(df)
-    _print_ladder_table(df)
+    ladder = ladder_fit_statistics(df)
+    _print_ladder_table(ladder)
 
     # --- GOF sanity: assert only what the data actually supports ---
-    g = df[df.outcome == "non_local"]
-    ks0 = g[g.model == "M0_const"].ks_within_band.mean()
-    ksf = g[g.model == FULL].ks_within_band.mean()
+    ks0 = ladder.loc[("M0_const", "non_local"), "ks_band_fraction"]
+    ksf = ladder.loc[(FULL, "non_local"), "ks_band_fraction"]
     assert ks0 < ksf, f"expected M0 KS-band frac < {FULL} ({ks0:.2f} !< {ksf:.2f})"
     print(
         f"\nKS calibration improves up the ladder: M0_const={ks0:.2f} -> {FULL}={ksf:.2f}"
     )
 
     # Honest reporting of where the textbook narrative does NOT hold:
-    bits = {
-        m: g[g.model == m].cv_bits_per_event.median()
-        for m in (*STOP_LADDER, *ARRIVAL_LADDER)
-    }
+    bits = ladder.xs("non_local", level="outcome")["cv_bits_median"]
     print(
         "CV bits/event: time block helps (M5_time={:.3f}); the raised-cosine "
         "self-history block costs held-out likelihood (M3r_histcos={:.3f}) -- "
         "in-sample KS improves but cv_bits drops. Dispersion stays ~{:.2f} "
         "(underdispersed at sparse 15 ms bins), so the dispersion->1 "
         "expectation does not apply here.".format(
-            bits["M5_time"], bits["M3r_histcos"], g[g.model == FULL].dispersion.median()
+            bits["M5_time"],
+            bits["M3r_histcos"],
+            ladder.loc[(FULL, "non_local"), "dispersion_median"],
         )
     )
 
     # --- per-event-type model-checking face of the dissociation ---
     print(f"\n=== fit quality by population (model={FULL}) ===")
     for oc in ["swr", "non_local_swr", "non_local_no_swr"]:
-        s = df[(df.outcome == oc) & (df.model == FULL)]
+        row = ladder.loc[(FULL, oc)]
         print(
-            f"  {oc:18s}: ks_band={s.ks_within_band.mean():.2f} "
-            f"bits/event_med={s.cv_bits_per_event.median():.3f} n={len(s)}"
+            f"  {oc:18s}: ks_band={row.ks_band_fraction:.2f} "
+            f"bits/event_med={row.cv_bits_median:.3f} n={int(row.n_fitted)}"
         )
 
     # --- example-session diagnostic quartets (inline refit) ---

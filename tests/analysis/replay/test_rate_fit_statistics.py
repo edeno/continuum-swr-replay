@@ -484,6 +484,8 @@ def test_ladder_fit_statistics_have_one_row_per_rung_and_population():
             "separated": [True, False, False, None, False, False],
             "cv_bits_per_event": [0.5, NAN, 1.5, -np.inf, 0.25, 0.75],
             "ks_within_band": [True, True, False, None, False, False],
+            "ks_statistic": [0.1, 0.4, 0.2, NAN, 0.3, 0.5],
+            "dispersion": [0.5, 0.75, 0.25, 4.0, NAN, 1.0],
         }
     )
     table = stats.ladder_fit_statistics(fits)
@@ -499,6 +501,8 @@ def test_ladder_fit_statistics_have_one_row_per_rung_and_population():
         "cv_not_finite_fraction": 0.5,  # two of all four fits
         # two of the three fits that carry the flag, not of all four
         "ks_band_fraction": pytest.approx(2 / 3),
+        "ks_statistic_median": 0.2,  # of the three fits that carry one
+        "dispersion_median": 0.625,  # of all four (their mean is 1.375)
     }
     assert table.loc[("M0", "non_local")].to_dict() == {
         "n_fitted": 2,
@@ -509,6 +513,8 @@ def test_ladder_fit_statistics_have_one_row_per_rung_and_population():
         "cv_bits_median": 0.5,
         "cv_not_finite_fraction": 0.0,
         "ks_band_fraction": 0.0,
+        "ks_statistic_median": 0.4,
+        "dispersion_median": 1.0,  # the one fit that carries one
     }
 
 

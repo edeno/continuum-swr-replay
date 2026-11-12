@@ -454,8 +454,8 @@ def ladder_fit_statistics(fits: pd.DataFrame) -> pd.DataFrame:
     fits : pd.DataFrame
         Per-session fits of the ladder, with ``model``, ``outcome``,
         ``coef_Intercept``, ``aic``, ``separated``, ``cv_bits_per_event`` (the
-        held-out score) and ``ks_within_band`` (whether the rescaled waiting
-        times stay inside the KS band).
+        held-out score), ``ks_within_band`` (whether the rescaled waiting
+        times stay inside the KS band), ``ks_statistic`` and ``dispersion``.
 
     Returns
     -------
@@ -474,6 +474,10 @@ def ladder_fit_statistics(fits: pd.DataFrame) -> pd.DataFrame:
         - ``ks_band_fraction``: of the fits that carry the KS flag, the share
           inside the band. A fit without the flag is left out of this share,
           though it counts in the two shares above.
+        - ``ks_statistic_median``: the median KS statistic of the rescaled
+          waiting times, over the fits that carry one.
+        - ``dispersion_median``: the median Pearson dispersion (1 for a
+          Poisson count), over the fits that carry one.
     """
     rows = {}
     for rung, rung_fits in fits.groupby(["model", "outcome"]):
@@ -488,6 +492,8 @@ def ladder_fit_statistics(fits: pd.DataFrame) -> pd.DataFrame:
             "cv_bits_median": finite_cv.median(),
             "cv_not_finite_fraction": float((~np.isfinite(cv)).mean()),
             "ks_band_fraction": float(rung_fits["ks_within_band"].mean()),
+            "ks_statistic_median": rung_fits["ks_statistic"].median(),
+            "dispersion_median": rung_fits["dispersion"].median(),
         }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis(
         ["model", "outcome"]
