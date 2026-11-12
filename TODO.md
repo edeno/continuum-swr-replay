@@ -61,11 +61,8 @@ Work that is deferred on purpose. Each item says when it should be done.
     numbers are `memoryless_sequence/sweep_statistics.py`'s.
   - behavior: `scripts/rate/plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`,
     `plot_model_checking.py` and `fit_per_bin_rate_models.py` (the arrival-window
-    shares), `scripts/behavior/run_stay_leave.py` (the pooled GEE's correction),
-    `scripts/coupling/fit_swr_power_model.py` and
-    `scripts/content/fit_swr_contrast_content.py` (animals positive, signed-rank
-    p), against `analysis/replay/coefficient_statistics.py`,
-    `rate_fit_statistics.py`, `stop_statistics.py` and `learning.py`.
+    shares), against `analysis/replay/coefficient_statistics.py`,
+    `rate_fit_statistics.py` and `stop_statistics.py`.
 
   *When:* at each figure's or report's next regeneration.
 
