@@ -2,7 +2,8 @@
 
 A fraction fit's AIC is a quasi-likelihood quantity at the event scale and a
 count fit's is at the timebin scale; the two are not comparable, so the plotted
-ΔAIC has to say which one it is.
+ΔAIC has to say which one it is. ΔAIC is the child's AIC minus the parent's,
+so a negative bar is a step whose child is better.
 """
 
 from __future__ import annotations
@@ -13,7 +14,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 import pytest
+from matplotlib.colors import to_rgba
 
+from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.replay_content_plots import (
     plot_coefficient_forest,
     plot_model_hierarchy_comparison,
@@ -23,9 +26,10 @@ COMPARISON = pd.DataFrame(
     {
         "parent": ["M0", "M1"],
         "child": ["M1", "M2"],
-        "delta_aic_median": [12.0, -3.0],
-        "delta_aic_q25": [8.0, -6.0],
-        "delta_aic_q75": [16.0, 1.0],
+        # M0 -> M1: the child's AIC is lower (negative); M1 -> M2: higher.
+        "delta_aic_median": [-12.0, 3.0],
+        "delta_aic_q25": [-16.0, -1.0],
+        "delta_aic_q75": [-8.0, 6.0],
         "n_sessions": [215, 215],
         "child_better_aic": [200, 40],
     }
@@ -35,12 +39,15 @@ COMPARISON = pd.DataFrame(
 @pytest.mark.parametrize(
     "scale_label,expected",
     [
-        (None, "ΔAIC (positive = child better)"),
+        (None, "ΔAIC, child − parent (negative = child better)"),
         (
             "event-scale (quasi)",
-            "ΔAIC, event-scale (quasi) (positive = child better)",
+            "ΔAIC, child − parent, event-scale (quasi) (negative = child better)",
         ),
-        ("timebin-scale", "ΔAIC, timebin-scale (positive = child better)"),
+        (
+            "timebin-scale",
+            "ΔAIC, child − parent, timebin-scale (negative = child better)",
+        ),
     ],
 )
 def test_the_axis_names_the_scale_the_fit_was_on(scale_label, expected) -> None:
@@ -48,6 +55,23 @@ def test_the_axis_names_the_scale_the_fit_was_on(scale_label, expected) -> None:
     try:
         plot_model_hierarchy_comparison(COMPARISON, ax=ax, scale_label=scale_label)
         assert ax.get_ylabel() == expected
+    finally:
+        plt.close("all")
+
+
+def test_a_step_whose_child_is_better_is_drawn_negative_in_the_non_local_colour():
+    _fig, ax = plt.subplots()
+    try:
+        plot_model_hierarchy_comparison(COMPARISON, ax=ax)
+        bars = ax.patches
+        assert [bar.get_height() for bar in bars] == [-12.0, 3.0]
+        assert bars[0].get_facecolor() == to_rgba(COLORS["Non-Local"], 0.7)
+        assert bars[1].get_facecolor() == to_rgba(COLORS["SWR"], 0.7)
+        (errors,) = ax.collections
+        assert [list(seg[:, 1]) for seg in errors.get_segments()] == [
+            [-16.0, -8.0],
+            [-1.0, 6.0],
+        ]
     finally:
         plt.close("all")
 

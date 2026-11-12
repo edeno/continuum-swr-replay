@@ -28,7 +28,9 @@ def plot_model_hierarchy_comparison(
     """Plot ΔAIC across the model hierarchy.
 
     Bar chart showing median ΔAIC at each step (M0→M1, M1→M2, ...),
-    with error bars for IQR and annotations for session counts.
+    with error bars for IQR and annotations for session counts. ΔAIC is the
+    child's AIC minus the parent's, so a bar below zero, drawn in the
+    non-local colour, is a step whose child is better.
 
     Parameters
     ----------
@@ -58,7 +60,7 @@ def plot_model_hierarchy_comparison(
     q25 = comparison_df.get("delta_aic_q25", pd.Series(dtype=float)).values
     q75 = comparison_df.get("delta_aic_q75", pd.Series(dtype=float)).values
 
-    colors = [COLORS["Non-Local"] if d > 0 else COLORS["SWR"] for d in daic]
+    colors = [COLORS["Non-Local"] if d < 0 else COLORS["SWR"] for d in daic]
     ax.bar(range(len(steps)), daic, color=colors, alpha=0.7, edgecolor="none")
 
     # Error bars if IQR available
@@ -79,9 +81,9 @@ def plot_model_hierarchy_comparison(
     ax.set_xticks(range(len(steps)))
     ax.set_xticklabels(steps, rotation=45, ha="right")
     ax.set_ylabel(
-        "ΔAIC (positive = child better)"
+        "ΔAIC, child − parent (negative = child better)"
         if scale_label is None
-        else f"ΔAIC, {scale_label} (positive = child better)"
+        else f"ΔAIC, child − parent, {scale_label} (negative = child better)"
     )
     ax.set_title("Model Hierarchy Comparison")
 
