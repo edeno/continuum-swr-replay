@@ -107,7 +107,9 @@ from continuum_swr_replay.analysis.pfc.load_population import (
 from continuum_swr_replay.analysis.pfc.matched_control import artifact_dropped_events
 from continuum_swr_replay.analysis.pfc.modulation import (
     curve_coefficients,
+    curve_standard_error,
     in_report_window,
+    peri_event_rate,
 )
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 from continuum_swr_replay.paths import processed_data_dir
@@ -126,6 +128,9 @@ warnings.filterwarnings("ignore")
 # Panel a — Single-neuron example (overlaid SWR + non-SWR modulation)
 # ---------------------------------------------------------------------------
 
+
+#: Panel a's PSTH bin width, s.
+PSTH_BIN_S = 0.010
 
 #: The range panel a always shows: 0.5x to 2x, on the log-modulation scale.
 MODULATION_REFERENCE_BOUNDS = (np.log(0.5), np.log(2.0))
@@ -227,11 +232,11 @@ def plot_single_neuron_overlay(
     for cfg in model_configs:
         model, coefficients = curve_coefficients(cfg["curve"], n_basis)
         result = glm_results[model]
-        params = np.asarray(result.params)[coefficients]
-        covariance = np.asarray(result.covariance)[coefficients, coefficients]
-        modulation = spline_basis @ params
-        variance = np.einsum("lp,pq,lq->l", spline_basis, covariance, spline_basis)
-        standard_error = np.sqrt(np.clip(variance, 0.0, None))
+        modulation, standard_error = curve_standard_error(
+            spline_basis,
+            np.asarray(result.params)[coefficients],
+            np.asarray(result.covariance)[coefficients, coefficients],
+        )
         upper = modulation + standard_error
         lower = modulation - standard_error
         drawn += [modulation, upper, lower]
@@ -277,31 +282,17 @@ def plot_single_neuron_overlay(
     )
 
     # ── Sub-row 2: overlaid PSTHs ──
-    # Cheap manual PSTH: compute spike-count density in lag bins around
-    # each event start for each event type.
-    psth_bin_ms = 10.0
-    psth_edges = np.arange(
-        lag_bounds[0], lag_bounds[1] + psth_bin_ms / 1000.0, psth_bin_ms / 1000.0
-    )
-    psth_centers = 0.5 * (psth_edges[:-1] + psth_edges[1:])
-
+    # The rate in 10-ms lag bins around each event start, per event type.
     for cfg in model_configs:
         events = event_times[cfg["event_key"]]
         if len(events) == 0:
             continue
-        starts = events["start_time"].to_numpy()
-        rel = []
-        for t0 in starts:
-            in_window = (neuron_spike_times >= t0 + lag_bounds[0]) & (
-                neuron_spike_times <= t0 + lag_bounds[1]
-            )
-            rel.append(neuron_spike_times[in_window] - t0)
-        if rel:
-            all_rel = np.concatenate(rel)
-        else:
-            all_rel = np.array([])
-        counts, _ = np.histogram(all_rel, bins=psth_edges)
-        rate = counts / (len(starts) * (psth_bin_ms / 1000.0))
+        psth_centers, rate = peri_event_rate(
+            neuron_spike_times,
+            events["start_time"].to_numpy(),
+            lag_bounds,
+            bin_s=PSTH_BIN_S,
+        )
         ax_psth.plot(
             psth_centers,
             rate,

@@ -1,7 +1,8 @@
 """Deviance and modulation statistics for the PFC GLMs.
 
-Deviance fractions for the nested model pairs, and the peak peri-event
-log-rate modulation, its standard error and the separation checks.
+Deviance fractions for the nested model pairs, the peak peri-event log-rate
+modulation, its standard error and the separation checks, one unit's kernel with
+its pointwise standard error, and a unit's firing rate around events.
 """
 
 from typing import Any, NamedTuple
@@ -224,6 +225,75 @@ def peak_modulation_se(
     at_peak = basis[np.clip(peak_index, 0, len(basis) - 1)]
     variance = np.einsum("np,npq,nq->n", at_peak, covariance, at_peak)
     return np.where(peak_index >= 0, np.sqrt(np.clip(variance, 0.0, None)), np.nan)
+
+
+def curve_standard_error(
+    spline_basis: NDArray, params: NDArray, covariance: NDArray
+) -> tuple[NDArray, NDArray]:
+    """One unit's kernel at every lag, and its pointwise standard error.
+
+    The kernel at a lag is ``b(lag)' beta`` and its variance
+    ``b(lag)' cov(beta) b(lag)``, the off-diagonal terms included (as
+    :func:`peak_modulation_se` at the peak alone). A variance rounded below
+    zero is taken as zero.
+
+    Parameters
+    ----------
+    spline_basis : NDArray, shape (n_lags, n_basis)
+    params : NDArray, shape (n_basis,)
+        One basis block of the fit's coefficients (:func:`curve_coefficients`).
+    covariance : NDArray, shape (n_basis, n_basis)
+        Covariance of that block.
+
+    Returns
+    -------
+    curve, standard_error : NDArray, shape (n_lags,)
+    """
+    curve = spline_basis @ params
+    variance = np.einsum("lp,pq,lq->l", spline_basis, covariance, spline_basis)
+    return curve, np.sqrt(np.clip(variance, 0.0, None))
+
+
+def peri_event_rate(
+    spike_times: NDArray,
+    event_times: NDArray,
+    lag_bounds: tuple[float, float],
+    bin_s: float,
+) -> tuple[NDArray, NDArray]:
+    """A unit's firing rate around events, averaged over events (a PSTH).
+
+    Each spike within ``lag_bounds`` of an event (both bounds included) counts
+    at its lag from that event, once per event it falls near; the rate is the
+    count per bin divided by the number of events and the bin width.
+
+    Parameters
+    ----------
+    spike_times : NDArray, shape (n_spikes,)
+        The unit's spike times, s.
+    event_times : NDArray, shape (n_events,)
+        The times the spikes are aligned to, s; at least one.
+    lag_bounds : tuple of float
+        First and last lag, s.
+    bin_s : float
+        Bin width, s. The bins run from the first lag in steps of ``bin_s``
+        (``np.arange``) up to the last lag.
+
+    Returns
+    -------
+    centers, rate : NDArray, shape (n_bins,)
+        Each bin's middle lag, s, and the rate in it, Hz.
+    """
+    edges = np.arange(lag_bounds[0], lag_bounds[1] + bin_s, bin_s)
+    lags = [
+        spike_times[
+            (spike_times >= start + lag_bounds[0])
+            & (spike_times <= start + lag_bounds[1])
+        ]
+        - start
+        for start in event_times
+    ]
+    counts, _ = np.histogram(np.concatenate(lags), bins=edges)
+    return 0.5 * (edges[:-1] + edges[1:]), counts / (len(event_times) * bin_s)
 
 
 def is_separated(params: NDArray, threshold: float = SEPARATED_LOG_RATE) -> NDArray:
