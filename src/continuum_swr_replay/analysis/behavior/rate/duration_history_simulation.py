@@ -532,8 +532,9 @@ def fit_history_direction(
 def summarize_direction(result: dict) -> dict:
     """The AIC contrasts of one :func:`fit_history_direction` result.
 
-    Positive values favour the more complex rung, or (``*_offset_vs_onset``)
-    the offset anchor.
+    Each is the AIC of the more complex rung minus that of the simpler one,
+    or (``*_offset_vs_onset``) of the offset anchor minus the onset anchor:
+    negative values favour the more complex rung, or the offset anchor.
 
     Returns
     -------
@@ -544,25 +545,25 @@ def summarize_direction(result: dict) -> dict:
         duration-aware: the chosen self rung -> it plus the cross block with
         both anchors, a fixed block so the test is not chosen by the data),
         and for the duration-aware design ``self_offset_vs_onset`` (AIC of
-        onset-only minus offset-only self history), ``cross_offset_vs_onset``
+        offset-only minus onset-only self history), ``cross_offset_vs_onset``
         (the same for the cross block, on the chosen self rung),
         ``best_self`` and ``best``.
     """
     aic = result["aic"]
     if not result["duration_aware"]:
         return {
-            "delta_aic_self": aic["none"] - aic["self"],
-            "delta_aic_cross": aic["self"] - aic["self+cross"],
+            "delta_aic_self": aic["self"] - aic["none"],
+            "delta_aic_cross": aic["self+cross"] - aic["self"],
             "best_self": "self",
             "best": result["best"],
         }
     best_self = result["best_self"]
     cross = {a: aic[f"{best_self}+cross_{a}"] for a in ANCHOR_SETS}
     return {
-        "delta_aic_self": aic["none"] - aic["self_both"],
-        "delta_aic_cross": aic[best_self] - cross["both"],
-        "self_offset_vs_onset": aic["self_onset"] - aic["self_offset"],
-        "cross_offset_vs_onset": cross["onset"] - cross["offset"],
+        "delta_aic_self": aic["self_both"] - aic["none"],
+        "delta_aic_cross": cross["both"] - aic[best_self],
+        "self_offset_vs_onset": aic["self_offset"] - aic["self_onset"],
+        "cross_offset_vs_onset": cross["offset"] - cross["onset"],
         "best_self": best_self,
         "best": result["best"],
     }

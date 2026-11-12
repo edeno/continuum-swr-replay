@@ -189,11 +189,12 @@ def _peak(result: dict, rung: str, block: str) -> tuple[int, float]:
 @pytest.mark.parametrize("response", STREAMS)
 def test_a_current_design_reads_history_into_independent_events(fits, response):
     """(a) No dependence: the shipped design still finds self- and cross-history
-    (AIC gains > 50) and a deep short-lag dip (log RR < -2): non-overlap read
-    as refractoriness and as cross-stream inhibition."""
+    (AIC lower by > 50: a child-minus-parent difference below -50) and a deep
+    short-lag dip (log RR < -2): non-overlap read as refractoriness and as
+    cross-stream inhibition."""
     result, summary = fits("a_independent", response, False)
-    assert summary["delta_aic_self"] > 50
-    assert summary["delta_aic_cross"] > 50
+    assert summary["delta_aic_self"] < -50
+    assert summary["delta_aic_cross"] < -50
     for block in ("self_onset", "cross_onset"):
         assert result["kernels"]["self+cross"][block][0] < -2
 
@@ -201,11 +202,11 @@ def test_a_current_design_reads_history_into_independent_events(fits, response):
 @pytest.mark.parametrize("response", STREAMS)
 def test_a_duration_aware_design_finds_no_history(fits, response):
     """(a) The at-risk design with onset+offset history finds nothing: the self
-    block (both anchors) gains < 4 AIC and the cross block < 10, and every
-    onset lies in an at-risk bin."""
+    block (both anchors) lowers the AIC by < 4 and the cross block by < 10
+    (differences above -4 and -10), and every onset lies in an at-risk bin."""
     result, summary = fits("a_independent", response, True)
-    assert summary["delta_aic_self"] < 4
-    assert summary["delta_aic_cross"] < 10
+    assert summary["delta_aic_self"] > -4
+    assert summary["delta_aic_cross"] > -10
     assert result["design_attrs"]["n_onsets_not_at_risk"] == 0
 
 
@@ -222,11 +223,11 @@ def test_b_current_design_reads_fragmentation_as_an_onset_locked_burst(fits):
 @pytest.mark.parametrize("response", STREAMS)
 def test_b_duration_aware_design_finds_offset_locked_history(fits, response):
     """(b) Offset-only history beats onset-only by > 50 AIC for the self and
-    the cross block, and the offset kernel peaks at lag 2-3 (30-45 ms; truth
+    the cross block (AIC(offset) - AIC(onset) < -50), and the offset kernel peaks at lag 2-3 (30-45 ms; truth
     peaks at lag 3, log RR 1.39) with log RR within 0.4 of the truth's peak."""
     result, summary = fits("b_fragmentation", response, True)
-    assert summary["self_offset_vs_onset"] > 50
-    assert summary["cross_offset_vs_onset"] > 50
+    assert summary["self_offset_vs_onset"] < -50
+    assert summary["cross_offset_vs_onset"] < -50
     assert summary["best_self"] in ("self_offset", "self_both")
     truth = true_lag_kernel(
         SCENARIOS["b_fragmentation"], target=response, source=response, anchor="offset"
@@ -238,12 +239,13 @@ def test_b_duration_aware_design_finds_offset_locked_history(fits, response):
 
 @pytest.mark.parametrize("response", STREAMS)
 def test_c_duration_aware_design_finds_onset_locked_rhythm(fits, response):
-    """(c) Onset-only history beats offset-only by > 30 AIC, and adding the
-    cross block gains < 10 (there is no coupling)."""
+    """(c) Onset-only history beats offset-only by > 30 AIC (AIC(offset) -
+    AIC(onset) > 30), and adding the cross block lowers the AIC by < 10
+    (there is no coupling)."""
     _, summary = fits("c_onset_rhythm", response, True)
-    assert summary["self_offset_vs_onset"] < -30
+    assert summary["self_offset_vs_onset"] > 30
     assert summary["best_self"] in ("self_onset", "self_both")
-    assert summary["delta_aic_cross"] < 10
+    assert summary["delta_aic_cross"] > -10
 
 
 def test_c_onset_rhythm_kernel_is_recovered(fits):
@@ -260,19 +262,20 @@ def test_c_onset_rhythm_kernel_is_recovered(fits):
 
 def test_d_current_design_reads_coupling_both_ways(fits):
     """(d) SWR-coupled -> non-SWR coupling only, yet the shipped design also
-    gains > 50 AIC from cross-history in the reverse direction."""
+    gains > 50 AIC from cross-history in the reverse direction (a difference
+    below -50)."""
     _, summary = fits("d_cross_swr_to_nonswr", "swr", False)
-    assert summary["delta_aic_cross"] > 50
+    assert summary["delta_aic_cross"] < -50
 
 
 def test_d_duration_aware_design_finds_the_direction_and_lag(fits):
-    """(d) Non-SWR given SWR-coupled: cross history gains > 50 AIC, offset
-    beats onset by > 50, and the cross offset kernel peaks at lag 3 +-1
+    """(d) Non-SWR given SWR-coupled: cross history lowers the AIC by > 50,
+    offset beats onset by > 50, and the cross offset kernel peaks at lag 3 +-1
     (truth: lag 3, log RR 1.33) within 0.4; SWR-coupled given non-SWR: the
-    cross block gains < 10."""
+    cross block lowers it by < 10."""
     result, summary = fits("d_cross_swr_to_nonswr", "no_swr", True)
-    assert summary["delta_aic_cross"] > 50
-    assert summary["cross_offset_vs_onset"] > 50
+    assert summary["delta_aic_cross"] < -50
+    assert summary["cross_offset_vs_onset"] < -50
     truth = true_lag_kernel(
         SCENARIOS["d_cross_swr_to_nonswr"],
         target="no_swr",
@@ -283,7 +286,7 @@ def test_d_duration_aware_design_finds_the_direction_and_lag(fits):
     assert abs(lag - 3) <= 1
     assert log_rr == pytest.approx(truth.max(), abs=0.4)
     _, reverse = fits("d_cross_swr_to_nonswr", "swr", True)
-    assert reverse["delta_aic_cross"] < 10
+    assert reverse["delta_aic_cross"] > -10
 
 
 def test_constant_durations_hide_the_anchor_of_an_onset_rhythm(fits):
@@ -291,12 +294,12 @@ def test_constant_durations_hide_the_anchor_of_an_onset_rhythm(fits):
     by a fixed lag, so the two blocks nearly coincide: the first canonical
     correlation between them is > 0.9 (0.938 here), and the onset-locked rhythm
     of (c) is no longer told from an offset-locked one (|AIC contrast| < 15;
-    -6.0 here, -25 to +6 over seeds 0-2 at log-SD <= 0.1). With the default
-    spread (log-SD 0.45) the correlation is < 0.75 (0.694) and onset wins by
-    > 50 AIC (70.1)."""
+    AIC(offset) - AIC(onset) is +6.0 here, -6 to +25 over seeds 0-2 at log-SD
+    <= 0.1). With the default spread (log-SD 0.45) the correlation is < 0.75
+    (0.694) and onset wins by > 50 AIC (+70.1)."""
     constant, constant_summary = fits("c_onset_rhythm", "no_swr", True, sigma=0.0)
     spread, spread_summary = fits("c_onset_rhythm", "no_swr", True)
     assert constant["collinearity"]["canonical_corr_self"] > 0.9
     assert spread["collinearity"]["canonical_corr_self"] < 0.75
     assert abs(constant_summary["self_offset_vs_onset"]) < 15
-    assert spread_summary["self_offset_vs_onset"] < -50
+    assert spread_summary["self_offset_vs_onset"] > 50
