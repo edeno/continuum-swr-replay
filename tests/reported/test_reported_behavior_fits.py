@@ -476,26 +476,42 @@ def _coefficient_fits(term: str, coefficients, se: float) -> pd.DataFrame:
     )
 
 
+def _rung_fit(aic, frame: pd.DataFrame | None = None) -> pd.DataFrame:
+    """One rung's fit statistics in the six sessions, beside ``frame``'s columns."""
+    fit = frame if frame is not None else _coefficient_fits("unused", [0.0] * 6, 0.1)
+    return fit.assign(llf=-40.0, aic=aic, bic=aic, n_params=3, n_events=50)
+
+
 def test_leaf_values_read_each_rung_s_own_term_and_step(tmp_path):
     rising = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]  # median 0.35
-    _coefficient_fits(
-        "reward_belief_variance_candidate_arm_preoutcome_z", rising, 0.05
+    # Each step's per-session AIC(child) - AIC(parent), sessions in ANIMALS order
+    # (a, a, b, c, d, e):
+    # M4 -> Mu  [-10, -6, -1, -3, 4, -5]: median -4, four below -2; animal
+    #           medians -8, -1, -3, 4, -5, four negative. The child is better.
+    # M4 -> Mv  [3, 1, 5, -4, 2, 6]: median 2.5, one below -2; animal medians
+    #           2, 5, -4, 2, 6, one negative. The parent is better.
+    # Mu -> Mvu [-1, 0.5, -2.5, 1.5, -0.5, 3]: median 0, one below -2; animal
+    #           medians -0.25, -2.5, 1.5, -0.5, 3, three negative.
+    m4 = np.full(6, 100.0)
+    mu = m4 + [-10, -6, -1, -3, 4, -5]
+    mv = m4 + [3, 1, 5, -4, 2, 6]
+    mvu = mu + [-1, 0.5, -2.5, 1.5, -0.5, 3]
+    _rung_fit(m4).to_pickle(tmp_path / "M4.pkl")
+    _rung_fit(
+        mu,
+        _coefficient_fits(
+            "reward_belief_variance_candidate_arm_preoutcome_z", rising, 0.05
+        ),
     ).to_pickle(tmp_path / "Mu.pkl")
-    _coefficient_fits(
-        "reward_belief_mean_candidate_arm_preoutcome", [-2 * c for c in rising], 0.07
+    _rung_fit(
+        mv,
+        _coefficient_fits(
+            "reward_belief_mean_candidate_arm_preoutcome",
+            [-2 * c for c in rising],
+            0.07,
+        ),
     ).to_pickle(tmp_path / "Mv.pkl")
-    pd.DataFrame(
-        {
-            # the last row is another step into Mu, which the summary does not read
-            "parent": ["M4", "M4", "Mu", "M3"],
-            "child": ["Mu", "Mv", "Mvu", "Mu"],
-            "n_animals": 5,
-            "delta_aic_median": [1.0, 2.0, 3.0, 9.0],
-            "child_better_aic": [10, 20, 30, 90],
-            "n_sessions": [40, 50, 60, 90],
-            "n_animals_child_better": [3, 4, 5, 1],
-        }
-    ).to_pickle(tmp_path / "model_comparison.pkl")
+    _rung_fit(mvu).to_pickle(tmp_path / "Mvu.pkl")
     values = _values(behavior.leaf_values(tmp_path, "source"))
     assert values["leaf_uncertainty"] == pytest.approx(0.35)
     assert values["leaf_value"] == pytest.approx(-0.7)
@@ -504,12 +520,37 @@ def test_leaf_values_read_each_rung_s_own_term_and_step(tmp_path):
     assert values["leaf_value_animals_positive"] == 0
     assert values["leaf_uncertainty_se"] == pytest.approx(0.05)
     assert values["leaf_value_se"] == pytest.approx(0.07)
-    assert values["leaf_step_uncertainty"] == 1.0
-    assert values["leaf_step_value"] == 2.0
-    assert values["leaf_step_both"] == 3.0
-    assert values["leaf_step_value_clear"] == 20
-    assert values["leaf_step_value_sessions"] == 50
-    assert values["leaf_step_value_animals"] == 4
+    assert values["leaf_step_uncertainty"] == -4.0
+    assert values["leaf_step_uncertainty_clear"] == 4
+    assert values["leaf_step_uncertainty_animals"] == 4
+    assert values["leaf_step_value"] == 2.5
+    assert values["leaf_step_value_clear"] == 1
+    assert values["leaf_step_value_sessions"] == 6
+    assert values["leaf_step_value_animals"] == 1
+    assert values["leaf_step_both"] == 0.0
+    assert values["leaf_step_both_clear"] == 1
+    assert values["leaf_step_both_animals"] == 3
+
+
+def test_leaf_steps_ignore_a_stored_comparison(tmp_path):
+    """A bundle's model_comparison.pkl written in the old sign (parent minus
+    child) is not read: the step comes from the rungs' own AICs."""
+    m4 = np.full(6, 100.0)
+    mu = m4 - 10.0
+    for name, aic in (("M4", m4), ("Mvu", mu)):
+        _rung_fit(aic).to_pickle(tmp_path / f"{name}.pkl")
+    for name, aic, term in (
+        ("Mu", mu, "reward_belief_variance_candidate_arm_preoutcome_z"),
+        ("Mv", m4, "reward_belief_mean_candidate_arm_preoutcome"),
+    ):
+        _rung_fit(aic, _coefficient_fits(term, [0.1] * 6, 0.05)).to_pickle(
+            tmp_path / f"{name}.pkl"
+        )
+    pd.DataFrame(
+        {"parent": ["M4"], "child": ["Mu"], "n_animals": 5, "delta_aic_median": 10.0}
+    ).to_pickle(tmp_path / "model_comparison.pkl")
+    values = _values(behavior.leaf_values(tmp_path, "source"))
+    assert values["leaf_step_uncertainty"] == -10.0
 
 
 def test_choice_values_read_each_block_s_own_term():

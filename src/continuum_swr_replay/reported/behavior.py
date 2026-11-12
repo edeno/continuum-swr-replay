@@ -87,6 +87,10 @@ from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
     term_separation_statistics,
 )
 from continuum_swr_replay.analysis.behavior.content import content_statistics
+from continuum_swr_replay.analysis.behavior.content.model_comparison import (
+    compare_nested_models,
+    summarize_comparison,
+)
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     MAX_UNIDENTIFIED_SHARE,
     MIN_SESSIONS_PER_TERM,
@@ -303,6 +307,9 @@ ESTIMATORS = {
 
 #: Leaf-ladder steps: key word -> (parent, child).
 LEAF_STEPS = {"uncertainty": ("M4", "Mu"), "value": ("M4", "Mv"), "both": ("Mu", "Mvu")}
+
+#: The leaf ladder's rung files the summary reads: the steps' rungs.
+LEAF_RUNGS = ("M4", "Mu", "Mv", "Mvu")
 
 #: Stay/leave content strata, by the file suffix their bundles carry.
 STAY_STRATA = {"all": "", "swr": "_swr", "non_swr": "_non_swr", "mua": "_mua"}
@@ -2186,7 +2193,13 @@ def estimator_values(
 
 
 def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
-    """Question 3.7: the leaf-only arm ladder's uncertainty and value rungs."""
+    """Question 3.7: the leaf-only arm ladder's uncertainty and value rungs.
+
+    Each step is compared from the two rungs' per-session fits
+    (:func:`~continuum_swr_replay.analysis.behavior.content.model_comparison.summarize_comparison`),
+    not read from the bundle's ``model_comparison.pkl``: the AIC difference is
+    the child's minus the parent's, and a stored comparison written before that
+    convention holds the opposite sign."""
     make = value_factory(leaf_values, source, TAGS["leaf_ladder"])
     values = []
     for word, model, term in (
@@ -2233,42 +2246,42 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
             ],
             _gate_note(stats, term),
         )
-    comparison = pd.read_pickle(leaf_dir / "model_comparison.pkl")
+    rungs = {name: pd.read_pickle(leaf_dir / f"{name}.pkl") for name in LEAF_RUNGS}
     for word, (parent, child) in LEAF_STEPS.items():
-        (row,) = comparison[
-            (comparison["parent"] == parent) & (comparison["child"] == child)
-        ].itertuples()
+        step = summarize_comparison(
+            compare_nested_models(rungs[parent], rungs[child]), parent, child
+        )
         what = f"leaf ladder {parent} to {child}"
-        _require(row.n_animals == 5, f"{what}: not 5 animals")
+        _require(step["n_animals"] == 5, f"{what}: not 5 animals")
         values += [
             make(
                 f"leaf_step_{word}",
-                row.delta_aic_median,
+                step["delta_aic_median"],
                 "quantity",
                 "sig2s",
-                f"{what}: median per-session AIC(parent) - AIC(child); positive = child better",
+                f"{what}: median per-session AIC(child) - AIC(parent); negative = child better",
                 "AIC",
             ),
             make(
                 f"leaf_step_{word}_clear",
-                row.child_better_aic,
+                step["child_better_aic"],
                 "count",
                 "count",
                 f"{what}: sessions in which the child's AIC is lower by more than 2",
             ),
             make(
                 f"leaf_step_{word}_sessions",
-                row.n_sessions,
+                step["n_sessions"],
                 "count",
                 "count",
                 f"{what}: sessions compared",
             ),
             make(
                 f"leaf_step_{word}_animals",
-                row.n_animals_child_better,
+                step["n_animals_child_better"],
                 "count",
                 "count",
-                f"{what}: animals whose median step favours the child",
+                f"{what}: animals whose median step is negative (favours the child)",
             ),
         ]
     return values
@@ -3039,7 +3052,7 @@ def summarize(inputs: BehaviorInputs, produced_by: str) -> Summary:
     )
     record(inputs.estimator_summary, inputs.estimator_bootstrap)
 
-    leaf_fits = [inputs.leaf_dir / f"{n}.pkl" for n in ("Mu", "Mv", "model_comparison")]
+    leaf_fits = [inputs.leaf_dir / f"{n}.pkl" for n in LEAF_RUNGS]
     summary.add(
         *pend(
             leaf_values(
