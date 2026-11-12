@@ -12,8 +12,7 @@ then runs on each subset as on any state (animal-level t-interval, the paired
 bout - matched-window difference) over the primary metrics, their per-held-out-
 spike versions and MAP_S's distance from the animal.
 
-Reads every epoch of the run whose ``per_epoch/{epoch}_validation.json`` is
-``ok``. Writes, beside the run:
+Reads every epoch the run's ``manifest.json`` marks ``ok``. Writes, beside the run:
 
 - ``nl_bouts_by_swr.parquet``: the labelled windows;
 - ``nl_bouts_by_swr_stats.csv``: the statistics (the events summary reads it, question 2c.3);
@@ -28,7 +27,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import json
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -43,7 +41,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import processed_data_dir
-from continuum_swr_replay.runs.io import write_json
+from continuum_swr_replay.runs.io import ok_epochs, read_manifest, write_json
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.io import read_table, write_table
 
@@ -57,15 +55,6 @@ METRICS = (
     "runcv_mapS_dist_cm",
     "runcv_ns_expected",
 )
-
-
-def ok_epochs(run_dir: Path) -> list[str]:
-    """The run's epochs whose validation record is ``ok``, sorted."""
-    return sorted(
-        path.name.removesuffix("_validation.json")
-        for path in (run_dir / "per_epoch").glob("*_validation.json")
-        if json.loads(path.read_text())["status"] == "ok"
-    )
 
 
 def label_epoch(run_dir: Path, epoch_id: str, decode_dir: Path) -> pd.DataFrame:
@@ -85,9 +74,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     run_dir = args.run_dir.resolve()
     decode_dir = processed_data_dir()
 
-    epochs = ok_epochs(run_dir)
+    epochs = ok_epochs(read_manifest(run_dir))
     if not epochs:
-        raise SystemExit(f"{run_dir}: no epoch with an ok validation record")
+        raise SystemExit(f"{run_dir}: no epoch the manifest marks ok")
     windows = pd.concat(
         [label_epoch(run_dir, e, decode_dir) for e in epochs], ignore_index=True
     )
