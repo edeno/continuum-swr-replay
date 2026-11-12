@@ -66,9 +66,7 @@ def map_estimate_to_patch(map_estimate, env):
             linear_positions[np.newaxis, :] - map_est[valid, np.newaxis]
         ).argmin(axis=1)
         nearest_edge = edge_ids[nearest_bin_idx]
-        result[valid] = [
-            TRACK_SEGMENT_TO_PATCH.get(int(e), np.nan) for e in nearest_edge
-        ]
+        result[valid] = [TRACK_SEGMENT_TO_PATCH.get(int(e), np.nan) for e in nearest_edge]
 
     return result
 
@@ -113,15 +111,11 @@ def add_trial_context(dot, trials):
     dot["prev_trial_to_patch"] = np.where(trial_idx > 0, to_patches[prev_idx], np.nan)
 
     # Previous trial's origin patch (= where animal came from)
-    dot["prev_trial_from_patch"] = np.where(
-        trial_idx > 0, from_patches[prev_idx], np.nan
-    )
+    dot["prev_trial_from_patch"] = np.where(trial_idx > 0, from_patches[prev_idx], np.nan)
 
     # Next trial's destination patch (= where animal will go)
     next_idx = np.clip(trial_idx, 0, n_trials - 1)
-    dot["next_trial_to_patch"] = np.where(
-        trial_idx < n_trials, to_patches[next_idx], np.nan
-    )
+    dot["next_trial_to_patch"] = np.where(trial_idx < n_trials, to_patches[next_idx], np.nan)
 
     # Most recently rewarded patch
     rewarded_mask = is_reward
@@ -173,15 +167,13 @@ for f in dot_files:
         nwb_match = [nwb for nwb in NWB_FILES if animal_date in nwb]
         if nwb_match:
             session_id = f"{animal_date}_{epoch}_HPC"
-            sessions.append(
-                {
-                    "nwb_file_name": nwb_match[0],
-                    "epoch_name": epoch,
-                    "session_id": session_id,
-                    "dot_file": f,
-                    "env_file": PROCESSED_DATA_DIR / f"{session_id}_environment.pkl",
-                }
-            )
+            sessions.append({
+                "nwb_file_name": nwb_match[0],
+                "epoch_name": epoch,
+                "session_id": session_id,
+                "dot_file": f,
+                "env_file": PROCESSED_DATA_DIR / f"{session_id}_environment.pkl",
+            })
 
 print(f"Matched {len(sessions)} sessions")
 
@@ -233,13 +225,9 @@ for i, session in enumerate(sessions[:n_sessions_to_load]):
 
     # Compute empirical chance for this session's track
     chance = compute_chance_per_patch(env)
-    session_chance_levels.append(
-        {
-            "nwb_file_name": nwb,
-            "epoch_name": epoch,
-            **chance,
-        }
-    )
+    session_chance_levels.append({
+        "nwb_file_name": nwb, "epoch_name": epoch, **chance,
+    })
 
     # Merge task_variables
     if "task_variables" in data and data["task_variables"] is not None:
@@ -286,9 +274,7 @@ print(f"\nEmpirical chance per patch (fraction of place bins):")
 for p in [1.0, 2.0, 3.0]:
     if p in chance_df.columns:
         vals = chance_df[p]
-        print(
-            f"  Patch {int(p)}: mean={vals.mean():.3f}, range=[{vals.min():.3f}, {vals.max():.3f}]"
-        )
+        print(f"  Patch {int(p)}: mean={vals.mean():.3f}, range=[{vals.min():.3f}, {vals.max():.3f}]")
 # Use grand mean as chance level (per-patch bins are ~equal across sessions)
 CHANCE_LEVEL = 1 / 3  # will verify this is approximately correct
 
@@ -299,8 +285,8 @@ swr = nl[nl["is_swr"]]
 noswr = nl[~nl["is_swr"]]
 
 print(f"Non-local immobile: {len(nl):,}")
-print(f"  SWR: {len(swr):,} ({len(swr) / len(nl) * 100:.1f}%)")
-print(f"  Non-SWR: {len(noswr):,} ({len(noswr) / len(nl) * 100:.1f}%)")
+print(f"  SWR: {len(swr):,} ({len(swr)/len(nl)*100:.1f}%)")
+print(f"  Non-SWR: {len(noswr):,} ({len(noswr)/len(nl)*100:.1f}%)")
 print(f"  Sessions: {nl.groupby(['animal', 'day', 'epoch']).ngroups}")
 
 # %% Analysis 1: What patch does replay represent?
@@ -381,23 +367,14 @@ for ax, ref in zip(axes, ref_names, strict=True):
         continue
 
     sns.boxplot(
-        data=plot_data,
-        x="event_type",
-        y=ref,
+        data=plot_data, x="event_type", y=ref,
         palette={"SWR": COLORS["SWR"], "Non-SWR": COLORS["Non-Local"]},
-        ax=ax,
-        width=0.5,
-        fliersize=2,
+        ax=ax, width=0.5, fliersize=2,
     )
     sns.stripplot(
-        data=plot_data,
-        x="event_type",
-        y=ref,
+        data=plot_data, x="event_type", y=ref,
         palette={"SWR": COLORS["SWR"], "Non-SWR": COLORS["Non-Local"]},
-        ax=ax,
-        size=2,
-        alpha=0.3,
-        jitter=True,
+        ax=ax, size=2, alpha=0.3, jitter=True,
     )
     ax.axhline(CHANCE_LEVEL, color="black", linestyle="--", linewidth=0.8)
     ax.set_title(ref, fontsize=7)
@@ -410,15 +387,8 @@ for ax, ref in zip(axes, ref_names, strict=True):
     if len(swr_vals) >= 5 and len(noswr_vals) >= 5:
         _, p = mannwhitneyu(swr_vals, noswr_vals, alternative="two-sided")
         sig = "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else "ns"
-        ax.text(
-            0.5,
-            0.95,
-            f"p={p:.1e} {sig}",
-            transform=ax.transAxes,
-            ha="center",
-            fontsize=5,
-            va="top",
-        )
+        ax.text(0.5, 0.95, f"p={p:.1e} {sig}", transform=ax.transAxes,
+                ha="center", fontsize=5, va="top")
 
 axes[0].set_ylabel("Fraction of Replay")
 sns.despine()
@@ -427,18 +397,14 @@ plt.show()
 
 # Print stats table (p-values are uncorrected for multiple comparisons)
 print("\n=== Analysis 1: Replay at reference patches (p-values uncorrected) ===")
-print(
-    f"{'Reference':<25} {'SWR median':>12} {'Non-SWR median':>15} {'p-value':>10} {'n_SWR':>6} {'n_noSWR':>8}"
-)
+print(f"{'Reference':<25} {'SWR median':>12} {'Non-SWR median':>15} {'p-value':>10} {'n_SWR':>6} {'n_noSWR':>8}")
 print("-" * 80)
 for ref in ref_names:
     swr_vals = all_fracs.loc[all_fracs["event_type"] == "SWR", ref].dropna()
     noswr_vals = all_fracs.loc[all_fracs["event_type"] == "Non-SWR", ref].dropna()
     if len(swr_vals) >= 5 and len(noswr_vals) >= 5:
         _, p = mannwhitneyu(swr_vals, noswr_vals, alternative="two-sided")
-        print(
-            f"{ref:<25} {swr_vals.median():>12.3f} {noswr_vals.median():>15.3f} {p:>10.2e} {len(swr_vals):>6} {len(noswr_vals):>8}"
-        )
+        print(f"{ref:<25} {swr_vals.median():>12.3f} {noswr_vals.median():>15.3f} {p:>10.2e} {len(swr_vals):>6} {len(noswr_vals):>8}")
     else:
         print(f"{ref:<25} {'insufficient data':>40}")
 
@@ -452,11 +418,9 @@ for ref in ref_names:
         vals = all_fracs.loc[all_fracs["event_type"] == etype, ref].dropna()
         if len(vals) >= 5:
             stat, p = wilcoxon(vals - CHANCE_LEVEL)
-            direction = "above" if vals.median() > 1 / 3 else "below"
-            print(
-                f"  {etype:>7} {ref:<25}: median={vals.median():.3f}, {direction} chance, "
-                f"Wilcoxon p={p:.2e}, n={len(vals)}"
-            )
+            direction = "above" if vals.median() > 1/3 else "below"
+            print(f"  {etype:>7} {ref:<25}: median={vals.median():.3f}, {direction} chance, "
+                  f"Wilcoxon p={p:.2e}, n={len(vals)}")
 
 # %% Analysis 3: Replay content around patch switches
 #
@@ -480,10 +444,8 @@ for keys, session_group in nl.groupby(session_cols):
         continue
 
     # For timepoints during switch trials, record trial-relative info
-    for swr_label, swr_mask in [
-        ("SWR", session_group["is_swr"]),
-        ("Non-SWR", ~session_group["is_swr"]),
-    ]:
+    for swr_label, swr_mask in [("SWR", session_group["is_swr"]),
+                                 ("Non-SWR", ~session_group["is_swr"])]:
         subset = session_group[swr_mask]
         if len(subset) < 10:
             continue
@@ -507,17 +469,13 @@ for keys, session_group in nl.groupby(session_cols):
             rp_sub = rp[valid][mask]
             cur_sub = current[valid][mask]
 
-            switch_data.append(
-                {
-                    "animal": animal,
-                    "day": day,
-                    "epoch": epoch,
-                    "event_type": swr_label,
-                    "trials_since_switch": trial_offset,
-                    "frac_at_current": (rp_sub == cur_sub).mean(),
-                    "n_timepoints": int(mask.sum()),
-                }
-            )
+            switch_data.append({
+                "animal": animal, "day": day, "epoch": epoch,
+                "event_type": swr_label,
+                "trials_since_switch": trial_offset,
+                "frac_at_current": (rp_sub == cur_sub).mean(),
+                "n_timepoints": int(mask.sum()),
+            })
 
 switch_df = pd.DataFrame(switch_data)
 print(f"\n=== Analysis 3: Replay around patch switches ===")
@@ -525,9 +483,7 @@ print(f"Total rows: {len(switch_df)}")
 if len(switch_df) > 0:
     print(f"Sessions with switch data: {switch_df.groupby(session_cols).ngroups}")
 print(f"Sessions skipped (no task_variables): {n_sessions_skipped_switch}")
-print(
-    "Note: trials_since_switch=0 is the inter-trial period AFTER the switch trial completed."
-)
+print("Note: trials_since_switch=0 is the inter-trial period AFTER the switch trial completed.")
 
 # %% Plot Analysis 3: replay at current patch as function of trials since switch
 
@@ -541,42 +497,27 @@ if len(switch_df) > 0:
 
         # Aggregate: median and IQR across sessions per trial offset
         agg = sub.groupby("trials_since_switch")["frac_at_current"].agg(
-            [
-                "median",
-                "count",
-                lambda x: np.nanpercentile(x, 25),
-                lambda x: np.nanpercentile(x, 75),
-            ]
+            ["median", "count",
+             lambda x: np.nanpercentile(x, 25),
+             lambda x: np.nanpercentile(x, 75)]
         )
         agg.columns = ["median", "count", "q25", "q75"]
         agg = agg.reset_index()
 
         ax.fill_between(
-            agg["trials_since_switch"],
-            agg["q25"],
-            agg["q75"],
-            color=color,
-            alpha=0.2,
+            agg["trials_since_switch"], agg["q25"], agg["q75"],
+            color=color, alpha=0.2,
         )
         ax.plot(
-            agg["trials_since_switch"],
-            agg["median"],
-            color=color,
-            linewidth=1.5,
-            marker="o",
-            markersize=4,
-            label=etype,
+            agg["trials_since_switch"], agg["median"],
+            color=color, linewidth=1.5, marker="o", markersize=4, label=etype,
         )
 
         # Annotate sample sizes
         for _, row in agg.iterrows():
             ax.text(
-                row["trials_since_switch"],
-                row["q75"] + 0.02,
-                f"n={int(row['count'])}",
-                fontsize=4,
-                ha="center",
-                color=color,
+                row["trials_since_switch"], row["q75"] + 0.02,
+                f"n={int(row['count'])}", fontsize=4, ha="center", color=color,
             )
 
     ax.axhline(1 / 3, color="black", linestyle="--", linewidth=0.8, label="Chance")
@@ -593,10 +534,8 @@ if len(switch_df) > 0:
     # Print sample sizes
     print("\nSample sizes by trials_since_switch:")
     pivot = switch_df.pivot_table(
-        index="trials_since_switch",
-        columns="event_type",
-        values="n_timepoints",
-        aggfunc=["count", "sum"],
+        index="trials_since_switch", columns="event_type",
+        values="n_timepoints", aggfunc=["count", "sum"]
     )
     print(pivot)
 
@@ -632,24 +571,20 @@ if "is_no_reward_1" in nl.columns:
                 rp_sub = rp[valid][cond_mask]
                 lr_sub = last_rew[valid][cond_mask]
 
-                omission_data.append(
-                    {
-                        **dict(zip(session_cols, keys, strict=True)),
-                        "event_type": etype,
-                        "condition": cond_label,
-                        "frac_at_rewarded": (rp_sub == lr_sub).mean(),
-                        "n_timepoints": int(cond_mask.sum()),
-                    }
-                )
+                omission_data.append({
+                    **dict(zip(session_cols, keys, strict=True)),
+                    "event_type": etype,
+                    "condition": cond_label,
+                    "frac_at_rewarded": (rp_sub == lr_sub).mean(),
+                    "n_timepoints": int(cond_mask.sum()),
+                })
 
     omission_df = pd.DataFrame(omission_data)
     print(f"\n=== Analysis 4: Reward omission effect ===")
     print(f"Total rows: {len(omission_df)}")
 
     if len(omission_df) > 0:
-        fig, axes = plt.subplots(
-            1, 2, figsize=(5.5, 2.5), constrained_layout=True, sharey=True
-        )
+        fig, axes = plt.subplots(1, 2, figsize=(5.5, 2.5), constrained_layout=True, sharey=True)
 
         for ax, etype in zip(axes, ["SWR", "Non-SWR"], strict=True):
             sub = omission_df[omission_df["event_type"] == etype]
@@ -659,27 +594,16 @@ if "is_no_reward_1" in nl.columns:
 
             palette = {"After Reward": COLORS["Non-Local"], "After Omission": "#CC79A7"}
             sns.boxplot(
-                data=sub,
-                x="condition",
-                y="frac_at_rewarded",
-                palette=palette,
-                ax=ax,
-                width=0.5,
-                fliersize=2,
+                data=sub, x="condition", y="frac_at_rewarded",
+                palette=palette, ax=ax, width=0.5, fliersize=2,
                 order=["After Reward", "After Omission"],
             )
             sns.stripplot(
-                data=sub,
-                x="condition",
-                y="frac_at_rewarded",
-                palette=palette,
-                ax=ax,
-                size=2,
-                alpha=0.3,
-                jitter=True,
+                data=sub, x="condition", y="frac_at_rewarded",
+                palette=palette, ax=ax, size=2, alpha=0.3, jitter=True,
                 order=["After Reward", "After Omission"],
             )
-            ax.axhline(1 / 3, color="black", linestyle="--", linewidth=0.8)
+            ax.axhline(1/3, color="black", linestyle="--", linewidth=0.8)
             ax.set_title(etype, fontsize=7)
             ax.set_xlabel("")
             ax.set_ylim(0, 1)
@@ -687,31 +611,16 @@ if "is_no_reward_1" in nl.columns:
             # Sample sizes
             for cond in ["After Reward", "After Omission"]:
                 n = len(sub[sub["condition"] == cond])
-                ax.text(
-                    0 if cond == "After Reward" else 1,
-                    -0.05,
-                    f"n={n}",
-                    fontsize=5,
-                    ha="center",
-                    transform=ax.get_xaxis_transform(),
-                )
+                ax.text(0 if cond == "After Reward" else 1, -0.05,
+                        f"n={n}", fontsize=5, ha="center", transform=ax.get_xaxis_transform())
 
             # Stats
             rew_vals = sub.loc[sub["condition"] == "After Reward", "frac_at_rewarded"]
-            omit_vals = sub.loc[
-                sub["condition"] == "After Omission", "frac_at_rewarded"
-            ]
+            omit_vals = sub.loc[sub["condition"] == "After Omission", "frac_at_rewarded"]
             if len(rew_vals) >= 5 and len(omit_vals) >= 5:
                 _, p = mannwhitneyu(rew_vals, omit_vals, alternative="two-sided")
-                ax.text(
-                    0.5,
-                    0.95,
-                    f"p={p:.2e}",
-                    transform=ax.transAxes,
-                    ha="center",
-                    fontsize=5,
-                    va="top",
-                )
+                ax.text(0.5, 0.95, f"p={p:.2e}", transform=ax.transAxes,
+                        ha="center", fontsize=5, va="top")
 
         axes[0].set_ylabel("Fraction at Rewarded Patch")
         sns.despine()
@@ -723,14 +632,12 @@ if "is_no_reward_1" in nl.columns:
         for etype in ["SWR", "Non-SWR"]:
             for cond in ["After Reward", "After Omission"]:
                 vals = omission_df.loc[
-                    (omission_df["event_type"] == etype)
-                    & (omission_df["condition"] == cond),
-                    "frac_at_rewarded",
+                    (omission_df["event_type"] == etype) &
+                    (omission_df["condition"] == cond),
+                    "frac_at_rewarded"
                 ]
                 if len(vals) > 0:
-                    print(
-                        f"  {etype:>7} {cond:<20}: median={vals.median():.3f}, n={len(vals)} sessions"
-                    )
+                    print(f"  {etype:>7} {cond:<20}: median={vals.median():.3f}, n={len(vals)} sessions")
 else:
     print("is_no_reward_1 not available")
 
@@ -741,15 +648,11 @@ print("SAMPLE SIZE REPORT")
 print("=" * 80)
 
 # Per-animal summary
-animal_summary = (
-    nl.groupby("animal")
-    .agg(
-        n_sessions=("epoch", "nunique"),
-        n_timepoints=("replay_patch", "count"),
-        n_swr=("is_swr", "sum"),
-    )
-    .reset_index()
-)
+animal_summary = nl.groupby("animal").agg(
+    n_sessions=("epoch", "nunique"),
+    n_timepoints=("replay_patch", "count"),
+    n_swr=("is_swr", "sum"),
+).reset_index()
 animal_summary["n_noswr"] = animal_summary["n_timepoints"] - animal_summary["n_swr"]
 print("\nPer-animal non-local immobile timepoints:")
 print(animal_summary.to_string(index=False))
@@ -757,16 +660,14 @@ print(animal_summary.to_string(index=False))
 # Switch events
 if "n_switches_session" in nl.columns:
     switch_summary = nl.groupby(session_cols)["n_switches_session"].first()
-    print(
-        f"\nPatch switches per session: median={switch_summary.median():.0f}, "
-        f"range=[{switch_summary.min():.0f}, {switch_summary.max():.0f}], "
-        f"total={switch_summary.sum():.0f}"
-    )
+    print(f"\nPatch switches per session: median={switch_summary.median():.0f}, "
+          f"range=[{switch_summary.min():.0f}, {switch_summary.max():.0f}], "
+          f"total={switch_summary.sum():.0f}")
 
 # Reward omission prevalence
 if "is_no_reward_1" in nl.columns:
     omission_rate = nl["is_no_reward_1"].astype(bool).mean()
-    print(f"Timepoints after omission: {omission_rate * 100:.1f}%")
+    print(f"Timepoints after omission: {omission_rate*100:.1f}%")
 
 print("\n" + "=" * 80)
 print("SUMMARY")

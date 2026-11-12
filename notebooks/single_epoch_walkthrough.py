@@ -89,20 +89,15 @@ import pandas as pd
 from matplotlib import patheffects
 from matplotlib.lines import Line2D
 
+# --- Data loading + decode outputs ---
+from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
+from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    validate_dot_event_contract,
+)
 from continuum_swr_replay.analysis.behavior import add_arm_fixed_effects
 from continuum_swr_replay.analysis.behavior.choice.choice_prediction import (
     build_choice_dataset,
     fit_choice_model,
-)
-from continuum_swr_replay.analysis.behavior.choice.retrospective import (
-    compute_retrospective_metrics,
-)
-from continuum_swr_replay.analysis.behavior.content.model_checking import (
-    cross_validate_conditional_poisson,
-)
-from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
-    build_trial_leaf_table,
-    hierarchical_quartile_profile,
 )
 from continuum_swr_replay.analysis.behavior.covariate_timing import (
     assert_predictor_timing,
@@ -111,6 +106,9 @@ from continuum_swr_replay.analysis.behavior.covariates import load_contingency
 
 # --- Fitters (statsmodels conditional models / Poisson GLM) ---
 from continuum_swr_replay.analysis.behavior.fitting import fit_conditional_poisson
+from continuum_swr_replay.analysis.behavior.content.model_checking import (
+    cross_validate_conditional_poisson,
+)
 
 # --- Model specifications (the four families walked here) ---
 from continuum_swr_replay.analysis.behavior.model_specs import (
@@ -125,6 +123,16 @@ from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
     PER_STOP_RATE_OUTCOMES,
     cross_validate_per_stop_rate_model,
     fit_per_stop_rate_model,
+)
+from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
+    load_conditional_posterior,
+)
+from continuum_swr_replay.analysis.behavior.choice.retrospective import (
+    compute_retrospective_metrics,
+)
+from continuum_swr_replay.tables.standardization import (
+    attach_standardized,
+    load_reference,
 )
 
 # --- Canonical table assembly (same functions as prepare_data) ---
@@ -143,23 +151,14 @@ from continuum_swr_replay.analysis.behavior.tables.tables_stop import (
     add_nonlocal_swr_split,
     build_stop_table,
 )
-
-# --- Data loading + decode outputs ---
-from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-    validate_dot_event_contract,
-)
-from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
-    load_conditional_posterior,
+from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
+    build_trial_leaf_table,
+    hierarchical_quartile_profile,
 )
 from continuum_swr_replay.data_loaders import load_data
-from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
-from continuum_swr_replay.tables.standardization import (
-    attach_standardized,
-    load_reference,
-)
+from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.visualization.session_tables import (
     BEHAVIORAL_MODEL_PANELS,
     plot_session_tables,
@@ -172,16 +171,21 @@ pd.set_option("display.width", 160)
 # Explicit comparison blocks keep qvals coverage from shrinking unrelated base
 # ladders while still fitting the behavioral-belief branches on one fair cohort.
 ARM_MODELS = {
-    name: MODEL_HIERARCHY[name] for name in default_content_model_names(MODEL_HIERARCHY)
+    name: MODEL_HIERARCHY[name]
+    for name in default_content_model_names(MODEL_HIERARCHY)
 }
 PATCH_MODELS = {
-    name: MODEL_PATCH[name] for name in default_content_model_names(MODEL_PATCH)
+    name: MODEL_PATCH[name]
+    for name in default_content_model_names(MODEL_PATCH)
 }
-BELIEF_ARM_MODELS = {name: MODEL_HIERARCHY[name] for name in ("M5", "Mv", "Mu", "Mvu")}
+BELIEF_ARM_MODELS = {
+    name: MODEL_HIERARCHY[name] for name in ("M5", "Mv", "Mu", "Mvu")
+}
 BELIEF_PATCH_MODELS = {name: MODEL_PATCH[name] for name in ("P3", "Pv")}
 RATE_MODELS = dict(MODEL_PER_STOP_RATE)
 CHOICE_MODELS = {
-    name: MODEL_CHOICE[name] for name in ("C_replay_only", "C_behavior", "C_full")
+    name: MODEL_CHOICE[name]
+    for name in ("C_replay_only", "C_behavior", "C_full")
 }
 CHOICE_SPLIT_MODELS = {
     name: MODEL_CHOICE[name] for name in ("C_behavior", "C_full_swr_split")
@@ -220,7 +224,9 @@ RESULTS_FILE = PROCESSED_DATA_DIR / f"{SESSION_ID}_results.nc"
 QVALS_FILE = table_path("qvals_table")
 ARM_Z_REFERENCE_FILE = REPLAY_CONTENT_DIR / "standardization_reference.json"
 HORSERACE_COEFS_FILE = (
-    REPLAY_CONTENT_DIR / "uncertainty_content" / "horserace_session_coefficients.csv"
+    REPLAY_CONTENT_DIR
+    / "uncertainty_content"
+    / "horserace_session_coefficients.csv"
 )
 
 for p in (
@@ -287,33 +293,26 @@ sc = ax.scatter(
     vmax=50,
     rasterized=True,
 )
-ax.set(
-    xlabel="time (s)",
-    ylabel="linear position (cm)",
-    title=f"{SESSION_ID}: linearized trajectory",
-)
+ax.set(xlabel="time (s)", ylabel="linear position (cm)",
+       title=f"{SESSION_ID}: linearized trajectory")
 fig.colorbar(sc, ax=ax, label="head speed (cm/s)", pad=0.01)
 
 # 2-D track graph with arm (edge) ids.
 ax = axes[1]
 node_pos = {n: track_graph.nodes[n]["pos"] for n in track_graph.nodes}
 nx.draw_networkx_edges(track_graph, node_pos, ax=ax, edge_color="0.7", width=2)
-nx.draw_networkx_nodes(track_graph, node_pos, ax=ax, node_size=120, node_color="0.3")
-nx.draw_networkx_labels(track_graph, node_pos, ax=ax, font_color="white", font_size=8)
+nx.draw_networkx_nodes(track_graph, node_pos, ax=ax, node_size=120,
+                       node_color="0.3")
+nx.draw_networkx_labels(track_graph, node_pos, ax=ax, font_color="white",
+                        font_size=8)
 for u, v, d in track_graph.edges(data=True):
     if "edge_id" in d:
         mx = 0.5 * (node_pos[u][0] + node_pos[v][0])
         my = 0.5 * (node_pos[u][1] + node_pos[v][1])
-        ax.text(
-            mx,
-            my,
-            f"arm {d['edge_id']}",
-            color="C3",
-            fontsize=8,
-            ha="center",
-            va="center",
-            bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none", alpha=0.8),
-        )
+        ax.text(mx, my, f"arm {d['edge_id']}", color="C3", fontsize=8,
+                ha="center", va="center",
+                bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none",
+                          alpha=0.8))
 ax.set(title="track graph (nodes = wells/junctions)")
 ax.set_aspect("equal")
 ax.axis("off")
@@ -321,10 +320,10 @@ fig.tight_layout()
 
 # %%
 # check that trials make sense
-from matplotlib.patches import Patch  # noqa: E402
+from matplotlib.patches import Patch
 
-from continuum_swr_replay.data_loaders import WELL_PATCH_MAPPING  # noqa: E402
-from continuum_swr_replay.visualization import plot_graph_as_1D  # noqa: E402
+from continuum_swr_replay.data_loaders import WELL_PATCH_MAPPING
+from continuum_swr_replay.visualization import plot_graph_as_1D
 
 t_start = float(position_info.index[0])
 t_stop = t_start + 750.0
@@ -353,20 +352,13 @@ fig, ax = plt.subplots(figsize=(15, 3.5))
 # spreadsheet-style alternating grey bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
-        trial["movement_start_time"],
-        trial["end_time"],
-        color="0.85" if row % 2 else "0.95",
-        linewidth=0,
-        zorder=0,
+        trial["movement_start_time"], trial["end_time"],
+        color="0.85" if row % 2 else "0.95", linewidth=0, zorder=0,
     )
 
 ax.scatter(
-    position_info.index,
-    position_info["linear_position"],
-    s=1,
-    color="magenta",
-    rasterized=True,
-    zorder=2,
+    position_info.index, position_info["linear_position"],
+    s=1, color="magenta", rasterized=True, zorder=2,
 )
 
 blend = ax.get_xaxis_transform()
@@ -374,43 +366,27 @@ for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
     # departure: open square at from_well, colored by from_patch
     ax.plot(
-        trial["movement_start_time"],
-        well_linear[from_well],
-        marker="s",
-        ms=6,
-        mfc="none",
-        mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]],
-        mew=1.5,
-        zorder=4,
+        trial["movement_start_time"], well_linear[from_well],
+        marker="s", ms=6, mfc="none",
+        mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]], mew=1.5, zorder=4,
     )
     # arrival: circle at destination_first_poke_in_time, filled iff rewarded
     dest_color = PATCH_COLORS[WELL_PATCH_MAPPING[to_well]]
     ax.plot(
-        trial["destination_first_poke_in_time"],
-        well_linear[to_well],
-        marker="o",
-        ms=7,
+        trial["destination_first_poke_in_time"], well_linear[to_well],
+        marker="o", ms=7,
         mfc=dest_color if trial["is_reward"] else "none",
-        mec=dest_color,
-        mew=1.5,
-        zorder=4,
+        mec=dest_color, mew=1.5, zorder=4,
     )
     if trial["is_patch_change"]:
         ax.plot(
-            trial["movement_start_time"],
-            0.97,
-            marker="v",
-            ms=6,
-            color="black",
-            transform=blend,
-            zorder=5,
+            trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
+            transform=blend, zorder=5,
         )
 
 ax.set(
-    xlabel="time (s)",
-    ylabel="linear position (cm)",
-    title=f"{SESSION_ID}: position and trials",
-    xlim=(t_start, t_stop),
+    xlabel="time (s)", ylabel="linear position (cm)",
+    title=f"{SESSION_ID}: position and trials", xlim=(t_start, t_stop),
 )
 well_axis = ax.secondary_yaxis("right")
 well_axis.set_yticks([well_linear[w] for w in sorted(well_linear)])
@@ -420,28 +396,14 @@ well_axis.set_yticklabels([f"well {w}" for w in sorted(well_linear)], fontsize=8
 def _marker(marker, filled, label, color="0.35"):
     """Neutral-grey proxy handle — real markers are colored by patch."""
     return Line2D(
-        [],
-        [],
-        linestyle="none",
-        marker=marker,
-        ms=7,
-        mfc=color if filled else "none",
-        mec=color,
-        mew=1.5,
-        label=label,
+        [], [], linestyle="none", marker=marker, ms=7,
+        mfc=color if filled else "none", mec=color, mew=1.5, label=label,
     )
 
 
 legend_handles = [
-    Line2D(
-        [],
-        [],
-        linestyle="none",
-        marker="o",
-        ms=4,
-        color="magenta",
-        label="linear position",
-    ),
+    Line2D([], [], linestyle="none", marker="o", ms=4, color="magenta",
+           label="linear position"),
     Patch(facecolor="0.85", edgecolor="none", label="trial (alternating)"),
     _marker("s", False, "departure (from_well)"),
     _marker("o", True, "arrival, rewarded"),
@@ -452,73 +414,43 @@ legend_handles = [
     for p in sorted(PATCH_COLORS)
 ]
 ax.legend(
-    handles=legend_handles,
-    loc="upper center",
-    bbox_to_anchor=(0.5, -0.28),
-    ncol=5,
-    fontsize=8,
-    frameon=False,
-    handletextpad=0.5,
-    columnspacing=1.5,
+    handles=legend_handles, loc="upper center", bbox_to_anchor=(0.5, -0.28),
+    ncol=5, fontsize=8, frameon=False, handletextpad=0.5, columnspacing=1.5,
 )
 
 reward_well_nodes = [n for n in track_graph.nodes if track_graph.degree(n) == 1]
 plot_graph_as_1D(
-    track_graph,
-    ax=ax,
-    edge_order=linear_edge_order,
-    edge_spacing=linear_edge_spacing,
+    track_graph, ax=ax,
+    edge_order=linear_edge_order, edge_spacing=linear_edge_spacing,
     reward_well_nodes=reward_well_nodes,
     other_axis_start=t_start,
-    reward_well_size=120,
-    edge_linewidth=5,
+    reward_well_size=120, edge_linewidth=5,
 )
 
 # Redundant columns — assert rather than draw.
 patch_from = trials["from_well"].map(WELL_PATCH_MAPPING)
 patch_to = trials["to_well"].map(WELL_PATCH_MAPPING)
-print(
-    "max |duration - (end - start)| :",
-    float(
-        (trials["duration"] - (trials["end_time"] - trials["movement_start_time"]))
-        .abs()
-        .max()
-    ),
-)
-print(
-    "from_patch/to_patch match wells:",
-    bool(
-        (patch_from == trials["from_patch"]).all()
-        and (patch_to == trials["to_patch"]).all()
-    ),
-)
-print(
-    "is_patch_change matches patches:",
-    bool(((patch_from != patch_to) == trials["is_patch_change"]).all()),
-)
-print(
-    "destination_first_poke_in_time inside trial :",
-    bool(
-        (
-            (trials["destination_first_poke_in_time"] >= trials["movement_start_time"])
-            & (trials["destination_first_poke_in_time"] <= trials["end_time"])
-        ).all()
-    ),
-)
-print(
-    "wells chain (to[i] == from[i+1]):",
-    bool((trials["to_well"].values[:-1] == trials["from_well"].values[1:]).all()),
-)
+print("max |duration - (end - start)| :",
+      float((trials["duration"] - (trials["end_time"] - trials["movement_start_time"])).abs().max()))
+print("from_patch/to_patch match wells:",
+      bool((patch_from == trials["from_patch"]).all() and (patch_to == trials["to_patch"]).all()))
+print("is_patch_change matches patches:",
+      bool(((patch_from != patch_to) == trials["is_patch_change"]).all()))
+print("destination_first_poke_in_time inside trial :",
+      bool(((trials["destination_first_poke_in_time"] >= trials["movement_start_time"])
+            & (trials["destination_first_poke_in_time"] <= trials["end_time"])).all()))
+print("wells chain (to[i] == from[i+1]):",
+      bool((trials["to_well"].values[:-1] == trials["from_well"].values[1:]).all()))
 
 trials
 
 
 # %%
 # check that trials make sense
-from matplotlib.patches import Patch  # noqa: E402
+from matplotlib.patches import Patch
 
-from continuum_swr_replay.data_loaders import WELL_PATCH_MAPPING  # noqa: E402
-from continuum_swr_replay.visualization import plot_graph_as_1D  # noqa: E402
+from continuum_swr_replay.data_loaders import WELL_PATCH_MAPPING
+from continuum_swr_replay.visualization import plot_graph_as_1D
 
 t_start = float(position_info.index[0]) + 750.0
 t_stop = t_start + 750.0
@@ -547,20 +479,13 @@ fig, ax = plt.subplots(figsize=(15, 3.5))
 # spreadsheet-style alternating grey bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
-        trial["movement_start_time"],
-        trial["end_time"],
-        color="0.85" if row % 2 else "0.95",
-        linewidth=0,
-        zorder=0,
+        trial["movement_start_time"], trial["end_time"],
+        color="0.85" if row % 2 else "0.95", linewidth=0, zorder=0,
     )
 
 ax.scatter(
-    position_info.index,
-    position_info["linear_position"],
-    s=1,
-    color="magenta",
-    rasterized=True,
-    zorder=2,
+    position_info.index, position_info["linear_position"],
+    s=1, color="magenta", rasterized=True, zorder=2,
 )
 
 blend = ax.get_xaxis_transform()
@@ -568,43 +493,27 @@ for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
     # departure: open square at from_well, colored by from_patch
     ax.plot(
-        trial["movement_start_time"],
-        well_linear[from_well],
-        marker="s",
-        ms=6,
-        mfc="none",
-        mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]],
-        mew=1.5,
-        zorder=4,
+        trial["movement_start_time"], well_linear[from_well],
+        marker="s", ms=6, mfc="none",
+        mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]], mew=1.5, zorder=4,
     )
     # arrival: circle at destination_first_poke_in_time, filled iff rewarded
     dest_color = PATCH_COLORS[WELL_PATCH_MAPPING[to_well]]
     ax.plot(
-        trial["destination_first_poke_in_time"],
-        well_linear[to_well],
-        marker="o",
-        ms=7,
+        trial["destination_first_poke_in_time"], well_linear[to_well],
+        marker="o", ms=7,
         mfc=dest_color if trial["is_reward"] else "none",
-        mec=dest_color,
-        mew=1.5,
-        zorder=4,
+        mec=dest_color, mew=1.5, zorder=4,
     )
     if trial["is_patch_change"]:
         ax.plot(
-            trial["movement_start_time"],
-            0.97,
-            marker="v",
-            ms=6,
-            color="black",
-            transform=blend,
-            zorder=5,
+            trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
+            transform=blend, zorder=5,
         )
 
 ax.set(
-    xlabel="time (s)",
-    ylabel="linear position (cm)",
-    title=f"{SESSION_ID}: position and trials",
-    xlim=(t_start, t_stop),
+    xlabel="time (s)", ylabel="linear position (cm)",
+    title=f"{SESSION_ID}: position and trials", xlim=(t_start, t_stop),
 )
 well_axis = ax.secondary_yaxis("right")
 well_axis.set_yticks([well_linear[w] for w in sorted(well_linear)])
@@ -614,28 +523,14 @@ well_axis.set_yticklabels([f"well {w}" for w in sorted(well_linear)], fontsize=8
 def _marker(marker, filled, label, color="0.35"):
     """Neutral-grey proxy handle — real markers are colored by patch."""
     return Line2D(
-        [],
-        [],
-        linestyle="none",
-        marker=marker,
-        ms=7,
-        mfc=color if filled else "none",
-        mec=color,
-        mew=1.5,
-        label=label,
+        [], [], linestyle="none", marker=marker, ms=7,
+        mfc=color if filled else "none", mec=color, mew=1.5, label=label,
     )
 
 
 legend_handles = [
-    Line2D(
-        [],
-        [],
-        linestyle="none",
-        marker="o",
-        ms=4,
-        color="magenta",
-        label="linear position",
-    ),
+    Line2D([], [], linestyle="none", marker="o", ms=4, color="magenta",
+           label="linear position"),
     Patch(facecolor="0.85", edgecolor="none", label="trial (alternating)"),
     _marker("s", False, "departure (from_well)"),
     _marker("o", True, "arrival, rewarded"),
@@ -646,26 +541,17 @@ legend_handles = [
     for p in sorted(PATCH_COLORS)
 ]
 ax.legend(
-    handles=legend_handles,
-    loc="upper center",
-    bbox_to_anchor=(0.5, -0.28),
-    ncol=5,
-    fontsize=8,
-    frameon=False,
-    handletextpad=0.5,
-    columnspacing=1.5,
+    handles=legend_handles, loc="upper center", bbox_to_anchor=(0.5, -0.28),
+    ncol=5, fontsize=8, frameon=False, handletextpad=0.5, columnspacing=1.5,
 )
 
 reward_well_nodes = [n for n in track_graph.nodes if track_graph.degree(n) == 1]
 plot_graph_as_1D(
-    track_graph,
-    ax=ax,
-    edge_order=linear_edge_order,
-    edge_spacing=linear_edge_spacing,
+    track_graph, ax=ax,
+    edge_order=linear_edge_order, edge_spacing=linear_edge_spacing,
     reward_well_nodes=reward_well_nodes,
     other_axis_start=t_start,
-    reward_well_size=120,
-    edge_linewidth=5,
+    reward_well_size=120, edge_linewidth=5,
 )
 
 
@@ -717,19 +603,15 @@ decoder_bin_width_s = float(np.median(np.diff(dot_times)))
 if not np.isfinite(decoder_bin_width_s) or decoder_bin_width_s <= 0:
     raise ValueError(f"invalid decoder bin width: {decoder_bin_width_s!r} s")
 
-n_nonlocal_events = int(
-    dot.loc[dot["non_local_event"] > 0, "non_local_event"].nunique()
-)
+n_nonlocal_events = int(dot.loc[dot["non_local_event"] > 0, "non_local_event"].nunique())
 print("dot           :", dot.shape)
 print("posterior     :", dict(posterior.sizes))
 print("max time drift:", f"{max_time_drift:.3g} s")
 print("decoder cadence:", f"{decoder_bin_width_s:.6g} s/bin")
 print("n place bins  :", env.place_bin_centers_.shape[0])
 print("n_nonlocal_events (raw labels):", n_nonlocal_events)
-print(
-    "\ndot state/event columns:\n",
-    [c for c in dot.columns if "prob" in c or "event" in c or c == "map_estimate"],
-)
+print("\ndot state/event columns:\n",
+      [c for c in dot.columns if "prob" in c or "event" in c or c == "map_estimate"])
 
 # %% [markdown]
 # ### 2a. One decoded non-local event
@@ -741,7 +623,9 @@ print(
 # window and this plot alone is not evidence of spatial departure or replay.
 
 # %%
-nonlocal_summed = dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
+nonlocal_summed = (
+    dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
+)
 # peak non-local prob per event label -> choose the strongest event
 peak_per_event = nonlocal_summed.groupby(dot["non_local_event"]).max()
 peak_per_event = peak_per_event[peak_per_event.index > 0]
@@ -764,17 +648,12 @@ mesh = ax.pcolormesh(
     shading="auto",
     rasterized=True,
 )
-ax.plot(
-    pos_win.index, pos_win.values, ".", color="magenta", ms=4, label="animal position"
-)
-ax.axvspan(
-    ev_times.min(), ev_times.max(), color="red", alpha=0.12, label="non-local event"
-)
-ax.set(
-    xlabel="time (s)",
-    ylabel="linear position (cm)",
-    title=f"event {int(example_label)}: conditional non-local posterior",
-)
+ax.plot(pos_win.index, pos_win.values, ".", color="magenta", ms=4,
+        label="animal position")
+ax.axvspan(ev_times.min(), ev_times.max(), color="red", alpha=0.12,
+           label="non-local event")
+ax.set(xlabel="time (s)", ylabel="linear position (cm)",
+       title=f"event {int(example_label)}: conditional non-local posterior")
 ax.legend(loc="upper right", fontsize=8)
 fig.colorbar(mesh, ax=ax, label="P(position | non-local)", pad=0.01)
 fig.tight_layout()
@@ -801,11 +680,11 @@ stop_table.head()
 
 # %%
 # check that trials make sense
-from matplotlib.patches import Patch  # noqa: E402
+from matplotlib.patches import Patch
+from continuum_swr_replay.visualization.palettes import COLORS
 
-from continuum_swr_replay.data_loaders import WELL_PATCH_MAPPING  # noqa: E402
-from continuum_swr_replay.visualization import plot_graph_as_1D  # noqa: E402
-from continuum_swr_replay.visualization.palettes import COLORS  # noqa: E402
+from continuum_swr_replay.data_loaders import WELL_PATCH_MAPPING
+from continuum_swr_replay.visualization import plot_graph_as_1D
 
 t_start = float(position_info.index[0]) + 750.0
 t_stop = t_start + 100.0
@@ -829,29 +708,20 @@ for i, (u, v) in enumerate(np.asarray(linear_edge_order)):
 
 PATCH_COLORS = {1: "#0072B2", 2: "#D55E00", 3: "#009E73"}  # Okabe-Ito
 
-fig, axs = plt.subplots(
-    4, 1, figsize=(15, 9), sharex=True, gridspec_kw={"height_ratios": [2, 1, 1, 1]}
-)
+fig, axs = plt.subplots(4, 1, figsize=(15, 9), sharex=True, gridspec_kw={"height_ratios": [2, 1, 1, 1]})
 
 ax = axs[0]
 
 # spreadsheet-style alternating grey bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
-        trial["movement_start_time"],
-        trial["end_time"],
-        color="0.85" if row % 2 else "0.95",
-        linewidth=0,
-        zorder=0,
+        trial["movement_start_time"], trial["end_time"],
+        color="0.85" if row % 2 else "0.95", linewidth=0, zorder=0,
     )
 
 ax.scatter(
-    position_info.index,
-    position_info["linear_position"],
-    s=1,
-    color="magenta",
-    rasterized=True,
-    zorder=2,
+    position_info.index, position_info["linear_position"],
+    s=1, color="magenta", rasterized=True, zorder=2,
 )
 
 blend = ax.get_xaxis_transform()
@@ -859,43 +729,27 @@ for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
     # departure: open square at from_well, colored by from_patch
     ax.plot(
-        trial["movement_start_time"],
-        well_linear[from_well],
-        marker="s",
-        ms=6,
-        mfc="none",
-        mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]],
-        mew=1.5,
-        zorder=4,
+        trial["movement_start_time"], well_linear[from_well],
+        marker="s", ms=6, mfc="none",
+        mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]], mew=1.5, zorder=4,
     )
     # arrival: circle at destination_first_poke_in_time, filled iff rewarded
     dest_color = PATCH_COLORS[WELL_PATCH_MAPPING[to_well]]
     ax.plot(
-        trial["destination_first_poke_in_time"],
-        well_linear[to_well],
-        marker="o",
-        ms=7,
+        trial["destination_first_poke_in_time"], well_linear[to_well],
+        marker="o", ms=7,
         mfc=dest_color if trial["is_reward"] else "none",
-        mec=dest_color,
-        mew=1.5,
-        zorder=4,
+        mec=dest_color, mew=1.5, zorder=4,
     )
     if trial["is_patch_change"]:
         ax.plot(
-            trial["movement_start_time"],
-            0.97,
-            marker="v",
-            ms=6,
-            color="black",
-            transform=blend,
-            zorder=5,
+            trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
+            transform=blend, zorder=5,
         )
 
 ax.set(
-    xlabel="time (s)",
-    ylabel="linear position (cm)",
-    title=f"{SESSION_ID}: position and trials",
-    xlim=(t_start, t_stop),
+    xlabel="time (s)", ylabel="linear position (cm)",
+    title=f"{SESSION_ID}: position and trials", xlim=(t_start, t_stop),
 )
 well_axis = ax.secondary_yaxis("right")
 well_axis.set_yticks([well_linear[w] for w in sorted(well_linear)])
@@ -905,28 +759,14 @@ well_axis.set_yticklabels([f"well {w}" for w in sorted(well_linear)], fontsize=8
 def _marker(marker, filled, label, color="0.35"):
     """Neutral-grey proxy handle — real markers are colored by patch."""
     return Line2D(
-        [],
-        [],
-        linestyle="none",
-        marker=marker,
-        ms=7,
-        mfc=color if filled else "none",
-        mec=color,
-        mew=1.5,
-        label=label,
+        [], [], linestyle="none", marker=marker, ms=7,
+        mfc=color if filled else "none", mec=color, mew=1.5, label=label,
     )
 
 
 legend_handles = [
-    Line2D(
-        [],
-        [],
-        linestyle="none",
-        marker="o",
-        ms=4,
-        color="magenta",
-        label="linear position",
-    ),
+    Line2D([], [], linestyle="none", marker="o", ms=4, color="magenta",
+           label="linear position"),
     Patch(facecolor="0.85", edgecolor="none", label="trial (alternating)"),
     _marker("s", False, "departure (from_well)"),
     _marker("o", True, "arrival, rewarded"),
@@ -937,76 +777,39 @@ legend_handles = [
     for p in sorted(PATCH_COLORS)
 ]
 ax.legend(
-    handles=legend_handles,
-    loc="upper center",
-    bbox_to_anchor=(0.5, -0.28),
-    ncol=5,
-    fontsize=8,
-    frameon=False,
-    handletextpad=0.5,
-    columnspacing=1.5,
+    handles=legend_handles, loc="upper center", bbox_to_anchor=(0.5, -0.28),
+    ncol=5, fontsize=8, frameon=False, handletextpad=0.5, columnspacing=1.5,
 )
 
 reward_well_nodes = [n for n in track_graph.nodes if track_graph.degree(n) == 1]
 plot_graph_as_1D(
-    track_graph,
-    ax=ax,
-    edge_order=linear_edge_order,
-    edge_spacing=linear_edge_spacing,
+    track_graph, ax=ax,
+    edge_order=linear_edge_order, edge_spacing=linear_edge_spacing,
     reward_well_nodes=reward_well_nodes,
     other_axis_start=t_start,
-    reward_well_size=120,
-    edge_linewidth=5,
+    reward_well_size=120, edge_linewidth=5,
 )
+
 
 
 axs[1].plot(
-    position_info.index,
-    position_info["head_speed"],
-    color="black",
-    rasterized=True,
-    zorder=2,
+    position_info.index, position_info["head_speed"],
+    color="black", rasterized=True, zorder=2,
 )
 axs[1].set_ylabel("Speed [cm/s]")
-for _, stop in stop_table.loc[
-    (stop_table.stop_start >= t_start) & (stop_table.stop_end <= t_stop)
-].iterrows():
-    axs[1].axvspan(stop.stop_start, stop.stop_end, color="C3", alpha=0.2, zorder=1)
-    axs[1].text(
-        stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start),
-        1.05,
-        f"{int(stop.stop_idx)}",
-        color="C3",
-        fontsize=8,
-        ha="center",
-        va="top",
-        transform=axs[1].get_xaxis_transform(),
-        zorder=3,
+for _, stop in stop_table.loc[(stop_table.stop_start >= t_start) & (stop_table.stop_end <= t_stop)].iterrows():
+    axs[1].axvspan(
+        stop.stop_start, stop.stop_end,
+        color="C3", alpha=0.2, zorder=1
     )
+    axs[1].text(stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start), 1.05, f"{int(stop.stop_idx)}",
+                color="C3", fontsize=8, ha="center", va="top", transform=axs[1].get_xaxis_transform(), zorder=3)
     if stop.n_SWR > 0:
-        axs[2].text(
-            stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start),
-            1.05,
-            f"{int(stop.n_SWR)}",
-            color=COLORS["SWR"],
-            fontsize=8,
-            ha="center",
-            va="top",
-            transform=axs[2].get_xaxis_transform(),
-            zorder=3,
-        )
+        axs[2].text(stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start), 1.05, f"{int(stop.n_SWR)}",
+                    color=COLORS["SWR"], fontsize=8, ha="center", va="top", transform=axs[2].get_xaxis_transform(), zorder=3)
     if stop.n_non_local > 0:
-        axs[3].text(
-            stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start),
-            1.05,
-            f"{int(stop.n_non_local)}",
-            color=COLORS["Non-Local"],
-            fontsize=8,
-            ha="center",
-            va="top",
-            transform=axs[3].get_xaxis_transform(),
-            zorder=3,
-        )
+        axs[3].text(stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start), 1.05, f"{int(stop.n_non_local)}",
+                    color=COLORS["Non-Local"], fontsize=8, ha="center", va="top", transform=axs[3].get_xaxis_transform(), zorder=3)
 
 dot.loc[t_start:t_stop, "SWR_zscore"].plot(
     ax=axs[2], linewidth=1, alpha=0.8, rasterized=True, color=COLORS["SWR"], zorder=2
@@ -1015,26 +818,19 @@ axs[2].set_ylabel("SWR z-score")
 axs[2].axhline(0, color="black", linewidth=0.5, alpha=0.5, zorder=3, linestyle="--")
 axs[2].axhline(2.0, color="black", linewidth=0.5, alpha=0.5, zorder=3, linestyle="--")
 
-dot.loc[t_start:t_stop, ["Non-Local_Continuous_prob", "Non-Local_Fragmented_prob"]].sum(
-    axis=1
-).plot(
-    ax=axs[3],
-    linewidth=1,
-    alpha=0.8,
-    rasterized=True,
-    color=COLORS["Non-Local"],
-    zorder=2,
+dot.loc[t_start:t_stop, [ "Non-Local_Continuous_prob", "Non-Local_Fragmented_prob"]].sum(axis=1).plot(
+    ax=axs[3], linewidth=1, alpha=0.8, rasterized=True, color=COLORS["Non-Local"], zorder=2
 )
 axs[3].axhline(0.8, color="black", linewidth=0.5, alpha=0.5, zorder=3, linestyle="--")
 axs[3].set_ylabel("Non-local prob")
 
 # %%
 # check that trials make sense
-from matplotlib.patches import Patch  # noqa: E402
+from matplotlib.patches import Patch
+from continuum_swr_replay.visualization.palettes import COLORS
 
-from continuum_swr_replay.data_loaders import WELL_PATCH_MAPPING  # noqa: E402
-from continuum_swr_replay.visualization import plot_graph_as_1D  # noqa: E402
-from continuum_swr_replay.visualization.palettes import COLORS  # noqa: E402
+from continuum_swr_replay.data_loaders import WELL_PATCH_MAPPING
+from continuum_swr_replay.visualization import plot_graph_as_1D
 
 t_start = float(position_info.index[0]) + 10.0
 t_stop = t_start + 20.0
@@ -1058,29 +854,20 @@ for i, (u, v) in enumerate(np.asarray(linear_edge_order)):
 
 PATCH_COLORS = {1: "#0072B2", 2: "#D55E00", 3: "#009E73"}  # Okabe-Ito
 
-fig, axs = plt.subplots(
-    4, 1, figsize=(15, 9), sharex=True, gridspec_kw={"height_ratios": [2, 1, 1, 1]}
-)
+fig, axs = plt.subplots(4, 1, figsize=(15, 9), sharex=True, gridspec_kw={"height_ratios": [2, 1, 1, 1]})
 
 ax = axs[0]
 
 # spreadsheet-style alternating grey bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
-        trial["movement_start_time"],
-        trial["end_time"],
-        color="0.85" if row % 2 else "0.95",
-        linewidth=0,
-        zorder=0,
+        trial["movement_start_time"], trial["end_time"],
+        color="0.85" if row % 2 else "0.95", linewidth=0, zorder=0,
     )
 
 ax.scatter(
-    position_info.index,
-    position_info["linear_position"],
-    s=1,
-    color="magenta",
-    rasterized=True,
-    zorder=2,
+    position_info.index, position_info["linear_position"],
+    s=1, color="magenta", rasterized=True, zorder=2,
 )
 
 blend = ax.get_xaxis_transform()
@@ -1088,43 +875,27 @@ for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
     # departure: open square at from_well, colored by from_patch
     ax.plot(
-        trial["movement_start_time"],
-        well_linear[from_well],
-        marker="s",
-        ms=6,
-        mfc="none",
-        mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]],
-        mew=1.5,
-        zorder=4,
+        trial["movement_start_time"], well_linear[from_well],
+        marker="s", ms=6, mfc="none",
+        mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]], mew=1.5, zorder=4,
     )
     # arrival: circle at destination_first_poke_in_time, filled iff rewarded
     dest_color = PATCH_COLORS[WELL_PATCH_MAPPING[to_well]]
     ax.plot(
-        trial["destination_first_poke_in_time"],
-        well_linear[to_well],
-        marker="o",
-        ms=7,
+        trial["destination_first_poke_in_time"], well_linear[to_well],
+        marker="o", ms=7,
         mfc=dest_color if trial["is_reward"] else "none",
-        mec=dest_color,
-        mew=1.5,
-        zorder=4,
+        mec=dest_color, mew=1.5, zorder=4,
     )
     if trial["is_patch_change"]:
         ax.plot(
-            trial["movement_start_time"],
-            0.97,
-            marker="v",
-            ms=6,
-            color="black",
-            transform=blend,
-            zorder=5,
+            trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
+            transform=blend, zorder=5,
         )
 
 ax.set(
-    xlabel="time (s)",
-    ylabel="linear position (cm)",
-    title=f"{SESSION_ID}: position and trials",
-    xlim=(t_start, t_stop),
+    xlabel="time (s)", ylabel="linear position (cm)",
+    title=f"{SESSION_ID}: position and trials", xlim=(t_start, t_stop),
 )
 well_axis = ax.secondary_yaxis("right")
 well_axis.set_yticks([well_linear[w] for w in sorted(well_linear)])
@@ -1134,28 +905,14 @@ well_axis.set_yticklabels([f"well {w}" for w in sorted(well_linear)], fontsize=8
 def _marker(marker, filled, label, color="0.35"):
     """Neutral-grey proxy handle — real markers are colored by patch."""
     return Line2D(
-        [],
-        [],
-        linestyle="none",
-        marker=marker,
-        ms=7,
-        mfc=color if filled else "none",
-        mec=color,
-        mew=1.5,
-        label=label,
+        [], [], linestyle="none", marker=marker, ms=7,
+        mfc=color if filled else "none", mec=color, mew=1.5, label=label,
     )
 
 
 legend_handles = [
-    Line2D(
-        [],
-        [],
-        linestyle="none",
-        marker="o",
-        ms=4,
-        color="magenta",
-        label="linear position",
-    ),
+    Line2D([], [], linestyle="none", marker="o", ms=4, color="magenta",
+           label="linear position"),
     Patch(facecolor="0.85", edgecolor="none", label="trial (alternating)"),
     _marker("s", False, "departure (from_well)"),
     _marker("o", True, "arrival, rewarded"),
@@ -1166,77 +923,40 @@ legend_handles = [
     for p in sorted(PATCH_COLORS)
 ]
 ax.legend(
-    handles=legend_handles,
-    loc="upper center",
-    bbox_to_anchor=(0.5, -0.28),
-    ncol=5,
-    fontsize=8,
-    frameon=False,
-    handletextpad=0.5,
-    columnspacing=1.5,
+    handles=legend_handles, loc="upper center", bbox_to_anchor=(0.5, -0.28),
+    ncol=5, fontsize=8, frameon=False, handletextpad=0.5, columnspacing=1.5,
 )
 
 reward_well_nodes = [n for n in track_graph.nodes if track_graph.degree(n) == 1]
 plot_graph_as_1D(
-    track_graph,
-    ax=ax,
-    edge_order=linear_edge_order,
-    edge_spacing=linear_edge_spacing,
+    track_graph, ax=ax,
+    edge_order=linear_edge_order, edge_spacing=linear_edge_spacing,
     reward_well_nodes=reward_well_nodes,
     other_axis_start=t_start,
-    reward_well_size=120,
-    edge_linewidth=5,
+    reward_well_size=120, edge_linewidth=5,
 )
+
 
 
 axs[1].plot(
-    position_info.index,
-    position_info["head_speed"],
-    color="black",
-    rasterized=True,
-    zorder=2,
+    position_info.index, position_info["head_speed"],
+    color="black", rasterized=True, zorder=2,
 )
 axs[1].axhline(4.0, color="black", linewidth=0.5, alpha=0.5, zorder=3, linestyle="--")
 axs[1].set_ylabel("Speed [cm/s]")
-for _, stop in stop_table.loc[
-    (stop_table.stop_start >= t_start) & (stop_table.stop_end <= t_stop)
-].iterrows():
-    axs[1].axvspan(stop.stop_start, stop.stop_end, color="C3", alpha=0.2, zorder=1)
-    axs[1].text(
-        stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start),
-        1.05,
-        f"{int(stop.stop_idx)}",
-        color="C3",
-        fontsize=8,
-        ha="center",
-        va="top",
-        transform=axs[1].get_xaxis_transform(),
-        zorder=3,
+for _, stop in stop_table.loc[(stop_table.stop_start >= t_start) & (stop_table.stop_end <= t_stop)].iterrows():
+    axs[1].axvspan(
+        stop.stop_start, stop.stop_end,
+        color="C3", alpha=0.2, zorder=1
     )
+    axs[1].text(stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start), 1.05, f"{int(stop.stop_idx)}",
+                color="C3", fontsize=8, ha="center", va="top", transform=axs[1].get_xaxis_transform(), zorder=3)
     if stop.n_SWR > 0:
-        axs[2].text(
-            stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start),
-            1.05,
-            f"{int(stop.n_SWR)}",
-            color=COLORS["SWR"],
-            fontsize=8,
-            ha="center",
-            va="top",
-            transform=axs[2].get_xaxis_transform(),
-            zorder=3,
-        )
+        axs[2].text(stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start), 1.05, f"{int(stop.n_SWR)}",
+                    color=COLORS["SWR"], fontsize=8, ha="center", va="top", transform=axs[2].get_xaxis_transform(), zorder=3)
     if stop.n_non_local > 0:
-        axs[3].text(
-            stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start),
-            1.05,
-            f"{int(stop.n_non_local)}",
-            color=COLORS["Non-Local"],
-            fontsize=8,
-            ha="center",
-            va="top",
-            transform=axs[3].get_xaxis_transform(),
-            zorder=3,
-        )
+        axs[3].text(stop.stop_start + 0.5 * (stop.stop_end - stop.stop_start), 1.05, f"{int(stop.n_non_local)}",
+                    color=COLORS["Non-Local"], fontsize=8, ha="center", va="top", transform=axs[3].get_xaxis_transform(), zorder=3)
 
 dot.loc[t_start:t_stop, "SWR_zscore"].plot(
     ax=axs[2], linewidth=1, alpha=0.8, rasterized=True, color=COLORS["SWR"], zorder=2
@@ -1245,32 +965,21 @@ axs[2].fill_between(
     dot.loc[t_start:t_stop].index,
     dot.loc[t_start:t_stop, "SWR_event"] > 0,
     where=dot.loc[t_start:t_stop, "SWR_event"] > 0,
-    color=COLORS["SWR"],
-    alpha=0.2,
-    zorder=1,
+    color=COLORS["SWR"], alpha=0.2, zorder=1
 )
 
 axs[2].set_ylabel("SWR z-score")
 axs[2].axhline(0, color="black", linewidth=0.5, alpha=0.5, zorder=3, linestyle="--")
 axs[2].axhline(2.0, color="black", linewidth=0.5, alpha=0.5, zorder=3, linestyle="--")
 
-dot.loc[t_start:t_stop, ["Non-Local_Continuous_prob", "Non-Local_Fragmented_prob"]].sum(
-    axis=1
-).plot(
-    ax=axs[3],
-    linewidth=1,
-    alpha=0.8,
-    rasterized=True,
-    color=COLORS["Non-Local"],
-    zorder=2,
+dot.loc[t_start:t_stop, [ "Non-Local_Continuous_prob", "Non-Local_Fragmented_prob"]].sum(axis=1).plot(
+    ax=axs[3], linewidth=1, alpha=0.8, rasterized=True, color=COLORS["Non-Local"], zorder=2
 )
 axs[3].fill_between(
     dot.loc[t_start:t_stop].index,
     dot.loc[t_start:t_stop, "non_local_event"] > 0,
     where=dot.loc[t_start:t_stop, "non_local_event"] > 0,
-    color=COLORS["Non-Local"],
-    alpha=0.2,
-    zorder=1,
+    color=COLORS["Non-Local"], alpha=0.2, zorder=1
 )
 axs[3].axhline(0.8, color="black", linewidth=0.5, alpha=0.5, zorder=3, linestyle="--")
 axs[3].set_ylabel("Non-local prob")
@@ -1347,7 +1056,9 @@ if missing_qvals_cols:
 if qvals_all["stop_id"].duplicated().any():
     raise ValueError("qvals_table.stop_id must be globally unique")
 
-qvals_session = qvals_all[qvals_all["stop_id"].isin(stop_table["stop_id"])].copy()
+qvals_session = qvals_all[
+    qvals_all["stop_id"].isin(stop_table["stop_id"])
+].copy()
 del qvals_all
 
 if qvals_session.empty:
@@ -1363,7 +1074,8 @@ trial_constancy = qvals_session.groupby("trial_number_by_epoch")[
 if not trial_constancy.le(1).all().all():
     bad_cols = trial_constancy.columns[trial_constancy.gt(1).any()].tolist()
     raise ValueError(
-        f"behavioral beliefs vary across stops assigned to the same trial: {bad_cols}"
+        "behavioral beliefs vary across stops assigned to the same trial: "
+        f"{bad_cols}"
     )
 
 belief_trials = (
@@ -1399,7 +1111,8 @@ stop_qvals_coverage = qvals_session["stop_id"].nunique() / len(stop_table)
 print(
     "behavioral beliefs:",
     f"{len(belief_trials)} trials,",
-    f"{len(qvals_session)}/{len(stop_table)} stops mapped ({stop_qvals_coverage:.1%})",
+    f"{len(qvals_session)}/{len(stop_table)} stops mapped "
+    f"({stop_qvals_coverage:.1%})",
 )
 
 # %% [markdown]
@@ -1417,7 +1130,9 @@ print(
 trial_axis = np.arange(len(belief_trials))
 rewarded = belief_trials["trial_reward"].to_numpy(dtype=bool)
 
-fig, axes = plt.subplots(3, 1, figsize=(12, 8), sharex=True, constrained_layout=True)
+fig, axes = plt.subplots(
+    3, 1, figsize=(12, 8), sharex=True, constrained_layout=True
+)
 belief_panels = (
     (p_reward_matrix.T, "nominal reward probability", "cividis", 0.0, 1.0),
     (
@@ -1436,7 +1151,9 @@ belief_panels = (
     ),
 )
 belief_images = []
-for ax, (matrix, title, cmap, vmin, vmax) in zip(axes, belief_panels, strict=True):
+for ax, (matrix, title, cmap, vmin, vmax) in zip(
+    axes, belief_panels, strict=True
+):
     image = ax.imshow(
         matrix,
         aspect="auto",
@@ -1485,7 +1202,9 @@ variance_colorbar = fig.colorbar(
     ticks=(0.0, 1 / 24, 1 / 12),
     pad=0.01,
 )
-variance_colorbar.set_ticks((0.0, 1 / 24, 1 / 12), labels=("0", "1/24", "1/12"))
+variance_colorbar.set_ticks(
+    (0.0, 1 / 24, 1 / 12), labels=("0", "1/24", "1/12")
+)
 belief_legend_handles = (
     Line2D(
         [],
@@ -1530,19 +1249,23 @@ stem_top1 = np.mean(
     == chosen_stem[valid_stem_probability]
 )
 mean_chosen_stem_probability = np.mean(
-    stem_probabilities[row[valid_stem_probability], chosen_stem[valid_stem_probability]]
+    stem_probabilities[
+        row[valid_stem_probability], chosen_stem[valid_stem_probability]
+    ]
 )
 
-q_midpoint_ecdf = (belief_trials["q_chosen"].rank(method="average") - 0.5) / len(
-    belief_trials
-)
+q_midpoint_ecdf = (
+    belief_trials["q_chosen"].rank(method="average") - 0.5
+) / len(belief_trials)
 belief_trials["q_chosen_quartile"] = pd.cut(
     q_midpoint_ecdf,
     bins=np.linspace(0, 1, 5),
     labels=["Q1", "Q2", "Q3", "Q4"],
     include_lowest=True,
 )
-reward_calibration = belief_trials.groupby("q_chosen_quartile", observed=True).agg(
+reward_calibration = belief_trials.groupby(
+    "q_chosen_quartile", observed=True
+).agg(
     mean_predicted_reward=("q_chosen", "mean"),
     observed_reward_rate=("trial_reward", "mean"),
     n_trials=("trial_reward", "size"),
@@ -1572,28 +1295,24 @@ display(pd.DataFrame(calibration_metrics).set_index("source").round(3))  # noqa:
 
 # %%
 # Beliefs on the wall clock, aligned to the behavior panel.
-from matplotlib.patches import Patch  # noqa: E402
+from matplotlib.patches import Patch
 
 t_start = float(position_info.index[0])
 t_stop = t_start + 750.0
 
-from continuum_swr_replay.analysis.behavior.covariates import (  # noqa: E402
+from continuum_swr_replay.analysis.behavior.covariates import (
     attach_arm_uncertainty,
     attach_contingency_value_block,
 )
-from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palette  # noqa: E402
+from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palette
 
 WELL_COLORS = {w: c for w, c in patch_grouped_arm_palette().items() if w < 6}
 TRIAL_SCALARS = (
     ("switch_advantage_mu_preoutcome_sess_z", "switch advantage ΔV", "-", "#0072B2"),
     ("beta_reward_entropy_z", "belief entropy", "-", "#009E73"),
     ("rpe_z", "RPE (post-outcome)", "--", "#D55E00"),
-    (
-        "global_mu_update_abs_postoutcome_sess_z",
-        "|value update| (post-outcome)",
-        "--",
-        "#CC79A7",
-    ),
+    ("global_mu_update_abs_postoutcome_sess_z", "|value update| (post-outcome)",
+     "--", "#CC79A7"),
 )
 
 # Every belief value below is produced by the SAME builders that populate the
@@ -1601,8 +1320,7 @@ TRIAL_SCALARS = (
 # never on trial number, whose origin differs by animal.
 stops = (
     stop_table[["stop_id", "stop_start", "stop_end"]]
-    .sort_values("stop_start")
-    .reset_index(drop=True)
+    .sort_values("stop_start").reset_index(drop=True)
 )
 n_stops = len(stops)
 arm_long = np.tile(np.arange(6), n_stops)
@@ -1617,21 +1335,13 @@ uncertainty_stop = arm_uncertainty.reshape(n_stops, 6)
 
 # Same one-to-one stop join build_trial_leaf_table performs.
 scalar_cols = [col for col, *_ in TRIAL_SCALARS]
-stop_scalars = (
-    stops.merge(
-        qvals_session[["stop_id", *scalar_cols]],
-        on="stop_id",
-        how="left",
-        validate="one_to_one",
-    )
-    .sort_values("stop_start")
-    .reset_index(drop=True)
-)
+stop_scalars = stops.merge(
+    qvals_session[["stop_id", *scalar_cols]],
+    on="stop_id", how="left", validate="one_to_one",
+).sort_values("stop_start").reset_index(drop=True)
 chosen_arm_stop = stops.merge(
     qvals_session[["stop_id", "arm", "trial_reward", "trial_number_by_epoch"]],
-    on="stop_id",
-    how="left",
-    validate="one_to_one",
+    on="stop_id", how="left", validate="one_to_one",
 )
 
 # Cell edges: each stop's belief is held from its start to the next stop's
@@ -1647,149 +1357,55 @@ stop_mid = 0.5 * (step_x[:-1] + step_x[1:])
 
 def _heat(ax, values, cmap, vmin, vmax):
     """Belief as wells x time; row order matches the behavior panel's well axis."""
-    return ax.pcolormesh(
-        step_x,
-        well_edges,
-        values.T,
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-        shading="flat",
-        rasterized=True,
-    )
+    return ax.pcolormesh(step_x, well_edges, values.T, cmap=cmap, vmin=vmin,
+                         vmax=vmax, shading="flat", rasterized=True)
 
 
 def _well_axis(ax):
-    ax.set_yticks(
-        np.arange(6) + 0.5, labels=[f"well {w}" for w in range(6)], fontsize=7
-    )
+    ax.set_yticks(np.arange(6) + 0.5, labels=[f"well {w}" for w in range(6)],
+                  fontsize=7)
     for tick, well in zip(ax.get_yticklabels(), range(6), strict=True):
         tick.set_color(WELL_COLORS[well])
 
 
 fig, axes = plt.subplots(
-    5,
-    1,
-    figsize=(15, 10),
-    sharex=True,
-    height_ratios=[3.0, 0.7, 1.5, 1.5, 1.6],
-    constrained_layout=True,
+    5, 1, figsize=(15, 10), sharex=True,
+    height_ratios=[3.0, 0.7, 1.5, 1.5, 1.6], constrained_layout=True,
 )
 
 # ---- panel 1: position + trials ------------------------------------------
 ax = axes[0]
 for row_i, (_, trial) in enumerate(trials.iterrows()):
-    ax.axvspan(
-        trial["movement_start_time"],
-        trial["end_time"],
-        color="0.85" if row_i % 2 else "0.95",
-        linewidth=0,
-        zorder=0,
-    )
-ax.scatter(
-    position_info.index,
-    position_info["linear_position"],
-    s=1,
-    color="magenta",
-    rasterized=True,
-    zorder=2,
-)
+    ax.axvspan(trial["movement_start_time"], trial["end_time"],
+               color="0.85" if row_i % 2 else "0.95", linewidth=0, zorder=0)
+ax.scatter(position_info.index, position_info["linear_position"], s=1,
+           color="magenta", rasterized=True, zorder=2)
 blend = ax.get_xaxis_transform()
 for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
-    ax.plot(
-        trial["movement_start_time"],
-        well_linear[from_well],
-        marker="s",
-        ms=6,
-        mfc="none",
-        mec=WELL_COLORS[from_well],
-        mew=1.5,
-        zorder=4,
-    )
-    ax.plot(
-        trial["destination_first_poke_in_time"],
-        well_linear[to_well],
-        marker="o",
-        ms=7,
-        mfc=WELL_COLORS[to_well] if trial["is_reward"] else "none",
-        mec=WELL_COLORS[to_well],
-        mew=1.5,
-        zorder=4,
-    )
+    ax.plot(trial["movement_start_time"], well_linear[from_well], marker="s", ms=6,
+            mfc="none", mec=WELL_COLORS[from_well], mew=1.5, zorder=4)
+    ax.plot(trial["destination_first_poke_in_time"], well_linear[to_well], marker="o", ms=7,
+            mfc=WELL_COLORS[to_well] if trial["is_reward"] else "none",
+            mec=WELL_COLORS[to_well], mew=1.5, zorder=4)
     if trial["is_patch_change"]:
-        ax.plot(
-            trial["movement_start_time"],
-            0.97,
-            marker="v",
-            ms=6,
-            color="black",
-            transform=blend,
-            zorder=5,
-        )
-ax.set(
-    ylabel="linear position (cm)",
-    title=f"{SESSION_ID}: behavior and Beta-model beliefs",
-)
+        ax.plot(trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
+                transform=blend, zorder=5)
+ax.set(ylabel="linear position (cm)",
+       title=f"{SESSION_ID}: behavior and Beta-model beliefs")
 well_axis = ax.secondary_yaxis("right")
 well_axis.set_yticks([well_linear[w] for w in sorted(well_linear)])
 well_axis.set_yticklabels([f"well {w}" for w in sorted(well_linear)], fontsize=8)
 for tick, well in zip(well_axis.get_yticklabels(), sorted(well_linear), strict=True):
     tick.set_color(WELL_COLORS[well])
-ax.legend(
-    handles=[
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="o",
-            ms=4,
-            color="magenta",
-            label="linear position",
-        ),
-        Patch(facecolor="0.85", edgecolor="none", label="trial (alternating)"),
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="s",
-            ms=7,
-            mfc="none",
-            mec="0.35",
-            mew=1.5,
-            label="departure",
-        ),
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="o",
-            ms=7,
-            mfc="0.35",
-            mec="0.35",
-            mew=1.5,
-            label="arrival, rewarded",
-        ),
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="o",
-            ms=7,
-            mfc="none",
-            mec="0.35",
-            mew=1.5,
-            label="arrival, unrewarded",
-        ),
-        Line2D(
-            [], [], ls="none", marker="v", ms=6, color="black", label="patch change"
-        ),
-    ],
-    loc="upper left",
-    bbox_to_anchor=(1.09, 1.0),
-    fontsize=8,
-    frameon=False,
-)
+ax.legend(handles=[
+    Line2D([], [], ls="none", marker="o", ms=4, color="magenta", label="linear position"),
+    Patch(facecolor="0.85", edgecolor="none", label="trial (alternating)"),
+    Line2D([], [], ls="none", marker="s", ms=7, mfc="none", mec="0.35", mew=1.5, label="departure"),
+    Line2D([], [], ls="none", marker="o", ms=7, mfc="0.35", mec="0.35", mew=1.5, label="arrival, rewarded"),
+    Line2D([], [], ls="none", marker="o", ms=7, mfc="none", mec="0.35", mew=1.5, label="arrival, unrewarded"),
+    Line2D([], [], ls="none", marker="v", ms=6, color="black", label="patch change"),
+], loc="upper left", bbox_to_anchor=(1.09, 1.0), fontsize=8, frameon=False)
 
 # ---- panel 2: programmed schedule (thin reference strip) ------------------
 mesh_p = _heat(axes[1], p_reward_stop, "cividis", 0.0, 1.0)
@@ -1809,30 +1425,13 @@ choice_marks = (
     .drop_duplicates("trial_number_by_epoch")
 )
 chosen = choice_marks["arm"].to_numpy(dtype=float) + 0.5
-marks = ax.scatter(
-    choice_marks["stop_mid"],
-    chosen,
-    marker="s",
-    s=14,
-    facecolors="none",
-    edgecolors="white",
-    linewidths=0.7,
-    zorder=3,
-)
-marks.set_path_effects(
-    [patheffects.Stroke(linewidth=1.8, foreground="black"), patheffects.Normal()]
-)
+marks = ax.scatter(choice_marks["stop_mid"], chosen, marker="s", s=14,
+                   facecolors="none", edgecolors="white", linewidths=0.7, zorder=3)
+marks.set_path_effects([patheffects.Stroke(linewidth=1.8, foreground="black"),
+                        patheffects.Normal()])
 rewarded = choice_marks["trial_reward"].to_numpy() == 1
-ax.scatter(
-    choice_marks["stop_mid"][rewarded],
-    chosen[rewarded],
-    marker="o",
-    s=8,
-    color="#E69F00",
-    edgecolors="0.2",
-    linewidths=0.3,
-    zorder=4,
-)
+ax.scatter(choice_marks["stop_mid"][rewarded], chosen[rewarded], marker="o", s=8,
+           color="#E69F00", edgecolors="0.2", linewidths=0.3, zorder=4)
 
 # ---- panel 4: belief uncertainty -----------------------------------------
 mesh_u = _heat(axes[3], uncertainty_stop, "magma", 0.0, 1 / 12)
@@ -1843,72 +1442,24 @@ axes[3].set_ylabel("arm_uncertainty\n(Beta variance)", fontsize=8)
 ax = axes[4]
 for col, label, ls, color in TRIAL_SCALARS:
     values = stop_scalars[col].to_numpy(dtype=float)
-    ax.step(
-        step_x,
-        np.append(values, values[-1]),
-        where="post",
-        color=color,
-        ls=ls,
-        lw=1.4,
-        label=label,
-    )
+    ax.step(step_x, np.append(values, values[-1]), where="post",
+            color=color, ls=ls, lw=1.4, label=label)
 ax.axhline(0.0, color="0.6", lw=0.6, zorder=0)
 ax.set(ylabel="pooled-global SD", xlabel="time (s)", xlim=(t_start, t_stop))
-ax.legend(
-    loc="upper left",
-    bbox_to_anchor=(1.09, 1.0),
-    fontsize=8,
-    frameon=False,
-    title="solid = pre-outcome\ndashed = post-outcome",
-    title_fontsize=8,
-)
+ax.legend(loc="upper left", bbox_to_anchor=(1.09, 1.0), fontsize=8, frameon=False,
+          title="solid = pre-outcome\ndashed = post-outcome", title_fontsize=8)
 
-fig.colorbar(
-    mesh_q,
-    ax=[axes[1], axes[2]],
-    label="reward probability",
-    ticks=(0, 0.5, 1),
-    pad=0.005,
-    aspect=18,
-)
-cbar_u = fig.colorbar(
-    mesh_u,
-    ax=axes[3],
-    label="variance [p²]",
-    ticks=(0, 1 / 24, 1 / 12),
-    pad=0.005,
-    aspect=10,
-)
+fig.colorbar(mesh_q, ax=[axes[1], axes[2]], label="reward probability",
+             ticks=(0, 0.5, 1), pad=0.005, aspect=18)
+cbar_u = fig.colorbar(mesh_u, ax=axes[3], label="variance [p²]",
+                      ticks=(0, 1 / 24, 1 / 12), pad=0.005, aspect=10)
 cbar_u.set_ticks((0, 1 / 24, 1 / 12), labels=("0", "1/24", "1/12"))
-axes[2].legend(
-    handles=[
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="s",
-            ms=6,
-            mfc="none",
-            mec="white",
-            mew=1.0,
-            label="chosen well",
-        ),
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="o",
-            ms=5,
-            mfc="#E69F00",
-            mec="0.2",
-            label="rewarded",
-        ),
-    ],
-    loc="upper left",
-    bbox_to_anchor=(1.09, 1.0),
-    fontsize=8,
-    frameon=False,
-)
+axes[2].legend(handles=[
+    Line2D([], [], ls="none", marker="s", ms=6, mfc="none", mec="white", mew=1.0,
+           label="chosen well"),
+    Line2D([], [], ls="none", marker="o", ms=5, mfc="#E69F00", mec="0.2",
+           label="rewarded"),
+], loc="upper left", bbox_to_anchor=(1.09, 1.0), fontsize=8, frameon=False)
 
 # ---- the production path must reproduce the section-4a belief table -------
 mapped = stops["stop_id"].isin(qvals_session["stop_id"]).to_numpy()
@@ -1919,21 +1470,19 @@ trial_row = pd.Index(belief_trials["trial_number_by_epoch"]).get_indexer(
     stop_trial[mapped]
 )
 np.testing.assert_allclose(q_stop[mapped], q_matrix[trial_row], rtol=0, atol=1e-12)
-print(
-    f"stops={n_stops}, with belief={int(mapped.sum())} ({mapped.mean():.1%}); "
-    "production q_arm matches the section-4a q_port matrix"
-)
+print(f"stops={n_stops}, with belief={int(mapped.sum())} ({mapped.mean():.1%}); "
+      "production q_arm matches the section-4a q_port matrix")
 
 
 # %%
 # Beliefs on the wall clock, aligned to the behavior panel.
-from matplotlib.patches import Patch  # noqa: E402
+from matplotlib.patches import Patch
 
-from continuum_swr_replay.analysis.behavior.covariates import (  # noqa: E402
+from continuum_swr_replay.analysis.behavior.covariates import (
     attach_arm_uncertainty,
     attach_contingency_value_block,
 )
-from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palette  # noqa: E402
+from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palette
 
 t_start = float(position_info.index[0])
 t_stop = float(position_info.index[-1])
@@ -1943,12 +1492,8 @@ TRIAL_SCALARS = (
     ("switch_advantage_mu_preoutcome_sess_z", "switch advantage ΔV", "-", "#0072B2"),
     ("beta_reward_entropy_z", "belief entropy", "-", "#009E73"),
     ("rpe_z", "RPE (post-outcome)", "--", "#D55E00"),
-    (
-        "global_mu_update_abs_postoutcome_sess_z",
-        "|value update| (post-outcome)",
-        "--",
-        "#CC79A7",
-    ),
+    ("global_mu_update_abs_postoutcome_sess_z", "|value update| (post-outcome)",
+     "--", "#CC79A7"),
 )
 
 # Every belief value below is produced by the SAME builders that populate the
@@ -1956,8 +1501,7 @@ TRIAL_SCALARS = (
 # never on trial number, whose origin differs by animal.
 stops = (
     stop_table[["stop_id", "stop_start", "stop_end"]]
-    .sort_values("stop_start")
-    .reset_index(drop=True)
+    .sort_values("stop_start").reset_index(drop=True)
 )
 n_stops = len(stops)
 arm_long = np.tile(np.arange(6), n_stops)
@@ -1972,21 +1516,13 @@ uncertainty_stop = arm_uncertainty.reshape(n_stops, 6)
 
 # Same one-to-one stop join build_trial_leaf_table performs.
 scalar_cols = [col for col, *_ in TRIAL_SCALARS]
-stop_scalars = (
-    stops.merge(
-        qvals_session[["stop_id", *scalar_cols]],
-        on="stop_id",
-        how="left",
-        validate="one_to_one",
-    )
-    .sort_values("stop_start")
-    .reset_index(drop=True)
-)
+stop_scalars = stops.merge(
+    qvals_session[["stop_id", *scalar_cols]],
+    on="stop_id", how="left", validate="one_to_one",
+).sort_values("stop_start").reset_index(drop=True)
 chosen_arm_stop = stops.merge(
     qvals_session[["stop_id", "arm", "trial_reward", "trial_number_by_epoch"]],
-    on="stop_id",
-    how="left",
-    validate="one_to_one",
+    on="stop_id", how="left", validate="one_to_one",
 )
 
 # Cell edges: each stop's belief is held from its start to the next stop's
@@ -2002,149 +1538,55 @@ stop_mid = 0.5 * (step_x[:-1] + step_x[1:])
 
 def _heat(ax, values, cmap, vmin, vmax):
     """Belief as wells x time; row order matches the behavior panel's well axis."""
-    return ax.pcolormesh(
-        step_x,
-        well_edges,
-        values.T,
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-        shading="flat",
-        rasterized=True,
-    )
+    return ax.pcolormesh(step_x, well_edges, values.T, cmap=cmap, vmin=vmin,
+                         vmax=vmax, shading="flat", rasterized=True)
 
 
 def _well_axis(ax):
-    ax.set_yticks(
-        np.arange(6) + 0.5, labels=[f"well {w}" for w in range(6)], fontsize=7
-    )
+    ax.set_yticks(np.arange(6) + 0.5, labels=[f"well {w}" for w in range(6)],
+                  fontsize=7)
     for tick, well in zip(ax.get_yticklabels(), range(6), strict=True):
         tick.set_color(WELL_COLORS[well])
 
 
 fig, axes = plt.subplots(
-    5,
-    1,
-    figsize=(15, 10),
-    sharex=True,
-    height_ratios=[3.0, 0.7, 1.5, 1.5, 1.6],
-    constrained_layout=True,
+    5, 1, figsize=(15, 10), sharex=True,
+    height_ratios=[3.0, 0.7, 1.5, 1.5, 1.6], constrained_layout=True,
 )
 
 # ---- panel 1: position + trials ------------------------------------------
 ax = axes[0]
 for row_i, (_, trial) in enumerate(trials.iterrows()):
-    ax.axvspan(
-        trial["movement_start_time"],
-        trial["end_time"],
-        color="0.85" if row_i % 2 else "0.95",
-        linewidth=0,
-        zorder=0,
-    )
-ax.scatter(
-    position_info.index,
-    position_info["linear_position"],
-    s=1,
-    color="magenta",
-    rasterized=True,
-    zorder=2,
-)
+    ax.axvspan(trial["movement_start_time"], trial["end_time"],
+               color="0.85" if row_i % 2 else "0.95", linewidth=0, zorder=0)
+ax.scatter(position_info.index, position_info["linear_position"], s=1,
+           color="magenta", rasterized=True, zorder=2)
 blend = ax.get_xaxis_transform()
 for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
-    ax.plot(
-        trial["movement_start_time"],
-        well_linear[from_well],
-        marker="s",
-        ms=6,
-        mfc="none",
-        mec=WELL_COLORS[from_well],
-        mew=1.5,
-        zorder=4,
-    )
-    ax.plot(
-        trial["destination_first_poke_in_time"],
-        well_linear[to_well],
-        marker="o",
-        ms=7,
-        mfc=WELL_COLORS[to_well] if trial["is_reward"] else "none",
-        mec=WELL_COLORS[to_well],
-        mew=1.5,
-        zorder=4,
-    )
+    ax.plot(trial["movement_start_time"], well_linear[from_well], marker="s", ms=6,
+            mfc="none", mec=WELL_COLORS[from_well], mew=1.5, zorder=4)
+    ax.plot(trial["destination_first_poke_in_time"], well_linear[to_well], marker="o", ms=7,
+            mfc=WELL_COLORS[to_well] if trial["is_reward"] else "none",
+            mec=WELL_COLORS[to_well], mew=1.5, zorder=4)
     if trial["is_patch_change"]:
-        ax.plot(
-            trial["movement_start_time"],
-            0.97,
-            marker="v",
-            ms=6,
-            color="black",
-            transform=blend,
-            zorder=5,
-        )
-ax.set(
-    ylabel="linear position (cm)",
-    title=f"{SESSION_ID}: behavior and Beta-model beliefs",
-)
+        ax.plot(trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
+                transform=blend, zorder=5)
+ax.set(ylabel="linear position (cm)",
+       title=f"{SESSION_ID}: behavior and Beta-model beliefs")
 well_axis = ax.secondary_yaxis("right")
 well_axis.set_yticks([well_linear[w] for w in sorted(well_linear)])
 well_axis.set_yticklabels([f"well {w}" for w in sorted(well_linear)], fontsize=8)
 for tick, well in zip(well_axis.get_yticklabels(), sorted(well_linear), strict=True):
     tick.set_color(WELL_COLORS[well])
-ax.legend(
-    handles=[
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="o",
-            ms=4,
-            color="magenta",
-            label="linear position",
-        ),
-        Patch(facecolor="0.85", edgecolor="none", label="trial (alternating)"),
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="s",
-            ms=7,
-            mfc="none",
-            mec="0.35",
-            mew=1.5,
-            label="departure",
-        ),
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="o",
-            ms=7,
-            mfc="0.35",
-            mec="0.35",
-            mew=1.5,
-            label="arrival, rewarded",
-        ),
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="o",
-            ms=7,
-            mfc="none",
-            mec="0.35",
-            mew=1.5,
-            label="arrival, unrewarded",
-        ),
-        Line2D(
-            [], [], ls="none", marker="v", ms=6, color="black", label="patch change"
-        ),
-    ],
-    loc="upper left",
-    bbox_to_anchor=(1.09, 1.0),
-    fontsize=8,
-    frameon=False,
-)
+ax.legend(handles=[
+    Line2D([], [], ls="none", marker="o", ms=4, color="magenta", label="linear position"),
+    Patch(facecolor="0.85", edgecolor="none", label="trial (alternating)"),
+    Line2D([], [], ls="none", marker="s", ms=7, mfc="none", mec="0.35", mew=1.5, label="departure"),
+    Line2D([], [], ls="none", marker="o", ms=7, mfc="0.35", mec="0.35", mew=1.5, label="arrival, rewarded"),
+    Line2D([], [], ls="none", marker="o", ms=7, mfc="none", mec="0.35", mew=1.5, label="arrival, unrewarded"),
+    Line2D([], [], ls="none", marker="v", ms=6, color="black", label="patch change"),
+], loc="upper left", bbox_to_anchor=(1.09, 1.0), fontsize=8, frameon=False)
 
 # ---- panel 2: programmed schedule (thin reference strip) ------------------
 mesh_p = _heat(axes[1], p_reward_stop, "cividis", 0.0, 1.0)
@@ -2164,30 +1606,13 @@ choice_marks = (
     .drop_duplicates("trial_number_by_epoch")
 )
 chosen = choice_marks["arm"].to_numpy(dtype=float) + 0.5
-marks = ax.scatter(
-    choice_marks["stop_mid"],
-    chosen,
-    marker="s",
-    s=14,
-    facecolors="none",
-    edgecolors="white",
-    linewidths=0.7,
-    zorder=3,
-)
-marks.set_path_effects(
-    [patheffects.Stroke(linewidth=1.8, foreground="black"), patheffects.Normal()]
-)
+marks = ax.scatter(choice_marks["stop_mid"], chosen, marker="s", s=14,
+                   facecolors="none", edgecolors="white", linewidths=0.7, zorder=3)
+marks.set_path_effects([patheffects.Stroke(linewidth=1.8, foreground="black"),
+                        patheffects.Normal()])
 rewarded = choice_marks["trial_reward"].to_numpy() == 1
-ax.scatter(
-    choice_marks["stop_mid"][rewarded],
-    chosen[rewarded],
-    marker="o",
-    s=8,
-    color="#E69F00",
-    edgecolors="0.2",
-    linewidths=0.3,
-    zorder=4,
-)
+ax.scatter(choice_marks["stop_mid"][rewarded], chosen[rewarded], marker="o", s=8,
+           color="#E69F00", edgecolors="0.2", linewidths=0.3, zorder=4)
 
 # ---- panel 4: belief uncertainty -----------------------------------------
 mesh_u = _heat(axes[3], uncertainty_stop, "magma", 0.0, 1 / 12)
@@ -2198,72 +1623,24 @@ axes[3].set_ylabel("arm_uncertainty\n(Beta variance)", fontsize=8)
 ax = axes[4]
 for col, label, ls, color in TRIAL_SCALARS:
     values = stop_scalars[col].to_numpy(dtype=float)
-    ax.step(
-        step_x,
-        np.append(values, values[-1]),
-        where="post",
-        color=color,
-        ls=ls,
-        lw=1.4,
-        label=label,
-    )
+    ax.step(step_x, np.append(values, values[-1]), where="post",
+            color=color, ls=ls, lw=1.4, label=label)
 ax.axhline(0.0, color="0.6", lw=0.6, zorder=0)
 ax.set(ylabel="pooled-global SD", xlabel="time (s)", xlim=(t_start, t_stop))
-ax.legend(
-    loc="upper left",
-    bbox_to_anchor=(1.09, 1.0),
-    fontsize=8,
-    frameon=False,
-    title="solid = pre-outcome\ndashed = post-outcome",
-    title_fontsize=8,
-)
+ax.legend(loc="upper left", bbox_to_anchor=(1.09, 1.0), fontsize=8, frameon=False,
+          title="solid = pre-outcome\ndashed = post-outcome", title_fontsize=8)
 
-fig.colorbar(
-    mesh_q,
-    ax=[axes[1], axes[2]],
-    label="reward probability",
-    ticks=(0, 0.5, 1),
-    pad=0.005,
-    aspect=18,
-)
-cbar_u = fig.colorbar(
-    mesh_u,
-    ax=axes[3],
-    label="variance [p²]",
-    ticks=(0, 1 / 24, 1 / 12),
-    pad=0.005,
-    aspect=10,
-)
+fig.colorbar(mesh_q, ax=[axes[1], axes[2]], label="reward probability",
+             ticks=(0, 0.5, 1), pad=0.005, aspect=18)
+cbar_u = fig.colorbar(mesh_u, ax=axes[3], label="variance [p²]",
+                      ticks=(0, 1 / 24, 1 / 12), pad=0.005, aspect=10)
 cbar_u.set_ticks((0, 1 / 24, 1 / 12), labels=("0", "1/24", "1/12"))
-axes[2].legend(
-    handles=[
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="s",
-            ms=6,
-            mfc="none",
-            mec="white",
-            mew=1.0,
-            label="chosen well",
-        ),
-        Line2D(
-            [],
-            [],
-            ls="none",
-            marker="o",
-            ms=5,
-            mfc="#E69F00",
-            mec="0.2",
-            label="rewarded",
-        ),
-    ],
-    loc="upper left",
-    bbox_to_anchor=(1.09, 1.0),
-    fontsize=8,
-    frameon=False,
-)
+axes[2].legend(handles=[
+    Line2D([], [], ls="none", marker="s", ms=6, mfc="none", mec="white", mew=1.0,
+           label="chosen well"),
+    Line2D([], [], ls="none", marker="o", ms=5, mfc="#E69F00", mec="0.2",
+           label="rewarded"),
+], loc="upper left", bbox_to_anchor=(1.09, 1.0), fontsize=8, frameon=False)
 
 # ---- the production path must reproduce the section-4a belief table -------
 mapped = stops["stop_id"].isin(qvals_session["stop_id"]).to_numpy()
@@ -2274,10 +1651,8 @@ trial_row = pd.Index(belief_trials["trial_number_by_epoch"]).get_indexer(
     stop_trial[mapped]
 )
 np.testing.assert_allclose(q_stop[mapped], q_matrix[trial_row], rtol=0, atol=1e-12)
-print(
-    f"stops={n_stops}, with belief={int(mapped.sum())} ({mapped.mean():.1%}); "
-    "production q_arm matches the section-4a q_port matrix"
-)
+print(f"stops={n_stops}, with belief={int(mapped.sum())} ({mapped.mean():.1%}); "
+      "production q_arm matches the section-4a q_port matrix")
 
 
 # %% [markdown]
@@ -2317,9 +1692,8 @@ event_table[
 fig, axes = plt.subplots(1, 3, figsize=(13, 3.5))
 
 axes[0].hist(event_table["event_duration"] * 1e3, bins=40, color="C0")
-axes[0].set(
-    xlabel="event duration (ms)", ylabel="# events", title="filtered event durations"
-)
+axes[0].set(xlabel="event duration (ms)", ylabel="# events",
+            title="filtered event durations")
 
 axes[1].hist(event_table["peak_nonlocal_prob"], bins=40, color="C1")
 axes[1].set(xlabel="peak non-local prob", title="peak non-local probability")
@@ -2391,16 +1765,10 @@ if not retrospective.empty:
 event_patch_table = build_event_patch_table(event_table, event_arm_table)
 add_arm_fixed_effects(event_arm_table)  # in-place: adds arm_fe_0 … arm_fe_7
 
-print(
-    "event_arm_table  :",
-    event_arm_table.shape,
-    f"({event_arm_table['event_id'].nunique()} events × 9 arms)",
-)
-print(
-    "event_patch_table:",
-    event_patch_table.shape,
-    f"({event_patch_table['event_id'].nunique()} events × 3 patches)",
-)
+print("event_arm_table  :", event_arm_table.shape,
+      f"({event_arm_table['event_id'].nunique()} events × 9 arms)")
+print("event_patch_table:", event_patch_table.shape,
+      f"({event_patch_table['event_id'].nunique()} events × 3 patches)")
 print("event_sequence   :", event_sequence_table.shape)
 print("\none event (9 arms):")
 cols = [
@@ -2438,9 +1806,9 @@ assert (event_patch_table.groupby("event_id").size() == 3).all()
 assert (event_patch_table.groupby("event_id")["patch"].nunique() == 3).all()
 assert int(stop_table["n_events"].sum()) == n_events
 assert int(stop_table["n_non_local"].sum()) == n_events
-assert (stop_table["n_non_local_SWR"] + stop_table["n_non_local_no_SWR"]).equals(
-    stop_table["n_non_local"]
-)
+assert (
+    stop_table["n_non_local_SWR"] + stop_table["n_non_local_no_SWR"]
+).equals(stop_table["n_non_local"])
 assert int(stop_table["n_non_local_SWR"].sum()) == int(
     event_table["is_swr"].fillna(False).sum()
 )
@@ -2476,9 +1844,13 @@ pd.testing.assert_series_equal(
     check_names=False,
 )
 
-arm_fraction_sums = event_arm_table.groupby("event_id")["arm_fraction"].sum(min_count=1)
+arm_fraction_sums = event_arm_table.groupby("event_id")["arm_fraction"].sum(
+    min_count=1
+)
 has_real_arm_bins = expected_real_arm_bins > 0
-assert np.allclose(arm_fraction_sums.loc[has_real_arm_bins], 1.0, rtol=0, atol=1e-10)
+assert np.allclose(
+    arm_fraction_sums.loc[has_real_arm_bins], 1.0, rtol=0, atol=1e-10
+)
 assert arm_fraction_sums.loc[~has_real_arm_bins].isna().all()
 max_arm_fraction_error = float(
     np.max(
@@ -2515,11 +1887,9 @@ for col in belief_cols:
     assert np.allclose(event_arm_table.loc[trunk_belief_rows, col], 0.0)
 assert event_arm_table.loc[leaf_belief_rows, "p_reward_arm"].between(0, 1).all()
 assert event_arm_table.loc[leaf_belief_rows, "q_arm"].between(0, 1).all()
-assert (
-    event_arm_table.loc[leaf_belief_rows, "arm_uncertainty"]
-    .between(0, 1 / 12 + 1e-12)
-    .all()
-)
+assert event_arm_table.loc[leaf_belief_rows, "arm_uncertainty"].between(
+    0, 1 / 12 + 1e-12
+).all()
 
 qvals_by_stop = qvals_session.set_index("stop_id")
 for arm in range(6):
@@ -2640,31 +2010,25 @@ print(
 arm_mass = event_arm_table.groupby("arm")["arm_count_hard"].sum()
 arm_mass = arm_mass / arm_mass.sum()
 frac_current = (
-    event_arm_table["arm_count_hard"] * event_arm_table["is_current"]
-).sum() / event_arm_table["arm_count_hard"].sum()
+    (event_arm_table["arm_count_hard"] * event_arm_table["is_current"]).sum()
+    / event_arm_table["arm_count_hard"].sum()
+)
 frac_prev = (
-    event_arm_table["arm_count_hard"] * event_arm_table["is_prev"]
-).sum() / event_arm_table["arm_count_hard"].sum()
+    (event_arm_table["arm_count_hard"] * event_arm_table["is_prev"]).sum()
+    / event_arm_table["arm_count_hard"].sum()
+)
 
 fig, ax = plt.subplots(figsize=(7, 3.5))
 ax.bar(arm_mass.index, arm_mass.values, color="C0")
 ax.axhline(1 / 9, color="0.4", ls="--", lw=1, label="uniform (1/9)")
-ax.set(
-    xlabel="arm id",
-    ylabel="fraction of replay timebins",
-    title="replay content by arm (this epoch)",
-)
+ax.set(xlabel="arm id", ylabel="fraction of replay timebins",
+       title="replay content by arm (this epoch)")
 ax.set_xticks(range(9))
 ax.legend(fontsize=8)
-ax.text(
-    0.02,
-    0.95,
-    f"on current arm: {frac_current:.0%}\non previous arm: {frac_prev:.0%}",
-    transform=ax.transAxes,
-    va="top",
-    fontsize=9,
-    bbox=dict(boxstyle="round", fc="white", ec="0.7"),
-)
+ax.text(0.02, 0.95,
+        f"on current arm: {frac_current:.0%}\non previous arm: {frac_prev:.0%}",
+        transform=ax.transAxes, va="top", fontsize=9,
+        bbox=dict(boxstyle="round", fc="white", ec="0.7"))
 fig.tight_layout()
 
 # %% [markdown]
@@ -2686,10 +2050,7 @@ trial_leaf_table, belief_replay_audit = build_trial_leaf_table(
     event_arm_table, stop_table, qvals_session
 )
 trial_group = ["session_id", "trial_number_by_epoch"]
-assert (
-    len(trial_leaf_table)
-    == 6 * trial_leaf_table[trial_group].drop_duplicates().shape[0]
-)
+assert len(trial_leaf_table) == 6 * trial_leaf_table[trial_group].drop_duplicates().shape[0]
 assert (
     trial_leaf_table.groupby(trial_group, observed=True)["arm"].nunique() == 6
 ).all()
@@ -2718,7 +2079,9 @@ absolute_overall = absolute_profiles["overall"]
 fig, axes = plt.subplots(1, 2, figsize=(11, 4))
 for _arm, group in conditional_profiles["arm"].groupby("arm", observed=True):
     x = group["uncertainty_quartile"].to_numpy(dtype=float)
-    axes[0].plot(x, 100 * group["value"], color="0.75", lw=0.8, alpha=0.8)
+    axes[0].plot(
+        x, 100 * group["value"], color="0.75", lw=0.8, alpha=0.8
+    )
 for _arm, group in absolute_profiles["arm"].groupby("arm", observed=True):
     x = group["uncertainty_quartile"].to_numpy(dtype=float)
     axes[1].plot(x, group["value"], color="0.75", lw=0.8, alpha=0.8)
@@ -2807,7 +2170,9 @@ horse_required_columns = {
 }
 missing_horse_columns = sorted(horse_required_columns - set(all_horserace.columns))
 if missing_horse_columns:
-    raise ValueError(f"horse-race artifact is missing columns: {missing_horse_columns}")
+    raise ValueError(
+        f"horse-race artifact is missing columns: {missing_horse_columns}"
+    )
 selected_horserace_id = "/".join(
     str(event_arm_table[col].iloc[0]) for col in ("animal", "day", "epoch")
 )
@@ -2830,7 +2195,9 @@ selected_animal = str(event_arm_table["animal"].iloc[0])
 if not belief_horserace["animal"].astype(str).eq(selected_animal).all():
     raise ValueError("horse-race artifact animal disagrees with the selected epoch")
 horse_numeric_columns = ["n_rows", "cond_number", *horse_coef_columns]
-if not np.isfinite(belief_horserace[horse_numeric_columns].to_numpy(dtype=float)).all():
+if not np.isfinite(
+    belief_horserace[horse_numeric_columns].to_numpy(dtype=float)
+).all():
     raise ValueError("selected horse-race diagnostics and coefficients must be finite")
 horse_predictors = [
     "arm_fraction",
@@ -2880,7 +2247,6 @@ belief_horserace[horserace_columns].set_index("population").round(4)
 # The thin adapter below derives each displayed model block's predictor union;
 # the package's production selector performs all cohort filtering. The other
 # helpers only present fields returned by the package fitters.
-
 
 # %%
 def freeze_complete_case_units(
@@ -2975,7 +2341,9 @@ def fits_to_stat_frame(
                 "cv_ll_per_timebin_mean": res.get("cv_ll_per_timebin_mean"),
                 "cv_ll_per_timebin_std": res.get("cv_ll_per_timebin_std"),
                 "cv_n_folds": res.get("cv_n_folds"),
-                "cv_n_nonconverged_folds": res.get("cv_n_nonconverged_folds"),
+                "cv_n_nonconverged_folds": res.get(
+                    "cv_n_nonconverged_folds"
+                ),
                 "cv_n_separated_folds": res.get("cv_n_separated_folds"),
                 "status": status,
             }
@@ -3020,16 +2388,14 @@ def coefs_to_frame(res: dict, spec) -> pd.DataFrame:
     """Coefficient / SE / p-value table for one fitted model."""
     rows = []
     for p in spec.predictors:
-        rows.append(
-            {
-                "predictor": p,
-                "coef": res.get(f"coef_{p}"),
-                "se": res.get(f"bse_{p}"),
-                "pval": res.get(f"pval_{p}"),
-                "rate_ratio": res.get(f"rr_{p}"),
-                "vif": res.get(f"vif_{p}"),
-            }
-        )
+        rows.append({
+            "predictor": p,
+            "coef": res.get(f"coef_{p}"),
+            "se": res.get(f"bse_{p}"),
+            "pval": res.get(f"pval_{p}"),
+            "rate_ratio": res.get(f"rr_{p}"),
+            "vif": res.get(f"vif_{p}"),
+        })
     return pd.DataFrame(rows).set_index("predictor").dropna(axis=1, how="all")
 
 
@@ -3087,9 +2453,7 @@ if fit_is_reliable(arm_fits["M7"]):
     m7_coefs = coefs_to_frame(arm_fits["M7"], ARM_MODELS["M7"])
     display(m7_coefs.round(3))  # noqa: F821 (IPython display)
 else:
-    print(
-        "M7 is unavailable or flagged; coefficients are suppressed (see diagnostics)."
-    )
+    print("M7 is unavailable or flagged; coefficients are suppressed (see diagnostics).")
 
 # %%
 # AIC trajectory + key non-geometry coefficients across the hierarchy.
@@ -3101,14 +2465,8 @@ axes[0].set(xlabel="model", ylabel="AIC", title="model fit (lower = better)")
 axes[0].tick_params(axis="x", rotation=45)
 
 # Track a few interpretable coefficients where present.
-track = [
-    "is_current",
-    "is_prev",
-    "reward_rate_arm_k10",
-    "is_last_rewarded_elsewhere",
-    "swr_x_current",
-    "swr_x_prev",
-]
+track = ["is_current", "is_prev", "reward_rate_arm_k10",
+         "is_last_rewarded_elsewhere", "swr_x_current", "swr_x_prev"]
 for predictor in track:
     xs, ys, es = [], [], []
     for name, res in arm_fits.items():
@@ -3119,11 +2477,9 @@ for predictor in track:
     if xs:
         axes[1].errorbar(xs, ys, yerr=es, marker="o", capsize=3, label=predictor)
 axes[1].axhline(0, color="0.6", lw=1)
-axes[1].set(
-    xlabel="model (first appearance →)",
-    ylabel="conditional log arm-allocation ratio",
-    title="key coefficients across hierarchy",
-)
+axes[1].set(xlabel="model (first appearance →)",
+            ylabel="conditional log arm-allocation ratio",
+            title="key coefficients across hierarchy")
 axes[1].tick_params(axis="x", rotation=45)
 axes[1].legend(fontsize=8)
 fig.tight_layout()
@@ -3186,9 +2542,9 @@ for name, spec in BELIEF_ARM_MODELS.items():
     belief_arm_fits[name] = fit
 
 belief_arm_stats = fits_to_stat_frame(belief_arm_fits, BELIEF_ARM_MODELS)
-assert (
-    belief_arm_stats.loc[belief_arm_stats["n_units"].notna(), "n_units"].nunique() <= 1
-)
+assert belief_arm_stats.loc[
+    belief_arm_stats["n_units"].notna(), "n_units"
+].nunique() <= 1
 display(  # noqa: F821
     belief_arm_stats.reindex(
         columns=[
@@ -3277,10 +2633,9 @@ for name, spec in BELIEF_PATCH_MODELS.items():
     belief_patch_fits[name] = fit
 
 belief_patch_stats = fits_to_stat_frame(belief_patch_fits, BELIEF_PATCH_MODELS)
-assert (
-    belief_patch_stats.loc[belief_patch_stats["n_units"].notna(), "n_units"].nunique()
-    <= 1
-)
+assert belief_patch_stats.loc[
+    belief_patch_stats["n_units"].notna(), "n_units"
+].nunique() <= 1
 display(  # noqa: F821
     belief_patch_stats.reindex(
         columns=[
@@ -3343,9 +2698,7 @@ patch_stats
 if fit_is_reliable(patch_fits["P4"]):
     display(coefs_to_frame(patch_fits["P4"], PATCH_MODELS["P4"]).round(3))  # noqa: F821
 else:
-    print(
-        "P4 is unavailable or flagged; coefficients are suppressed (see diagnostics)."
-    )
+    print("P4 is unavailable or flagged; coefficients are suppressed (see diagnostics).")
 
 # %% [markdown]
 # ### 7d. Event rate — R0–R2, Rlag (Poisson GLM, log-time offset)
@@ -3420,10 +2773,13 @@ for outcome, response_col in PER_STOP_RATE_OUTCOMES.items():
         )
         if fits[name] is not None and cv is not None:
             fits[name].update(cv)
-    stats = fits_to_stat_frame(fits, RATE_MODELS, cohort_ids=outcome_cohort_ids)
+    stats = fits_to_stat_frame(
+        fits, RATE_MODELS, cohort_ids=outcome_cohort_ids
+    )
     rate_fits[outcome] = fits
     rate_cohort_sizes[outcome] = {
-        name: None if fit is None else int(fit["n_stops"]) for name, fit in fits.items()
+        name: None if fit is None else int(fit["n_stops"])
+        for name, fit in fits.items()
     }
     rate_stat_frames[outcome] = stats
 
@@ -3491,7 +2847,9 @@ print("choice primary cohort:", cohort_count_summary(choice_cohort))
 print("choice SWR-split cohort:", cohort_count_summary(choice_split_cohort))
 
 choice_fits = {
-    name: fit_choice_model(choice_fit_table, list(spec.predictors), stop_col="stop_id")
+    name: fit_choice_model(
+        choice_fit_table, list(spec.predictors), stop_col="stop_id"
+    )
     for name, spec in CHOICE_MODELS.items()
 }
 choice_split_fits = {
@@ -3502,16 +2860,12 @@ choice_split_fits = {
 }
 choice_primary_stats = fits_to_stat_frame(choice_fits, CHOICE_MODELS)
 choice_split_stats = fits_to_stat_frame(choice_split_fits, CHOICE_SPLIT_MODELS)
-assert (
-    choice_primary_stats.loc[
-        choice_primary_stats["n_units"].notna(), "n_units"
-    ].nunique()
-    <= 1
-)
-assert (
-    choice_split_stats.loc[choice_split_stats["n_units"].notna(), "n_units"].nunique()
-    <= 1
-)
+assert choice_primary_stats.loc[
+    choice_primary_stats["n_units"].notna(), "n_units"
+].nunique() <= 1
+assert choice_split_stats.loc[
+    choice_split_stats["n_units"].notna(), "n_units"
+].nunique() <= 1
 choice_stats = pd.concat(
     {"primary": choice_primary_stats, "swr_split": choice_split_stats},
     names=["block", "model"],
@@ -3532,23 +2886,20 @@ if fit_is_reliable(choice_fits["C_full"]) and fit_is_reliable(
     print(f"C_behavior partial llf : {choice_fits['C_behavior']['llf']:.2f}")
     print(f"C_full     partial llf : {choice_fits['C_full']['llf']:.2f}")
     print(f"2Δllf from +replay_frac: {2 * d_llf:.2f}  (1 added parameter)")
-    print(
-        f"replay_frac coef       : {choice_fits['C_full']['coef_replay_frac']:.3f}"
-        f"  (p = {choice_fits['C_full']['pval_replay_frac']:.3g})"
-    )
+    print(f"replay_frac coef       : {choice_fits['C_full']['coef_replay_frac']:.3f}"
+          f"  (p = {choice_fits['C_full']['pval_replay_frac']:.3g})")
 else:
     print("C_full / C_behavior are not both available and unflagged.")
 
-if fit_is_reliable(choice_split_fits["C_full_swr_split"]) and fit_is_reliable(
-    choice_split_fits["C_behavior"]
+if (
+    fit_is_reliable(choice_split_fits["C_full_swr_split"])
+    and fit_is_reliable(choice_split_fits["C_behavior"])
 ):
     split_d_llf = (
         choice_split_fits["C_full_swr_split"]["llf"]
         - choice_split_fits["C_behavior"]["llf"]
     )
-    print(
-        f"2Δllf from SWR + non-SWR replay: {2 * split_d_llf:.2f} (2 added parameters)"
-    )
+    print(f"2Δllf from SWR + non-SWR replay: {2 * split_d_llf:.2f} (2 added parameters)")
 else:
     print("C_full_swr_split / C_behavior are not both available and unflagged.")
 
