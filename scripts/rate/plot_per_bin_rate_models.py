@@ -54,19 +54,14 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     BIN_S,
-    N_HISTORY_BASIS,
-    N_HISTORY_LAGS,
-    PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
-)
-from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
-    reconstruct_self_history_kernels,
 )
 from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
     paired_coefficient_statistics,
     reward_kernel_animal_medians,
     reward_kernel_by_lag,
+    self_history_kernel_by_lag,
 )
 from continuum_swr_replay.paths import (
     figure_dir,
@@ -104,30 +99,6 @@ POP_STYLE = {
     "non_local_swr": ("non-local w/ SWR", "C3"),
     "non_local_no_swr": ("non-local NO SWR", "C0"),
 }
-
-
-def _self_history_kernel(
-    df: pd.DataFrame,
-) -> dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]]:
-    """Per-lag median + IQR self-history rate ratios across sessions, by outcome.
-
-    Each session's kernel is reconstructed from that session's own four
-    raised-cosine coefficients and the quantiles are taken per lag. Summarizing
-    the coefficients first and reconstructing once would describe a session that
-    does not exist: the basis coefficients are collinear, so their marginal
-    medians are not any fitted kernel.
-    """
-    out = {}
-    columns = [f"coef_{c}" for c in PER_BIN_HISTORY_COLUMNS]
-    for oc in POP_STYLE:
-        fitted = df.loc[df.outcome == oc, columns].to_numpy(dtype=float)
-        kernels = np.exp(
-            reconstruct_self_history_kernels(fitted, N_HISTORY_LAGS, N_HISTORY_BASIS)
-        )
-        med = np.median(kernels, axis=0)
-        lo, hi = np.percentile(kernels, [25, 75], axis=0)
-        out[oc] = (med, lo, hi)
-    return out
 
 
 # The first raised-cosine reward-history basis coefficient. Its feature is a
@@ -252,14 +223,16 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
 
 
 def plot_selfhistory(m7: pd.DataFrame) -> None:
-    ker = _self_history_kernel(m7)
     fig, ax = plt.subplots(figsize=(8, 5))
-    lagms = np.arange(1, N_HISTORY_LAGS + 1) * BIN_S * 1000
     for oc in ["swr", "non_local", "non_local_swr", "non_local_no_swr"]:
         label, col = POP_STYLE[oc]
-        med, lo, hi = ker[oc]
+        kernel = self_history_kernel_by_lag(fit_rows(m7, outcome=oc))
+        med, lo, hi = (
+            kernel[column].to_numpy()
+            for column in ("median", "lower_quartile", "upper_quartile")
+        )
         ax.errorbar(
-            lagms,
+            kernel.index * BIN_S * 1000,
             med,
             yerr=[med - lo, hi - med],
             marker="o",

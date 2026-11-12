@@ -37,6 +37,9 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
+    PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
@@ -44,6 +47,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (
     reconstruct_reward_kernels,
+    reconstruct_self_history_kernels,
 )
 from continuum_swr_replay.analysis.statistics import (
     session_median_statistics,
@@ -298,6 +302,38 @@ def reward_kernel_animal_medians(fits: pd.DataFrame) -> pd.DataFrame:
     lags = pd.RangeIndex(1, kernels.shape[1] + 1, name="lag")
     log_kernels = pd.DataFrame(kernels, index=gated["animal"].to_numpy(), columns=lags)
     return np.exp(log_kernels.groupby(level=0).median()).rename_axis("animal")
+
+
+def self_history_kernel_by_lag(fits: pd.DataFrame) -> pd.DataFrame:
+    """The reconstructed self-history kernel at each lag after an event ended.
+
+    The history columns are the plain projection of the per-lag counts of
+    event ends onto the raw raised-cosine bumps, so an event that ended ``j``
+    bins back contributes ``sum_k coef_k * B[k, j]`` to the log rate. Each
+    session's kernel is reconstructed from its own coefficients and then
+    summarized lag by lag.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Per-session fits of one rung and population that carries the
+        self-history block, with ``coef_<column>`` for each column of
+        :data:`~continuum_swr_replay.analysis.replay.model_specs.PER_BIN_HISTORY_COLUMNS`.
+        A session missing any of them is left out.
+
+    Returns
+    -------
+    kernel : pd.DataFrame, shape (N_HISTORY_LAGS, 3)
+        Indexed by ``lag`` (bins of ``BIN_S`` after the event ended, from 1):
+        ``median``, ``lower_quartile`` and ``upper_quartile`` over sessions of
+        the session's kernel, as a rate ratio.
+    """
+    require_one_fit_per_session(fits)
+    columns = [f"coef_{column}" for column in PER_BIN_HISTORY_COLUMNS]
+    kernels = reconstruct_self_history_kernels(
+        fits[columns].to_numpy(dtype=float), N_HISTORY_LAGS, N_HISTORY_BASIS
+    )
+    return _rate_ratios_by_lag(kernels)
 
 
 def lag_one_reward_kernels(fits: pd.DataFrame) -> pd.DataFrame:

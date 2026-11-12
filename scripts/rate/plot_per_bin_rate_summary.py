@@ -42,19 +42,16 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    BIN_S,
     MODEL_PER_BIN_RATE,
-    N_HISTORY_LAGS,
-    PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
     SPLINE_KNOTS,
     TMAX,
 )
-from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
-    self_history_rate_ratios,
-)
 from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
     reward_kernel_by_lag,
+    self_history_kernel_by_lag,
 )
 from continuum_swr_replay.figure_utilities import save_figure  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
@@ -323,18 +320,15 @@ def _panel_reward_kernel(ax, df):
 
 
 def _panel_selfhistory(ax, df):
-    """Self-history kernel reconstructed from the raised-cosine coefficients.
-
-    ``offhist_rcos_k`` is the plain projection of the ``offset_lag{j}`` counts
-    (event ends) onto the raw bumps, so an event that ended ``j`` bins back
-    contributes ``sum_k coef_k * B[k, j]`` to the log rate.
+    """Self-history kernel from event ends, reconstructed per session from the
+    raised-cosine coefficients: the median over sessions
+    (``rate_fit_statistics.self_history_kernel_by_lag``).
     """
-    lags = np.arange(1, N_HISTORY_LAGS + 1)
     for oc in POPS4:
-        sessions = df[(df.model == FULL) & (df.outcome == oc)]
+        kernel = self_history_kernel_by_lag(fit_rows(df, model=FULL, outcome=oc))
         ax.plot(
-            lags * 15,
-            self_history_rate_ratios(sessions, PER_BIN_HISTORY_COLUMNS),
+            kernel.index * BIN_S * 1000,
+            kernel["median"],
             marker="o",
             color=STYLE[oc][1],
             label=STYLE[oc][0],

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import logging
 import warnings
-from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -29,8 +28,6 @@ from continuum_swr_replay.intervals import overlaps_intervals
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .design_constants import (
-    N_HISTORY_BASIS,
-    N_HISTORY_LAGS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
     REWARD_HISTORY_N_BASIS,
@@ -48,7 +45,6 @@ __all__ = [
     "reconstruct_self_history_kernels",
     "reward_basis_from_lags",
     "reward_kernel_weights",
-    "self_history_rate_ratios",
 ]
 
 logger = logging.getLogger(__name__)
@@ -421,39 +417,6 @@ def reconstruct_self_history_kernels(
     coefs = np.atleast_2d(np.asarray(coefs, dtype=float))
     coefs = coefs[~np.isnan(coefs).any(axis=1)]
     return coefs @ raised_cosine_history_basis(n_lags, n_basis)
-
-
-def self_history_rate_ratios(
-    sessions: pd.DataFrame, basis_columns: Sequence[str]
-) -> np.ndarray:
-    """Across-session median of the per-session reconstructed self-history kernel.
-
-    A history basis column (``hist_rcos_k`` from onsets, ``offhist_rcos_k`` from
-    event ends) is the plain projection of the per-lag counts onto the raw
-    raised-cosine bumps, so an event ``j`` bins back contributes
-    ``sum_k coef_k * B[k, j]`` to the log rate -- the un-normalized basis,
-    unlike the reward block's bump-weighted fractions.
-
-    Parameters
-    ----------
-    sessions : pd.DataFrame
-        One row per session for a single (model, outcome), carrying
-        ``coef_<column>`` for each of ``basis_columns``. Sessions with any NaN
-        basis coefficient contribute nothing.
-    basis_columns : sequence of str
-        The block's ``N_HISTORY_BASIS`` basis columns, in basis order (the
-        per-bin rate ladders' are ``model_specs.PER_BIN_HISTORY_COLUMNS``).
-
-    Returns
-    -------
-    np.ndarray, shape (N_HISTORY_LAGS,)
-        Median rate ratio at each lag ``1..N_HISTORY_LAGS``.
-    """
-    columns = [f"coef_{c}" for c in basis_columns]
-    kernels = reconstruct_self_history_kernels(
-        sessions[columns].to_numpy(dtype=float), N_HISTORY_LAGS, N_HISTORY_BASIS
-    )
-    return np.median(np.exp(kernels), axis=0)
 
 
 def arrival_spanning_stop_ids(stops: pd.DataFrame) -> np.ndarray:

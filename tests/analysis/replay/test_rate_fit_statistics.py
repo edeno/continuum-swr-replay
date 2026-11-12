@@ -8,11 +8,17 @@ import pytest
 
 from continuum_swr_replay.analysis.replay import rate_fit_statistics as stats
 from continuum_swr_replay.analysis.replay.model_specs import (
+    N_HISTORY_BASIS,
+    N_HISTORY_LAGS,
+    PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
 )
-from continuum_swr_replay.analysis.replay.per_bin_design import reward_kernel_weights
+from continuum_swr_replay.analysis.replay.per_bin_design import (
+    raised_cosine_history_basis,
+    reward_kernel_weights,
+)
 
 NAN = np.nan
 ANIMALS = ("a", "b", "c", "d", "e")
@@ -362,6 +368,50 @@ def test_the_animal_kernels_are_the_median_log_kernel_of_each_animals_kept_sessi
     assert np.exp(np.median(np.log(animals[1]))) == pytest.approx(
         stats.reward_kernel_statistics(fits)["lag_one_animal_rate_ratio"]
     )
+
+
+def _history_fits(first_bump, separated=None) -> pd.DataFrame:
+    """One fit per value: that coefficient on the first self-history bump, 0 on
+    the others; NaN for a fit without the block."""
+    n = len(first_bump)
+    frame = pd.DataFrame(
+        {
+            "animal": [ANIMALS[i % 5] for i in range(n)],
+            "session_date": [f"d{i}" for i in range(n)],
+            "epoch": ["02_r1"] * n,
+            "separated": separated if separated is not None else [False] * n,
+        }
+    )
+    for k, column in enumerate(PER_BIN_HISTORY_COLUMNS):
+        frame[f"coef_{column}"] = (
+            first_bump if k == 0 else np.where(np.isnan(first_bump), NAN, 0.0)
+        )
+    return frame
+
+
+def test_the_self_history_kernel_by_lag_is_the_median_of_each_sessions_kernel():
+    # first-bump coefficients 2.0, -1.0, 0.5, 1.0, a fit without the block, and
+    # a separated fit (3.0), which is kept: the self-history kernel is not gated
+    fits = _history_fits(
+        np.array([2.0, -1.0, NAN, 0.5, 1.0, 3.0]),
+        separated=[False, False, False, False, False, True],
+    )
+    kernel = stats.self_history_kernel_by_lag(fits)
+    bump = raised_cosine_history_basis(N_HISTORY_LAGS, N_HISTORY_BASIS)[0]
+    assert list(kernel.index) == list(range(1, N_HISTORY_LAGS + 1))
+    peak = int(np.argmax(bump))  # an event ends `peak + 1` bins back
+    e = np.exp(np.array([-1.0, 0.5, 1.0, 2.0, 3.0]) * bump[peak])
+    row = kernel.loc[peak + 1]
+    assert row["median"] == pytest.approx(e[2])
+    assert row["lower_quartile"] == pytest.approx(e[1])
+    assert row["upper_quartile"] == pytest.approx(e[3])
+    # an even number of kept sessions: the median averages the middle two
+    even = stats.self_history_kernel_by_lag(fits.iloc[:5])
+    assert even.loc[peak + 1, "median"] == pytest.approx(
+        (np.exp(0.5 * bump[peak]) + np.exp(1.0 * bump[peak])) / 2
+    )
+    with pytest.raises(ValueError, match="more than one fit for a session"):
+        stats.self_history_kernel_by_lag(pd.concat([fits, fits]))
 
 
 def test_the_paired_test_compares_lag_one_kernels_within_session():
