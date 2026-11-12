@@ -10,10 +10,10 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
     MATCHED_NULL_OBSERVED_COLUMNS,
 )
-from continuum_swr_replay.reported.mpfc import (
+from continuum_swr_replay.reported.mpfc.common import TAGS
+from continuum_swr_replay.reported.mpfc.inputs import STEM
+from continuum_swr_replay.reported.mpfc.population import (
     CURVES,
-    STEM,
-    TAGS,
     called_fraction_values,
     cohort_values,
     estimator_values,
@@ -363,7 +363,7 @@ def test_overlap_and_effect_values_keep_the_two_replay_classes_apart(population)
 def test_the_overlap_descriptions_name_the_called_threshold(population, monkeypatch):
     # The calls do not move between 0.01 and 0.5, so only the text says which
     # threshold the counts are at.
-    monkeypatch.setattr("continuum_swr_replay.reported.mpfc.ALPHA", 0.02)
+    monkeypatch.setattr("continuum_swr_replay.reported.mpfc.population.ALPHA", 0.02)
     values = _values(overlap_and_effect_values, population)
     assert values["overlap_units_both"].value == 4
     assert values["overlap_units_both"].description == (

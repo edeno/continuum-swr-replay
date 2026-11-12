@@ -6,9 +6,9 @@ import pytest
 
 from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
 from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
-from continuum_swr_replay.reported.mpfc import (
+from continuum_swr_replay.reported.mpfc.common import TAGS
+from continuum_swr_replay.reported.mpfc.swr_without_replay import (
     SWR_WITHOUT_REPLAY_MIN_EVENTS,
-    TAGS,
     swr_without_replay_values,
 )
 from continuum_swr_replay.reported.values import value_factory

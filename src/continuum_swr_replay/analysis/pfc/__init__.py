@@ -51,7 +51,7 @@ Population statistics (``population_statistics``, ``timing``)
 -------------------------------------------------------------
 The summary statistics of the unit table and of the curves' timing: each
 function takes tables or arrays and returns named numbers. The mpfc summary
-(``reported/mpfc.py``) reports them.
+(``reported/mpfc/``) reports them.
 
 See Also
 --------

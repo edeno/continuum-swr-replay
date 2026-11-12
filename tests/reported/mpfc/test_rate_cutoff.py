@@ -5,11 +5,11 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
-from continuum_swr_replay.reported.mpfc import (
+from continuum_swr_replay.reported.mpfc.common import TAGS
+from continuum_swr_replay.reported.mpfc.population import called_fraction_values
+from continuum_swr_replay.reported.mpfc.rate_cutoff import (
     CHECK_FIRING_RATE_HZ,
     CHECK_KEYS,
-    TAGS,
-    called_fraction_values,
     rate_cutoff_check_values,
 )
 from continuum_swr_replay.reported.values import value_factory

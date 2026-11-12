@@ -5,7 +5,8 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
-from continuum_swr_replay.reported.mpfc import TAGS, timing_values
+from continuum_swr_replay.reported.mpfc.common import TAGS
+from continuum_swr_replay.reported.mpfc.timing import timing_values
 from continuum_swr_replay.reported.values import value_factory
 
 LAG_TIME = np.arange(-100, 101) / 500.0

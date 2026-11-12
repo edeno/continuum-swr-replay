@@ -10,9 +10,9 @@ This script loads the population once with no gate, keeps the units at or above
 each gate
 (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.units_at_or_above_rate`)
 and recomputes Part 4's per-unit values with Part 4's own functions
-(:func:`~continuum_swr_replay.reported.mpfc.called_fraction_values`,
-:func:`~continuum_swr_replay.reported.mpfc.overlap_and_effect_values`,
-:func:`~continuum_swr_replay.reported.mpfc.swr_without_replay_values`). It
+(:func:`~continuum_swr_replay.reported.mpfc.population.called_fraction_values`,
+:func:`~continuum_swr_replay.reported.mpfc.population.overlap_and_effect_values`,
+:func:`~continuum_swr_replay.reported.mpfc.swr_without_replay.swr_without_replay_values`). It
 also counts, per gate, the units the loader drops for another reason (no usable
 fit, a non-finite modulation curve), and gives the called fractions per
 firing-rate band, so a low gate can be checked for units with almost no spikes.
@@ -51,13 +51,17 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     significant_fraction,
 )
 from continuum_swr_replay.paths import ROOT_DIR
-from continuum_swr_replay.reported.mpfc import (
+from continuum_swr_replay.reported.mpfc.inputs import (
     STEM,
-    SWR_WITHOUT_REPLAY_CURVES,
-    called_fraction_values,
     default_inputs,
-    overlap_and_effect_values,
     read_sidecars,
+)
+from continuum_swr_replay.reported.mpfc.population import (
+    called_fraction_values,
+    overlap_and_effect_values,
+)
+from continuum_swr_replay.reported.mpfc.swr_without_replay import (
+    SWR_WITHOUT_REPLAY_CURVES,
     swr_without_replay_values,
 )
 

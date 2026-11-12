@@ -1,5 +1,7 @@
-"""The mPFC summary: values read from fits made on other inputs than the current ones are
-pending, and a fit that does not cover the PFC cohort is refused."""
+"""The mPFC summary's follow-up values: the marked-family and stop-context
+values from synthetic tables, pending when those fits were made on other
+inputs than the current ones, and refused when a fit does not cover the PFC
+cohort."""
 
 from __future__ import annotations
 
@@ -12,14 +14,16 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.reported.mpfc import (
-    MpfcInputs,
+from continuum_swr_replay.reported.mpfc.common import TAGS
+from continuum_swr_replay.reported.mpfc.followups import (
     followup_values,
     marked_family_staleness,
-    staleness,
+    marked_family_values,
     stop_context_staleness,
-    table_hashes,
+    stop_context_values,
 )
+from continuum_swr_replay.reported.mpfc.inputs import MpfcInputs, table_hashes
+from continuum_swr_replay.reported.values import value_factory
 
 SESSIONS = (("j1620210706_.nwb", "02_r1"), ("j1620210706_.nwb", "04_r2"))
 
@@ -34,21 +38,6 @@ def tables(tmp_path) -> tuple[Path, Path]:
     event.write_bytes(b"events")
     stop.write_bytes(b"stops")
     return event, stop
-
-
-def test_bundle_staleness_names_the_count(tables):
-    event, stop = tables
-    fresh = {
-        "canonical_event_table_sha256": _sha(event),
-        "stop_table_sha256": _sha(stop),
-    }
-    sidecars = [dict(fresh), dict(fresh), dict(fresh)]
-    assert staleness(sidecars, table_hashes(event, stop)) is None
-    sidecars[1]["stop_table_sha256"] = "old"
-    note = staleness(sidecars, table_hashes(event, stop))
-    assert note.startswith("the mPFC bundles were made from other inputs")
-    assert "stop_table_sha256 differs in 1 of 3" in note
-    assert "canonical_event_table_sha256" not in note
 
 
 def _stop_context(root: Path, current: dict[str, str]) -> Path:
@@ -202,3 +191,136 @@ def test_the_pending_notes_reach_the_followup_values(tmp_path, tables):
     # a fit over fewer sessions than the cohort is refused
     with pytest.raises(ValueError, match="not the 3 of the PFC cohort"):
         followup_values(inputs, current, 3)
+
+
+def test_marked_family_values_quote_peak_sign_gain_and_leakage():
+    rows = []
+    for event_class in ("non_local_SWR", "non_local_no_SWR"):
+        for statistic, value in (
+            ("peak_value", -0.03),
+            ("peak_lag_ms", 62.0),
+            ("animals_same_sign", 5.0),
+            ("post_onset_mean", -0.02),
+            ("post_onset_animals_same_sign", 4.0),
+            ("frac_pos", 0.35),
+            ("n_animals", 5.0),
+            ("n_units", 120.0),
+            ("n_usable", 118.0),
+            ("n_excluded_blowup", 2.0),
+            ("n_sessions", 75.0),
+        ):
+            rows.append(
+                (
+                    "replay_content",
+                    event_class,
+                    "current_arm_fraction",
+                    statistic,
+                    value,
+                )
+            )
+        rows.append(
+            (
+                "event_strength",
+                event_class,
+                "ripple_power_z & mua_rate_z",
+                "mark_correlation",
+                0.79,
+            )
+        )
+    rows.append(("ripple_power_pooled", "pooled", "ripple_power_z", "peak_value", 0.01))
+    # A marginal model is not quoted.
+    rows.append(
+        ("marginal_mua_rate_z", "non_local_SWR", "mua_rate_z", "peak_value", 0.02)
+    )
+    summary = pd.DataFrame(
+        rows, columns=["model", "event_class", "target", "statistic", "value"]
+    )
+    make = value_factory(marked_family_values, "synthetic", TAGS["modulation"])
+
+    values = {v.key: v.value for v in marked_family_values(summary, make)}
+
+    assert values["marked_content_current_arm_swr_replay_peak"] == -0.03
+    assert values["marked_content_current_arm_swr_replay_post_onset_mean"] == -0.02
+    # The animal count is the fixed 0 to +150 ms window's, not the peak lag's.
+    assert (
+        values["marked_content_current_arm_non_swr_replay_post_onset_animals_same_sign"]
+        == 4
+    )
+    assert not any(key.endswith("_peak_animals_same_sign") for key in values)
+    assert "marked_content_current_arm_non_swr_replay_animals_same_sign" not in values
+    # The held-out-gain share is quoted for the marks a sentence uses, per replay
+    # class, and says that no chance reference was computed.
+    share = {
+        v.key: v
+        for v in marked_family_values(summary, make)
+        if v.key.endswith("heldout_gain_fraction")
+    }
+    assert set(share) == {
+        "marked_content_current_arm_swr_replay_heldout_gain_fraction",
+        "marked_content_current_arm_non_swr_replay_heldout_gain_fraction",
+    }
+    assert values["marked_content_current_arm_swr_replay_heldout_gain_fraction"] == 0.35
+    assert all("no chance reference" in v.description.lower() for v in share.values())
+    assert values["marked_ripple_mua_correlation_swr_replay"] == 0.79
+    assert values["marked_ripplepooled_ripple_power_pooled_peak"] == 0.01
+    assert not any(key.startswith("marked_marginal") for key in values)
+    assert all(not any(ch.isdigit() for ch in key) for key in values)
+    # The share's denominators are named in its description.
+    assert (
+        "118 usable of 120 unit fits, 2 left out as blow-ups, in 75 sessions"
+        in share[
+            "marked_content_current_arm_swr_replay_heldout_gain_fraction"
+        ].description
+    )
+
+
+def _rows(n_loao_estimated: int = 5) -> list[dict]:
+    rows = []
+    for event_class, sign, unit_set, estimator, term in itertools.product(
+        ("non_local_SWR", "non_local_no_SWR"),
+        ("increase", "decrease"),
+        ("called", "all"),
+        ("conditional", "plugin"),
+        ("rewarded", "next_trip_switches_patch", "overlap"),
+    ):
+        rows.append(
+            {
+                "event_class": event_class,
+                "sign": sign,
+                "unit_set": unit_set,
+                "estimator": estimator,
+                "term": term,
+                "exp_coef": 1.08 if estimator == "conditional" else 1.10,
+                "ci_low": 1.02,
+                "ci_high": 1.14,
+                "n_animals_pooled_sign": 3,
+                "n_animals_estimated": 5,
+                "loao_exp_coef_min": 1.02,
+                "loao_exp_coef_max": 1.10,
+                "n_animals": 5,
+                "n_loao_estimated": n_loao_estimated,
+            }
+        )
+    return rows
+
+
+def test_stop_context_values_main_and_check_rows():
+    make = value_factory(stop_context_values, "synthetic", TAGS["modulation"])
+
+    values = {v.key: v.value for v in stop_context_values(pd.DataFrame(_rows()), make)}
+
+    assert values["stop_context_reward_gain_swr_replay_increase"] == 1.08
+    assert (
+        values["stop_context_reward_gain_swr_replay_increase_animals_pooled_sign"] == 3
+    )
+    assert "stop_context_reward_gain_non_swr_replay_increase_all_units" in values
+    # Only the reward check for increases is given over all units; no overlap.
+    assert "stop_context_switch_gain_swr_replay_increase_all_units" not in values
+    assert not any("overlap" in key for key in values)
+    assert all(not any(ch.isdigit() for ch in key) for key in values)
+
+
+def test_a_failed_leave_one_out_fit_is_refused():
+    make = value_factory(stop_context_values, "synthetic", TAGS["modulation"])
+    with pytest.raises(ValueError, match="4 of 5 leave-one-animal-out fits"):
+        stop_context_values(pd.DataFrame(_rows(n_loao_estimated=4)), make)
