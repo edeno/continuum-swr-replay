@@ -23,7 +23,7 @@ Artifacts (gitignored, under `Processed-Data/replay_content/content_estimator_co
 |---|---|
 | `content_estimator_comparison.parquet` | one row per (session, rung, term, estimator) |
 | `content_estimator_comparison_summary.csv` | per (rung, term): animal-balanced median coefficient, animals-positive count, median ΔAIC, median SE ratio, per estimator |
-| `content_estimator_bootstrap.csv` | nested-bootstrap (animals, then their sessions) 2.5 / 50 / 97.5 percentiles (2000 draws, seed 0); rewritten 2026-11-12 from the stored coefficients, before which it resampled animals only |
+| `content_estimator_bootstrap.csv` | per (rung, term, estimator): the animal-balanced median, its 95 % interval `low`, `high` and the draws' `bootstrap_sd`, from the nested bootstrap (animals, then their sessions; 2000 draws, seed 0) with a small-sample t correction over the animals; rewritten 2026-11-12 from the stored coefficients, before which it resampled animals only and held percentiles |
 | `content_estimator_comparison_skips.csv` | the (session, rung) keys no estimator set could be formed for |
 | `content_estimator_comparison.provenance.json` | inputs, git hash, `n_unidentified_triples_dropped`, `n_fits_delta_aic_row_mismatch`, `min_events_session_phi` |
 
@@ -44,7 +44,7 @@ the runner too, and not kept in the repository).
 the retired count model on the x axis and the fraction / DM estimate on the y
 axis (identity dashed, colour = animal). `log_phi_by_session.png` plots the DM
 concentration intercept and its `is_swr` shift per session for `C2_base`, with
-the nested-bootstrap band.
+the animal-balanced median and its 95 % nested-bootstrap interval as a band.
 
 Question 3.6 (`src/continuum_swr_replay/reported/questions.py`) is answered by the
 arm-value comparison (§3, §4); the rest of this document is the method record
@@ -85,8 +85,10 @@ being overdispersed.
 ## 3. Real data — the key terms
 
 Animal-balanced median coefficient (median over animals of that animal's
-per-session median), `(animals positive / 5)`, and the nested-bootstrap
-(animals, then their sessions) 2.5–97.5 interval (2000 draws, seed 0). `n` is the paired session count shared
+per-session median), `(animals positive / 5)`, and its 95 % interval: the
+nested bootstrap (animals, then their sessions; 2000 draws, seed 0), the median
+plus or minus t(0.975, 4) sqrt(5/4) times the draws' standard deviation over the
+five animals (`analysis/shared_statistics.py:bootstrap_interval`). `n` is the paired session count shared
 by all three estimators on that (rung, term).
 
 | rung | term | n | count (retired) | fraction (shipped) | Dirichlet-multinomial |

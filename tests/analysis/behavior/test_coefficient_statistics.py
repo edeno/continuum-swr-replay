@@ -186,7 +186,6 @@ def test_the_bootstrap_resamples_the_animals_then_their_sessions():
         animal,
         rng=np.random.default_rng(7),
         n_draws=200,
-        percentiles=(2.5, 50, 97.5),
     )
     assert result["n_sessions"] == 6
     assert result["n_animals"] == 2
@@ -213,30 +212,36 @@ def test_the_bootstrap_resamples_the_animals_then_their_sessions():
             for a in drawn
         ]
         expected.append(np.median(np.repeat(own, draw.animals[drawn])))
-    np.testing.assert_allclose(
-        result["percentiles"], np.percentile(expected, (2.5, 50, 97.5))
-    )
+    # The interval: 1.5 +/- t(0.975, 1) sqrt(2) SD(draws), two animals.
+    half = 12.7062047362 * np.sqrt(2) * np.std(expected, ddof=1)
+    assert result["bootstrap_sd"] == pytest.approx(np.std(expected, ddof=1))
+    assert result["low"] == pytest.approx(1.5 - half)
+    assert result["high"] == pytest.approx(1.5 + half)
     # resampling the animals alone could give only 0, 1.5 or 3
     assert not set(expected) <= {0.0, 1.5, 3.0}
 
 
-def test_the_bootstrap_of_one_animal_resamples_its_sessions_and_of_none_draws_nothing():
+def test_the_bootstrap_of_one_animal_has_no_interval_and_of_none_draws_nothing():
     values, animal = _animal_values([1.0, 5.0, 2.0], ["a", "a", "a"])
-    one = stats.animal_median_bootstrap(
-        values, animal, rng=np.random.default_rng(0), n_draws=50, percentiles=(5, 95)
-    )
-    # a resample of 1, 2 and 5 has median 1, 2 or 5
-    np.testing.assert_array_equal(one["percentiles"], [1.0, 5.0])
+    rng = np.random.default_rng(0)
+    before = rng.bit_generator.state
+    one = stats.animal_median_bootstrap(values, animal, rng=rng, n_draws=50)
+    # its sessions are resampled (the generator moves; a resample of 1, 2
+    # and 5 has median 1, 2 or 5, so the draws vary), but one animal gives
+    # no t quantile
+    assert rng.bit_generator.state != before
+    assert one["animal_median"] == 2.0
+    assert one["bootstrap_sd"] > 0
+    assert np.isnan(one["low"]) and np.isnan(one["high"])
 
     rng = np.random.default_rng(0)
     before = rng.bit_generator.state
     empty, animal = _animal_values([NAN, NAN], ["a", "b"])
-    none = stats.animal_median_bootstrap(
-        empty, animal, rng=rng, n_draws=50, percentiles=(5, 95)
-    )
+    none = stats.animal_median_bootstrap(empty, animal, rng=rng, n_draws=50)
     assert none["n_animals"] == 0
     assert np.isnan(none["animal_median"])
-    assert np.isnan(none["percentiles"]).all()
+    assert np.isnan(none["low"]) and np.isnan(none["high"])
+    assert np.isnan(none["bootstrap_sd"])
     assert rng.bit_generator.state == before
 
 

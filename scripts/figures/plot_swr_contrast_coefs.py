@@ -3,9 +3,10 @@
 For each effect: the coefficient of every session the per-term gate keeps is a faint
 jittered dot (colored by animal; a term the gate refuses is drawn empty and labelled
 "(not reported)"); the 5 larger dots are per-animal medians; the black bar is the
-across-animal median; the horizontal whisker is its 95% CI (nested bootstrap: the
-animals, then each drawn animal's sessions, each draw's statistic the median over
-animals of their medians -- the animal is the inferential unit, n=5;
+across-animal median; the horizontal whisker is its 95% interval (nested bootstrap:
+the animals, then each drawn animal's sessions, each draw's statistic the median over
+animals of their medians -- the animal is the inferential unit, n=5; the median plus
+or minus a small-sample t correction over the animals times the draws' SD;
 ``coefficient_statistics.animal_median_bootstrap``, 4000 draws). Continuous-predictor
 coefficients are shown STANDARDIZED (per 1 SD of the predictor: raw_coef * SD, which
 is exact for these Poisson GLMs) so effect sizes are comparable across predictors,
@@ -210,13 +211,12 @@ def forest(ax, df, rows, title, sd):
             pd.Series(np.repeat(drawn, [len(s[a]) for a in drawn])),
             rng=np.random.default_rng(BOOTSTRAP_SEED),
             n_draws=N_BOOTSTRAP,
-            percentiles=(2.5, 97.5),
         )
         for a in drawn:
             m = summary["animal_medians"][a]
             ax.plot(m, yi, "o", ms=7, color=CMAP[a], mec="k", mew=0.6, zorder=5)
         gm = summary["animal_median"]
-        lo, hi = summary["percentiles"]
+        lo, hi = summary["low"], summary["high"]
         ax.plot([lo, hi], [yi, yi], color="k", lw=1.4, zorder=4)
         ax.plot([gm, gm], [yi - 0.34, yi + 0.34], color="k", lw=2.6, zorder=6)
     ax.axvline(0, color="0.4", lw=1, ls="--", zorder=1)

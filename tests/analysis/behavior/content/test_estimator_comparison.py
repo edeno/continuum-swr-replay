@@ -10,7 +10,6 @@ from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import
     ESTIMATOR as DIRICHLET_MULTINOMIAL,
 )
 from continuum_swr_replay.analysis.behavior.content.estimator_comparison import (
-    BOOTSTRAP_PERCENTILES,
     BOOTSTRAP_SEED,
     N_BOOTSTRAP,
     attach_delta_aic,
@@ -28,7 +27,6 @@ from continuum_swr_replay.analysis.behavior.fitting import (
 def test_bootstrap_defaults_are_two_thousand_draws_at_seed_zero():
     assert N_BOOTSTRAP == 2000
     assert BOOTSTRAP_SEED == 0
-    assert BOOTSTRAP_PERCENTILES == (2.5, 50.0, 97.5)
 
 
 def _row(term, coef, sd, separated_terms="", estimator=CONDITIONAL_POISSON_COUNT):

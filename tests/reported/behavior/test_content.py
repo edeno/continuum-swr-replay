@@ -170,8 +170,9 @@ def _estimator_tables(n_animals: int = 5) -> tuple[pd.DataFrame, pd.DataFrame]:
                     "model": rung,
                     "term": term,
                     "estimator": estimator,
-                    "p2_5": i + j / 10 - 0.05,
-                    "p97_5": i + j / 10 + 0.05,
+                    "n_animals": n_animals,
+                    "low": i + j / 10 - 0.05,
+                    "high": i + j / 10 + 0.05,
                 }
             )
         summary.append(row)
@@ -180,8 +181,9 @@ def _estimator_tables(n_animals: int = 5) -> tuple[pd.DataFrame, pd.DataFrame]:
             "model": "C2_base",
             "term": BREADTH,
             "estimator": "dirichlet_multinomial",
-            "p2_5": 0.4,
-            "p97_5": 1.6,
+            "n_animals": n_animals,
+            "low": 0.4,
+            "high": 1.6,
         }
     )
     return pd.DataFrame(summary), pd.DataFrame(bootstrap)
@@ -209,6 +211,16 @@ def test_estimator_values_read_each_term_under_each_estimator():
     assert read["est_breadth_dm_high"] == 1.6
     assert values["est_breadth_dm_low"].questions == ("3.1",)
     assert values["est_current_count"].questions == ("3.1", "3.6", "3.7")
+    assert "small-sample t correction over the 5 animals" in (
+        values["est_current_dm_low"].description
+    )
+
+
+def test_estimator_values_refuse_a_percentile_bootstrap():
+    summary, bootstrap = _estimator_tables()
+    old = bootstrap.rename(columns={"low": "p2_5", "high": "p97_5"})
+    with pytest.raises(ValueError, match="holds percentiles"):
+        estimator_values(summary, old, "x")
 
 
 def test_estimator_values_refuse_a_missing_animal():

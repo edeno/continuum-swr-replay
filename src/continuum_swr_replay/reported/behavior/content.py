@@ -483,8 +483,8 @@ def estimator_values(
 ) -> list[Value]:
     """Questions 3.1, 3.6 and 3.7: the three-estimator comparison on one shared event
     set. Coefficients are animal-balanced medians as the comparison writes them;
-    intervals are its nested bootstrap's (animals, then their sessions) 2.5 and
-    97.5 percentiles."""
+    intervals are its 95 % intervals from the nested bootstrap (animals, then
+    their sessions) with a small-sample t correction over the animals."""
     make = value_factory(estimator_values, source, TAGS["estimators"])
     values = []
     for word, (rung, term) in ESTIMATOR_TERMS.items():
@@ -526,23 +526,22 @@ def estimator_values(
                 & (bootstrap["estimator"] == estimator)
             ]
             _require(len(boot) == 1, f"{what}: {len(boot)} bootstrap rows")
+            interval = _estimator_interval(boot)
             values += [
                 make(
                     f"est_{word}_{est_word}_low",
-                    boot["p2_5"].iloc[0],
+                    boot["low"].iloc[0],
                     "quantity",
                     "sig2s",
-                    f"{what}: 2.5th percentile of the nested bootstrap "
-                    "(animals, then their sessions)",
+                    f"{what}: lower bound of the {interval}",
                     "log weight",
                 ),
                 make(
                     f"est_{word}_{est_word}_high",
-                    boot["p97_5"].iloc[0],
+                    boot["high"].iloc[0],
                     "quantity",
                     "sig2s",
-                    f"{what}: 97.5th percentile of the nested bootstrap "
-                    "(animals, then their sessions)",
+                    f"{what}: upper bound of the {interval}",
                     "log weight",
                 ),
             ]
@@ -564,21 +563,32 @@ def estimator_values(
         & (bootstrap["estimator"] == ESTIMATORS["dm"])
     ]
     _require(len(boot) == 1, f"C2_base log_phi_is_swr: {len(boot)} bootstrap rows")
-    for end, column in (("low", "p2_5"), ("high", "p97_5")):
+    for end, bound in (("low", "lower"), ("high", "upper")):
         values.append(
             make(
                 f"est_breadth_dm_{end}",
-                boot[column].iloc[0],
+                boot[end].iloc[0],
                 "quantity",
                 "sig2s",
-                f"C2_base log_phi_is_swr, {ESTIMATORS['dm']}: "
-                f"{'2.5th' if end == 'low' else '97.5th'} percentile of the nested "
-                "bootstrap (animals, then their sessions)",
+                f"C2_base log_phi_is_swr, {ESTIMATORS['dm']}: {bound} bound of the "
+                f"{_estimator_interval(boot)}",
                 "log concentration",
                 tags=TAGS["estimators_anchoring"],
             )
         )
     return values
+
+
+def _estimator_interval(boot: pd.DataFrame) -> str:
+    """The words for one bootstrap row's interval."""
+    _require(
+        {"low", "high"} <= set(boot.columns),
+        "the estimator bootstrap holds percentiles, not the small-sample t interval",
+    )
+    return (
+        "95 % interval (nested bootstrap, animals then their sessions; small-sample "
+        f"t correction over the {boot['n_animals'].iloc[0]:.0f} animals)"
+    )
 
 
 def leaf_values(leaf_dir: Path, source: str) -> list[Value]:

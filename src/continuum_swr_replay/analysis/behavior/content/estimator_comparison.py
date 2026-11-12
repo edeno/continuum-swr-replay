@@ -17,8 +17,8 @@ table:
   cannot identify, as whole estimator triples;
 - :func:`summarize_estimators` gives one row per (rung, term) of animal-balanced
   medians;
-- :func:`bootstrap_animals` gives the nested bootstrap (animals, then their
-  sessions) of those medians.
+- :func:`bootstrap_animals` gives the 95 % interval of those medians from the
+  nested bootstrap (animals, then their sessions).
 """
 
 from __future__ import annotations
@@ -87,7 +87,6 @@ SE_TYPE_LABELS = {
 
 N_BOOTSTRAP = 2000
 BOOTSTRAP_SEED = 0
-BOOTSTRAP_PERCENTILES = (2.5, 50.0, 97.5)
 
 
 def se_ratio_column(label: str) -> str:
@@ -426,14 +425,15 @@ def bootstrap_animals(
     *,
     n_draws: int = N_BOOTSTRAP,
     seed: int = BOOTSTRAP_SEED,
-    percentiles: Sequence[float] = BOOTSTRAP_PERCENTILES,
 ) -> pd.DataFrame:
-    """Nested bootstrap of the animal-balanced median, per (rung, term, estimator).
+    """The animal-balanced median and its 95 % nested-bootstrap interval, per
+    (rung, term, estimator).
 
     The coefficient's
     :func:`~continuum_swr_replay.analysis.behavior.coefficient_statistics.animal_median_bootstrap`
     in each (rung, term, estimator), the groups taken in sorted order from one
-    generator.
+    generator: the interval is the median plus or minus a small-sample t
+    correction over the animals times the draws' standard deviation.
 
     Parameters
     ----------
@@ -444,17 +444,15 @@ def bootstrap_animals(
     seed : int, optional
         RNG seed; the draws are generated in sorted group order, so the result
         is reproducible independent of the input row order.
-    percentiles : sequence of float, optional
-        Percentiles of the bootstrap distribution to report.
 
     Returns
     -------
     pandas.DataFrame
         One row per (rung, term, estimator) with ``n_animals``, ``n_sessions``,
-        the observed statistic, and one ``p<percentile>`` column each.
+        the observed ``statistic``, its interval ``low`` and ``high``, the
+        draws' ``bootstrap_sd``, ``n_bootstrap`` and ``seed``.
     """
     identified = identified_rows(coefficients)
-    percentile_names = [f"p{value:g}".replace(".", "_") for value in percentiles]
     columns = [
         "model",
         "term",
@@ -462,7 +460,9 @@ def bootstrap_animals(
         "n_animals",
         "n_sessions",
         "statistic",
-        *percentile_names,
+        "low",
+        "high",
+        "bootstrap_sd",
         "n_bootstrap",
         "seed",
     ]
@@ -479,7 +479,6 @@ def bootstrap_animals(
             group["animal"],
             rng=rng,
             n_draws=n_draws,
-            percentiles=percentiles,
         )
         records.append(
             {
@@ -489,12 +488,9 @@ def bootstrap_animals(
                 "n_animals": bootstrap["n_animals"],
                 "n_sessions": bootstrap["n_sessions"],
                 "statistic": bootstrap["animal_median"],
-                **{
-                    name: float(value)
-                    for name, value in zip(
-                        percentile_names, bootstrap["percentiles"], strict=True
-                    )
-                },
+                "low": bootstrap["low"],
+                "high": bootstrap["high"],
+                "bootstrap_sd": bootstrap["bootstrap_sd"],
                 "n_bootstrap": int(n_draws),
                 "seed": int(seed),
             }
@@ -532,8 +528,8 @@ class ComparisonResult:
     summary : pandas.DataFrame
         One row per (rung, term).
     bootstrap : pandas.DataFrame
-        One row per (rung, term, estimator) with the animal-bootstrap
-        percentiles.
+        One row per (rung, term, estimator) with the animal-balanced median
+        and its nested-bootstrap interval.
     skips : pandas.DataFrame
         One row per (session, rung) that produced no comparable triple.
     """

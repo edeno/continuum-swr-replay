@@ -5,7 +5,7 @@ fraction model and the Dirichlet-multinomial disagree, so what is pinned here is
 what makes such a comparison readable: every (session, rung, term, estimator)
 appears exactly once, the three estimators are fit on ONE shared event set per
 (session, rung), the likelihood constants are equalized before any AIC is
-differenced, and the animal bootstrap reports the requested percentiles.
+differenced, and the animal bootstrap reports an interval about each median.
 
 The cohort is simulated with a planted Dirichlet concentration (phi = 3), so the
 within-event timebins are genuinely correlated and the count model's standard
@@ -313,20 +313,15 @@ def test_the_planted_concentration_shift_is_recovered_with_a_consistent_sign(one
     assert row["dm_log_phi_is_swr_animal_median"] < 0.0
 
 
-def test_the_bootstrap_reports_the_requested_percentiles(one_rung):
+def test_the_bootstrap_reports_an_interval_about_each_median(one_rung):
     bootstrap = one_rung.bootstrap
     assert not bootstrap.duplicated(["model", "term", "estimator"]).any()
-    for column in ("p2_5", "p50", "p97_5"):
-        assert column in bootstrap.columns
-    assert (bootstrap["p2_5"] <= bootstrap["p50"]).all()
-    assert (bootstrap["p50"] <= bootstrap["p97_5"]).all()
     assert bootstrap["n_animals"].eq(2).all()
     assert bootstrap["seed"].eq(ec.BOOTSTRAP_SEED).all()
-    current = bootstrap[
-        (bootstrap["term"] == "is_current_arm")
-        & (bootstrap["estimator"] == DIRICHLET_MULTINOMIAL)
-    ].iloc[0]
-    assert current["p2_5"] <= current["statistic"] <= current["p97_5"]
+    # two animals: the median +/- t(0.975, 1) sqrt(2) SD(draws)
+    half = 12.7062047362 * np.sqrt(2) * bootstrap["bootstrap_sd"]
+    np.testing.assert_allclose(bootstrap["low"], bootstrap["statistic"] - half)
+    np.testing.assert_allclose(bootstrap["high"], bootstrap["statistic"] + half)
 
 
 def test_the_bootstrap_is_reproducible_from_its_seed(one_rung):

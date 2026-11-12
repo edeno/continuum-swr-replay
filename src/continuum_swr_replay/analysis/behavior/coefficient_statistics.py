@@ -41,8 +41,10 @@ from continuum_swr_replay.analysis.behavior.fit_comparability import (
     why_not_comparable,
 )
 from continuum_swr_replay.analysis.shared_statistics import (
+    BootstrapInterval,
     animal_medians,
     benjamini_hochberg,
+    bootstrap_interval,
     nested_bootstrap_draw,
     nested_codes,
     session_median_statistics,
@@ -244,16 +246,19 @@ def animal_median_bootstrap(
     *,
     rng: np.random.Generator,
     n_draws: int,
-    percentiles: Sequence[float],
 ) -> dict[str, object]:
-    """A nested bootstrap of the median over animals of each animal's median.
+    """The median over animals of each animal's median, with a 95 % interval
+    from a nested bootstrap.
 
     Each draw is one replicate of the nested bootstrap
     (:func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_draw`):
     the animals with replacement, then each drawn animal's sessions with
     replacement. Its statistic is the median over the drawn animals (an animal
     drawn twice counting twice) of each one's median over its drawn sessions
-    (the sessions of an animal drawn twice pooled).
+    (the sessions of an animal drawn twice pooled). The interval is
+    :func:`~continuum_swr_replay.analysis.shared_statistics.bootstrap_interval`
+    of the statistic on the data and the draws, a small-sample t correction
+    over the animals.
 
     Parameters
     ----------
@@ -267,9 +272,6 @@ def animal_median_bootstrap(
         order it makes the calls; nothing is drawn when no animal has a value.
     n_draws : int
         Bootstrap replicates.
-    percentiles : sequence of float
-        Percentiles of the resampled statistic, in [0, 100] (linear
-        interpolation).
 
     Returns
     -------
@@ -282,16 +284,18 @@ def animal_median_bootstrap(
           ``animal_median`` of
           :func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`);
           NaN when no animal has a value.
-        - ``percentiles``: the resampled statistic's ``percentiles``, a
-          ``numpy.ndarray`` of shape ``(len(percentiles),)``; NaN when no
-          animal has a value. With one animal every draw is that animal, and
-          its sessions are still resampled.
+        - ``low``, ``high``: the 95 % interval; NaN with fewer than two
+          animals (with one, its sessions are still resampled, so the draws
+          use the generator).
+        - ``bootstrap_sd``: the draws' standard deviation; NaN when no animal
+          has a value.
     """
     known = values.dropna()
     medians = animal_medians(values, animal)
     n_animals = len(medians)
+    estimate = float(medians.median())
     if n_animals == 0:
-        spread = np.full(len(percentiles), np.nan)
+        interval = BootstrapInterval(np.nan, np.nan, np.nan)
     else:
         own = animal[known.index].to_numpy()
         animal_codes, session_codes = nested_codes(own, np.arange(len(known)))
@@ -317,13 +321,15 @@ def animal_median_bootstrap(
             statistic[i] = weighted_median(
                 own_medians[order], draw.animals[drawn][order]
             )
-        spread = np.percentile(statistic, percentiles)
+        interval = bootstrap_interval(estimate, statistic, n_animals)
     return {
         "n_sessions": len(known),
         "n_animals": n_animals,
         "animal_medians": medians,
-        "animal_median": float(medians.median()),
-        "percentiles": np.asarray(spread, dtype=float),
+        "animal_median": estimate,
+        "low": interval.low,
+        "high": interval.high,
+        "bootstrap_sd": interval.sd,
     }
 
 

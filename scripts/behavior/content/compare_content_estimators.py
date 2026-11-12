@@ -38,9 +38,11 @@ before ``aic_equalized`` is formed. ``pseudo_r2`` has a different null under
 each estimator and is deliberately not tabulated.
 
 Inference is the project's standard: five animals, sign consistency, and a
-nested bootstrap (resample the animals present with replacement, then each
-drawn animal's sessions; statistic = median over the drawn animals of each
-one's median over its drawn sessions).
+95 % interval from a nested bootstrap (resample the animals present with
+replacement, then each drawn animal's sessions; statistic = median over the
+drawn animals of each one's median over its drawn sessions): the median plus or
+minus a small-sample t correction over the animals times the draws' standard
+deviation.
 
 Usage:
     uv run python scripts/behavior/content/compare_content_estimators.py
@@ -74,7 +76,6 @@ from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import
     ESTIMATOR as DIRICHLET_MULTINOMIAL,
 )
 from continuum_swr_replay.analysis.behavior.content.estimator_comparison import (  # noqa: E402
-    BOOTSTRAP_PERCENTILES,
     BOOTSTRAP_SEED,
     COUNT_RESPONSE,
     ESTIMATOR_LABELS,
@@ -298,13 +299,13 @@ def plot_log_phi_by_session(
         if not band.empty:
             row = band.iloc[0]
             ax.axhspan(
-                float(row["p2_5"]),
-                float(row["p97_5"]),
+                float(row["low"]),
+                float(row["high"]),
                 color="0.75",
                 alpha=0.4,
                 zorder=0,
             )
-            ax.axhline(float(row["p50"]), color="0.3", lw=0.9, zorder=1)
+            ax.axhline(float(row["statistic"]), color="0.3", lw=0.9, zorder=1)
         if term == LOG_PHI_IS_SWR:
             ax.axhline(0.0, color="k", lw=0.6, ls=":", zorder=1)
         ax.set_ylabel(label, fontsize=8)
@@ -313,7 +314,7 @@ def plot_log_phi_by_session(
     axes[0].legend(fontsize=6, frameon=False, ncol=5, title="animal", title_fontsize=6)
     fig.suptitle(
         f"Dirichlet-multinomial concentration, {rung} "
-        "(band = nested-bootstrap 2.5–97.5%)",
+        "(band = 95 % nested-bootstrap interval)",
         fontsize=10,
     )
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -348,11 +349,13 @@ non-SWR event's timebins cluster on a few arms; **bottom,** the additive shift
 of that log concentration on SWR events, where a value below zero means SWR
 events are *more* concentrated (more redundant bins) and above zero means their
 mass is spread over more arms. Each line is one animal, plotted in session order
-within that animal. The grey band is the nested bootstrap's 2.5–97.5 percentile
-interval and the grey line its median: the animals present are resampled with
-replacement, then each drawn animal's sessions, for 2000 draws at **seed 0**, and
-each draw's statistic is the median over the drawn animals of each one's median
-over its drawn sessions.
+within that animal. The grey line is the median over animals of each animal's
+median, and the grey band its 95 % interval from a nested bootstrap: the animals
+present are resampled with replacement, then each drawn animal's sessions, for
+2000 draws at **seed 0**, and each draw's statistic is the median over the drawn
+animals of each one's median over its drawn sessions. The band is the median plus
+or minus t(0.975, A - 1) sqrt(A / (A - 1)) times the draws' standard deviation,
+over the A animals.
 """
 
 
@@ -490,7 +493,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             "bootstrap": {
                 "n_draws": args.n_bootstrap,
                 "seed": args.seed,
-                "percentiles": list(BOOTSTRAP_PERCENTILES),
+                "interval": "95 %: the median +/- t(0.975, n_animals - 1) "
+                "sqrt(n_animals / (n_animals - 1)) SD(draws)",
                 "unit": "animal, then session within animal",
             },
             "aic_equalization": (

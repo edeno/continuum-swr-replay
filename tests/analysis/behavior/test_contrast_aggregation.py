@@ -954,9 +954,9 @@ def test_a_forest_rows_ci_does_not_depend_on_the_rows_drawn_before_it(
     monkeypatch,
 ) -> None:
     """The jitter of the dots and the bootstrap draw from separate generators, so
-    a row's CI is the same whether or not another row was drawn first. With five
-    animals the 2.5 / 97.5 percentiles are the extreme animal medians whatever the
-    draws, so the test uses 400 animals of one session each, where they are not."""
+    a row's CI is the same whether or not another row was drawn first. 400
+    animals of one session each make every draw's statistic differ, so a shared
+    generator would move the interval."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -978,7 +978,7 @@ def test_a_forest_rows_ci_does_not_depend_on_the_rows_drawn_before_it(
 
     def recording_bootstrap(*args, **kwargs):
         summary = bootstrap(*args, **kwargs)
-        drawn.append(tuple(summary["percentiles"]))
+        drawn.append((summary["low"], summary["high"]))
         return summary
 
     monkeypatch.setattr(figure, "animal_median_bootstrap", recording_bootstrap)
