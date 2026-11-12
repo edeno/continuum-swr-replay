@@ -462,6 +462,20 @@ def test_estimator_names_the_response_scale_and_the_fitter():
         assert fit["llf_includes_constants"] is False
 
 
+def test_both_analytical_nulls_report_the_same_convergence_flags():
+    """A missing flag reads as not converged, so the null rung must state its own."""
+    long_df = _with_event_fraction(
+        simulate_with_event_covariates(CONTENT_BETA, n_events=60, L_e=4, seed=9)
+    )
+    flags = ["converged", "separated", "separated_terms", "n_convergence_warnings"]
+    poisson = fit_null_model_conditional(long_df)
+    logit = fit_null_model_conditional_logit(long_df)
+
+    assert {k: poisson[k] for k in flags} == {k: logit[k] for k in flags}
+    assert poisson["converged"] is True
+    assert poisson["separated"] is False
+
+
 def test_null_models_carry_the_estimator_of_the_ladder_they_null():
     """A null rung is compared against its ladder, so it must be labeled like it."""
     long_df = _with_event_fraction(

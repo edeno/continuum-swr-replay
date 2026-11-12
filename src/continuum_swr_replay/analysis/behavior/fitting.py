@@ -1102,7 +1102,9 @@ def fit_null_model_conditional(
     Returns
     -------
     dict
-        Null model fit statistics with 0 parameters.
+        Null model fit statistics with 0 parameters, with the same convergence
+        flags as :func:`fit_null_model_conditional_logit`: an analytical null has
+        nothing to converge or separate.
     """
     df = long_df[[event_col, response_col]].copy()
     has_nan = df[[event_col, response_col]].isna().any(axis=1)
@@ -1129,6 +1131,10 @@ def fit_null_model_conditional(
         "bic": float(-2 * llf),  # 0*log(n) - 2*llf
         "pseudo_r2": 0.0,
         "predicted_frac": 1.0 / n_arms,
+        "converged": True,
+        "separated": False,
+        "separated_terms": "",
+        "n_convergence_warnings": 0,
     }
 
 
