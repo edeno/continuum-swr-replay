@@ -205,7 +205,10 @@ layers below it, never from a layer above:
    other foundation modules.
 2. **`analysis/events/`**, the analysed-time rule and the event substrate. It imports
    only the foundation, `analysis/constants.py` (which itself imports only the
-   foundation) and itself.
+   foundation), `analysis/statistics.py` and itself. `analysis/statistics.py` holds
+   the statistics that know nothing of the task, for every `analysis/` package: the
+   signed-rank test, the Benjamini-Hochberg correction and the animal-balanced
+   summary over sessions. It imports nothing from the package.
 3. **The other `analysis/` packages** (`hippocampus/`, `replay/`, `pfc/`, `behavior/`,
    `contfrag/`, `inventory_comparison/`). `hippocampus/` never imports `pfc/` or
    `inventory_comparison/`. No `analysis/` code imports `visualization/`.

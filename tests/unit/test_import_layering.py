@@ -23,7 +23,8 @@ reported as a plain edge rather than as an ``ImportError`` from a cycle:
   foundation modules, and nothing from ``scripts``.
 - ``events_imports_only_foundation``: the analysed-time and event substrate
   (``analysis.events``) imports, from within the package, only foundation
-  modules, ``analysis.constants`` and itself, and nothing from ``scripts``.
+  modules, ``analysis.constants``, ``analysis.statistics`` and itself, and
+  nothing from ``scripts``.
 - ``hippocampus_imports_no_replay`` and
   ``hippocampus_imports_no_pfc_or_inventory_comparison``: the hippocampus
   package does not reach into those analysis packages. Today each of them
@@ -51,7 +52,9 @@ from tests.unit._imports import (
 )
 
 #: Package nodes, besides the foundation, that ``analysis.events`` may import.
-EVENTS_MAY_IMPORT = frozenset({"analysis.events", "analysis.constants"})
+EVENTS_MAY_IMPORT = frozenset(
+    {"analysis.events", "analysis.constants", "analysis.statistics"}
+)
 
 
 def package_graph(root: Path = SRC) -> dict[str, set[str]]:

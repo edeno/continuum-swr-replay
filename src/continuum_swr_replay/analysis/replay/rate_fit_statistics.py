@@ -30,7 +30,6 @@ from continuum_swr_replay.analysis.replay.coefficient_statistics import (
     _paired_difference,
     require_one_fit_per_session,
     separated_fraction,
-    session_median_statistics,
 )
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     gate_term_sessions,
@@ -46,6 +45,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     reconstruct_reward_kernels,
     reward_kernel_rate_ratios,
 )
+from continuum_swr_replay.analysis.statistics import session_median_statistics
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
 
 TIME_COURSE_GRID_POINTS = 401

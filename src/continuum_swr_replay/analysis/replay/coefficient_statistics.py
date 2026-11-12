@@ -8,12 +8,13 @@ row per session, with the session columns of
 :data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`) and return
 named numbers.
 
-:func:`session_median_statistics` is the one summary every other function is
-built on: the median over sessions with the sessions' signs, and the median
-over animals of each animal's own median with the animals' signs. "Animals
-positive" counts the animals whose own median is above zero. A signed-rank p
-treats the sessions as independent, which sessions of one animal are not: it
-describes consistency across sessions and is not a test on the animals.
+:func:`~continuum_swr_replay.analysis.statistics.session_median_statistics` is
+the one summary every other function is built on: the median over sessions
+with the sessions' signs, and the median over animals of each animal's own
+median with the animals' signs. "Animals positive" counts the animals whose own
+median is above zero. A signed-rank p treats the sessions as independent, which
+sessions of one animal are not: it describes consistency across sessions and is
+not a test on the animals.
 
 Which sessions a coefficient is read over is the per-term gate of
 :func:`~continuum_swr_replay.analysis.replay.contrast_aggregation.gate_term_sessions`.
@@ -33,6 +34,7 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     separated_for_term,
     session_se,
 )
+from continuum_swr_replay.analysis.statistics import session_median_statistics
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 
@@ -121,57 +123,6 @@ def _paired_difference(
     for name in same:
         both = both[both[f"{name}_a"] == both[f"{name}_b"]]
     return both[f"{column}_a"] - both[f"{column}_b"], both["animal"]
-
-
-def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str, float]:
-    """The median of a per-session number, with the sessions' and animals' signs.
-
-    Parameters
-    ----------
-    values : pd.Series, shape (n_sessions,)
-        One number per session, none missing.
-    animal : pd.Series, shape (n_sessions,)
-        Each session's animal, indexed as ``values``.
-
-    Returns
-    -------
-    statistics : dict
-        - ``n_sessions``: the sessions.
-        - ``median``: the median over sessions.
-        - ``n_positive``, ``n_negative``: sessions above and below zero.
-        - ``positive_fraction``, ``negative_fraction``: their shares of the
-          sessions.
-        - ``n_animals``: the animals with a session.
-        - ``animal_median``: the median over animals of each animal's median
-          over its sessions.
-        - ``n_animals_positive``, ``n_animals_negative``: animals whose own
-          median is above and below zero.
-        - ``n_animals_same_sign``: animals whose own median has the sign of
-          ``median``.
-
-    Raises
-    ------
-    ValueError
-        If ``animal`` is not indexed as ``values`` (a session without an
-        animal would be left out of the animals' medians).
-    """
-    if not values.index.equals(animal.index):
-        raise ValueError("values and animal are not indexed alike")
-    median = float(values.median())
-    per_animal = values.groupby(animal).median()
-    return {
-        "n_sessions": len(values),
-        "median": median,
-        "n_positive": int((values > 0).sum()),
-        "n_negative": int((values < 0).sum()),
-        "positive_fraction": float((values > 0).mean()),
-        "negative_fraction": float((values < 0).mean()),
-        "n_animals": len(per_animal),
-        "animal_median": float(per_animal.median()),
-        "n_animals_positive": int((per_animal > 0).sum()),
-        "n_animals_negative": int((per_animal < 0).sum()),
-        "n_animals_same_sign": int((np.sign(per_animal) == np.sign(median)).sum()),
-    }
 
 
 def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
