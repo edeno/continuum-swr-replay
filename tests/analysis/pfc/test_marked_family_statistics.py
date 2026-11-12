@@ -300,3 +300,76 @@ def test_complete_bundle_records_keep_only_complete_bundles_in_name_order(tmp_pa
         "c_marked_family.provenance.json",
     ]
     assert [extra["model_name"] for _, extra in records] == ["a", "c"]
+
+
+def test_summary_table_is_one_row_per_model_tier_class_target_statistic():
+    """Two models of two tiers; the correlations follow the statistics, each
+    with its model's tier and without its session count."""
+    keys = {
+        "model": ["m", "marginal_t"],
+        "event_class": ["pooled", "pooled"],
+        "target": ["t", "t"],
+    }
+    fractions = pd.DataFrame({**keys, "frac_pos": [0.6, 0.4], "n_units": [10, 8]})
+    peaks = pd.DataFrame({**keys, "peak_value": [0.2, -0.1]})
+    bands = pd.DataFrame({**keys, "peak_outside_band": [True, False]})
+    tiers = pd.DataFrame(
+        {"model": ["m", "marginal_t", "m"], "tier": ["joint", "marginal", "joint"]}
+    )
+    correlations = pd.DataFrame(
+        {
+            "model": ["m"],
+            "event_class": ["non_local_SWR"],
+            "target": ["a & b"],
+            "statistic": ["mark_correlation"],
+            "value": [0.7],
+            "n_sessions": [12],
+        }
+    )
+
+    table = stats.summary_table(fractions, peaks, bands, tiers, correlations)
+
+    assert list(table.columns) == [
+        "model",
+        "tier",
+        "event_class",
+        "target",
+        "statistic",
+        "value",
+    ]
+    assert not table.duplicated(
+        ["model", "tier", "event_class", "target", "statistic"]
+    ).any()
+    # 2 models x 4 statistics, then the correlation
+    assert len(table) == 9
+    assert table["statistic"].iloc[-1] == "mark_correlation"
+    values = table.set_index(["model", "statistic"])
+    assert values.loc[("m", "frac_pos"), "value"] == 0.6
+    assert values.loc[("m", "peak_outside_band"), "value"] == 1.0
+    assert values.loc[("marginal_t", "peak_outside_band"), "value"] == 0.0
+    assert values.loc[("marginal_t", "frac_pos"), "tier"] == "marginal"
+    assert values.loc[("m", "mark_correlation"), "tier"] == "joint"
+    assert values.loc[("m", "mark_correlation"), "value"] == 0.7
+
+
+def test_summary_table_without_bands_or_correlations():
+    keys = {"model": ["m"], "event_class": ["pooled"], "target": ["t"]}
+    table = stats.summary_table(
+        pd.DataFrame({**keys, "frac_pos": [0.5]}),
+        pd.DataFrame({**keys, "peak_value": [0.3]}),
+        pd.DataFrame(),
+        pd.DataFrame({"model": ["m"], "tier": ["joint"]}),
+        pd.DataFrame(
+            columns=[
+                "model",
+                "event_class",
+                "target",
+                "statistic",
+                "value",
+                "n_sessions",
+            ]
+        ),
+    )
+
+    assert sorted(table["statistic"]) == ["frac_pos", "peak_value"]
+    assert table["value"].tolist() == [0.5, 0.3]

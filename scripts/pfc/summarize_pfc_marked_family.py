@@ -81,6 +81,7 @@ from continuum_swr_replay.analysis.pfc.marked_family_statistics import (
     null_band_summary,
     population_curve_summary,
     shuffled_band,
+    summary_table,
 )
 from continuum_swr_replay.analysis.pfc.marked_glm import (
     EXTENDED_MARKED_EVENT_CLASSES,
@@ -231,45 +232,6 @@ def load_bundles(
 #: Absolute mark-pair correlation from which the report flags possible ridge
 #: leakage between the two marks' slopes.
 STRONG_MARK_CORRELATION = 0.5
-
-
-def summary_table(
-    fractions: pd.DataFrame,
-    peaks: pd.DataFrame,
-    bands: pd.DataFrame,
-    tiers: pd.DataFrame,
-) -> pd.DataFrame:
-    """Long table: one row per model, tier, class, target and statistic.
-
-    Parameters
-    ----------
-    fractions, peaks, bands : pandas.DataFrame
-        From :func:`animal_balanced_fraction_positive`,
-        :func:`population_curve_summary` and :func:`null_band_summary`
-        (``bands`` may be empty).
-    tiers : pandas.DataFrame
-        ``model`` and ``tier`` of every model.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Columns ``model``, ``tier``, ``event_class``, ``target``,
-        ``statistic`` and ``value`` (float; booleans as 0/1).
-    """
-    keys = ["model", "event_class", "target"]
-    wide = fractions.merge(peaks, on=keys, how="outer")
-    if len(bands):
-        wide = wide.merge(bands, on=keys, how="left")
-    wide = wide.merge(tiers.drop_duplicates("model"), on="model", how="left")
-    long = wide.melt(
-        id_vars=["model", "tier", "event_class", "target"],
-        var_name="statistic",
-        value_name="value",
-    )
-    long["value"] = pd.to_numeric(long["value"], errors="coerce").astype(float)
-    return long.sort_values(
-        ["model", "event_class", "target", "statistic"]
-    ).reset_index(drop=True)
 
 
 def joint_versus_marginal(merged: pd.DataFrame) -> pd.DataFrame:
@@ -603,16 +565,9 @@ def main() -> None:
         )
         args.out.write_text(report)
     summary_path = args.summary_parquet or args.bundle_dir / "summary.parquet"
-    tiers_of = tiers.drop_duplicates("model").set_index("model")["tier"]
-    pd.concat(
-        [
-            summary_table(fractions, peaks, bands, tiers),
-            correlations.drop(columns="n_sessions").assign(
-                tier=correlations["model"].map(tiers_of)
-            ),
-        ],
-        ignore_index=True,
-    ).to_parquet(summary_path, index=False)
+    summary_table(fractions, peaks, bands, tiers, correlations).to_parquet(
+        summary_path, index=False
+    )
     print(report)
     print(f"Wrote {summary_path}")
 

@@ -42,31 +42,6 @@ def test_summary_pairs_joint_and_marginal_for_each_target():
     assert (row.joint_frac_pos, row.marginal_frac_pos) == (0.5, 0.7)
 
 
-def test_summary_table_is_one_row_per_model_tier_class_target_statistic():
-    keys = {"model": ["m"], "event_class": ["pooled"], "target": ["t"]}
-    fractions = pd.DataFrame({**keys, "frac_pos": [0.6], "n_units": [10]})
-    peaks = pd.DataFrame({**keys, "peak_value": [0.2]})
-    bands = pd.DataFrame({**keys, "peak_outside_band": [True]})
-    tiers = pd.DataFrame({"model": ["m"], "tier": ["joint"]})
-
-    table = summarize.summary_table(fractions, peaks, bands, tiers)
-
-    assert list(table.columns) == [
-        "model",
-        "tier",
-        "event_class",
-        "target",
-        "statistic",
-        "value",
-    ]
-    assert not table.duplicated(
-        ["model", "tier", "event_class", "target", "statistic"]
-    ).any()
-    values = table.set_index("statistic")["value"]
-    assert values["frac_pos"] == 0.6
-    assert values["peak_outside_band"] == 1.0
-
-
 def _write_bundle(directory, session, *, version, event_set="canonical"):
     """One complete fake bundle: sidecar, statistics, lag axis and curves."""
     base = directory / f"{session}_mPFC_m_marked_family"

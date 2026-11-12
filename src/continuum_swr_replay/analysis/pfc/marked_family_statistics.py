@@ -20,6 +20,8 @@ and writes the summary the mpfc summary builder reads.
   marks, from the bundles' sidecars.
 - :func:`complete_bundle_records`: the complete bundles of a directory, the
   only ones :func:`mark_correlations` and the summary script read.
+- :func:`summary_table`: all of these as the one long table the summary
+  builder reads.
 """
 
 from __future__ import annotations
@@ -459,3 +461,56 @@ def null_band_summary(
             }
         )
     return pd.DataFrame(out)
+
+
+def summary_table(
+    fractions: pd.DataFrame,
+    peaks: pd.DataFrame,
+    bands: pd.DataFrame,
+    tiers: pd.DataFrame,
+    correlations: pd.DataFrame,
+) -> pd.DataFrame:
+    """Long table: one row per model, tier, class, target and statistic.
+
+    Parameters
+    ----------
+    fractions, peaks, bands : pandas.DataFrame
+        From :func:`animal_balanced_fraction_positive`,
+        :func:`population_curve_summary` and :func:`null_band_summary`
+        (``bands`` may be empty).
+    tiers : pandas.DataFrame
+        ``model`` and ``tier`` of every model.
+    correlations : pandas.DataFrame
+        From :func:`mark_correlations`; appended after the other statistics,
+        each row with its model's tier and without ``n_sessions``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``model``, ``tier``, ``event_class``, ``target``,
+        ``statistic`` and ``value`` (float; booleans as 0/1).
+    """
+    keys = ["model", "event_class", "target"]
+    wide = fractions.merge(peaks, on=keys, how="outer")
+    if len(bands):
+        wide = wide.merge(bands, on=keys, how="left")
+    wide = wide.merge(tiers.drop_duplicates("model"), on="model", how="left")
+    long = wide.melt(
+        id_vars=["model", "tier", "event_class", "target"],
+        var_name="statistic",
+        value_name="value",
+    )
+    long["value"] = pd.to_numeric(long["value"], errors="coerce").astype(float)
+    long = long.sort_values(
+        ["model", "event_class", "target", "statistic"]
+    ).reset_index(drop=True)
+    tiers_of = tiers.drop_duplicates("model").set_index("model")["tier"]
+    return pd.concat(
+        [
+            long,
+            correlations.drop(columns="n_sessions").assign(
+                tier=correlations["model"].map(tiers_of)
+            ),
+        ],
+        ignore_index=True,
+    )
