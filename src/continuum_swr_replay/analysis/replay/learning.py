@@ -32,9 +32,8 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
-from statsmodels.stats.multitest import multipletests
 
+from continuum_swr_replay.analysis.statistics import benjamini_hochberg, signed_rank_p
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -686,54 +685,31 @@ def cross_session_role_summary(coefs: pd.DataFrame) -> pd.DataFrame:
         ``role``, ``n_sessions`` (converged sessions with a finite
         ``beta_inter``), ``median_beta_inter``, ``n_pos``, ``n_neg``, ``p``,
         ``p_fdr``, and ``status`` (``"ok"`` or ``"too_few_sessions"``). A role
-        with fewer than five sessions is not testable and is excluded from the
-        correction as well as from the test.
+        whose sessions give no signed-rank p (fewer than six with a non-zero
+        ``beta_inter``,
+        :func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`) is
+        ``"too_few_sessions"``, has no median, and is left out of the
+        correction as well as the test.
     """
     converged = coefs[coefs["status"] == "ok"]
     rows = []
     for role in ROLES:
-        sub = converged[converged["role"] == role].dropna(subset=["beta_inter"])
-        if len(sub) < 5:
-            rows.append(
-                {
-                    "role": role,
-                    "n_sessions": len(sub),
-                    "median_beta_inter": np.nan,
-                    "n_pos": int((sub["beta_inter"] > 0).sum()),
-                    "n_neg": int((sub["beta_inter"] < 0).sum()),
-                    "p": np.nan,
-                    "status": "too_few_sessions",
-                }
-            )
-            continue
-        try:
-            _, p = wilcoxon(sub["beta_inter"])
-        except ValueError:
-            # SciPy refuses an all-zero sample; that is a failed test, not a
-            # p-value, and must not become one below.
-            p = float("nan")
+        beta = converged.loc[converged["role"] == role, "beta_inter"].dropna()
+        p = signed_rank_p(beta)
+        tested = bool(np.isfinite(p))
         rows.append(
             {
                 "role": role,
-                "n_sessions": len(sub),
-                "median_beta_inter": float(sub["beta_inter"].median()),
-                "n_pos": int((sub["beta_inter"] > 0).sum()),
-                "n_neg": int((sub["beta_inter"] < 0).sum()),
+                "n_sessions": len(beta),
+                "median_beta_inter": float(beta.median()) if tested else np.nan,
+                "n_pos": int((beta > 0).sum()),
+                "n_neg": int((beta < 0).sum()),
                 "p": p,
-                "status": "ok",
+                "status": "ok" if tested else "too_few_sessions",
             }
         )
     summary = pd.DataFrame(rows)
-    summary["p_fdr"] = np.nan
-    # ``multipletests`` returns an all-NaN vector if ANY input is NaN, so a
-    # single role that failed its test would otherwise erase every other role's
-    # FDR. Correct the finite p-values and pass NaN through for the rest.
-    testable = (summary["status"] == "ok") & np.isfinite(summary["p"])
-    if testable.any():
-        _, p_fdr, _, _ = multipletests(
-            summary.loc[testable, "p"].to_numpy(dtype=float), method="fdr_bh"
-        )
-        summary.loc[testable, "p_fdr"] = p_fdr
+    summary["p_fdr"] = benjamini_hochberg(summary["p"])
     return summary
 
 
@@ -751,16 +727,16 @@ def pooled_gee_role_summary(pooled: pd.DataFrame) -> pd.DataFrame:
     pandas.DataFrame
         One row per role whose fit converged (none when no fit did): ``role``
         and ``p_fdr``, its ``p_inter`` Benjamini-Hochberg corrected across
-        those roles. A converged fit without a p-value enters the correction
-        as 1.
+        those roles. A converged fit without a p-value is left out of the
+        correction, and its ``p_fdr`` is NaN.
     """
     converged = pooled[pooled["status"] == "ok"]
-    p_fdr = np.array([])
-    if len(converged):  # the correction divides by the number of tests
-        _, p_fdr, _, _ = multipletests(
-            converged["p_inter"].fillna(1.0).to_numpy(), method="fdr_bh"
-        )
-    return pd.DataFrame({"role": converged["role"].to_numpy(), "p_fdr": p_fdr})
+    return pd.DataFrame(
+        {
+            "role": converged["role"].to_numpy(),
+            "p_fdr": benjamini_hochberg(converged["p_inter"]),
+        }
+    )
 
 
 def smallest_adjusted_p(summaries: Mapping[str, pd.DataFrame]) -> dict[str, object]:

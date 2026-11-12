@@ -1,15 +1,15 @@
 """Regression test: cross-session FDR must not be poisoned
 by a NaN p-value from a single role.
 
-``learning.cross_session_role_summary`` runs one Wilcoxon per role
-and corrects across roles. It sets ``p = nan`` when ``wilcoxon`` raises
-``ValueError`` (e.g. all-zero β_inter samples on some SciPy versions).
-``multipletests`` returns an all-NaN adjusted-p vector when *any* input is NaN,
-so a single failed role would contaminate every other role's reported FDR.
+``learning.cross_session_role_summary`` runs one signed-rank test per role and
+corrects across roles. A role with no p (an all-zero β_inter sample, or too few
+sessions) has ``p = nan``. ``multipletests`` returns an all-NaN adjusted-p
+vector when *any* input is NaN, so a single untested role would contaminate
+every other role's reported FDR.
 
-The fix corrects only the finite p-values and passes NaN through for the failed
-roles. These tests drive the shipped function, not a copy of it, so the
-regression cannot come back through an edit the test does not see.
+The correction leaves the NaN out of the family and passes it through. These
+tests drive the shipped function, not a copy of it, so the regression cannot
+come back through an edit the test does not see.
 """
 
 from __future__ import annotations
@@ -17,10 +17,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from continuum_swr_replay.analysis.replay import learning
 from continuum_swr_replay.analysis.replay.learning import (
     ROLES,
     cross_session_role_summary,
@@ -54,16 +52,9 @@ def _betas(shift: float) -> np.ndarray:
 
 
 class TestStage6FdrNanPropagation:
-    def test_nan_pvalue_does_not_poison_other_roles(self, monkeypatch):
-        # Whether an all-zero sample raises is a SciPy-version detail (this
-        # one returns 1.0), so drive the failure explicitly: what matters is
-        # that a role with no p-value cannot erase the others'.
-        def refuse_zero_samples(sample):
-            if np.allclose(sample, 0.0):
-                raise ValueError("zero_method 'wilcox' and 'pratt' do not work")
-            return wilcoxon(sample)
-
-        monkeypatch.setattr(learning, "wilcoxon", refuse_zero_samples)
+    def test_nan_pvalue_does_not_poison_other_roles(self):
+        # An all-zero sample has no non-zero difference to rank: no p-value,
+        # and it must not erase the other roles'.
         coefs = _coefs(
             {
                 "current": _betas(0.0),
@@ -91,7 +82,7 @@ class TestStage6FdrNanPropagation:
             {
                 "current": _betas(0.0),
                 "prev": _betas(0.5),
-                # Three sessions is below the five-session floor, so this role
+                # Three sessions are below the six-session floor, so this role
                 # is neither tested nor part of the correction's denominator.
                 "best": _betas(0.0)[:3],
             }

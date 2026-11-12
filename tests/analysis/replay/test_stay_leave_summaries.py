@@ -25,9 +25,9 @@ def test_the_pooled_gee_summary_corrects_across_the_converged_roles():
     )
     summary = pooled_gee_role_summary(pooled)
     assert list(summary["role"]) == ["current", "prev", "last_rewarded"]
-    # Three converged roles, the one without a p entering as 1:
-    # 0.01 * 3 / 1, 0.04 * 3 / 2, 1 * 3 / 3. The failed fit's 0.001 is not used.
-    assert list(summary["p_fdr"]) == pytest.approx([0.03, 0.06, 1.0])
+    # Three converged roles; the one without a p is not a test, so the family
+    # is two: 0.01 * 2 / 1, 0.04 * 2 / 2. The failed fit's 0.001 is not used.
+    np.testing.assert_allclose(summary["p_fdr"], [0.02, 0.04, NAN])
 
 
 def test_the_pooled_gee_summary_of_a_stratum_where_no_fit_converged_is_empty():
