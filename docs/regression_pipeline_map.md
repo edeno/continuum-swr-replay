@@ -534,7 +534,7 @@ Quantify the non-local/SWR overlap sub-cases on real data.
 
 Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
 
-`fit_power_model`, `build_parser`, `main`
+`build_parser`, `main`
 
 ### `scripts/behavior/rate/fit_cross_history_rate.py`
 
@@ -724,7 +724,7 @@ Switch-aligned timing analysis for patch-switch prediction.
 
 Per-model cohort / drop-profile audit records.
 
-`is_qvals_sourced_column`, `is_qvals_gap_column`, `attach_has_qvals_row`, `qvals_gap_event_ids`, `cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
+`is_qvals_sourced_column`, `is_qvals_gap_column`, `attach_has_qvals_row`, `qvals_gap_event_ids`, `cohort_record`, `fitted_cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
 
 ### `src/continuum_swr_replay/analysis/behavior/content/model_checking.py`
 
@@ -968,7 +968,7 @@ Does each detector's content reproduce in cells it never saw?
 
 What the mPFC kernel estimator does to the timing and size of a known response.
 
-`response_shape`, `event_onsets`, `stretch_offset_and_onsets`, `read_curves`, `simulate_and_fit`, `scenario_list`, `parse_arguments`, `main`
+`response_shape`, `event_onsets`, `stretch_offset_and_onsets`, `simulate_and_fit`, `scenario_list`, `parse_arguments`, `main`
 
 ### `scripts/pfc/check_pfc_ridge_lambda0.py`
 
@@ -1160,6 +1160,12 @@ Fit one content rung on every session of a cohort.
 
 `fit_model_per_session`
 
+### `src/continuum_swr_replay/analysis/behavior/coupling/swr_power.py`
+
+The per-event SWR-power model: an event's ripple power against the behavioral covariates.
+
+`post_outcome_masks`, `balanced_post_outcome_selection`, `gate_events_after_outcome`, `fit_power_model`, `power_distribution_statistics`, `duration_power_correlation`, `power_cohort_records`
+
 ### `src/continuum_swr_replay/analysis/behavior/fit_comparability.py`
 
 Which sessions of a rung pair can be compared by an information criterion.
@@ -1171,6 +1177,12 @@ Which sessions of a rung pair can be compared by an information criterion.
 Summary statistics of the event-history kernels of the duration-aware rate fits.
 
 `lag_ms`, `lag_index`, `measurable_kernel`, `kernel_peak`, `self_history_statistics`, `self_history_range_statistics`, `cross_history_statistics`
+
+### `src/continuum_swr_replay/analysis/behavior/rate/post_outcome.py`
+
+What a per-bin rate model may see once the trial's outcome is known.
+
+`mask_post_outcome_covariates`, `retained_time_course_support`, `gate_bins_after_outcome`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/rate_fit_statistics.py`
 
