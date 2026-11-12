@@ -27,10 +27,6 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.content.model_comparison import (
-    COMPARABILITY_COLUMNS,
-    why_not_comparable,
-)
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     gate_term_sessions,
     gated_term_statistics,
@@ -38,6 +34,10 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     session_se,
     typical_session_se,
     unidentified_for_term,
+)
+from continuum_swr_replay.analysis.behavior.fit_comparability import (
+    COMPARABILITY_COLUMNS,
+    why_not_comparable,
 )
 from continuum_swr_replay.analysis.shared_statistics import (
     benjamini_hochberg,
@@ -481,7 +481,7 @@ def aic_difference_statistics(
     child, parent : pd.DataFrame
         Per-session fits of the two rungs for one population, with the session
         columns and ``aic``, and any of
-        :data:`~continuum_swr_replay.analysis.behavior.content.model_comparison.COMPARABILITY_COLUMNS`;
+        :data:`~continuum_swr_replay.analysis.behavior.fit_comparability.COMPARABILITY_COLUMNS`;
         at most one row per session.
 
     Returns
@@ -490,7 +490,7 @@ def aic_difference_statistics(
         :func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`
         of ``AIC(child) - AIC(parent)`` over the sessions with both fits that
         can be compared
-        (:func:`~continuum_swr_replay.analysis.behavior.content.model_comparison.why_not_comparable`:
+        (:func:`~continuum_swr_replay.analysis.behavior.fit_comparability.why_not_comparable`:
         the two rungs were fit to the same number of events, bins and stops,
         on the same clock and stop cohort, with likelihoods on the same
         constants) and a difference that is not missing. An infinite AIC is
