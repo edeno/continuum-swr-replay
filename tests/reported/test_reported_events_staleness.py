@@ -112,6 +112,17 @@ def test_the_pending_note_reaches_every_value():
     # an existing note is kept, and no note leaves the values unchanged
     assert pend([_value("x", "untracked")], "stale")[0].pending == "untracked; stale"
     assert pend(values, None) == values
+    # several notes are added in order, a None among them skipped, as nested
+    # calls would add them
+    both = pend([_value("x", "untracked"), _value("y")], "stale", None, "other run")
+    assert [v.pending for v in both] == [
+        "untracked; stale; other run",
+        "stale; other run",
+    ]
+    assert both == pend(
+        pend(pend([_value("x", "untracked"), _value("y")], "stale"), None), "other run"
+    )
+    assert pend(values) == values
 
 
 def _gamma_reference() -> pd.DataFrame:

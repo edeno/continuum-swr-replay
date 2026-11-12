@@ -1164,8 +1164,7 @@ def class_step_values_with_staleness(
     return [
         *pend(class_step_values(steps, source), event_table_stale),
         *pend(
-            pend(class_step_evidence_values(steps, source), event_table_stale),
-            evidence_stale,
+            class_step_evidence_values(steps, source), event_table_stale, evidence_stale
         ),
     ]
 

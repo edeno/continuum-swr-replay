@@ -298,18 +298,21 @@ class Summary:
         tmp.replace(path)
 
 
-def pend(values: Iterable[Value], note: str | None) -> list[Value]:
-    """``values`` with ``note`` added to their pending notes.
+def pend(values: Iterable[Value], *notes: str | None) -> list[Value]:
+    """``values`` with each note that is not None added, in order, to their
+    pending notes, joined by ``"; "``.
 
     The one rule for a value read from a stale output (one made from other
     tables than the current ones): it is kept and marked pending with the
     reason, never dropped and never a reason to refuse the build. The release
     check refuses a pending value the manuscript cites.
     """
-    if note is None:
+    kept = [note for note in notes if note is not None]
+    if not kept:
         return list(values)
+    added = "; ".join(kept)
     return [
-        replace(v, pending=note if v.pending is None else f"{v.pending}; {note}")
+        replace(v, pending=added if v.pending is None else f"{v.pending}; {added}")
         for v in values
     ]
 

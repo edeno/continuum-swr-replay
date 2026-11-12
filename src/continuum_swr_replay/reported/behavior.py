@@ -2969,16 +2969,14 @@ def summarize(inputs: BehaviorInputs, produced_by: str) -> Summary:
     # pending on all three fits: the notes join as fit_staleness of the three would
     summary.add(
         *pend(
-            pend(
-                per_bin_detail_values(
-                    per_bin,
-                    per_bin_all,
-                    in_transit,
-                    f"{rel(inputs.per_bin)}, {rel(inputs.per_bin_all_stops)} and "
-                    f"{rel(inputs.per_bin_in_transit)} (rate.per_bin.*)",
-                ),
-                per_bin_stale,
+            per_bin_detail_values(
+                per_bin,
+                per_bin_all,
+                in_transit,
+                f"{rel(inputs.per_bin)}, {rel(inputs.per_bin_all_stops)} and "
+                f"{rel(inputs.per_bin_in_transit)} (rate.per_bin.*)",
             ),
+            per_bin_stale,
             in_transit_stale,
         )
     )
