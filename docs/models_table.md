@@ -291,8 +291,9 @@ MU_uncertainty  count ~ BS_TC + REWBASIS + OFFCOS
 `MODEL_CROSS_HISTORY_RATE` in `model_specs.py`. Fit per session in both
 directions — the non-SWR non-local rate given the with-SWR stream's history, and
 the reverse. Reward enters through the kernel only. Both rungs carry
-`parent = None`; the runner compares the pair directly (self → self + cross AIC
-drop and held-out bits per event).
+`parent = None`; the runner compares the pair directly (the AIC difference
+`Mselfcross − Mself`, negative when cross history helps, and the held-out bits
+per event).
 
 ```rungs
 Mself       count ~ BS_TC + REWBASIS + HISTCOS

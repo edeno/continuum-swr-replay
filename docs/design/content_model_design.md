@@ -71,7 +71,8 @@ dispersion of `M4` at the (event, arm) grain ≈ 28.
 The consequences were measured directly by refitting real sessions through the
 same fitter with one draw per event instead of hard counts: standard errors on
 `reward_fraction_candidate_arm_last10_visits` moved from 0.07–0.12 to 0.40–0.73
-(**~6×**), and `ΔAIC(M3 vs M2)` collapsed from 10–317 to −2.0…+6.7 — that is,
+(**~6×**), and `ΔAIC = AIC(M3) − AIC(M2)` collapsed from −317…−10 to
+−6.7…+2.0 (child minus parent; negative favours `M3`) — that is,
 the count response was manufacturing decisive model-selection evidence out of
 autocorrelated bins. Point estimates moved too (e.g. −0.43 → −0.03, −2.03 →
 −0.81), because a count response weights an event by its duration and by how

@@ -478,6 +478,7 @@ still compute a reported statistic themselves are listed in `TODO.md`.
 6. **Track graph**: NetworkX graph of 10 nodes, where nodes 0–5 are wells (6–8 patch junctions, 9 the center) and edges are track segments
 7. **Index/time alignment**: Use `.loc[start:end]` for time-based slicing, not `.iloc`
 8. **Data roots**: every root is read at call time from `$CSR_PROCESSED_DATA_DIR` through `paths`. In tests that variable is the one patch point (the `processed_data_root` fixture); the suite starts with a sentinel root that cannot be read or written
+9. **AIC and BIC differences**: the child rung's minus the parent rung's, within session; negative means the child is better (`analysis/behavior/coefficient_statistics.aic_difference_statistics`, `analysis/behavior/content/model_comparison.compare_nested_models`). Likelihood-ratio statistics and held-out gains keep their own signs
 
 ## Notes on Data Quality
 
