@@ -234,6 +234,17 @@ def test_the_lag_one_kernel_over_sessions_and_animals():
     assert result["n_animals_lag_one_positive"] == 3
 
 
+def test_a_missing_convergence_flag_counts_as_not_converged():
+    # one fit converged False, one with no flag; the sixth fit, gated out, has
+    # no flag either and is not counted
+    fits = _fits(
+        _first_bump([0.5, 1.0, -0.2, 0.3, 0.4, 0.6]),
+        separated=[""] * 5 + [REWARD_HISTORY_COLUMNS[0]],
+        converged=[True, NAN, False, True, True, NAN],
+    )
+    assert stats.reward_kernel_statistics(fits)["n_nonconverged"] == 2
+
+
 def test_animals_with_a_negative_median_lag_one_kernel_are_not_counted_positive():
     fits = _fits(
         _first_bump([0.5, 1.0, -0.2, -0.3, 0.4]), animals=["a", "a", "b", "b", "c"]

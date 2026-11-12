@@ -336,7 +336,8 @@ def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
 
         - ``n_sessions``: those sessions.
         - ``n_dropped``: fitted sessions the gate left out.
-        - ``n_nonconverged``: kept sessions whose fit did not converge.
+        - ``n_nonconverged``: kept sessions whose fit did not converge; a
+          missing ``converged`` flag counts as not converged.
         - ``rate_ratio_lag_<k>``, for each lag ``k`` from 1: the median over
           sessions of the session's kernel at that lag, as a rate ratio.
         - ``late_rate_ratio_min``, ``late_rate_ratio_max``: the lowest and
@@ -360,7 +361,7 @@ def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
     return {
         "n_sessions": len(gated),
         "n_dropped": n_fitted - len(gated),
-        "n_nonconverged": int((gated["converged"] == False).sum()),  # noqa: E712
+        "n_nonconverged": int((~gated["converged"].eq(True)).sum()),
         **{
             f"rate_ratio_lag_{lag}": float(rate_ratio)
             for lag, rate_ratio in enumerate(rate_ratios, start=1)
