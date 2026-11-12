@@ -1199,21 +1199,8 @@ def check_heldout_claims(heldout: pd.DataFrame) -> None:
             "The caption says the sliding window reported no event our detector "
             "missed; the held-out summary holds comparator-only events."
         )
-    placeless = {
-        estimator: sweep_statistics.heldout_fold_statistics(
-            heldout,
-            tuple(FOLD_HATCH),
-            ("ours_only", "shared"),
-            "no_content",
-            estimator=estimator,
-        )
-        for estimator in ("state_space", "sliding_window")
-    }
-    if any(statistics["n_folds_with_support"] for statistics in placeless.values()):
-        raise RuntimeError(
-            "The caption says no informative place-less burst event has "
-            "held-out support; the held-out summary disagrees."
-        )
+    # refuses a summary in which an informative place-less burst has support
+    placeless = sweep_statistics.placeless_burst_statistics(heldout, tuple(FOLD_HATCH))
     by_class = heldout[heldout["summary"] == "by_class"]
     local = by_class[(by_class.truth == "local") & (by_class.measure == "n_events_all")]
     if local.value.sum() > 0:
@@ -1221,7 +1208,7 @@ def check_heldout_claims(heldout: pd.DataFrame) -> None:
             "The caption says no event of pure local coding reached the held-out "
             "test; the held-out summary holds some."
         )
-    if not placeless["state_space"]["n_events"]:
+    if not placeless["n_events"]:
         raise RuntimeError(
             "The caption states a place-less burst result; no place-less burst "
             "event is informative, so there is none to state."

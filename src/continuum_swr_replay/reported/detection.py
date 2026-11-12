@@ -938,15 +938,8 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         )
         for name, classes in (("ours", ("ours_only",)), ("shared", ("shared",)))
     }
-    placeless = {
-        estimator: over_folds(_FOLDS, either, "no_content", estimator=estimator)
-        for estimator in ("state_space", "sliding_window")
-    }
-    if any(stats["n_folds_with_support"] for stats in placeless.values()):
-        raise ValueError(
-            "the caption says no informative place-less burst event has held-out "
-            "support; the held-out summary disagrees"
-        )
+    # refuses a summary in which an informative place-less burst has support
+    placeless = sweep_statistics.placeless_burst_statistics(heldout, _FOLDS)
     placeless_loose = over_folds(_FOLDS, either, "no_content", suffix="_floor2")
     if shared["rate_spread"] != 0:
         raise ValueError(
@@ -984,7 +977,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "heldout_placeless_informative_events",
-            placeless["state_space"]["n_events"],
+            placeless["n_events"],
             "count",
             "count",
             "informative place-less burst events over the three folds (none has "

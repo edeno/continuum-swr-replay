@@ -793,6 +793,72 @@ def test_heldout_fold_statistics_have_no_range_over_a_fold_with_no_rate(folds):
     assert np.isnan(result["rate_spread"])
 
 
+def _placeless(
+    state_space_rate_b: float = 0.0, sliding_rate_b: float = 0.0
+) -> pd.DataFrame:
+    """Place-less bursts with no support: 3 ours-only and 2 shared informative in
+    fold A, 4 ours-only in fold B; the sliding window's content judges 3 and 4
+    ours-only ones."""
+    return _heldout(
+        [
+            *_by_class(
+                "A", "ours_only", "no_content", {"n_events": 3, "support_rate": 0.0}
+            ),
+            *_by_class(
+                "A", "shared", "no_content", {"n_events": 2, "support_rate": 0.0}
+            ),
+            *_by_class(
+                "B",
+                "ours_only",
+                "no_content",
+                {"n_events": 4, "support_rate": state_space_rate_b},
+            ),
+            *_by_class(
+                "A",
+                "ours_only",
+                "no_content",
+                {"n_events": 3, "support_rate": 0.0},
+                "sliding_window",
+            ),
+            *_by_class(
+                "B",
+                "ours_only",
+                "no_content",
+                {"n_events": 4, "support_rate": sliding_rate_b},
+                "sliding_window",
+            ),
+        ]
+    )
+
+
+def test_placeless_burst_statistics_count_both_classes_under_our_estimate():
+    result = stats.placeless_burst_statistics(_placeless(), ("A", "B"))
+    # 3 + 2 in fold A and 4 in fold B; the sliding window's estimate judges 7
+    assert result == {"n_events": 9}
+
+
+@pytest.mark.parametrize(
+    ("state_space_rate_b", "sliding_rate_b"), [(0.25, 0.0), (0.0, 0.25)]
+)
+def test_placeless_burst_statistics_refuse_a_supported_burst(
+    state_space_rate_b, sliding_rate_b
+):
+    # 1 of fold B's 4 informative place-less bursts, under either estimate
+    with pytest.raises(ValueError, match="no informative place-less burst"):
+        stats.placeless_burst_statistics(
+            _placeless(state_space_rate_b, sliding_rate_b), ("A", "B")
+        )
+
+
+def test_placeless_burst_statistics_ignore_a_fold_with_no_informative_burst():
+    # fold B's four bursts are not informative: no rate, which is no support
+    table = _placeless()
+    in_b = (table["fold"] == "B") & (table["estimator"] == "state_space")
+    table.loc[in_b & (table["measure"] == "n_events"), "value"] = 0.0
+    table.loc[in_b & (table["measure"] == "support_rate"), "value"] = np.nan
+    assert stats.placeless_burst_statistics(table, ("A", "B")) == {"n_events": 5}
+
+
 def test_lowest_estimator_agreement_is_over_folds():
     assert stats.lowest_estimator_agreement(HELDOUT) == 0.9
 

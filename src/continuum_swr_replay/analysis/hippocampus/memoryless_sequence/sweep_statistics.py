@@ -33,6 +33,7 @@ __all__ = [
     "no_replay_statistics",
     "part_recovery_statistics",
     "parts_by_level",
+    "placeless_burst_statistics",
     "pooled_heldout_rate",
     "sweep_by_duration",
     "sweep_grid_statistics",
@@ -791,6 +792,54 @@ def heldout_fold_statistics(
         "n_counted": sum(fold["n_counted"] for fold in pooled),
         "n_folds_with_support": sum(fold["rate"] > 0 for fold in pooled),
     }
+
+
+def placeless_burst_statistics(
+    heldout: pd.DataFrame, folds: Sequence[str]
+) -> dict[str, int]:
+    """Place-less bursts in the held-out check: none informative has held-out
+    support, under either content estimate, or the summary is refused.
+
+    A place-less burst is an event whose truth is ``"no_content"``, of either
+    class the state-space detector reported (``"ours_only"``, ``"shared"``).
+
+    Parameters
+    ----------
+    heldout : pd.DataFrame, shape (n_rows, n_columns)
+        The held-out summary (:func:`pooled_heldout_rate`).
+    folds : sequence of str
+        The folds.
+
+    Returns
+    -------
+    statistics : dict
+        - ``n_events``: the informative place-less burst events, summed over
+          the folds, under the state-space content estimate
+          (:func:`heldout_fold_statistics`).
+
+    Raises
+    ------
+    ValueError
+        If a fold's rate of held-out support among its informative place-less
+        bursts is above zero under either content estimate, or a row read is
+        missing (:func:`pooled_heldout_rate`).
+    """
+    by_estimator = {
+        estimator: heldout_fold_statistics(
+            heldout, folds, ("ours_only", "shared"), "no_content", estimator=estimator
+        )
+        for estimator in ("state_space", "sliding_window")
+    }
+    supported = {
+        estimator: statistics["n_folds_with_support"]
+        for estimator, statistics in by_estimator.items()
+    }
+    if any(supported.values()):
+        raise ValueError(
+            "held-out summary: expected no informative place-less burst with "
+            f"held-out support; folds with support, by content estimate: {supported}"
+        )
+    return {"n_events": by_estimator["state_space"]["n_events"]}
 
 
 def lowest_estimator_agreement(heldout: pd.DataFrame) -> float:
