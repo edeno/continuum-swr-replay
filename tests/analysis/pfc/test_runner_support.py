@@ -68,9 +68,9 @@ class TestReadSessionList:
 
     def test_it_refuses_a_malformed_line(self, tmp_path):
         path = tmp_path / "sessions.txt"
-        path.write_text("a_.nwb 01_r1 extra\n")
+        path.write_text("a_.nwb 01_r1\na_.nwb 01_r1 extra\n")
 
-        with pytest.raises(ValueError, match="expected"):
+        with pytest.raises(ValueError, match="sessions.txt:2: expected"):
             read_session_list(path)
 
     def test_it_refuses_a_file_naming_no_sessions(self, tmp_path):

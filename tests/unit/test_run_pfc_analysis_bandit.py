@@ -657,35 +657,6 @@ def _epoch_info(keys: list[tuple[str, str]]) -> pd.DataFrame:
 
 
 class TestSessionPartitionFile:
-    def test_a_partition_file_reads_as_session_keys_in_file_order(self, tmp_path):
-        path = tmp_path / "worker0.sessions"
-        path.write_text(
-            "# worker 0\n"
-            "chimi20200223_.nwb 02_r1\n"
-            "\n"
-            "j1620210710_.nwb,04_r2  # trailing comment\n"
-            "chimi20200223_.nwb 02_r1\n"  # a repeat must not be fit twice
-        )
-
-        assert runner.read_session_list(path) == [
-            ("chimi20200223_.nwb", "02_r1"),
-            ("j1620210710_.nwb", "04_r2"),
-        ]
-
-    def test_a_malformed_line_names_itself(self, tmp_path):
-        path = tmp_path / "bad.sessions"
-        path.write_text("chimi20200223_.nwb\n")
-
-        with pytest.raises(ValueError, match="bad.sessions:1"):
-            runner.read_session_list(path)
-
-    def test_an_empty_partition_file_is_an_error(self, tmp_path):
-        path = tmp_path / "empty.sessions"
-        path.write_text("# nothing here\n")
-
-        with pytest.raises(ValueError, match="names no sessions"):
-            runner.read_session_list(path)
-
     def test_only_the_named_sessions_are_fit(self, tmp_path):
         keys = [
             ("chimi20200223_.nwb", "02_r1"),

@@ -49,7 +49,6 @@ python run_pfc_analysis_bandit.py --brain_area mPFC --n_workers 1 \
     --gpu 2 --sessions worker0.sessions
 """
 
-import hashlib
 import json
 import logging
 import sys
@@ -114,6 +113,10 @@ from continuum_swr_replay.analysis.pfc.modulation import (  # noqa: E402
     THREE_CLASS_MODEL,
     curve_coefficients,
 )
+from continuum_swr_replay.analysis.pfc.runner_support import (  # noqa: E402
+    read_session_list,
+    session_seed,
+)
 from continuum_swr_replay.analysis.pfc.scoring import score_session  # noqa: E402
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     fit_provenance_path,
@@ -173,33 +176,6 @@ INFERENCE = "blocked_heldout_deviance"
 #: would read an asymptotic test of a model that was never fit unpenalised.
 RETIRED_STATISTIC_SUFFIXES = (": lr", ": pval", ": aic")
 RETIRED_STATISTIC_COLUMNS = ("min_aic_model", "min_aic_model_replay_split")
-
-
-def session_seed(stream: str, nwb_file_name: str, epoch_name: str) -> int:
-    """Per-session, per-stream seed derived from the session key.
-
-    Derived rather than counted, exactly as the matched control's own seed is:
-    a session refit on its own -- to repair one bundle, say -- draws the same
-    folds and the same null as the batch drew, and two sessions never share a
-    draw. The stream name keeps the fold split and the null draws independent
-    of each other and of the shipped control.
-
-    Parameters
-    ----------
-    stream : str
-        Which draw the seed is for, e.g. ``"folds"`` or ``"control_draws"``.
-    nwb_file_name : str
-        NWB file name, e.g. ``"wilbur20210329_.nwb"``.
-    epoch_name : str
-        Epoch name, e.g. ``"02_r1"``.
-
-    Returns
-    -------
-    int
-        The low 64 bits of ``sha256(f"{stream}|{nwb_file_name}|{epoch_name}")``.
-    """
-    key = f"{stream}|{nwb_file_name}|{epoch_name}".encode()
-    return int.from_bytes(hashlib.sha256(key).digest()[:8], "little")
 
 
 def modulation_path(
@@ -1213,48 +1189,6 @@ def get_command_line_arguments(argv: Sequence[str] | None = None) -> Namespace:
             "or drop --gpu and let each worker claim a free card of its own."
         )
     return args
-
-
-def read_session_list(path: Path) -> list[tuple[str, str]]:
-    """Session keys from a partition file, in file order.
-
-    Parameters
-    ----------
-    path : Path
-        One ``<nwb_file_name> <epoch_name>`` per line, comma or whitespace
-        separated. Blank lines and ``#`` comments are ignored.
-
-    Returns
-    -------
-    list of (str, str)
-        ``(nwb_file_name, epoch_name)`` pairs, duplicates removed, first
-        occurrence kept.
-
-    Raises
-    ------
-    ValueError
-        On a line that is not two fields, naming the line so the file can be
-        fixed rather than guessed at.
-    """
-    pairs: list[tuple[str, str]] = []
-    seen: set[tuple[str, str]] = set()
-    for number, raw in enumerate(path.read_text().splitlines(), start=1):
-        line = raw.split("#", 1)[0].strip()
-        if not line:
-            continue
-        fields = [field for field in line.replace(",", " ").split() if field]
-        if len(fields) != 2:
-            raise ValueError(
-                f"{path}:{number}: expected '<nwb_file_name> <epoch_name>', "
-                f"got {raw.strip()!r}"
-            )
-        key = (fields[0], fields[1])
-        if key not in seen:
-            seen.add(key)
-            pairs.append(key)
-    if not pairs:
-        raise ValueError(f"{path} names no sessions")
-    return pairs
 
 
 def _session_keys(epoch_info: pd.DataFrame) -> list[tuple[str, str]]:

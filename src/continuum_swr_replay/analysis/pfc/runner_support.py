@@ -2,7 +2,9 @@
 
 The marked-kernel and marked-model-family runners are two entry points into
 the same corpus: they select sessions the same way, seed their random streams
-the same way, certify a bundle on the same immobile at-well stop cohort,
+the same way (the canonical bundle runner, ``run_pfc_analysis_bandit.py``, reads
+its partition files and seeds its folds and null draws with the same two
+functions), certify a bundle on the same immobile at-well stop cohort,
 read a bundle's sidecar against its fit contract and remove a stale bundle the
 same way, and report the same peri-event window. Keeping one copy of those rules here is
 what makes two bundles comparable -- a second copy of ``session_seed`` that
