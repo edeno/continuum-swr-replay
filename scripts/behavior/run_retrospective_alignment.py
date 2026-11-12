@@ -362,12 +362,12 @@ def main(argv: Sequence[str] | None = None) -> None:
         diff_col = f"real_minus_shuffled_{metric}"
         if real_col not in out.columns:
             continue
-        real, diff = (
-            pd.to_numeric(out[column], errors="coerce").dropna()
+        real_summary, diff_summary = (
+            session_median_statistics(
+                pd.to_numeric(out[column], errors="coerce"), out["animal"]
+            )
             for column in (real_col, diff_col)
         )
-        real_summary = session_median_statistics(real, out.loc[real.index, "animal"])
-        diff_summary = session_median_statistics(diff, out.loc[diff.index, "animal"])
         logging.info(
             "  %-25s  real=%.3f  Δ vs shuffle=%+.3f  pos=%d/%d",
             metric,

@@ -771,8 +771,7 @@ def n_unpaired_triples(coefficients: pd.DataFrame) -> int:
 
 def _animal_summary(frame: pd.DataFrame, column: str) -> dict[str, float]:
     """``session_median_statistics`` of one column over the rows that have it."""
-    values = frame[column].dropna()
-    return session_median_statistics(values, frame.loc[values.index, "animal"])
+    return session_median_statistics(frame[column], frame["animal"])
 
 
 def _wide_by_estimator(coefficients: pd.DataFrame) -> pd.DataFrame:

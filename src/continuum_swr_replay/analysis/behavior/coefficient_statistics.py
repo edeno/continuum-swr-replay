@@ -157,9 +157,8 @@ def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
           below six sessions with a non-zero coefficient).
     """
     require_one_fit_per_session(fits)
-    known = fits.dropna(subset=[column])
-    values = known[column]
-    statistics = session_median_statistics(values, known["animal"])
+    values = fits[column]
+    statistics = session_median_statistics(values, fits["animal"])
     return {
         **statistics,
         **_exp_medians(statistics),
@@ -499,8 +498,7 @@ def aic_difference_statistics(
         median step favours it.
     """
     difference, animal = _paired_difference(child, parent, "aic", same)
-    difference = difference.dropna()
-    return session_median_statistics(difference, animal[difference.index])
+    return session_median_statistics(difference, animal)
 
 
 def separated_fraction(fits: pd.DataFrame) -> float:

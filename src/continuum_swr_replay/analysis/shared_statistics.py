@@ -89,15 +89,17 @@ def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str,
     Parameters
     ----------
     values : pd.Series, shape (n_sessions,)
-        One number per session, none missing. An infinite value is a value.
+        One number per session. A missing value is left out: its session
+        counts in nothing. An infinite value is a value.
     animal : pd.Series, shape (n_sessions,)
         Each session's animal, indexed as ``values``. An animal (a category of
-        a categorical) with no session is not an animal of the summary.
+        a categorical) with no session that has a value is not an animal of
+        the summary.
 
     Returns
     -------
     statistics : dict
-        - ``n_sessions``: the sessions.
+        - ``n_sessions``: the sessions with a value.
         - ``median``: the median over sessions.
         - ``n_positive``, ``n_negative``: sessions above and below zero.
         - ``positive_fraction``, ``negative_fraction``: their shares of the
@@ -115,26 +117,21 @@ def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str,
     ------
     ValueError
         If ``animal`` is not indexed as ``values`` (a session without an
-        animal would be left out of the animals' medians), or a value is
-        missing (it would count as a session that is neither positive nor
-        negative).
+        animal would be left out of the animals' medians).
     """
     if not values.index.equals(animal.index):
         raise ValueError("values and animal are not indexed alike")
-    if values.isna().any():
-        raise ValueError(
-            f"{int(values.isna().sum())} of {len(values)} values are missing: "
-            "drop them before summarizing"
-        )
-    median = float(values.median())
-    per_animal = values.groupby(animal, observed=True).median()
+    has_value = values.notna()
+    known = values[has_value]
+    median = float(known.median())
+    per_animal = known.groupby(animal[has_value], observed=True).median()
     return {
-        "n_sessions": len(values),
+        "n_sessions": len(known),
         "median": median,
-        "n_positive": int((values > 0).sum()),
-        "n_negative": int((values < 0).sum()),
-        "positive_fraction": float((values > 0).mean()),
-        "negative_fraction": float((values < 0).mean()),
+        "n_positive": int((known > 0).sum()),
+        "n_negative": int((known < 0).sum()),
+        "positive_fraction": float((known > 0).mean()),
+        "negative_fraction": float((known < 0).mean()),
         "n_animals": len(per_animal),
         "animal_median": float(per_animal.median()),
         "n_animals_positive": int((per_animal > 0).sum()),

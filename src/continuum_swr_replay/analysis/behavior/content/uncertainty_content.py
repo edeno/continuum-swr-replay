@@ -667,8 +667,7 @@ def summarize_mu_coefficients(mu_results: pd.DataFrame) -> dict[str, pd.DataFram
             .assign(cohort=cohort)
         )
         summaries.append(animal)
-        known = subset[coefficient].dropna()
-        summary = session_median_statistics(known, subset.loc[known.index, "animal"])
+        summary = session_median_statistics(subset[coefficient], subset["animal"])
         overall_rows.append(
             {
                 "cohort": cohort,
@@ -869,9 +868,7 @@ def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
             values = pop_df[coef_col].dropna()
             if len(values) < 2:
                 continue
-            summary = session_median_statistics(
-                values, pop_df.loc[values.index, "animal"]
-            )
+            summary = session_median_statistics(pop_df[coef_col], pop_df["animal"])
             rows.append(
                 {
                     "population": population,

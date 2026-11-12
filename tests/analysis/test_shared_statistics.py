@@ -175,11 +175,26 @@ def test_the_animals_must_be_indexed_as_the_values():
         )
 
 
-def test_a_missing_value_is_refused():
-    # Counted, it would be a session that is neither positive nor negative.
-    values = pd.Series([1.0, np.nan, -3.0])
-    with pytest.raises(ValueError, match="missing"):
-        stats.session_median_statistics(values, pd.Series(["a", "a", "b"]))
+def test_a_missing_value_is_left_out_and_counts_in_nothing():
+    # Animal c's only session is missing, so c is not an animal; a's missing
+    # session is not a session. Counted, a missing value would be a session that
+    # is neither positive nor negative, and in a's median it would be skipped
+    # while c would count with a NaN median.
+    values = pd.Series([1.0, np.nan, 2.0, -3.0, np.nan], index=[10, 11, 12, 13, 14])
+    animal = pd.Series(["a", "a", "a", "b", "c"], index=values.index)
+    assert stats.session_median_statistics(values, animal) == {
+        "n_sessions": 3,
+        "median": 1.0,
+        "n_positive": 2,
+        "n_negative": 1,
+        "positive_fraction": pytest.approx(2 / 3),
+        "negative_fraction": pytest.approx(1 / 3),
+        "n_animals": 2,
+        "animal_median": -0.75,
+        "n_animals_positive": 1,
+        "n_animals_negative": 1,
+        "n_animals_same_sign": 1,
+    }
 
 
 def test_an_animal_without_a_session_is_not_an_animal_of_the_summary():
