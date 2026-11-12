@@ -14,6 +14,9 @@ negative means the child rung is better. Which sessions of a rung pair can be
 compared at all is
 :func:`~continuum_swr_replay.analysis.behavior.fit_comparability.why_not_comparable`,
 which both use.
+
+One rung's own fit quality over sessions (its AIC, BIC, log-likelihood or
+pseudo-R²) is :func:`fit_metric_statistics`.
 """
 
 from __future__ import annotations
@@ -52,6 +55,32 @@ METADATA_COLUMNS = (
     "time_clock",
     "stop_cohort",
 )
+
+
+def fit_metric_statistics(fits: pd.DataFrame, metric: str) -> dict[str, float]:
+    """One fit metric of a rung over its sessions: median and quartiles.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame, shape (n_sessions, n_columns)
+        One rung's per-session fits, carrying ``metric``.
+    metric : str
+        The column, e.g. ``"aic"``, ``"llf"`` or ``"pseudo_r2"``.
+
+    Returns
+    -------
+    dict
+        ``n_sessions`` (the sessions with a value), ``median``,
+        ``quartile_25`` and ``quartile_75`` (pandas' linear interpolation)
+        over the sessions whose value is not NaN; NaN when there is none.
+    """
+    values = fits[metric].dropna()
+    return {
+        "n_sessions": len(values),
+        "median": values.median(),
+        "quartile_25": values.quantile(0.25),
+        "quartile_75": values.quantile(0.75),
+    }
 
 
 def compare_nested_models(

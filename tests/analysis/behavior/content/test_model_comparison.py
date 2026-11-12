@@ -15,8 +15,36 @@ import pytest
 
 from continuum_swr_replay.analysis.behavior.content.model_comparison import (
     compare_nested_models,
+    fit_metric_statistics,
     summarize_comparison,
 )
+
+
+def test_a_fit_metric_is_summarized_over_the_sessions_that_have_it():
+    """Four values and a NaN: the median of 1, 2, 4, 10 is 3 (the mean is 4.25),
+    and the linear quartiles are 1.75 and 5.5."""
+    fits = pd.DataFrame({"pseudo_r2": [10.0, 1.0, np.nan, 4.0, 2.0]})
+
+    assert fit_metric_statistics(fits, "pseudo_r2") == {
+        "n_sessions": 4,
+        "median": 3.0,
+        "quartile_25": 1.75,
+        "quartile_75": 5.5,
+    }
+
+
+def test_a_fit_metric_of_an_odd_count_is_its_middle_value():
+    stats = fit_metric_statistics(pd.DataFrame({"aic": [5.0, 1.0, 3.0]}), "aic")
+    assert stats["median"] == 3.0
+    assert (stats["quartile_25"], stats["quartile_75"]) == (2.0, 4.0)
+
+
+def test_a_fit_metric_no_session_has_is_nan():
+    stats = fit_metric_statistics(pd.DataFrame({"llf": [np.nan, np.nan]}), "llf")
+    assert stats["n_sessions"] == 0
+    assert np.isnan(stats["median"])
+    assert np.isnan(stats["quartile_25"])
+    assert np.isnan(stats["quartile_75"])
 
 
 def _make_comparison_df(daic_values):

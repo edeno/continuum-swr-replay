@@ -107,6 +107,7 @@ from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
     scale_label,
 )
 from continuum_swr_replay.analysis.behavior.content.model_comparison import (
+    fit_metric_statistics,
     run_full_hierarchy_comparison,
 )
 from continuum_swr_replay.analysis.behavior.content.session_fits import (
@@ -359,12 +360,12 @@ def print_model_results(
     print(f"\nFit quality (n={len(mdf)} sessions; {scale_label(estimator)}):")
     for metric in ["aic", "bic", "llf"]:
         if metric in mdf.columns:
-            vals = mdf[metric].dropna()
-            if len(vals) > 0:
-                print(f"  {metric}: median={vals.median():.2f}")
+            stats = fit_metric_statistics(mdf, metric)
+            if stats["n_sessions"] > 0:
+                print(f"  {metric}: median={stats['median']:.2f}")
     if "pseudo_r2" in mdf.columns:
-        vals = mdf["pseudo_r2"].dropna()
-        if len(vals) > 0:
+        stats = fit_metric_statistics(mdf, "pseudo_r2")
+        if stats["n_sessions"] > 0:
             # McFadden's ratio is not comparable across estimators: the DM's
             # llf and llf_null both carry the multinomial constant that a
             # conditional likelihood omits, and its null refits the
@@ -375,7 +376,7 @@ def print_model_results(
                 if estimator == "dirichlet_multinomial"
                 else ""
             )
-            print(f"  pseudo_r2: median={vals.median():.3f}{note}")
+            print(f"  pseudo_r2: median={stats['median']:.3f}{note}")
 
     if not predictors:
         print("  (null model — uniform allocation)")

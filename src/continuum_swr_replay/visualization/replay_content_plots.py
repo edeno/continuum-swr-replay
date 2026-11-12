@@ -14,6 +14,9 @@ import seaborn as sns
 from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
     coefficient_family_statistics,
 )
+from continuum_swr_replay.analysis.behavior.content.model_comparison import (
+    fit_metric_statistics,
+)
 from continuum_swr_replay.analysis.behavior.model_specs import (
     MODEL_HIERARCHY,
 )
@@ -196,6 +199,10 @@ def plot_pseudo_r2_progression(
 ) -> plt.Figure | None:
     """Plot pseudo-R² progression across the model hierarchy.
 
+    Each rung's median over sessions, with its interquartile band
+    (:func:`~continuum_swr_replay.analysis.behavior.content.model_comparison.fit_metric_statistics`,
+    which the content runner prints too).
+
     Parameters
     ----------
     all_results : pd.DataFrame
@@ -214,19 +221,13 @@ def plot_pseudo_r2_progression(
         fig = None
 
     model_names = [m for m in MODEL_HIERARCHY if (all_results["model"] == m).any()]
-    medians = []
-    q25s = []
-    q75s = []
-
-    for m in model_names:
-        vals = all_results.loc[all_results["model"] == m, "pseudo_r2"].dropna()
-        medians.append(vals.median())
-        q25s.append(vals.quantile(0.25))
-        q75s.append(vals.quantile(0.75))
-
-    medians = np.array(medians)
-    q25s = np.array(q25s)
-    q75s = np.array(q75s)
+    statistics = [
+        fit_metric_statistics(all_results[all_results["model"] == m], "pseudo_r2")
+        for m in model_names
+    ]
+    medians = np.array([s["median"] for s in statistics])
+    q25s = np.array([s["quartile_25"] for s in statistics])
+    q75s = np.array([s["quartile_75"] for s in statistics])
 
     ax.fill_between(
         range(len(model_names)), q25s, q75s, alpha=0.3, color=COLORS["Non-Local"]
