@@ -16,20 +16,8 @@ The first test's `ALLOWED` table is the current exception list, and it only
 shrinks. One entry is left: `exploratory/_content_cohort_control.py`, which runs
 `behavior/content/fit_swr_contrast_content.py` with its cohort rule bypassed.
 
-The detection-comparison and memoryless-sweep families once imported each other; their
-shared code is now in the package (2026-10-25): the inventory run's roster, grid and table
-layout in `analysis/inventory_comparison/inventory_run.py`, the event features run's tables
-and inputs in `analysis/inventory_comparison/feature_run.py` (its populations in
-`populations.py`), a decode's marks (`decode_marks`) in `analysis/hippocampus/detection_inputs.py`,
-the example figures' draw, inputs, recomputation and figure in
-`visualization/inventory_examples.py`, the sweep's simulated recording and detector runs in
-`analysis/hippocampus/memoryless_sequence/sweep.py`, the controls' conditions in
-`memoryless_sequence/sweep_controls.py`, the comparison figure's simulation in
-`memoryless_sequence/comparison_simulation.py`, the epoch selection in
-`runs/cli.py` (`select_analysed_epochs`), the device choice and XLA flags in
-`runs/device.py`, the sweeps' commit in `runs/provenance.py` (`described_commit`) and the
-remote distance in `analysis/constants.py` (`REMOTE_CM`). A runner that computes on the CPU
-says so first thing in its `main` (`default_jax_platforms("cpu")`), not when imported.
+A runner that computes on the CPU says so first thing in its `main`
+(`default_jax_platforms("cpu")`), not when imported.
 
 The exploratory scripts that unit tests pin (`_verify_harmonization_parity.py`,
 `_statescript_contingency.py`, `_augment_data_over_time.py`,
@@ -218,10 +206,10 @@ them importable.
 - `fetch_spatial_bandit_behavior.sh` — pull the canonical SpatialBanditTask behavior CSVs.
 - `build_qvals_table.py` — build the per-stop behavioral-model covariate table
   (`qvals_table`) from the shared DataJoint RL-model and trial-timing schemas.
-- `run_retrospective_alignment.py` (was `pfc/run_stage5b_retrospective.py`, "Stage 5B") —
+- `run_retrospective_alignment.py` ("Stage 5B") —
   does content during a stop match the arm visited next, against a visit-context shuffle
   (Part 3, the events relate to behavior). `at_well` only, because its metrics need a current arm.
-- `run_stay_leave.py` (was `pfc/run_stage6_learning.py`, "Stage 6") — content × reward
+- `run_stay_leave.py` ("Stage 6") — content × reward
   outcome → stay or leave (Part 3); `--stop-cohort all_stops` writes the `_allstops`
   sensitivity bundle. Output files keep their `stage5b_*` / `stage6_*` names.
 
@@ -266,9 +254,7 @@ them importable.
   marked pending the Phase 2 pilot checks. Built and tested; not yet run on a real features run.
 - `archive/` — retired figure scripts (not linted; kept for provenance).
 
-## `checks/` — parity, audits, checks and doc writers (`workflows/` holds `run_refits.py`)
-- `_report.py` — not a script: the run's command line (`_invocation`) and the markdown
-  table (`_md`) that several QA and PFC reports share, imported as `scripts.checks._report`.
+## `workflows/` — runners that run other scripts
 - `run_refits.py` — reruns the CPU fits for Part 3 (the events relate to behavior) and the figures that read them,
   in dependency order. Each run is pinned to its own CPUs from `--cpus` (default: all this
   process may use), and OMP/MKL/OpenBLAS/numba threads are capped per run. Runs are named
@@ -277,7 +263,7 @@ them importable.
   the selection; `--dry-run` lists the runs under their question. The uncited sensitivity runs
   are opt-in (`--include-optional`, or name them in full). One log and JSON record
   per run (a "blocked" record when a dependency failed) go under `logs/refits_<time>/`, then
-  `check_fit_provenance.py` checks every artifact the runs wrote. Set
+  `checks/check_fit_provenance.py` checks every artifact the runs wrote. Set
   `CSR_PROCESSED_DATA_DIR` to read and write another data root. `--with-tables` first
   rebuilds the tables the selected runs read, as `tables.*` runs in the order their code
   requires: `prepare_replay_content_data.py --stop-only` → `build_qvals_table.py --write` →
@@ -287,6 +273,10 @@ them importable.
   detection or the decodes (`--dry-run` lists them in order as prerequisites, and a
   preflight checks they are on disk before a table run), the Part 1 and Part 2 checks or the PFC unit
   GLM.
+
+## `checks/` — parity, audits, checks and doc writers
+- `_report.py` — not a script: the run's command line (`_invocation`) and the markdown
+  table (`_md`) that several QA and PFC reports share, imported as `scripts.checks._report`.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`.
 - `_memoryless_reference.py` — not a script: the Widloski & Foster reference's sorted-cell
@@ -508,88 +498,7 @@ audited pipeline; outputs go to `.claude/research/*_outputs/`. May be stale. The
 exceptions are the five that unit tests pin (listed at the top of this file), which
 must keep passing their tests.
 
-## Moved scripts (2026-11)
+## Moved scripts
 
-`rate/`, `content/` and `coupling/` moved under `behavior/`, and `qa/` split
-into `workflows/` (runners that run other scripts) and `checks/` (audits,
-parity checks and doc writers). Nothing is left at the old paths.
-
-| Old path | New path |
-|---|---|
-| `scripts/content/analyze_content_occupancy.py` (removed: moved) | `scripts/behavior/content/analyze_content_occupancy.py` |
-| `scripts/content/analyze_uncertainty_content.py` (removed: moved) | `scripts/behavior/content/analyze_uncertainty_content.py` |
-| `scripts/content/compare_content_estimators.py` (removed: moved) | `scripts/behavior/content/compare_content_estimators.py` |
-| `scripts/content/compare_event_source_models.py` (removed: moved) | `scripts/behavior/content/compare_event_source_models.py` |
-| `scripts/content/fit_replay_content_models.py` (removed: moved) | `scripts/behavior/content/fit_replay_content_models.py` |
-| `scripts/content/fit_swr_contrast_content.py` (removed: moved) | `scripts/behavior/content/fit_swr_contrast_content.py` |
-| `scripts/content/generate_replay_content_figures.py` (removed: moved) | `scripts/behavior/content/generate_replay_content_figures.py` |
-| `scripts/content/quantify_swr_overlap_geometry.py` (removed: moved) | `scripts/behavior/content/quantify_swr_overlap_geometry.py` |
-| `scripts/coupling/fit_swr_power_model.py` (removed: moved) | `scripts/behavior/coupling/fit_swr_power_model.py` |
-| `scripts/qa/_memoryless_reference.py` (removed: moved) | `scripts/checks/_memoryless_reference.py` |
-| `scripts/qa/_report.py` (removed: moved) | `scripts/checks/_report.py` |
-| `scripts/qa/audit_event_patch_fraction.py` (removed: moved) | `scripts/checks/audit_event_patch_fraction.py` |
-| `scripts/qa/audit_stop_table_reward_history.py` (removed: moved) | `scripts/checks/audit_stop_table_reward_history.py` |
-| `scripts/qa/check_data_availability.py` (removed: moved) | `scripts/checks/check_data_availability.py` |
-| `scripts/qa/check_fit_provenance.py` (removed: moved) | `scripts/checks/check_fit_provenance.py` |
-| `scripts/qa/compare_memoryless_to_reference.py` (removed: moved) | `scripts/checks/compare_memoryless_to_reference.py` |
-| `scripts/qa/compare_to_golden_baseline.py` (removed: moved) | `scripts/checks/compare_to_golden_baseline.py` |
-| `scripts/qa/compute_hpc_raw_stats.py` (removed: moved) | `scripts/checks/compute_hpc_raw_stats.py` |
-| `scripts/qa/diagnose_trial_detection.py` (removed: moved) | `scripts/checks/diagnose_trial_detection.py` |
-| `scripts/qa/freeze_regression_baseline.py` (removed: moved) | `scripts/checks/freeze_regression_baseline.py` |
-| `scripts/qa/mutation_check.py` (removed: moved) | `scripts/checks/mutation_check.py` |
-| `scripts/qa/run_quality_metrics.py` (removed: moved) | `scripts/checks/run_quality_metrics.py` |
-| `scripts/qa/run_refits.py` (removed: moved) | `scripts/workflows/run_refits.py` |
-| `scripts/qa/summarize_cohort_audits.py` (removed: moved) | `scripts/checks/summarize_cohort_audits.py` |
-| `scripts/qa/summarize_stage6_fdr.py` (removed: moved) | `scripts/checks/summarize_stage6_fdr.py` |
-| `scripts/qa/table_parity.py` (removed: moved) | `scripts/checks/table_parity.py` |
-| `scripts/qa/write_epoch_register_doc.py` (removed: moved) | `scripts/checks/write_epoch_register_doc.py` |
-| `scripts/qa/write_pipeline_map.py` (removed: moved) | `scripts/checks/write_pipeline_map.py` |
-| `scripts/rate/fit_cross_history_rate.py` (removed: moved) | `scripts/behavior/rate/fit_cross_history_rate.py` |
-| `scripts/rate/fit_cross_history_ridge_cv.py` (removed: moved) | `scripts/behavior/rate/fit_cross_history_ridge_cv.py` |
-| `scripts/rate/fit_duration_aware_history_rate.py` (removed: moved) | `scripts/behavior/rate/fit_duration_aware_history_rate.py` |
-| `scripts/rate/fit_per_bin_rate_models.py` (removed: moved) | `scripts/behavior/rate/fit_per_bin_rate_models.py` |
-| `scripts/rate/fit_per_stop_rate_models.py` (removed: moved) | `scripts/behavior/rate/fit_per_stop_rate_models.py` |
-| `scripts/rate/fit_swr_contrast_rate.py` (removed: moved) | `scripts/behavior/rate/fit_swr_contrast_rate.py` |
-| `scripts/rate/fit_uncertainty_rate.py` (removed: moved) | `scripts/behavior/rate/fit_uncertainty_rate.py` |
-| `scripts/rate/plot_model_checking.py` (removed: moved) | `scripts/behavior/rate/plot_model_checking.py` |
-| `scripts/rate/plot_per_bin_rate_models.py` (removed: moved) | `scripts/behavior/rate/plot_per_bin_rate_models.py` |
-| `scripts/rate/plot_per_bin_rate_summary.py` (removed: moved) | `scripts/behavior/rate/plot_per_bin_rate_summary.py` |
-| `scripts/rate/plot_uncertainty_rate.py` (removed: moved) | `scripts/behavior/rate/plot_uncertainty_rate.py` |
-
-## Moved scripts (2026-10)
-
-`scripts/` was regrouped by pipeline on 2026-10-20. Nothing is left at the old paths;
-outputs written before the move still record the old path in their provenance.
-An old path is marked "(removed: moved)" so the doc-path test does not look for it.
-
-| Old path | New path |
-|---|---|
-| `scripts/decoding/run_swr_detection.py` (removed: moved) | `scripts/detection/run_swr_detection.py` |
-| `scripts/decoding/run_carey_detection.py` (removed: moved) | `scripts/detection/run_carey_detection.py` |
-| `scripts/decoding/run_memoryless_detection.py` (removed: moved) | `scripts/detection/run_memoryless_detection.py` |
-| `scripts/decoding/run_artifact_detection.py` (removed: moved) | `scripts/detection/run_artifact_detection.py` |
-| `scripts/qa/run_inventory_comparison.py` (removed: moved) | `scripts/detection/run_inventory_comparison.py` |
-| `scripts/qa/report_inventory_comparison.py` (removed: moved) | `scripts/detection/report_inventory_comparison.py` |
-| `scripts/qa/run_event_features.py` (removed: moved) | `scripts/detection/run_event_features.py` |
-| `scripts/qa/report_event_features.py` (removed: moved) | `scripts/detection/report_event_features.py` |
-| `scripts/qa/run_state_evidence.py` (removed: moved) | `scripts/detection/run_state_evidence.py` |
-| `scripts/qa/sweep_memoryless_detection.py` (removed: moved) | `scripts/detection/sweep_memoryless_detection.py` |
-| `scripts/qa/sweep_memoryless_controls.py` (removed: moved) | `scripts/detection/sweep_memoryless_controls.py` |
-| `scripts/qa/sweep_memoryless_heldout.py` (removed: moved) | `scripts/detection/sweep_memoryless_heldout.py` |
-| `scripts/qa/analyze_event_spike_evidence.py` (removed: moved) | `scripts/detection/analyze_event_spike_evidence.py` |
-| `scripts/decoding/prepare_replay_content_data.py` (removed: moved) | `scripts/tables/prepare_replay_content_data.py` |
-| `scripts/decoding/prepare_contfrag_replay_content_data.py` (removed: moved) | `scripts/tables/prepare_contfrag_replay_content_data.py` |
-| `scripts/decoding/regenerate_stop_table.py` (removed: moved) | `scripts/tables/regenerate_stop_table.py` |
-| `scripts/rate/fit_swr_power_model.py` (removed: moved) | `scripts/behavior/coupling/fit_swr_power_model.py` |
-| `scripts/decoding/build_timebin_tables.py` (removed: moved) | `scripts/tables/build_timebin_tables.py` |
-| `scripts/decoding/assemble_replay_content_shards.py` (removed: moved) | `scripts/tables/assemble_replay_content_shards.py` |
-| `scripts/decoding/assemble_contfrag_shards.py` (removed: moved) | `scripts/tables/assemble_contfrag_shards.py` |
-| `scripts/decoding/convert_tables_to_parquet.py` (removed: moved) | `scripts/tables/convert_tables_to_parquet.py` |
-| `scripts/decoding/write_regeneration_manifest.py` (removed: moved) | `scripts/tables/write_regeneration_manifest.py` |
-| `scripts/decoding/refresh_contfrag_behavioral_covariates.py` (removed: moved) | `scripts/tables/refresh_contfrag_behavioral_covariates.py` |
-| `scripts/qa/compare_pfc_cohorts.py` (removed: moved) | `scripts/pfc/compare_pfc_cohorts.py` |
-| `scripts/qa/compare_pfc_fitters.py` (removed: moved) | `scripts/pfc/compare_pfc_fitters.py` |
-| `scripts/qa/check_pfc_ridge_lambda0.py` (removed: moved) | `scripts/pfc/check_pfc_ridge_lambda0.py` |
-| `scripts/qa/measure_pfc_null_geometry.py` (removed: moved) | `scripts/pfc/measure_pfc_null_geometry.py` |
-| `scripts/qa/diagnose_pfc_event_definition.py` (removed: moved) | `scripts/pfc/diagnose_pfc_event_definition.py` |
-| `scripts/qa/memoryless_reference.py` (removed: moved) | `scripts/checks/_memoryless_reference.py` (2026-10-25: a module, not a script) |
+Where each moved script went (2026-10 and 2026-11) is recorded in
+[../docs/history/2026-module-moves.md](../docs/history/2026-module-moves.md).

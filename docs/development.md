@@ -103,6 +103,7 @@ paper/                     # The manuscript — see paper/README.md
 Makefile                   # Common tasks: make help
 docs/                      # Published reference — see docs/README.md for the doc-type→home scheme
 ├── design/               #   scientific/methodological design specs (human-discoverable)
+├── history/              #   where moved code and data went
 └── known_issues/
 .claude/docs/              # Agent-process docs (not scientific record)
 ├── plans/                #   phased implementation plans
@@ -113,7 +114,8 @@ tests/                     # pytest suite — see tests/README.md
 
 > Documentation homes are indexed in [docs/README.md](README.md): published/scientific
 > docs live in `docs/` (incl. design specs in `docs/design/`); agent-process/scratch under `.claude/`.
-> The import layering rules and the 2026-10 old→new module map are in [docs/README.md](README.md) ("Code layout").
+> The import layering rules are in [docs/README.md](README.md) ("Code layout"); where moved
+> modules and scripts went is in [docs/history/2026-module-moves.md](history/2026-module-moves.md).
 > **All model ladders (rate, content, is_swr-contrast) are defined in one place —
 > `src/continuum_swr_replay/analysis/behavior/model_specs.py`** (the single source of truth;
 > `docs/models_table.md` mirrors it, its rung sets enforced by
