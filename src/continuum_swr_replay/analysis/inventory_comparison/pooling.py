@@ -8,10 +8,13 @@ where the comparison was unavailable is not summed; it is listed instead
 Every per-animal table of the inventory comparison's report
 (``scripts/detection/report_inventory_comparison.py``) and of the event
 features report (``scripts/detection/report_event_features.py``) is pooled by
-:func:`pool_sessions`. Two of them are built here whole, from the run's tables
-(:func:`session_tables`), because ``nonlocal_comparison.left_out_statistics``
-computes them too: each detector's counts (:func:`counts_by_animal`, the
-non-local detector's exposure) and the cells (:func:`cells_by_animal`).
+:func:`pool_sessions`. Three of them are built here whole, because the events
+summary reads them: from the run's tables (:func:`session_tables`), which
+``nonlocal_comparison.left_out_statistics`` computes too, each detector's
+counts (:func:`counts_by_animal`, the non-local detector's exposure) and the
+cells (:func:`cells_by_animal`); and the directional agreement
+(:func:`directional_by_animal`), which ``nonlocal_comparison`` checks its
+memberships against.
 """
 
 from __future__ import annotations
@@ -264,3 +267,30 @@ def cells_by_animal(by_session: pd.DataFrame) -> pd.DataFrame:
         sums=["n_events", *(f"n_{m}" for m in MEMBERSHIPS)],
         available=by_session.available,
     )
+
+
+DIRECTIONAL_SUMS = (
+    "shared_exposure_s",
+    "n_source_events",
+    "n_eligible",
+    "n_excluded",
+    "n_matched",
+)
+"""The directional table's columns an animal sums (:func:`directional_by_animal`)."""
+
+
+def directional_by_animal(
+    directional: pd.DataFrame, by: Sequence[str] = ()
+) -> pd.DataFrame:
+    """Directional agreement pooled per animal and ordered pair.
+
+    ``proportion_matched`` is the summed ``n_matched`` over the summed
+    ``n_eligible`` of the sessions whose pair was available.
+    """
+    pooled = pool_sessions(
+        directional,
+        by=[*by, "source_detector", "target_detector"],
+        sums=DIRECTIONAL_SUMS,
+        available=directional.available,
+    )
+    return pooled.assign(proportion_matched=ratio(pooled.n_matched, pooled.n_eligible))

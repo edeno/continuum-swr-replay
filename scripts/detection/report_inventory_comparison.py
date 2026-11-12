@@ -55,6 +55,7 @@ from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
 from continuum_swr_replay.analysis.inventory_comparison.pooling import (  # noqa: E402
     cells_by_animal,
     counts_by_animal,
+    directional_by_animal,
     pool_sessions,
     ratio,
     session_names,
@@ -366,32 +367,6 @@ def _distribution(
     if frame.empty:
         return pd.DataFrame(columns=[*keys, *named])
     return frame.groupby(list(keys)).agg(**named).reset_index()
-
-
-DIRECTIONAL_SUMS = (
-    "shared_exposure_s",
-    "n_source_events",
-    "n_eligible",
-    "n_excluded",
-    "n_matched",
-)
-
-
-def directional_by_animal(
-    directional: pd.DataFrame, by: Sequence[str] = ()
-) -> pd.DataFrame:
-    """Directional agreement pooled per animal and ordered pair.
-
-    ``proportion_matched`` is the summed ``n_matched`` over the summed
-    ``n_eligible`` of the sessions whose pair was available.
-    """
-    pooled = pool_sessions(
-        directional,
-        by=[*by, "source_detector", "target_detector"],
-        sums=DIRECTIONAL_SUMS,
-        available=directional.available,
-    )
-    return pooled.assign(proportion_matched=ratio(pooled.n_matched, pooled.n_eligible))
 
 
 COVERED_FRACTIONS = (0.5, 0.9)

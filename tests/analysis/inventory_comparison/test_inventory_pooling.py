@@ -213,3 +213,56 @@ class TestUnknownMembership:
 
         with pytest.raises(ValueError, match="are not"):
             pooling.cells_by_session(cells, availability, self.SOURCES)
+
+
+class TestDirectionalByAnimal:
+    """An animal's directional agreement pools its sessions' counts."""
+
+    TWO_SESSIONS = [
+        # 9 of 10 and 9 of 90: the counts pool to 18 of 100, the proportions
+        # average to 0.5
+        session("02_r1", n_source_events=10, n_eligible=10, n_matched=9),
+        session("04_r2", n_source_events=95, n_eligible=90, n_excluded=5, n_matched=9),
+    ]
+    UNAVAILABLE = session(
+        # counts a flagged session should never carry, so leaving it out shows
+        "06_r3",
+        available=False,
+        n_source_events=50,
+        n_eligible=50,
+        n_matched=50,
+    )
+
+    @staticmethod
+    def directional(records: list[dict]) -> pd.DataFrame:
+        return rows(
+            "directional",
+            [
+                {
+                    "source_detector": "state_space",
+                    "target_detector": "kay",
+                    "proportion_matched": record["n_matched"] / record["n_eligible"],
+                    **record,
+                }
+                for record in records
+            ],
+        )
+
+    def test_by_summing_counts_not_averaging_proportions(self):
+        pooled = pooling.directional_by_animal(self.directional(self.TWO_SESSIONS))
+
+        row = pooled.iloc[0]
+        assert (row.n_sessions, row.n_eligible, row.n_matched) == (2, 100, 18)
+        assert row.n_excluded == 5
+        assert row.proportion_matched == pytest.approx(0.18)
+        assert np.mean([9 / 10, 9 / 90]) == pytest.approx(0.5)
+
+    def test_an_unavailable_session_is_left_out_and_listed(self):
+        pooled = pooling.directional_by_animal(
+            self.directional([*self.TWO_SESSIONS, self.UNAVAILABLE])
+        )
+
+        row = pooled.iloc[0]
+        assert (row.n_sessions, row.n_eligible, row.n_matched) == (2, 100, 18)
+        assert row.proportion_matched == pytest.approx(0.18)
+        assert row.unavailable_sessions == "sim20200101_06_r3"
