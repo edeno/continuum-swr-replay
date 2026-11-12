@@ -333,7 +333,7 @@ def state_fraction_values(sessions: pd.DataFrame, source: str) -> list[Value]:
             f"state_fraction_{movement}_{_STATE_WORDS[state]}",
             fractions.loc[movement, state],
             "fraction",
-            "pct",
+            "pct1",
             f"median over sessions of each session's mean {state} over its "
             f"{where[movement]} outside excluded time, sessions pooled",
         )

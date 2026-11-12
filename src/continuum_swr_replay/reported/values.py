@@ -39,7 +39,7 @@ question's (:mod:`~continuum_swr_replay.reported.questions`)."""
 KINDS = ("count", "fraction", "quantity")
 """A count is exact; a fraction is a share in [0, 1]; a quantity has a unit."""
 
-STYLES = ("count", "pct", "pctnum", "sig2", "sig2s", "int", "dec2", "pval")
+STYLES = ("count", "pct", "pct1", "pctnum", "sig2", "sig2s", "int", "dec2", "pval")
 """How a value is printed (:mod:`continuum_swr_replay.reported.formatting`)."""
 
 _KEY = re.compile(r"[a-z]+(_[a-z]+)*")

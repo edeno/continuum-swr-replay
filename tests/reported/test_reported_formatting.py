@@ -41,6 +41,10 @@ def _value(x: float, kind: str = "quantity", style: str = "sig2") -> Value:
         (0.564, "fraction", "pct", "56 %"),
         (0.005, "fraction", "pct", "1 %"),
         (1.0, "fraction", "pct", "100 %"),
+        # pct1: a percent to one decimal; a half rounds up
+        (0.004, "fraction", "pct1", "0.4 %"),
+        (0.0125, "fraction", "pct1", "1.3 %"),
+        (0.78, "fraction", "pct1", "78.0 %"),
         # pctnum: the same number without the sign
         (0.47, "fraction", "pctnum", "47"),
         # int: a whole number; a half rounds away from zero
@@ -86,6 +90,7 @@ def test_each_style_prints_by_its_rule(x, kind, style, text):
     [
         (75675, "count", "count", "75{,}675"),
         (0.57, "fraction", "pct", "57"),
+        (0.004, "fraction", "pct1", "0.4"),
         (-0.071, "quantity", "sig2s", "\\ensuremath{-}0.071"),
         (-0.071, "quantity", "dec2", "\\ensuremath{-}0.07"),
         (1.1e-11, "quantity", "pval", "\\ensuremath{1.1\\times10^{-11}}"),
@@ -107,6 +112,7 @@ def test_a_marker_s_style_replaces_the_value_s_own():
     [
         (12, "count", "pct", "prints fractions"),
         (2.5, "quantity", "pctnum", "prints fractions"),
+        (2.5, "quantity", "pct1", "prints fractions"),
         (2.5, "quantity", "count", "needs a whole number"),
     ],
 )

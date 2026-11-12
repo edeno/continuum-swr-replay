@@ -2,6 +2,8 @@ r"""How a reported value is printed: the project's only rounding rules.
 
 - ``count``: an exact whole number with thousands separators (``75,675``).
 - ``pct``: a fraction as a whole percent with its sign (``57 %``).
+- ``pct1``: a percent to one decimal (``0.4 %``), for a share small enough that
+  a whole percent would read 0 or 1.
 - ``pctnum``: the same percent without the sign (``57``), for ranges such as
   ``47–65 %`` where the sign is written once.
 - ``int``: a quantity rounded to a whole number (a median of 37.5 spikes reads
@@ -69,7 +71,7 @@ def formatted(value: Value, style: str | None = None, *, latex: bool = False) ->
         count, or a count style for a value that is not whole.
     """
     style = style or value.style
-    if style in ("pct", "pctnum") and value.kind != "fraction":
+    if style in ("pct", "pct1", "pctnum") and value.kind != "fraction":
         raise ValueError(f"{value.key}: {style} prints fractions, not {value.kind}s")
     return format_number(value.value, style, latex=latex, name=value.key)
 
@@ -95,6 +97,9 @@ def format_number(
     if style in ("pct", "pctnum"):
         number = format(_round(Decimal(repr(float(x))) * 100, 0), "f")
         return number if (latex or style == "pctnum") else f"{number} %"
+    if style == "pct1":
+        number = format(_round(Decimal(repr(float(x))) * 100, 1), "f")
+        return number if latex else f"{number} %"
     if style == "int":
         return _signed(format(_round(x, 0), "f"), latex)
     if style == "dec2":
