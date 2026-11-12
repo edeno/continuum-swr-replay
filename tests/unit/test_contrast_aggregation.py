@@ -645,6 +645,17 @@ def test_a_rate_meta_without_the_frozen_units_is_refused(
         contrast_aggregation.load_fit_time_sd_reference(path)
 
 
+def test_the_sd_reference_is_the_population_sd_of_the_present_values() -> None:
+    frame = pd.DataFrame({"a": [1.0, 3.0, float("nan")], "b": [2.0, 2.0, 2.0]})
+
+    sd = contrast_aggregation.sd_reference(frame, ["b", "absent", "a"])
+
+    # a: values 1 and 3, mean 2, population SD 1 (the sample SD would be 1.41);
+    # an absent covariate is left out; the order is that of the columns asked
+    assert sd == {"b": 0.0, "a": 1.0}
+    assert list(sd) == ["b", "a"]
+
+
 def test_an_absent_rate_meta_is_refused(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         contrast_aggregation.load_fit_time_sd_reference(tmp_path / "absent.json")

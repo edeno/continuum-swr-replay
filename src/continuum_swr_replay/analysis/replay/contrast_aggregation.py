@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -964,8 +964,22 @@ def _leaf_arm_rows(frame: pd.DataFrame) -> pd.DataFrame:
     ]
 
 
-def _sd_reference(frame: pd.DataFrame, cols) -> dict:
-    """Pooled SD of each raw covariate present in ``frame`` (the per-SD unit)."""
+def sd_reference(frame: pd.DataFrame, cols: Sequence[str]) -> dict[str, float]:
+    """Pooled SD of each raw covariate present in ``frame``: the per-SD unit.
+
+    Parameters
+    ----------
+    frame : pandas.DataFrame
+        Rows of the cohort the unit describes.
+    cols : sequence of str
+        Covariates; one absent from ``frame`` is left out, not recorded as NaN.
+
+    Returns
+    -------
+    dict of str to float
+        Covariate -> population SD (``ddof=0``) over its non-missing values,
+        in the order of ``cols``.
+    """
     return {
         c: float(np.nanstd(frame[c].to_numpy(dtype=float)))
         for c in cols
@@ -1008,9 +1022,9 @@ def prepare_cohorts(
         # over the leaf arms only (the trunks are structural zeros for every term the
         # aggregation rescales), the patch SDs over all rows.
         "arm_cohort_support": _ARM_SD_SUPPORT_LABEL,
-        "arm_cohort": _sd_reference(_leaf_arm_rows(ev), _ARM_SD_TERMS),
+        "arm_cohort": sd_reference(_leaf_arm_rows(ev), _ARM_SD_TERMS),
         "patch_cohort_support": _PATCH_SD_SUPPORT_LABEL,
-        "patch_cohort": _sd_reference(pt, _PATCH_SD_TERMS),
+        "patch_cohort": sd_reference(pt, _PATCH_SD_TERMS),
     }
     ev, stratum_audit = select_outcome_stratum(ev, outcome_stratum)
     if outcome_stratum != "all":

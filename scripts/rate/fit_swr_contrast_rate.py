@@ -110,6 +110,7 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
     aggregate_contrast,
+    sd_reference,
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E402
     assert_predictor_timing,
@@ -838,14 +839,13 @@ def _covariate_sds(qv: pd.DataFrame, st: pd.DataFrame) -> dict[str, float]:
     Returns
     -------
     dict of str to float
-        ``covariate -> nanstd``.
+        ``covariate -> SD``
+        (:func:`~continuum_swr_replay.analysis.replay.contrast_aggregation.sd_reference`),
+        in the order of :data:`_RATE_CONT_COVARS`.
     """
-    sd: dict[str, float] = {}
-    for c in _RATE_CONT_COVARS:
-        src = qv if c in qv.columns else st if c in st.columns else None
-        if src is not None:
-            sd[c] = float(np.nanstd(src[c].to_numpy(dtype=float)))
-    return sd
+    not_in_qvals = [c for c in _RATE_CONT_COVARS if c not in qv.columns]
+    sd = {**sd_reference(st, not_in_qvals), **sd_reference(qv, _RATE_CONT_COVARS)}
+    return {c: sd[c] for c in _RATE_CONT_COVARS if c in sd}
 
 
 def _max_relative_sd_difference(
