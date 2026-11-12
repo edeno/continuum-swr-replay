@@ -11,6 +11,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.spike_evidence import (
+    SPIKE_EVIDENCE_METRICS,
+)
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     STATE_SHARE_COLUMNS,
 )
@@ -659,7 +662,7 @@ def test_spike_evidence_metrics_read_every_epoch_and_refuse_a_missing_one(tmp_pa
     for epoch, group in (("a1", "baseline"), ("b1", "SWR-remote")):
         (tmp_path / epoch).mkdir()
         pd.DataFrame({"epoch_id": [epoch, epoch], "group": group}).to_parquet(
-            tmp_path / epoch / builder.SPIKE_EVIDENCE_METRICS
+            tmp_path / epoch / SPIKE_EVIDENCE_METRICS
         )
     metrics = builder.spike_evidence_metrics(tmp_path, n_epochs=2)
     assert list(metrics["epoch_id"]) == ["a1", "a1", "b1", "b1"]
@@ -667,7 +670,7 @@ def test_spike_evidence_metrics_read_every_epoch_and_refuse_a_missing_one(tmp_pa
         builder.spike_evidence_metrics(tmp_path, n_epochs=3)
     # a table that names another epoch than its folder's
     pd.DataFrame({"epoch_id": ["a1"], "group": "baseline"}).to_parquet(
-        tmp_path / "b1" / builder.SPIKE_EVIDENCE_METRICS
+        tmp_path / "b1" / SPIKE_EVIDENCE_METRICS
     )
     with pytest.raises(ValueError, match="holds epochs \\['a1'\\]"):
         builder.spike_evidence_metrics(tmp_path, n_epochs=2)

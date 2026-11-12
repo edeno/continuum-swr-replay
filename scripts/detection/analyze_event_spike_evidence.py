@@ -89,6 +89,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa
     validate_dot_event_contract,
 )
 from continuum_swr_replay.analysis.hippocampus.spike_evidence import (  # noqa: E402
+    SPIKE_EVIDENCE_METRICS,
     build_session_events,
     event_metrics,
     stored_event_likelihood,
@@ -568,7 +569,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
     metrics = pd.concat(all_metrics, ignore_index=True)
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    metrics.to_parquet(args.output_dir / "event_spike_evidence_metrics.parquet")
+    metrics.to_parquet(args.output_dir / SPIKE_EVIDENCE_METRICS)
     summary = summarize(metrics)
     summary.to_csv(args.output_dir / "event_spike_evidence_summary.csv", index=False)
     pd.DataFrame(left_out_rows).to_csv(

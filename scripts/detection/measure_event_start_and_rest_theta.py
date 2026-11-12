@@ -33,6 +33,9 @@ from continuum_swr_replay.analysis.events import analysed_time
 from continuum_swr_replay.analysis.hippocampus.start_and_rest_theta import (
     start_and_rest_theta,
 )
+from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
+    EVENT_FEATURES_RUN,
+)
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.paths import (
@@ -41,7 +44,6 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.reported.events import EVENT_FEATURES_RUN
 from continuum_swr_replay.runs.io import read_manifest, sha256_file
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 

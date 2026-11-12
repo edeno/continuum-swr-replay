@@ -6,7 +6,8 @@ What ``scripts/detection/run_event_features.py`` writes for each epoch
 and its example figures read; and the inventory comparison's and the memoryless
 run's tables those two read beside a run, for the epochs its manifest marks
 ``ok`` (:func:`read_inputs`). The run's manifest and its ``ok`` epochs are read
-by ``runs.io`` (``read_manifest``, ``ok_epochs``, ``ok_table_paths``).
+by ``runs.io`` (``read_manifest``, ``ok_epochs``, ``ok_table_paths``). The run
+the events summary reads is :data:`EVENT_FEATURES_RUN`.
 Design: ``docs/design/replay_detection_comparison/04-event-features.md``.
 """
 
@@ -37,12 +38,19 @@ from continuum_swr_replay.tables.io import read_table
 
 __all__ = [
     "CANDIDATE_COLUMNS",
+    "EVENT_FEATURES_RUN",
     "FEATURE_DTYPES",
     "MS_DTYPES",
     "TABLE_DTYPES",
     "output_paths",
     "read_inputs",
 ]
+
+EVENT_FEATURES_RUN = "30cf1cc432e9"
+"""The event features run the events summary reads (242 epochs, all ``ok``),
+and the run the scripts that measure the summary's derived inputs from it read
+(``scripts/detection/measure_event_start_and_rest_theta.py``,
+``scripts/detection/measure_ripple_class_structure.py``)."""
 
 MS_DTYPES: Mapping[str, object] = MappingProxyType(
     {

@@ -9,15 +9,17 @@ import pandas as pd
 import pytest
 
 import scripts.detection.measure_ripple_class_structure as structure
+from continuum_swr_replay.analysis.hippocampus.spike_evidence import (
+    SPIKE_EVIDENCE_METRICS,
+)
+from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
+    EVENT_FEATURES_RUN,
+)
 from continuum_swr_replay.paths import (
     event_features_root,
     event_spike_evidence_dir,
     replay_content_dir,
     table_path,
-)
-from continuum_swr_replay.reported.events import (
-    EVENT_FEATURES_RUN,
-    SPIKE_EVIDENCE_METRICS,
 )
 from continuum_swr_replay.runs.io import files_sha256, output_path
 

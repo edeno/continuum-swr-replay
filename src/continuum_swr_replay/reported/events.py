@@ -64,7 +64,13 @@ from continuum_swr_replay.analysis.hippocampus import event_statistics, quality_
 from continuum_swr_replay.analysis.hippocampus.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
+from continuum_swr_replay.analysis.hippocampus.spike_evidence import (
+    SPIKE_EVIDENCE_METRICS,
+)
 from continuum_swr_replay.analysis.inventory_comparison import nonlocal_comparison
+from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
+    EVENT_FEATURES_RUN,
+)
 from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_animals,
     analysed_epoch_ids,
@@ -129,12 +135,6 @@ TAGS = {
 """Each group of values: the questions it answers and the figures that show it. The
 remote events' spike-support values also answer question 2c.7: their tags are a
 spike group's joined with ``spike_remote``."""
-
-EVENT_FEATURES_RUN = "30cf1cc432e9"
-"""The event features run the events summary reads (242 epochs, all ``ok``). The
-scripts that measure the summary's derived inputs from that run
-(``scripts/detection/measure_event_start_and_rest_theta.py``,
-``scripts/detection/measure_ripple_class_structure.py``) read its id here."""
 
 #: The other detectors of question 2b.3, by the word their keys use. Kay is the main
 #: figure's; the rest go to the supplement.
@@ -924,10 +924,6 @@ _SPIKE_EVIDENCE_GROUPS = {
     "non_swr_remote": "nonSWR-remote",
     "non_swr_close": "nonSWR-close",
 }
-
-
-SPIKE_EVIDENCE_METRICS = "event_spike_evidence_metrics.parquet"
-"""An epoch's table of the spike-evidence run, in the epoch's folder."""
 
 
 def spike_evidence_metrics(per_epoch_dir: Path, n_epochs: int) -> pd.DataFrame:

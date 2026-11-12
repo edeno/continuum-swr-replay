@@ -51,6 +51,10 @@ MIN_EVENT_BINS = 3
 MAX_BASELINE_BINS = 40
 """A quiet window has at most this many bins."""
 
+SPIKE_EVIDENCE_METRICS = "event_spike_evidence_metrics.parquet"
+"""An epoch's per-event metrics table in the spike-evidence run, in the epoch's
+folder."""
+
 
 def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
     """Classify non-local events and matched non-event baseline windows.

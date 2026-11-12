@@ -55,8 +55,14 @@ from continuum_swr_replay.analysis.events import analysed_time  # noqa: E402
 from continuum_swr_replay.analysis.hippocampus import (  # noqa: E402
     class_or_continuum as cc,
 )
+from continuum_swr_replay.analysis.hippocampus.spike_evidence import (  # noqa: E402
+    SPIKE_EVIDENCE_METRICS,
+)
 from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
     inventory_run,
+)
+from continuum_swr_replay.analysis.inventory_comparison.feature_run import (  # noqa: E402
+    EVENT_FEATURES_RUN,
 )
 from continuum_swr_replay.analysis.inventory_comparison.features import (  # noqa: E402
     _grid_rows,
@@ -70,10 +76,6 @@ from continuum_swr_replay.paths import (  # noqa: E402
     processed_data_dir,
     replay_content_dir,
     table_path,
-)
-from continuum_swr_replay.reported.events import (  # noqa: E402
-    EVENT_FEATURES_RUN,
-    SPIKE_EVIDENCE_METRICS,
 )
 from continuum_swr_replay.runs.io import (  # noqa: E402
     files_sha256,
