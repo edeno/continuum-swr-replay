@@ -32,7 +32,10 @@ import pandas as pd
 
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-from ...shared_statistics import session_median_statistics
+from ...shared_statistics import (
+    akaike_information_criterion,
+    session_median_statistics,
+)
 from .._fit_diagnostics import SEPARATION_COEF_ABS
 from ..coefficient_statistics import animal_median_bootstrap
 from ..contrast_aggregation import LOG_PHI_IS_SWR, MIN_EVENTS, prepare_session
@@ -144,7 +147,7 @@ def estimator_rows(
         equalized = fit["llf"] + (
             0.0 if fit["llf_includes_constants"] else log_constant
         )
-        aic_equalized = 2.0 * fit["n_params"] - 2.0 * equalized
+        aic_equalized = akaike_information_criterion(equalized, fit["n_params"])
         separated_terms = str(fit.get("separated_terms") or "")
         separated = set(separated_terms.split("|")) - {""}
         for name in [k[len("coef_") :] for k in fit if k.startswith("coef_")]:

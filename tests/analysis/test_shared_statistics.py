@@ -113,6 +113,43 @@ def test_the_adjusted_p_is_statsmodels_to_the_last_digit():
 # --- the animal-balanced summary ------------------------------------------------------
 
 
+# --- information criteria and pseudo-R² ---------------------------------------------
+
+
+def test_aic_is_twice_the_parameters_less_twice_the_log_likelihood():
+    assert stats.akaike_information_criterion(-10.5, 3) == 27.0
+    assert stats.akaike_information_criterion(-10.5, 0) == 21.0
+
+
+def test_bic_penalizes_each_parameter_by_the_log_of_the_observations():
+    assert stats.bayesian_information_criterion(-10.5, 2, np.e**3) == pytest.approx(
+        27.0
+    )
+    # No parameters: no penalty, whatever n.
+    assert stats.bayesian_information_criterion(-10.5, 0, 50) == 21.0
+
+
+def test_information_criteria_take_one_fit_per_element():
+    llf = np.array([-1.0, -2.0, np.nan])
+    np.testing.assert_array_equal(
+        stats.akaike_information_criterion(llf, 2), [6.0, 8.0, np.nan]
+    )
+    np.testing.assert_array_equal(
+        stats.bayesian_information_criterion(llf, np.array([0, 1, 1]), 1),
+        [2.0, 4.0, np.nan],
+    )
+
+
+def test_pseudo_r2_is_one_less_the_ratio_to_the_null():
+    assert stats.mcfadden_pseudo_r2(-30.0, -40.0) == 0.25
+    assert stats.mcfadden_pseudo_r2(-40.0, -40.0) == 0.0
+
+
+@pytest.mark.parametrize("llf_null", [0.0, np.nan, -np.inf])
+def test_pseudo_r2_is_missing_without_a_finite_nonzero_null(llf_null):
+    assert np.isnan(stats.mcfadden_pseudo_r2(-30.0, llf_null))
+
+
 def test_session_median_statistics_count_sessions_and_animals_by_sign():
     # sorted: -3, -1, 0, 1, 2, 4 -> median 0.5
     values = pd.Series([1.0, 2.0, -3.0, 4.0, 0.0, -1.0])

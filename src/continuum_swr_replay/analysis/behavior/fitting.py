@@ -28,6 +28,11 @@ from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
+from continuum_swr_replay.analysis.shared_statistics import (
+    akaike_information_criterion,
+    bayesian_information_criterion,
+    mcfadden_pseudo_r2,
+)
 
 from ._fit_diagnostics import (
     EXPECTED_FIT_ERRORS,
@@ -903,12 +908,12 @@ def fit_conditional_poisson(
 
     llf = finish.llf
     n_params = len(predictors)
-    aic = 2 * n_params - 2 * llf
+    aic = akaike_information_criterion(llf, n_params)
     # BIC with n = n_events (the number of conditioning groups).
     # Alternative choices (n_rows = n_event x n_arm pairs, or total
     # count) yield different penalty scales; we use n_events for
     # consistency with the conditional-Poisson likelihood structure.
-    bic = n_params * np.log(n_events) - 2 * llf
+    bic = bayesian_information_criterion(llf, n_params, n_events)
 
     # Pseudo-R² against the analytical null (uniform allocation over
     # ``n_categories`` candidate slots per event). The arm-level fit
@@ -919,9 +924,7 @@ def fit_conditional_poisson(
     # filtering drops categories from some events (reviewer flag #1).
     total_count = float(y.sum())
     llf_null = -total_count * np.log(n_categories)
-    pseudo_r2 = (
-        1.0 - llf / llf_null if np.isfinite(llf_null) and llf_null != 0 else np.nan
-    )
+    pseudo_r2 = mcfadden_pseudo_r2(llf, llf_null)
 
     output = {
         **{f"coef_{k}": v for k, v in coefs.items()},
@@ -1129,8 +1132,8 @@ def fit_null_model_conditional(
         "n_params": 0,
         "llf": float(llf),
         "llf_null": float(llf),
-        "aic": float(-2 * llf),  # 2*0 - 2*llf
-        "bic": float(-2 * llf),  # 0*log(n) - 2*llf
+        "aic": float(akaike_information_criterion(llf, 0)),
+        "bic": float(bayesian_information_criterion(llf, 0, n_events)),
         "pseudo_r2": 0.0,
         "predicted_frac": 1.0 / n_arms,
         "converged": True,
@@ -1194,8 +1197,8 @@ def fit_null_model_conditional_logit(
         "n_params": 0,
         "llf": llf,
         "llf_null": llf,
-        "aic": float(-2 * llf),
-        "bic": float(-2 * llf),
+        "aic": float(akaike_information_criterion(llf, 0)),
+        "bic": float(bayesian_information_criterion(llf, 0, n_events)),
         "pseudo_r2": 0.0,
         "predicted_frac": 1.0 / n_arms,
         "converged": True,
@@ -1380,8 +1383,10 @@ def conditional_logit_or_reason(
         "n_rows": len(df),
         "n_params": len(predictors),
         "llf": float(result.llf),
-        "aic": float(2 * len(predictors) - 2 * result.llf),
-        "bic": float(len(predictors) * np.log(n_events) - 2 * result.llf),
+        "aic": float(akaike_information_criterion(result.llf, len(predictors))),
+        "bic": float(
+            bayesian_information_criterion(result.llf, len(predictors), n_events)
+        ),
         **{
             f"sd_{name}": float(s)
             for name, s in zip(predictors, predictor_sd, strict=True)

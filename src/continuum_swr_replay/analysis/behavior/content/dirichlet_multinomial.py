@@ -53,6 +53,11 @@ from scipy.special import gammaln
 from scipy.stats import norm
 
 from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
+from continuum_swr_replay.analysis.shared_statistics import (
+    akaike_information_criterion,
+    bayesian_information_criterion,
+    mcfadden_pseudo_r2,
+)
 
 from .._fit_diagnostics import NUISANCE_TERMS, separated_terms
 from ..fitting import within_group_full_rank
@@ -674,9 +679,7 @@ def fit_dirichlet_multinomial(
     # not be tabulated against each other. Its null also differs: the DM null
     # refits the concentration, so the baseline is uniform-allocation-at-the-
     # fitted-redundancy rather than uniform-allocation-at-independent-bins.
-    pseudo_r2 = (
-        1.0 - llf / llf_null if np.isfinite(llf_null) and llf_null != 0 else np.nan
-    )
+    pseudo_r2 = mcfadden_pseudo_r2(llf, llf_null)
 
     return {
         **{f"coef_{k}": float(v) for k, v in zip(names, res.x, strict=True)},
@@ -706,10 +709,10 @@ def fit_dirichlet_multinomial(
         "n_params": int(n_params),
         "llf": llf,
         "llf_null": float(llf_null),
-        "aic": float(2 * n_params - 2 * llf),
+        "aic": float(akaike_information_criterion(llf, n_params)),
         # BIC with n = n_events: the DM likelihood's independent units are events,
         # not timebins (which is the whole point of the concentration parameter).
-        "bic": float(n_params * np.log(n_events) - 2 * llf),
+        "bic": float(bayesian_information_criterion(llf, n_params, n_events)),
         "pseudo_r2": float(pseudo_r2),
         "converged": bool(res.success),
         "separated": len(separated) > 0,

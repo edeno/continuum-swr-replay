@@ -118,6 +118,9 @@ import numpy as np
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.pfc.gpu import require_configured_device
+from continuum_swr_replay.analysis.shared_statistics import (
+    akaike_information_criterion,
+)
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
@@ -1809,7 +1812,7 @@ def fit_poisson_glms(
     # parameters in the design's own columns.
     params_host = np.asarray(params) @ back.T
     llf_host = llf_kernel - np.asarray(log_factorial)
-    aic = -2.0 * llf_host + 2.0 * rank
+    aic = akaike_information_criterion(llf_host, rank)
     # A unit whose iteration ran away has no usable fit; it is reported like
     # one with no spikes at all rather than as a finite near-miss.
     failed = failed | diverged

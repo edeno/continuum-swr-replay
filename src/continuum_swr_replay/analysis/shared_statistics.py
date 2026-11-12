@@ -4,6 +4,9 @@
   against zero.
 - :func:`benjamini_hochberg`: Benjamini-Hochberg adjusted p-values of a family
   of tests.
+- :func:`akaike_information_criterion`, :func:`bayesian_information_criterion`
+  and :func:`mcfadden_pseudo_r2`: a fit's information criteria and pseudo-R²
+  from its log-likelihood.
 - :func:`session_median_statistics`: the animal-balanced summary of one number
   per session: the median over sessions with the sessions' signs, and the
   median over animals of each animal's own median with the animals' signs.
@@ -99,6 +102,63 @@ def benjamini_hochberg(p_values: ArrayLike) -> NDArray[np.float64]:
     in_family[order] = stepped
     adjusted[tested] = in_family
     return adjusted
+
+
+def akaike_information_criterion(llf: ArrayLike, n_params: ArrayLike) -> ArrayLike:
+    """AIC of a fit: ``2 k - 2 llf``.
+
+    Parameters
+    ----------
+    llf : float or array_like
+        The fit's maximized log-likelihood (one per fit for an array).
+    n_params : int or array_like
+        Its number of estimated parameters, ``k``.
+
+    Returns
+    -------
+    aic : float or numpy.ndarray
+        Same shape as the broadcast inputs.
+    """
+    return 2 * n_params - 2 * llf
+
+
+def bayesian_information_criterion(
+    llf: ArrayLike, n_params: ArrayLike, n_observations: ArrayLike
+) -> ArrayLike:
+    """BIC of a fit: ``k log(n) - 2 llf``.
+
+    Parameters
+    ----------
+    llf : float or array_like
+        The fit's maximized log-likelihood.
+    n_params : int or array_like
+        Its number of estimated parameters, ``k``.
+    n_observations : int or array_like
+        The ``n`` of the penalty: the likelihood's independent units, which
+        the caller names (events for a fit conditioned on events).
+
+    Returns
+    -------
+    bic : float or numpy.ndarray
+        Same shape as the broadcast inputs; NaN when ``n`` is 0.
+    """
+    return n_params * np.log(n_observations) - 2 * llf
+
+
+def mcfadden_pseudo_r2(llf: float, llf_null: float) -> float:
+    """McFadden's pseudo-R² of a fit against its null: ``1 - llf / llf_null``.
+
+    Parameters
+    ----------
+    llf, llf_null : float
+        The fit's and its null model's log-likelihoods, on one scale.
+
+    Returns
+    -------
+    pseudo_r2 : float
+        NaN when the null log-likelihood is not finite or is zero.
+    """
+    return 1.0 - llf / llf_null if np.isfinite(llf_null) and llf_null != 0 else np.nan
 
 
 def animal_medians(values: pd.Series, animal: pd.Series) -> pd.Series:
