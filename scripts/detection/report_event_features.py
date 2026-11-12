@@ -536,10 +536,6 @@ def epoch_status(manifest: Mapping) -> pd.DataFrame:
     )
 
 
-def _ok(manifest: Mapping) -> list[str]:
-    return sorted(i for i, r in manifest["epochs"].items() if r["status"] == "ok")
-
-
 def _session_of(identifier: str) -> tuple[str, int, str]:
     """``(animal, day, epoch)`` of ``{animal}{day}_{epoch}_HPC``."""
     key = parse_epoch_identifier(identifier)
@@ -891,7 +887,7 @@ def memoryless_cohort_by_session(
                 scope,
                 bool(manifest["epochs"][identifier].get("memoryless_available")),
             )
-            for identifier in _ok(manifest)
+            for identifier in feature_run.ok_epochs(manifest)
             for scope in ("candidates", "compared")
         ],
         columns=[*keys, "available"],

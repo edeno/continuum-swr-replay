@@ -10,7 +10,6 @@ putting the repo root on ``sys.path``.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Collection, Mapping, Sequence
 from pathlib import Path
 from types import MappingProxyType
@@ -18,6 +17,10 @@ from types import MappingProxyType
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
+    ok_epochs,
+    read_manifest,
+)
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     MEMORYLESS,
     MEMORYLESS_CRITERIA,
@@ -63,6 +66,10 @@ def read_run(
 ) -> tuple[dict, dict[str, pd.DataFrame]]:
     """The run's manifest and every table of its ``ok`` epochs, concatenated.
 
+    The manifest and its ``ok`` epochs are read by ``feature_run.read_manifest``
+    and ``feature_run.ok_epochs``: an inventory comparison run's manifest has
+    the same epoch records as an event features run's.
+
     Parameters
     ----------
     run_dir : Path
@@ -79,12 +86,8 @@ def read_run(
     tables : dict of str to DataFrame
         By name, with the runner's columns and dtypes.
     """
-    manifest: dict = json.loads((run_dir / "manifest.json").read_text())
-    ok = sorted(
-        identifier
-        for identifier, record in manifest["epochs"].items()
-        if record["status"] == "ok"
-    )
+    manifest = read_manifest(run_dir)
+    ok = ok_epochs(manifest)
     tables = {
         name: typed_table(
             (read_table(output_path(identifier, run_dir, name)) for identifier in ok),
