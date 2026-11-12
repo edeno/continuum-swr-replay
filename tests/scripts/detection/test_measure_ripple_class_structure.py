@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 
 import pandas as pd
+import pytest
 
 import scripts.detection.measure_ripple_class_structure as structure
 from continuum_swr_replay.analysis.inventory_comparison import feature_run
@@ -96,3 +98,12 @@ def test_load_events_reads_the_features_of_the_ok_epochs_only(processed_data_roo
         "sha256": files_sha256([feature_run.output_path("e1", run, "features")]),
     }
     assert record["checks"]["peak_differs_from_features_run"] == 0
+
+
+def test_measure_refuses_a_features_run_without_an_epochs_record(processed_data_root):
+    run = event_features_root() / EVENT_FEATURES_RUN
+    run.mkdir(parents=True)
+    (run / "manifest.json").write_text(json.dumps({"settings": {}}))
+
+    with pytest.raises(ValueError, match="no readable run manifest"):
+        structure.run_measure(argparse.Namespace(epochs=None, n_workers=1))

@@ -177,9 +177,7 @@ def epoch_identifier(row: pd.Series) -> str:
 
 
 def run_measure(args: argparse.Namespace) -> None:
-    manifest = json.loads(
-        (event_features_root() / EVENT_FEATURES_RUN / "manifest.json").read_text()
-    )
+    manifest = feature_run.read_manifest(event_features_root() / EVENT_FEATURES_RUN)
     events = pd.read_parquet(table_path("event_table", replay_content_dir()))
     events = events.assign(epoch_id=events.apply(epoch_identifier, axis=1))
     by_epoch = dict(tuple(events.groupby("epoch_id")))
