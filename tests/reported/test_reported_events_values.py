@@ -238,7 +238,7 @@ def test_brain_state_values_name_each_signal_class_and_reference():
             # of the SWR events, 7 reaches the running level and 3 does not
             expected |= {"like_fraction_non_swr": 0.0, "like_fraction_swr": 0.5}
         assert own == pytest.approx(expected), signal
-    assert values["ripple_median_swr"].figures == ("3b",)
+    assert values["ripple_median_swr"].figures == ("3c",)
     assert values["theta_median_swr"].figures == ()
 
 

@@ -408,6 +408,100 @@ def plot_swr_zscore_by_state(
         plt.close(fig)
 
 
+#: The two classes of immobile non-local events, as the event table's ``is_swr``,
+#: with the colour and legend label each per-event panel gives them.
+_EVENT_CLASSES = (
+    (False, "non_swr", COLORS["Non-Local"], "non-SWR"),
+    (True, "swr", COLORS["SWR"], "SWR"),
+)
+
+
+def _event_class_histograms(
+    events: pd.DataFrame,
+    column: str,
+    medians: dict[str, float],
+    bins: np.ndarray,
+    ax: plt.Axes,
+) -> None:
+    """Each class's per-event ``column`` as a density histogram, with a dashed
+    line at the class median it is given (gid ``median_<class>``)."""
+    for is_swr, word, color, label in _EVENT_CLASSES:
+        ax.hist(
+            events.loc[events["is_swr"] == is_swr, column].dropna(),
+            bins=bins,
+            density=True,
+            alpha=0.6,
+            color=color,
+            edgecolor="none",
+            label=label,
+        )
+        ax.axvline(
+            medians[word],
+            color=color,
+            linestyle="--",
+            linewidth=1.0,
+            gid=f"median_{word}",
+        )
+
+
+def plot_event_ripple_by_swr(
+    events: pd.DataFrame,
+    medians: dict[str, float],
+    references: dict[str, float],
+    ax: plt.Axes | None = None,
+) -> None:
+    """Ripple power of immobile non-local events, SWR-overlapping against non-SWR.
+
+    Each event's value is its mean over its bins of the epoch's z-scored ripple
+    power (the event table's ``ripple_power_z``). The lines are drawn where they
+    are given, not computed here: each class's median (dashed, gid
+    ``median_non_swr`` / ``median_swr``) and the running and quiet-rest
+    references (gid ``reference_running`` / ``reference_rest``).
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        The canonical event table, with ``is_swr`` and ``ripple_power_z``.
+    medians : dict
+        ``non_swr`` and ``swr``: each class's median event value, z.
+    references : dict
+        ``running`` and ``rest``: the typical running and quiet-rest level, z.
+    ax : matplotlib.axes.Axes, optional
+        Axes to draw on. If None, a standalone figure is created.
+    """
+    standalone = ax is None
+    if standalone:
+        fig, ax = plt.subplots(figsize=PANEL_SINGLE)
+
+    _event_class_histograms(
+        events, "ripple_power_z", medians, np.arange(-3.0, 10.5, 0.5), ax
+    )
+    ax.axvline(
+        references["rest"],
+        color="grey",
+        linestyle=":",
+        linewidth=1.0,
+        label="quiet rest",
+        gid="reference_rest",
+    )
+    ax.axvline(
+        references["running"],
+        color="black",
+        linestyle="-.",
+        linewidth=1.0,
+        label="running",
+        gid="reference_running",
+    )
+
+    ax.set_xlabel("Ripple power z (event mean)")
+    ax.set_ylabel("Density")
+    ax.legend()
+
+    if standalone:
+        sns.despine(ax=ax)
+        plt.tight_layout()
+
+
 def _nonlocal_swr_event_bin_masks(
     data_over_time: pd.DataFrame,
 ) -> tuple[pd.Series, pd.Series]:
@@ -481,6 +575,84 @@ def plot_replay_speed_by_swr(
             save_figure(fig, figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
             logging.info(f"Saved: {figure_name}")
         plt.close(fig)
+
+
+def plot_event_speed_by_swr(
+    events: pd.DataFrame,
+    medians: dict[str, float],
+    contrasts: pd.Series,
+    axes: list[plt.Axes] | None = None,
+) -> None:
+    """Replay speed of immobile non-local events, SWR-overlapping against non-SWR.
+
+    Each event's value is the median over its bins of the decoded position's
+    speed (the event table's ``replay_speed_median_cm_s``). The first axes
+    draws each class's events as a density histogram and its median as a
+    dashed line (gid ``median_non_swr`` / ``median_swr``); the second draws the
+    SWR minus non-SWR difference of medians, plain and at matched duration,
+    each with its 95 % nested-bootstrap interval (gid ``difference`` /
+    ``matched_difference``). Every number is drawn as given; none is computed
+    here.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        The canonical event table, with ``is_swr`` and
+        ``replay_speed_median_cm_s``.
+    medians : dict
+        ``non_swr`` and ``swr``: each class's median event value, cm/s.
+    contrasts : pd.Series
+        ``difference``, ``difference_low``, ``difference_high``,
+        ``matched_difference``, ``matched_difference_low`` and
+        ``matched_difference_high``, cm/s: the bootstrap's estimates and
+        interval bounds.
+    axes : list of matplotlib.axes.Axes, optional
+        Two axes, [histograms, differences]. If None, a standalone figure is
+        created.
+    """
+    standalone = axes is None
+    if standalone:
+        fig, axes = plt.subplots(
+            1, 2, figsize=PANEL_SINGLE, gridspec_kw={"width_ratios": [3, 1]}
+        )
+    if len(axes) != 2:
+        raise ValueError(f"plot_event_speed_by_swr needs 2 axes, got {len(axes)}")
+    ax_hist, ax_difference = axes
+
+    _event_class_histograms(
+        events, "replay_speed_median_cm_s", medians, np.arange(0, 3000, 100), ax_hist
+    )
+    ax_hist.set_xlabel("Replay speed (cm/s, event median)")
+    ax_hist.set_ylabel("Density")
+    ax_hist.legend(loc="upper right")
+
+    for x, word in enumerate(("difference", "matched_difference")):
+        estimate = contrasts[word]
+        ax_difference.errorbar(
+            x,
+            estimate,
+            yerr=[
+                [estimate - contrasts[f"{word}_low"]],
+                [contrasts[f"{word}_high"] - estimate],
+            ],
+            fmt="o",
+            color="black",
+            markersize=3,
+            capsize=2,
+            linewidth=1.0,
+            gid=word,
+        )
+    ax_difference.axhline(0.0, color="grey", linewidth=0.75)
+    ax_difference.set_xticks([0, 1])
+    ax_difference.set_xticklabels(
+        ["all", "duration-\nmatched"], rotation=45, ha="right", rotation_mode="anchor"
+    )
+    ax_difference.set_xlim(-0.6, 1.6)
+    ax_difference.set_ylabel("SWR − non-SWR (cm/s)")
+
+    if standalone:
+        sns.despine(fig=fig)
+        plt.tight_layout()
 
 
 def plot_replay_position_by_swr(

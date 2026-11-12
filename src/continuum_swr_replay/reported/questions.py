@@ -100,7 +100,9 @@ FIGURES: dict[str, Figure] = {
         "Non-local events and SWRs", "scripts/figures/generate_figure02.py", "abcde"
     ),
     "3": Figure(
-        "Non-local events outside SWRs", "scripts/figures/generate_figure03.py", "abcd"
+        "Non-local events outside SWRs",
+        "scripts/figures/generate_figure03.py",
+        "abcdef",
     ),
     "4": Figure(
         "mPFC responses to SWR and non-SWR events",
@@ -235,7 +237,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2b.5",
         "How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?",
-        figures=("3b",),
+        figures=("3b", "3c"),
     ),
     Question(
         "2b.6",
@@ -247,7 +249,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2c.1",
         "How do theta z-score and speed compare across SWR events, non-SWR events and running?",
-        figures=("3b", "decoder_validation"),
+        figures=("3c", "decoder_validation"),
     ),
     Question(
         "2c.2",
@@ -295,7 +297,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.2",
         "How does replay speed differ between SWR and non-SWR events?",
-        figures=("3c",),
+        figures=("3d", "3e"),
     ),
     Question(
         "2d.3",

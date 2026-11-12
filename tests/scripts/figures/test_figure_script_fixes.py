@@ -8,6 +8,7 @@
   invalidate it.
 - Figure 3 panel a's relative-time ticks sit on round steps and each label is
   its tick's exact relative time (task 26c).
+- Figure 3 panels c and e draw the events summary's ripple and speed values.
 - The rate summary's panel B boxes log(RR), so one extreme session does not set
   its axis; the contrast coefficient figures keep their titles and x labels
   inside the figure; the arrival retention note is computed from the fit; and
@@ -571,6 +572,185 @@ def test_the_figure03_panel_a_axes_get_the_ticks_and_keep_their_limits(offline):
         assert ax.get_xlim() == (T0, T0 + 2.0)
     assert [t.get_text() for t in axes[-1].get_xticklabels()][0] == "0"
     plt.close(fig)
+
+
+# --------------------------------------------------------------------------
+# Figure 3 panels c and e: the events summary's ripple and speed values
+# --------------------------------------------------------------------------
+
+#: Event-table columns the events summary's other property values read; the
+#: Figure 3 test gives them a constant.
+_OTHER_PROPERTY_COLUMNS = (
+    "event_duration_s",
+    "spatial_extent_cm",
+    "posterior_peak_mean",
+    "hpd_coverage_cm",
+    "pause_fraction",
+    "step_distance_max_cm",
+    "n_reversals",
+    "multimodal_fraction",
+    "n_unique_arms",
+)
+
+
+def _figure03_events() -> pd.DataFrame:
+    """Eight events in two animals, four of each class. Each class's mean
+    differs from its median, and its median is the mean of the middle two:
+    non-SWR ripple 0.2, 0.4, 3.0 (a) and 1.0 (b), median 0.7; SWR 2.0, 4.0 (a)
+    and 5.0, 1.0 (b), median 3.0; non-SWR speed 100, 200, 900 and 300, median
+    250; SWR 400, 600 and 500, 1300, median 550."""
+    events = pd.DataFrame(
+        {
+            "animal": ["a"] * 5 + ["b"] * 3,
+            "session_date": ["d1"] * 5 + ["d2"] * 3,
+            "epoch": "e1",
+            "is_swr": [False, False, False, True, True, False, True, True],
+            "ripple_power_z": [0.2, 0.4, 3.0, 2.0, 4.0, 1.0, 5.0, 1.0],
+            "replay_speed_median_cm_s": [100, 200, 900, 400, 600, 300, 500, 1300.0],
+        }
+    )
+    events["theta_z"] = events["ripple_power_z"]
+    events["mua_rate_z"] = events["ripple_power_z"]
+    for column in _OTHER_PROPERTY_COLUMNS:
+        events[column] = 1.0
+    return events
+
+
+def _figure03_reference() -> pd.DataFrame:
+    """Three epochs, one with no event: the running medians 0.5, 0.1, 1.5
+    (median 0.5, mean 0.7) and the rest medians -0.5, -0.9, -0.2 (median -0.5)."""
+    reference = pd.DataFrame(
+        {
+            "animal": ["a", "b", "a"],
+            "session_date": ["d1", "d2", "d1"],
+            "epoch": ["e1", "e1", "e2"],
+            "ripple_running_median": [0.5, 0.1, 1.5],
+            "ripple_rest_median": [-0.5, -0.9, -0.2],
+        }
+    )
+    for signal in ("theta", "mua"):
+        reference[f"{signal}_running_median"] = reference["ripple_running_median"]
+        reference[f"{signal}_rest_median"] = reference["ripple_rest_median"]
+    return reference
+
+
+def _figure03_intervals() -> pd.DataFrame:
+    """The bootstrap's ``intervals.csv``: every property of the events summary,
+    the speed row with its own numbers."""
+    from continuum_swr_replay.reported.events import _PROPERTIES
+
+    columns = [
+        f"{word}{suffix}"
+        for word in ("median_non_swr", "median_swr", "difference", "matched_difference")
+        for suffix in ("", "_low", "_high", "_nan_replicates")
+    ]
+    intervals = pd.DataFrame(
+        0.0, index=[p[0] for p in _PROPERTIES], columns=columns
+    ).assign(n_replicates=1000.0, matched_replicates_skipping_strata=0.0)
+    intervals.loc["speed", ["difference", "difference_low", "difference_high"]] = [
+        300.0,
+        120.0,
+        480.0,
+    ]
+    intervals.loc[
+        "speed",
+        ["matched_difference", "matched_difference_low", "matched_difference_high"],
+    ] = [200.0, 50.0, 350.0]
+    return intervals
+
+
+def test_figure03_panels_c_and_e_draw_the_values_of_the_events_summary(offline):
+    """The medians, references and intervals the two per-event panels draw are
+    the events summary's values of the same inputs, and the values are tagged
+    to those panels."""
+    import matplotlib.pyplot as plt
+
+    from continuum_swr_replay.reported.events import (
+        brain_state_values,
+        property_interval_values,
+        property_values,
+    )
+    from continuum_swr_replay.visualization.figure_panels import (
+        plot_event_ripple_by_swr,
+        plot_event_speed_by_swr,
+    )
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    events, reference, intervals = (
+        _figure03_events(),
+        _figure03_reference(),
+        _figure03_intervals(),
+    )
+    panels = figure03.event_panels(events, reference, intervals)
+
+    fig, (ax_c, ax_e, ax_e_difference) = plt.subplots(1, 3)
+    plot_event_ripple_by_swr(
+        panels["events"], panels["ripple_medians"], panels["ripple_references"], ax=ax_c
+    )
+    plot_event_speed_by_swr(
+        panels["events"],
+        panels["speed_medians"],
+        panels["speed_contrasts"],
+        axes=[ax_e, ax_e_difference],
+    )
+    drawn_c = {line.get_gid(): line.get_xdata()[0] for line in ax_c.lines}
+    drawn_e = {line.get_gid(): line.get_xdata()[0] for line in ax_e.lines}
+    drawn_intervals = {}
+    for container in ax_e_difference.containers:
+        data_line, _, (bars,) = container.lines
+        ((_, low), (_, high)) = bars.get_segments()[0]
+        drawn_intervals[data_line.get_gid()] = (data_line.get_ydata()[0], low, high)
+    plt.close(fig)
+
+    ripple = {v.key: v for v in brain_state_values(events, reference, "s")}
+    speed = {v.key: v for v in property_values(events, "s")}
+    bounds = {v.key: v for v in property_interval_values(intervals, "s")}
+
+    assert drawn_c == pytest.approx(
+        {
+            "median_non_swr": ripple["ripple_median_non_swr"].value,
+            "median_swr": ripple["ripple_median_swr"].value,
+            "reference_running": ripple["ripple_running_reference"].value,
+            "reference_rest": ripple["ripple_rest_reference"].value,
+        }
+    )
+    assert drawn_c == pytest.approx(
+        {
+            "median_non_swr": 0.7,
+            "median_swr": 3.0,
+            "reference_running": 0.5,
+            "reference_rest": -0.5,
+        }
+    )
+    assert drawn_e == pytest.approx(
+        {
+            "median_non_swr": speed["speed_median_non_swr"].value,
+            "median_swr": speed["speed_median_swr"].value,
+        }
+    )
+    assert drawn_e == pytest.approx({"median_non_swr": 250.0, "median_swr": 550.0})
+    assert drawn_intervals["difference"][1:] == pytest.approx(
+        (bounds["speed_difference_low"].value, bounds["speed_difference_high"].value)
+    )
+    assert drawn_intervals["matched_difference"] == pytest.approx(
+        (
+            bounds["speed_matched_difference"].value,
+            bounds["speed_matched_difference_low"].value,
+            bounds["speed_matched_difference_high"].value,
+        )
+    )
+    assert drawn_intervals["difference"] == pytest.approx((300.0, 120.0, 480.0))
+
+    tagged = {
+        key: value.figures
+        for values in (ripple, speed, bounds)
+        for key, value in values.items()
+        if key.startswith(("ripple_", "speed_"))
+    }
+    assert tagged and all(
+        figures == (("3c",) if key.startswith("ripple_") else ("3e",))
+        for key, figures in tagged.items()
+    )
 
 
 # --------------------------------------------------------------------------
