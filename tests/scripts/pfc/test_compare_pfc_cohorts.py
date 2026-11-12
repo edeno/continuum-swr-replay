@@ -1325,7 +1325,7 @@ class TestPeakShrinkage:
             fromlist=["load_population_data"],
         ).load_population_data(after, min_firing_rate=0.0)
 
-        table = shrinkage_table(peak_shrinkage(population))
+        table = shrinkage_table(population)
 
         assert set(table["units"]) == {"separated", "well posed"}
         assert (table["n_prior_binds"] <= table["n_units"]).all()
@@ -1334,27 +1334,32 @@ class TestPeakShrinkage:
         ]
 
     def test_the_binding_percent_is_over_each_rows_own_units(self):
-        """Five units of one curve: three well posed, of which the prior binds
-        on one; two separated, of which it binds on both."""
-        frame = pd.DataFrame(
+        """Six units of one curve: three well posed, of which the prior binds
+        on one (unit 2 has no flag, which is not binding); two separated, of
+        which it binds on both; one that did not converge, on which it binds."""
+        population = pd.DataFrame(
             {
-                "curve": "SWR",
-                "peak_penalised": 1.0,
-                "peak_mle": [1.5, 1.0, 1.0, 30.0, 30.0],
-                "peak_mle_se": 0.1,
-                "units": ["well posed"] * 3 + ["separated"] * 2,
-                "prior_binds": [True, False, False, True, True],
+                "SWR: peak_log_modulation": 1.0,
+                "SWR: peak_log_modulation_mle": [1.5, 1.0, 1.0, 30.0, 30.0, 9.0],
+                "SWR: peak_log_modulation_mle_se": 0.1,
+                "SWR: prior_binds": [True, False, np.nan, True, True, True],
+                "SWR: mle_converged": [True] * 5 + [False],
+                "SWR: mle_separated": [False] * 3 + [True] * 2 + [False],
                 "animal": "chimi",
             }
         )
-        frame["delta"] = frame["peak_penalised"] - frame["peak_mle"]
 
-        table = shrinkage_table(frame).set_index("units")
+        table = shrinkage_table(population).set_index("units")
 
+        # the other curves have no columns here and are left out
+        assert set(table["curve"]) == {"SWR"}
         assert table.loc["well posed", "n_units"] == 3
+        assert table.loc["well posed", "n_prior_binds"] == 1
         assert table.loc["well posed", "prior_binds_pct"] == 33.3
         assert table.loc["separated", "n_units"] == 2
         assert table.loc["separated", "prior_binds_pct"] == 100.0
+        assert table.loc["nonconverged", "n_units"] == 1
+        assert table.loc["nonconverged", "prior_binds_pct"] == 100.0
 
 
 class TestEstimatorTables:

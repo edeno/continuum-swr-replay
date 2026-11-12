@@ -1307,18 +1307,21 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
+def shrinkage_table(after: pd.DataFrame) -> pd.DataFrame:
     """Per curve and separation status: how far the prior moved the peak.
 
+    The rows are :func:`peak_shrinkage` of ``after`` (the penalised
+    population), grouped by curve and
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.fit_status`.
     A unit whose unpenalised fit ran away has no peak to difference against,
     so its row is reported -- it is where a prior is supposed to do the work --
     but "the prior binds" is counted only where a maximum-likelihood peak
-    exists to be moved. ``prior_binds_pct`` is ``n_prior_binds`` as a percent
-    of the row's own units; on the well-posed row it is the share
+    exists to be moved. ``prior_binds_pct`` is, on the well-posed row,
     :func:`~continuum_swr_replay.analysis.pfc.population_statistics.prior_binding_percent`
-    reports, since the rows are
-    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.fit_status`.
+    of ``after``, the share the mpfc summary reports; on the other rows,
+    ``n_prior_binds`` as a percent of the row's own units.
     """
+    frame = peak_shrinkage(after)
     if frame.empty:
         return frame
     grouped = frame.groupby(["curve", "units"], dropna=False)
@@ -1351,11 +1354,16 @@ def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
         ),
         max_abs_delta=("delta", lambda s: finite_statistic(s, np.max, absolute=True)),
         median_peak_mle_se=("peak_mle_se", lambda s: finite_statistic(s, np.median)),
-        n_prior_binds=("prior_binds", lambda s: int(s.fillna(False).sum())),
+        # ``== True`` reads a missing flag as False, as prior_binding_percent does.
+        n_prior_binds=("prior_binds", lambda s: int(s.eq(True).sum())),
     ).reset_index()
-    summary["prior_binds_pct"] = (
-        100.0 * summary["n_prior_binds"] / summary["n_units"]
-    ).round(1)
+    percent = 100.0 * summary["n_prior_binds"] / summary["n_units"]
+    well_posed = summary["units"] == "well posed"
+    binding = population_statistics.prior_binding_percent(
+        after, summary.loc[well_posed, "curve"].unique()
+    )
+    percent[well_posed] = summary.loc[well_posed, "curve"].map(binding)
+    summary["prior_binds_pct"] = percent.round(1)
     return summary
 
 
@@ -2314,7 +2322,7 @@ def build_estimator_report(
         "supposed to do the work, and is left out of the binding count.\n"
     )
     shrinkage = peak_shrinkage(after)
-    add(_md(shrinkage_table(shrinkage)))
+    add(_md(shrinkage_table(after)))
     lacking = curves_lacking_shrinkage_columns(after)
     if lacking:
         add(
