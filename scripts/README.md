@@ -187,7 +187,7 @@ them importable.
   every panel is a reported value (each script's docstring names those that are).
 
 ## `behavior/coupling/` — SWR-coupling strength of the events
-- `fit_swr_power_model.py` — each non-local event's ripple power (`ripple_power_z`) against the behavioral covariates: how strongly an event is SWR-coupled, beside the rate (how often) and content (what) layers.
+- `fit_swr_power_model.py` — each non-local event's ripple power (`ripple_power_z`) against the behavioral covariates: how strongly an event is SWR-coupled, beside the rate (how often) and content (what) layers. The fit, its post-outcome gate, its cohort record and the statistics it prints are `analysis/behavior/coupling/swr_power.py`.
 
 ## `behavior/content/` — replay content / choice models
 - `fit_replay_content_models.py` — arm/patch content hierarchy (M0–M7 / P0–P4), per `is_swr` split.

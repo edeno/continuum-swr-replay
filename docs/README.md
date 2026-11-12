@@ -246,8 +246,8 @@ and the covariate builders from importing `model_specs.py`, and has no allowlist
 violation fails.
 
 Inside `analysis/behavior/` the subpackages import in one direction: `covariates/`,
-then `choice/`, then `tables/`, then `rate/` and `content/`, which do not import
-each other; each may import the modules at the package's top level, which hold
+then `choice/`, then `tables/`, then `rate/`, `content/` and `coupling/`, which do
+not import each other; each may import the modules at the package's top level, which hold
 what several subpackages share (the package docstring lists them); a top-level module
 imports no subpackage, except that `cohort_audit`, `covariate_timing` and
 `contrast_aggregation` import `covariates/`. The layering test checks both.

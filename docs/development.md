@@ -72,7 +72,7 @@ uv run --frozen mypy src/
 src/continuum_swr_replay/
 ├── data_loaders/          # Data loading from Spyglass/NWB (load_data in bandit_task.py)
 ├── analysis/              # Analysis modules
-│   ├── behavior/          #   the events and the task: covariates/, tables/, rate/, content/, choice/, and the shared model ladders, fitters and fit statistics
+│   ├── behavior/          #   the events and the task: covariates/, tables/, rate/, content/, coupling/, choice/, and the shared model ladders, fitters and fit statistics
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
 │   ├── events/            #   analysed-time rule, SWR source, event eligibility, classified event table, cohorts
 │   ├── hippocampus/       #   decode masks and aggregation, posterior/quality metrics, event statistics, SWR inventories, artifact detector

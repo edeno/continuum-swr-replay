@@ -1,5 +1,5 @@
-"""The events and the task: covariates, tables, and the rate, content and choice
-analyses fit on them.
+"""The events and the task: covariates, tables, and the rate, content, coupling
+and choice analyses fit on them.
 
 Subpackages, each importing only those listed before it and the modules at
 this level:
@@ -10,8 +10,8 @@ this level:
   retrospective alignment.
 - ``tables``: the canonical event, arm, patch, stop and time-bin tables and
   their contracts.
-- ``rate`` and ``content``: the event-rate and content models and their
-  statistics. Neither imports the other.
+- ``rate``, ``content`` and ``coupling``: the event-rate and content models,
+  the per-event SWR-power model, and their statistics. None imports another.
 
 The modules at this level are what several subpackages share: the model
 ladders (``model_specs``) and design constants, the per-bin design and its

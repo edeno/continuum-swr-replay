@@ -56,9 +56,7 @@ Work that is deferred on purpose. Each item says when it should be done.
   audit-only tables are still computed in the scripts.
   These still hold their own copy; make each call the function, comparing its
   output before and after on the cluster:
-  - behavior: `scripts/behavior/coupling/fit_swr_power_model.py` (percentiles, mean
-    and SD of ripple power by class, the duration correlation it prints);
-    `scripts/behavior/content/fit_replay_content_models.py` and
+  - behavior: `scripts/behavior/content/fit_replay_content_models.py` and
     `visualization/replay_content_plots.plot_pseudo_r2_progression` (medians and
     IQR of the fit metrics).
   - events: `scripts/detection/analyze_event_spike_evidence.py` (per-epoch and

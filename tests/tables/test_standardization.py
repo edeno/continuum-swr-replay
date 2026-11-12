@@ -307,6 +307,7 @@ def test_runner_references_written(tmp_path):
     Exercises each runner's real output-writing block, so deleting its
     ``save_reference`` call fails here rather than passing silently.
     """
+    from continuum_swr_replay.analysis.behavior.coupling import swr_power
     from scripts.behavior.coupling import fit_swr_power_model
     from scripts.behavior.rate import fit_uncertainty_rate
 
@@ -336,7 +337,7 @@ def test_runner_references_written(tmp_path):
     # The power model standardizes inside a per-session loop, so its payload is
     # one reference per session under the by-session filename.
     _, session_reference = attach_standardized(
-        frame.copy(), ["a"], support_label=fit_swr_power_model.FIT_SUPPORT_LABEL
+        frame.copy(), ["a"], support_label=swr_power.FIT_SUPPORT_LABEL
     )
     power_out = fit_swr_power_model._write_outputs(
         tmp_path / "power",
