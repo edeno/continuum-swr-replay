@@ -948,3 +948,45 @@ def test_arm_assembly_flags_the_stops_with_a_qvals_row(
 
     assert ev["has_qvals_row"].dtype == bool
     assert ev.set_index("stop_id")["has_qvals_row"].to_dict() == {10: True, 11: False}
+
+
+def test_a_forest_rows_ci_does_not_depend_on_the_rows_drawn_before_it(
+    monkeypatch,
+) -> None:
+    """The jitter of the dots and the bootstrap draw from separate generators, so
+    a row's CI is the same whether or not another row was drawn first. With five
+    animals the 2.5 / 97.5 percentiles are the extreme animal medians whatever the
+    draws, so the test uses 400 animals of one session each, where they are not."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    from scripts.figures import plot_swr_contrast_coefs as figure
+
+    n_animals = 400
+    animals = [f"a{index}" for index in range(n_animals)]
+    monkeypatch.setattr(figure, "ANIM", animals)
+    monkeypatch.setattr(figure, "CMAP", dict.fromkeys(animals, "k"))
+    fits = _dm_rows(n_sessions=n_animals).assign(
+        animal=animals,
+        coef_log_phi_is_swr=np.random.default_rng(3).normal(size=n_animals),
+    )
+    bootstrap = figure.animal_median_bootstrap
+    drawn = []
+
+    def recording_bootstrap(*args, **kwargs):
+        summary = bootstrap(*args, **kwargs)
+        drawn.append(tuple(summary["percentiles"]))
+        return summary
+
+    monkeypatch.setattr(figure, "animal_median_bootstrap", recording_bootstrap)
+    row = ("concentration", "C0", "all", "log_phi_is_swr")
+    fig, axes = plt.subplots(1, 2)
+    figure.forest(axes[0], fits, [row], "alone", {})
+    figure.forest(axes[1], fits, [row, row], "after another row", {})
+    plt.close(fig)
+
+    alone, first, second = drawn
+    assert alone == first == second

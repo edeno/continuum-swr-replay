@@ -135,7 +135,10 @@ def _per_sd_units(artifacts: dict[str, Path]):
 
 ANIM = list(analysed_animals())
 CMAP = dict(zip(ANIM, plt.cm.tab10(np.linspace(0, 0.5, 5)), strict=True))
-RNG = np.random.default_rng(0)
+# The dots' vertical jitter only. Each row's bootstrap has its own generator,
+# seeded BOOTSTRAP_SEED, so a row's CI does not depend on the rows drawn before it.
+JITTER_RNG = np.random.default_rng(0)
+BOOTSTRAP_SEED = 0
 N_BOOTSTRAP = 4000
 
 
@@ -194,7 +197,7 @@ def forest(ax, df, rows, title, sd):
             allv.append(s[a])
             ax.scatter(
                 s[a],
-                yi + RNG.uniform(-0.28, 0.28, len(s[a])),
+                yi + JITTER_RNG.uniform(-0.28, 0.28, len(s[a])),
                 s=6,
                 color=CMAP[a],
                 alpha=0.20,
@@ -204,7 +207,7 @@ def forest(ax, df, rows, title, sd):
         summary = animal_median_bootstrap(
             pd.Series(np.concatenate([s[a] for a in drawn])),
             pd.Series(np.repeat(drawn, [len(s[a]) for a in drawn])),
-            rng=RNG,
+            rng=np.random.default_rng(BOOTSTRAP_SEED),
             n_draws=N_BOOTSTRAP,
             percentiles=(2.5, 97.5),
         )

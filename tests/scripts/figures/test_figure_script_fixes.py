@@ -790,7 +790,8 @@ _CONTRAST_FUNCTIONS = {
 _CONTRAST_NAMES = {
     "ANIM",
     "CMAP",
-    "RNG",
+    "JITTER_RNG",
+    "BOOTSTRAP_SEED",
     "N_BOOTSTRAP",
     "SWR",
     "NON",
