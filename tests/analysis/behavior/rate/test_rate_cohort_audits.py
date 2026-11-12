@@ -51,7 +51,9 @@ def _stop_table(n_per_session=20, n_immobility_bad=2, n_rewardbasis_nan=3, seed=
 
 
 def test_per_bin_records_attribute_own_drops():
-    from scripts.behavior.rate import fit_per_bin_rate_models as mod
+    from continuum_swr_replay.analysis.behavior.rate import (
+        per_bin_rate_ladder as mod,
+    )
 
     stop = _stop_table()
     total = len(stop)
@@ -72,7 +74,7 @@ def test_per_bin_records_attribute_own_drops():
             for a, d in [("a", 1), ("b", 2)]
         ]
     )
-    recs = mod._cohort_records(models, stop)
+    recs = mod.per_bin_cohort_records(models, stop)
     assert all(_reconciles(r) for r in recs)
 
     by = {(r["model"], r["population"]): r for r in recs}

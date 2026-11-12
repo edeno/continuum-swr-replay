@@ -35,14 +35,8 @@ from non_local_detector.model_checking.sorted_spikes import (  # noqa: E402
 )
 
 from continuum_swr_replay.analysis.behavior import (  # noqa: E402
-    BIN_S,
     MODEL_PER_BIN_RATE,
-    N_HISTORY_BASIS,
-    N_HISTORY_LAGS,
-    POPULATIONS,
     STOP_COVARIATES,
-    TMAX,
-    aggregate_to_timebins,
     attach_is_swr_to_onsets,
     fit_per_bin_rate_model,
     freeze_per_bin_cohort,
@@ -50,12 +44,11 @@ from continuum_swr_replay.analysis.behavior import (  # noqa: E402
 from continuum_swr_replay.analysis.behavior.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
-    longest_history_window_s,
-)
 from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (  # noqa: E402
-    at_risk_events,
     attach_event_ends,
+)
+from continuum_swr_replay.analysis.behavior.rate.per_bin_rate_ladder import (  # noqa: E402
+    ladder_design,
 )
 from continuum_swr_replay.analysis.behavior.rate.rate_fit_statistics import (  # noqa: E402
     arrival_window_statistics,
@@ -267,7 +260,7 @@ def _refit_session(
 
     The fit is the published one: the stops of the fit's ``stop_cohort``
     (``select_stop_cohort``), and the cohort frozen over the whole ladder's
-    columns, as ``fit_per_bin_rate_models.py`` freezes it.
+    columns, as ``per_bin_rate_ladder.fit_ladder_session`` freezes it.
 
     Carries ``stop_start`` as an extra covariate (ignored by the fit) so the
     drift panel can order bins by true within-session time -- ``stop_id`` is a
@@ -281,22 +274,13 @@ def _refit_session(
     om = pd.Series(True, index=onsets.index)
     for c, v in zip(SC, keys, strict=True):
         om &= onsets[c] == v
-    pop = POPULATIONS[outcome](onsets[om])
-    # the bins the published fits used: excluded time and the bins whose
-    # history window (the ladder's longest) reaches it are not analysed, nor
-    # the bins inside an ongoing event (the at-risk design)
-    design = aggregate_to_timebins(
+    # the bins the published fits used: the runner's own design (excluded
+    # time, the ladder's history window, the at-risk bins)
+    design = ladder_design(
         stops_g,
-        pop,
-        bin_s=BIN_S,
-        tmax=TMAX,
-        reward_basis=True,
-        self_history_lags=N_HISTORY_LAGS,
-        self_history_basis=N_HISTORY_BASIS,
+        onsets[om],
+        outcome,
         stop_covariates=(*STOP_COVARIATES, "stop_start"),
-        history_window_s=longest_history_window_s(MODEL_PER_BIN_RATE.values()),
-        at_risk_events=at_risk_events(onsets[om], outcome),
-        offset_history=True,
     )
     # ONE cohort for the whole ladder, as the runner freezes it: a stop missing
     # another rung's column (the arrival clock) is not in the published fit.

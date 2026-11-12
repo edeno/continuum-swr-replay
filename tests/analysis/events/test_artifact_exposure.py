@@ -481,10 +481,10 @@ class TestPfcFitBins:
 
 
 def test_every_rate_fit_drops_the_excluded_bins():
-    """Each runner that builds a per-bin design gives it its ladder's history
-    window, as a keyword or through a ``**`` dict literal assigned in the same
-    function, and leaves excluded time to the design, which reads it from the
-    source."""
+    """Each runner, or the package function it calls, that builds a per-bin
+    design gives it its ladder's history window, as a keyword or through a
+    ``**`` dict literal assigned in the same function, and leaves excluded time
+    to the design, which reads it from the source."""
     import ast
     from pathlib import Path
 
@@ -492,7 +492,13 @@ def test_every_rate_fit_drops_the_excluded_bins():
     scripts = Path(__file__).resolve().parents[3] / "scripts"
     rate = scripts / "behavior" / "rate"
     offenders, n_calls = [], 0
-    runners = [*rate.glob("fit_*.py"), rate / "plot_model_checking.py"]
+    package = scripts.parent / "src" / "continuum_swr_replay" / "analysis"
+    runners = [
+        *rate.glob("fit_*.py"),
+        rate / "plot_model_checking.py",
+        # the per-session fits the runners call
+        package / "behavior" / "rate" / "per_bin_rate_ladder.py",
+    ]
     for path in sorted(runners):
         tree = ast.parse(path.read_text())
         for function in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
@@ -520,7 +526,7 @@ def test_every_rate_fit_drops_the_excluded_bins():
                         given |= literals.get(spread.value.id, set())
                 if not wanted <= given or "excluded_intervals" in given:
                     offenders.append(f"{path.name}:{node.lineno}")
-    assert n_calls >= 6
+    assert n_calls >= 5
     assert offenders == []
 
 
