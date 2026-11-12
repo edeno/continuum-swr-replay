@@ -45,12 +45,12 @@ STEPS = [
     {
         "title": "4. Collapse to events  (build_event_table)",
         "shape": "E events  (modal arm/well + first-row onset flags)",
-        "assumption": "Modal arm represents the event;  onset flags use the first timebin.\nReal data: 0.12 % of events straddle a trial boundary  →  modal-context is unambiguous.",
+        "assumption": "Modal arm represents the event;  onset flags use the first timebin.",
     },
     {
         "title": "5. Compute arm counts  (arm_count_hard)",
         "shape": "E × 9 arm_count_hard  (+ arm_fraction;  total n_nonlocal_bins L_e)",
-        "assumption": "Each timebin contributes 1 count to 1 arm  (MAP-collapse, hard assignment).\nReal data: median fragmentation = 0  →  events sit on a single arm.",
+        "assumption": "Each timebin contributes 1 count to 1 arm  (MAP-collapse, hard assignment).",
     },
     {
         "title": "6. Long format  (build_event_arm_table)",
@@ -70,7 +70,7 @@ STEPS = [
     {
         "title": "9. Fit conditional Poisson  (fit_conditional_poisson)",
         "shape": "β̂ , SE, p, AIC, BIC, VIF  per predictor",
-        "assumption": "Within-event timebins independent  (multinomial).  Events independent.\n→ Tested: nominal SE under-covers under within-event autocorrelation (ρ≈0.94 on real data).",
+        "assumption": "Within-event timebins independent  (multinomial).  Events independent.\n→ Tested: nominal SE under-covers under within-event autocorrelation.",
     },
 ]
 
@@ -175,7 +175,7 @@ def draw_schematic(output_dir: Path) -> None:
         color="w",
         markerfacecolor=note_color,
         markersize=10,
-        label="Assumption (red text); Real-data check noted where applicable.",
+        label="Assumption (red text)",
     )
     legend_handles.append(note_proxy)
     ax.legend(
