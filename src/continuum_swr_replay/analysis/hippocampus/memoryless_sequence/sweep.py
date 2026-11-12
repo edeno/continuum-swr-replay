@@ -1,15 +1,18 @@
 """The simulated recording the memoryless sweeps share, and each detector's run on it.
 
-The injected-replay sweep (``scripts/detection/sweep_memoryless_detection.py``),
-its controls (``sweep_memoryless_controls.py``), the held-out check
-(``sweep_memoryless_heldout.py``) and the reference check
-(``scripts/checks/compare_memoryless_to_reference.py``) read one simulated recording
-(:func:`build_recording`, sorted spikes on a linear track, both detectors fitted
-on its non-event data), one grid of injected replays (:data:`PATH_CM`,
-:data:`DURATION_S`, :data:`PEAK_RATE_HZ`, :data:`MIDPOINT_CM`), and run the
-two detectors over a stretch of it the same way: the memoryless sliding window
-(:func:`run_sliding_window`) and the switching state-space model
-(:func:`run_state_space`), each reporting its events as :class:`ReportedEvent`.
+The injected-replay sweep (``sweep_replays``), its controls (``sweep_controls``),
+the held-out check (``inventory_comparison.heldout_sweep``) and the reference
+check (``scripts/checks/compare_memoryless_to_reference.py``) read one simulated
+recording (:func:`build_recording`, sorted spikes on a linear track, both
+detectors fitted on its non-event data), place events in its immobile stretches
+clear of its own events (:func:`usable_intervals`), read one grid of injected
+replays (:data:`PATH_CM`, :data:`DURATION_S`, :data:`PEAK_RATE_HZ`,
+:data:`MIDPOINT_CM`; the combinations inside the track are :func:`replay_grid`),
+and run the two detectors over a stretch of it (:func:`decode_window`) the same
+way: the memoryless sliding window (:func:`run_sliding_window`, whose events
+under the published definition are :func:`published_events`) and the switching
+state-space model (:func:`run_state_space`), each reporting its events as
+:class:`ReportedEvent`.
 """
 
 from dataclasses import dataclass
@@ -17,7 +20,10 @@ from dataclasses import dataclass
 import numpy as np
 from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.environment import Environment
-from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
+from non_local_detector.simulate.sorted_spikes_simulation import (
+    TRACK_HEIGHT,
+    make_simulated_data,
+)
 
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
@@ -39,6 +45,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     ShuffleResult,
     ShuffleSeed,
     shuffle_candidate_sorted,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+    immobile_intervals,
+    without,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     aggregate_windows,
@@ -64,11 +74,15 @@ __all__ = [
     "SlidingWindowRun",
     "StateSpaceRun",
     "build_recording",
+    "decode_window",
     "nearest_bin",
     "non_local_intervals",
     "overlaps",
+    "published_events",
+    "replay_grid",
     "run_sliding_window",
     "run_state_space",
+    "usable_intervals",
 ]
 
 DECODE_BIN_STRIDE = 3
@@ -193,6 +207,87 @@ def build_recording(seed: int = 0, cells: np.ndarray | None = None):
     }
 
 
+def replay_grid() -> list[tuple[float, float, float, float]]:
+    """Every injected replay of the grid whose path lies on the track.
+
+    Returns
+    -------
+    list of (path_cm, midpoint_cm, duration_s, peak_rate_hz)
+        In the order :data:`PATH_CM`, :data:`MIDPOINT_CM`, :data:`DURATION_S`,
+        :data:`PEAK_RATE_HZ`, the last varying fastest; a combination whose
+        path, centered on its midpoint, would run off either end of the track
+        is left out.
+    """
+    return [
+        (path_cm, midpoint_cm, duration_s, rate_hz)
+        for path_cm in PATH_CM
+        for midpoint_cm in MIDPOINT_CM
+        for duration_s in DURATION_S
+        for rate_hz in PEAK_RATE_HZ
+        if 0.0 <= midpoint_cm - path_cm / 2
+        and midpoint_cm + path_cm / 2 <= TRACK_HEIGHT
+    ]
+
+
+def usable_intervals(recording: dict) -> np.ndarray:
+    """The recording's immobile stretches with its own labeled events cut out.
+
+    Stretches still for at least 1 s, less each labeled event and
+    :data:`PLACEMENT_MARGIN_S` either side of it. The events are cut out rather
+    than their stretches discarded: every stretch holds one, so discarding them
+    would leave nothing.
+
+    Returns
+    -------
+    ndarray, shape (n_intervals, 2)
+        Start and end times in seconds.
+    """
+    return without(
+        immobile_intervals(
+            recording["time"],
+            recording["speed"],
+            CONFIG.speed_threshold_cm_per_s,
+            minimum_duration_s=1.0,
+        ),
+        recording["event_times"],
+        margin_s=PLACEMENT_MARGIN_S,
+    )
+
+
+def decode_window(
+    recording: dict,
+    bounds: tuple[float, float],
+    margin_s: float = DECODE_MARGIN_S,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The recording's samples from ``margin_s`` before to ``margin_s`` after ``bounds``.
+
+    Both ends are inclusive.
+
+    Parameters
+    ----------
+    recording : dict
+        As :func:`build_recording` returns it.
+    bounds : (float, float)
+        Start and end of the stretch, in seconds.
+    margin_s : float, optional
+        Decoded on each side of it; :data:`DECODE_MARGIN_S` around an
+        injection, 0 for a stretch decoded as it is.
+
+    Returns
+    -------
+    time, position, speed : ndarray, shape (n_window,)
+    """
+    start_s, end_s = bounds
+    mask = (recording["time"] >= start_s - margin_s) & (
+        recording["time"] <= end_s + margin_s
+    )
+    return (
+        recording["time"][mask],
+        recording["position"][mask],
+        recording["speed"][mask],
+    )
+
+
 def overlaps(reported: tuple[float, float], bounds: tuple[float, float]) -> bool:
     """Strict, positive-duration overlap. The same rule for both detectors."""
     return reported[0] < bounds[1] and bounds[0] < reported[1]
@@ -297,6 +392,15 @@ def run_sliding_window(recording, injected, window, cell_key) -> SlidingWindowRu
         events=events,
         shuffles=shuffles,
     )
+
+
+def published_events(run: SlidingWindowRun) -> list[ReportedEvent]:
+    """The sliding window's events under the published definition.
+
+    The accepted candidates (duration and dispersion criteria met) that also
+    pass the place-cell identity shuffle, in candidate order.
+    """
+    return [run.events[i] for i in run.accepted if run.shuffles[i].passes]
 
 
 def nearest_bin(recording, position_cm: np.ndarray) -> np.ndarray:

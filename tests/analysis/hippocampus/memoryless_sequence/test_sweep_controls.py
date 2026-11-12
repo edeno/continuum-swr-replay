@@ -1,4 +1,4 @@
-"""The controls sweep's own helpers: truth, geometry, per-trial scoring."""
+"""The controls' truth, geometry and per-trial scoring."""
 
 import numpy as np
 import pytest
@@ -13,7 +13,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     piecewise_replay,
     place_field_means,
 )
-from scripts.detection import sweep_memoryless_controls as controls
 
 MEANS = place_field_means(25, 170.0)
 
@@ -91,9 +90,9 @@ class TestScoreTrial:
     def test_one_event_over_both_parts_spans_them(self):
         activity = chain(30.0, 90.0, gap_s=0.01)
         spanning = event(*activity.bounds, activity)
-        events = {detector: [spanning] for detector in controls.DETECTORS}
+        events = {detector: [spanning] for detector in sweep_controls.DETECTORS}
 
-        rows = controls.score_trial(activity, events, state_run(activity))
+        rows = sweep_controls.score_trial(activity, events, state_run(activity))
 
         assert [row["segmentation"] for row in rows] == ["spanning"] * 4
         assert all(row["called"] and row["n_recovered"] == 2 for row in rows)
@@ -116,9 +115,9 @@ class TestScoreTrial:
             30.0 + 60.0 * (times - first_start) / (first_end - first_start),
         )
         wrong_second = sweep.ReportedEvent(*activity.bounds, times, decoded)
-        events = {detector: [wrong_second] for detector in controls.DETECTORS}
+        events = {detector: [wrong_second] for detector in sweep_controls.DETECTORS}
 
-        rows = controls.score_trial(activity, events, state_run(activity))
+        rows = sweep_controls.score_trial(activity, events, state_run(activity))
 
         assert [row["n_recovered"] for row in rows] == [1] * 4
         assert {row["segmentation"] for row in rows} == {"parts_missing"}
@@ -126,18 +125,18 @@ class TestScoreTrial:
     def test_an_event_off_the_path_is_called_but_recovers_nothing(self):
         activity = chain()
         wrong = event(*activity.bounds, activity, offset_cm=50.0)
-        events = {detector: [wrong] for detector in controls.DETECTORS}
+        events = {detector: [wrong] for detector in sweep_controls.DETECTORS}
 
-        rows = controls.score_trial(activity, events, state_run(activity))
+        rows = sweep_controls.score_trial(activity, events, state_run(activity))
 
         assert all(row["called"] and row["n_recovered"] == 0 for row in rows)
         assert {row["segmentation"] for row in rows} == {"parts_missing"}
 
     def test_no_event_is_not_called(self):
         activity = chain()
-        events = {detector: [] for detector in controls.DETECTORS}
+        events = {detector: [] for detector in sweep_controls.DETECTORS}
 
-        rows = controls.score_trial(activity, events, state_run(activity))
+        rows = sweep_controls.score_trial(activity, events, state_run(activity))
 
         assert not any(row["called"] for row in rows)
         assert rows[0]["continuous_share"] == pytest.approx(0.25)
@@ -148,6 +147,6 @@ class TestPartAlone:
         original = [np.array([0.5, 1.05, 1.2, 1.3, 2.0])]
         injected = [np.array([0.5, 1.01, 1.02, 1.21, 1.22, 2.0])]
 
-        alone = controls.part_alone_spikes(original, injected, (1.0, 1.15))
+        alone = sweep_controls.part_alone_spikes(original, injected, (1.0, 1.15))
 
         np.testing.assert_array_equal(alone[0], [0.5, 1.01, 1.02, 1.2, 1.3, 2.0])
