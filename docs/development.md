@@ -68,7 +68,8 @@ src/continuum_swr_replay/
 │   ├── hippocampus/       #   decode masks and aggregation, posterior/quality metrics, event statistics, SWR inventories, artifact detector
 │   ├── inventory_comparison/ # event inventories from different detectors compared
 │   ├── pfc/               #   mPFC/OFC unit analysis
-│   └── constants.py       #   analysis constants and defaults
+│   ├── constants.py       #   analysis constants and defaults
+│   └── shared_statistics.py #  statistics that know nothing of the task
 ├── decoding/              # decode configs and detector classes, transitions, identifiers and file names, the results.nc reader
 ├── runs/                  # run infrastructure: provenance, CLI, batch loops, BLAS thread pin (threads), JAX device choice (device)
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, atomic writes, parity
@@ -85,6 +86,7 @@ scripts/                   # Analysis scripts, grouped by domain — see scripts
 paper/                     # The manuscript — see paper/README.md
 ├── main.tex  main.pdf     #   LaTeX source and the built PDF (make manuscript)
 ├── reported/              #   <summary>.json summaries every reported number is read from
+│   └── inputs/            #     the tracked input files a summary reads (today the detection sweep summaries)
 ├── reported_values.tex    #   generated macros, one per reported number (make reported-values)
 ├── tables/                #   Supplementary Table S1 and the literature survey CSV it is built from
 └── figures/<topic>/       #   Publication figures in topic subdirs (no loose files)

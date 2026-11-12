@@ -666,7 +666,8 @@ The prose at lines 1–56 goes to `docs/rate_models.md`, and section 5 (lines
 217–236, no values) goes to `TODO.md` if it is still pending. Its inbound links
 include `scripts/behavior/rate/plot_per_bin_rate_summary.py`,
 `src/continuum_swr_replay/reported/behavior.py` (then named part3.py) and
-`tests/unit/test_summarize_per_bin_rate_models.py`. These are code, so each is
+`tests/unit/test_summarize_per_bin_rate_models.py` (the test was removed later,
+with `summarize_per_bin_rate_models.py`, which it tested). These are code, so each is
 checked before the file is removed.
 
 **`docs/analysis_map.md`** (deleted after the move)

@@ -18,9 +18,10 @@ ladders (``model_specs``) and design constants, the per-bin design and its
 bases, the fitters and their diagnostics, the spatial lookups, the fit
 provenance, the cohort audits, the covariate timing, the contrast
 aggregation and the across-session coefficient statistics. Of these,
-``cohort_audit``, ``covariate_timing``, ``contrast_aggregation`` and
-``coefficient_statistics`` read ``covariates`` (so ``covariates`` imports
-none of the four); the others import no subpackage.
+``cohort_audit``, ``covariate_timing`` and ``contrast_aggregation`` read
+``covariates``, and ``coefficient_statistics`` reaches it only through
+``contrast_aggregation`` (so ``covariates`` imports none of the four); the
+others import no subpackage.
 
 Note: public names are exposed through PEP 562 ``__getattr__``, so importing a
 leaf submodule (e.g. ``analysis.behavior.design_constants``) does not run the
