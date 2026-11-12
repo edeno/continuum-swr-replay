@@ -260,7 +260,7 @@ def _panel_reward1(ax, df):
     ]
     ax.set_yticks(np.log(rate_ratios), labels=[f"{r:g}" for r in rate_ratios])
     ax.set_ylabel("recent-reward RR, first history basis (per session, log scale)")
-    ax.set_title("B. First reward-history basis component (M7r, controlled)")
+    ax.set_title("B. First reward-history basis component (M7r, gated sessions)")
 
 
 def _panel_reward_kernel(ax, df):
@@ -287,7 +287,7 @@ def _panel_reward_kernel(ax, df):
     ax.set_ylim(0, 4.3)
     ax.set_xlabel("reward lag (trials back)")
     ax.set_ylabel("rate ratio")
-    ax.set_title("C. Reward kernel (M7r, reconstructed from the basis)")
+    ax.set_title("C. Reward kernel (M7r, reconstructed, gated sessions)")
     ax.legend(frameon=False, fontsize=7)
 
 
@@ -360,7 +360,7 @@ def _panel_covar(ax, df):
     ax.set_xticks(range(3))
     ax.set_xticklabels(SHORT)
     ax.set_ylabel("rate ratio")
-    ax.set_title("F. Slow reward-history component by type (M7r)")
+    ax.set_title("F. Slow reward-history component by type (M7r, gated sessions)")
 
 
 def build_parser() -> argparse.ArgumentParser:
