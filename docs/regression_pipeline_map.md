@@ -602,18 +602,6 @@ Plot replay rate vs uncertainty/value by population from the tidy fit output.
 
 `report`, `plot`, `build_parser`, `main`
 
-### `scripts/behavior/run_retrospective_alignment.py`
-
-Stage 5B: per-session retrospective replay-content alignment.
-
-`fit_input_paths`, `main`
-
-### `scripts/behavior/run_stay_leave.py`
-
-Stage 6: replay content × reward outcome → behavioral change.
-
-`fit_input_paths`, `summary_path`, `fit_path`, `write_summary_provenance`, `log_cross_session_role_summary`, `main`
-
 ### `scripts/decoding/_decode_runner.py`
 
 The flow both decode runners share, and the record of what differs.
@@ -1135,6 +1123,18 @@ Centralized schema/version literals for the covariate pipeline.
 ## Unassigned
 
 Modules under a mapped root that no stage pattern claims. A module landing here means `write_pipeline_map.py` needs a stage rule, not that the module is unused.
+
+### `scripts/behavior/choice/run_retrospective_alignment.py`
+
+Stage 5B: per-session retrospective replay-content alignment.
+
+`fit_input_paths`, `main`
+
+### `scripts/behavior/choice/run_stay_leave.py`
+
+Stage 6: replay content × reward outcome → behavioral change.
+
+`fit_input_paths`, `summary_path`, `fit_path`, `write_summary_provenance`, `log_cross_session_role_summary`, `main`
 
 ### `src/continuum_swr_replay/analysis/behavior/coefficient_statistics.py`
 
