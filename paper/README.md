@@ -12,8 +12,7 @@ This needs LaTeX with `latexmk` and BibTeX (TeX Live or MacTeX). It needs neithe
 Python nor the lab's data: it uses the committed figures and
 `reported_values.tex`.
 
-The [paper-questions review](../.claude/docs/reviews/2026-11-11-paper-questions-review.md)
-assesses the argument, scope, and likely reviewer concerns. The proposed
+The proposed
 [paper-development plan](../docs/design/2026-11-11-paper-development-plan.md)
 orders the validation, analysis, and writing work, with completion criteria for
 each stage.
