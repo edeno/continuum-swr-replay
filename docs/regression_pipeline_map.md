@@ -718,7 +718,7 @@ Switch-aligned timing analysis for patch-switch prediction.
 
 Per-model cohort / drop-profile audit records.
 
-`is_qvals_sourced_column`, `is_qvals_gap_column`, `attach_has_qvals_row`, `qvals_gap_event_ids`, `cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
+`fit_flag_counts`, `is_qvals_sourced_column`, `is_qvals_gap_column`, `attach_has_qvals_row`, `qvals_gap_event_ids`, `cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
 
 ### `src/continuum_swr_replay/analysis/behavior/content/model_checking.py`
 
@@ -1152,7 +1152,7 @@ Summary statistics of the event-history kernels of the duration-aware rate fits.
 
 Summary statistics of the per-bin event-rate ladder's fits.
 
-`frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `reward_gated_fits`, `reward_kernel_by_lag`, `reward_kernel_animal_medians`, `self_history_kernel_by_lag`, `lag_one_reward_kernels`, `reward_kernel_statistics`, `paired_lag_one_reward_kernels`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
+`frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `reward_gated_fits`, `reward_kernel_by_lag`, `reward_kernel_animal_medians`, `self_history_kernel_by_lag`, `reward_kernel_statistics`, `paired_lag_one_reward_kernels`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/stop_statistics.py`
 
