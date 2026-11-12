@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy.stats import chi2, wilcoxon
+from scipy.stats import chi2
 
+from continuum_swr_replay.analysis.statistics import signed_rank_p
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .model_specs import MODEL_HIERARCHY
@@ -285,19 +286,9 @@ def summarize_comparison(
         "lrt_significant": int(lr_sig),
     }
 
-    # Wilcoxon signed-rank on delta-AIC. Drop NaN sessions first —
-    # scipy's default nan_policy="propagate" returns NaN whenever any
-    # input is NaN, which silently invalidates the omnibus p whenever
-    # the mismatched-n_events guard marked some sessions NaN.
-    daic_valid = daic.dropna()
-    if len(daic_valid) >= 5:
-        try:
-            _, p = wilcoxon(daic_valid)
-            result["wilcoxon_p"] = float(p)
-        except ValueError:
-            result["wilcoxon_p"] = np.nan
-    else:
-        result["wilcoxon_p"] = np.nan
+    # Wilcoxon signed-rank on delta-AIC over the sessions with a finite one
+    # (the mismatched-n_events guard marks a session NaN).
+    result["wilcoxon_p"] = signed_rank_p(daic)
 
     # Animal-level view of the same step. Sessions within an animal are not
     # independent and the corpus is unbalanced, so the session Wilcoxon above is a

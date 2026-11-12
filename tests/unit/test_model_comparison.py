@@ -153,17 +153,17 @@ class TestSummarizeComparison:
 
     def test_drops_nan_before_wilcoxon(self):
         """scipy.stats.wilcoxon defaults to nan_policy='propagate' and
-        returns NaN for any NaN in the input. summarize_comparison must
-        drop NaN sessions before calling wilcoxon so the omnibus p-value
-        is valid whenever at least five sessions are comparable."""
-        comparisons = _make_comparison_df([-1.0, -2.0, np.nan, -0.5, -1.5, -2.5])
+        returns NaN for any NaN in the input. A NaN session is left out, so
+        the omnibus p-value is valid whenever six sessions are comparable:
+        six of one sign give the exact p 2 / 2 ** 6."""
+        comparisons = _make_comparison_df([-1.0, -2.0, np.nan, -0.5, -1.5, -2.5, -3.0])
         result = summarize_comparison(comparisons, "M0", "M1")
-        assert not np.isnan(result["wilcoxon_p"])
+        assert result["wilcoxon_p"] == pytest.approx(2 / 2**6)
 
-    def test_nan_when_fewer_than_five_valid_sessions(self):
-        """wilcoxon needs >=5 sessions. After dropping NaN, if fewer
-        than five remain, the result is NaN (not a crash)."""
-        comparisons = _make_comparison_df([-1.0, np.nan, np.nan, -0.5])
+    def test_nan_when_fewer_than_six_valid_sessions(self):
+        """Five sessions cannot reach p < 0.05 (their smallest p is 2 / 2 ** 5):
+        after dropping NaN, if fewer than six remain, the result is NaN."""
+        comparisons = _make_comparison_df([-1.0, np.nan, -0.5, -2.0, -1.5, -2.5])
         result = summarize_comparison(comparisons, "M0", "M1")
         assert np.isnan(result["wilcoxon_p"])
 
