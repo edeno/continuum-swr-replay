@@ -492,6 +492,39 @@ def ladder_fit_statistics(fits: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def model_checking_examples(fits: pd.DataFrame) -> dict[str, tuple]:
+    """The sessions whose fits the model-checking figure draws in full.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        One rung's per-session fits of one population, with ``n_events`` and
+        the session columns.
+
+    Returns
+    -------
+    dict of str to tuple
+        ``"rich"``: the session with the most event bins. ``"sparse"``: the
+        session at position ``n // 6`` of the ascending ``n_events`` order of
+        the ``n`` fitted sessions (about the 17th percentile, and never above
+        the second last), when that is not the rich session. Each is an
+        ``(animal, session_date, epoch)`` tuple. Empty when no session has
+        ``n_events``.
+    """
+    fitted = fits.dropna(subset=["n_events"])
+    if fitted.empty:
+        return {}
+    ordered = fitted.sort_values("n_events")
+    examples = {"rich": tuple(ordered.iloc[-1][list(SESSION_COLUMNS)])}
+    # ~17th percentile as a genuinely sparser (but still fitted) example; fall
+    # back to a distinct session if the run is tiny.
+    sparse_pos = min(len(ordered) // 6, len(ordered) - 2) if len(ordered) > 1 else 0
+    sparse_keys = tuple(ordered.iloc[sparse_pos][list(SESSION_COLUMNS)])
+    if sparse_keys != examples["rich"]:
+        examples["sparse"] = sparse_keys
+    return examples
+
+
 def arrival_window_statistics(cohort: Mapping[str, int]) -> dict[str, float]:
     """What the arrival clock and its window keep of one population's cohort.
 

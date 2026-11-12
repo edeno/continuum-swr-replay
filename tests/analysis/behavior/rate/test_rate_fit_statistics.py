@@ -725,3 +725,34 @@ def test_the_cumulative_shape_is_the_trapezoid_area_scaled_to_one():
     # unequal steps: areas 2 * 1 = 2 and 1 * 2 = 2
     cdf = stats._shape_cdf(np.array([0.0, 2.0, 3.0]), np.array([1.0, 1.0, 3.0]))
     np.testing.assert_allclose(cdf, [0.0, 0.5, 1.0])
+
+
+def test_model_checking_examples_are_the_richest_and_a_sparse_session():
+    """Seven fitted sessions and one without a fit: the rich example has 7 event
+    bins, the sparse one is at position 7 // 6 = 1 of the ascending order (2)."""
+    fits = pd.DataFrame(
+        {
+            "animal": list("abcdefgh"),
+            "session_date": [1] * 8,
+            "epoch": ["02_r1"] * 8,
+            "n_events": [5, 1, 7, 3, 2, 6, 4, np.nan],
+        }
+    )
+
+    examples = stats.model_checking_examples(fits)
+
+    assert examples == {"rich": ("c", 1, "02_r1"), "sparse": ("e", 1, "02_r1")}
+
+
+def test_model_checking_examples_of_one_and_two_sessions():
+    one = pd.DataFrame(
+        {"animal": ["a"], "session_date": [1], "epoch": ["02_r1"], "n_events": [3]}
+    )
+    two = pd.concat([one, one.assign(animal="b", n_events=1)], ignore_index=True)
+
+    assert stats.model_checking_examples(one) == {"rich": ("a", 1, "02_r1")}
+    assert stats.model_checking_examples(two) == {
+        "rich": ("a", 1, "02_r1"),
+        "sparse": ("b", 1, "02_r1"),
+    }
+    assert stats.model_checking_examples(one.assign(n_events=np.nan)) == {}

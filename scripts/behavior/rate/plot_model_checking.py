@@ -53,6 +53,7 @@ from continuum_swr_replay.analysis.behavior.rate.per_bin_rate_ladder import (  #
 from continuum_swr_replay.analysis.behavior.rate.rate_fit_statistics import (  # noqa: E402
     arrival_window_statistics,
     ladder_fit_statistics,
+    model_checking_examples,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     require_swr_source,
@@ -465,20 +466,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     onsets = attach_event_ends(
         attach_is_swr_to_onsets(onset_table, event_table), event_table
     )
-    full_nl = df[(df.outcome == "non_local") & (df.model == FULL)].dropna(
-        subset=["n_events"]
+    examples = model_checking_examples(
+        df[(df.outcome == "non_local") & (df.model == FULL)]
     )
-    if full_nl.empty:
+    if not examples:
         print("No fitted non_local M7 sessions; skipping example quartets.")
         return
-    ordered = full_nl.sort_values("n_events")
-    examples = {"rich": tuple(ordered.iloc[-1][SC])}
-    # ~17th percentile as a genuinely sparser (but still fitted) example; fall
-    # back to a distinct session if the run is tiny.
-    sparse_pos = min(len(ordered) // 6, len(ordered) - 2) if len(ordered) > 1 else 0
-    sparse_keys = tuple(ordered.iloc[sparse_pos][SC])
-    if sparse_keys != examples["rich"]:
-        examples["sparse"] = sparse_keys
     (stop_cohort,) = df["stop_cohort"].unique()
     for tag, keys in examples.items():
         design, fit = _refit_session(stop, onsets, keys, "non_local", stop_cohort)
