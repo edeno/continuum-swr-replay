@@ -12,7 +12,8 @@ pass, and how far the state-space detector's bounds are from the truth.
 figure (``scripts/figures/generate_memoryless_comparison.py``) draws and checks
 the same functions' values.
 
-Every function takes ``decoded``, :func:`simulate_and_decode`'s dict; those
+Every function but :func:`draws_from_passing` (which takes the result of
+:func:`shuffle_of`) takes ``decoded``, :func:`simulate_and_decode`'s dict; those
 reading the state-space detector's events (:func:`bound_error_ms`,
 :func:`recording_numbers`) also need its ``"state_space_intervals"``, which
 :func:`state_space_intervals` gives. An event is a row of

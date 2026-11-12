@@ -10,9 +10,13 @@ Lower panels summarize the sweep in `scripts/detection/sweep_memoryless_detectio
 which wrote replays of chosen path length, duration, firing rate and distance
 from the animal one at a time into a simulated recording and recorded what each
 detector reported, and its controls and held-out sweeps. Those panels read the
-aggregates the sweeps save, through the functions the detection summary reports
-from (``memoryless_sequence.sweep_statistics``), so the figure and the numbers
-quoted from the sweeps cannot disagree; re-run the sweeps to change them.
+aggregates the sweeps save; re-run the sweeps to change them. The onset and
+offset error, burst, carving and held-out panels read them through the
+functions the detection summary reports from
+(``memoryless_sequence.sweep_statistics``), so those panels and the numbers
+quoted from the sweeps cannot disagree. The detection-rate grids
+(:func:`detection_grid`) and the absorption panel (:func:`plot_absorption`)
+read the sweep summary's rows directly.
 
 The figure's caption is prose this script does not write, and no draft of it is
 kept in the repository. Its numbers are reported values
