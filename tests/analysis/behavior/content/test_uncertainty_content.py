@@ -158,6 +158,30 @@ def test_summarize_horserace_is_animal_balanced_and_signs_uncertainty_positive()
     assert unc["median_cond_number"] > 0
 
 
+def test_horserace_consistency_counts_animals_with_the_median_s_sign():
+    """Six sessions of three animals; the coefficient's median is negative.
+
+    Sessions -3 -2 -1 0.5 1 1: median -0.25. Animals a -1.5, b -1, c 0.75: two
+    share the median's sign, one is positive.
+    """
+    coefficients = pd.DataFrame(
+        {
+            "population": "all",
+            "animal": ["a", "a", "b", "b", "c", "c"],
+            "coef_x": [-1.0, -2.0, -3.0, 1.0, 0.5, 1.0],
+            "cond_number": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        }
+    )
+
+    row = summarize_horserace(coefficients).iloc[0]
+
+    assert row["predictor"] == "x"
+    assert row["median"] == pytest.approx(-0.25)
+    assert row["n_animals"] == 3
+    assert row["n_animals_consistent"] == 2
+    assert row["n_sessions"] == 6
+
+
 def _synthetic_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Create complete stop, belief, and event-arm tables without mocks."""
     stop_rows = []
