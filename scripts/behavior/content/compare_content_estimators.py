@@ -965,7 +965,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "n_draws": args.n_bootstrap,
                 "seed": args.seed,
                 "percentiles": list(BOOTSTRAP_PERCENTILES),
-                "unit": "animal",
+                "unit": "animal, then session within animal",
             },
             "aic_equalization": (
                 "multinomial_log_constant over the count matrix added to both "
