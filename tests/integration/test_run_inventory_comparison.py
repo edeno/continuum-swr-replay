@@ -33,7 +33,10 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.analysis.events import analysed_time, swr_source
-from continuum_swr_replay.analysis.inventory_comparison import inventory_run
+from continuum_swr_replay.analysis.inventory_comparison import (
+    epoch_comparison,
+    inventory_run,
+)
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     coverage_from_observations,
     still_intervals,
@@ -570,8 +573,8 @@ class TestTheStoredTablesRebuildTheComparison:
         saved = pd.read_pickle(inventory_run.decode_path(identifier))
         dot = analysed_time.with_swr_source(saved)
         with pytest.MonkeyPatch.context() as patch:
-            patch.setattr(runner, "event_matches", spy)
-            runner.compare_epoch(
+            patch.setattr(epoch_comparison, "event_matches", spy)
+            epoch_comparison.compare_epoch(
                 dot,
                 analysed_time.artifact_event_drops(saved),
                 decode_run_id="decode",
