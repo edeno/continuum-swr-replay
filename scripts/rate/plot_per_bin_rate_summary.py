@@ -36,6 +36,7 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     attach_is_swr_to_onsets,
 )
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (  # noqa: E402
+    aic_difference_statistics,
     fit_rows,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
@@ -49,6 +50,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
     fitted_time_course,
+    ladder_fit_statistics,
     reward_kernel_by_lag,
     self_history_kernel_by_lag,
 )
@@ -320,17 +322,24 @@ def _panel_selfhistory(ax, df):
 
 
 def _panel_ladder(ax, df):
-    g = df[df.outcome == "non_local"]
-    aic0 = g[g.model == "M0_const"]["aic"].median()
-    daic = [g[g.model == m]["aic"].median() - aic0 for m in LADDER]
+    """Each stop-clock rung against M0_const for the non-local population: the
+    median within-session AIC difference (``aic_difference_statistics``) and
+    the median held-out bits per event over the sessions with a finite score
+    (``rate_fit_statistics.ladder_fit_statistics``)."""
+    g = fit_rows(df, outcome="non_local")
+    null = fit_rows(g, model="M0_const")
+    daic = [
+        aic_difference_statistics(fit_rows(g, model=m), null)["median"] for m in LADDER
+    ]
+    ladder = ladder_fit_statistics(g)
     x = np.arange(len(LADDER))
     ax.bar(x, daic, color="0.6")
     ax.set_xticks(x)
     ax.set_xticklabels(LADDER, rotation=70, ha="right", fontsize=6)
-    ax.set_ylabel("median ΔAIC vs M0 (lower=better)")
+    ax.set_ylabel("median within-session ΔAIC vs M0 (lower=better)")
     ax.set_title("E. Model ladder (non-local): ΔAIC + CV bits/event")
     ax2 = ax.twinx()
-    cvb = [g[g.model == m]["cv_bits_per_event"].median() for m in LADDER]
+    cvb = [ladder.loc[(m, "non_local"), "cv_bits_median"] for m in LADDER]
     ax2.plot(x, cvb, marker="D", color="C1", lw=1.5, ms=4)
     ax2.axhline(0, color="C1", ls=":", alpha=0.5)
     ax2.set_ylabel("CV bits/event (orange, higher=better)", color="C1")
