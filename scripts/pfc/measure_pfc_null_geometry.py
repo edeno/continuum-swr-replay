@@ -56,7 +56,10 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     _matchable_subset_seed,
     null_draw_seeds,
 )
-from continuum_swr_replay.analysis.pfc.load_population import load_population_data
+from continuum_swr_replay.analysis.pfc.load_population import (
+    MIN_FIRING_RATE_HZ,
+    load_population_data,
+)
 from continuum_swr_replay.analysis.pfc.matched_control import (
     MATCHED_CONTROL_SOURCE_CLASS,
     make_matched_control_times,
@@ -524,8 +527,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--min-firing-rate",
         type=float,
-        default=1.0,
-        help="Inclusion gate on the immobility firing rate, as the audit uses.",
+        default=MIN_FIRING_RATE_HZ,
+        help=(
+            "Inclusion gate on the immobility firing rate, in Hz; by default "
+            "the summary's and Figure 4's (none)."
+        ),
     )
     parser.add_argument("--out", type=Path, default=None, help="Write the report here.")
     args = parser.parse_args(argv)

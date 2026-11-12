@@ -104,6 +104,13 @@ REQUIRED_COLUMNS = (
 )
 
 
+MIN_FIRING_RATE_HZ = 0.0
+"""The population's firing-rate cutoff, in Hz: none (the lead, 2026-10-29), so
+every unit with a usable fit. A unit with no spike in the fitted bins has no fit
+and drops out in the loader. The mpfc summary, Figure 4 and the
+``scripts/pfc/`` reports read this one value."""
+
+
 #: Tests the superseded bundles were FDR-corrected on. Kept so an audit can
 #: read those bundles as they were read then; nothing current produces them.
 LEGACY_FDR_TESTS = (
@@ -274,7 +281,7 @@ def _validate_heldout_provenance(
 
 def load_population_data(
     data_dir: Path,
-    min_firing_rate: float = 1.0,
+    min_firing_rate: float = MIN_FIRING_RATE_HZ,
     artifact_suffix: str = "",
     inference: str = "heldout",
     *,
@@ -290,7 +297,8 @@ def load_population_data(
     data_dir : Path
         Directory containing *_mPFC_modulation.pkl and .npy files.
     min_firing_rate : float
-        Minimum immobility firing rate (Hz) to include a neuron. The screened
+        Minimum immobility firing rate (Hz) to include a neuron; by default
+        :data:`MIN_FIRING_RATE_HZ`, no cutoff. The screened
         column, ``immobility_avg_firing_rate``, is the mean rate over the bins
         the bundle was fit on -- with a stop cohort, that cohort's immobile
         bins, not every immobile bin -- so the gate screens the sample the

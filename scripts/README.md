@@ -436,7 +436,10 @@ them importable.
   classes'; how much of the engagement null's draws land on the shipped control they
   are entered beside; how many units called at raw p < .05 have no positive held-out
   improvement of their own; and how many events of each class had no legal within-bout
-  control and so entered neither side of its test.
+  control and so entered neither side of its test. It and `compare_pfc_cohorts.py`
+  load the population at the summary's firing-rate cutoff
+  (`analysis/pfc/load_population.py`'s `MIN_FIRING_RATE_HZ`, none) unless
+  `--min-firing-rate` gives another.
 - `measure_pfc_mark_context.py` — measures what the marked kernels' content mark
   (`current_arm_fraction`) is entangled with, session by session and per replay
   class, over the well-anchored events of the canonical `event_arm_table`: its

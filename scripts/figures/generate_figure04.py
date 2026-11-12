@@ -98,7 +98,10 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     DEFAULT_CONTROL_DRAWS,
     empirical_pvalue_floor,
 )
-from continuum_swr_replay.analysis.pfc.load_population import load_population_data
+from continuum_swr_replay.analysis.pfc.load_population import (
+    MIN_FIRING_RATE_HZ,
+    load_population_data,
+)
 from continuum_swr_replay.analysis.pfc.matched_control import artifact_dropped_events
 from continuum_swr_replay.analysis.pfc.modulation import (
     REPORT_HALF_WINDOW_S,
@@ -112,7 +115,6 @@ from continuum_swr_replay.figure_utilities import (
 )
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 from continuum_swr_replay.paths import processed_data_dir
-from continuum_swr_replay.reported.mpfc import MIN_FIRING_RATE_HZ
 from continuum_swr_replay.visualization.palettes import COLORS
 
 figure_utilities.set_figure_defaults(context="paper")

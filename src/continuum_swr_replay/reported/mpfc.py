@@ -55,7 +55,10 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.pfc import population_statistics, timing
 from continuum_swr_replay.analysis.pfc.heldout import empirical_pvalue_floor
-from continuum_swr_replay.analysis.pfc.load_population import load_population_data
+from continuum_swr_replay.analysis.pfc.load_population import (
+    MIN_FIRING_RATE_HZ,
+    load_population_data,
+)
 from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
 from continuum_swr_replay.analysis.replay.coefficient_statistics import group_range
 from continuum_swr_replay.paths import (
@@ -88,10 +91,6 @@ a suffix after it."""
 
 ALPHA = 0.05
 """Figure 4's raw empirical-p threshold."""
-
-MIN_FIRING_RATE_HZ = 0.0
-"""No firing-rate cutoff (the lead, 2026-10-29): every unit with a usable fit.
-A unit with no spike in the fitted bins has no fit and drops out in the loader."""
 
 CHECK_FIRING_RATE_HZ = 1.0
 """The cutoff the main values used before 2026-10-29, kept as a check; the full

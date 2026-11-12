@@ -61,7 +61,10 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.pfc import population_statistics
-from continuum_swr_replay.analysis.pfc.load_population import load_population_data
+from continuum_swr_replay.analysis.pfc.load_population import (
+    MIN_FIRING_RATE_HZ,
+    load_population_data,
+)
 from continuum_swr_replay.analysis.pfc.modulation import curve_peaks
 from continuum_swr_replay.analysis.statistics import benjamini_hochberg
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
@@ -2491,7 +2494,15 @@ def main(argv: Sequence[str] | None = None) -> None:
             "describe."
         ),
     )
-    parser.add_argument("--min-firing-rate", type=float, default=1.0)
+    parser.add_argument(
+        "--min-firing-rate",
+        type=float,
+        default=MIN_FIRING_RATE_HZ,
+        help=(
+            "Inclusion gate on the immobility firing rate, in Hz; by default "
+            "the summary's and Figure 4's (none)."
+        ),
+    )
     parser.add_argument("--alpha", type=float, default=0.05)
     parser.add_argument(
         "--note",
