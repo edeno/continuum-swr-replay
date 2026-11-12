@@ -258,13 +258,14 @@ def test_an_epoch_without_its_inputs_is_recorded_and_the_run_goes_on(
     (inventory_root / "inv01" / "manifest.json").write_text(
         json.dumps(
             {
+                "epochs": {},
                 "settings": {
                     "cells": {
                         "exactly_one_detector": {
                             "against": ["kay", "state_space", "mua"]
                         }
                     }
-                }
+                },
             }
         )
     )

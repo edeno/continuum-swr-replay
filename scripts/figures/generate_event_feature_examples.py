@@ -79,7 +79,7 @@ from continuum_swr_replay.paths import (  # noqa: E402
     memoryless_root as memoryless_runs_root,
 )
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
-from continuum_swr_replay.runs.io import json_ready  # noqa: E402
+from continuum_swr_replay.runs.io import json_ready, read_manifest  # noqa: E402
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from continuum_swr_replay.visualization import (  # noqa: E402
@@ -423,9 +423,7 @@ def write_examples(
     runs = manifest["settings"]["input_runs"]
     inventory_dir = inventory_root / runs["inventory"]
     memoryless_dir = memoryless_root / runs["memoryless"]
-    cells = json.loads((inventory_dir / "manifest.json").read_text())["settings"][
-        "cells"
-    ]
+    cells = read_manifest(inventory_dir)["settings"]["cells"]
     against = {
         COMPARATOR_ONLY: [STATE_SPACE],
         OURS_ONLY: sorted(set(cells[EXACTLY_ONE]["against"]) - {STATE_SPACE}),

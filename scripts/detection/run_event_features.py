@@ -208,6 +208,7 @@ from continuum_swr_replay.runs.io import (  # noqa: E402
     json_ready,
     ok_epochs,
     output_path,
+    read_manifest,
     replace_outputs,
     sha256_file,
     write_json,
@@ -458,7 +459,7 @@ def epoch_tables(
     marks_hash = marks_sha256(spike_times, spike_waveform_features)
     run = _memoryless_run(identifier, stored["observations"], memoryless_dir, time)
     if run is not None:
-        memoryless = json.loads((memoryless_dir / "manifest.json").read_text())
+        memoryless = read_manifest(memoryless_dir)
         reason = memoryless_input_mismatch(
             memoryless["epochs"][identifier],
             {
@@ -828,7 +829,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     inventory_manifest = inventory_dir / "manifest.json"
     if not inventory_manifest.exists():
         sys.exit(f"--inventory-run-id: no run manifest at {inventory_manifest}.")
-    inventory = json.loads(inventory_manifest.read_text())
+    inventory = read_manifest(inventory_dir)
     input_runs = inventory["settings"]["input_runs"]
     current = {
         "swr": swr_source.SWR_INVENTORY_RUN_ID,

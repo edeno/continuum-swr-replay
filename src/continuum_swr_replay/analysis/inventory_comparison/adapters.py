@@ -30,7 +30,6 @@ the epoch: its adapter returns an empty inventory and a ``missing_run_table``
 row saying why.
 """
 
-import json
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
@@ -79,7 +78,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     validate_inventory,
 )
 from continuum_swr_replay.intervals import intersect, interval_mask
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import read_manifest, sha256_file
 from continuum_swr_replay.tables.event_ids import hash_event_id
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
@@ -274,7 +273,7 @@ def _run_files(
     manifest_path = run_dir / "manifest.json"
     if not manifest_path.exists():
         raise _Unavailable(f"no manifest at {manifest_path}")
-    manifest = json.loads(manifest_path.read_text())
+    manifest = read_manifest(run_dir)
     if manifest.get("run_id") != run_dir.name:
         raise ValueError(
             f"{manifest_path} is run {manifest.get('run_id')!r}, not the folder's "
