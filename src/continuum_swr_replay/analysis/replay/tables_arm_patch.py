@@ -15,6 +15,7 @@ from continuum_swr_replay.data_loaders.constants import (
     WELL_ARMS,
 )
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
+from continuum_swr_replay.tables.session_keys import require_session_unique_ids
 
 from ._helpers import (
     align_count_matrix as _align_count_matrix,
@@ -258,12 +259,10 @@ def build_event_patch_table(
     # 48 rows instead of the expected 6 session-patch rows). Mirror
     # the precondition already enforced in ``predict_arm_fractions``,
     # ``build_choice_dataset``, and ``stop_patch_replay``.
-    from .choice_prediction import _require_session_unique_ids
-
-    _require_session_unique_ids(
+    require_session_unique_ids(
         event_arm_table, "event_id", helper_name="build_event_patch_table"
     )
-    _require_session_unique_ids(
+    require_session_unique_ids(
         event_table, "event_id", helper_name="build_event_patch_table"
     )
     validate_event_arm_table(event_arm_table, event_table=event_table)

@@ -35,10 +35,12 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.statistics import benjamini_hochberg, signed_rank_p
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    present_session_columns,
+)
 
 from ._helpers import strict_mean, strict_sum
-from .retrospective import _session_keys
 
 __all__ = [
     "StopSummaryConfig",
@@ -86,7 +88,7 @@ def _select_arm_fractions(
     ``event_table``, which is where it originates) telling us which
     arm to look up per event.
     """
-    sess_keys = _session_keys(event_arm_table)
+    sess_keys = present_session_columns(event_arm_table)
     keep = event_arm_table[
         [*sess_keys, "event_id", "candidate_arm", arm_col, "arm_fraction"]
     ]

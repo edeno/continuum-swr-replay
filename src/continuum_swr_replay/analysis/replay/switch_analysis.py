@@ -12,7 +12,10 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    require_session_unique_ids,
+)
 
 from ._helpers import strict_mean, strict_sum
 from .choice_prediction import predict_arm_fractions
@@ -44,8 +47,6 @@ def _stop_replay_per_patch(
     'event_id'])`` and ``groupby('stop_id')`` reductions silently
     average across sessions whenever a value is reused.
     """
-    from .choice_prediction import _require_session_unique_ids
-
     eat = event_arm_table.copy()
     eat["_patch"] = eat["candidate_arm"].map(TRACK_SEGMENT_TO_PATCH)
 
@@ -62,8 +63,8 @@ def _stop_replay_per_patch(
             how="left",
         )
 
-    _require_session_unique_ids(eat, "event_id", helper_name="_stop_replay_per_patch")
-    _require_session_unique_ids(eat, "stop_id", helper_name="_stop_replay_per_patch")
+    require_session_unique_ids(eat, "event_id", helper_name="_stop_replay_per_patch")
+    require_session_unique_ids(eat, "stop_id", helper_name="_stop_replay_per_patch")
 
     p_arr = eat["_patch"].to_numpy(dtype=float)
     f_arr = eat[fraction_col].to_numpy(dtype=float)
@@ -496,12 +497,10 @@ def stop_patch_replay(
     # otherwise, and per-event sums of arm fractions can climb above
     # 1 as multiple sessions' events with the same id are added
     # together. Reuse the shared precondition helper.
-    from .choice_prediction import _require_session_unique_ids
-
-    _require_session_unique_ids(
+    require_session_unique_ids(
         event_arm_table, "event_id", helper_name="stop_patch_replay"
     )
-    _require_session_unique_ids(
+    require_session_unique_ids(
         event_arm_table, "stop_id", helper_name="stop_patch_replay"
     )
 

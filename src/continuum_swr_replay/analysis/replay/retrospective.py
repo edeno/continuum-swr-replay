@@ -53,7 +53,9 @@ from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
     WELL_PATCH_MAPPING,
 )
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import (
+    present_session_columns,
+)
 
 from ._helpers import strict_sum
 from .shuffles import next_arm_circular_shift
@@ -83,11 +85,6 @@ _PATCH_TO_TRUNK_ARM: dict[int, int] = {1: 6, 2: 7, 3: 8}
 
 # Wells are arms 0–5 (degree-1 leaves of the track graph).
 _VALID_WELL_ARMS = frozenset(WELL_PATCH_MAPPING.keys())
-
-
-def _session_keys(df: pd.DataFrame) -> list[str]:
-    """Session-key columns present in ``df``."""
-    return [c for c in SESSION_COLUMNS if c in df.columns]
 
 
 def _visit_context_ids(event_table: pd.DataFrame) -> pd.Series:
@@ -181,7 +178,7 @@ def at_well_event_cohort(
     at_well, _ = select_event_cohort(event_table, cohort="at_well")
     current = pd.to_numeric(at_well["occupancy_well_arm"], errors="coerce")
     events = at_well.loc[np.isfinite(current)].reset_index(drop=True)
-    key_cols = [*_session_keys(event_table), "event_id"]
+    key_cols = [*present_session_columns(event_table), "event_id"]
     keys = events[key_cols].drop_duplicates()
 
     def _restrict(frame: pd.DataFrame) -> pd.DataFrame:
@@ -199,7 +196,7 @@ def at_well_event_cohort(
 
 def _empty_metric_frame(df: pd.DataFrame, metric_col: str) -> pd.DataFrame:
     """Empty metric frame preserving available session keys."""
-    return pd.DataFrame(columns=[*_session_keys(df), "event_id", metric_col])
+    return pd.DataFrame(columns=[*present_session_columns(df), "event_id", metric_col])
 
 
 def arm_path_well_to_well(current_arm: int, next_arm: int) -> set[int]:
@@ -265,7 +262,7 @@ def _arm_fraction_at(
     ev = event_table.dropna(subset=[target_col]).copy()
     ev[target_col] = ev[target_col].astype(int)
 
-    sess_keys = _session_keys(event_arm_table)
+    sess_keys = present_session_columns(event_arm_table)
     ea = event_arm_table[[*sess_keys, "event_id", "candidate_arm", "arm_fraction"]]
 
     merged = ev.merge(
@@ -341,7 +338,7 @@ def _ends_at_arm(
     ev = event_table.dropna(subset=[target_col]).copy()
     ev[target_col] = ev[target_col].astype(int)
 
-    sess_keys = _session_keys(event_sequence_table)
+    sess_keys = present_session_columns(event_sequence_table)
     last_bin = (
         event_sequence_table.sort_values([*sess_keys, "event_id", "t_in_event"])
         .groupby([*sess_keys, "event_id"], as_index=False)
@@ -418,7 +415,7 @@ def _contains_path(
     ev[source_col] = ev[source_col].astype(int)
     ev[target_col] = ev[target_col].astype(int)
 
-    sess_keys = _session_keys(event_sequence_table)
+    sess_keys = present_session_columns(event_sequence_table)
     # Empty ``event_sequence_table`` is a legitimate input
     # (sessions can have events but no in-event timebins yet, e.g.
     # before posterior reconstruction lands). The previous chained
@@ -536,7 +533,7 @@ def chosen_patch_fraction(
     ev = event_table.dropna(subset=["next_patch"]).copy()
     ev["next_patch"] = ev["next_patch"].astype(int)
 
-    sess_keys = _session_keys(event_arm_table)
+    sess_keys = present_session_columns(event_arm_table)
     ea = event_arm_table[
         [*sess_keys, "event_id", "candidate_arm", "arm_fraction"]
     ].copy()
@@ -608,7 +605,7 @@ def ends_at_next_patch(
     ev = event_table.dropna(subset=["next_patch"]).copy()
     ev["next_patch"] = ev["next_patch"].astype(int)
 
-    sess_keys = _session_keys(event_sequence_table)
+    sess_keys = present_session_columns(event_sequence_table)
     last_bin = (
         event_sequence_table.sort_values([*sess_keys, "event_id", "t_in_event"])
         .groupby([*sess_keys, "event_id"], as_index=False)
@@ -659,7 +656,7 @@ def compute_retrospective_metrics(
         table has ``next_patch``, and the ``prev_arm`` mirror when
         ``include_prev=True``.
     """
-    sess_keys = _session_keys(event_table)
+    sess_keys = present_session_columns(event_table)
     cf = chosen_arm_fraction(event_table, event_arm_table)
     en = ends_at_next(event_table, event_sequence_table)
     cp = contains_path_to_next(event_table, event_sequence_table)
@@ -764,7 +761,7 @@ def _compute_requested_metrics(
 ) -> pd.DataFrame:
     """Compute only selected metrics on one already-frozen event cohort."""
     metrics = _validate_requested_metrics(metrics)
-    key_cols = [*_session_keys(event_table), "event_id"]
+    key_cols = [*present_session_columns(event_table), "event_id"]
     out = event_table[key_cols].copy()
     calculators = {
         "chosen_arm_fraction": lambda: chosen_arm_fraction(
@@ -823,7 +820,7 @@ def _observable_event_keys(
     coverage still requires at least one finite decoded arm; otherwise there
     is no decoded sequence on which to evaluate set coverage.
     """
-    key_cols = [*_session_keys(event_table), "event_id"]
+    key_cols = [*present_session_columns(event_table), "event_id"]
     keys = event_table[key_cols].drop_duplicates()
     if any(
         metric in {"chosen_arm_fraction", "chosen_patch_fraction"} for metric in metrics
@@ -908,7 +905,7 @@ def _freeze_retrospective_cohort_with_audit(
             "Calibrated retrospective shuffle requires canonical event "
             f"column(s) {missing}; regenerate event tables"
         )
-    session_cols = _session_keys(event_table)
+    session_cols = present_session_columns(event_table)
     if session_cols and event_table[session_cols].drop_duplicates().shape[0] > 1:
         raise ValueError(
             "retrospective alignment requires one session at a time; "
@@ -964,7 +961,7 @@ def _freeze_retrospective_cohort_with_audit(
     events["next_arm"] = numeric_next.astype(int)
     n_events_after_valid_next = int(len(events))
 
-    key_cols = [*_session_keys(events), "event_id"]
+    key_cols = [*present_session_columns(events), "event_id"]
 
     def _restrict_family(
         frame: pd.DataFrame,
@@ -1172,7 +1169,7 @@ def freeze_retrospective_cohort(
         )
         for selected in family_metrics.values()
     ]
-    key_cols = [*_session_keys(event_table), "event_id"]
+    key_cols = [*present_session_columns(event_table), "event_id"]
     union_events = (
         pd.concat(
             [frozen.event_table for frozen in frozen_families],

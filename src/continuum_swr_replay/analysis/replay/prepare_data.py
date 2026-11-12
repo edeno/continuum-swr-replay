@@ -54,7 +54,6 @@ from continuum_swr_replay.analysis.replay.covariates import (
     load_contingency,
 )
 from continuum_swr_replay.analysis.replay.retrospective import (
-    _session_keys,
     compute_retrospective_metrics,
 )
 from continuum_swr_replay.analysis.replay.tables_arm_patch import (
@@ -86,7 +85,10 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.tables.io import (
     write_atomically,
 )
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    present_session_columns,
+)
 from continuum_swr_replay.tables.standardization import (
     assert_standardized_present,
     attach_standardized,
@@ -488,7 +490,7 @@ def _process_session(
     # than inside build_event_table. This replaces the previously
     # standalone post-hoc pass for the per-event columns.
     if event_sequence_table is not None and len(event_table) > 0:
-        sess_keys = _session_keys(event_table)
+        sess_keys = present_session_columns(event_table)
         retro = compute_retrospective_metrics(
             event_table, event_arm_table, event_sequence_table
         )

@@ -9,6 +9,10 @@ through twenty files.
 The hippocampus event table names its date column ``day`` rather than
 ``session_date``; that column name is load-bearing for that grain, so
 ``SESSION_COLUMNS_DAY`` serves it without forcing a rename.
+
+The table builders and the analyses that group by an id share two helpers
+here: :func:`present_session_columns` (the session columns a frame carries)
+and :func:`require_session_unique_ids` (an id names one session).
 """
 
 from __future__ import annotations
@@ -31,6 +35,8 @@ __all__ = [
     "n_sessions",
     "session_key_frame",
     "subset_max_per_animal",
+    "present_session_columns",
+    "require_session_unique_ids",
 ]
 
 
@@ -89,3 +95,44 @@ def subset_max_per_animal(
         keep = keep.sort_values(list(SESSION_COLUMNS))
     keep = keep.groupby("animal", sort=False).head(n)
     return frame.merge(keep, on=list(SESSION_COLUMNS))
+
+
+def present_session_columns(df: pd.DataFrame) -> list[str]:
+    """Session-key columns present in ``df``."""
+    return [c for c in SESSION_COLUMNS if c in df.columns]
+
+
+def require_session_unique_ids(
+    df: pd.DataFrame, id_col: str, *, helper_name: str
+) -> None:
+    """Raise if ``id_col`` values are not unique across sessions.
+
+    The canonical hashed event_id / stop_id columns mix session keys
+    into the hash, so each ID maps to exactly one
+    ``(animal, day, epoch)`` tuple. Helpers that do per-ID groupbys
+    (softmax / mean / sum) silently produce wrong results — fractions
+    summing above 1, dropped stops, cross-session averages — when
+    that invariant is violated. This guard catches session-local IDs
+    early with a clear message instead.
+
+    No-op when the session columns aren't present (e.g. tests that
+    pass minimal frames without animal/day/epoch).
+    """
+    missing = [c for c in SESSION_COLUMNS if c not in df.columns]
+    if missing or id_col not in df.columns:
+        return
+    per_id_session_count = (
+        df.groupby(id_col)[list(SESSION_COLUMNS)].nunique().max(axis=1)
+    )
+    bad = per_id_session_count[per_id_session_count > 1]
+    if len(bad):
+        sample = bad.index[: min(3, len(bad))].tolist()
+        raise ValueError(
+            f"{helper_name}: {id_col!r} must be globally unique across "
+            f"sessions, but {len(bad)} value(s) appear in multiple "
+            f"(animal, day, epoch) tuples (e.g. {sample}). Use the "
+            "canonical hashed IDs from "
+            "``tables.event_ids.hash_event_id`` / "
+            "``hash_stop_id`` (or the ContFrag equivalents) before "
+            "calling this helper."
+        )

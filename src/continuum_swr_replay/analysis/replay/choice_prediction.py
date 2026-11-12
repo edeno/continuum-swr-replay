@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import WELL_ARMS
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import require_session_unique_ids
 
 from ._fit_diagnostics import (
     EXPECTED_FIT_ERRORS,
@@ -53,42 +53,6 @@ logger = logging.getLogger(__name__)
 # already documents that trunk arms cannot be stop endpoints. The
 # learning-stage helpers use the same set under
 # ``StopSummaryConfig.well_arms`` for "best arm" lookups.
-
-
-def _require_session_unique_ids(
-    df: pd.DataFrame, id_col: str, *, helper_name: str
-) -> None:
-    """Raise if ``id_col`` values are not unique across sessions.
-
-    The canonical hashed event_id / stop_id columns mix session keys
-    into the hash, so each ID maps to exactly one
-    ``(animal, day, epoch)`` tuple. Helpers that do per-ID groupbys
-    (softmax / mean / sum) silently produce wrong results — fractions
-    summing above 1, dropped stops, cross-session averages — when
-    that invariant is violated. This guard catches session-local IDs
-    early with a clear message instead.
-
-    No-op when the session columns aren't present (e.g. tests that
-    pass minimal frames without animal/day/epoch).
-    """
-    missing = [c for c in SESSION_COLUMNS if c not in df.columns]
-    if missing or id_col not in df.columns:
-        return
-    per_id_session_count = (
-        df.groupby(id_col)[list(SESSION_COLUMNS)].nunique().max(axis=1)
-    )
-    bad = per_id_session_count[per_id_session_count > 1]
-    if len(bad):
-        sample = bad.index[: min(3, len(bad))].tolist()
-        raise ValueError(
-            f"{helper_name}: {id_col!r} must be globally unique across "
-            f"sessions, but {len(bad)} value(s) appear in multiple "
-            f"(animal, day, epoch) tuples (e.g. {sample}). Use the "
-            "canonical hashed IDs from "
-            "``tables.event_ids.hash_event_id`` / "
-            "``hash_stop_id`` (or the ContFrag equivalents) before "
-            "calling this helper."
-        )
 
 
 # ── Residualized replay ──
@@ -130,7 +94,7 @@ def predict_arm_fractions(
         ``residual_frac`` columns added.
     """
     eat = event_arm_table.copy()
-    _require_session_unique_ids(eat, event_col, helper_name="predict_arm_fractions")
+    require_session_unique_ids(eat, event_col, helper_name="predict_arm_fractions")
 
     # Event-wise NaN filtering matches ``fit_conditional_poisson``:
     # if any predictor (or the observed fraction) is NaN for any
@@ -302,10 +266,10 @@ def build_choice_dataset(
     # stops.
     # Both inputs are aggregated by stop_id later, which produces
     # session-mixing means / drops if stop_id repeats across sessions.
-    _require_session_unique_ids(
+    require_session_unique_ids(
         stop_table, "stop_id", helper_name="build_choice_dataset"
     )
-    _require_session_unique_ids(
+    require_session_unique_ids(
         event_arm_table, "stop_id", helper_name="build_choice_dataset"
     )
 
