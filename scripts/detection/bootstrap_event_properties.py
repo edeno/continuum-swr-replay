@@ -25,7 +25,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import time
 from collections.abc import Sequence
@@ -44,6 +43,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.runs.io import files_sha256, sha256_file
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 SEED = 20261028
@@ -113,10 +113,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     replicates.to_parquet(folder / "replicates.parquet", index=False)
     intervals.to_csv(folder / "intervals.csv")
     event_table = table_path("event_table", replay_content_dir())
-    digest = hashlib.sha256()
-    for p in start_paths:
-        digest.update(p.name.encode())
-        digest.update(hashlib.sha256(p.read_bytes()).digest())
     (folder / "manifest.json").write_text(
         json.dumps(
             {
@@ -124,12 +120,12 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "commit": described_commit(),
                 "event_table": {
                     "path": str(event_table),
-                    "sha256": hashlib.sha256(event_table.read_bytes()).hexdigest(),
+                    "sha256": sha256_file(event_table),
                 },
                 "start_distance": {
                     "folder": START_DIR,
                     "n_files": len(start_paths),
-                    "sha256": digest.hexdigest(),
+                    "sha256": files_sha256(start_paths),
                 },
                 "n_events": len(events),
                 "n_replicates": args.n_replicates,
