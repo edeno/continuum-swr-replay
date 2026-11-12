@@ -102,8 +102,9 @@ layers below it, never from a layer above:
    only the foundation, `analysis/constants.py` (which itself imports only the
    foundation), `analysis/shared_statistics.py` and itself. `analysis/shared_statistics.py` holds
    the statistics that know nothing of the task, for every `analysis/` package: the
-   signed-rank test, the Benjamini-Hochberg correction and the animal-balanced
-   summary over sessions. It imports nothing from the package.
+   signed-rank test, the Benjamini-Hochberg correction, the animal-balanced
+   summary over sessions and the nested bootstrap. It imports nothing from the
+   package.
 3. **The other `analysis/` packages** (`hippocampus/`, `behavior/`, `pfc/`,
    `contfrag/`, `inventory_comparison/`). `hippocampus/` never imports `pfc/` or
    `inventory_comparison/`. No `analysis/` code imports `visualization/`.
