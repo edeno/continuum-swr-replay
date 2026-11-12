@@ -1,164 +1,133 @@
-"""Regression test: ``prepare_replay_content_data.py`` always writes
-``event_sequence_table.pkl``, even when no session contributed
-sequence rows.
+"""``run_prepare_data`` always writes ``event_sequence_table``, even when no
+session contributed sequence rows.
 
-The retrospective-alignment pass does
-``read_table(INPUT_DIR / "event_sequence_table.pkl")``
-unconditionally. The previous prep code returned ``None`` for the
-aggregated sequence frame and skipped the save when no posterior
-was available, which crashed the retrospective pass with
-``FileNotFoundError``. The fix builds an empty schema-complete
-frame in that branch so the retrospective pass can read a real file and the
-existing "empty sequence table is legitimate" path in
-``contains_path_to_next`` then handles it cleanly.
-
-The contract the prep script must keep:
-
-1. The aggregator never assigns ``event_sequence_table_all = None``
-   (otherwise the saver loop's ``if frame is None: continue``
-   branch silently drops the file).
-2. The save loop tuple actually includes
-   ``("event_sequence_table", event_sequence_table_all)`` — without
-   it, no fallback frame is enough.
-3. The empty-fallback path uses the canonical schema from
-   :data:`_EVENT_SEQUENCE_TABLE_COLUMNS` so the retrospective pass finds the
-   columns it expects when the reader returns 0 rows.
-
-These three preconditions are checked here through AST inspection
-(structural) plus a behavioral roundtrip of the empty schema frame
-(write_table → read_table preserves the canonical column order).
+The retrospective-alignment pass and ``write_regeneration_manifest.py`` read
+``event_sequence_table`` unconditionally, so a run in which no session had a
+posterior must still publish it: an empty frame with the canonical columns of
+:data:`_EVENT_SEQUENCE_TABLE_COLUMNS`, which the retrospective helpers treat as
+a legitimate input.
 """
 
 from __future__ import annotations
 
-import ast
-from pathlib import Path
+import argparse
 
+import numpy as np
 import pandas as pd
+import pytest
 
+from continuum_swr_replay.analysis.behavior.tables import prepare_data
 from continuum_swr_replay.analysis.behavior.tables._tables_common import (
     _EVENT_SEQUENCE_TABLE_COLUMNS,
 )
 from continuum_swr_replay.tables.io import read_table, write_table
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
-# The build lives in the package; its command line is
-# scripts/tables/prepare_replay_content_data.py.
-PREPARE_DATA = (
-    REPO_ROOT / "src/continuum_swr_replay/analysis/behavior/tables/prepare_data.py"
-)
+SESSION = {"animal": "test", "session_date": 20200101, "epoch": "01_r1"}
 
 
-def _main_function_ast() -> ast.Module:
-    """Parse the whole prepare_data module.
+def _session_tables() -> tuple[list, list, list, list]:
+    """One session's event, event-arm and stop tables, and no sequence rows.
 
-    The assembly/publish logic these tests inspect lives in the extracted stage
-    helpers (``_assemble_canonical_tables`` / ``_publish_canonical_tables``), not
-    in ``main`` itself, so walk the module rather than a single function.
+    One non-local event in one stop, with the nine arm rows the patch
+    projection needs (arms 0, 1, 6 are patch 1; 2, 3, 7 patch 2; 4, 5, 8
+    patch 3).
     """
-    return ast.parse(PREPARE_DATA.read_text())
-
-
-def test_event_sequence_table_all_never_assigned_None_in_main():
-    main_fn = _main_function_ast()
-    bad = []
-    for stmt in ast.walk(main_fn):
-        if isinstance(stmt, ast.Assign):
-            for target in stmt.targets:
-                if (
-                    isinstance(target, ast.Name)
-                    and target.id == "event_sequence_table_all"
-                ):
-                    rhs_dump = ast.dump(stmt.value)
-                    if (
-                        "Constant(value=None" in rhs_dump
-                        or "NameConstant(value=None" in rhs_dump
-                    ):
-                        bad.append(rhs_dump)
-    assert not bad, (
-        "event_sequence_table_all is still being assigned None in "
-        f"main() — the retrospective pass will crash on read. RHS samples: "
-        f"{bad}"
+    events = pd.DataFrame(
+        [
+            {
+                **SESSION,
+                "event_id": 1,
+                "stop_id": 1,
+                "n_nonlocal_bins": 4,
+                "n_undecoded_bins": 4,
+                "last_rewarded_arm": np.nan,
+                "prev_patch": np.nan,
+                "did_last_completed_trip_switch_patch": 0,
+                "is_swr": False,
+            }
+        ]
     )
-
-
-def test_save_loop_includes_event_sequence_table_tuple():
-    """The saver iterates a hard-coded ``(name, frame)`` tuple list.
-    A regression that drops the ``event_sequence_table`` entry
-    leaves the retrospective pass without a file to read, regardless of how
-    correct the empty-fallback frame is."""
-    module = _main_function_ast()
-    found = False
-    # The publish spec is a ``(basename, table_key, frame)`` tuple (basename
-    # first, frame last), passed to ``_publish_canonical_tables``. Find it
-    # wherever it is built in the module.
-    for node in ast.walk(module):
-        if not isinstance(node, ast.Tuple) or len(node.elts) < 2:
-            continue
-        name_node, frame_node = node.elts[0], node.elts[-1]
-        if (
-            isinstance(name_node, ast.Constant)
-            and name_node.value == "event_sequence_table"
-            and isinstance(frame_node, ast.Name)
-            and frame_node.id == "event_sequence_table_all"
-        ):
-            found = True
-            break
-    assert found, (
-        "The publish spec no longer pairs "
-        '("event_sequence_table", ..., event_sequence_table_all); '
-        "the retrospective pass's read will fail with FileNotFoundError."
+    arms = range(9)
+    event_arms = pd.DataFrame(
+        {
+            "event_id": 1,
+            "candidate_arm": list(arms),
+            "arm_count_hard": 0.0,
+            "is_same_patch_as_current": 0,
+            "reward_count_candidate_arm_last10_known_trials": np.nan,
+            "visit_recency_trials": np.nan,
+            "is_candidate_arm_never_visited": np.nan,
+        }
     )
+    stops = pd.DataFrame([{**SESSION, "stop_id": 1, "n_selected_events": 1}])
+    return [events], [event_arms], [stops], []
 
 
-def test_empty_fallback_uses_canonical_sequence_schema():
-    """The else-branch when no session emitted sequence rows must
-    build the empty frame from ``_EVENT_SEQUENCE_TABLE_COLUMNS``
-    so the saved file has the canonical column order. A regression
-    that constructs an empty ``pd.DataFrame()`` instead writes a
-    0-column frame; the retrospective pass then ``KeyError``s on the expected
-    fields."""
-    # The else-branch must construct a DataFrame whose columns kwarg is
-    # built from the canonical constant. AST-walk the conditional that
-    # gates on ``all_event_sequence_tables`` and inspect its else body.
-    main_fn = _main_function_ast()
-    found_canonical_call = False
-    for node in ast.walk(main_fn):
-        if not isinstance(node, ast.If):
-            continue
-        if (
-            isinstance(node.test, ast.Name)
-            and node.test.id == "all_event_sequence_tables"
-        ):
-            for else_stmt in node.orelse:
-                for sub in ast.walk(else_stmt):
-                    if (
-                        isinstance(sub, ast.Name)
-                        and sub.id == "_EVENT_SEQUENCE_TABLE_COLUMNS"
-                    ):
-                        found_canonical_call = True
-    assert found_canonical_call, (
-        "the empty-sequence-table fallback in main() no longer "
-        "references ``_EVENT_SEQUENCE_TABLE_COLUMNS`` to populate "
-        "DataFrame columns — the retrospective pass will read a 0-column frame "
-        "and KeyError on its expected fields."
+@pytest.fixture
+def published(monkeypatch, tmp_path):
+    """Run ``run_prepare_data`` on that session and return its output folder.
+
+    The Spyglass-backed steps (finding sessions, reading the contingency
+    table, building each session, the pooled standardization) are replaced;
+    the assembly and the publish loop run as written. Tables are written with
+    ``write_table``, without the canonical-schema validation the one-event
+    tables here could not pass.
+    """
+    monkeypatch.setattr(
+        prepare_data, "find_sessions", lambda max_per_animal: [{"session_id": "x"}]
     )
+    monkeypatch.setattr(prepare_data, "load_contingency", lambda path: None)
+    monkeypatch.setattr(
+        prepare_data,
+        "_build_all_session_tables",
+        lambda sessions, contingency, *, from_cache, t0: _session_tables(),
+    )
+    monkeypatch.setattr(
+        prepare_data, "_standardize_event_arm", lambda table, contingency: table
+    )
+    monkeypatch.setattr(
+        prepare_data,
+        "publish_swr_table",
+        lambda frame, path, *, table, basename: write_table(frame, path / basename),
+    )
+    monkeypatch.setattr(prepare_data, "OUTPUT_DIR", None)
+    monkeypatch.setattr(prepare_data, "SESSION_CACHE_DIR", None)
+    args = argparse.Namespace(
+        output_dir=tmp_path,
+        behavior_cache_dir=None,
+        contingency_dir=None,
+        test=False,
+        max_per_animal=None,
+        animal=None,
+        from_cache=True,
+        cache_only=False,
+        stop_only=False,
+    )
+    prepare_data.run_prepare_data(args)
+    return tmp_path
+
+
+def test_an_empty_event_sequence_table_is_published(published):
+    sequence = read_table(published / "event_sequence_table")
+
+    assert len(sequence) == 0
+    assert list(sequence.columns) == list(_EVENT_SEQUENCE_TABLE_COLUMNS)
+
+
+def test_the_other_tables_are_published_beside_it(published):
+    for name in ("event_table", "event_arm_table", "event_patch_table", "stop_table"):
+        assert len(read_table(published / name)) > 0, name
 
 
 def test_empty_canonical_frame_roundtrips_through_storage(tmp_path):
-    """Behavioral: an empty frame with the canonical schema
-    survives write_table → read_table with column order intact. This is
-    what the retrospective pass receives when no session contributed sequences,
-    so the column set is the contract the retrospective pass relies on."""
+    """An empty frame with the canonical schema survives write_table ->
+    read_table with its column order intact: what the retrospective pass
+    receives when no session contributed sequences."""
     cols = list(_EVENT_SEQUENCE_TABLE_COLUMNS)
     df = pd.DataFrame(columns=cols)
     path = write_table(df, tmp_path / "event_sequence_table")
     loaded = read_table(path)
-    assert list(loaded.columns) == cols, (
-        f"empty schema frame did not roundtrip cleanly: "
-        f"{list(loaded.columns)} != {cols}"
-    )
+    assert list(loaded.columns) == cols
     assert len(loaded) == 0
-    # Sanity: required the retrospective pass fields are present.
     for required in ("event_id", "decoded_arm_map", "nonlocal_prob"):
         assert required in loaded.columns

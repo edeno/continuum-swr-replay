@@ -188,14 +188,28 @@ def test_parse(filename, animal):
     assert parse_nwb_filename(filename)[0] == animal
 ```
 
-## Adding regression tests for un-importable scripts
+## Tests that extract a function by `ast`
 
-`scripts/tables/prepare_contfrag_replay_content_data.py` and similar prep scripts can't
-be unit-tested directly — they pull from Spyglass and run for hours. The pattern
-used in [`test_prep_event_sequence_always_written.py`](../tests/analysis/behavior/tables/test_prep_event_sequence_always_written.py)
-and [`test_contfrag_event_source_dispatch.py`](../tests/analysis/contfrag/test_contfrag_event_source_dispatch.py)
-parses the script via `ast`, optionally `exec`s a single function definition
-into an isolated namespace, then exercises it with synthetic inputs. Brittle
-by design (any restructuring of the script breaks the test) but the only way
-to catch regressions in code paths that only run during multi-hour pipeline
-jobs.
+Import what you test. A package module imports without Spyglass, so its
+functions are tested by a plain import, with the Spyglass-backed steps replaced
+by `monkeypatch`
+([`test_prep_event_sequence_always_written.py`](../tests/analysis/behavior/tables/test_prep_event_sequence_always_written.py)
+runs `run_prepare_data` that way).
+
+A few older tests still parse a file with `ast` and `exec` one function into an
+isolated namespace, or inspect a function's syntax tree, instead of importing it.
+They break on any restructuring of the file:
+
+- [`test_contfrag_paths.py`](../tests/analysis/behavior/content/test_contfrag_paths.py)
+  (`scripts/tables/prepare_contfrag_replay_content_data.py`);
+- [`test_run_quality_metrics_empty_calib.py`](../tests/scripts/checks/test_run_quality_metrics_empty_calib.py)
+  (`scripts/checks/run_quality_metrics.py`);
+- [`test_figure_script_fixes.py`](../tests/scripts/figures/test_figure_script_fixes.py)
+  (`scripts/figures/plot_swr_contrast_coefs.py`, its plotting functions);
+- [`test_prep_zero_event_session_keeps_stop_rows.py`](../tests/scripts/tables/test_prep_zero_event_session_keeps_stop_rows.py)
+  (the syntax of `_process_session` in `analysis/behavior/tables/prepare_data.py`
+  and the ContFrag prep script);
+- [`test_contfrag_hash_safety.py`](../tests/analysis/contfrag/test_contfrag_hash_safety.py)
+  (`analysis/contfrag/tables.py` and `tables/event_ids.py`, both importable now).
+
+Do not add another; convert one of these to an import when you touch it.
