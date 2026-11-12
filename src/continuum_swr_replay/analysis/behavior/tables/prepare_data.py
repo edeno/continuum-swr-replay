@@ -10,7 +10,11 @@ outputs, the flags, and the ``--from-cache`` contract are documented.
 Also the home of the session-scope and behavioral-cache helpers
 (:func:`find_sessions`, :func:`load_behavioral_context`,
 :func:`populate_behavioral_context_cache`, :func:`session_cache_dir`) that the
-other ``scripts/tables`` drivers share.
+other ``scripts/tables`` drivers share, and of the assembly of per-animal
+shards into one bundle (:func:`assemble_replay_content_shards`,
+:func:`assemble_replay_stop_shards`, and :func:`read_disjoint_shards`, which the
+ContFrag shard assembly also reads with), whose front end is
+``scripts/tables/assemble_replay_content_shards.py``.
 """
 
 from __future__ import annotations
