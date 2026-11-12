@@ -76,8 +76,10 @@ from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
 
+from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+    gated_coefficient_statistics,
+)
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     drop_profile,
@@ -558,6 +560,9 @@ def _run(
 
 
 def _summ(res: pd.DataFrame, ladder: dict, key_term: dict) -> None:
+    """One line per rung and population: the key term over the sessions the
+    per-term gate keeps (``gated_coefficient_statistics``); a term the gate
+    refuses has no line."""
     print(
         f"\n{'model':18s}{'pop':8s}{'term':30s}{'n':>4}{'medCoef':>9}"
         f"{'%pos':>6}{'anim':>6}{'signed-rank p':>14}"
@@ -566,22 +571,21 @@ def _summ(res: pd.DataFrame, ladder: dict, key_term: dict) -> None:
         term = key_term.get(name)
         if term is None:
             continue
-        col = f"coef_{term}"
         scope = ladder[name][1]
         for pop in ["all"] if scope == "pooled" else ["all", "SWR", "nonSWR"]:
             s = res[(res.model == name) & (res.population == pop)]
-            if col not in s.columns:
+            if f"coef_{term}" not in s.columns:
                 continue
-            x = s[col].dropna()
-            x = x[x.abs() < 10]  # drop quasi-separated sessions (coefs are O(1))
-            if len(x) < 5:
+            stats = gated_coefficient_statistics(s, term)
+            if stats["gate_refuses"]:
                 continue
-            nan = (s.groupby("animal")[col].median() > 0).sum()
-            p = wilcoxon(x)[1] if len(x) > 5 else np.nan
+            p = stats["signed_rank_p"]
             star = "***" if p < 1e-3 else "**" if p < 1e-2 else "*" if p < 0.05 else ""
+            animals = f"{stats['n_animals_positive']}/{stats['n_animals']}"
             print(
-                f"{name:18s}{pop:8s}{term:30s}{len(x):4d}{x.median():+9.3f}"
-                f"{100 * (x > 0).mean():5.0f}%{f'{nan}/5':>6}{p:14.2e} {star}"
+                f"{name:18s}{pop:8s}{term:30s}{stats['n_sessions']:4d}"
+                f"{stats['median']:+9.3f}{100 * stats['positive_fraction']:5.0f}%"
+                f"{animals:>6}{p:14.2e} {star}"
             )
 
 
