@@ -106,6 +106,14 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     summaries; interpretation moved into the manuscript's Results; the documents it
     retires and where each section goes; the inventory's findings and the lead's
     decisions.
+  - [design/2026-11-11-paper-development-plan.md](design/2026-11-11-paper-development-plan.md)
+    — proposed scientific plan for the paper's questions, validation, behavioral
+    and cortical analyses, figures, and writing, with priorities and completion
+    criteria; links to the accompanying dated review.
+  - [design/2026-11-12-paper-question-outline.md](design/2026-11-12-paper-question-outline.md)
+    — proposed main questions, subquestions, supporting controls, and mapping from
+    the current question identifiers; replay includes stationary representations
+    as well as trajectories.
   - [design/content_model_design.md](design/content_model_design.md) — the `is_swr`
     content ladder, parallel to the per-bin rate ladder, on the beta-Bernoulli covariates;
     implemented in `scripts/behavior/content/fit_swr_contrast_content.py`.
