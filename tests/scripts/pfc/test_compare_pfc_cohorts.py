@@ -1325,7 +1325,7 @@ class TestPeakShrinkage:
             fromlist=["load_population_data"],
         ).load_population_data(after, min_firing_rate=0.0)
 
-        table = shrinkage_table(population)
+        table = shrinkage_table(peak_shrinkage(population), population)
 
         assert set(table["units"]) == {"separated", "well posed"}
         assert (table["n_prior_binds"] <= table["n_units"]).all()
@@ -1349,7 +1349,9 @@ class TestPeakShrinkage:
             }
         )
 
-        table = shrinkage_table(population).set_index("units")
+        table = shrinkage_table(peak_shrinkage(population), population).set_index(
+            "units"
+        )
 
         # the other curves have no columns here and are left out
         assert set(table["curve"]) == {"SWR"}

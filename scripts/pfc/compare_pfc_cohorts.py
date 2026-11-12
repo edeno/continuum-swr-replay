@@ -1307,11 +1307,10 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def shrinkage_table(after: pd.DataFrame) -> pd.DataFrame:
+def shrinkage_table(shrinkage: pd.DataFrame, after: pd.DataFrame) -> pd.DataFrame:
     """Per curve and separation status: how far the prior moved the peak.
 
-    The rows are :func:`peak_shrinkage` of ``after`` (the penalised
-    population), grouped by curve and
+    The rows of ``shrinkage``, grouped by curve and
     :func:`~continuum_swr_replay.analysis.pfc.population_statistics.fit_status`.
     A unit whose unpenalised fit ran away has no peak to difference against,
     so its row is reported -- it is where a prior is supposed to do the work --
@@ -1320,11 +1319,17 @@ def shrinkage_table(after: pd.DataFrame) -> pd.DataFrame:
     :func:`~continuum_swr_replay.analysis.pfc.population_statistics.prior_binding_percent`
     of ``after``, the share the mpfc summary reports; on the other rows,
     ``n_prior_binds`` as a percent of the row's own units.
+
+    Parameters
+    ----------
+    shrinkage : pandas.DataFrame
+        :func:`peak_shrinkage` of ``after``.
+    after : pandas.DataFrame
+        The penalised population, from ``load_population_data``.
     """
-    frame = peak_shrinkage(after)
-    if frame.empty:
-        return frame
-    grouped = frame.groupby(["curve", "units"], dropna=False)
+    if shrinkage.empty:
+        return shrinkage
+    grouped = shrinkage.groupby(["curve", "units"], dropna=False)
 
     def finite_statistic(
         values: pd.Series, statistic: object, *, absolute: bool = False
@@ -2322,7 +2327,7 @@ def build_estimator_report(
         "supposed to do the work, and is left out of the binding count.\n"
     )
     shrinkage = peak_shrinkage(after)
-    add(_md(shrinkage_table(after)))
+    add(_md(shrinkage_table(shrinkage, after)))
     lacking = curves_lacking_shrinkage_columns(after)
     if lacking:
         add(
