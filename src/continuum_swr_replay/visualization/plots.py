@@ -131,6 +131,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from numpy.typing import NDArray
 
+from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.visualization.palettes import COLORS
 
 
@@ -476,7 +477,9 @@ def plot_spike_times(
     non_local_probabilities = acausal_state_probabilities.sel(
         states="Non-Local Continuous"
     ) + acausal_state_probabilities.sel(states="Non-Local Fragmented")
-    is_non_local = (non_local_probabilities > 0.8).values.squeeze()
+    is_non_local = (
+        non_local_probabilities > DEFAULT_NON_LOCAL_THRESHOLD
+    ).values.squeeze()
     try:
         place_fields = detector.encoding_model_[("", 0)]["place_fields"]
         neuron_sort_ind = np.argsort(
@@ -585,7 +588,13 @@ def plot_acausal_probabilities(
     ax.set_ylim((0, 1))
 
     if plot_thresholds:
-        ax.axhline(0.8, color="grey", linestyle="--", linewidth=1, zorder=10)
+        ax.axhline(
+            DEFAULT_NON_LOCAL_THRESHOLD,
+            color="grey",
+            linestyle="--",
+            linewidth=1,
+            zorder=10,
+        )
 
 
 def plot_conditional_non_local_posterior(
