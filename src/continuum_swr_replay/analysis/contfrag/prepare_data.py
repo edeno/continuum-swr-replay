@@ -29,6 +29,10 @@ import pandas as pd
 from continuum_swr_replay.analysis.behavior.tables import (
     prepare_data as replay_prepare_data,
 )
+from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
+    validate_event_arm_table,
+    validate_event_patch_table,
+)
 from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
     build_event_patch_table,
 )
@@ -493,3 +497,97 @@ def build_contfrag_tables(
     )
     logging.info("total time: %ds", int(time.time() - t0))
     return tables
+
+
+def assemble_contfrag_shards(
+    shard_dirs: list[Path],
+    *,
+    output_dir: Path,
+    event_source: str,
+    brain_area: str,
+    expected_sessions: int,
+) -> dict[str, pd.DataFrame]:
+    """Join per-animal shards of the ContFrag tables into one published bundle.
+
+    The shards' event, event-arm and stop tables are concatenated in shard
+    order and the event-patch table is projected from the whole event-arm
+    table, as :func:`build_contfrag_tables` does over every session at once.
+
+    Parameters
+    ----------
+    shard_dirs : list of Path
+        The shard folders, each written by :func:`build_contfrag_tables` for
+        one animal.
+    output_dir : Path
+        Where the four tables are published.
+    event_source : str
+        ``"SWR"`` or ``"MUA"``.
+    brain_area : str
+        ``"HPC"``, ``"mPFC"`` or ``"OFC"``.
+    expected_sessions : int
+        The number of sessions the shards must hold together.
+
+    Returns
+    -------
+    dict of str to pd.DataFrame
+        The published tables (:func:`publish_contfrag_tables`).
+
+    Raises
+    ------
+    ValueError
+        If the shards overlap or miss sessions, a shard or the bundle breaks
+        stop/event count conservation, or an ``event_id`` or ``stop_id`` is
+        missing or repeats.
+    """
+    basenames = contfrag_table_basenames(event_source, brain_area)
+    shards = replay_prepare_data.read_disjoint_shards(
+        shard_dirs,
+        {
+            name: basenames[name]
+            for name in ("event_table", "event_arm_table", "stop_table")
+        },
+        what="ContFrag",
+        expected_sessions=expected_sessions,
+    )
+    for shard_dir, frames in zip(shard_dirs, shards, strict=True):
+        validate_event_arm_table(
+            frames["event_arm_table"], event_table=frames["event_table"]
+        )
+        if int(frames["stop_table"]["n_selected_events"].sum()) != len(
+            frames["event_table"]
+        ):
+            raise ValueError(f"{shard_dir} violates stop/event count conservation")
+
+    event_table = pd.concat(
+        [frames["event_table"] for frames in shards], ignore_index=True
+    )
+    event_arm_table = pd.concat(
+        [frames["event_arm_table"] for frames in shards], ignore_index=True
+    )
+    stop_table = pd.concat(
+        [frames["stop_table"] for frames in shards], ignore_index=True
+    )
+    if (
+        event_table["event_id"].isna().any()
+        or event_table["event_id"].duplicated().any()
+    ):
+        raise ValueError("assembled event_table requires unique nonmissing event_id")
+    if stop_table["stop_id"].isna().any() or stop_table["stop_id"].duplicated().any():
+        raise ValueError("assembled stop_table requires unique nonmissing stop_id")
+    validate_event_arm_table(event_arm_table, event_table=event_table)
+    if int(stop_table["n_selected_events"].sum()) != len(event_table):
+        raise ValueError("assembled stop/event count conservation failed")
+
+    event_patch_table = build_event_patch_table(event_table, event_arm_table)
+    event_patch_table["event_source"] = event_source
+    event_patch_table["brain_area"] = brain_area
+    validate_event_patch_table(event_patch_table, event_table=event_table)
+
+    return publish_contfrag_tables(
+        event_table,
+        event_arm_table,
+        event_patch_table,
+        stop_table,
+        output_dir=output_dir,
+        basenames=basenames,
+    )
