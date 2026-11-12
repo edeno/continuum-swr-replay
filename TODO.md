@@ -91,9 +91,6 @@ Work that is deferred on purpose. Each item says when it should be done.
     and grid and keeps separated sessions, unlike
     `rate_fit_statistics.fitted_time_course`, so the plotted curve can disagree with
     the reported peak.
-  - `analysis/inventory_comparison/nonlocal_comparison.py`: `_read_epochs` globs every
-    `*_{name}.parquet` in the run folder, so it can read epochs the run's manifest
-    does not mark `ok`; `feature_run.read_inputs` reads only the `ok` ones.
 
   *When:* before the Results that cite these values or figures are drafted.
 
