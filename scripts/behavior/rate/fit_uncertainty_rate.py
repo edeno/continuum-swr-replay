@@ -68,14 +68,11 @@ from continuum_swr_replay.analysis.behavior import (  # noqa: E402
     fit_per_bin_rate_model,
     freeze_per_bin_cohort,
 )
-from continuum_swr_replay.analysis.behavior._fit_diagnostics import (  # noqa: E402
-    fit_flag_counts,
-)
 from continuum_swr_replay.analysis.behavior.coefficient_statistics import (  # noqa: E402
     coefficient_statistics,
 )
 from continuum_swr_replay.analysis.behavior.cohort_audit import (  # noqa: E402
-    cohort_record,
+    fitted_cohort_record,
     stop_own_missing,
     write_cohort_audit,
 )
@@ -501,7 +498,7 @@ def _cohort_records(
     stop_level = [
         c for c in _design_columns(MU_UNCERTAINTY) if c in stop_fitted.columns
     ]
-    n_own = int(stop_own_missing(stop_fitted, stop_level).sum())
+    own_missing = stop_own_missing(stop_fitted, stop_level)
     records = []
     for outcome in POPULATIONS_TO_FIT:
         sub = (
@@ -509,31 +506,22 @@ def _cohort_records(
             if len(models)
             else models
         )
-        n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
-        fit_keys = (
-            {tuple(r) for r in sub[list(SESSION_COLUMNS)].to_numpy()}
-            if len(sub)
-            else set()
-        )
         records.append(
-            cohort_record(
+            fitted_cohort_record(
                 MU_UNCERTAINTY.name,
                 outcome,
                 "stop",
+                sub,
+                count_column="n_stops",
                 n_in=n_postjoin + int(qvals_gap),
-                n_modeled=n_modeled,
                 sessions_in=n_sessions_postjoin,
-                sessions_modeled=len(fit_keys),
-                animals_modeled=len({k[0] for k in fit_keys}),
+                own_missing=own_missing,
+                n_qvals_gap=int(qvals_gap),
                 drop_notes=(
                     "qvals inner-join -> qvals_gap (mechanism B); immobility<=0 / NaN "
                     "stop-level predictor -> own; first-session/subset/physical "
                     "post-outcome bin gate -> excluded"
                 ),
-                n_drop_qvals_gap=int(qvals_gap),
-                n_drop_own_predictor_missing=n_own,
-                n_excluded_session=n_postjoin - n_own - n_modeled,
-                **fit_flag_counts(sub),
             )
         )
     return records

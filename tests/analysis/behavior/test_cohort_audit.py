@@ -14,6 +14,7 @@ from continuum_swr_replay.analysis.behavior.cohort_audit import (
     escape_note_field,
     estimator_skip_note,
     event_drop_buckets,
+    fitted_cohort_record,
     records_from_common_cohort_provenance,
     term_diagnostics,
     write_cohort_audit,
@@ -50,6 +51,100 @@ def test_mismatch_raises():
             sessions_modeled=9,
             animals_modeled=5,
             n_drop_own_predictor_missing=10,
+        )
+
+
+def _fits(rows):
+    return pd.DataFrame(
+        rows, columns=["animal", "session_date", "epoch", "n_stops", "converged"]
+    )
+
+
+def test_fitted_cohort_record_books_each_unit_once():
+    """Hand count: 10 stops, 4 more in the qvals gap, two sessions fit.
+
+    ``common_missing`` marks 3 stops, one of which ``own_missing`` also marks,
+    so 2 are common; the rest not modelled is the session remainder.
+    """
+    own = pd.Series([True, True] + [False] * 8)
+    common = pd.Series([False, True, True, True] + [False] * 6)
+    fits = _fits([("a", 1, "e", 2, True), ("b", 1, "e", 1, np.nan)])
+
+    rec = fitted_cohort_record(
+        "M1",
+        "all",
+        "stop",
+        fits,
+        count_column="n_stops",
+        n_in=14,
+        sessions_in=3,
+        own_missing=own,
+        common_missing=common,
+        n_qvals_gap=4,
+        n_frozen_out=4,
+        cohort_mode="common",
+        drop_notes="note",
+    )
+
+    assert rec["n_drop_qvals_gap"] == 4
+    assert rec["n_drop_own_predictor_missing"] == 2
+    assert rec["n_drop_common_cohort_other"] == 2
+    assert rec["n_modeled"] == 3
+    assert rec["n_excluded_session"] == 14 - 4 - 2 - 2 - 3
+    assert (rec["n_sessions_in"], rec["n_sessions_modeled"]) == (3, 2)
+    assert rec["n_animals_modeled"] == 2
+    # A missing convergence flag counts as not converged.
+    assert rec["n_sessions_flagged_nonconverged"] == 1
+    assert (rec["cohort_mode"], rec["drop_notes"]) == ("common", "note")
+
+
+def test_fitted_cohort_record_counts_animals_not_sessions():
+    fits = _fits([("a", 1, "e", 5, True), ("a", 2, "e", 5, True)])
+    rec = fitted_cohort_record(
+        "M1",
+        "all",
+        "stop",
+        fits,
+        count_column="n_stops",
+        n_in=12,
+        sessions_in=2,
+        own_missing=pd.Series([False] * 12),
+    )
+    assert (rec["n_sessions_modeled"], rec["n_animals_modeled"]) == (2, 1)
+    assert rec["n_drop_common_cohort_other"] == 0
+    assert rec["n_excluded_session"] == 2
+
+
+def test_fitted_cohort_record_with_no_fits_models_nothing():
+    for fits in (pd.DataFrame(), _fits([])):
+        rec = fitted_cohort_record(
+            "M1",
+            "all",
+            "event",
+            fits,
+            count_column="n_events",
+            n_in=5,
+            sessions_in=1,
+            own_missing=pd.Series([True, False, False, False, False]),
+        )
+        assert rec["n_modeled"] == 0
+        assert rec["n_sessions_modeled"] == 0
+        assert rec["n_excluded_session"] == 4
+
+
+def test_fitted_cohort_record_refuses_a_freeze_it_cannot_account_for():
+    with pytest.raises(AssertionError, match="cohort freeze removed 3"):
+        fitted_cohort_record(
+            "M1",
+            "all",
+            "stop",
+            _fits([]),
+            count_column="n_stops",
+            n_in=4,
+            sessions_in=1,
+            own_missing=pd.Series([True, False, False, False]),
+            common_missing=pd.Series([True, True, False, False]),
+            n_frozen_out=3,
         )
 
 

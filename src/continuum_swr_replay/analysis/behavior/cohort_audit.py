@@ -21,9 +21,11 @@ from collections.abc import Container, Iterable, Iterator, Sequence
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+
 # Session-level informational flags (``_fit_diagnostics.fit_flag_counts``). Carried
 # on the record but NOT subtracted in the reconciliation (they count fits, not rows).
-from ._fit_diagnostics import FLAG_FIELDS
+from ._fit_diagnostics import FLAG_FIELDS, fit_flag_counts
 from .covariates.definitions import (
     QVALS_ROW_GATED_COVARIATES,
     QVALS_SOURCED_COVARIATES,
@@ -333,6 +335,103 @@ def cohort_record(
             f"(drop buckets must be mutually exclusive and cover every dropped unit)"
         )
     return rec
+
+
+def fitted_cohort_record(
+    model: str,
+    population: str,
+    grain: str,
+    fits: pd.DataFrame,
+    *,
+    count_column: str,
+    n_in: int,
+    sessions_in: int,
+    own_missing: pd.Series,
+    common_missing: pd.Series | None = None,
+    n_qvals_gap: int = 0,
+    n_frozen_out: int = 0,
+    cohort_mode: str = "per_rung",
+    drop_notes: str = "",
+) -> dict:
+    """The cohort record of one (model, population) from its per-session fits.
+
+    The units a rung leaves out are booked in order: the qvals gap (counted by
+    the caller, already off ``own_missing``'s frame), the units ``own_missing``
+    marks, the units ``common_missing`` marks that ``own_missing`` does not,
+    and the rest of the units not modelled, which are ``n_excluded_session``.
+    ``n_modeled`` is the fits' own count of units.
+
+    Parameters
+    ----------
+    model, population, grain, cohort_mode, drop_notes : str
+        As :func:`cohort_record`.
+    fits : pd.DataFrame, shape (n_fits, n_columns)
+        This rung's per-session fits, with the session columns and
+        ``count_column``; may be empty.
+    count_column : str
+        The fits' column counting the units each fit used (``n_stops`` for a
+        per-bin rate fit, ``n_events`` for the SWR-power fit). A fit table
+        without it modelled 0.
+    n_in : int
+        The units that entered, the qvals gap included.
+    sessions_in : int
+        The sessions that entered.
+    own_missing : pd.Series of bool, shape (n_units,)
+        The units this rung's own predictors leave out.
+    common_missing : pd.Series of bool, shape (n_units,), optional
+        The units the rung's frozen cohort leaves out; those also in
+        ``own_missing`` are booked there.
+    n_qvals_gap : int
+        The units with no ``qvals_table`` row.
+    n_frozen_out : int
+        The units the cohort freeze removed; at most what ``own_missing`` and
+        ``common_missing`` account for.
+
+    Returns
+    -------
+    dict
+        The :func:`cohort_record` of the rung, with its fits' convergence and
+        separation counts.
+
+    Raises
+    ------
+    AssertionError
+        If ``n_frozen_out`` exceeds the own and common drops, or the record
+        does not reconcile.
+    """
+    n_own = int(own_missing.sum())
+    n_common = (
+        int((common_missing & ~own_missing).sum()) if common_missing is not None else 0
+    )
+    if n_frozen_out > n_own + n_common:
+        raise AssertionError(
+            f"{model}/{population}: the cohort freeze removed {n_frozen_out} "
+            f"stops but the stop-level attribution only accounts for "
+            f"{n_own + n_common} (own {n_own} + common {n_common})"
+        )
+    fit_keys = (
+        {tuple(r) for r in fits[list(SESSION_COLUMNS)].to_numpy()}
+        if len(fits)
+        else set()
+    )
+    n_modeled = int(fits[count_column].sum()) if count_column in fits else 0
+    return cohort_record(
+        model,
+        population,
+        grain,
+        cohort_mode=cohort_mode,
+        n_in=n_in,
+        n_modeled=n_modeled,
+        sessions_in=sessions_in,
+        sessions_modeled=len(fit_keys),
+        animals_modeled=len({k[0] for k in fit_keys}),
+        drop_notes=drop_notes,
+        n_drop_qvals_gap=int(n_qvals_gap),
+        n_drop_own_predictor_missing=n_own,
+        n_drop_common_cohort_other=n_common,
+        n_excluded_session=n_in - int(n_qvals_gap) - n_own - n_common - n_modeled,
+        **fit_flag_counts(fits),
+    )
 
 
 def classify_drops(dropped_mask_by_reason: dict) -> dict:

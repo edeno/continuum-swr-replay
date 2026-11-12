@@ -106,11 +106,8 @@ from continuum_swr_replay.analysis.behavior import (  # noqa: E402
     freeze_per_bin_cohort,
     per_bin_rate_gof,
 )
-from continuum_swr_replay.analysis.behavior._fit_diagnostics import (  # noqa: E402
-    fit_flag_counts,
-)
 from continuum_swr_replay.analysis.behavior.cohort_audit import (  # noqa: E402
-    cohort_record,
+    fitted_cohort_record,
     stop_own_missing,
     write_cohort_audit,
 )
@@ -530,40 +527,26 @@ def _cohort_records(
     union_missing = stop_own_missing(stop, list(dict.fromkeys(union_cols)))
     recs = []
     for name, spec in MODEL_PER_BIN_RATE.items():
-        stop_level = _stop_level_design_columns(spec, stop)
-        own_missing = stop_own_missing(stop, stop_level)
-        n_own = int(own_missing.sum())
-        n_common = int((union_missing & ~own_missing).sum())
+        own_missing = stop_own_missing(stop, _stop_level_design_columns(spec, stop))
         for outcome in POPULATIONS:
             sub = (
                 models[(models.model == name) & (models.outcome == outcome)]
                 if len(models)
                 else models
             )
-            fit_keys = (
-                {tuple(r) for r in sub[list(SESSION_COLUMNS)].to_numpy()}
-                if len(sub)
-                else set()
-            )
-            n_modeled = int(sub["n_stops"].sum()) if "n_stops" in sub else 0
-            n_frozen_out = int(frozen_drops.get(outcome, 0))
-            if n_frozen_out > n_own + n_common:
-                raise AssertionError(
-                    f"{name}/{outcome}: the cohort freeze removed {n_frozen_out} "
-                    f"stops but the stop-level attribution only accounts for "
-                    f"{n_own + n_common} (own {n_own} + common {n_common})"
-                )
             recs.append(
-                cohort_record(
+                fitted_cohort_record(
                     name,
                     outcome,
                     "stop",
+                    sub,
+                    count_column="n_stops",
                     cohort_mode="common",
                     n_in=total,
-                    n_modeled=n_modeled,
                     sessions_in=n_sessions_in,
-                    sessions_modeled=len(fit_keys),
-                    animals_modeled=len({k[0] for k in fit_keys}),
+                    own_missing=own_missing,
+                    common_missing=union_missing,
+                    n_frozen_out=int(frozen_drops.get(outcome, 0)),
                     drop_notes=(
                         "immobility<=0 / NaN own stop-level predictor -> own; "
                         "NaN only in another rung's column (frozen cohort) -> common; "
@@ -575,10 +558,6 @@ def _cohort_records(
                             else ""
                         )
                     ),
-                    n_drop_own_predictor_missing=n_own,
-                    n_drop_common_cohort_other=n_common,
-                    n_excluded_session=total - n_own - n_common - n_modeled,
-                    **fit_flag_counts(sub),
                 )
             )
     return recs

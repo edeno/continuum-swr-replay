@@ -22,7 +22,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.cohort_audit import cohort_record
+from continuum_swr_replay.analysis.behavior.cohort_audit import fitted_cohort_record
 from continuum_swr_replay.analysis.behavior.covariate_timing import (
     assert_predictor_timing,
 )
@@ -355,7 +355,6 @@ def power_cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
     fitter's own count, the sum of ``coefs["n_events"]``. ``n_excluded_session`` is
     split by the two :data:`COHORT_EXTRA_COLUMNS` (pre-outcome events, and events
     of sessions left with one outcome); the rest of it is the <30-event gate."""
-    n_in = len(df)
     # Raises if the timing columns are absent, so ``event_start_s`` below
     # needs no membership guard: reaching this point means it exists.
     _, eligible, selected, _ = balanced_post_outcome_selection(df)
@@ -378,28 +377,23 @@ def power_cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
     )
     omask = pd.Series(omask, index=df.index) & ~qmask
     complete = ~(qmask | omask)
-    fit_keys = {tuple(r) for r in coefs[SC].to_numpy()} if len(coefs) else set()
-    # The fitter reports how many events each fitted session kept.
-    n_modeled = int(coefs["n_events"].sum()) if len(coefs) else 0
-    n_qvals, n_own = int(qmask.sum()), int(omask.sum())
     records = [
-        cohort_record(
+        fitted_cohort_record(
             "swr_power",
             "all",
             "event",
-            n_in=n_in,
-            n_modeled=n_modeled,
+            coefs,
+            # The fitter reports how many events each fitted session kept.
+            count_column="n_events",
+            n_in=len(df),
             sessions_in=df.groupby(SC).ngroups,
-            sessions_modeled=len(fit_keys),
-            animals_modeled=len({k[0] for k in fit_keys}),
+            own_missing=omask,
+            n_qvals_gap=int(qmask.sum()),
             drop_notes=(
                 "qvals-derived predictor NaN (left join) -> qvals_gap (mechanism B); "
                 "other predictor/response/timing NaN -> own; pre-outcome event, "
                 "one-outcome session or <30-event session -> excluded"
             ),
-            n_drop_qvals_gap=n_qvals,
-            n_drop_own_predictor_missing=n_own,
-            n_excluded_session=n_in - n_qvals - n_own - n_modeled,
         )
     ]
     records[0].update(
