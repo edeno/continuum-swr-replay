@@ -24,7 +24,6 @@ in cm, shares in [0, 1].
 
 import numpy as np
 
-from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
     CONTINUOUS_INBOUND_EVENT,
     CONTINUOUS_OUTBOUND_EVENT,
@@ -36,6 +35,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_si
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     SIGNIFICANCE_LEVEL,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep import (
+    non_local_intervals,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     NO_CENTER,
     dispersion_cm,
@@ -43,8 +45,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
 
 __all__ = [
     "LOCAL_TOLERANCE_CM",
-    "NON_LOCAL_MINIMUM_DURATION_S",
-    "NON_LOCAL_PROB_THRESHOLD",
     "ZOOMED_EVENTS",
     "accepted_overlapping",
     "best_dispersion_cm",
@@ -65,15 +65,6 @@ __all__ = [
     "verdict",
 ]
 
-NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
-NON_LOCAL_MINIMUM_DURATION_S = 0.015
-"""The project's non-local event threshold and nominal minimum, applied with a
-timestamp-span test (:func:`state_space_intervals`): non-local probability
-above 0.8 over a first-to-last span of at least 15 ms, i.e. 9 samples on the
-simulation's 2 ms grid. ``get_confident_times`` counts samples instead (7 on the
-real decode grid; ``docs/known_issues/nonlocal_minimum_duration_rounding.md``).
-The span test is kept so the published comparison does not change."""
-
 LOCAL_TOLERANCE_CM = 15.0
 """A window decodes the animal's own place when its center is closer than this."""
 
@@ -90,6 +81,10 @@ event, over which it reports nothing."""
 
 def state_space_intervals(decoded: dict) -> list[tuple[float, float]]:
     """When the switching state-space model calls the representation non-local.
+
+    Its events are the sweep's (:func:`~continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep.non_local_intervals`:
+    non-local probability above 0.8 over a first-to-last span of at least
+    15 ms), as (start, end) times.
 
     The comparison needs this. Every event the sliding-window detector misses
     has to be an event some detector can find, or the figure shows the limits
@@ -125,15 +120,7 @@ def state_space_intervals(decoded: dict) -> list[tuple[float, float]]:
             "probabilities must sum to one at every time."
         )
 
-    above = probability > NON_LOCAL_PROB_THRESHOLD
-    edges = np.diff(above.astype(np.int8), prepend=0, append=0)
-    return [
-        (time[start], time[stop])
-        for start, stop in zip(
-            np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1, strict=True
-        )
-        if time[stop] - time[start] >= NON_LOCAL_MINIMUM_DURATION_S
-    ]
+    return [(time[a], time[b]) for a, b in non_local_intervals(time, probability)]
 
 
 def candidates_overlapping(decoded: dict, event: int) -> list[int]:
