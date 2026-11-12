@@ -30,6 +30,7 @@ them importable.
 - `run_decoding_bandit.py` — continuum decoding for the bandit task (HPC/mPFC/OFC).
 - `run_decoding_contfrag.py` — decoding for the ContFrag (SWR/MUA) event sources.
 - `_decode_runner.py` — not a script: the flow both decode runners share, imported as `scripts.decoding._decode_runner`.
+- `measure_decoder_quality.py` — each analysed epoch's Local-state decoding error, state fractions and calibration curve, which the events summary reads.
 
 ## `detection/` — event detectors and the detection comparison
 - `_report.py` — not a script: what the two detection-comparison reports share, imported as `scripts.detection._report`.
