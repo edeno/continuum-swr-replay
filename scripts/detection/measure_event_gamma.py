@@ -41,23 +41,16 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events import analysed_time, swr_source
-from continuum_swr_replay.analysis.hippocampus.brain_state_reference import (
-    brain_state_reference,
-    regime_masks,
-)
 from continuum_swr_replay.analysis.hippocampus.gamma_power import (
     FILTER_ORDER,
     GAMMA_BANDS,
-    band_power,
-    event_means,
-    power_change_db,
-    samples_in_intervals,
-    zscore_on,
+)
+from continuum_swr_replay.analysis.hippocampus.gamma_power import (
+    epoch_gamma as epoch_gamma_measures,
 )
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
-from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.paths import (
     processed_data_dir,
     replay_content_dir,
@@ -77,7 +70,8 @@ def out_dir(name: str = "event_gamma") -> Path:
 def epoch_gamma(
     identifier: str, record: dict[str, Any], events: pd.DataFrame
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """One epoch's events with their mean gamma, and its reference levels."""
+    """One epoch's events with their mean gamma, and its reference levels
+    (``gamma_power.epoch_gamma`` on the epoch's LFP and decode frame)."""
     inputs = get_ripple_band_inputs(record["nwb_file_name"], record["epoch_name"])
     keep = np.isin(inputs["electrode_ids"], np.asarray(record["electrode_ids"]))
     if keep.sum() != len(record["electrode_ids"]):
@@ -90,36 +84,14 @@ def epoch_gamma(
         pd.read_pickle(inventory_run.decode_path(identifier))
     )
     grid_time, _ = inventory_run.speed_trace(dot)
-    excluded = analysed_time.excluded_intervals(identifier)
-    in_span = (lfp_time >= grid_time[0]) & (lfp_time <= grid_time[-1])
-    zscore_keep = in_span & ~interval_mask(lfp_time, excluded)
-
-    starts = events["event_start_s"].to_numpy(dtype=np.float64)
-    ends = events["event_end_s"].to_numpy(dtype=np.float64)
-    is_swr = events["is_swr"].to_numpy(dtype=bool)
-    rest = regime_masks(dot)["rest"]
-    in_class = {
-        "swr": samples_in_intervals(grid_time, starts[is_swr], ends[is_swr]),
-        "non_swr": samples_in_intervals(grid_time, starts[~is_swr], ends[~is_swr]),
-    }
-    columns = {}
-    change_db = {}
-    for word, band in GAMMA_BANDS.items():
-        power = band_power(lfp, sampling_frequency, band)
-        on_grid = np.interp(grid_time, lfp_time, zscore_on(power, zscore_keep))
-        dot[f"{word}_z"] = on_grid
-        columns[f"{word}_z"] = event_means(grid_time, on_grid, starts, ends)
-        power_on_grid = np.interp(grid_time, lfp_time, power)
-        dot[f"{word}_power"] = power_on_grid
-        columns[f"{word}_power"] = event_means(grid_time, power_on_grid, starts, ends)
-        for group, mask in in_class.items():
-            change_db[f"{word}_db_{group}"] = power_change_db(power_on_grid, mask, rest)
-    reference = brain_state_reference(
+    columns, reference = epoch_gamma_measures(
+        lfp,
+        lfp_time,
+        sampling_frequency,
         dot,
-        {
-            **{word: f"{word}_z" for word in GAMMA_BANDS},
-            **{f"{word}_power": f"{word}_power" for word in GAMMA_BANDS},
-        },
+        grid_time,
+        analysed_time.excluded_intervals(identifier),
+        events,
     )
     table = events[
         [*KEYS, "event_id", "event_start_s", "event_end_s", "is_swr"]
@@ -132,7 +104,6 @@ def epoch_gamma(
         "n_kept_tetrodes": int(keep.sum()),
         "sampling_frequency": sampling_frequency,
         **reference,
-        **change_db,
     }
 
 

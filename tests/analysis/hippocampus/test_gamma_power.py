@@ -1,11 +1,13 @@
 """gamma_power: band power, z-scoring and event means, on simulated signals."""
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.gamma_power import (
     GAMMA_BANDS,
     band_power,
+    epoch_gamma,
     event_means,
     power_change_db,
     samples_in_intervals,
@@ -96,3 +98,84 @@ def test_samples_in_intervals_matches_event_means_rule():
         grid, np.array([0.002, 0.011]), np.array([0.006, 0.014])
     )
     np.testing.assert_array_equal(np.flatnonzero(mask), [1, 2, 3, 6, 7])
+
+
+# --- one epoch ---------------------------------------------------------------------
+
+
+def _epoch():
+    """8 s of LFP at 1 kHz: a slow-gamma sine of amplitude 0.2, raised to 1
+    during 3.0-3.5 s (an SWR event) and 100 during 7.0-7.5 s (excluded time).
+    The decode grid steps by 2 ms over 0.5-7.9 s; the animal rests below
+    4 cm/s except while running at 20 cm/s over 5-6 s. A non-SWR event at
+    4.0-4.5 s holds no raised gamma."""
+    time = np.arange(8000) / FS
+    gain = np.full(time.size, 0.2)
+    gain[(time >= 3.0) & (time < 3.5)] = 1.0
+    gain[(time >= 7.0) & (time < 7.5)] = 100.0
+    lfp = sines(40.0, n_channels=2, seconds=8.0) * gain[:, None]
+    grid = np.round(np.arange(0.5, 7.9, 0.002), 6)
+    label = ((grid >= 3.0) & (grid <= 3.5)) | ((grid >= 4.0) & (grid <= 4.5))
+    dot = pd.DataFrame(
+        {
+            "head_speed": np.where((grid >= 5.0) & (grid < 6.0), 20.0, 1.0),
+            "in_excluded_time": (grid >= 6.9) & (grid <= 7.6),
+            "non_local_event": label.astype(int),
+            "SWR_event": ((grid >= 3.0) & (grid <= 3.5)).astype(int),
+            "MUA_event": 0,
+        },
+        index=grid,
+    )
+    excluded = pd.DataFrame({"start_time": [6.9], "end_time": [7.6]})
+    events = pd.DataFrame(
+        {
+            "event_start_s": [3.0, 4.0],
+            "event_end_s": [3.5, 4.5],
+            "is_swr": [True, False],
+        }
+    )
+    return lfp, time, dot, grid, excluded, events
+
+
+def test_epoch_gamma_measures_events_and_references_on_analysed_time():
+    lfp, time, dot, grid, excluded, events = _epoch()
+    before = dot.copy()
+
+    columns, reference = epoch_gamma(lfp, time, FS, dot, grid, excluded, events)
+
+    pd.testing.assert_frame_equal(dot, before)
+    assert list(columns) == [
+        "slow_gamma_z",
+        "slow_gamma_power",
+        "fast_gamma_z",
+        "fast_gamma_power",
+    ]
+    # power 1 in the SWR event, 0.04 elsewhere (a sine's squared envelope)
+    np.testing.assert_allclose(columns["slow_gamma_power"], [1.0, 0.04], rtol=0.1)
+    assert reference["slow_gamma_power_rest_median"] == pytest.approx(0.04, rel=0.05)
+    assert reference["slow_gamma_power_running_median"] == pytest.approx(0.04, rel=0.05)
+    assert reference["n_running_bins"] == 500
+    # each class against the mean power over quiet rest: one SWR event, so its
+    # samples' mean is the event's mean
+    rest = reference["slow_gamma_power_rest_mean"]
+    assert reference["slow_gamma_db_swr"] == pytest.approx(
+        10 * np.log10(columns["slow_gamma_power"][0] / rest)
+    )
+    assert reference["slow_gamma_db_non_swr"] == pytest.approx(
+        10 * np.log10(columns["slow_gamma_power"][1] / rest)
+    )
+    assert (
+        reference["slow_gamma_db_swr"] > 12.0 > 1.0 > reference["slow_gamma_db_non_swr"]
+    )
+    # the burst in excluded time does not enter the z-score: with it (power
+    # 10^4 for 0.5 s) the SWR event's z would be below 0
+    z = columns["slow_gamma_z"]
+    assert z[0] > 2.0
+    assert z[1] < 0.0
+    assert reference["slow_gamma_rest_median"] < 0
+    assert list(reference)[-4:] == [
+        "slow_gamma_db_swr",
+        "slow_gamma_db_non_swr",
+        "fast_gamma_db_swr",
+        "fast_gamma_db_non_swr",
+    ]

@@ -16,6 +16,9 @@ z-scored signals (``theta_power_zscore``, ``SWR_zscore``):
    events' change against the epoch's quiet rest:
    ``10 log10(mean power over the events' samples / mean power over rest)``.
 
+:func:`epoch_gamma` does all of it for one epoch, with each event's mean and the
+epoch's running and quiet-rest levels (``brain_state_reference``).
+
 The fast band stops at 100 Hz, below Colgin's upper bound (about 140 Hz), to
 keep clear of the ripple band (150-250 Hz) and of the broadband rise spikes
 leave in the LFP during SWRs.
@@ -24,8 +27,16 @@ leave in the LFP during SWRs.
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 from scipy.signal import butter, hilbert, sosfiltfilt
+
+from continuum_swr_replay.analysis.hippocampus.brain_state_reference import (
+    EVENT_COLUMNS,
+    brain_state_reference,
+    regime_masks,
+)
+from continuum_swr_replay.intervals import interval_mask
 
 GAMMA_BANDS: dict[str, tuple[float, float]] = {
     "slow_gamma": (25.0, 55.0),
@@ -151,3 +162,84 @@ def power_change_db(
     if a.size == 0 or b.size == 0:
         return float("nan")
     return float(10.0 * np.log10(a.mean() / b.mean()))
+
+
+def epoch_gamma(
+    lfp: NDArray[np.float64],
+    lfp_time: NDArray[np.float64],
+    sampling_frequency: float,
+    dot: pd.DataFrame,
+    grid_time: NDArray[np.float64],
+    excluded: pd.DataFrame,
+    events: pd.DataFrame,
+) -> tuple[dict[str, NDArray[np.float64]], dict[str, float]]:
+    """One epoch's gamma: each event's mean, the running and rest levels, and each class's change.
+
+    For each band of :data:`GAMMA_BANDS`: the band power (:func:`band_power`),
+    z-scored over the LFP samples inside the decode span and outside excluded
+    time (:func:`zscore_on`), each read onto the decode grid by linear
+    interpolation; each event's mean of both (:func:`event_means`); and the
+    change of each class of events (SWR, non-SWR) against quiet rest in dB
+    (:func:`power_change_db`, on the band power).
+
+    Parameters
+    ----------
+    lfp : NDArray, shape (n_lfp, n_channels)
+        Referenced raw LFP of the kept CA1 tetrodes.
+    lfp_time : NDArray, shape (n_lfp,)
+        Its sample times, seconds.
+    sampling_frequency : float
+        Hz.
+    dot : pd.DataFrame, shape (n_time, n_columns)
+        The epoch's decode frame read through the SWR source, with
+        ``head_speed``, ``in_excluded_time`` and the event labels
+        (``brain_state_reference.EVENT_COLUMNS``). Not changed.
+    grid_time : NDArray, shape (n_time,)
+        The decode grid (the frame's index), seconds.
+    excluded : pd.DataFrame
+        The epoch's excluded time, ``start_time`` and ``end_time``.
+    events : pd.DataFrame, shape (n_events, n_columns)
+        The epoch's events: ``event_start_s``, ``event_end_s``, ``is_swr``.
+
+    Returns
+    -------
+    columns : dict of NDArray, each shape (n_events,)
+        ``{band}_z`` and ``{band}_power``: each event's mean.
+    reference : dict
+        The running and quiet-rest levels of every column
+        (``brain_state_reference``; the z under the band's word, the power
+        under ``{band}_power``), then ``{band}_db_swr`` and
+        ``{band}_db_non_swr``.
+    """
+    in_span = (lfp_time >= grid_time[0]) & (lfp_time <= grid_time[-1])
+    zscore_keep = in_span & ~interval_mask(lfp_time, excluded)
+
+    starts = events["event_start_s"].to_numpy(dtype=np.float64)
+    ends = events["event_end_s"].to_numpy(dtype=np.float64)
+    is_swr = events["is_swr"].to_numpy(dtype=bool)
+    rest = regime_masks(dot)["rest"]
+    in_class = {
+        "swr": samples_in_intervals(grid_time, starts[is_swr], ends[is_swr]),
+        "non_swr": samples_in_intervals(grid_time, starts[~is_swr], ends[~is_swr]),
+    }
+    signals = dot[["head_speed", "in_excluded_time", *EVENT_COLUMNS]].copy()
+    columns = {}
+    change_db = {}
+    for word, band in GAMMA_BANDS.items():
+        power = band_power(lfp, sampling_frequency, band)
+        on_grid = np.interp(grid_time, lfp_time, zscore_on(power, zscore_keep))
+        signals[f"{word}_z"] = on_grid
+        columns[f"{word}_z"] = event_means(grid_time, on_grid, starts, ends)
+        power_on_grid = np.interp(grid_time, lfp_time, power)
+        signals[f"{word}_power"] = power_on_grid
+        columns[f"{word}_power"] = event_means(grid_time, power_on_grid, starts, ends)
+        for group, mask in in_class.items():
+            change_db[f"{word}_db_{group}"] = power_change_db(power_on_grid, mask, rest)
+    reference = brain_state_reference(
+        signals,
+        {
+            **{word: f"{word}_z" for word in GAMMA_BANDS},
+            **{f"{word}_power": f"{word}_power" for word in GAMMA_BANDS},
+        },
+    )
+    return columns, {**reference, **change_db}
