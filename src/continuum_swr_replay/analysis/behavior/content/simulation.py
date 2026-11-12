@@ -982,8 +982,7 @@ def make_bandit_track_graph():
     6 wells (nodes 0-5, all degree-1), 3 patch junctions (6-8), 1 center
     junction (9). Each well connects to its patch junction via a leaf arm
     (edge_id = well_id), and each patch junction connects to the center
-    via a trunk arm (edge_id 6, 7, 8). Mirrors the fixture in
-    ``tests/unit/test_replay_content.py``.
+    via a trunk arm (edge_id 6, 7, 8).
     """
     import networkx as nx
 
