@@ -85,12 +85,20 @@ class TestStage6FdrNanPropagation:
                 # Three sessions are below the six-session floor, so this role
                 # is neither tested nor part of the correction's denominator.
                 "best": _betas(0.0)[:3],
+                # Eight sessions, none with a non-zero difference: untested too.
+                "last_rewarded": np.zeros(N_SESSIONS),
             }
         )
         summary = cross_session_role_summary(coefs).set_index("role")
 
-        assert summary.loc["best", "status"] == "too_few_sessions"
-        assert np.isnan(summary.loc["best", "p_fdr"])
+        for untested, n_sessions in [("best", 3), ("last_rewarded", N_SESSIONS)]:
+            assert summary.loc[untested, "status"] == "too_few_sessions"
+            assert summary.loc[untested, "n_sessions"] == n_sessions
+            # An untested role has no median (its sessions' would be 0.229 and 0).
+            assert np.isnan(summary.loc[untested, "median_beta_inter"])
+            assert np.isnan(summary.loc[untested, "p_fdr"])
+        # A tested role's median is its sessions' (0.1 .. 1.0 in eight steps).
+        assert summary.loc["current", "median_beta_inter"] == pytest.approx(0.55)
         tested = ["current", "prev"]
         _, expected, _, _ = multipletests(
             summary.loc[tested, "p"].to_numpy(dtype=float), method="fdr_bh"
