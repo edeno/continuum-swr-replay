@@ -73,6 +73,7 @@ from continuum_swr_replay.analysis.behavior.rate.stop_statistics import (  # noq
     still_immobile_fraction,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
+    excluded_intervals_by_session,
     require_swr_source,
 )
 from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
@@ -176,9 +177,16 @@ def _panel_timecourse(ax, stop, onsets):
     exposure makes it a rate whatever the stops' durations; what changes with
     time is the support (fewer, longer, more-rewarded stops), shown by the
     survival overlay."""
+    # Read once: the stops, and so their excluded time, are the same for every
+    # population.
+    excluded = excluded_intervals_by_session(stop)
     for oc in POPS4:
         course = onset_rate_time_course(
-            stop, POPULATIONS[oc](onsets), TMAX, DESCRIPTIVE_BIN_S
+            stop,
+            POPULATIONS[oc](onsets),
+            TMAX,
+            DESCRIPTIVE_BIN_S,
+            excluded_intervals=excluded,
         )
         ax.plot(
             course.index, course["rate"], color=STYLE[oc][1], label=STYLE[oc][0], lw=1.8
