@@ -193,7 +193,7 @@ def test_parse(filename, animal):
 `scripts/tables/prepare_contfrag_replay_content_data.py` and similar prep scripts can't
 be unit-tested directly — they pull from Spyglass and run for hours. The pattern
 used in [`test_prep_event_sequence_always_written.py`](../tests/analysis/behavior/tables/test_prep_event_sequence_always_written.py)
-and [`test_contfrag_event_source_dispatch.py`](../tests/scripts/tables/test_contfrag_event_source_dispatch.py)
+and [`test_contfrag_event_source_dispatch.py`](../tests/analysis/contfrag/test_contfrag_event_source_dispatch.py)
 parses the script via `ast`, optionally `exec`s a single function definition
 into an isolated namespace, then exercises it with synthetic inputs. Brittle
 by design (any restructuring of the script breaks the test) but the only way

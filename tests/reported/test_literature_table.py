@@ -17,7 +17,7 @@ import pytest
 from continuum_swr_replay.reported import literature
 from continuum_swr_replay.reported import survey as builder
 
-PAPER_TABLES = Path(__file__).resolve().parents[3] / "paper" / "tables"
+PAPER_TABLES = Path(__file__).resolve().parents[2] / "paper" / "tables"
 
 
 @pytest.fixture(scope="module")

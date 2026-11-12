@@ -77,7 +77,7 @@ uv run --frozen python scripts/figures/generate_supp_literature_table.py
 The introduction's literature numbers (modes, ranges and shares) are computed
 from the same survey into `reported/survey.json`; after regenerating the table, run
 `uv run --frozen python scripts/reported/summarize.py --summary survey` and
-`make reported-values`. `tests/scripts/figures/test_literature_table.py` and
+`make reported-values`. `tests/reported/test_literature_table.py` and
 `tests/reported/test_reported_survey.py` fail when the committed table or summary no
 longer matches the CSV.
 
