@@ -18,8 +18,8 @@ it calls.
 | `survey.json` | `cb5c16baa03a` | yes | 32 | 0 |
 | `detection.json` | `cb5c16baa03a` | yes | 132 | 0 |
 | `events.json` | `93ac9014034d` | yes | 331 | 0 |
-| `behavior.json` | `afa8dfd15e22` | yes | 922 | 0 |
-| `mpfc.json` | `afa8dfd15e22` | yes | 604 | 0 |
+| `behavior.json` | `93ac9014034d` | yes | 922 | 0 |
+| `mpfc.json` | `93ac9014034d` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
