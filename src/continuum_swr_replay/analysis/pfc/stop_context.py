@@ -541,12 +541,15 @@ def prepare_session_stop_context(
         _session_events,
         _session_fit_population,
     )
-    from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+    from continuum_swr_replay.decoding.identifiers import (
+        format_epoch_identifier,
+        parse_nwb_filename,
+    )
     from continuum_swr_replay.runs.io import sha256_file
 
     stop_cohort = "at_well"
     session_logger = logging.getLogger(
-        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}_stop_context"
+        format_epoch_identifier(nwb_file_name, epoch_name, brain_area, "_stop_context")
     )
     cohort_stops, cohort_report = load_session_stop_cohort(
         nwb_file_name, epoch_name, cohort=stop_cohort

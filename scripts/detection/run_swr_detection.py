@@ -228,15 +228,6 @@ SPYGLASS_INPUTS_KAY = "kay_spyglass_inputs"
 """The Kay check's name for Kay run on Spyglass's own inputs (version only)."""
 
 
-def epoch_id(nwb_file_name: str, epoch_name: str) -> str:
-    """``{stem}_{epoch}_HPC``, the decoders' name for the epoch's CA1 data.
-
-    ``epoch_id("chimi20200225_.nwb", "02_r1")`` is ``"chimi20200225_02_r1_HPC"``.
-    The rule is ``swr_source.swr_epoch_id``, which the other runners call.
-    """
-    return swr_source.swr_epoch_id(nwb_file_name, epoch_name)
-
-
 def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
     """Every file an epoch can write, keyed by detector or table name."""
     paths = swr_source.swr_inventory_paths(identifier, output_dir, DETECTOR_SETTINGS)
@@ -576,7 +567,7 @@ def _detect(
     # before any input is read: a configured artifact run that cannot serve
     # the epoch fails it
     artifact_mask = epoch_artifact_intervals(
-        artifact_dir, epoch_id(nwb_file_name, epoch_name)
+        artifact_dir, swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     )
     inputs = fetch_inputs(nwb_file_name, epoch_name)
     band_check: dict[str, Any] = {
@@ -833,7 +824,7 @@ def _detect(
     stamp = {
         "produced_by": PRODUCED_BY,
         "run_id": run_id,
-        "epoch_id": epoch_id(nwb_file_name, epoch_name),
+        "epoch_id": swr_source.swr_epoch_id(nwb_file_name, epoch_name),
         "commit": record["provenance"]["commit"],
     }
     for frame in frames.values():
@@ -898,7 +889,7 @@ def run_epoch(
         or ``"partial"``, with every field the module docstring lists.
     """
     started = clock.perf_counter()
-    identifier = epoch_id(nwb_file_name, epoch_name)
+    identifier = swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     try:
         record, tables = _detect(
             nwb_file_name,
@@ -987,7 +978,7 @@ def _run_epoch_logged(
         tag="swr",
         run_epoch=run_epoch,
         describe=summary,
-        epoch_id=epoch_id,
+        epoch_id=swr_source.swr_epoch_id,
         log_provenance=True,
     )
 
@@ -1147,7 +1138,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
 
     to_run = []
     for nwb_file_name, epoch_name in epochs:
-        identifier = epoch_id(nwb_file_name, epoch_name)
+        identifier = swr_source.swr_epoch_id(nwb_file_name, epoch_name)
         if records.get(identifier, {}).get("status") == "ok" and not args.overwrite:
             print(f"{identifier}: already written", flush=True)
         else:
@@ -1176,7 +1167,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     # the workers only return records: this process alone writes the manifest
     log_directory = Path.cwd() / "logs"
     tasks = {
-        epoch_id(nwb_file_name, epoch_name): (
+        swr_source.swr_epoch_id(nwb_file_name, epoch_name): (
             nwb_file_name,
             epoch_name,
             run_epoch_kwargs,

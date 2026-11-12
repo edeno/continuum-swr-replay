@@ -31,7 +31,6 @@ from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.runs.io import array_sha256, sha256_file
 from continuum_swr_replay.tables.io import read_table
 from scripts.detection.run_carey_detection import main, run_epoch
-from scripts.detection.run_swr_detection import epoch_id
 from tests.support._swr_inventory_fixtures import write_artifact_run
 
 FS = 1000.0
@@ -40,7 +39,7 @@ BASE_TIME_S = 1.58e9
 
 NWB_FILE_NAME = "sim20200101_.nwb"
 EPOCH_NAME = "02_r1"
-IDENTIFIER = epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+IDENTIFIER = swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)
 
 INJECTED_RIPPLE_TIMES_S = (5.0, 10.0, 15.0, 20.0, 25.0)
 """Seconds after the first sample: the five ripple-plus-burst events of 30 s."""

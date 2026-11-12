@@ -46,11 +46,7 @@ from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.runs import batch
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_attrs, read_table, write_table
-from scripts.detection.run_swr_detection import (
-    epoch_id,
-    main,
-    run_epoch,
-)
+from scripts.detection.run_swr_detection import main, run_epoch
 from tests.support._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     use_artifact_run,
@@ -344,7 +340,7 @@ def test_outputs_and_manifest_fields(tmp_path):
     calls: list = []
     fetchers = _fetchers(epoch, calls=calls)
     output_dir = tmp_path / "out"
-    identifier = epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+    identifier = swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)
 
     record = run_epoch(NWB_FILE_NAME, EPOCH_NAME, output_dir=output_dir, **fetchers)
 
@@ -475,7 +471,7 @@ def test_one_detector_failing_makes_the_epoch_partial(tmp_path, monkeypatch, fai
     left from an earlier run is removed, so the folder matches the record.
     """
     output_dir = tmp_path / "out"
-    identifier = epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+    identifier = swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)
     paths = _outputs(output_dir, identifier)
     if failing == "karlsson":
         error = RuntimeError("simulated Karlsson failure")
@@ -551,7 +547,7 @@ def test_an_exception_fails_the_epoch_and_clears_its_outputs(tmp_path):
 
     fetchers["fetch_position"] = fetch_position
     output_dir = tmp_path / "out"
-    paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
+    paths = _outputs(output_dir, swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME))
     write_table(pd.DataFrame({"start_time": [1.0]}), paths["kay"])
     paths["yu_diagnostics"].write_text("{}")
 
@@ -638,7 +634,9 @@ def test_unusable_candidates_are_excluded_and_written_as_null(tmp_path):
     assert channel["scores"]["0"] is None
     assert channel["scores"]["4"] is None
     observed = read_table(
-        _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))["swr_observed"]
+        _outputs(output_dir, swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME))[
+            "swr_observed"
+        ]
     )
     zugaro = observed.loc[observed.scope == "zugaro", ["start_s", "end_s"]]
     edge = swr_detectors.settling_samples(
@@ -661,7 +659,7 @@ def test_lfp_outside_the_position_span_is_dropped(tmp_path):
     epoch = _simulated_epoch(10.0, (1.0, 5.0, 9.0))
     span = (BASE_TIME_S + 2.0, BASE_TIME_S + 8.0)
     output_dir = tmp_path / "out"
-    identifier = epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+    identifier = swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)
     fetchers = _fetchers(epoch, position_span_s=(2.0, 8.0))
 
     record = run_epoch(NWB_FILE_NAME, EPOCH_NAME, output_dir=output_dir, **fetchers)
@@ -761,7 +759,7 @@ def test_version_only_kay_reads_spyglass_inputs(tmp_path):
 
     record = run_epoch(NWB_FILE_NAME, EPOCH_NAME, output_dir=output_dir, **fetchers)
 
-    paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
+    paths = _outputs(output_dir, swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME))
     kay_check = read_table(paths["kay_version_check"])
     assert not (kay_check.detector == "kay_spyglass_inputs").any()
     direct = kay_check.detector == "kay"
@@ -818,7 +816,9 @@ def test_version_only_kay_runs_with_spyglass_stored_parameters(tmp_path):
     }
     assert expected[3.0] < expected[2.0]
     kay_check = read_table(
-        _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))["kay_version_check"]
+        _outputs(output_dir, swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME))[
+            "kay_version_check"
+        ]
     )
     assert (kay_check.detector == "kay_spyglass_inputs").sum() == expected[3.0]
     version_check = record["kay_version_check"]
@@ -851,7 +851,7 @@ def test_spyglass_kay_inputs_that_cannot_be_read_leave_the_epoch_partial(tmp_pat
     assert record["status"] == "partial"
     assert "version-only Kay check" in record["reason"]
     assert record["detectors"] == dict.fromkeys(DETECTORS, "ok")
-    paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
+    paths = _outputs(output_dir, swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME))
     for name in DETECTORS:
         assert paths[name].exists(), name
     version_check = record["kay_version_check"]
@@ -890,7 +890,7 @@ def test_with_no_kay_comparison_left_the_summary_claims_none(tmp_path, monkeypat
     assert record["status"] == "partial"
     assert record["kay_version_check"]["counts"] == {}
     assert record["kay_version_check"]["differences"] == {}
-    paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
+    paths = _outputs(output_dir, swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME))
     assert not paths["kay_version_check"].exists()
     parts = runner.summary(record).split("; ")
     assert not any(part.startswith("Kay check") for part in parts)
@@ -938,7 +938,7 @@ def test_a_failed_zugaro_preparation_leaves_the_epoch_partial(tmp_path, monkeypa
     }
     assert record["zugaro_channel"]["electrode_id"] in ELECTRODE_IDS.tolist()
     assert record["zugaro_channel"]["error"] == repr(error)
-    paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
+    paths = _outputs(output_dir, swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME))
     assert not paths["zugaro"].exists()
     assert set(read_table(paths["swr_observed"]).scope) == {"stored_band"}
 
@@ -994,7 +994,7 @@ def test_head_speed_varying_over_time_is_interpolated(tmp_path):
     ]
     position_time = position_info.index.to_numpy()
     head_speed = position_info.head_speed.to_numpy()
-    paths = _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME))
+    paths = _outputs(output_dir, swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME))
     for name in ("kay", "karlsson", "zugaro"):
         events = read_table(paths[name])
         assert len(events) > 0, name
@@ -1074,7 +1074,7 @@ def test_one_artifact_mask_for_all_four_detectors(tmp_path, monkeypatch):
     every detector's events that overlap it are dropped and counted, and its
     time is not observed in either scope of ``swr_observed``."""
     epoch = _main_epoch()
-    identifier = epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+    identifier = swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)
     artifact_dir = _artifact_run(tmp_path, identifier)
     masks = _recording_detectors(monkeypatch)
     lo, hi = (BASE_TIME_S + bound for bound in ARTIFACT_MASK_S)
@@ -1179,7 +1179,9 @@ def test_an_artifact_run_without_the_epoch_fails_it(tmp_path):
     assert "not in the artifact run" in record["error"]
     assert not any(
         path.exists()
-        for path in _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME)).values()
+        for path in _outputs(
+            output_dir, swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+        ).values()
     )
 
 
@@ -1307,7 +1309,9 @@ def test_rule_rt_failing_closed_fails_the_epoch(tmp_path):
     assert len(selection["coupling"]) == ELECTRODE_IDS.size
     assert not any(
         path.exists()
-        for path in _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME)).values()
+        for path in _outputs(
+            output_dir, swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+        ).values()
     )
 
 
@@ -1333,7 +1337,9 @@ def test_two_band_channels_of_one_tetrode_fail_the_epoch(tmp_path):
     assert "tetrode_selection" not in record
     assert not any(
         path.exists()
-        for path in _outputs(output_dir, epoch_id(NWB_FILE_NAME, EPOCH_NAME)).values()
+        for path in _outputs(
+            output_dir, swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+        ).values()
     )
 
 
@@ -1456,7 +1462,10 @@ def test_a_failed_epoch_is_recorded_and_the_rest_run(
     ]
     manifest = json.loads((tmp_path / "swr" / "test-run" / "manifest.json").read_text())
     epochs = manifest["epochs"]
-    good, bad = epoch_id(NWB_FILE_NAME, "02_r1"), epoch_id(NWB_FILE_NAME, "04_r2")
+    good, bad = (
+        swr_source.swr_epoch_id(NWB_FILE_NAME, "02_r1"),
+        swr_source.swr_epoch_id(NWB_FILE_NAME, "04_r2"),
+    )
     assert set(epochs) == {good, bad}
     assert epochs[good]["status"] == "ok"
     assert epochs[bad]["status"] == "failed"
@@ -1500,8 +1509,11 @@ def test_the_run_takes_its_epochs_from_the_epoch_register(
     manifest = _cli(tmp_path)
 
     assert ran == ["02_r1"]
-    assert set(manifest["epochs"]) == {epoch_id(NWB_FILE_NAME, "02_r1")}
-    assert manifest["epochs"][epoch_id(NWB_FILE_NAME, "02_r1")]["status"] == "ok"
+    assert set(manifest["epochs"]) == {swr_source.swr_epoch_id(NWB_FILE_NAME, "02_r1")}
+    assert (
+        manifest["epochs"][swr_source.swr_epoch_id(NWB_FILE_NAME, "02_r1")]["status"]
+        == "ok"
+    )
     assert not hasattr(runner, "KNOWN_NO_INPUT_EPOCHS")
     assert not hasattr(runner, "get_epoch_info")
 
@@ -1524,7 +1536,9 @@ def test_pending_only_runs_the_registers_pending_epochs_alone(
     manifest = _cli(tmp_path, *flags)
 
     assert asked == [pending_only]
-    assert set(manifest["epochs"]) == {epoch_id(NWB_FILE_NAME, EPOCH_NAME)}
+    assert set(manifest["epochs"]) == {
+        swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+    }
 
 
 def test_rerun_without_overwrite_skips_done_epochs(
@@ -1562,7 +1576,12 @@ def test_rerun_without_overwrite_skips_done_epochs(
 
     assert ran == [EPOCH_NAME, EPOCH_NAME]
     assert seen == [set()]
-    assert overwritten["epochs"][epoch_id(NWB_FILE_NAME, EPOCH_NAME)]["status"] == "ok"
+    assert (
+        overwritten["epochs"][swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)][
+            "status"
+        ]
+        == "ok"
+    )
 
 
 def test_a_rerun_with_other_settings_is_refused(
@@ -1593,7 +1612,7 @@ def test_the_run_reads_and_records_the_configured_artifact_run(
     """The artifact run is the SWR source's, read when the run starts: its id
     is in the run's settings, every epoch is masked by it, and a rerun under
     the same run id with another artifact run is refused."""
-    identifier = epoch_id(NWB_FILE_NAME, EPOCH_NAME)
+    identifier = swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)
     artifact_dir = _artifact_run(tmp_path, identifier)
     use_artifact_run(monkeypatch, artifact_dir)
     monkeypatch.setattr(
@@ -1668,7 +1687,10 @@ def test_a_second_run_under_the_same_run_id_is_refused(
     _with_fakes(monkeypatch)
     manifest = _cli(tmp_path)
 
-    assert manifest["epochs"][epoch_id(NWB_FILE_NAME, EPOCH_NAME)]["status"] == "ok"
+    assert (
+        manifest["epochs"][swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)]["status"]
+        == "ok"
+    )
     take_lock = "import fcntl, sys; fcntl.lockf(open(sys.argv[1], 'a'), fcntl.LOCK_EX | fcntl.LOCK_NB)"
     subprocess.run([sys.executable, "-c", take_lock, str(lock)], check=True)
 
@@ -1740,7 +1762,11 @@ def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
         assert task()["status"] == "skipped"
 
     assert closed == [True]
-    log = tmp_path / "logs" / f"{epoch_id(NWB_FILE_NAME, EPOCH_NAME)}_swr.log"
+    log = (
+        tmp_path
+        / "logs"
+        / f"{swr_source.swr_epoch_id(NWB_FILE_NAME, EPOCH_NAME)}_swr.log"
+    )
     assert any(
         line.endswith("NWB files Spyglass held open closed: True")
         for line in log.read_text().splitlines()

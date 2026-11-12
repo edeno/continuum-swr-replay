@@ -8,7 +8,6 @@
   invalidate it.
 - Figure 3 panel a's relative-time ticks sit on round steps and each label is
   its tick's exact relative time (task 26c).
-- ``animal_from_epoch_id`` keeps the digits of ``j16`` (task 26c).
 - The rate summary's panel B boxes log(RR), so one extreme session does not set
   its axis; the contrast coefficient figures keep their titles and x labels
   inside the figure; the arrival retention note is computed from the fit; and
@@ -562,34 +561,6 @@ def test_the_figure03_panel_a_axes_get_the_ticks_and_keep_their_limits(offline):
         assert ax.get_xlim() == (T0, T0 + 2.0)
     assert [t.get_text() for t in axes[-1].get_xticklabels()][0] == "0"
     plt.close(fig)
-
-
-# --------------------------------------------------------------------------
-# The animal id of an epoch identifier (task 26c)
-# --------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "module",
-    [
-        "scripts.behavior.content.analyze_content_occupancy",
-        "scripts.detection.analyze_event_spike_evidence",
-    ],
-)
-@pytest.mark.parametrize(
-    ("epoch_id", "animal"),
-    [
-        ("j1620210709_02_r1_HPC", "j16"),
-        ("chimi20200213_02_r1_HPC", "chimi"),
-        ("peanut20201125_04_r2_HPC", "peanut"),
-        ("senor20201031_06_r3_HPC", "senor"),
-        ("wilbur20210329_02_r1_HPC", "wilbur"),
-    ],
-)
-def test_the_animal_id_of_an_epoch_keeps_the_digits_of_j16(
-    offline, module, epoch_id, animal
-):
-    assert offline(module).animal_from_epoch_id(epoch_id) == animal
 
 
 # --------------------------------------------------------------------------

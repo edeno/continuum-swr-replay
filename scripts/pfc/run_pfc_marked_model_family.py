@@ -123,6 +123,7 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     session_seed,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import processed_data_dir, table_path
 from continuum_swr_replay.runs.batch import setup_logger
@@ -701,7 +702,7 @@ def run_analysis(
             "gpu_uuid": None,
             "gpu_name": None,
         }
-    epoch_identifier = f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
+    epoch_identifier = format_epoch_identifier(nwb_file_name, epoch_name, brain_area)
     logger = setup_logger(
         name_logfile=f"{epoch_identifier}_marked_family",
         path_logfile=log_directory / f"{epoch_identifier}_marked_family.log",
@@ -1363,9 +1364,7 @@ def main() -> None:
             gpu_record=gpu_record,
             failure_sink=sink,
         )
-        identifier = (
-            f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{args.brain_area}"
-        )
+        identifier = format_epoch_identifier(nwb_file_name, epoch_name, args.brain_area)
         for name in args.models:
             status = _written_bundle_status(
                 family_artifact_path(args.output_dir, identifier, name)

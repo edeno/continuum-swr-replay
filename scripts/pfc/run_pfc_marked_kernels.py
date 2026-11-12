@@ -89,6 +89,7 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     session_seed,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import processed_data_dir, table_path
 from continuum_swr_replay.runs.batch import setup_logger
@@ -438,7 +439,7 @@ def run_analysis(
         the session raised, or when too many units failed to converge for the
         bundle to be certified.
     """
-    epoch_identifier = f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}"
+    epoch_identifier = format_epoch_identifier(nwb_file_name, epoch_name, brain_area)
     logger = setup_logger(
         name_logfile=f"{epoch_identifier}_marked",
         path_logfile=log_directory / f"{epoch_identifier}_marked.log",
@@ -853,9 +854,7 @@ def main() -> None:
             failures.append((f"{nwb_file_name} {epoch_name}", kind, message))
             continue
         # A no-units session writes the sidecar marker only, never the table.
-        identifier = (
-            f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{args.brain_area}"
-        )
+        identifier = format_epoch_identifier(nwb_file_name, epoch_name, args.brain_area)
         artifact = marked_artifact_path(
             args.output_dir, identifier, args.scientific_mark
         )

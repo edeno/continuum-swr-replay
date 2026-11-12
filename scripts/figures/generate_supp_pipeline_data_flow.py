@@ -43,6 +43,7 @@ from continuum_swr_replay.analysis.events.analysed_time import (
     read_dot_with_swr_source,
     require_swr_source,
 )
+from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_session
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
     figure_dir,
@@ -114,7 +115,9 @@ ARM_COLORS = {
 
 
 def load_session(animal: str, day: int, epoch: str):
-    paths = decode_paths(f"{animal}{day}_{epoch}_HPC", processed_data_dir())
+    paths = decode_paths(
+        swr_epoch_id_of_session(animal, day, epoch), processed_data_dir()
+    )
     dot_path = paths.data_over_time
     env_path = paths.environment
     # Through the SWR source: its event labels, and the excluded-time column.

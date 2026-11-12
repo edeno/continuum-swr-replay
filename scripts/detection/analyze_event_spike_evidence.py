@@ -142,15 +142,6 @@ GROUP_COLORS = {
 
 
 # --- Session / epoch helpers --------------------------------------------------
-def animal_from_epoch_id(epoch_id: str) -> str:
-    """``"chimi20200213_02_r1_HPC"`` -> ``"chimi"``, ``"j1620210709_..."`` -> ``"j16"``.
-
-    The NWB stem ends in an 8-digit date, so the animal id is everything before
-    it (``j16`` keeps its digits), as :func:`parse_epoch_identifier` reads it.
-    """
-    return parse_epoch_identifier(epoch_id).animal
-
-
 def find_sessions(animal: str | None) -> list[str]:
     """Return analysed HPC epoch identifiers with detector + results + data_over_time.
 
@@ -477,7 +468,7 @@ def analyze_session(
         bin_s = float(np.median(np.diff(t)))
 
     records = []
-    animal = animal_from_epoch_id(epoch_id)
+    animal = parse_epoch_identifier(epoch_id).animal
     for group, g in events.groupby("group"):
         if len(g) > n_sample:
             print(f"    {epoch_id} [{group}]: capping {len(g)} -> {n_sample} events")

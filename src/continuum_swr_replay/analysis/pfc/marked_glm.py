@@ -36,7 +36,10 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
 from continuum_swr_replay.analysis.pfc.design import convolve_event_basis
 from continuum_swr_replay.analysis.pfc.event_sets import EVENT_SETS, SWR_NO_NON_LOCAL
 from continuum_swr_replay.analysis.pfc.heldout import empirical_pvalue
-from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+from continuum_swr_replay.decoding.identifiers import (
+    format_epoch_identifier,
+    parse_nwb_filename,
+)
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table, resolved_table_path
@@ -575,7 +578,7 @@ def prepare_marked_session_context(
 
     stop_cohort = "at_well"
     logger = logging.getLogger(
-        f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}_marked"
+        format_epoch_identifier(nwb_file_name, epoch_name, brain_area, "_marked")
     )
     results, data, position_info, alignment = _load_aligned_session(
         nwb_file_name, epoch_name, logger

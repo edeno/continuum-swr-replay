@@ -117,15 +117,6 @@ QUADRANT_LABELS = (
 
 
 # --- Session helpers ----------------------------------------------------------
-def animal_from_epoch_id(epoch_id: str) -> str:
-    """``"chimi20200213_02_r1_HPC"`` -> ``"chimi"``, ``"j1620210709_..."`` -> ``"j16"``.
-
-    The NWB stem ends in an 8-digit date, so the animal id is everything before
-    it (``j16`` keeps its digits), as :func:`parse_epoch_identifier` reads it.
-    """
-    return parse_epoch_identifier(epoch_id).animal
-
-
 def find_sessions(animal: str | None) -> list[str]:
     """Analysed HPC epoch identifiers with data_over_time + environment present.
 
@@ -269,7 +260,7 @@ def analyze(
             dwell_hist[group] += np.histogram(dw, bins=DWE)[0]
             row = {
                 "epoch_id": epoch_id,
-                "animal": animal_from_epoch_id(epoch_id),
+                "animal": parse_epoch_identifier(epoch_id).animal,
                 "group": group,
                 "n": len(da),
             }

@@ -1689,9 +1689,8 @@ def render_epoch(
     # immobility bouts (stop unit) it provides are used by every event's
     # behavioral-context panel. Per-arm predictors/content additionally need
     # the conditional posterior (NL categories only).
-    dot = read_dot_with_swr_source(
-        decode_paths(f"{epoch_id}_HPC", data_dir).data_over_time
-    )
+    hpc_epoch_id = swr_epoch_id(nwb_file_name, epoch_name)
+    dot = read_dot_with_swr_source(decode_paths(hpc_epoch_id, data_dir).data_over_time)
     imm_bouts = immobility_bout_intervals(dot)
     # The SWR trace's shading: the epoch's SWR source intervals, the ones its
     # events were classified against (not load_data's stored ripples).
@@ -1701,7 +1700,7 @@ def render_epoch(
     arm_table = None
     if (sel["category"] != "swr_not_nonlocal").any():
         posterior = load_conditional_posterior(
-            decode_paths(f"{epoch_id}_HPC", data_dir).results
+            decode_paths(hpc_epoch_id, data_dir).results
         )
         event_table = build_event_table(
             dot,

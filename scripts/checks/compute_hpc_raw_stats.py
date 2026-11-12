@@ -42,6 +42,7 @@ from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_types import DataLoadingPreset
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.paths import processed_data_dir
 
 logging.basicConfig(
@@ -57,7 +58,7 @@ ALL_STAT_COLS = list(RAW_STAT_COLUMNS) + list(TRANSITION_MATRIX_COLUMNS)
 
 def _load_detector(epoch_identifier: str):
     """Load a fitted HPC detector pickle for an epoch, or None if missing."""
-    path = decode_paths(f"{epoch_identifier}_HPC", processed_data_dir()).detector
+    path = decode_paths(epoch_identifier, processed_data_dir()).detector
     if not path.exists():
         return None
     # Local import to keep module import cheap when --help is requested
@@ -106,11 +107,7 @@ def _compute_one_session(
     raw = compute_hpc_raw_stats_single(hpc_times, hpc_feats, epoch_dur_s)
     row.update(raw)
 
-    # Derive the epoch_identifier used for saved detector pickles:
-    # {animal}{date}_{epoch}_HPC  -> strip trailing "_" and ".nwb"
-    stem = nwb_file_name.replace(".nwb", "").rstrip("_")
-    epoch_identifier = f"{stem}_{epoch_name}"
-    detector = _load_detector(epoch_identifier)
+    detector = _load_detector(format_epoch_identifier(nwb_file_name, epoch_name, "HPC"))
     if detector is not None:
         row.update(extract_discrete_transition_matrix(detector))
         # Free JAX/GPU-backed state eagerly; detectors can hold onto device
