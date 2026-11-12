@@ -21,6 +21,11 @@ run_session
 process_neuron
     One unit's statistics and curves from its fits (prefitted by
     ``run_session``, or fit here).
+load_aligned_session, session_fit_population, session_events
+    ``run_session``'s preparation of a session, in order: the decode and data
+    trimmed to their shared timestamps, the fit mask with theta phase blanked
+    in excluded time, and the event sets with the matched control. Figure 4
+    prepares its example session with them.
 build_session_fit_mask, build_session_event_sets
     The bins a session is fit on (immobility inside the stop cohort) and the
     event classes its designs are keyed on (``event_sets``).
@@ -85,11 +90,14 @@ _LAZY_EXPORTS = {
     "build_session_event_sets": ("event_sets", "build_session_event_sets"),
     "build_session_fit_mask": ("event_sets", "build_session_fit_mask"),
     "fit_immobility_models": ("fit", "_fit_immobility_models"),
+    "load_aligned_session": ("session", "_load_aligned_session"),
     "make_design_matrices": ("design", "_make_design_matrices"),
     "make_matched_control_times": ("matched_control", "make_matched_control_times"),
     "matched_control_seed": ("matched_control", "matched_control_seed"),
     "process_neuron": ("session", "process_neuron"),
     "run_session": ("session", "run_session"),
+    "session_events": ("session", "_session_events"),
+    "session_fit_population": ("session", "_session_fit_population"),
 }
 
 
@@ -119,5 +127,10 @@ if TYPE_CHECKING:  # pragma: no cover - types only
         MatchedControlDraw,
         make_matched_control_times,
         matched_control_seed,
+    )
+    from .session import _load_aligned_session as load_aligned_session  # noqa: F401
+    from .session import _session_events as session_events  # noqa: F401
+    from .session import (  # noqa: F401
+        _session_fit_population as session_fit_population,
     )
     from .session import process_neuron, run_session  # noqa: F401

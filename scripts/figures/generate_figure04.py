@@ -48,6 +48,7 @@ Usage:
 """
 
 import argparse
+import logging
 import warnings
 from collections.abc import Sequence
 from pathlib import Path
@@ -58,38 +59,19 @@ from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
-from continuum_swr_replay.analysis.events.analysed_time import (
-    excluded_intervals,
-    read_artifact_event_drops,
-)
 from continuum_swr_replay.analysis.events.cohort_selection import stop_cohort_suffix
-from continuum_swr_replay.analysis.events.swr_source import (
-    ripple_power_inputs,
-    swr_epoch_id,
-)
-from continuum_swr_replay.analysis.hippocampus import load_results
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-    align_results_to_position,
-)
 from continuum_swr_replay.analysis.pfc import (
-    build_session_event_sets,
-    build_session_fit_mask,
     fit_immobility_models,
+    load_aligned_session,
     make_design_matrices,
-    make_matched_control_times,
-    matched_control_seed,
     population_statistics,
+    session_events,
+    session_fit_population,
 )
 from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
-from continuum_swr_replay.analysis.pfc.canonical_events import (
-    load_session_canonical_events,
-    load_session_swr_intervals,
-    session_data_over_time_path,
-)
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
 from continuum_swr_replay.analysis.pfc.design import symmetric_lags
 from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
@@ -104,7 +86,6 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     MIN_FIRING_RATE_HZ,
     load_population_data,
 )
-from continuum_swr_replay.analysis.pfc.matched_control import artifact_dropped_events
 from continuum_swr_replay.analysis.pfc.modulation import (
     curve_coefficients,
     curve_standard_error,
@@ -572,39 +553,15 @@ def generate_figure(
             f"prior ({DEFAULT_PENALTY_SIGMA})."
         )
     # --- Load single-neuron data ---
+    # The example neuron is refit here, so its session is prepared exactly as
+    # the runner prepares the population's (``analysis.pfc.session``): the
+    # aligned decode and data, the fit mask and excluded time, and the canonical
+    # event sets with the matched non-event control drawn on the session's seed.
     print(f"Loading data for {nwb_file_name}, {epoch_name}...")
-    results_hpc, _, _ = load_results(
-        nwb_file_name, epoch_name, decoding_brain_area="HPC"
+    logger = logging.getLogger(f"figure04.{nwb_file_name}.{epoch_name}")
+    results_hpc, data, position_info, _ = load_aligned_session(
+        nwb_file_name, epoch_name, logger
     )
-    from continuum_swr_replay.data_loaders import load_data
-
-    # the ripple trace is the source's (the Kay consensus over R-T's tetrodes)
-    data = load_data(
-        nwb_file_name,
-        epoch_name,
-        ripple_power=ripple_power_inputs(swr_epoch_id(nwb_file_name, epoch_name)),
-    )
-
-    # Decodes saved before get_position_info was trimmed carry a few more time
-    # bins than load_data now returns; refit the example neuron on the run the
-    # two axes share, exactly as the runner does.
-    results_hpc, position_info, alignment_counts = align_results_to_position(
-        results_hpc, data["position_info"]
-    )
-    data = {**data, "position_info": position_info}
-    if alignment_counts["dropped_at"] != "none":
-        print(
-            "Trimmed decode/position axes to their shared timestamps: dropped "
-            f"{alignment_counts['n_results_bins_dropped']} results bins and "
-            f"{alignment_counts['n_position_rows_dropped']} position rows at "
-            f"the {alignment_counts['dropped_at']}"
-        )
-
-    position_time = position_info.index
-
-    # The example neuron is refit here, so it must be cut exactly as the
-    # population bundle was: the same event sets and the same fit mask the
-    # runner builds, from the same two functions.
     cohort_stops = None
     if stop_cohort != "all_stops":
         cohort_stops, cohort_report = load_session_stop_cohort(
@@ -614,67 +571,39 @@ def generate_figure(
             f"Stop cohort {stop_cohort}: "
             f"{cohort_report['n_stops_after']}/{cohort_report['n_stops_before']} stops"
         )
-    # Design matrices
-    time = position_time.to_numpy(dtype=float)
+    time = position_info.index.to_numpy(dtype=float)
     lags = FIT_LAGS
-    _, fit_mask, bin_counts = build_session_fit_mask(
-        data["position_info"],
+    data, _, _, fit_mask, bin_counts = session_fit_population(
+        data,
+        nwb_file_name,
+        epoch_name,
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
-        immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        excluded_intervals=excluded_intervals(swr_epoch_id(nwb_file_name, epoch_name)),
-        basis_half_window_s=DEFAULT_BASIS_HALF_WINDOW_S,
+        logger=logger,
     )
     print(
         f"Fit bins: {bin_counts['n_bins_fit']}/{bin_counts['n_bins_immobile']} "
         "immobile bins in cohort"
     )
-
-    # The example neuron's events are the canonical ones -- the shipped event
-    # table's rows for this session and its own ``is_swr`` split -- so the panel
-    # and the population bundle describe the same events.
-    canonical_events, _ = load_session_canonical_events(nwb_file_name, epoch_name)
-    swr_intervals, _ = load_session_swr_intervals(
-        nwb_file_name,
-        epoch_name,
-        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    )
-    event_times, event_counts = build_session_event_sets(
+    event_times, event_counts, *_ = session_events(
         data,
         results_hpc,
-        canonical_events=canonical_events,
-        swr_intervals=swr_intervals,
+        nwb_file_name,
+        epoch_name,
+        time=time,
+        fit_mask=fit_mask,
+        fit_lags=lags,
+        sampling_frequency=DEFAULT_SAMPLING_FREQUENCY_HZ,
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
-        fit_mask=fit_mask,
-        basis_half_window_s=float(np.abs(lags).max()) / DEFAULT_SAMPLING_FREQUENCY_HZ,
+        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+        logger=logger,
     )
     print(
         f"Events in cohort: {event_counts['n_nonlocal_after']}"
         f"/{event_counts['n_nonlocal_before']} non-local, "
-        f"{event_counts['n_ripple_after']}/{event_counts['n_ripple_before']} SWRs"
-    )
-
-    # The example neuron is fit on the same ladder the population bundle was,
-    # matched non-event control included, drawn with the same session-keyed
-    # seed -- so the panel's engagement model is the population's.
-    event_times["matched_control"] = make_matched_control_times(
-        event_times,
-        fit_mask,
-        np.random.default_rng(matched_control_seed(nwb_file_name, epoch_name)),
-        avoid=artifact_dropped_events(
-            read_artifact_event_drops(
-                session_data_over_time_path(
-                    nwb_file_name,
-                    epoch_name,
-                    non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
-                )
-            )
-        ),
-    ).times
-    print(
-        f"Matched non-event controls: {len(event_times['matched_control'])}"
+        f"{event_counts['n_ripple_after']}/{event_counts['n_ripple_before']} SWRs; "
+        f"matched non-event controls: {len(event_times['matched_control'])}"
         f"/{len(event_times['non_local'])} placed"
     )
 

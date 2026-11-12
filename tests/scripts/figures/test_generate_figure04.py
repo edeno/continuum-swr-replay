@@ -495,7 +495,7 @@ def test_a_non_canonical_prior_is_refused_before_anything_is_loaded(monkeypatch)
     def _must_not_load(*args, **kwargs):
         raise AssertionError("loaded data for a refused prior")
 
-    monkeypatch.setattr(figure04, "load_results", _must_not_load)
+    monkeypatch.setattr(figure04, "load_aligned_session", _must_not_load)
     with pytest.raises(ValueError, match="sensitivity bundle"):
         figure04.generate_figure(penalty_sigma=1.0)
 
