@@ -12,8 +12,9 @@ artifact mask).
 
 **Where the numbers come from.** Unless a number names a later run, it is a dated
 measurement of 2026-10-09 or earlier, made by the studies below; no summary in
-`paper/reported/` computes it. The studies' working files were scratch analyses and are
-not in the repository: this note is their record, and it names them by these labels.
+`paper/reported/` computes it, and nothing in the repository recomputes it. The studies'
+working files were scratch analyses and are not in the repository: this note is their
+record, and it names them by these labels.
 
 - **C1:** the events at the ports, and the proxies we have for licking;
 - **C1b:** the field's noise-channel veto and R-rip, and the j16 residual;

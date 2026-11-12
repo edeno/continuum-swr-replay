@@ -20,7 +20,8 @@ None until runbook R9 runs the detector on all epochs and sets it.
 
 **Where the numbers come from.** Unless a number names a later run, it is a dated
 measurement of 2026-10-05 to 2026-10-09 on the 218 epochs then analysed, made by the
-studies below; no summary in `paper/reported/` computes it. The studies' working files
+studies below; no summary in `paper/reported/` computes it, and nothing in the repository
+recomputes it. The studies' working files
 were scratch analyses and are not in the repository: this note is their record, and it
 names them by these labels.
 
