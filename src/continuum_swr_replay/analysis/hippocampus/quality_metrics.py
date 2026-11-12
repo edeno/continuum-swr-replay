@@ -35,8 +35,12 @@ Main Functions
 --------------
 compute_local_decoding_error
     Decoding error (graph distance) during local state.
+local_decoding_error_statistics
+    The median over sessions of that error.
 compute_state_fraction_during_movement
     Fraction of movement time in each decoder state.
+state_fractions_by_movement
+    The median over sessions of the state fractions, moving and immobile.
 compute_non_local_during_movement
     Rate and duration of non-local events during movement.
 compute_behavior_state_breakdown
@@ -58,6 +62,8 @@ compute_local_state_collapse_details
     Detailed characterization of local state collapse episodes.
 compute_calibration_curve
     Relationship between decoder confidence and error.
+calibration_curve_statistics
+    That relationship over sessions: median and interquartile range.
 compute_session_quality_summary
     Aggregate all metrics into a single per-session summary.
 
@@ -223,6 +229,27 @@ def compute_local_decoding_error(
         )
         .reset_index()
     )
+
+
+def local_decoding_error_statistics(error_df: pd.DataFrame) -> dict[str, float]:
+    """The typical session's Local-state decoding error.
+
+    Parameters
+    ----------
+    error_df : pd.DataFrame, shape (n_sessions, n_columns)
+        :func:`compute_local_decoding_error`'s table, one row per session with
+        ``median_error_cm``.
+
+    Returns
+    -------
+    statistics : dict
+        - ``n_sessions``: the sessions with a finite median error.
+        - ``median_error_cm``: the median over those sessions of each
+          session's median error, in cm (sessions pooled, not balanced by
+          animal).
+    """
+    errors = error_df["median_error_cm"].dropna()
+    return {"n_sessions": len(errors), "median_error_cm": errors.median()}
 
 
 def compute_state_fraction_during_movement(
@@ -1292,6 +1319,101 @@ def compute_calibration_curve(
             include_groups=False,
         )
         .reset_index()
+    )
+
+
+def calibration_curve_statistics(calibration: pd.DataFrame) -> pd.DataFrame:
+    """The calibration curve over sessions: median and interquartile range.
+
+    Parameters
+    ----------
+    calibration : pd.DataFrame, shape (n_session_bins, n_columns)
+        :func:`compute_calibration_curve`'s table: one row per session and
+        ``Local_prob`` bin, with ``prob_bin_center`` and ``median_error_cm``.
+
+    Returns
+    -------
+    curve : pd.DataFrame, shape (n_prob_bins, 3)
+        Indexed by ``prob_bin_center`` (ascending): ``median``, ``q25`` and
+        ``q75`` over the sessions with that bin of their median error, in cm.
+        Sessions are pooled, not balanced by animal.
+    """
+    grouped = calibration.groupby("prob_bin_center")["median_error_cm"]
+    return pd.DataFrame(
+        {
+            "median": grouped.median(),
+            "q25": grouped.quantile(0.25),
+            "q75": grouped.quantile(0.75),
+        }
+    )
+
+
+#: The decoder states' probability columns, in the order the state-fraction
+#: statistics report them.
+STATE_PROBABILITY_COLUMNS = (
+    "Local_prob",
+    "No-Spike_prob",
+    "Non-Local_Continuous_prob",
+    "Non-Local_Fragmented_prob",
+)
+
+
+def state_fractions_by_movement(
+    data: pd.DataFrame,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    group_cols: list[str] | None = None,
+) -> pd.DataFrame:
+    """The typical session's decoder state fractions, moving and immobile.
+
+    A session's fraction of a state is the mean of its probability over the
+    session's bins outside excluded time: moving bins are those faster than
+    ``speed_threshold`` (:func:`compute_state_fraction_during_movement`),
+    immobile bins those slower than it (strictly, the project's immobility
+    rule; a bin at the threshold or without a speed is in neither). Each value
+    is the median over sessions of the session fractions, sessions pooled.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        ``data_over_time`` read through the SWR source, with ``head_speed``,
+        ``in_excluded_time``, the :data:`STATE_PROBABILITY_COLUMNS` and the
+        session columns.
+    speed_threshold : float, optional
+        Speed (cm/s) between moving and immobile.
+    group_cols : list[str] | None, optional
+        Session grouping columns, by default ``["animal", "day", "epoch"]``.
+
+    Returns
+    -------
+    fractions : pd.DataFrame, shape (2, 4)
+        Index ``moving`` and ``immobile``; one column per state, named as
+        :data:`STATE_PROBABILITY_COLUMNS`.
+    """
+    if group_cols is None:
+        group_cols = list(_DEFAULT_GROUP_COLS)
+    prob_cols = list(STATE_PROBABILITY_COLUMNS)
+
+    moving = compute_state_fraction_during_movement(
+        data, speed_threshold=speed_threshold, group_cols=group_cols
+    )
+    moving_fractions = [
+        moving[col].median()
+        for col in (
+            "local_fraction",
+            "nospike_fraction",
+            "nonlocal_continuous_fraction",
+            "nonlocal_fragmented_fraction",
+        )
+    ]
+
+    is_immobile = (data["head_speed"] < speed_threshold) & _analysed_rows(data)
+    immobile = data.loc[is_immobile].groupby(group_cols, sort=False)[prob_cols].mean()
+    immobile_fractions = [immobile[col].median() for col in prob_cols]
+
+    return pd.DataFrame(
+        [moving_fractions, immobile_fractions],
+        index=["moving", "immobile"],
+        columns=prob_cols,
     )
 
 

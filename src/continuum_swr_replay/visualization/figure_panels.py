@@ -27,9 +27,13 @@ from continuum_swr_replay.analysis.events.nonlocal_detection import (
 from continuum_swr_replay.analysis.hippocampus import (
     compute_calibration_curve,
     compute_local_decoding_error,
-    compute_state_fraction_during_movement,
     get_event_durations_ms,
     get_event_start_end_times,
+)
+from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
+    calibration_curve_statistics,
+    local_decoding_error_statistics,
+    state_fractions_by_movement,
 )
 from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
     compute_triggered_average_curves,
@@ -657,24 +661,18 @@ def plot_calibration_curve(
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-    calib = compute_calibration_curve(data_over_time)
-
-    # Aggregate across sessions: median and IQR per probability bin
-    grouped = calib.groupby("prob_bin_center")["median_error_cm"]
-    agg_median = grouped.median()
-    agg_q25 = grouped.quantile(0.25)
-    agg_q75 = grouped.quantile(0.75)
+    curve = calibration_curve_statistics(compute_calibration_curve(data_over_time))
 
     ax.fill_between(
-        agg_median.index,
-        agg_q25.values,
-        agg_q75.values,
+        curve.index,
+        curve["q25"].values,
+        curve["q75"].values,
         color=COLORS["Local"],
         alpha=0.3,
     )
     ax.plot(
-        agg_median.index,
-        agg_median.values,
+        curve.index,
+        curve["median"].values,
         color=COLORS["Local"],
         linewidth=1.5,
         marker="o",
@@ -732,7 +730,7 @@ def plot_decoding_error_distribution(
         edgecolor="none",
     )
 
-    grand_median = errors.median()
+    grand_median = local_decoding_error_statistics(error_df)["median_error_cm"]
     ax.axvline(
         grand_median,
         color="black",
@@ -760,7 +758,9 @@ def plot_state_fractions_by_movement(
 
     Shows stacked bars of decoder state fractions for moving and immobile
     periods, demonstrating that the model assigns mostly local during movement.
-    Both bars use per-session medians for consistent aggregation.
+    The fractions are
+    :func:`~continuum_swr_replay.analysis.hippocampus.quality_metrics.state_fractions_by_movement`'s:
+    the median over sessions of each session's mean state probability.
 
     Parameters
     ----------
@@ -775,36 +775,9 @@ def plot_state_fractions_by_movement(
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-    group_cols = ["animal", "day", "epoch"]
-    prob_cols = [
-        "Local_prob",
-        "No-Spike_prob",
-        "Non-Local_Continuous_prob",
-        "Non-Local_Fragmented_prob",
-    ]
-
-    # Compute per-session state fractions during movement
-    moving_df = compute_state_fraction_during_movement(data_over_time)
-    moving_frac_cols = [
-        "local_fraction",
-        "nospike_fraction",
-        "nonlocal_continuous_fraction",
-        "nonlocal_fragmented_fraction",
-    ]
-    moving_fracs = [moving_df[col].median() for col in moving_frac_cols]
-
-    # Compute per-session state fractions during immobility (same aggregation),
-    # over the immobile bins (speed strictly below the threshold, the project's
-    # immobility rule) outside excluded time
-    is_immobile = (
-        data_over_time["head_speed"] < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ) & analysed_bins(data_over_time)
-    immobile_session = (
-        data_over_time.loc[is_immobile]
-        .groupby(group_cols, sort=False)[prob_cols]
-        .mean()
-    )
-    immobile_fracs = [immobile_session[col].median() for col in prob_cols]
+    fractions = state_fractions_by_movement(data_over_time)
+    moving_fracs = list(fractions.loc["moving"])
+    immobile_fracs = list(fractions.loc["immobile"])
 
     state_labels = [
         "Local",
