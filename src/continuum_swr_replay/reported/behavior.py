@@ -1860,7 +1860,6 @@ def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
         step = aic_difference_statistics(
             fit_rows(fits, model="R1", outcome=outcome),
             fit_rows(fits, model="R0", outcome=outcome),
-            same=("n_stops",),
         )
         _require(step["n_animals"] == 5, f"{outcome}: {step['n_animals']} animals")
         values += [

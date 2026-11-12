@@ -10,10 +10,13 @@ across sessions.
 An AIC or BIC difference is the child rung's minus the parent rung's, within
 session, as in
 :func:`~continuum_swr_replay.analysis.behavior.coefficient_statistics.aic_difference_statistics`:
-negative means the child rung is better.
+negative means the child rung is better. Which sessions of a rung pair can be
+compared at all is :func:`why_not_comparable`, which both use.
 """
 
 from __future__ import annotations
+
+import logging
 
 import numpy as np
 import pandas as pd
@@ -69,6 +72,60 @@ INVALIDATING_METADATA_COLUMNS = {
     ),
 }
 
+#: Cohort-size columns: rungs fit to different numbers of events, bins or stops
+#: were fit to different rows, and AIC, BIC and deviance all scale with the rows,
+#: so the rung fit to fewer wins mechanically. Which one is the unit depends on
+#: the family: events (conditional arm/patch), bins (per-bin conditional
+#: intensity), stops (per-stop rate).
+COHORT_SIZE_COLUMNS = ("n_events", "n_bins", "n_stops")
+
+#: The columns a session's two fits must agree on to be compared
+#: (:func:`why_not_comparable`).
+COMPARABILITY_COLUMNS = (*COHORT_SIZE_COLUMNS, *INVALIDATING_METADATA_COLUMNS)
+
+#: Why a session whose fits differ on a cohort-size column is not compared.
+_COHORT_SIZE_REASON = (
+    "have mismatched cohort sizes between parent and child — freeze one cohort "
+    "for the ladder before fitting"
+)
+
+
+def why_not_comparable(paired: pd.DataFrame, suffixes: tuple[str, str]) -> pd.DataFrame:
+    """Which sessions of a rung pair can be compared, and why the others cannot.
+
+    Parameters
+    ----------
+    paired : pd.DataFrame, shape (n_sessions, n_columns)
+        The two rungs' fits merged on session, each rung's columns carried with
+        its suffix. A column of :data:`COMPARABILITY_COLUMNS` is checked when
+        both rungs carry it.
+    suffixes : tuple of str
+        The two rungs' column suffixes, for example ``("_parent", "_child")``.
+
+    Returns
+    -------
+    differs : pd.DataFrame of bool, shape (n_sessions, n_checked)
+        On ``paired``'s index, one column per checked column of
+        :data:`COMPARABILITY_COLUMNS`: True where the session's two fits differ
+        on it. A session can be compared when no column is True. A
+        cohort-size column (:data:`COHORT_SIZE_COLUMNS`) differs wherever its two
+        values differ, a missing one included: rows of unknown number are not
+        known to be the same rows. A column of
+        :data:`INVALIDATING_METADATA_COLUMNS` differs only where both fits state
+        a value: a fit that records nothing is unknown, not different.
+    """
+    first, second = suffixes
+    differing = {}
+    for column in COMPARABILITY_COLUMNS:
+        a, b = f"{column}{first}", f"{column}{second}"
+        if a not in paired or b not in paired:
+            continue
+        differs = paired[a] != paired[b]
+        if column not in COHORT_SIZE_COLUMNS:
+            differs &= paired[a].notna() & paired[b].notna()
+        differing[column] = differs.astype(bool)
+    return pd.DataFrame(differing, index=paired.index, dtype=bool)
+
 
 def compare_nested_models(
     parent_results: pd.DataFrame,
@@ -98,10 +155,11 @@ def compare_nested_models(
         same for BIC: negative means the child is better. ``lr_stat`` is
         ``2 * (llf_child - llf_parent)``.
         ``delta_aic`` / ``delta_bic`` / ``lr_stat`` / ``lr_pvalue`` are NaN for
-        any session whose parent and child report different ``n_events``,
+        any session whose two fits cannot be compared
+        (:func:`why_not_comparable`): they report different ``n_events``,
         ``n_bins``, or ``n_stops`` — rungs fit to different rows are not
-        comparable — and likewise for any session whose two rungs disagree on
-        one of :data:`INVALIDATING_METADATA_COLUMNS`: on
+        comparable — or disagree on one of
+        :data:`INVALIDATING_METADATA_COLUMNS`: on
         ``llf_includes_constants`` because the Dirichlet-multinomial likelihood
         carries the multinomial coefficient and a statsmodels conditional
         likelihood does not, so differencing them measures that constant rather
@@ -115,11 +173,10 @@ def compare_nested_models(
 
     # Cohort-size columns present in BOTH frames are carried through so the
     # guard below can invalidate a comparison whose rungs were fit to different
-    # rows. Which one is the unit depends on the family: events (conditional
-    # arm/patch), bins (per-bin conditional intensity), stops (per-stop rate).
+    # rows.
     count_cols = [
         col
-        for col in ("n_events", "n_bins", "n_stops")
+        for col in COHORT_SIZE_COLUMNS
         if col in parent_results.columns and col in child_results.columns
     ]
     # The scale the two rungs were fit at travels with the comparison. A delta
@@ -157,53 +214,19 @@ def compare_nested_models(
         merged["lr_stat"].clip(lower=0), df=merged["df_diff"].clip(lower=1)
     )
 
-    # Invalidate all comparison metrics when parent and child used different
-    # numbers of events, bins, or stops (the caller did not freeze one cohort
-    # for the ladder before fitting). AIC / BIC / deviance all scale with the
-    # number of rows, so a rung fit to fewer rows wins mechanically.
-    if count_cols:
-        different_n = pd.Series(False, index=merged.index)
-        mismatched: list[str] = []
-        for col in count_cols:
-            differs = merged[f"{col}_parent"] != merged[f"{col}_child"]
-            if differs.any():
-                mismatched.append(f"{col} ({int(differs.sum())})")
-            different_n = different_n | differs
-        if different_n.any():
-            import logging
-
-            logging.warning(
-                "%d/%d sessions have mismatched cohort sizes between parent and "
-                "child [%s] — invalidating comparisons. Freeze one cohort for "
-                "the ladder before fitting.",
-                int(different_n.sum()),
-                len(merged),
-                ", ".join(mismatched),
-            )
-        for col in ["delta_aic", "delta_bic", "lr_stat", "lr_pvalue"]:
-            merged.loc[different_n, col] = np.nan
-
-    # Invalidate the same metrics when the two rungs disagree on a metadata
-    # column that makes their information criteria incommensurable. Both sides
-    # must actually say so: a legacy frame that records nothing is unknown, not
-    # different.
-    for column, reason in INVALIDATING_METADATA_COLUMNS.items():
-        parent_col, child_col = f"{column}_parent", f"{column}_child"
-        if parent_col not in merged.columns or child_col not in merged.columns:
-            continue
-        stated = merged[parent_col].notna() & merged[child_col].notna()
-        mismatched = stated & (merged[parent_col] != merged[child_col])
-        if mismatched.any():
-            import logging
-
-            logging.warning(
-                "%d/%d sessions %s — invalidating those comparisons.",
-                int(mismatched.sum()),
-                len(merged),
-                reason,
-            )
-        for col in ["delta_aic", "delta_bic", "lr_stat", "lr_pvalue"]:
-            merged.loc[mismatched, col] = np.nan
+    # Invalidate all comparison metrics for a session whose two fits cannot be
+    # compared: fit to different rows, or with incommensurable likelihoods.
+    differs = why_not_comparable(merged, ("_parent", "_child"))
+    for column in differs.columns[differs.any()]:
+        logging.warning(
+            "%d/%d sessions %s [%s] — invalidating those comparisons.",
+            int(differs[column].sum()),
+            len(merged),
+            INVALIDATING_METADATA_COLUMNS.get(column, _COHORT_SIZE_REASON),
+            column,
+        )
+    invalid = differs.any(axis=1)
+    merged.loc[invalid, ["delta_aic", "delta_bic", "lr_stat", "lr_pvalue"]] = np.nan
 
     return merged
 

@@ -491,15 +491,34 @@ def test_an_infinite_aic_is_kept_unless_both_are_infinite():
     assert result["negative_fraction"] == pytest.approx(2 / 3)
 
 
-def test_the_aic_difference_can_require_the_same_stops():
+def test_the_aic_difference_compares_only_rungs_fit_to_the_same_stops():
     child = _rung([10.0, 20.0, 30.0, 40.0])
-    parent = _rung([12.0, 19.0, 35.0, 44.0], n_stops=[5, 6, 5, 5])
-    # the second session's rungs saw different stops: -2, -5, -4 remain
-    result = stats.aic_difference_statistics(child, parent, same=("n_stops",))
+    parent = _rung([12.0, 19.0, 35.0, 44.0], n_stops=[5, 6, 5, NAN])
+    # the second session's rungs saw different stops and the fourth's parent
+    # does not say how many: -2 and -5 remain
+    result = stats.aic_difference_statistics(child, parent)
+    assert result["n_sessions"] == 2
+    assert result["median"] == -3.5
+    assert result["negative_fraction"] == 1.0
+    # a count only one rung carries is not checked
+    assert (
+        stats.aic_difference_statistics(child, parent.drop(columns="n_stops"))[
+            "n_sessions"
+        ]
+        == 4
+    )
+
+
+def test_the_aic_difference_compares_only_rungs_on_the_same_clock():
+    child = _rung([10.0, 20.0, 30.0, 40.0]).assign(
+        time_clock=["stop", "arrival", None, "stop"]
+    )
+    parent = _rung([12.0, 19.0, 35.0, 44.0]).assign(time_clock="stop")
+    # the second session's rungs are on different clocks; the third's child
+    # does not say, which is unknown and not different: -2, -5, -4 remain
+    result = stats.aic_difference_statistics(child, parent)
     assert result["n_sessions"] == 3
     assert result["median"] == -4.0
-    assert result["negative_fraction"] == 1.0
-    assert stats.aic_difference_statistics(child, parent)["n_sessions"] == 4
 
 
 def test_the_aic_difference_refuses_two_fits_of_one_session():

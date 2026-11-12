@@ -27,6 +27,10 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.content.model_comparison import (
+    COMPARABILITY_COLUMNS,
+    why_not_comparable,
+)
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     gate_term_sessions,
     gated_term_statistics,
@@ -90,22 +94,17 @@ def require_one_fit_per_session(fits: pd.DataFrame) -> None:
 
 
 def _paired_difference(
-    fits_a: pd.DataFrame,
-    fits_b: pd.DataFrame,
-    column: str,
-    same: Sequence[str] = (),
+    fits_a: pd.DataFrame, fits_b: pd.DataFrame, column: str
 ) -> tuple[pd.Series, pd.Series]:
     """One column of two sets of fits, differenced within session.
 
     Parameters
     ----------
     fits_a, fits_b : pd.DataFrame
-        Per-session fits with the session columns, ``column`` and the ``same``
-        columns; at most one row per session.
+        Per-session fits with the session columns and ``column``; at most one
+        row per session.
     column : str
         The column differenced.
-    same : sequence of str
-        Columns that must be equal in a session's two fits for it to count.
 
     Returns
     -------
@@ -121,12 +120,9 @@ def _paired_difference(
         If either set of fits holds two rows for one session.
     """
     session = list(SESSION_COLUMNS)
-    columns = [*session, column, *same]
-    both = fits_a[columns].merge(
-        fits_b[columns], on=session, suffixes=("_a", "_b"), validate="1:1"
+    both = fits_a[[*session, column]].merge(
+        fits_b[[*session, column]], on=session, suffixes=("_a", "_b"), validate="1:1"
     )
-    for name in same:
-        both = both[both[f"{name}_a"] == both[f"{name}_b"]]
     return both[f"{column}_a"] - both[f"{column}_b"], both["animal"]
 
 
@@ -476,7 +472,7 @@ def gated_coefficient_difference_statistics(
 
 
 def aic_difference_statistics(
-    child: pd.DataFrame, parent: pd.DataFrame, same: Sequence[str] = ()
+    child: pd.DataFrame, parent: pd.DataFrame
 ) -> dict[str, float]:
     """A child rung's AIC minus its parent's, within session.
 
@@ -484,24 +480,41 @@ def aic_difference_statistics(
     ----------
     child, parent : pd.DataFrame
         Per-session fits of the two rungs for one population, with the session
-        columns, ``aic`` and the ``same`` columns; at most one row per session.
-    same : sequence of str
-        Columns that must be equal in a session's two fits for it to count
-        (``n_stops``: both rungs were fit on the same stops).
+        columns and ``aic``, and any of
+        :data:`~continuum_swr_replay.analysis.behavior.content.model_comparison.COMPARABILITY_COLUMNS`;
+        at most one row per session.
 
     Returns
     -------
     statistics : dict
         :func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`
-        of ``AIC(child) - AIC(parent)`` over the sessions with both fits and a difference that is not missing. An
-        infinite AIC is not missing: its session is kept, with an infinite
-        difference, unless both AICs are infinite. Negative means the child is
-        better, so ``negative_fraction`` is the share of sessions in which the
-        child has the lower AIC and ``n_animals_negative`` the animals whose
-        median step favours it.
+        of ``AIC(child) - AIC(parent)`` over the sessions with both fits that
+        can be compared
+        (:func:`~continuum_swr_replay.analysis.behavior.content.model_comparison.why_not_comparable`:
+        the two rungs were fit to the same number of events, bins and stops,
+        on the same clock and stop cohort, with likelihoods on the same
+        constants) and a difference that is not missing. An infinite AIC is
+        not missing: its session is kept, with an infinite difference, unless
+        both AICs are infinite. Negative means the child is better, so
+        ``negative_fraction`` is the share of sessions in which the child has
+        the lower AIC and ``n_animals_negative`` the animals whose median step
+        favours it.
+
+    Raises
+    ------
+    pandas.errors.MergeError
+        If either set of fits holds two rows for one session.
     """
-    difference, animal = _paired_difference(child, parent, "aic", same)
-    return session_median_statistics(difference, animal)
+    session = list(SESSION_COLUMNS)
+    carried = [c for c in COMPARABILITY_COLUMNS if c in child and c in parent]
+    columns = [*session, "aic", *carried]
+    paired = child[columns].merge(
+        parent[columns], on=session, suffixes=("_child", "_parent"), validate="1:1"
+    )
+    paired = paired[~why_not_comparable(paired, ("_child", "_parent")).any(axis=1)]
+    return session_median_statistics(
+        paired["aic_child"] - paired["aic_parent"], paired["animal"]
+    )
 
 
 def separated_fraction(fits: pd.DataFrame) -> float:
