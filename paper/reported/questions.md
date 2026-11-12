@@ -15,7 +15,7 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `cb5c16baa03a` | yes | 32 | 0 |
+| `survey.json` | `2e9afd93423a` | yes | 32 | 0 |
 | `detection.json` | `c123684d9a61` | yes | 132 | 0 |
 | `events.json` | `c123684d9a61` | yes | 353 | 0 |
 | `behavior.json` | `c123684d9a61` | yes | 922 | 0 |
