@@ -39,8 +39,13 @@ local_decoding_error_statistics
     The median over sessions of that error.
 compute_state_fraction_during_movement
     Fraction of movement time in each decoder state.
-state_fractions_by_movement
-    The median over sessions of the state fractions, moving and immobile.
+session_state_fractions
+    Each session's state fractions, moving and immobile.
+state_fraction_statistics
+    The median over sessions of those fractions.
+session_decoder_quality
+    Each session's Local-state error and state fractions, the stored inputs of
+    the two statistics over sessions.
 compute_non_local_during_movement
     Rate and duration of non-local events during movement.
 compute_behavior_state_breakdown
@@ -1361,19 +1366,30 @@ STATE_PROBABILITY_COLUMNS = (
 )
 
 
-def state_fractions_by_movement(
+#: :func:`compute_state_fraction_during_movement`'s column for each state.
+_MOVING_FRACTION_COLUMNS = {
+    "Local_prob": "local_fraction",
+    "No-Spike_prob": "nospike_fraction",
+    "Non-Local_Continuous_prob": "nonlocal_continuous_fraction",
+    "Non-Local_Fragmented_prob": "nonlocal_fragmented_fraction",
+}
+
+#: The bins a state fraction is taken over: moving and immobile.
+MOVEMENT_STATES = ("moving", "immobile")
+
+
+def session_state_fractions(
     data: pd.DataFrame,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
-    """The typical session's decoder state fractions, moving and immobile.
+    """Each session's decoder state fractions, moving and immobile.
 
     A session's fraction of a state is the mean of its probability over the
     session's bins outside excluded time: moving bins are those faster than
     ``speed_threshold`` (:func:`compute_state_fraction_during_movement`),
     immobile bins those slower than it (strictly, the project's immobility
-    rule; a bin at the threshold or without a speed is in neither). Each value
-    is the median over sessions of the session fractions, sessions pooled.
+    rule; a bin at the threshold or without a speed is in neither).
 
     Parameters
     ----------
@@ -1388,9 +1404,12 @@ def state_fractions_by_movement(
 
     Returns
     -------
-    fractions : pd.DataFrame, shape (2, 4)
-        Index ``moving`` and ``immobile``; one column per state, named as
-        :data:`STATE_PROBABILITY_COLUMNS`.
+    fractions : pd.DataFrame, shape (n_sessions, n_group_cols + 8)
+        One row per session with a moving or an immobile bin: the session
+        columns, and ``<movement>_<state column>`` for each of
+        :data:`MOVEMENT_STATES` and :data:`STATE_PROBABILITY_COLUMNS`
+        (``moving_Local_prob``, ...). A session with no bin of one movement
+        state has NaN fractions for it.
     """
     if group_cols is None:
         group_cols = list(_DEFAULT_GROUP_COLS)
@@ -1399,24 +1418,79 @@ def state_fractions_by_movement(
     moving = compute_state_fraction_during_movement(
         data, speed_threshold=speed_threshold, group_cols=group_cols
     )
-    moving_fractions = [
-        moving[col].median()
-        for col in (
-            "local_fraction",
-            "nospike_fraction",
-            "nonlocal_continuous_fraction",
-            "nonlocal_fragmented_fraction",
-        )
-    ]
+    moving = moving[group_cols + [_MOVING_FRACTION_COLUMNS[c] for c in prob_cols]]
+    moving.columns = group_cols + [f"moving_{c}" for c in prob_cols]
 
     is_immobile = immobile_analysed_bins(data, speed_threshold)
-    immobile = data.loc[is_immobile].groupby(group_cols, sort=False)[prob_cols].mean()
-    immobile_fractions = [immobile[col].median() for col in prob_cols]
+    immobile = (
+        data.loc[is_immobile]
+        .groupby(group_cols, sort=False)[prob_cols]
+        .mean()
+        .add_prefix("immobile_")
+        .reset_index()
+    )
+    return moving.merge(immobile, on=group_cols, how="outer", validate="one_to_one")
 
+
+def state_fraction_statistics(session_fractions: pd.DataFrame) -> pd.DataFrame:
+    """The typical session's decoder state fractions, moving and immobile.
+
+    Parameters
+    ----------
+    session_fractions : pd.DataFrame, shape (n_sessions, n_columns)
+        :func:`session_state_fractions`'s table.
+
+    Returns
+    -------
+    fractions : pd.DataFrame, shape (2, 4)
+        Index :data:`MOVEMENT_STATES`; one column per state, named as
+        :data:`STATE_PROBABILITY_COLUMNS`. Each value is the median over the
+        sessions with a fraction of the session fractions, sessions pooled
+        (not balanced by animal).
+    """
     return pd.DataFrame(
-        [moving_fractions, immobile_fractions],
-        index=["moving", "immobile"],
-        columns=prob_cols,
+        [
+            [
+                session_fractions[f"{movement}_{col}"].median()
+                for col in STATE_PROBABILITY_COLUMNS
+            ]
+            for movement in MOVEMENT_STATES
+        ],
+        index=list(MOVEMENT_STATES),
+        columns=list(STATE_PROBABILITY_COLUMNS),
+    )
+
+
+def session_decoder_quality(
+    data: pd.DataFrame, group_cols: list[str] | None = None
+) -> pd.DataFrame:
+    """Each session's Local-state decoding error and its state fractions.
+
+    The inputs of :func:`local_decoding_error_statistics` and
+    :func:`state_fraction_statistics`, one row per session, so they can be
+    stored per epoch and summarized without the decode frames.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        ``data_over_time`` read through the SWR source.
+    group_cols : list[str] | None, optional
+        Session grouping columns, by default ``["animal", "day", "epoch"]``.
+
+    Returns
+    -------
+    quality : pd.DataFrame, shape (n_sessions, n_columns)
+        :func:`compute_local_decoding_error`'s columns and
+        :func:`session_state_fractions`'s, joined on the session columns; a
+        session missing from one has NaN in its columns.
+    """
+    if group_cols is None:
+        group_cols = list(_DEFAULT_GROUP_COLS)
+    return compute_local_decoding_error(data, group_cols=group_cols).merge(
+        session_state_fractions(data, group_cols=group_cols),
+        on=group_cols,
+        how="outer",
+        validate="one_to_one",
     )
 
 

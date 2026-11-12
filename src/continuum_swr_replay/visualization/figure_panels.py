@@ -39,7 +39,8 @@ from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
 from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
     calibration_curve_statistics,
     local_decoding_error_statistics,
-    state_fractions_by_movement,
+    session_state_fractions,
+    state_fraction_statistics,
 )
 from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
     compute_triggered_average_curves,
@@ -738,8 +739,10 @@ def plot_state_fractions_by_movement(
     Shows stacked bars of decoder state fractions for moving and immobile
     periods, demonstrating that the model assigns mostly local during movement.
     The fractions are
-    :func:`~continuum_swr_replay.analysis.hippocampus.quality_metrics.state_fractions_by_movement`'s:
-    the median over sessions of each session's mean state probability.
+    :func:`~continuum_swr_replay.analysis.hippocampus.quality_metrics.state_fraction_statistics`'s
+    over :func:`~continuum_swr_replay.analysis.hippocampus.quality_metrics.session_state_fractions`:
+    the median over sessions of each session's mean state probability, as the
+    events summary reports them.
 
     Parameters
     ----------
@@ -754,7 +757,7 @@ def plot_state_fractions_by_movement(
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-    fractions = state_fractions_by_movement(data_over_time)
+    fractions = state_fraction_statistics(session_state_fractions(data_over_time))
     moving_fracs = list(fractions.loc["moving"])
     immobile_fracs = list(fractions.loc["immobile"])
 
