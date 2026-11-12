@@ -33,6 +33,9 @@ from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
     frame_estimator,
     scale_label,
 )
+from continuum_swr_replay.analysis.behavior.content.model_comparison import (
+    run_full_hierarchy_comparison,
+)
 from continuum_swr_replay.analysis.behavior.fit_provenance import (
     require_fresh_inputs,
 )
@@ -95,7 +98,6 @@ def main(argv: Sequence[str] | None = None):
 
     # ── Load results ──
     all_models_path = models_dir / "all_models.pkl"
-    comparison_path = models_dir / "model_comparison.pkl"
     behavior_path = rc / "behavior_prediction.pkl"
 
     if not all_models_path.exists():
@@ -111,11 +113,10 @@ def main(argv: Sequence[str] | None = None):
     logging.info("Loaded %d model fits", len(all_results))
 
     # ── Figure 1: Model hierarchy comparison ──
-    if comparison_path.exists():
-        require_fresh_inputs(
-            comparison_path, all_models_inputs, allow_stale=args.allow_stale
-        )
-        comparison = pd.read_pickle(comparison_path)
+    # Taken from the fits rather than from the bundle's model_comparison.pkl,
+    # so the figure has the comparison's current sign whatever code wrote it.
+    comparison = run_full_hierarchy_comparison(all_results, hierarchy=MODEL_HIERARCHY)
+    if not comparison.empty:
         fig = plot_model_hierarchy_comparison(
             comparison, scale_label=scale_label(frame_estimator(comparison))
         )
