@@ -139,7 +139,7 @@ uv run pytest --cov=src/continuum_swr_replay --cov-report=html
 
 Note: 0–14% coverage on most visualization modules is *expected*.
 `bandit_task.py` imports Spyglass only inside its loaders; its orchestration
-is tested with faked loaders (`data_loaders/test_position.py`), and its Spyglass reads
+is tested with faked loaders (`tests/data_loaders/test_position.py`), and its Spyglass reads
 need `-m real_data`. Visualization modules are a deliberate non-target — plotting code is
 low-ROI to test, and scientific correctness is verified through analysis
 tests upstream of the plotting layer.
