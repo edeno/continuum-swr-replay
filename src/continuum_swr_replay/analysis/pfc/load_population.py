@@ -112,9 +112,14 @@ and drops out in the loader. The mpfc summary, Figure 4 and the
 
 
 CALLED_ALPHA = 0.05
-"""Figure 4's raw empirical-p threshold: a unit is called for a test when its
-held-out p-value is below it (:func:`tested_and_called`). The mpfc summary and
-the ``scripts/pfc/`` reports read this one value."""
+"""The mPFC level, with two uses. It is Figure 4's raw empirical-p threshold: a
+unit is called for a test when its held-out p-value is below it
+(:func:`tested_and_called`). It is also the Benjamini-Hochberg q level: of the
+mpfc summary's ``engagement_bh_fraction``
+(:func:`~continuum_swr_replay.analysis.pfc.population_statistics.bh_called_fraction`)
+and of the FDR tables of ``scripts/pfc/compare_pfc_cohorts.py``, whose
+``--alpha`` defaults to it.
+The mpfc summary and the ``scripts/pfc/`` reports read this one value."""
 
 
 #: Tests the superseded bundles were FDR-corrected on. Kept so an audit can
