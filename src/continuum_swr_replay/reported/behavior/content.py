@@ -28,7 +28,12 @@ from continuum_swr_replay.analysis.behavior.content.model_comparison import (
     summarize_comparison,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import MODEL_HIERARCHY
-from continuum_swr_replay.reported.behavior.common import TAGS, _gate_note, _require
+from continuum_swr_replay.reported.behavior.common import (
+    TAGS,
+    _gate_note,
+    _require,
+    _require_every_animal,
+)
 from continuum_swr_replay.reported.values import (
     Tags,
     Value,
@@ -345,9 +350,7 @@ def content_contrast_values(
             f"{model} {term} ({estimator}, population {pop}, outcome stratum {stratum})"
         )
         if not suffix == "_omitted":
-            _require(
-                int(row["n_animals"]) == 5, f"{word}: {row['n_animals']} animals, not 5"
-            )
+            _require_every_animal(row["n_animals"], word)
         values += [
             make(
                 word,
@@ -498,9 +501,7 @@ def estimator_values(
         ].itertuples()
         for est_word, estimator in ESTIMATORS.items():
             what = f"{rung} {term}, {estimator}"
-            _require(
-                getattr(row, f"n_animals_{est_word}") == 5, f"{what}: not 5 animals"
-            )
+            _require_every_animal(getattr(row, f"n_animals_{est_word}"), what)
             values += [
                 make(
                     f"est_{word}_{est_word}",
@@ -612,7 +613,7 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
         ("leaf_value", "Mv", "reward_belief_mean_candidate_arm_preoutcome"),
     ):
         stats = gated_coefficient_statistics(rungs[model], term)
-        _require(stats["n_animals"] == 5, f"{term}: {stats['n_animals']} animals")
+        _require_every_animal(stats["n_animals"], term)
         what = f"leaf ladder {model} {term}"
         values += pend(
             [
@@ -654,7 +655,7 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
             compare_nested_models(rungs[parent], rungs[child]), parent, child
         )
         what = f"leaf ladder {parent} to {child}"
-        _require(step["n_animals"] == 5, f"{what}: not 5 animals")
+        _require_every_animal(step["n_animals"], what)
         values += [
             make(
                 f"leaf_step_{word}",

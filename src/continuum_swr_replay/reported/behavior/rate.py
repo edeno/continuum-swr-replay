@@ -38,7 +38,12 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
 from continuum_swr_replay.analysis.behavior.rate import (
     rate_fit_statistics,
 )
-from continuum_swr_replay.reported.behavior.common import TAGS, _gate_note, _require
+from continuum_swr_replay.reported.behavior.common import (
+    TAGS,
+    _gate_note,
+    _require,
+    _require_every_animal,
+)
 from continuum_swr_replay.reported.behavior.inputs import BehaviorInputs
 from continuum_swr_replay.reported.values import (
     Value,
@@ -130,7 +135,7 @@ def per_bin_values(
         immediate = gated_coefficient_statistics(full, REWARD_HISTORY_COLUMNS[0])
         immediate_note = _gate_note(immediate, REWARD_HISTORY_COLUMNS[0])
         for stats in (kernel, immediate):
-            _require(stats["n_animals"] == 5, f"{stats['n_animals']} animals, not 5")
+            _require_every_animal(stats["n_animals"], outcome)
         marginal = aic_difference_statistics(
             fit_rows(fits, model="M1_rew", outcome=outcome), null
         )
@@ -429,10 +434,7 @@ def per_bin_values(
         )
     )
     for stats in (paired, paired_all):
-        _require(
-            stats["n_animals"] == 5,
-            f"paired test spans {stats['n_animals']} animals, not 5",
-        )
+        _require_every_animal(stats["n_animals"], "the paired test")
     immediate_all_by_outcome = {
         outcome: gated_coefficient_statistics(
             fit_rows(all_stops, model=FULL_RATE_RUNG, outcome=outcome),
@@ -443,7 +445,7 @@ def per_bin_values(
     immediate_all = immediate_all_by_outcome["non_local_no_swr"]
     immediate_all_note = _gate_note(immediate_all, REWARD_HISTORY_COLUMNS[0])
     kernel_all = rate_fit_statistics.reward_kernel_statistics(no_swr_all)
-    _require(kernel_all["n_animals"] == 5, f"{kernel_all['n_animals']} animals, not 5")
+    _require_every_animal(kernel_all["n_animals"], "the non-SWR reward kernel")
     paired_what = (
         "the reconstructed lag-1 reward kernel, SWR-coupled minus non-SWR non-local "
         "events, within session, over the sessions in which both streams' reward "
@@ -566,7 +568,7 @@ def per_bin_values(
     ]
     for word, (outcome, label) in RATE_POPULATIONS.items():
         stats = immediate_all_by_outcome[outcome]
-        _require(stats["n_animals"] == 5, f"{stats['n_animals']} animals, not 5")
+        _require_every_animal(stats["n_animals"], outcome)
         values += pend(
             [
                 make(
@@ -1243,7 +1245,7 @@ def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
             fit_rows(fits, model="R1", outcome=outcome),
             fit_rows(fits, model="R0", outcome=outcome),
         )
-        _require(step["n_animals"] == 5, f"{outcome}: {step['n_animals']} animals")
+        _require_every_animal(step["n_animals"], outcome)
         values += [
             make(
                 f"per_stop_delta_aic_animal_{word}",

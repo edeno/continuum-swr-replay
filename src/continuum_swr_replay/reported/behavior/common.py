@@ -1,6 +1,6 @@
 """What every part of the behavior summary shares: the tags of its values,
 the note a value read through a refusing per-term gate carries, and the
-check that refuses a build."""
+checks that refuse a build."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     MAX_UNIDENTIFIED_SHARE,
     MIN_SESSIONS_PER_TERM,
 )
+from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.reported.values import (
     Tags,
 )
@@ -55,3 +56,12 @@ def _gate_note(statistics: Mapping[str, Any], term: str) -> str | None:
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
+
+
+def _require_every_animal(n_animals: float, what: str) -> None:
+    """Refuse a statistic that does not span every analysed animal."""
+    expected = len(analysed_animals())
+    _require(
+        n_animals == expected,
+        f"{what}: {n_animals} animals, not the {expected} analysed",
+    )

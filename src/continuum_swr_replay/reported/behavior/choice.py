@@ -20,7 +20,11 @@ from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
 from continuum_swr_replay.analysis.behavior.rate import (
     stop_statistics,
 )
-from continuum_swr_replay.reported.behavior.common import TAGS, _gate_note, _require
+from continuum_swr_replay.reported.behavior.common import (
+    TAGS,
+    _gate_note,
+    _require_every_animal,
+)
 from continuum_swr_replay.reported.values import (
     Value,
     pend,
@@ -50,7 +54,7 @@ def choice_values(fits: dict, source: str) -> list[Value]:
         ("choice_raw", "choice", "C_replay_only", "replay_fraction"),
     ):
         stats = gated_coefficient_statistics(fits[block][model], term)
-        _require(stats["n_animals"] == 5, f"{term}: {stats['n_animals']} animals")
+        _require_every_animal(stats["n_animals"], term)
         what = f"{model} {term}"
         values += pend(
             [
