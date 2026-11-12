@@ -19,6 +19,9 @@ We report the cross-history coefficients, the self->cross AIC difference
 (``delta_aic`` = AIC(Mselfcross) - AIC(Mself); negative = cross history helps),
 and the cross cv-bits/event gain; then aggregate across sessions (median, %
 improved, per-animal sign consistency, Benjamini-Hochberg q of the signed-rank p).
+The two rungs are frozen on their own columns, so a session-direction whose two
+cohorts differ in bins, event bins or stops
+(``fit_comparability.why_not_comparable``) is not fit.
 
 Usage: python scripts/behavior/rate/fit_cross_history_rate.py [--max-per-animal N] [--write]
 """
@@ -47,6 +50,9 @@ from continuum_swr_replay.analysis.behavior import (
 from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
     coefficient_family_statistics,
     coefficient_statistics,
+)
+from continuum_swr_replay.analysis.behavior.fit_comparability import (
+    why_not_comparable,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import (
     MODEL_CROSS_HISTORY_RATE,
@@ -83,6 +89,12 @@ M_CROSS = MODEL_CROSS_HISTORY_RATE["Mselfcross"]
 # touches excluded time, so the two are fit to the same bins.
 HISTORY_WINDOW_S = longest_history_window_s([M_SELF, M_CROSS])
 CROSS_COEFS = [f"coef_cross_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
+# A fit's cohort-size column -> the cohort freeze's count of it.
+COHORT_SIZE_SOURCES = {
+    "n_bins": "n_bins",
+    "n_events": "n_event_bins",
+    "n_stops": "n_stops",
+}
 
 
 def _fit_direction(stops_g, onsets_g, resp_pop, cross_pop) -> dict | None:
@@ -108,8 +120,29 @@ def _fit_direction(stops_g, onsets_g, resp_pop, cross_pop) -> dict | None:
     )
     # One cohort per design before the first fit: the fitters refuse an
     # incomplete design rather than subsetting it per rung.
-    design_self, _ = freeze_per_bin_cohort(design_self, [M_SELF])
-    design_cross, _ = freeze_per_bin_cohort(design_cross, [M_CROSS])
+    design_self, freeze_self = freeze_per_bin_cohort(design_self, [M_SELF])
+    design_cross, freeze_cross = freeze_per_bin_cohort(design_cross, [M_CROSS])
+    # The two rungs are frozen on different columns, so their AIC difference
+    # compares only when the two cohorts are the same size.
+    paired = pd.DataFrame(
+        [
+            {
+                f"{column}_{rung}": freeze[f"{source}_after"]
+                for rung, freeze in (("self", freeze_self), ("cross", freeze_cross))
+                for column, source in COHORT_SIZE_SOURCES.items()
+            }
+        ]
+    )
+    differs = why_not_comparable(paired, ("_self", "_cross")).iloc[0]
+    if differs.any():
+        logger.warning(
+            "%s -> %s: not fit, the Mself and Mselfcross cohorts differ in %s (%s)",
+            cross_pop,
+            resp_pop,
+            list(differs.index[differs]),
+            paired.iloc[0].to_dict(),
+        )
+        return None
     fit_self = fit_per_bin_rate_model(design_self, M_SELF)
     fit_cross = fit_per_bin_rate_model(design_cross, M_CROSS)
     if fit_self is None or fit_cross is None:
