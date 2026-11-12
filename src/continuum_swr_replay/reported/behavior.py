@@ -308,8 +308,9 @@ ESTIMATORS = {
 #: Leaf-ladder steps: key word -> (parent, child).
 LEAF_STEPS = {"uncertainty": ("M4", "Mu"), "value": ("M4", "Mv"), "both": ("Mu", "Mvu")}
 
-#: The leaf ladder's rung files the summary reads: the steps' rungs.
-LEAF_RUNGS = ("M4", "Mu", "Mv", "Mvu")
+#: The leaf ladder's rung files the summary reads: the steps' rungs, each once,
+#: in the order the steps name them.
+LEAF_RUNGS = tuple(dict.fromkeys(rung for step in LEAF_STEPS.values() for rung in step))
 
 #: Stay/leave content strata, by the file suffix their bundles carry.
 STAY_STRATA = {"all": "", "swr": "_swr", "non_swr": "_non_swr", "mua": "_mua"}
@@ -2206,14 +2207,13 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
     the child's minus the parent's, and a stored comparison written before that
     convention holds the opposite sign."""
     make = value_factory(leaf_values, source, TAGS["leaf_ladder"])
+    rungs = {name: pd.read_pickle(leaf_dir / f"{name}.pkl") for name in LEAF_RUNGS}
     values = []
     for word, model, term in (
         ("leaf_uncertainty", "Mu", "reward_belief_variance_candidate_arm_preoutcome_z"),
         ("leaf_value", "Mv", "reward_belief_mean_candidate_arm_preoutcome"),
     ):
-        stats = gated_coefficient_statistics(
-            pd.read_pickle(leaf_dir / f"{model}.pkl"), term
-        )
+        stats = gated_coefficient_statistics(rungs[model], term)
         _require(stats["n_animals"] == 5, f"{term}: {stats['n_animals']} animals")
         what = f"leaf ladder {model} {term}"
         values += pend(
@@ -2251,7 +2251,6 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
             ],
             _gate_note(stats, term),
         )
-    rungs = {name: pd.read_pickle(leaf_dir / f"{name}.pkl") for name in LEAF_RUNGS}
     for word, (parent, child) in LEAF_STEPS.items():
         step = summarize_comparison(
             compare_nested_models(rungs[parent], rungs[child]), parent, child
