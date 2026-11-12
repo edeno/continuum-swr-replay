@@ -239,12 +239,18 @@ def _write_summary(
 
     def select_overall_contrast(metric: str, response: str, scope: str) -> pd.Series:
         """The ``overall`` row of :func:`paired_quartile_contrasts`."""
-        return contrasts[
+        rows = contrasts[
             contrasts["metric"].eq(metric)
             & contrasts["response"].eq(response)
             & contrasts["scope"].eq(scope)
             & contrasts["level"].eq("overall")
-        ].iloc[0]
+        ]
+        if rows.empty:
+            raise ValueError(
+                f"paired_quartile_contrasts gave no overall row for {metric} "
+                f"({response} response, {scope} wells)"
+            )
+        return rows.iloc[0]
 
     def positive_animals(contrast: pd.Series) -> str:
         return f"{int(contrast['n_animals_positive'])}/{int(contrast['n_animals'])}"

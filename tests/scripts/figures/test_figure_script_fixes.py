@@ -1090,3 +1090,43 @@ def test_the_isi_autocorrelation_panel_draws_its_points_and_the_bounds():
     )
     ci = 1.96 / np.sqrt(n_spikes)
     np.testing.assert_allclose(bounds, [-ci, ci])
+
+
+# --------------------------------------------------------------------------
+# The uncertainty-content figure reads the analysis's animal counts
+# --------------------------------------------------------------------------
+
+
+def _uncertainty_contrasts() -> pd.DataFrame:
+    """Q4 - Q1 contrast rows of ``analyze_uncertainty_content``: the overall
+    posterior unchosen-well row of each metric among rows of other responses,
+    scopes and levels, each with its own counts."""
+    rows = [
+        # (metric, response, scope, level, n_animals_positive, n_animals)
+        ("conditional_event_share", "posterior", "unchosen", "overall", 3, 5),
+        ("conditional_event_share", "hard", "unchosen", "overall", 5, 5),
+        ("conditional_event_share", "posterior", "all", "overall", 1, 5),
+        ("conditional_event_share", "posterior", "unchosen", "animal", 1, 1),
+        ("absolute_rate", "posterior", "unchosen", "overall", 4, 4),
+    ]
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "metric",
+            "response",
+            "scope",
+            "level",
+            "n_animals_positive",
+            "n_animals",
+        ],
+    )
+
+
+def test_the_uncertainty_annotation_refuses_a_metric_without_an_overall_row():
+    figure = importlib.import_module(
+        "scripts.figures.generate_uncertainty_content_figure"
+    )
+    contrasts = _uncertainty_contrasts()
+    contrasts = contrasts[~contrasts["metric"].eq("absolute_rate")]
+    with pytest.raises(ValueError, match="no overall posterior row for absolute_rate"):
+        figure._positive_animals_note(contrasts, "absolute_rate")

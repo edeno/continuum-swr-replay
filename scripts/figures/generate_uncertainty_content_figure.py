@@ -308,7 +308,13 @@ def _positive_animals_note(contrasts: pd.DataFrame, metric: str) -> str:
     """The animals whose Q4 - Q1 contrast is above zero, as the analysis counts
     them (``paired_quartile_contrasts``)."""
     overall = _contrast(contrasts, metric=metric, scope="unchosen", level="overall")
-    row = overall[overall["response"].eq("posterior")].iloc[0]
+    rows = overall[overall["response"].eq("posterior")]
+    if rows.empty:
+        raise ValueError(
+            f"quartile_contrasts.csv has no overall posterior row for {metric} at "
+            "unchosen wells; rerun scripts/behavior/content/analyze_uncertainty_content.py."
+        )
+    row = rows.iloc[0]
     return (
         f"Q4 − Q1 > 0 in {int(row['n_animals_positive'])}/{int(row['n_animals'])} "
         "animals"
