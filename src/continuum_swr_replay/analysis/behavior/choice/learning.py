@@ -49,10 +49,14 @@ __all__ = [
     "StopSummaryConfig",
     "fit_is_stay_logistic_per_session",
     "fit_is_stay_pooled_gee",
+    "fit_stay_leave_roles",
     "stop_replay_summary",
 ]
 
 logger = logging.getLogger(__name__)
+
+#: Minimum stops per session for a per-session stay fit.
+DEFAULT_MIN_STAY_STOPS = 30
 
 # Roles whose ``arm_fraction`` we track at the stop level. Each role
 # maps to the column on ``event_table`` that names the arm to query.
@@ -404,7 +408,7 @@ def fit_is_stay_logistic_per_session(
     content_col: str = "frac_on_last_rewarded",
     outcome_col: str = "is_omitted_outcome",
     target_col: str = "is_stay",
-    min_stops: int = 30,
+    min_stops: int = DEFAULT_MIN_STAY_STOPS,
 ) -> pd.DataFrame:
     """Per-session logistic: ``is_stay ~ outcome * content_col``.
 
@@ -667,6 +671,100 @@ def fit_is_stay_pooled_gee(
 ARM_ROLES = ("current", "prev", "last_rewarded", "best")
 PATCH_ROLES = ("current_patch", "prev_patch", "last_rewarded_patch", "best_patch")
 ROLES = ARM_ROLES + PATCH_ROLES
+
+
+def role_content_column(role: str, stratum: str) -> str:
+    """The :func:`stop_replay_summary` column holding one role's content.
+
+    ``frac_on_<role>`` for all events, ``frac_on_<role>_<stratum>`` for one
+    event stratum (``swr``, ``non_swr``, ``mua``).
+    """
+    if stratum == "all":
+        return f"frac_on_{role}"
+    return f"frac_on_{role}_{stratum}"
+
+
+def fit_stay_leave_roles(
+    summary: pd.DataFrame,
+    *,
+    content_stratum: str,
+    stop_cohort: str,
+    min_stops: int = DEFAULT_MIN_STAY_STOPS,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Fit the stay decision on each role's content, per session and pooled.
+
+    For each role of :data:`ROLES` whose content column the summary carries,
+    the stops with that content (``dropna`` on the column) are fit with
+    :func:`fit_is_stay_logistic_per_session` and :func:`fit_is_stay_pooled_gee`
+    (``is_stay ~ is_omitted_outcome * <content>``). A role without its column
+    is skipped with a warning.
+
+    Parameters
+    ----------
+    summary : pd.DataFrame
+        :func:`stop_replay_summary` of the stop cohort.
+    content_stratum : str
+        Which events' content is the predictor (``all``, ``swr``, ``non_swr``,
+        ``mua``).
+    stop_cohort : str
+        The stop cohort's name, written on every row.
+    min_stops : int, optional
+        Minimum stops per session for a per-session fit.
+
+    Returns
+    -------
+    (per_session, pooled)
+        The per-session fits of every role, with ``role``, ``content_stratum``,
+        ``content_col`` and ``stop_cohort``; and one pooled-GEE row per role.
+        Either is empty when no role was fit.
+    """
+    all_results = []
+    gee_rows = []
+    for role in ROLES:
+        col = role_content_column(role, content_stratum)
+        if col not in summary.columns:
+            logger.warning("Skipping role=%s: column %s missing", role, col)
+            continue
+        usable = summary.dropna(subset=[col])
+        logger.info(
+            "Role=%-25s stratum=%-7s usable stops=%d",
+            role,
+            content_stratum,
+            len(usable),
+        )
+        coefs = fit_is_stay_logistic_per_session(
+            usable,
+            content_col=col,
+            outcome_col="is_omitted_outcome",
+            target_col="is_stay",
+            min_stops=min_stops,
+        )
+        coefs["role"] = role
+        coefs["content_stratum"] = content_stratum
+        coefs["content_col"] = col
+        coefs["stop_cohort"] = stop_cohort
+        all_results.append(coefs)
+
+        # Pooled GEE on the same data.
+        gee_result = fit_is_stay_pooled_gee(
+            usable,
+            content_col=col,
+            outcome_col="is_omitted_outcome",
+            target_col="is_stay",
+        )
+        gee_result.update(
+            {
+                "role": role,
+                "content_stratum": content_stratum,
+                "stop_cohort": stop_cohort,
+            }
+        )
+        gee_rows.append(gee_result)
+
+    per_session = (
+        pd.concat(all_results, ignore_index=True) if all_results else pd.DataFrame()
+    )
+    return per_session, pd.DataFrame(gee_rows)
 
 
 def cross_session_role_summary(coefs: pd.DataFrame) -> pd.DataFrame:

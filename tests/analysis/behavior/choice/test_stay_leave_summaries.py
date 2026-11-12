@@ -8,7 +8,9 @@ import pytest
 
 from continuum_swr_replay.analysis.behavior.choice.learning import (
     fit_status_counts,
+    fit_stay_leave_roles,
     pooled_gee_role_summary,
+    role_content_column,
     smallest_adjusted_p,
 )
 
@@ -86,3 +88,50 @@ def test_fit_status_counts_the_rows_and_the_converged_fits():
         {"status": ["ok", "ok", "too_few_stops_3", "fit_error", "ok", "not_converged"]}
     )
     assert fit_status_counts(fits) == {"n_fits": 6, "n_converged": 3}
+
+
+def test_a_role_s_content_column_names_its_stratum():
+    assert role_content_column("current", "all") == "frac_on_current"
+    assert role_content_column("best_patch", "non_swr") == "frac_on_best_patch_non_swr"
+
+
+def test_the_role_fits_read_each_role_s_own_stops_and_skip_a_missing_role():
+    """Two roles carry content; ``current`` has it on 3 of 4 stops, ``prev`` on 2.
+
+    ``min_stops`` is above both counts, so no session is fit, but each role's
+    row says how many stops it read, and every other role is skipped.
+    """
+    summary = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": 1,
+            "epoch": "02_r1",
+            "stop_id": [0, 1, 2, 3],
+            "is_stay": [1.0, 0.0, 1.0, 0.0],
+            "is_omitted_outcome": [0.0, 1.0, 1.0, 0.0],
+            "frac_on_current": [0.5, NAN, 0.2, 0.1],
+            "frac_on_prev": [NAN, 0.4, NAN, 0.3],
+        }
+    )
+
+    per_session, pooled = fit_stay_leave_roles(
+        summary, content_stratum="all", stop_cohort="at_well", min_stops=10
+    )
+
+    assert list(per_session["role"]) == ["current", "prev"]
+    assert list(per_session["n_stops"]) == [3, 2]
+    assert per_session["beta_inter"].isna().all()
+    assert set(per_session["stop_cohort"]) == {"at_well"}
+    assert list(per_session["content_col"]) == ["frac_on_current", "frac_on_prev"]
+    assert list(pooled["role"]) == ["current", "prev"]
+    assert set(pooled["content_stratum"]) == {"all"}
+
+
+def test_no_role_column_fits_nothing():
+    per_session, pooled = fit_stay_leave_roles(
+        pd.DataFrame({"animal": ["a"], "session_date": [1], "epoch": ["e"]}),
+        content_stratum="swr",
+        stop_cohort="at_well",
+    )
+    assert per_session.empty
+    assert pooled.empty

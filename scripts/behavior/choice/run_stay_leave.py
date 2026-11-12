@@ -48,10 +48,9 @@ from typing import Any
 import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.choice.learning import (
-    ROLES,
+    DEFAULT_MIN_STAY_STOPS,
     cross_session_role_summary,
-    fit_is_stay_logistic_per_session,
-    fit_is_stay_pooled_gee,
+    fit_stay_leave_roles,
     pooled_gee_role_summary,
     stop_replay_summary,
 )
@@ -145,12 +144,6 @@ def write_summary_provenance(
     )
 
 
-def _content_col_for(role: str, stratum: str) -> str:
-    if stratum == "all":
-        return f"frac_on_{role}"
-    return f"frac_on_{role}_{stratum}"
-
-
 def log_cross_session_role_summary(summary: pd.DataFrame) -> None:
     """Log one line per role of :func:`cross_session_role_summary`."""
     for row in summary.itertuples():
@@ -181,7 +174,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--min-stops",
         type=int,
-        default=30,
+        default=DEFAULT_MIN_STAY_STOPS,
         help="Minimum stops per session for fitting.",
     )
     parser.add_argument(
@@ -294,48 +287,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
 
     # Fit per-session logistic for each role + pooled GEE.
-    all_results = []
-    gee_rows = []
-    for role in ROLES:
-        col = _content_col_for(role, args.content_stratum)
-        if col not in summary.columns:
-            logging.warning("Skipping role=%s: column %s missing", role, col)
-            continue
-        usable = summary.dropna(subset=[col])
-        logging.info(
-            "Role=%-25s stratum=%-7s usable stops=%d",
-            role,
-            args.content_stratum,
-            len(usable),
-        )
-        coefs = fit_is_stay_logistic_per_session(
-            usable,
-            content_col=col,
-            outcome_col="is_omitted_outcome",
-            target_col="is_stay",
-            min_stops=args.min_stops,
-        )
-        coefs["role"] = role
-        coefs["content_stratum"] = args.content_stratum
-        coefs["content_col"] = col
-        coefs["stop_cohort"] = args.stop_cohort
-        all_results.append(coefs)
-
-        # Pooled GEE on the same data.
-        gee_result = fit_is_stay_pooled_gee(
-            usable,
-            content_col=col,
-            outcome_col="is_omitted_outcome",
-            target_col="is_stay",
-        )
-        gee_result.update(
-            {
-                "role": role,
-                "content_stratum": args.content_stratum,
-                "stop_cohort": args.stop_cohort,
-            }
-        )
-        gee_rows.append(gee_result)
+    out, gee_df = fit_stay_leave_roles(
+        summary,
+        content_stratum=args.content_stratum,
+        stop_cohort=args.stop_cohort,
+        min_stops=args.min_stops,
+    )
 
     provenance_extra = {
         "stop_cohort": args.stop_cohort,
@@ -347,7 +304,6 @@ def main(argv: Sequence[str] | None = None) -> None:
         "summary_artifact": cache_path.name,
     }
 
-    out = pd.concat(all_results, ignore_index=True) if all_results else pd.DataFrame()
     if not out.empty:
         out_path = fit_path("logistic", args.content_stratum, args.stop_cohort)
         out.to_pickle(out_path)
@@ -356,7 +312,6 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
         logging.info("Saved %d rows → %s", len(out), out_path)
 
-    gee_df = pd.DataFrame(gee_rows)
     if not gee_df.empty:
         gee_path = fit_path("pooled_gee", args.content_stratum, args.stop_cohort)
         gee_df.to_pickle(gee_path)
