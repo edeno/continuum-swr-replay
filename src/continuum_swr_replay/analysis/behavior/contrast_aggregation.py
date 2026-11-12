@@ -69,7 +69,7 @@ from continuum_swr_replay.tables.standardization import (
 
 from ._fit_diagnostics import SEPARATION_COEF_ABS
 from ._helpers import add_arm_fixed_effects
-from .cohort_audit import HAS_QVALS_ROW, qvals_gap_event_ids
+from .cohort_audit import HAS_QVALS_ROW, fit_flag_counts, qvals_gap_event_ids
 from .covariates.history.value_uncertainty import validate_uncertainty_inputs
 from .covariates.interactions import (
     LOG1P_STOP_TIME,
@@ -683,19 +683,7 @@ def aggregate_contrast(
         # Session-level fit-diagnostics counts (informational; NOT drops). These stay
         # FIT-level -- they answer "how many fits had any unidentified term", which is
         # a different question from the per-term drop above. Counted over ALL modeled
-        # session-fits for this (model, population). A fit with no convergence
-        # flag has not converged; a missing separation flag is not separated.
-        # Absent columns (older res without diagnostics) count nothing.
-        n_nonconverged = (
-            int((~s_all["converged"].eq(True)).sum())
-            if "converged" in s_all.columns
-            else 0
-        )
-        n_separated = (
-            int((s_all["separated"] == True).sum())  # noqa: E712
-            if "separated" in s_all.columns
-            else 0
-        )
+        # session-fits for this (model, population) (fit_flag_counts).
         rows.append(
             {
                 "level": level,
@@ -706,8 +694,7 @@ def aggregate_contrast(
                 "n_animals": summary["n_animals"],
                 "n_dropped": gate.n_dropped,
                 "n_unidentified": gate.n_unidentified,
-                "n_sessions_flagged_nonconverged": n_nonconverged,
-                "n_sessions_flagged_separated": n_separated,
+                **fit_flag_counts(s_all),
                 "coef_animal_median": summary["animal_median"],
                 "n_animals_pos": summary["n_animals_positive"],
                 "coef_session_median": summary["median"],

@@ -43,6 +43,34 @@ DROP_FIELDS = (
 # reconciliation (they count fits, not rows).
 FLAG_FIELDS = ("n_sessions_flagged_nonconverged", "n_sessions_flagged_separated")
 
+
+def fit_flag_counts(fits: pd.DataFrame) -> dict[str, int]:
+    """The fits flagged as not converged and as separated: the :data:`FLAG_FIELDS`.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame, shape (n_fits, n_columns)
+        Per-session fits, optionally with ``converged`` and ``separated``.
+
+    Returns
+    -------
+    counts : dict
+        - ``n_sessions_flagged_nonconverged``: fits whose ``converged`` is not
+          True; a missing flag has not converged.
+        - ``n_sessions_flagged_separated``: fits whose ``separated`` is True; a
+          missing flag is not separated.
+
+        A column the fits do not carry counts 0.
+    """
+    nonconverged, separated = FLAG_FIELDS
+    return {
+        nonconverged: (
+            int((~fits["converged"].eq(True)).sum()) if "converged" in fits else 0
+        ),
+        separated: int(fits["separated"].eq(True).sum()) if "separated" in fits else 0,
+    }
+
+
 # Full column order for the emitted CSV.
 COHORT_COLUMNS = (
     "model",

@@ -73,6 +73,7 @@ from continuum_swr_replay.analysis.behavior.coefficient_statistics import (  # n
 )
 from continuum_swr_replay.analysis.behavior.cohort_audit import (  # noqa: E402
     cohort_record,
+    fit_flag_counts,
     stop_own_missing,
     write_cohort_audit,
 )
@@ -530,12 +531,7 @@ def _cohort_records(
                 n_drop_qvals_gap=int(qvals_gap),
                 n_drop_own_predictor_missing=n_own,
                 n_excluded_session=n_postjoin - n_own - n_modeled,
-                n_sessions_flagged_nonconverged=(
-                    int((sub["converged"] == False).sum()) if "converged" in sub else 0  # noqa: E712
-                ),
-                n_sessions_flagged_separated=(
-                    int((sub["separated"] == True).sum()) if "separated" in sub else 0  # noqa: E712
-                ),
+                **fit_flag_counts(sub),
             )
         )
     return records

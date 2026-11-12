@@ -14,6 +14,7 @@ from continuum_swr_replay.analysis.behavior.cohort_audit import (
     escape_note_field,
     estimator_skip_note,
     event_drop_buckets,
+    fit_flag_counts,
     records_from_common_cohort_provenance,
     term_diagnostics,
     write_cohort_audit,
@@ -132,6 +133,30 @@ def test_flags_do_not_reconcile():
     assert rec["n_sessions_flagged_nonconverged"] == 2
     assert rec["n_sessions_flagged_separated"] == 3
     assert rec["n_modeled"] == 35
+
+
+def test_a_missing_convergence_flag_has_not_converged_and_a_missing_separation_flag_is_not_separated():
+    # converged: True, False, NaN, None, True -> 3 not converged (a `== False`
+    # count would give 1); separated: True, False, NaN, None, True -> 2.
+    fits = pd.DataFrame(
+        {
+            "converged": pd.Series([True, False, np.nan, None, True], dtype=object),
+            "separated": pd.Series([True, False, np.nan, None, True], dtype=object),
+        }
+    )
+    assert fit_flag_counts(fits) == {
+        "n_sessions_flagged_nonconverged": 3,
+        "n_sessions_flagged_separated": 2,
+    }
+    # a column the fits do not carry counts nothing
+    assert fit_flag_counts(fits[["separated"]]) == {
+        "n_sessions_flagged_nonconverged": 0,
+        "n_sessions_flagged_separated": 2,
+    }
+    assert fit_flag_counts(fits[["converged"]]) == {
+        "n_sessions_flagged_nonconverged": 3,
+        "n_sessions_flagged_separated": 0,
+    }
 
 
 def test_drop_profile_early_session():

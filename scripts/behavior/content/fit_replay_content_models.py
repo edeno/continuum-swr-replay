@@ -87,6 +87,7 @@ from continuum_swr_replay.analysis.behavior.cohort_audit import (
     drop_profile,
     estimator_skip_note,
     event_drop_buckets,
+    fit_flag_counts,
     is_qvals_sourced_column,
     write_cohort_audit,
 )
@@ -1791,17 +1792,7 @@ def _audit_compare_and_publish(
                 n_drop_common_cohort_other=buckets["n_drop_common_cohort_other"],
                 n_drop_zero_response=buckets["n_drop_zero_response"],
                 n_excluded_session=n_before - n_drops - n_modeled,
-                n_sessions_flagged_nonconverged=(
-                    # a fit with no convergence flag has not converged
-                    int((~mdf["converged"].eq(True)).sum())
-                    if "converged" in mdf.columns
-                    else 0
-                ),
-                n_sessions_flagged_separated=(
-                    int((mdf["separated"] == True).sum())  # noqa: E712
-                    if "separated" in mdf.columns
-                    else 0
-                ),
+                **fit_flag_counts(mdf),
             )
         )
 
