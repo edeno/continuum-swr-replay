@@ -30,6 +30,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.statistics import signed_rank_p
 from continuum_swr_replay.data_loaders.constants import LEAF_ARMS, port_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -835,12 +836,12 @@ def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
     For each (population, predictor): the across-session median coefficient, the
     number of animals whose own median matches the overall sign (sign consistency,
     of those present), the median per-session design condition number, and the
-    Wilcoxon signed-rank p. The Wilcoxon is **descriptive** — sessions within an
-    animal are not independent — so read the animal sign-consistency as the
-    population evidence.
+    Wilcoxon signed-rank p
+    (:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`, NaN below
+    six non-zero coefficients). The Wilcoxon is **descriptive** —
+    sessions within an animal are not independent — so read the animal
+    sign-consistency as the population evidence.
     """
-    from scipy.stats import wilcoxon
-
     coef_cols = [c for c in coefficients.columns if c.startswith("coef_")]
     rows = []
     for population, pop_df in coefficients.groupby("population", observed=True):
@@ -850,10 +851,6 @@ def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
                 continue
             median = float(values.median())
             per_animal = pop_df.groupby("animal", observed=True)[coef_col].median()
-            try:
-                pvalue = float(wilcoxon(values).pvalue)
-            except ValueError:
-                pvalue = float("nan")
             rows.append(
                 {
                     "population": population,
@@ -864,7 +861,7 @@ def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
                     ),
                     "n_animals": int(per_animal.notna().sum()),
                     "median_cond_number": float(pop_df["cond_number"].median()),
-                    "wilcoxon_p": pvalue,
+                    "wilcoxon_p": signed_rank_p(values),
                     "n_sessions": int(len(values)),
                 }
             )
