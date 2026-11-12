@@ -74,6 +74,12 @@ def _lag_one(coefs) -> np.ndarray:
     return np.asarray(coefs, dtype=float) @ WEIGHTS[:, 0]
 
 
+def _paired_statistics(fits_a, fits_b) -> dict:
+    return stats.paired_lag_one_kernel_statistics(
+        stats.paired_lag_one_reward_kernels(fits_a, fits_b)
+    )
+
+
 # --- the cohort and the baseline rate -------------------------------------------------
 
 
@@ -400,7 +406,7 @@ def test_the_paired_test_compares_lag_one_kernels_within_session():
     assert (_lag_one(swr) > _lag_one(no_swr)).all()
     assert (swr[:, 0] < no_swr[:, 0]).all()
 
-    paired = stats.paired_lag_one_kernel_statistics(_fits(swr), _fits(no_swr))
+    paired = _paired_statistics(_fits(swr), _fits(no_swr))
 
     assert paired["n_sessions"] == n
     assert paired["positive_fraction"] == 1.0
@@ -412,9 +418,7 @@ def test_the_paired_test_drops_a_session_gated_in_either_stream():
     separated = [""] * 10
     separated[2] = REWARD_HISTORY_COLUMNS[0]
 
-    paired = stats.paired_lag_one_kernel_statistics(
-        _fits(coefs + 0.1), _fits(coefs, separated=separated)
-    )
+    paired = _paired_statistics(_fits(coefs + 0.1), _fits(coefs, separated=separated))
 
     assert paired["n_sessions"] == 9
 
@@ -424,14 +428,14 @@ def test_the_paired_difference_is_a_minus_b_over_sessions_and_animals():
     a = _fits(_first_bump([0.5, 0.2, 0.9, 0.6, -0.2]), animals=animals)
     b = _fits(_first_bump([0.1, 0.4, 0.3, 0.1, 0.1]), animals=animals)
     # differences 0.4, -0.2, 0.6, 0.5, -0.3; animal medians 0.1, 0.55, -0.3
-    result = stats.paired_lag_one_kernel_statistics(a, b)
+    result = _paired_statistics(a, b)
     assert result["n_sessions"] == 5
     assert result["positive_fraction"] == 0.6
     assert result["n_animals"] == 3
     assert result["n_animals_positive"] == 2
     # five differences are too few for a signed-rank p
     assert np.isnan(result["signed_rank_p"])
-    reverse = stats.paired_lag_one_kernel_statistics(b, a)
+    reverse = _paired_statistics(b, a)
     assert reverse["positive_fraction"] == 0.4
     assert reverse["n_animals_positive"] == 1
 
@@ -452,7 +456,7 @@ def test_the_paired_kernels_are_the_sessions_both_streams_keep():
     np.testing.assert_allclose(paired["lag_one_a"], [0.5, 0.9, 0.6, -0.2])
     np.testing.assert_allclose(paired["lag_one_b"], [0.1, 0.3, 0.1, 0.1])
     # the paired statistics read these sessions: differences 0.4, 0.6, 0.5, -0.3
-    result = stats.paired_lag_one_kernel_statistics(a, b)
+    result = stats.paired_lag_one_kernel_statistics(paired)
     assert result["n_sessions"] == 4
     assert result["positive_fraction"] == 0.75
     assert result["n_animals"] == 4
@@ -465,7 +469,7 @@ def test_the_reward_kernel_refuses_two_fits_of_one_session():
     with pytest.raises(ValueError, match="more than one fit for a session"):
         stats.reward_kernel_statistics(two)
     with pytest.raises(ValueError, match="more than one fit for a session"):
-        stats.paired_lag_one_kernel_statistics(one, two)
+        stats.paired_lag_one_reward_kernels(one, two)
     with pytest.raises(ValueError, match="more than one fit for a session"):
         stats.paired_lag_one_reward_kernels(two, one)
 

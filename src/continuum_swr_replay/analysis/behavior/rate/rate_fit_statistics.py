@@ -301,25 +301,6 @@ def self_history_kernel_by_lag(fits: pd.DataFrame) -> pd.DataFrame:
     return _rate_ratios_by_lag(kernels)
 
 
-def lag_one_reward_kernels(fits: pd.DataFrame) -> pd.DataFrame:
-    """Each gated session's reconstructed reward kernel at lag 1.
-
-    Parameters
-    ----------
-    fits : pd.DataFrame
-        Per-session fits of one rung and population (:func:`reward_gated_fits`),
-        with the session columns and ``converged``.
-
-    Returns
-    -------
-    kernels : pd.DataFrame, shape (n_gated_sessions, 5)
-        The session columns, ``converged`` and ``lag_one``: the log rate ratio
-        of a reward one trial back.
-    """
-    gated, kernels = _gated_reward_kernels(fits)
-    return gated[[*SESSION_COLUMNS, "converged"]].assign(lag_one=kernels[:, 0])
-
-
 def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
     """The reconstructed reward kernel of one rung and population.
 
@@ -327,7 +308,7 @@ def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
     ----------
     fits : pd.DataFrame
         Per-session fits of one rung and population that carries the reward
-        block (:func:`lag_one_reward_kernels`).
+        block (:func:`reward_gated_fits`), with ``converged``.
 
     Returns
     -------
@@ -386,7 +367,7 @@ def paired_lag_one_reward_kernels(
     ----------
     fits_a, fits_b : pd.DataFrame
         Per-session fits of one rung, each of one population
-        (:func:`lag_one_reward_kernels`).
+        (:func:`reward_gated_fits`).
 
     Returns
     -------
@@ -397,51 +378,46 @@ def paired_lag_one_reward_kernels(
     """
     session = list(SESSION_COLUMNS)
     kernels_a, kernels_b = (
-        lag_one_reward_kernels(fits)[[*session, "lag_one"]] for fits in (fits_a, fits_b)
+        gated[session].assign(lag_one=kernels[:, 0])
+        for gated, kernels in map(_gated_reward_kernels, (fits_a, fits_b))
     )
     return kernels_a.merge(kernels_b, on=session, suffixes=("_a", "_b"), validate="1:1")
 
 
-def paired_lag_one_kernel_statistics(
-    fits_a: pd.DataFrame, fits_b: pd.DataFrame
-) -> dict[str, float]:
+def paired_lag_one_kernel_statistics(kernels: pd.DataFrame) -> dict[str, float]:
     """The lag-1 reward kernel of one population against another's, within session.
 
     Parameters
     ----------
-    fits_a, fits_b : pd.DataFrame
-        Per-session fits of one rung, each of one population
-        (:func:`lag_one_reward_kernels`).
+    kernels : pd.DataFrame, shape (n_paired_sessions, 5)
+        The paired sessions' lag-1 kernels, ``lag_one_a`` and ``lag_one_b``
+        (:func:`paired_lag_one_reward_kernels`).
 
     Returns
     -------
     statistics : dict
-        Over the sessions in which both populations' fits pass the reward gate
-        (:func:`paired_lag_one_reward_kernels`): ``n_sessions``;
-        ``positive_fraction``, the share whose log lag-1 kernel is larger in a
-        than in b; ``n_animals``; ``n_animals_positive``, the animals whose
-        median a - b difference is positive; and ``signed_rank_p``, the paired
-        Wilcoxon signed-rank p.
+        Over the sessions in which both populations' fits pass the reward gate:
+        ``n_sessions``; ``positive_fraction``, the share whose log lag-1 kernel
+        is larger in a than in b; ``n_animals``; ``n_animals_positive``, the
+        animals whose median a - b difference is positive
+        (:func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`
+        of the differences); and ``signed_rank_p``, the paired Wilcoxon
+        signed-rank p
+        (:func:`~continuum_swr_replay.analysis.shared_statistics.signed_rank_p`).
     """
-    paired = paired_lag_one_reward_kernels(fits_a, fits_b)
-    statistics = paired_coefficient_statistics(
-        *(
-            paired[[*SESSION_COLUMNS, f"lag_one_{side}"]].rename(
-                columns={f"lag_one_{side}": "lag_one"}
-            )
-            for side in ("a", "b")
-        ),
-        "lag_one",
-    )
+    difference = kernels["lag_one_a"] - kernels["lag_one_b"]
+    statistics = session_median_statistics(difference, kernels["animal"])
     return {
-        name: statistics[name]
-        for name in (
-            "n_sessions",
-            "positive_fraction",
-            "n_animals",
-            "n_animals_positive",
-            "signed_rank_p",
-        )
+        **{
+            name: statistics[name]
+            for name in (
+                "n_sessions",
+                "positive_fraction",
+                "n_animals",
+                "n_animals_positive",
+            )
+        },
+        "signed_rank_p": signed_rank_p(difference),
     }
 
 

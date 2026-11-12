@@ -174,7 +174,7 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     pair = ("non_local_swr", "non_local_no_swr")
     fits_a, fits_b = (fit_rows(m7, outcome=oc) for oc in pair)
     kernels = paired_lag_one_reward_kernels(fits_a, fits_b)
-    paired = paired_lag_one_kernel_statistics(fits_a, fits_b)
+    paired = paired_lag_one_kernel_statistics(kernels)
     if paired["n_sessions"] < 2:
         raise SystemExit(
             f"Only {paired['n_sessions']} paired sessions for the SWR/no-SWR "

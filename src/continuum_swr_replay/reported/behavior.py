@@ -755,11 +755,16 @@ def per_bin_values(
             )
     no_swr_all = fit_rows(all_stops, model=FULL_RATE_RUNG, outcome="non_local_no_swr")
     paired = rate_fit_statistics.paired_lag_one_kernel_statistics(
-        fit_rows(fits, model=FULL_RATE_RUNG, outcome="non_local_swr"),
-        fit_rows(fits, model=FULL_RATE_RUNG, outcome="non_local_no_swr"),
+        rate_fit_statistics.paired_lag_one_reward_kernels(
+            fit_rows(fits, model=FULL_RATE_RUNG, outcome="non_local_swr"),
+            fit_rows(fits, model=FULL_RATE_RUNG, outcome="non_local_no_swr"),
+        )
     )
     paired_all = rate_fit_statistics.paired_lag_one_kernel_statistics(
-        fit_rows(all_stops, model=FULL_RATE_RUNG, outcome="non_local_swr"), no_swr_all
+        rate_fit_statistics.paired_lag_one_reward_kernels(
+            fit_rows(all_stops, model=FULL_RATE_RUNG, outcome="non_local_swr"),
+            no_swr_all,
+        )
     )
     for stats in (paired, paired_all):
         _require(
