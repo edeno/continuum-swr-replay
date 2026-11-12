@@ -51,9 +51,15 @@ Work that is deferred on purpose. Each item says when it should be done.
 - [ ] **Scripts and figures that compute a reported statistic themselves.** Each
   summary's statistics are functions in `analysis/` (`docs/development.md`,
   "Reported numbers"). Figure 2's panels b and d and Figure 4d call them, and the
-  `scripts/pfc/` reports take a statistic whole from them or compute their own.
+  `scripts/pfc/` reports take the summary's statistics from them (the
+  marked-family summary's are `analysis/pfc/marked_family_statistics.py`'s); their
+  audit-only tables are still computed in the scripts.
   These still hold their own copy; make each call the function, comparing its
   output before and after on the cluster:
+  - mpfc: `scripts/pfc/calibrate_pfc_kernel_timing.py` computes the timing
+    calibration the summary reads (each rule's unit median, percentiles and bias,
+    in `read_curves` and `simulate_and_fit`). Moving them splits the simulation's
+    fit from its summary, and checking the move reruns the simulated fits.
   - detection and events: `scripts/detection/report_inventory_comparison.py` pools the
     per-animal tables (`_report.pool_sessions`) that
     `nonlocal_comparison.left_out_statistics` reads; the `summarize` functions of
