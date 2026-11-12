@@ -23,7 +23,6 @@ from continuum_swr_replay.analysis.behavior.content.cohort import (
     zero_response_event_ids,
 )
 from continuum_swr_replay.analysis.behavior.content.simulation import (
-    simulate_dirichlet_multinomial_counts,
     simulate_with_event_covariates,
 )
 from continuum_swr_replay.analysis.behavior.fit_provenance import (
@@ -37,7 +36,11 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS, WELL_ARMS
 from continuum_swr_replay.tables.io import write_table
 from scripts.behavior.content import fit_replay_content_models as mod
-from tests.support._content_tables import canonical_arm_table
+from tests.support._content_tables import (
+    canonical_arm_table,
+    dm_session,
+    simulated_session,
+)
 
 # the runner resolves its directories, and /tmp is itself a symlink on macOS
 CONTENT_IN = Path("/tmp/content-in").resolve()
@@ -208,56 +211,6 @@ def test_parser_leaves_the_response_to_the_estimator_by_default() -> None:
 
 
 # ── Estimator and response recorded on every fitted row ──
-
-
-def _simulated_session(response_col: str, seed: int = 5) -> pd.DataFrame:
-    df = simulate_with_event_covariates(
-        {"is_current_arm": 0.7}, n_events=60, L_e=20, seed=seed
-    )
-    df["arm_fraction"] = df["arm_count_hard"] / df.groupby("event_id")[
-        "arm_count_hard"
-    ].transform("sum")
-    df["animal"] = "chimi"
-    df["session_date"] = "20200212"
-    df["epoch"] = "02_r1"
-    assert response_col in df.columns
-    return df
-
-
-@pytest.mark.parametrize(
-    "response_col,estimator",
-    [
-        ("arm_fraction", "conditional_poisson_fraction"),
-        ("arm_count_hard", "conditional_poisson_count"),
-    ],
-)
-def test_fitted_rows_record_the_estimator_and_the_response(
-    response_col, estimator
-) -> None:
-    result = mod.fit_model_per_session(
-        _simulated_session(response_col),
-        "X",
-        ["is_current_arm"],
-        response_col=response_col,
-    )
-    assert len(result) == 1
-    assert result["estimator"].tolist() == [estimator]
-    assert result["response_col"].tolist() == [response_col]
-
-
-def test_fitted_rows_carry_the_optimizer_diagnostics() -> None:
-    result = mod.fit_model_per_session(
-        _simulated_session("arm_fraction"),
-        "X",
-        ["is_current_arm"],
-        response_col="arm_fraction",
-    )
-    row = result.iloc[0]
-    assert row["llf"] < 0
-    assert row["newton_decrement"] < 1e-8
-    assert row["max_abs_grad"] < 1e-3
-    assert row["n_newton_steps"] >= 0
-    assert row["unidentified_terms"] == ""
 
 
 def test_the_printed_se_skips_a_session_that_cannot_inform_the_term(capsys) -> None:
@@ -655,7 +608,7 @@ def test_renormalized_leaf_bundles_say_so_in_their_provenance(tmp_path) -> None:
 
 def test_leaf_only_ladder_fits_six_categories_on_the_rescaled_response() -> None:
     """End to end on simulated data: six-category null, and the rows say so."""
-    sim = _simulated_session("arm_fraction").rename(columns={"arm_id": "candidate_arm"})
+    sim = simulated_session("arm_fraction").rename(columns={"arm_id": "candidate_arm"})
     long_df, renormalized = model_specs.leaf_only_cohort(
         sim, response_col="arm_fraction", response="fraction"
     )
@@ -771,95 +724,6 @@ def test_dm_numbers_are_labelled_a_full_event_likelihood() -> None:
     )
 
 
-def _dm_session(
-    n_events: int, *, seed: int, animal: str = "chimi", epoch: str = "02_r1"
-) -> pd.DataFrame:
-    df = simulate_dirichlet_multinomial_counts(
-        {"is_current_arm": 0.8},
-        log_phi_intercept=1.2,
-        n_events=n_events,
-        L_e=20,
-        seed=seed,
-    )
-    df["animal"] = animal
-    df["session_date"] = "20200212"
-    df["epoch"] = epoch
-    # Event ids are globally unique; the simulator numbers each session from 0.
-    df["event_id"] = [f"{epoch}-{index}" for index in df["event_id"]]
-    # The simulator leaves its drawn allocations in attrs, which pandas compares
-    # element-wise (and so raises on) when concatenating two sessions.
-    df.attrs.clear()
-    return df
-
-
-def test_short_dm_session_borrows_its_animals_concentration() -> None:
-    """A 20-event session cannot pin down its own concentration; a 60-event one can."""
-    cohort = pd.concat(
-        [
-            _dm_session(60, seed=0, epoch="02_r1"),
-            _dm_session(20, seed=1, epoch="04_r2"),
-        ],
-        ignore_index=True,
-    )
-
-    result = mod.fit_model_per_session(
-        cohort,
-        "X",
-        ["is_current_arm"],
-        response_col="arm_count_hard",
-        estimator="dirichlet_multinomial",
-        n_jobs=2,
-        min_events_session_phi=40,
-    )
-
-    assert result["estimator"].tolist() == ["dirichlet_multinomial"] * 2
-    assert result["response_col"].tolist() == ["arm_count_hard"] * 2
-    rows = result.set_index("epoch")
-    assert rows.loc["02_r1", "n_events"] == 60
-    assert rows.loc["04_r2", "n_events"] == 20
-    assert rows.loc["02_r1", "phi_source"] == "session"
-    assert rows.loc["04_r2", "phi_source"] == "animal_pooled"
-    assert rows.loc["04_r2", "coef_log_phi_intercept"] == pytest.approx(
-        rows.loc["02_r1", "coef_log_phi_intercept"]
-    )
-    # The concentration modifier is estimated because the cohort carries both
-    # kinds of event.
-    assert "coef_log_phi_is_swr" in result.columns
-    assert result["coef_log_phi_is_swr"].notna().all()
-    assert bool(result["llf_includes_constants"].all())
-
-
-def test_dm_concentration_modifier_is_dropped_within_an_swr_subset() -> None:
-    """Inside a subset ``is_swr`` is constant, so there is no contrast to fit."""
-    cohort = _dm_session(60, seed=0)
-    assert mod.concentration_cols_for_cohort(cohort) == ("is_swr",)
-    subset = cohort[cohort["is_swr"] == 1.0]
-    assert mod.concentration_cols_for_cohort(subset) == ()
-    assert mod.concentration_cols_for_cohort(cohort.drop(columns="is_swr")) == ()
-
-
-def test_dm_session_with_a_refused_design_is_an_audited_skip() -> None:
-    """A predictor constant within every event raises; the ladder books it instead."""
-    good = _dm_session(60, seed=0, epoch="02_r1")
-    bad = _dm_session(60, seed=2, epoch="04_r2").assign(is_prev_arm=0.0)
-    cohort = pd.concat([good, bad], ignore_index=True)
-
-    result = mod.fit_model_per_session(
-        cohort,
-        "X",
-        ["is_current_arm", "is_prev_arm"],
-        response_col="arm_count_hard",
-        estimator="dirichlet_multinomial",
-        n_jobs=2,
-        min_events_session_phi=40,
-    )
-
-    assert result["epoch"].tolist() == ["02_r1"]
-    skips = result.attrs["estimator_skips"]
-    assert [skip["session"] for skip in skips] == ["chimi/20200212/04_r2"]
-    assert skips[0]["reason"].startswith("dm_design:")
-
-
 def test_a_refused_dm_session_is_named_in_the_published_cohort_audit(tmp_path) -> None:
     """The skip channel's consumer: the audit says which session, and why.
 
@@ -868,8 +732,8 @@ def test_a_refused_dm_session_is_named_in_the_published_cohort_audit(tmp_path) -
     can learn that a session is missing from the fitted cohort, and for what
     reason, is the audit's ``drop_notes``.
     """
-    good = _dm_session(60, seed=0, epoch="02_r1")
-    bad = _dm_session(60, seed=2, epoch="04_r2").assign(is_prev_arm=0.0)
+    good = dm_session(60, seed=0, epoch="02_r1")
+    bad = dm_session(60, seed=2, epoch="04_r2").assign(is_prev_arm=0.0)
     cohort_df = pd.concat([good, bad], ignore_index=True)
     ladder = {"X": ModelSpec("X", ("is_current_arm", "is_prev_arm"), "two arms", None)}
     args = _args(estimator="dirichlet_multinomial", response="hard_count", n_jobs=2)

@@ -1,4 +1,4 @@
-"""Small canonical content tables.
+"""Small canonical content tables and simulated content sessions.
 
 The content runner's tests and the tests of the package functions it calls
 build their inputs here, so a function and its runner are tested on the same
@@ -10,6 +10,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.content.simulation import (
+    simulate_dirichlet_multinomial_counts,
+    simulate_with_event_covariates,
+)
 from continuum_swr_replay.analysis.behavior.model_specs import (
     MODEL_HIERARCHY,
     MODEL_PATCH,
@@ -169,3 +173,40 @@ def default_ladder_patch_table(n_events: int = 2) -> pd.DataFrame:
                 continue
             frame[predictor] = 0.0
     return stamp_swr_source(stamp_covariate_schema(frame, table="event_patch"))
+
+
+def simulated_session(response_col: str, seed: int = 5) -> pd.DataFrame:
+    """One simulated session of 60 events, with both the counts and fractions."""
+    df = simulate_with_event_covariates(
+        {"is_current_arm": 0.7}, n_events=60, L_e=20, seed=seed
+    )
+    df["arm_fraction"] = df["arm_count_hard"] / df.groupby("event_id")[
+        "arm_count_hard"
+    ].transform("sum")
+    df["animal"] = "chimi"
+    df["session_date"] = "20200212"
+    df["epoch"] = "02_r1"
+    assert response_col in df.columns
+    return df
+
+
+def dm_session(
+    n_events: int, *, seed: int, animal: str = "chimi", epoch: str = "02_r1"
+) -> pd.DataFrame:
+    """One session of Dirichlet-multinomial counts with globally unique event ids."""
+    df = simulate_dirichlet_multinomial_counts(
+        {"is_current_arm": 0.8},
+        log_phi_intercept=1.2,
+        n_events=n_events,
+        L_e=20,
+        seed=seed,
+    )
+    df["animal"] = animal
+    df["session_date"] = "20200212"
+    df["epoch"] = epoch
+    # Event ids are globally unique; the simulator numbers each session from 0.
+    df["event_id"] = [f"{epoch}-{index}" for index in df["event_id"]]
+    # The simulator leaves its drawn allocations in attrs, which pandas compares
+    # element-wise (and so raises on) when concatenating two sessions.
+    df.attrs.clear()
+    return df
