@@ -100,6 +100,9 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     nearest_interior_bins,
     subnormal_occupancy_bin_mask,
 )
+from continuum_swr_replay.analysis.shared_statistics import (  # noqa: E402
+    animal_medians,
+)
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
@@ -663,11 +666,12 @@ def per_animal_medians(metrics_df: pd.DataFrame) -> pd.DataFrame:
     ``event_statistics.spike_evidence_statistics``, which compares these
     medians).
     """
-    return (
-        metrics_df.groupby(["animal", "group"])["dll_per_spike"]
-        .median()
-        .unstack("group")
-    )
+    return pd.DataFrame(
+        {
+            group: animal_medians(rows["dll_per_spike"], rows["animal"])
+            for group, rows in metrics_df.groupby("group")
+        }
+    ).rename_axis(columns="group")
 
 
 # --- CLI ----------------------------------------------------------------------

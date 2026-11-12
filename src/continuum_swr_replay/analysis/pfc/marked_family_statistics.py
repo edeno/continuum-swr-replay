@@ -29,7 +29,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.shared_statistics import session_median_statistics
+from continuum_swr_replay.analysis.shared_statistics import (
+    animal_medians,
+    session_median_statistics,
+)
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
 #: The max-statistic call: outside the reference when the plus-one p is at
@@ -172,14 +175,12 @@ def animal_balanced_fraction_positive(
             .groupby(["animal", "session"])["pos"]
             .mean()
         )
-        balanced = session_median_statistics(
-            per_session,
-            pd.Series(
-                per_session.index.get_level_values("animal"), index=per_session.index
-            ),
+        animal = pd.Series(
+            per_session.index.get_level_values("animal"), index=per_session.index
         )
+        balanced = session_median_statistics(per_session, animal)
         # The range across animals of the animal medians balanced is the median of.
-        per_animal = per_session.groupby(level="animal").median()
+        per_animal = animal_medians(per_session, animal)
         out.append(
             {
                 **dict(zip(keys, key, strict=True)),

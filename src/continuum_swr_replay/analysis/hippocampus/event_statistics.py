@@ -23,6 +23,10 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.shared_statistics import (
+    animal_medians,
+    session_median_statistics,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
 
 # --- how the events sit against SWRs ----------------------------------------------
@@ -344,10 +348,10 @@ def power_change_statistics(reference: pd.DataFrame, bands: list[str]) -> pd.Dat
                 raise ValueError(
                     f"{int(reference[column].isna().sum())} epochs have no {column}"
                 )
-            per_animal = reference.groupby("animal")[column].median()
+            summary = session_median_statistics(reference[column], reference["animal"])
             rows[(band, is_swr)] = {
-                "median": reference[column].median(),
-                "n_animals_above_rest": (per_animal > 0).sum(),
+                "median": summary["median"],
+                "n_animals_above_rest": summary["n_animals_positive"],
             }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis(["band", "is_swr"])
 
@@ -454,7 +458,7 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
     """
     base = metrics[metrics["group"] == baseline]
     epoch_base = base.groupby("epoch_id")["dll_per_spike"].median()
-    animal_base = base.groupby("animal")["dll_per_spike"].median()
+    animal_base = animal_medians(base["dll_per_spike"], base["animal"])
     without = epoch_base.reindex(metrics["epoch_id"].unique()).isna()
     if without.any():
         raise ValueError(
@@ -464,7 +468,9 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
     rows = {}
     for group, group_rows in metrics.groupby("group"):
         epoch_median = group_rows.groupby("epoch_id")["dll_per_spike"].median()
-        animal_median = group_rows.groupby("animal")["dll_per_spike"].median()
+        animal_median = animal_medians(
+            group_rows["dll_per_spike"], group_rows["animal"]
+        )
         is_baseline = group == baseline
         rows[group] = {
             "n_scored": len(group_rows),

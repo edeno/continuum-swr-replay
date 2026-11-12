@@ -41,6 +41,7 @@ from continuum_swr_replay.analysis.behavior.fit_comparability import (
     why_not_comparable,
 )
 from continuum_swr_replay.analysis.shared_statistics import (
+    animal_medians,
     benjamini_hochberg,
     session_median_statistics,
     signed_rank_p,
@@ -283,20 +284,19 @@ def animal_median_bootstrap(
           each percentile is its median.
     """
     known = values.dropna()
-    known_animal = animal[known.index]
-    animal_medians = known.groupby(known_animal, sort=True, observed=True).median()
-    n_animals = len(animal_medians)
+    medians = animal_medians(values, animal)
+    n_animals = len(medians)
     if n_animals == 0:
         spread = np.full(len(percentiles), np.nan)
     else:
-        per_animal = animal_medians.to_numpy(dtype=float)
+        per_animal = medians.to_numpy(dtype=float)
         draws = rng.integers(0, n_animals, size=(n_draws, n_animals))
         spread = np.percentile(np.median(per_animal[draws], axis=1), percentiles)
     return {
         "n_sessions": len(known),
         "n_animals": n_animals,
-        "animal_medians": animal_medians,
-        "animal_median": float(animal_medians.median()),
+        "animal_medians": medians,
+        "animal_median": float(medians.median()),
         "percentiles": np.asarray(spread, dtype=float),
     }
 

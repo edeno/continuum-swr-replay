@@ -83,6 +83,33 @@ def benjamini_hochberg(p_values: ArrayLike) -> NDArray[np.float64]:
     return adjusted
 
 
+def animal_medians(values: pd.Series, animal: pd.Series) -> pd.Series:
+    """Each animal's median of a per-session (or per-event) number.
+
+    Parameters
+    ----------
+    values : pd.Series, shape (n_rows,)
+        One number per row. A missing value is left out.
+    animal : pd.Series, shape (n_rows,)
+        Each row's animal, indexed as ``values``. An animal (a category of a
+        categorical) with no row that has a value is not in the result.
+
+    Returns
+    -------
+    medians : pd.Series, shape (n_animals,)
+        Indexed by animal in sorted order.
+
+    Raises
+    ------
+    ValueError
+        If ``animal`` is not indexed as ``values``.
+    """
+    if not values.index.equals(animal.index):
+        raise ValueError("values and animal are not indexed alike")
+    has_value = values.notna()
+    return values[has_value].groupby(animal[has_value], observed=True).median()
+
+
 def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str, float]:
     """The median of a per-session number, with the sessions' and animals' signs.
 
@@ -119,12 +146,9 @@ def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str,
         If ``animal`` is not indexed as ``values`` (a session without an
         animal would be left out of the animals' medians).
     """
-    if not values.index.equals(animal.index):
-        raise ValueError("values and animal are not indexed alike")
-    has_value = values.notna()
-    known = values[has_value]
+    per_animal = animal_medians(values, animal)
+    known = values.dropna()
     median = float(known.median())
-    per_animal = known.groupby(animal[has_value], observed=True).median()
     return {
         "n_sessions": len(known),
         "median": median,

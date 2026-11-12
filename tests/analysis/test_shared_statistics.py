@@ -215,3 +215,17 @@ def test_a_zero_session_median_has_the_sign_of_the_zero_animals_only():
     result = stats.session_median_statistics(values, animal)
     assert result["median"] == 0.0
     assert result["n_animals_same_sign"] == 1  # a, whose own median is 0
+
+
+def test_animal_medians_are_each_animals_median_over_its_rows_in_sorted_order():
+    values = pd.Series([1.0, 9.0, 3.0, 4.0, np.nan, 5.0, 7.0])
+    animal = pd.Series(["b", "b", "a", "a", "c", "b", "b"])
+    result = stats.animal_medians(values, animal)
+    # b has 1, 9, 5, 7 (even count, median 6; its mean is 5.5), a has 3, 4
+    assert list(result.index) == ["a", "b"]
+    assert list(result) == [3.5, 6.0]
+
+
+def test_animal_medians_need_the_animals_indexed_as_the_values():
+    with pytest.raises(ValueError, match="indexed alike"):
+        stats.animal_medians(pd.Series([1.0, 2.0]), pd.Series(["a", "b"], index=[5, 6]))
