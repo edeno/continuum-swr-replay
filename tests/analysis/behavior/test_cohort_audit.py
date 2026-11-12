@@ -641,6 +641,29 @@ def test_prepare_session_books_the_qvals_gap_per_row(monkeypatch):
     assert set(surv["event_id"]) == {3}
 
 
+def test_prepare_session_drops_an_infinite_predictor_in_its_own_bucket(monkeypatch):
+    """An event with a +-inf predictor (and no NaN) is dropped and booked as
+    non-finite, as ``event_drop_buckets`` books it."""
+    from continuum_swr_replay.analysis.behavior import contrast_aggregation
+
+    monkeypatch.setattr(contrast_aggregation, "MIN_EVENTS", 1)
+    v = "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"
+    frame = _masked_value_frame()
+    frame.loc[frame["event_id"].eq(3) & frame["candidate_arm"].eq(1), v] = np.inf
+    frame = pd.concat(
+        [frame, frame[frame["event_id"].eq(3)].assign(event_id=4, **{v: 0.0})],
+        ignore_index=True,
+    )
+
+    surv, prep = contrast_aggregation.prepare_session(
+        frame, ["is_current_arm", v], response_col="y"
+    )
+
+    assert (prep["n_qvals"], prep["n_own"], prep["n_nonfinite"]) == (1, 1, 1)
+    assert prep["n_surv"] == 1
+    assert set(surv["event_id"]) == {4}
+
+
 def test_qvals_gap_needs_the_row_flag_only_for_a_qvals_predictor():
     from continuum_swr_replay.analysis.behavior.cohort_audit import (
         qvals_gap_event_ids,

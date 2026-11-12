@@ -287,6 +287,7 @@ def _audit(n_modeled: int, reason: str = "") -> dict:
         "n_in": 2,
         "n_drop_qvals_gap": 0,
         "n_drop_own_predictor_missing": 0,
+        "n_drop_nonfinite": 0,
         "n_drop_zero_response": 0,
         "n_excluded_session": 2 - n_modeled,
         "n_modeled": n_modeled,

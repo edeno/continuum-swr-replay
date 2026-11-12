@@ -127,6 +127,42 @@ def test_null_model_filters_zero_count_events_like_non_null_model():
     assert null["n_rows"] == 15
 
 
+_SIX_EVENTS = [[3, 1, 0], [0, 2, 1], [2, 0, 1], [1, 1, 2], [4, 1, 0], [1, 3, 1]]
+
+
+@pytest.mark.parametrize("fit", [fit_conditional_poisson, fit_conditional_logit])
+def test_an_event_with_an_infinite_predictor_is_left_out_like_a_missing_one(fit):
+    """A non-finite predictor on one candidate drops its whole event, as a
+    missing one does (the complete-case rule of ``freeze_common_cohort``)."""
+    long_df = _make_long_df(_SIX_EVENTS)
+    one_cell = long_df["event_id"].eq(1) & long_df["candidate_arm"].eq(2)
+    with_inf = long_df.assign(is_prev_arm=long_df["is_prev_arm"].mask(one_cell, np.inf))
+    with_nan = long_df.assign(is_prev_arm=long_df["is_prev_arm"].mask(one_cell))
+
+    inf_fit = fit(with_inf, predictors=["is_prev_arm"])
+    nan_fit = fit(with_nan, predictors=["is_prev_arm"])
+
+    assert inf_fit["n_events"] == nan_fit["n_events"] == 5
+    assert inf_fit["llf"] == nan_fit["llf"]
+    assert inf_fit["coef_is_prev_arm"] == nan_fit["coef_is_prev_arm"]
+
+
+@pytest.mark.parametrize(
+    "null", [fit_null_model_conditional, fit_null_model_conditional_logit]
+)
+def test_an_analytic_null_leaves_out_an_event_with_an_infinite_response(null):
+    long_df = _make_long_df(_SIX_EVENTS).astype({"arm_count_hard": float})
+    long_df.loc[
+        long_df["event_id"].eq(1) & long_df["candidate_arm"].eq(2), ("arm_count_hard")
+    ] = np.inf
+
+    result = null(long_df, n_arms=3)
+
+    assert result["n_events"] == 5
+    assert result["n_rows"] == 15
+    assert np.isfinite(result["llf"])
+
+
 def test_fit_conditional_logit_ties_break_by_lowest_arm_id(monkeypatch):
     """Dominant-arm robustness fit should not depend on row order."""
     long_df = _make_long_df(

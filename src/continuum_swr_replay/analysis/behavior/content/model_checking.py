@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 from statsmodels.discrete.conditional_models import ConditionalPoisson
 
+from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
+
 from .._fit_diagnostics import (
     EXPECTED_FIT_ERRORS,
     NUISANCE_TERMS,
@@ -67,13 +69,13 @@ def cross_validate_conditional_poisson(
         return None
 
     required = [event_col, response_col] + predictors
-    df = long_df[required].copy()
 
-    # Event-wise NaN filtering: drop entire events if any row has NaN,
-    # so the candidate set stays at 9 arms for all retained events.
-    has_nan = df[required].isna().any(axis=1)
-    events_with_nan = df.loc[has_nan, event_col].unique()
-    df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
+    # Event-wise complete cases: drop entire events if any row has a missing
+    # or non-finite value, so the candidate set stays at 9 arms for all
+    # retained events.
+    df, _selection = freeze_common_cohort(
+        long_df[required], unit_col=event_col, required_cols=required
+    )
     if len(df) == 0:
         return None
 
@@ -263,13 +265,12 @@ def compute_pearson_residuals(
         columns.
     """
     required = [event_col, response_col] + predictors
-    df = long_df.copy()
 
-    # Event-wise NaN filtering (same as fitter): drop entire events
-    # if any row has NaN in required columns.
-    has_nan = df[required].isna().any(axis=1)
-    events_with_nan = df.loc[has_nan, event_col].unique()
-    df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
+    # Event-wise complete cases (same as fitter): drop entire events if any
+    # row has a missing or non-finite value in a required column.
+    df, _selection = freeze_common_cohort(
+        long_df, unit_col=event_col, required_cols=required
+    )
 
     # Remove zero-count events (same as fitter).
     event_totals = df.groupby(event_col)[response_col].transform("sum")

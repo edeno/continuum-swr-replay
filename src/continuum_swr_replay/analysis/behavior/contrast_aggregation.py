@@ -43,7 +43,10 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
-from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
+from continuum_swr_replay.analysis.events.cohort_selection import (
+    freeze_common_cohort,
+    select_event_cohort,
+)
 from continuum_swr_replay.analysis.shared_statistics import (
     benjamini_hochberg,
     session_median_statistics,
@@ -1279,7 +1282,8 @@ def prepare_session(
 
     Returns ``(fittable_rows_or_None, prep)``. ``prep`` carries the event-level
     cohort counts (``n_in`` and the mutually exclusive ``n_drop_qvals_gap`` /
-    ``n_drop_own_predictor_missing`` / ``n_drop_zero_response``), the surviving
+    ``n_drop_own_predictor_missing`` / ``n_drop_nonfinite`` /
+    ``n_drop_zero_response``), the surviving
     event count, a skip ``reason``, and a one-row-per-dropped-event ``dropped``
     frame for the profile.
 
@@ -1300,6 +1304,7 @@ def prepare_session(
             "n_in": n_in,
             "n_qvals": 0,
             "n_own": 0,
+            "n_nonfinite": 0,
             "n_zero": 0,
             "n_surv": n_in,
             "dropped": empty,
@@ -1310,21 +1315,24 @@ def prepare_session(
     # predictor NaN on a stop with no qvals row, decided per row) vs own-predictor
     # missingness (mechanism A: every other predictor NaN, a qvals column masked
     # on a stop that has a row included), qvals taking priority so the buckets
-    # stay disjoint.
+    # stay disjoint. An event with no NaN but a +-inf predictor is the third,
+    # non-finite bucket, as in ``cohort_audit.event_drop_buckets``.
     qvals_nan = qvals_gap_event_ids(g, predictors, event_col="event_id")
     # The response is not a predictor. An event whose response is undefined --
     # every candidate NaN, which is what a leaf-only event with no leaf mass
     # renormalizes to -- has no allocation to fit, and that is a response drop,
     # not predictor missingness. Keeping it out of this split books it under
     # n_drop_zero_response below, as the ladder's cohort audit does.
-    other_nan = (
-        set(g.loc[g[predictors].isna().any(axis=1), "event_id"])
-        if predictors
-        else set()
-    )
-    other_nan -= qvals_nan
-    n_qvals, n_own = len(qvals_nan), len(other_nan)
-    dropped_events = qvals_nan | other_nan
+    if predictors:
+        _complete, selection = freeze_common_cohort(
+            g, unit_col="event_id", required_cols=predictors
+        )
+        other_nan = set(selection["missing_unit_ids"]) - qvals_nan
+        nonfinite = set(selection["nonfinite_unit_ids"])
+    else:
+        other_nan, nonfinite = set(), set()
+    n_qvals, n_own, n_nonfinite = len(qvals_nan), len(other_nan), len(nonfinite)
+    dropped_events = qvals_nan | other_nan | nonfinite
 
     # Preserve the full candidate set within every retained event (row-wise NaN drops
     # would shrink an event's arm/patch set and desync it from the null's n_categories).
@@ -1346,6 +1354,7 @@ def prepare_session(
         "n_in": n_in,
         "n_qvals": n_qvals,
         "n_own": n_own,
+        "n_nonfinite": n_nonfinite,
         "n_zero": n_zero,
         "n_surv": n_surv,
         "dropped": dropped,

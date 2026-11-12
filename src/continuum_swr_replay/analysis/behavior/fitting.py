@@ -27,6 +27,8 @@ from scipy.stats import norm
 from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
+from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
+
 from ._fit_diagnostics import (
     EXPECTED_FIT_ERRORS,
     NUISANCE_TERMS,
@@ -756,22 +758,21 @@ def fit_conditional_poisson(
         logger.error("Missing columns: %s", missing)
         return None
 
-    df = long_df[required].copy()
-
-    # Event-wise missing-data filtering: drop entire events if ANY row
-    # within the event has NaN in any required column. This preserves the
-    # 9-arm candidate set so that the conditional likelihood and the null
-    # model use the same |A_e| for every event.
-    has_nan = df[required].isna().any(axis=1)
-    events_with_nan = df.loc[has_nan, event_col].unique()
-    if len(events_with_nan) > 0:
+    # Event-wise complete cases: drop entire events if ANY row within the
+    # event has a missing or non-finite value in a required column. This
+    # preserves the 9-arm candidate set so that the conditional likelihood and
+    # the null model use the same |A_e| for every event.
+    df, selection = freeze_common_cohort(
+        long_df[required], unit_col=event_col, required_cols=required
+    )
+    n_incomplete = selection["n_missing_units"] + selection["n_nonfinite_units"]
+    if n_incomplete > 0:
         logger.info(
-            "fit_conditional_poisson: dropping %d event(s) with NaN in a required "
-            "column before fitting %s",
-            len(events_with_nan),
+            "fit_conditional_poisson: dropping %d event(s) with a missing or "
+            "non-finite required value before fitting %s",
+            n_incomplete,
             predictors,
         )
-    df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
 
     df = _drop_zero_count_events(df, event_col, response_col)
 
@@ -1106,10 +1107,11 @@ def fit_null_model_conditional(
         flags as :func:`fit_null_model_conditional_logit`: an analytical null has
         nothing to converge or separate.
     """
-    df = long_df[[event_col, response_col]].copy()
-    has_nan = df[[event_col, response_col]].isna().any(axis=1)
-    events_with_nan = df.loc[has_nan, event_col].unique()
-    df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
+    df, _selection = freeze_common_cohort(
+        long_df[[event_col, response_col]],
+        unit_col=event_col,
+        required_cols=[response_col],
+    )
     df = _drop_zero_count_events(df, event_col, response_col)
 
     event_totals = df.groupby(event_col)[response_col].sum()
@@ -1175,10 +1177,12 @@ def fit_null_model_conditional_logit(
         Null fit statistics with 0 parameters, keyed to match
         :func:`fit_conditional_logit`.
     """
-    df = long_df[[event_col, response_col]].copy()
-    has_nan = df.isna().any(axis=1)
-    df = df[~df[event_col].isin(df.loc[has_nan, event_col].unique())]
-    df = _drop_zero_count_events(df.reset_index(drop=True), event_col, response_col)
+    df, _selection = freeze_common_cohort(
+        long_df[[event_col, response_col]],
+        unit_col=event_col,
+        required_cols=[response_col],
+    )
+    df = _drop_zero_count_events(df, event_col, response_col)
 
     n_events = int(df[event_col].nunique())
     llf = -n_events * float(np.log(n_arms))
@@ -1286,20 +1290,19 @@ def conditional_logit_or_reason(
     select_cols = required + (
         [arm_col] if arm_col is not None and arm_col not in required else []
     )
-    df = long_df[select_cols].copy()
-
-    # Event-wise NaN filtering: drop entire events if any row has NaN,
-    # consistent with fit_conditional_poisson.
-    has_nan = df[required].isna().any(axis=1)
-    events_with_nan = df.loc[has_nan, event_col].unique()
-    if len(events_with_nan) > 0:
+    # Event-wise complete cases, as in fit_conditional_poisson: drop entire
+    # events if any row has a missing or non-finite required value.
+    df, selection = freeze_common_cohort(
+        long_df[select_cols], unit_col=event_col, required_cols=required
+    )
+    n_incomplete = selection["n_missing_units"] + selection["n_nonfinite_units"]
+    if n_incomplete > 0:
         logger.info(
-            "fit_conditional_logit: dropping %d event(s) with NaN in a required "
-            "column before fitting %s",
-            len(events_with_nan),
+            "fit_conditional_logit: dropping %d event(s) with a missing or "
+            "non-finite required value before fitting %s",
+            n_incomplete,
             predictors,
         )
-    df = df[~df[event_col].isin(events_with_nan)].reset_index(drop=True)
 
     df = _drop_zero_count_events(df, event_col, response_col)
 

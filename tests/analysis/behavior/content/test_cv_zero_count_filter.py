@@ -6,7 +6,8 @@ them in ``n_test_events`` (the per-event LL denominator). This made
 the per-event LL drift while the per-timebin LL stayed identical:
 with one zero-count event, ``cv_ll_per_event_mean`` shifted from
 -2.7465 to -3.2958 after explicit pre-filtering, exposing the
-inconsistency.
+inconsistency. The CV and the residuals also drop an event with a
+non-finite predictor, as the fitter does.
 """
 
 from __future__ import annotations
@@ -16,8 +17,10 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.content import model_checking
 from continuum_swr_replay.analysis.behavior.content.model_checking import (
+    compute_pearson_residuals,
     cross_validate_conditional_poisson,
 )
+from continuum_swr_replay.analysis.behavior.fitting import fit_conditional_poisson
 
 
 def _toy_long_df(n_events: int, n_arms: int = 9) -> pd.DataFrame:
@@ -126,3 +129,44 @@ class TestCvConditionalPoissonInvalidation:
         assert out["cv_n_nonconverged_folds"] == 0
         assert np.isnan(out["cv_ll_per_event_mean"])
         assert np.isnan(out["cv_ll_per_timebin_mean"])
+
+
+def _with_one_predictor_cell(df: pd.DataFrame, value: float) -> pd.DataFrame:
+    """``df`` with event 0's first candidate's ``pred`` set to ``value``."""
+    cell = df["event_id"].eq(0) & df["candidate_arm"].eq(0)
+    return df.assign(pred=df["pred"].mask(cell, value))
+
+
+class TestNonFinitePredictorDropsTheEvent:
+    """A non-finite predictor drops its whole event, as a missing one does
+    (the complete-case rule of ``freeze_common_cohort``)."""
+
+    def test_cv_treats_an_infinite_predictor_as_missing(self):
+        df = _toy_long_df_with_predictor(n_events=90)
+        kwargs = {
+            "predictors": ["pred"],
+            "event_col": "event_id",
+            "response_col": "arm_count_hard",
+            "n_folds": 5,
+        }
+        with_inf = cross_validate_conditional_poisson(
+            _with_one_predictor_cell(df, np.inf), **kwargs
+        )
+        with_nan = cross_validate_conditional_poisson(
+            _with_one_predictor_cell(df, np.nan), **kwargs
+        )
+        assert np.isfinite(with_nan["cv_ll_per_event_mean"])
+        assert with_inf["cv_ll_per_event_mean"] == with_nan["cv_ll_per_event_mean"]
+        assert with_inf["cv_ll_per_timebin_mean"] == with_nan["cv_ll_per_timebin_mean"]
+
+    def test_residuals_leave_out_an_event_with_an_infinite_predictor(self):
+        df = _toy_long_df_with_predictor(n_events=90)
+        fit = fit_conditional_poisson(df, ["pred"])
+
+        out = compute_pearson_residuals(
+            _with_one_predictor_cell(df, np.inf), fit, ["pred"]
+        )
+
+        assert 0 not in set(out["event_id"])
+        assert out["event_id"].nunique() == 89
+        assert np.isfinite(out["pearson_resid"]).all()

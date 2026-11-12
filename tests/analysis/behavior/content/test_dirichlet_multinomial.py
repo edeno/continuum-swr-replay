@@ -222,6 +222,23 @@ def test_zero_response_events_dropped_and_counted():
     assert fit["n_rows"] == 77 * 9
 
 
+def test_an_event_with_an_infinite_predictor_is_dropped_like_a_missing_one():
+    """A non-finite predictor on one candidate removes its whole event and is
+    counted with the missing ones, as ``freeze_common_cohort`` does."""
+    df = _simulate(3.0, seed=4, n_events=80)
+    first_rows = df.index[df["event_id"].isin([0, 1])][[0, 9]]
+    with_inf = df.copy()
+    with_inf.loc[first_rows[0], "is_prev_arm"] = np.inf
+    with_inf.loc[first_rows[1], "is_prev_arm"] = np.nan
+
+    fit = fit_dirichlet_multinomial(with_inf, PREDICTORS)
+    reference = fit_dirichlet_multinomial(df[~df["event_id"].isin([0, 1])], PREDICTORS)
+
+    assert fit["n_drop_nan_events"] == 2
+    assert fit["n_events"] == 78
+    assert fit["llf"] == reference["llf"]
+
+
 def test_fixed_log_phi_pins_intercept():
     """Pinning the concentration removes a free parameter but not the beta recovery."""
     df = _simulate(3.0, seed=7)

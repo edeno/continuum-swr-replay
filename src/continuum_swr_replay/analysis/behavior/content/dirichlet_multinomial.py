@@ -52,6 +52,8 @@ from scipy.optimize import minimize
 from scipy.special import gammaln
 from scipy.stats import norm
 
+from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
+
 from .._fit_diagnostics import NUISANCE_TERMS, separated_terms
 from ..fitting import within_group_full_rank
 
@@ -248,20 +250,21 @@ def _pack_events(
     if missing:
         raise ValueError(f"long_df is missing required column(s): {missing}")
 
-    df = long_df[list(dict.fromkeys(required))].copy()
+    required = list(dict.fromkeys(required))
 
-    # Event-wise NaN filtering, as in ``fit_conditional_poisson``: dropping rows
+    # Event-wise complete cases, as in ``fit_conditional_poisson``: dropping rows
     # would leave the event with a smaller candidate set than the model assumes.
-    has_nan = df.isna().any(axis=1)
-    events_with_nan = df.loc[has_nan, event_col].unique()
-    n_drop_nan = int(len(events_with_nan))
+    # ``n_drop_nan`` counts the events with a missing or non-finite value.
+    df, selection = freeze_common_cohort(
+        long_df[required], unit_col=event_col, required_cols=required
+    )
+    n_drop_nan = selection["n_missing_units"] + selection["n_nonfinite_units"]
     if n_drop_nan:
         logger.info(
-            "fit_dirichlet_multinomial: dropping %d event(s) with NaN in a "
-            "required column",
+            "fit_dirichlet_multinomial: dropping %d event(s) with a missing or "
+            "non-finite required value",
             n_drop_nan,
         )
-        df = df[~df[event_col].isin(events_with_nan)]
 
     df = df.sort_values([event_col], kind="stable").reset_index(drop=True)
     totals = df.groupby(event_col, sort=True)[response_col].transform("sum")
@@ -273,8 +276,8 @@ def _pack_events(
 
     if len(df) == 0:
         raise ValueError(
-            f"no events left after dropping NaN and zero-total events "
-            f"({n_drop_nan} NaN, {n_drop_zero_response} zero-total)"
+            f"no events left after dropping incomplete and zero-total events "
+            f"({n_drop_nan} missing or non-finite, {n_drop_zero_response} zero-total)"
         )
 
     # Order matters: a fraction response also fails the integer check, and the
