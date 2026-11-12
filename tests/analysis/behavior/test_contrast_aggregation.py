@@ -566,6 +566,21 @@ def test_a_rung_with_too_few_differences_is_left_out_of_the_correction() -> None
     assert out["session_signrank_fdr_q"].isna().iloc[1]
 
 
+def test_the_correction_is_within_each_population() -> None:
+    """A second population's rung is its own family. Six positive sessions give
+    p = 2 / 2 ** 6; corrected together with the first population's 2 / 2 ** 8,
+    the first's q would be min(2 * 2 / 2 ** 8, 2 / 2 ** 6) = 2 / 2 ** 7."""
+    fits = _session_fits()
+    other = _session_fits(population=["SWR"] * 8).iloc[:6].copy()
+    specs = [*SPECS, ("G5_rpe", "SWR", "rpe_postoutcome")]
+
+    out = aggregate_contrast(pd.concat([fits, other]), specs, level="rate", sd=SD)
+
+    assert list(out["population"]) == ["non_local", "SWR"]
+    assert list(out["session_signrank_p"]) == pytest.approx([2 / 2**8, 2 / 2**6])
+    assert list(out["session_signrank_fdr_q"]) == pytest.approx([2 / 2**8, 2 / 2**6])
+
+
 # ── Per-SD units come from the fit, not from a reader's own recomputation ──
 
 _ARM_UNITS = {
