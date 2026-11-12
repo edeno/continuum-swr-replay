@@ -413,14 +413,22 @@ def test_class_step_values_name_the_properties_with_the_most_steps():
     values = _by_key(builder.class_step_values(steps, "s"))
     assert {key: value.value for key, value in values.items()} == {
         "step_other_properties_criterion_animals_max": 3,
+    }
+    description = values["step_other_properties_criterion_animals_max"].description
+    assert description.endswith("attained by spatial extent, replay speed")
+    # spike evidence's step has its own builder: it alone reads the spike-evidence run
+    evidence = _by_key(builder.class_step_evidence_values(steps, "s"))
+    assert {key: value.value for key, value in evidence.items()} == {
         "step_evidence_criterion_animals": 2,
         "step_evidence_criterion_animals_same_sign": 4,
         "step_evidence_criterion_share_median": 0.3,
     }
-    description = values["step_other_properties_criterion_animals_max"].description
-    assert description.endswith("attained by spatial extent, replay speed")
-    with pytest.raises(ValueError, match="one fit for each of 5 animals"):
-        builder.class_step_values(steps[steps.animal != animals[0]], "s")
+    assert {value.function for value in evidence.values()} == {
+        "class_step_evidence_values"
+    }
+    for build in (builder.class_step_values, builder.class_step_evidence_values):
+        with pytest.raises(ValueError, match="one fit for each of 5 animals"):
+            build(steps[steps.animal != animals[0]], "s")
 
 
 def _property_events() -> pd.DataFrame:

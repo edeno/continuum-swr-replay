@@ -72,6 +72,7 @@ from continuum_swr_replay.paths import (  # noqa: E402
     table_path,
 )
 from continuum_swr_replay.reported.events import EVENT_FEATURES_RUN  # noqa: E402
+from continuum_swr_replay.runs.io import files_sha256, sha256_file  # noqa: E402
 from continuum_swr_replay.runs.provenance import (  # noqa: E402
     described_commit,
     produced_by,
@@ -208,18 +209,6 @@ def run_measure(args: argparse.Namespace) -> None:
 # --- stage analyze: inputs -------------------------------------------------------
 
 
-def sha256_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def files_digest(paths: Sequence[Path]) -> str:
-    digest = hashlib.sha256()
-    for path in sorted(paths):
-        digest.update(path.name.encode())
-        digest.update(hashlib.sha256(path.read_bytes()).digest())
-    return digest.hexdigest()
-
-
 def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
     """The canonical events with their ripple power, spike counts and spike evidence."""
     event_table = table_path("event_table", replay_content_dir())
@@ -302,11 +291,11 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
         "event_features_run": {
             "run": EVENT_FEATURES_RUN,
             "n_files": len(feature_paths),
-            "sha256": files_digest(feature_paths),
+            "sha256": files_sha256(feature_paths),
         },
         "criterion": {
             "n_files": len(criterion_paths),
-            "sha256": files_digest(criterion_paths),
+            "sha256": files_sha256(criterion_paths),
             "decode_sha256": dict(
                 sorted(criterion.groupby("epoch_id").decode_sha256.first().items())
             ),
@@ -314,7 +303,7 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
         "spike_evidence": {
             "path": str(event_spike_evidence_dir()),
             "n_files": len(metric_paths),
-            "sha256": files_digest(metric_paths),
+            "sha256": files_sha256(metric_paths),
         },
     }
     return events, {"checks": checks, "inputs": inputs}

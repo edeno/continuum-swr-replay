@@ -17,6 +17,7 @@ from continuum_swr_replay.reported.events import (
     gamma_db_values,
     property_interval_values,
     rest_theta_values,
+    spike_evidence_staleness,
 )
 from continuum_swr_replay.reported.values import Value, pend
 
@@ -75,6 +76,32 @@ def test_a_manifest_recording_another_table_is_stale():
 def test_a_manifest_recording_no_table_is_stale():
     note = event_table_staleness({"epochs": {}}, CURRENT, "event_gamma")
     assert note == "event_gamma records no event-table SHA-256; rerun it before citing"
+
+
+def test_an_output_made_from_the_current_spike_evidence_run_is_fresh():
+    manifest = {"inputs": {"spike_evidence": {"n_files": 2, "sha256": CURRENT}}}
+    assert spike_evidence_staleness(manifest, CURRENT, "out") is None
+
+
+def test_an_output_made_from_another_spike_evidence_run_is_stale():
+    # the event table it records is the current one: only the run differs
+    manifest = {
+        "inputs": {
+            "event_table": {"sha256": CURRENT},
+            "spike_evidence": {"sha256": "c" * 64},
+        }
+    }
+    assert event_table_staleness(manifest, CURRENT, "steps") is None
+    note = spike_evidence_staleness(manifest, CURRENT, "steps")
+    assert note == (
+        "steps was made from another spike-evidence run than the current one "
+        "(sha256 cccccccccccc, current aaaaaaaaaaaa); rerun it before citing"
+    )
+
+
+def test_an_output_recording_no_spike_evidence_run_is_stale():
+    note = spike_evidence_staleness({"inputs": {"event_table": {}}}, CURRENT, "steps")
+    assert note == "steps records no spike-evidence SHA-256; rerun it before citing"
 
 
 def test_the_pending_note_reaches_every_value():

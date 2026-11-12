@@ -176,27 +176,53 @@ def default_inputs() -> EventsInputs:
     )
 
 
-def event_table_staleness(manifest: dict, current_sha256: str, what: str) -> str | None:
-    """Why an output made from the canonical event table is stale, or None.
+def _input_staleness(
+    manifest: dict, name: str, current_sha256: str, what: str, adjective: str, noun: str
+) -> str | None:
+    """Why an output is stale for one of its inputs, or None.
 
-    ``manifest`` records the table's SHA-256 under ``event_table`` or
-    ``inputs.event_table``; an output recording none cannot be tied to the
-    current table and is treated as stale.
+    ``manifest`` records the input's SHA-256 under ``name`` or ``inputs.<name>``;
+    an output recording none cannot be tied to the current input and is treated
+    as stale.
     """
-    recorded = (
-        manifest.get("event_table")
-        or manifest.get("inputs", {}).get("event_table")
-        or {}
-    ).get("sha256")
+    recorded = (manifest.get(name) or manifest.get("inputs", {}).get(name) or {}).get(
+        "sha256"
+    )
     if recorded is None:
-        return f"{what} records no event-table SHA-256; rerun it before citing"
+        return f"{what} records no {adjective} SHA-256; rerun it before citing"
     if recorded != current_sha256:
         return (
-            f"{what} was made from another event table than the current one "
+            f"{what} was made from another {noun} than the current one "
             f"(sha256 {recorded[:12]}, current {current_sha256[:12]}); rerun it "
             "before citing"
         )
     return None
+
+
+def event_table_staleness(manifest: dict, current_sha256: str, what: str) -> str | None:
+    """Why an output made from the canonical event table is stale, or None."""
+    return _input_staleness(
+        manifest, "event_table", current_sha256, what, "event-table", "event table"
+    )
+
+
+def spike_evidence_staleness(
+    manifest: dict, current_sha256: str, what: str
+) -> str | None:
+    """Why an output made from the spike-evidence run is stale, or None.
+
+    ``current_sha256`` is the one digest over the run's per-epoch metrics
+    (``runs.io.files_sha256``), which the output's manifest records under
+    ``inputs.spike_evidence`` and this summary records for the same files.
+    """
+    return _input_staleness(
+        manifest,
+        "spike_evidence",
+        current_sha256,
+        what,
+        "spike-evidence",
+        "spike-evidence run",
+    )
 
 
 def _manifest(folder: Path) -> dict:
@@ -1032,6 +1058,16 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     ]
 
 
+def _step_statistics(steps: pd.DataFrame) -> pd.DataFrame:
+    """The step test's statistics per property, at the main settings."""
+    return event_statistics.threshold_step_statistics(
+        steps,
+        n_knots=STEP_KNOTS,
+        window_z=STEP_WINDOW_Z,
+        n_animals=len(analysed_animals()),
+    )
+
+
 def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.5 and the property questions, test 2: is there a step at the threshold?
 
@@ -1045,23 +1081,17 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
     over all its events. The per-property counts, the version with log
     duration, the version on the event's own power, the sensitivity settings and
     the simulation checks stay in the CSV outputs.
+
+    This is the value over the properties other than spike evidence, which are
+    read from the event table and the event features run;
+    :func:`class_step_evidence_values` holds spike evidence's.
     """
-    statistics = event_statistics.threshold_step_statistics(
-        steps,
-        n_knots=STEP_KNOTS,
-        window_z=STEP_WINDOW_Z,
-        n_animals=len(analysed_animals()),
-    )
     most, attaining = event_statistics.most_steps(
-        statistics, list(_OTHER_STEP_PROPERTIES)
+        _step_statistics(steps), list(_OTHER_STEP_PROPERTIES)
     )
     # the note names the property (or properties) that attain the maximum
     attained = ", ".join(_OTHER_STEP_PROPERTIES[p] for p in attaining)
     make = value_factory(class_step_values, source, TAGS["class_step"])
-    evidence = statistics.loc["evidence"]
-    make_evidence = value_factory(
-        class_step_values, source, TAGS["class_step_evidence"]
-    )
     return [
         make(
             "step_other_properties_criterion_animals_max",
@@ -1073,6 +1103,19 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
             "coverage, spike count, arms visited): the term's interval excludes 0 and "
             f"it lowers the held-out error; attained by {attained}",
         ),
+    ]
+
+
+def class_step_evidence_values(steps: pd.DataFrame, source: str) -> list[Value]:
+    """Questions 2b.5 and 2c.3, test 2 (:func:`class_step_values`) for spike
+    evidence per spike: the one property of the step test read from the
+    spike-evidence run, so these values are stale when that run has changed
+    since the step fits were made (:func:`spike_evidence_staleness`)."""
+    evidence = _step_statistics(steps).loc["evidence"]
+    make_evidence = value_factory(
+        class_step_evidence_values, source, TAGS["class_step_evidence"]
+    )
+    return [
         make_evidence(
             "step_evidence_criterion_animals",
             evidence["n_animals_with_step"],
@@ -1625,13 +1668,12 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             "(every event, no cap)",
         )
     )
-    summary.inputs.append(
-        files_record(
-            SPIKE_EVIDENCE_METRICS,
-            inputs.spike_evidence_dir.glob(f"*/{SPIKE_EVIDENCE_METRICS}"),
-            ROOT_DIR,
-        )
+    spike_evidence_record = files_record(
+        SPIKE_EVIDENCE_METRICS,
+        inputs.spike_evidence_dir.glob(f"*/{SPIKE_EVIDENCE_METRICS}"),
+        ROOT_DIR,
     )
+    summary.inputs.append(spike_evidence_record)
 
     stats = pd.read_csv(inputs.heldout_by_swr)
     summary.add(*heldout_by_swr_values(stats, rel(inputs.heldout_by_swr)))
@@ -1661,10 +1703,16 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             class_stale,
         )
     )
+    steps = pd.read_csv(folder / "step_fits.csv")
+    summary.add(*pend(class_step_values(steps, source), class_stale))
+    # spike evidence's step is also stale when the spike-evidence run has changed
+    evidence_stale = spike_evidence_staleness(
+        _manifest(folder), spike_evidence_record["sha256"], rel(folder)
+    )
     summary.add(
         *pend(
-            class_step_values(pd.read_csv(folder / "step_fits.csv"), source),
-            class_stale,
+            pend(class_step_evidence_values(steps, source), class_stale),
+            evidence_stale,
         )
     )
     summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]
