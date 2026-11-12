@@ -29,6 +29,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
+    gated_coefficient_statistics,
+)
+from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
+    gate_term_sessions,
+)
 from continuum_swr_replay.analysis.behavior.fit_provenance import (
     require_fresh_inputs,
 )
@@ -51,6 +57,7 @@ from continuum_swr_replay.paths import (
     processed_data_dir,
     table_path,
 )
+from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -220,6 +227,87 @@ def draw_indicator_table(ax: plt.Axes, long_table: pd.DataFrame):
     return table
 
 
+#: Panel F's M3 terms.
+COEFFICIENT_TERMS = (
+    "is_current_arm",
+    "is_prev_arm",
+    "reward_fraction_candidate_arm_last10_visits",
+)
+
+
+def draw_coefficients(ax: plt.Axes, m3_fits: pd.DataFrame) -> None:
+    """Panel F: each M3 term's per-session coefficients and their median.
+
+    A term's sessions are those its per-term gate keeps
+    (:func:`~continuum_swr_replay.analysis.behavior.contrast_aggregation.gate_term_sessions`),
+    and the printed median is
+    :func:`~continuum_swr_replay.analysis.behavior.coefficient_statistics.gated_coefficient_statistics`'s,
+    printed as the summary prints a coefficient (``sig2s``).
+
+    Parameters
+    ----------
+    ax : plt.Axes
+    m3_fits : pd.DataFrame, shape (n_sessions, n_columns)
+        The M3 rung's per-session fits.
+    """
+    kept = {
+        term: m3_fits.loc[gate_term_sessions(m3_fits, term).kept, f"coef_{term}"]
+        for term in COEFFICIENT_TERMS
+    }
+    statistics = {
+        term: gated_coefficient_statistics(m3_fits, term) for term in COEFFICIENT_TERMS
+    }
+    positions = np.arange(len(COEFFICIENT_TERMS))
+    # Clip view to a sensible range: a few kept sessions have large
+    # coefficients that distort the y-axis without conveying signal.
+    y_lo, y_hi = -2.5, 2.5
+    n_clipped = sum(
+        int(((kept[term] > y_hi) | (kept[term] < y_lo)).sum())
+        for term in COEFFICIENT_TERMS
+    )
+    bp = ax.boxplot(
+        [kept[term].clip(lower=y_lo, upper=y_hi) for term in COEFFICIENT_TERMS],
+        positions=positions,
+        widths=0.6,
+        patch_artist=True,
+        medianprops={"color": "black", "linewidth": 1.5},
+        flierprops={"markersize": 3, "alpha": 0.5},
+    )
+    for patch in bp["boxes"]:
+        patch.set_facecolor("#3b6ea5")
+        patch.set_alpha(0.6)
+    for i, term in enumerate(COEFFICIENT_TERMS):
+        med = float(statistics[term]["median"])
+        ax.text(
+            i,
+            min(max(med, y_lo), y_hi) + 0.12,
+            format_number(med, "sig2s"),
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            fontweight="bold",
+            color="#1a2433",
+        )
+    ax.axhline(0, color="black", lw=0.8)
+    ax.set_xticks(positions)
+    ax.set_xticklabels(
+        [
+            f"{term}\n({statistics[term]['n_sessions']} sessions)"
+            for term in COEFFICIENT_TERMS
+        ],
+        rotation=20,
+        ha="right",
+        fontsize=8,
+    )
+    ax.set_ylabel("coefficient (clipped to ±2.5)")
+    ax.set_ylim(y_lo, y_hi)
+    ax.set_title(
+        f"(F) Fitted coefficients (M3) of {len(m3_fits)} sessions, each term over "
+        "the sessions its gate keeps\n"
+        f"per-session ConditionalPoisson fits; {n_clipped} extreme outliers clipped"
+    )
+
+
 def make_figure(
     *,
     dot: pd.DataFrame,
@@ -256,14 +344,6 @@ def make_figure(
 
     # Indicator columns from the long_count for the long-format mini-table.
     long_table = indicator_table(lc_event, event_id)
-
-    # Per-session M3 coefficients, one row per session the M3 fit kept.
-    coef_cols = [
-        "coef_is_current_arm",
-        "coef_is_prev_arm",
-        "coef_reward_fraction_candidate_arm_last10_visits",
-    ]
-    coef_long = m3_fits[coef_cols].rename(columns=lambda c: c.removeprefix("coef_"))
 
     # ── Layout: 3 rows × 2 cols ──
     fig, axes = figure_axes()
@@ -420,51 +500,7 @@ def make_figure(
     )
 
     # ── (F) Population coefficient distribution across sessions ──
-    ax = ax_f
-    positions = np.arange(len(coef_long.columns))
-    # Clip view to a sensible range — a handful of sessions have
-    # degenerate fits with |β| > 5 driven by quasi-separation in small
-    # event sets; they distort the y-axis without conveying signal.
-    y_lo, y_hi = -2.5, 2.5
-    n_outliers = {
-        c: int(((coef_long[c] > y_hi) | (coef_long[c] < y_lo)).sum())
-        for c in coef_long.columns
-    }
-    clipped = coef_long.clip(lower=y_lo, upper=y_hi)
-    bp = ax.boxplot(
-        [clipped[c].dropna() for c in clipped.columns],
-        positions=positions,
-        widths=0.6,
-        patch_artist=True,
-        medianprops={"color": "black", "linewidth": 1.5},
-        flierprops={"markersize": 3, "alpha": 0.5},
-    )
-    for patch in bp["boxes"]:
-        patch.set_facecolor("#3b6ea5")
-        patch.set_alpha(0.6)
-    # Annotate medians
-    for i, c in enumerate(coef_long.columns):
-        med = float(coef_long[c].median())
-        ax.text(
-            i,
-            min(max(med, y_lo), y_hi) + 0.12,
-            f"{med:+.2f}",
-            ha="center",
-            va="bottom",
-            fontsize=8,
-            fontweight="bold",
-            color="#1a2433",
-        )
-    ax.axhline(0, color="black", lw=0.8)
-    ax.set_xticks(positions)
-    ax.set_xticklabels(coef_long.columns, rotation=20, ha="right", fontsize=8)
-    ax.set_ylabel("coefficient (clipped to ±2.5)")
-    ax.set_ylim(y_lo, y_hi)
-    n_clipped_total = sum(n_outliers.values())
-    ax.set_title(
-        f"(F) Fitted coefficients — pooled across {len(m3_fits)} sessions  (M3)\n"
-        f"per-session ConditionalPoisson fits; {n_clipped_total} extreme outliers clipped"
-    )
+    draw_coefficients(ax_f, m3_fits)
 
     fig.suptitle(
         "Replay-content GLM pipeline — one event traced through every transformation",

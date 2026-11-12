@@ -170,6 +170,40 @@ def test_the_panel_e_headers_fit_their_cells():
     plt.close(fig)
 
 
+def test_panel_f_prints_each_term_s_median_over_the_sessions_its_gate_keeps():
+    """Panel F printed the median over every fitted session. Session 4's
+    ``is_current_arm`` is separated and session 3's ``is_prev_arm`` ran away
+    (|coef| >= 10): the gate leaves each out of its term."""
+    import matplotlib.pyplot as plt
+
+    terms = flow.COEFFICIENT_TERMS
+    fits = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b", "b", "c"],
+            "session_date": [1, 2, 1, 2, 1],
+            "epoch": "02_r1",
+            f"coef_{terms[0]}": [0.1, 0.2, 0.4, 0.8, 5.0],
+            f"coef_{terms[1]}": [-0.3, -0.1, 0.2, 12.0, 0.0],
+            f"coef_{terms[2]}": [0.5, 0.25, 0.75, 1.0, -1.0],
+            "separated_terms": ["", "", "", "", terms[0]],
+        }
+    )
+    fig, ax = plt.subplots()
+
+    flow.draw_coefficients(ax, fits)
+
+    # medians of the kept sessions: (0.2 + 0.4) / 2, (-0.1 + 0.0) / 2 and the
+    # median of all five; over every session they were 0.4, 0.0 and 0.5
+    assert [text.get_text() for text in ax.texts] == ["+0.30", "−0.050", "+0.50"]
+    labels = [label.get_text() for label in ax.get_xticklabels()]
+    assert [label.split("\n")[1] for label in labels] == [
+        "(4 sessions)",
+        "(4 sessions)",
+        "(5 sessions)",
+    ]
+    plt.close(fig)
+
+
 EPOCH_ID = "chimi20200213_02_r1_HPC"
 TIME = np.round(100.0 + np.arange(2000) / 500.0, 6)
 
