@@ -71,8 +71,9 @@ No caption draft is kept in the repository. Three were, beside their figures, un
 content-estimator and uncertainty-content scripts write theirs again when they run;
 the memoryless comparison's was hand-written prose, and its script still checks the
 verdicts that prose stated (those about the labeled recording through
-`memoryless_sequence/recording_statistics.py`, those about the sweeps through
-`memoryless_sequence/sweep_statistics.py`, both of which the detection summary reads too). A number in a caption is never typed by hand: in a
+`memoryless_sequence/recording_statistics.py`, most of those about the sweeps through
+`memoryless_sequence/sweep_statistics.py` (the checks of the by-path and by-distance rows read
+the sweep summary directly), both of which the detection summary reads too). A number in a caption is never typed by hand: in a
 markdown draft it is an inline value marker, `<!--v:<summary>.key-->…<!--/v-->`,
 which `make reported-values` fills, and in `paper/main.tex` it is the matching macro
 ([paper/README.md](../paper/README.md#numbers)).

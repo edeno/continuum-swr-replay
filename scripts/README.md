@@ -243,8 +243,10 @@ them importable.
   the sweep summary below; every verdict in its titles and caption is read from the data,
   the labeled recording's verdicts and numbers from `memoryless_sequence/recording_statistics.py`
   (written to `paper/reported/inputs/detection/memoryless_comparison_recording.json`)
-  and the sweeps' panels and checks from `memoryless_sequence/sweep_statistics.py`, the
-  functions the detection summary reports from → `paper/figures/memoryless_comparison/`.
+  and the sweeps' timing, burst, carving and held-out panels from
+  `memoryless_sequence/sweep_statistics.py`, the functions the detection summary reports
+  from (the detection-rate grids and the absorption panel read the sweep summary's rows
+  directly) → `paper/figures/memoryless_comparison/`.
 - `generate_inventory_examples.py` — seeded draws from each cell of one inventory comparison run
   (`--run-id`), each event on one time axis: spikes, the state-space posterior, the Widloski window
   posteriors (recomputed and checked against the run's stored candidates; a figure that disagrees is
