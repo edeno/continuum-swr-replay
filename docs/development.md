@@ -79,6 +79,7 @@ src/continuum_swr_replay/
 │   ├── inventory_comparison/ # event inventories from different detectors compared
 │   ├── pfc/               #   mPFC/OFC unit analysis
 │   ├── constants.py       #   analysis constants and defaults
+│   ├── literature_survey.py #  the replay-study survey's modes, ranges and method shares
 │   └── shared_statistics.py #  statistics that know nothing of the task
 ├── decoding/              # decode configs and detector classes, transitions, identifiers and file names, the results.nc reader
 ├── runs/                  # run infrastructure: provenance, CLI, batch loops, BLAS thread pin (threads), JAX device choice (device)
@@ -91,7 +92,7 @@ src/continuum_swr_replay/
 └── data_types.py          # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
-├── decoding/  detection/  tables/  behavior/{rate,content,coupling}/  figures/  workflows/  checks/  pfc/  reported/
+├── decoding/  detection/  tables/  behavior/{rate,content,coupling,choice}/  figures/  workflows/  checks/  pfc/  reported/
 └── exploratory/           #   unsupported one-offs (_*.py)
 paper/                     # The manuscript — see paper/README.md
 ├── main.tex  main.pdf     #   LaTeX source and the built PDF (make manuscript)
@@ -417,7 +418,7 @@ Every number the project reports is read from a summary file, `paper/reported/<s
 what it holds: `survey`, `detection`, `events`, `behavior`, `mpfc` (`scripts/reported/summarize.py`, then
 `scripts/reported/emit_reported_values.py`). The survey summary holds the literature numbers the
 introduction quotes, computed from the replay-study survey of Supplementary Table S1
-(`continuum_swr_replay.reported.survey`); it needs no lab data.
+(`analysis/literature_survey.py`, built by `continuum_swr_replay.reported.survey`); it needs no lab data.
 
 Which question each value answers, and which figure shows it, is written once, in the question list
 (`src/continuum_swr_replay/reported/questions.py`). It organizes the writing by part: a question need
