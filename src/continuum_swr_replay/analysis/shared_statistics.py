@@ -11,6 +11,10 @@
   (animals, then sessions within each drawn animal, then the units or events
   within each drawn session), the resampling behind every interval; with
   :func:`nested_codes` and :func:`weighted_median`.
+- :func:`session_mean_curve`, :func:`animal_balanced_curve` and
+  :func:`animal_curve_sem`: a curve (one value per lag) taken unit -> session
+  -> animal, the mean over animals of each animal's mean over its sessions, and
+  its standard error over animals.
 
 A signed-rank p over sessions treats the sessions as independent, which
 sessions of one animal are not: it describes consistency across sessions and is
@@ -19,6 +23,7 @@ not a test on the animals.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import NamedTuple
 
 import numpy as np
@@ -299,3 +304,81 @@ def weighted_median(values_sorted: NDArray, weights: NDArray) -> float:
     low = np.searchsorted(cumulative, (total + 1) // 2, side="left")
     high = np.searchsorted(cumulative, total // 2 + 1, side="left")
     return float((values_sorted[low] + values_sorted[high]) / 2.0)
+
+
+# --- curves over sessions and animals ----------------------------------------------
+
+
+def session_mean_curve(unit_curves: NDArray) -> NDArray:
+    """One session's curve: the mean over its units whose curve is finite.
+
+    Parameters
+    ----------
+    unit_curves : NDArray, shape (n_lags, n_units)
+        The session's per-unit curves.
+
+    Returns
+    -------
+    NDArray, shape (n_lags,)
+        The mean over the units whose curve is finite at every lag; a unit
+        with a non-finite value at any lag is left out whole.
+
+    Raises
+    ------
+    ValueError
+        If no unit's curve is finite at every lag.
+    """
+    finite = np.isfinite(unit_curves).all(axis=0)
+    if not finite.any():
+        raise ValueError("no unit's curve is finite at every lag")
+    return unit_curves[:, finite].mean(axis=1)
+
+
+def animal_balanced_curve(
+    by_session: dict[str, np.ndarray], animal_of: dict[str, str]
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    """Unit-mean session curves -> per-animal means -> mean over animals.
+
+    Parameters
+    ----------
+    by_session : dict
+        ``session -> array``; the last axis is lag (a curve, or draws x lags).
+    animal_of : dict
+        ``session -> animal``.
+
+    Returns
+    -------
+    population : NDArray
+        Mean over animals of each animal's mean over its sessions.
+    per_animal : dict
+        ``animal -> that animal's mean over its sessions``.
+    """
+    grouped: dict[str, list[np.ndarray]] = defaultdict(list)
+    for session, curve in by_session.items():
+        grouped[animal_of[session]].append(np.asarray(curve, dtype=float))
+    per_animal = {
+        animal: np.mean(np.stack(group), axis=0)
+        for animal, group in sorted(grouped.items())
+    }
+    return np.mean(np.stack(list(per_animal.values())), axis=0), per_animal
+
+
+def animal_curve_sem(per_animal: dict[str, np.ndarray]) -> np.ndarray:
+    """Standard error over animals of the animals' mean curves, at each lag.
+
+    Parameters
+    ----------
+    per_animal : dict
+        ``animal -> curve``, shape (n_lags,), as :func:`animal_balanced_curve`
+        returns them.
+
+    Returns
+    -------
+    NDArray, shape (n_lags,)
+        The sample standard deviation over animals (``ddof=1``) over the
+        square root of the number of animals; NaN with one animal.
+    """
+    stack = np.stack(list(per_animal.values()))  # (n_animals, n_lags)
+    if len(stack) < 2:
+        return np.full(stack.shape[1], np.nan)
+    return stack.std(axis=0, ddof=1) / np.sqrt(len(stack))

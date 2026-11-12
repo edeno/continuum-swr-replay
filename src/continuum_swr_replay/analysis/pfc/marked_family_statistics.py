@@ -9,7 +9,7 @@ and writes the summary the mpfc summary builder reads.
 - :func:`animal_balanced_fraction_positive`: the share of units whose held-out
   deviance improves with a target's kernel, and the deltas' scale.
 - The population curve of per-session curves and its standard error over
-  animals are :mod:`~continuum_swr_replay.analysis.pfc.population_statistics`'
+  animals are :mod:`~continuum_swr_replay.analysis.shared_statistics`'
   :func:`animal_balanced_curve` and :func:`animal_curve_sem`, which Figure 4c
   also uses.
 - :func:`population_curve_summary`: its peak, its pre- and post-onset means
@@ -32,7 +32,7 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.pfc.population_statistics import (
+from continuum_swr_replay.analysis.shared_statistics import (
     animal_balanced_curve,
     animal_curve_sem,
     session_mean_curve,
@@ -163,7 +163,7 @@ def animal_balanced_fraction_positive(
         ``frac_pos`` (the mean over animals of each animal's mean over its
         sessions of each session's share of usable units whose delta is
         positive: the reduction of
-        :func:`~continuum_swr_replay.analysis.pfc.population_statistics.animal_balanced_curve`,
+        :func:`~continuum_swr_replay.analysis.shared_statistics.animal_balanced_curve`,
         which the population curves use), ``frac_pos_min``/``frac_pos_max``
         across those animal means, ``delta_median`` and ``delta_p95`` over
         usable units, pooled for the deltas' scale.

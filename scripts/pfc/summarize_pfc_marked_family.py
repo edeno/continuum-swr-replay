@@ -29,8 +29,8 @@ The statistics are
 :mod:`~continuum_swr_replay.analysis.pfc.marked_family_statistics`'s, and the
 population curve's reduction (a session's unit mean, the animals' means and
 their standard error) is
-:mod:`~continuum_swr_replay.analysis.pfc.population_statistics`'s, the one
-Figure 4c draws with; this script reads the bundles, writes the tables and
+:mod:`~continuum_swr_replay.analysis.shared_statistics`'s, the one Figure 4c
+draws with; this script reads the bundles, writes the tables and
 draws the figures.
 
 Bundles of one directory must share one fit contract version and one event
@@ -89,7 +89,7 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     POOLED_CLASS,
     model_set_of,
 )
-from continuum_swr_replay.analysis.pfc.population_statistics import (
+from continuum_swr_replay.analysis.shared_statistics import (
     animal_balanced_curve,
     animal_curve_sem,
     session_mean_curve,

@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis import shared_statistics
 from continuum_swr_replay.analysis.pfc import marked_family_statistics as stats
-from continuum_swr_replay.analysis.pfc import population_statistics
 
 
 def _units() -> pd.DataFrame:
@@ -187,11 +187,11 @@ def test_animal_curve_sem_at_the_peak_is_the_summary_sem():
     by_session = {"a1": 0.9 * bump, "a2": 0.5 * bump, "b1": 0.2 * bump}
 
     peaks = stats.population_curve_summary({key: by_session}, lag, animal_of)
-    _, per_animal = population_statistics.animal_balanced_curve(by_session, animal_of)
+    _, per_animal = shared_statistics.animal_balanced_curve(by_session, animal_of)
 
     # animal a: 0.7, animal b: 0.2 -> SEM 0.25 at the peak lag
     assert peaks.iloc[0].sem_at_peak == pytest.approx(0.25)
-    assert population_statistics.animal_curve_sem(per_animal)[2] == pytest.approx(0.25)
+    assert shared_statistics.animal_curve_sem(per_animal)[2] == pytest.approx(0.25)
 
 
 def test_shuffled_band_keeps_shared_sessions_and_the_fewest_draws():

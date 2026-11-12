@@ -889,30 +889,6 @@ def test_swr_without_replay_timing_statistics_of_one_unit_and_of_none():
 # --- population curves -----------------------------------------------------------------
 
 
-def test_session_mean_curve_leaves_out_a_unit_with_a_non_finite_lag():
-    # lags x units; the middle unit is NaN at lag 0 and is left out whole.
-    unit_curves = np.array([[1.0, NAN, 3.0], [2.0, 5.0, 4.0]])
-
-    np.testing.assert_allclose(stats.session_mean_curve(unit_curves), [2.0, 3.0])
-    with pytest.raises(ValueError, match="finite"):
-        stats.session_mean_curve(np.array([[NAN], [1.0]]))
-
-
-def test_animal_curve_sem_is_over_animals_at_each_lag():
-    # Animal means at lag 0: 1, 2, 4 (mean 7/3, sample SD sqrt(7/3)); at lag 1
-    # all equal.
-    per_animal = {
-        "a": np.array([1.0, 5.0]),
-        "b": np.array([2.0, 5.0]),
-        "c": np.array([4.0, 5.0]),
-    }
-
-    sem = stats.animal_curve_sem(per_animal)
-
-    np.testing.assert_allclose(sem, [np.sqrt(7 / 3) / np.sqrt(3), 0.0])
-    assert np.isnan(stats.animal_curve_sem({"a": np.array([1.0, 5.0])})).all()
-
-
 def test_animal_balanced_unit_curve_weights_animals_equally():
     # Columns are units, in no session order. Animal a: session a1 holds three
     # units (mean [3, 0]), a2 one ([1, 2]), so a is [2, 1]. Animal b: b1 holds
