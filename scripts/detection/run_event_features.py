@@ -206,6 +206,7 @@ from continuum_swr_replay.runs.cli import (  # noqa: E402
 from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
 from continuum_swr_replay.runs.io import (  # noqa: E402
     json_ready,
+    ok_epochs,
     output_path,
     replace_outputs,
     sha256_file,
@@ -902,9 +903,8 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         "inventory_dir": inventory_dir,
         "memoryless_dir": memoryless_dir,
         "decode_sha256": {
-            identifier: record["decode"]["sha256"]
-            for identifier, record in inventory["epochs"].items()
-            if record["status"] == "ok"
+            identifier: inventory["epochs"][identifier]["decode"]["sha256"]
+            for identifier in ok_epochs(inventory)
         },
         "stop_table": table_path("stop_table"),
         "provenance": provenance,
