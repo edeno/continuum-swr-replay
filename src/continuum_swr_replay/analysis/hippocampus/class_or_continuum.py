@@ -393,6 +393,48 @@ def fit_step(
     )
 
 
+def overall_step_share(fit: StepFit, y: NDArray, is_swr: NDArray) -> dict[str, float]:
+    """A step as a share of the SWR minus non-SWR difference over all the events.
+
+    :attr:`StepFit.step_share` divides by the label difference over the rows the
+    fit compared on; this divides by the difference over every event with the
+    property (``y``), whichever rows the fit used.
+
+    Parameters
+    ----------
+    fit : StepFit
+        The step test (:func:`fit_step`).
+    y : NDArray, shape (n_events,)
+        The property of every event, on the scale the fit compared on.
+    is_swr : NDArray of bool, shape (n_events,)
+
+    Returns
+    -------
+    share : dict
+        - ``overall_difference``: mean ``y`` of the SWR events less that of the
+          others.
+        - ``step_share_overall``: ``fit.step`` over it.
+        - ``share_overall_ci_low``, ``share_overall_ci_high``: the step's
+          interval over it, lower bound first (a negative difference swaps the
+          bounds).
+
+    Raises
+    ------
+    ZeroDivisionError
+        If the difference is zero.
+    """
+    y = np.asarray(y, dtype=np.float64)
+    is_swr = np.asarray(is_swr, dtype=bool)
+    overall = float(y[is_swr].mean() - y[~is_swr].mean())
+    bounds = (fit.step_ci_low / overall, fit.step_ci_high / overall)
+    return {
+        "overall_difference": overall,
+        "step_share_overall": fit.step / overall,
+        "share_overall_ci_low": min(bounds),
+        "share_overall_ci_high": max(bounds),
+    }
+
+
 # --- simulations for test 2 ----------------------------------------------------
 
 

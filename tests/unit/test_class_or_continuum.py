@@ -107,6 +107,52 @@ def test_fit_step_with_a_covariate():
     assert fit.label_vif > 1
 
 
+def _fit(step: float, ci_low: float, ci_high: float) -> cc.StepFit:
+    """A step test with only its term set; the share reads nothing else."""
+    return cc.StepFit(
+        n_events=0,
+        n_groups=0,
+        n_labelled=0,
+        step=step,
+        step_ci_low=ci_low,
+        step_ci_high=ci_high,
+        raw_difference=np.nan,
+        step_share=np.nan,
+        label_vif=np.nan,
+        label_power_correlation=np.nan,
+        mse_smooth=np.nan,
+        mse_step=np.nan,
+        heldout_gain=np.nan,
+        folds_step_better=0,
+        n_folds=0,
+    )
+
+
+def test_overall_step_share_is_over_the_mean_difference_of_every_event():
+    # non-SWR 1, 2 and 6 (mean 3, median 2); SWR 5 and 7 (mean 6)
+    y = np.array([1.0, 2.0, 5.0, 6.0, 7.0])
+    is_swr = np.array([False, False, True, False, True])
+    share = cc.overall_step_share(_fit(1.5, -0.3, 3.0), y, is_swr)
+    assert share == pytest.approx(
+        {
+            "overall_difference": 3.0,
+            "step_share_overall": 0.5,
+            "share_overall_ci_low": -0.1,
+            "share_overall_ci_high": 1.0,
+        }
+    )
+
+
+def test_overall_step_share_keeps_the_lower_bound_first_below_zero():
+    # the SWR events lower: a difference of -3 swaps the bounds
+    y = np.array([4.0, 5.0, 1.0, 2.0])
+    is_swr = np.array([False, False, True, True])
+    share = cc.overall_step_share(_fit(1.5, -0.3, 3.0), y, is_swr)
+    assert share["step_share_overall"] == pytest.approx(-0.5)
+    assert share["share_overall_ci_low"] == pytest.approx(-1.0)
+    assert share["share_overall_ci_high"] == pytest.approx(0.1)
+
+
 def test_sustained_level():
     z = np.array([0.0, 3.0, 3.0, 2.0, np.nan, 5.0])
     level = cc.sustained_level(z, 2)

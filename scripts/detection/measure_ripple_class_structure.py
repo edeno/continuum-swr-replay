@@ -492,9 +492,6 @@ def step_table(
     for word in PROPERTIES:
         for animal, all_rows in events.groupby("animal"):
             frame = property_frame(all_rows, word)
-            overall = float(
-                frame.y[frame.is_swr].mean() - frame.y[~frame.is_swr].mean()
-            )
             for power in POWERS:
                 for window in windows if power == "criterion" else (np.nan,):
                     keep, label, low, high = design_rows(frame, power, window)
@@ -527,17 +524,7 @@ def step_table(
                                     "rows_fraction": len(sub) / len(frame),
                                     **fit.__dict__,
                                     "has_step": fit.has_step,
-                                    "overall_difference": overall,
-                                    "step_share_overall": fit.step / overall,
-                                    # dividing by a negative contrast swaps the bounds
-                                    "share_overall_ci_low": min(
-                                        fit.step_ci_low / overall,
-                                        fit.step_ci_high / overall,
-                                    ),
-                                    "share_overall_ci_high": max(
-                                        fit.step_ci_low / overall,
-                                        fit.step_ci_high / overall,
-                                    ),
+                                    **cc.overall_step_share(fit, frame.y, frame.is_swr),
                                     "label_agrees_with_is_swr": float(
                                         (label == sub.is_swr.to_numpy()).mean()
                                     ),
