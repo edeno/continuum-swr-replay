@@ -96,7 +96,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
 )
 from continuum_swr_replay.analysis.shared_statistics import (
     bootstrap_interval,
-    nested_bootstrap_draw,
+    nested_bootstrap_draws,
     nested_codes,
 )
 
@@ -519,8 +519,8 @@ def nested_mean_intervals(
     """95 % intervals of the animal-level and epoch-weighted means of per-epoch
     summaries, from one nested bootstrap.
 
-    Each replicate is one draw of
-    :func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_draw`
+    The replicates are
+    :func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_draws`
     with the epochs as the sessions (each its own row): the animals with
     replacement, then each drawn animal's epochs with replacement. On it, the
     animal-level mean is the mean over the drawn animals (each as often as it
@@ -574,11 +574,9 @@ def nested_mean_intervals(
     animal_estimate = float(_animal_summaries(values, animals).mean())
     epoch_estimate = float(values.mean())
     stream = keyed_rng(seed, "hierarchical")
-    draws = [
-        nested_bootstrap_draw(animal_codes, epoch_codes, stream) for _ in range(n_boot)
-    ]
-    epochs_drawn = np.stack([draw.rows for draw in draws]).astype(float)
-    animals_drawn = np.stack([draw.animals for draw in draws]).astype(float)
+    draws = nested_bootstrap_draws(animal_codes, epoch_codes, stream, n_boot)
+    epochs_drawn = draws.rows.astype(float)
+    animals_drawn = draws.animals.astype(float)
     member = np.eye(n_animals)[animal_codes]  # (n_epochs, n_animals)
     sums = epochs_drawn @ (member * values[:, None])
     counts = epochs_drawn @ member

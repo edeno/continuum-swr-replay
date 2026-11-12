@@ -64,7 +64,8 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     window_folds,
 )
 from continuum_swr_replay.analysis.shared_statistics import (
-    nested_bootstrap_draw,
+    NestedDraw,
+    nested_bootstrap_draws,
     nested_codes,
 )
 from tests.support._memoryless_clusterless_epoch import build_simulated_epoch
@@ -855,10 +856,12 @@ def test_the_nested_intervals_are_the_corrected_t_rule_on_nested_replicates():
     # drawn animal's epochs drawn as often as it was (pooled).
     values, owner = summaries[:6], animals[:6]
     animal_codes, epoch_codes = nested_codes(owner, np.arange(6))
-    stream = keyed_rng((4,), "hierarchical")
+    replicates = nested_bootstrap_draws(
+        animal_codes, epoch_codes, keyed_rng((4,), "hierarchical"), 300
+    )
     animal_draws, epoch_draws = [], []
-    for _ in range(300):
-        draw = nested_bootstrap_draw(animal_codes, epoch_codes, stream)
+    for draw in zip(*replicates, strict=True):
+        draw = NestedDraw(*draw)
         own = [
             np.average(values[animal_codes == a], weights=draw.rows[animal_codes == a])
             for a in np.flatnonzero(draw.animals)

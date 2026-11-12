@@ -12,8 +12,9 @@
   a mean of session means.
 - :func:`nested_bootstrap_draw`: one replicate of the nested bootstrap
   (animals, then sessions within each drawn animal, then the units or events
-  within each drawn session), the resampling behind every interval; with
-  :func:`nested_codes` and :func:`weighted_median`.
+  within each drawn session), the resampling behind every interval, and
+  :func:`nested_bootstrap_draws`, many at once; with :func:`nested_codes` and
+  :func:`weighted_median`.
 - :func:`bootstrap_interval`: the 95 % interval from those draws, a
   small-sample t correction over the animals.
 - :func:`session_mean_curve`, :func:`animal_balanced_curve` and
@@ -261,7 +262,9 @@ def nested_codes(
 
 
 class NestedDraw(NamedTuple):
-    """One replicate of :func:`nested_bootstrap_draw`.
+    """Replicates of the nested bootstrap: one of :func:`nested_bootstrap_draw`,
+    or ``n_draws`` of :func:`nested_bootstrap_draws` (each array then has a
+    leading axis of length ``n_draws``).
 
     Attributes
     ----------
@@ -305,30 +308,71 @@ def nested_bootstrap_draw(
     Returns
     -------
     NestedDraw
+        :func:`nested_bootstrap_draws` with one draw, its leading axis dropped.
+    """
+    draws = nested_bootstrap_draws(animal, session, rng, 1)
+    return NestedDraw(draws.animals[0], draws.sessions[0], draws.rows[0])
+
+
+def nested_bootstrap_draws(
+    animal: NDArray[np.int64],
+    session: NDArray[np.int64],
+    rng: np.random.Generator,
+    n_draws: int,
+) -> NestedDraw:
+    """``n_draws`` replicates of the nested bootstrap at once.
+
+    Each replicate is drawn as in :func:`nested_bootstrap_draw`; the generator
+    is used level by level for all replicates together (the animals of every
+    replicate, then each animal's sessions, then each session's rows), so one
+    draw here is :func:`nested_bootstrap_draw`'s with the same generator, and
+    ``n_draws`` here are not the numbers of ``n_draws`` calls of it (they have
+    the same distribution).
+
+    Parameters
+    ----------
+    animal, session : NDArray of int, shape (n_rows,)
+        Codes ``0..n-1`` (:func:`nested_codes`); every session belongs to one
+        animal.
+    rng : numpy.random.Generator
+        The draws' source.
+    n_draws : int
+        Replicates.
+
+    Returns
+    -------
+    NestedDraw
+        Arrays of shape (n_draws, n_animals), (n_draws, n_sessions) and
+        (n_draws, n_rows).
     """
     animal = np.asarray(animal, dtype=np.int64)
     session = np.asarray(session, dtype=np.int64)
     n_animals = int(animal.max()) + 1
     session_animal = np.zeros(int(session.max()) + 1, dtype=np.int64)
     session_animal[session] = animal
-    animal_draws = rng.multinomial(n_animals, np.full(n_animals, 1.0 / n_animals))
-    session_draws = np.zeros(session_animal.size, dtype=np.int64)
-    for a in np.flatnonzero(animal_draws):
+    animal_draws = rng.multinomial(
+        n_animals, np.full(n_animals, 1.0 / n_animals), size=n_draws
+    )
+    session_draws = np.zeros((n_draws, session_animal.size), dtype=np.int64)
+    # A multinomial of zero draws takes nothing from the generator, so a
+    # replicate that does not draw an animal (or a session) uses none of it.
+    for a in np.flatnonzero(animal_draws.any(axis=0)):
         mine = np.flatnonzero(session_animal == a)
-        session_draws[mine] = rng.multinomial(
-            animal_draws[a] * mine.size, np.full(mine.size, 1.0 / mine.size)
+        session_draws[:, mine] = rng.multinomial(
+            animal_draws[:, a] * mine.size, np.full(mine.size, 1.0 / mine.size)
         )
-    counts = np.zeros(animal.size, dtype=np.int64)
+    counts = np.zeros((n_draws, animal.size), dtype=np.int64)
     order = np.argsort(session, kind="stable")
     bounds = np.searchsorted(session[order], np.arange(session_animal.size + 1))
     # A session of one row draws it as often as the session is drawn (a
     # one-category multinomial takes nothing from the generator).
     single = np.diff(bounds) == 1
-    counts[order[bounds[:-1][single]]] = session_draws[single]
-    for s in np.flatnonzero((session_draws > 0) & ~single):
+    counts[:, order[bounds[:-1][single]]] = session_draws[:, single]
+    for s in np.flatnonzero((session_draws > 0).any(axis=0) & ~single):
         members = order[bounds[s] : bounds[s + 1]]
-        counts[members] = rng.multinomial(
-            session_draws[s] * members.size, np.full(members.size, 1.0 / members.size)
+        counts[:, members] = rng.multinomial(
+            session_draws[:, s] * members.size,
+            np.full(members.size, 1.0 / members.size),
         )
     return NestedDraw(animal_draws, session_draws, counts)
 

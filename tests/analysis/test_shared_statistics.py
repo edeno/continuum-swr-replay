@@ -353,6 +353,31 @@ def test_the_draw_counts_each_level_consistently():
         np.testing.assert_array_equal(per_session, draw.sessions * sizes)
 
 
+def test_many_draws_at_once_keep_the_nesting_and_one_is_the_single_draw():
+    # Unequal sizes: animal 0 has sessions of 1 and 3 rows, animal 1 one of 2.
+    animal = np.array([0, 0, 0, 0, 1, 1])
+    session = np.array([0, 1, 1, 1, 2, 2])
+    sizes = np.array([1, 3, 2])
+    draws = stats.nested_bootstrap_draws(animal, session, np.random.default_rng(4), 200)
+    assert draws.animals.shape == (200, 2) and draws.rows.shape == (200, 6)
+    np.testing.assert_array_equal(draws.animals.sum(axis=1), 2)
+    np.testing.assert_array_equal(draws.sessions[:, :2].sum(1), 2 * draws.animals[:, 0])
+    np.testing.assert_array_equal(draws.sessions[:, 2], draws.animals[:, 1])
+    per_session = np.stack(
+        [np.bincount(session, weights=r, minlength=3) for r in draws.rows]
+    )
+    np.testing.assert_array_equal(per_session, draws.sessions * sizes)
+    # both animals and every row of the three-row session vary over replicates
+    assert (draws.rows.std(axis=0) > 0).all()
+    # one draw at once is the single draw, and leaves the generator alike
+    rng_one, rng_many = np.random.default_rng(9), np.random.default_rng(9)
+    single = stats.nested_bootstrap_draw(animal, session, rng_one)
+    batch = stats.nested_bootstrap_draws(animal, session, rng_many, 1)
+    for a, b in zip(single, batch, strict=True):
+        np.testing.assert_array_equal(a, b[0])
+    assert rng_one.integers(10**9) == rng_many.integers(10**9)
+
+
 def test_bootstrap_interval_is_the_estimate_plus_minus_the_corrected_t_half_width():
     # Draws 1, 2, 3, 4: SD (ddof=1) sqrt(5/3). Five animals: t(0.975, 4) is
     # 2.7764451, the correction sqrt(5/4). The interval is centred on the
