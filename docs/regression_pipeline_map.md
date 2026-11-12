@@ -1134,7 +1134,7 @@ Modules under a mapped root that no stage pattern claims. A module landing here 
 
 Across-session summaries of what the per-session fits wrote.
 
-`fit_rows`, `require_one_fit_per_session`, `coefficient_statistics`, `gated_coefficient_statistics`, `gated_exp_median_ratio`, `gated_coefficient_difference_statistics`, `aic_difference_statistics`, `separated_fraction`, `known_fraction`, `fits_carrying`, `term_separation_statistics`, `rung_separation_range`, `audited_drop_statistics`, `group_range`
+`fit_rows`, `require_one_fit_per_session`, `coefficient_statistics`, `coefficient_family_statistics`, `animal_median_bootstrap`, `gated_coefficient_statistics`, `gated_exp_median_ratio`, `gated_coefficient_difference_statistics`, `aic_difference_statistics`, `separated_fraction`, `known_fraction`, `fits_carrying`, `term_separation_statistics`, `rung_separation_range`, `audited_drop_statistics`, `group_range`
 
 ### `src/continuum_swr_replay/analysis/replay/content_statistics.py`
 
