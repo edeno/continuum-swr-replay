@@ -32,6 +32,10 @@ Collect one tidy row per (session, population) with every covariate's
 ``coef_`` / ``bse_`` / ``pval_`` / ``rr_`` ->
 ``Processed-Data/replay_content/models_per_bin_rate/uncertainty_rate.pkl``.
 
+The fit loop, the qvals join, the first-exposure drop, the RL z-scores and the
+cohort audit are ``analysis/behavior/rate/uncertainty_rate.py``; this script
+reads the tables, selects the stop cohort, and writes.
+
 Usage::
 
     uv run python scripts/behavior/rate/fit_uncertainty_rate.py                    # full
@@ -54,31 +58,18 @@ import time  # noqa: E402
 import warnings  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.behavior import (  # noqa: E402
     BIN_S,
-    N_HISTORY_BASIS,
-    N_HISTORY_LAGS,
-    STOP_COVARIATES,
-    TMAX,
     add_uncertainty_covariates,
-    aggregate_to_timebins,
     attach_is_swr_to_onsets,
-    fit_per_bin_rate_model,
-    freeze_per_bin_cohort,
 )
 from continuum_swr_replay.analysis.behavior.coefficient_statistics import (  # noqa: E402
     coefficient_statistics,
 )
 from continuum_swr_replay.analysis.behavior.cohort_audit import (  # noqa: E402
-    fitted_cohort_record,
-    stop_own_missing,
     write_cohort_audit,
-)
-from continuum_swr_replay.analysis.behavior.covariate_timing import (  # noqa: E402
-    assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.behavior.covariates import (  # noqa: E402
     CANONICAL_SWITCH_WINDOW,
@@ -88,28 +79,19 @@ from continuum_swr_replay.analysis.behavior.fit_provenance import (  # noqa: E40
     record_inputs,
     write_fit_provenance,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
-    MODEL_UNCERTAINTY_RATE,
-    MU_UNCERTAINTY_COVARIATES,
-    MU_UNCERTAINTY_RL_COVARIATES,
-    PER_BIN_DESIGN,
-    longest_history_window_s,
-)
-from continuum_swr_replay.analysis.behavior.per_bin_design import (  # noqa: E402
-    POPULATIONS,
-)
 from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (  # noqa: E402
-    at_risk_events,
     attach_event_ends,
 )
-from continuum_swr_replay.analysis.behavior.rate.per_bin_rate_model import (  # noqa: E402
-    _design_columns,
+from continuum_swr_replay.analysis.behavior.rate.uncertainty_rate import (  # noqa: E402
+    FITTED_COVARIATES,
+    MU_UNCERTAINTY,
+    POPULATIONS_TO_FIT,
+    drop_exposure_sessions,
+    fit_uncertainty_rate,
+    join_uncertainty_qvals,
+    standardize_rl_covariates,
+    uncertainty_cohort_records,
 )
-from continuum_swr_replay.analysis.behavior.rate.post_outcome import (  # noqa: E402
-    POST_OUTCOME_GATE_RULE,
-    gate_bins_after_outcome,
-)
-from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS  # noqa: E402
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     require_swr_source,
 )
@@ -120,12 +102,6 @@ from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E40
 )
 from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     swr_source_name,
-)
-from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
-    first_exposure_epochs,
-)
-from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
-    parse_nwb_filename,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
     model_dir,
@@ -142,14 +118,9 @@ from continuum_swr_replay.tables.session_keys import (  # noqa: E402
 )
 from continuum_swr_replay.tables.standardization import (  # noqa: E402
     Reference,
-    attach_standardized,
     save_reference,
     z_reference_path,
 )
-
-# This runner's names for the model_specs blocks it fits and standardizes.
-FITTED_COVARIATES = MU_UNCERTAINTY_COVARIATES
-RL_COVARIATES = MU_UNCERTAINTY_RL_COVARIATES
 
 # separated history coefs legitimately overflow exp(); convergence/separation are
 # recorded per fit as flags in per_bin_rate_model (analysis.behavior._fit_diagnostics),
@@ -170,200 +141,6 @@ def fit_input_paths() -> dict[str, Path]:
         "event_table": table_path("event_table", rc),
         "qvals_table": table_path("qvals_table", rc),
     }
-
-
-# Nominal schedule covariates, now sourced from qvals_table (derived from Alison's
-# p_rew_leaf/contingency_count, exactly stop-start-aligned) rather than the difflib
-# contingency_table_csv -- so every covariate the model fits shares one alignment.
-VALUE_COVARIATES = (
-    "task_reward_probability_chosen_arm",
-    "task_reward_probability_patch_mean_gap_best_vs_second",
-    "trials_since_block_change",
-)
-
-# Fit-cohort standardization support: the moments are the fitted rows' own.
-FIT_SUPPORT_LABEL = "fit_cohort_all_rows"
-
-# The three non-local-vs-SWR populations to dissociate (pooled non_local is the
-# null and is not fit here).
-POPULATIONS_TO_FIT = ("swr", "non_local_swr", "non_local_no_swr")
-
-MU_UNCERTAINTY = MODEL_UNCERTAINTY_RATE["MU_uncertainty"]
-
-
-def _drop_exposure_sessions(stop_table: pd.DataFrame) -> pd.DataFrame:
-    """Drop the epoch register's first-exposure sessions (``first_exposure_epochs``).
-
-    All six ports share one p(R) there (1.0, then 0.5), so the value covariates
-    have no contrast between ports.
-    """
-    exposure = pd.MultiIndex.from_tuples(
-        [(*parse_nwb_filename(name), epoch) for name, epoch in first_exposure_epochs()],
-        names=list(SESSION_COLUMNS),
-    )
-    sessions = pd.MultiIndex.from_frame(stop_table[list(SESSION_COLUMNS)])
-    return stop_table[~sessions.isin(exposure)]
-
-
-def fit_uncertainty_rate(
-    stop_table: pd.DataFrame,
-    onsets: pd.DataFrame,
-) -> pd.DataFrame:
-    """One row per (session, population): MU_uncertainty fit coefficients.
-
-    ``stop_table`` must already carry the uncertainty + value covariates and the
-    reward lags; ``onsets`` must already carry ``is_swr``.
-    """
-    assert_predictor_timing(FITTED_COVARIATES, retrospective=True)
-    onset_groups = dict(tuple(onsets.groupby(list(SESSION_COLUMNS), sort=False)))
-    stop_covariates = (
-        *STOP_COVARIATES,
-        *FITTED_COVARIATES,
-        "stop_start",
-        "outcome_known_time",
-        "trial_reward",
-    )
-
-    rows: list[dict] = []
-    gate_audit_rows: list[dict] = []
-    attempted = dict.fromkeys(POPULATIONS_TO_FIT, 0)
-    n_unfit = dict.fromkeys(POPULATIONS_TO_FIT, 0)
-    for keys, stops_g in stop_table.groupby(list(SESSION_COLUMNS), sort=False):
-        if keys not in onset_groups:
-            continue
-        onsets_g = onset_groups[keys]
-        for outcome in POPULATIONS_TO_FIT:
-            attempted[outcome] += 1
-            design = aggregate_to_timebins(
-                stops_g,
-                POPULATIONS[outcome](onsets_g),
-                bin_s=BIN_S,
-                tmax=TMAX,
-                reward_basis=True,
-                self_history_lags=N_HISTORY_LAGS,
-                self_history_basis=N_HISTORY_BASIS,
-                stop_covariates=stop_covariates,
-                history_window_s=longest_history_window_s([MU_UNCERTAINTY]),
-                at_risk_events=at_risk_events(onsets_g, outcome),
-                offset_history=True,
-            )
-            design, gate_audit = gate_bins_after_outcome(design, MU_UNCERTAINTY)
-            gate_audit_rows.append(
-                {
-                    **dict(zip(SESSION_COLUMNS, keys, strict=True)),
-                    "outcome": outcome,
-                    "post_outcome_gate": True,
-                    "post_outcome_gate_rule": POST_OUTCOME_GATE_RULE,
-                    "outcome_time_semantics": OUTCOME_TIME_SEMANTICS,
-                    **gate_audit,
-                }
-            )
-            if not gate_audit["outcome_balance_valid"]:
-                n_unfit[outcome] += 1
-                logger.warning(
-                    "  %s / %s: skipped (%s)",
-                    "_".join(map(str, keys)),
-                    outcome,
-                    gate_audit["outcome_balance_status"],
-                )
-                continue
-            # One cohort for the fitted rung, frozen before the fit: the
-            # fitter refuses an incomplete design rather than subsetting it.
-            # The physical post-outcome gate above already selected the rows
-            # that are complete for exactly these columns, so this must remove
-            # nothing -- a removal would mean the two selections disagree.
-            design, freeze = freeze_per_bin_cohort(design, [MU_UNCERTAINTY])
-            if freeze["n_bins_after"] != freeze["n_bins_before"]:
-                raise ValueError(
-                    f"{'_'.join(map(str, keys))} / {outcome}: the cohort freeze "
-                    f"removed {freeze['n_bins_before'] - freeze['n_bins_after']} "
-                    "bins the post-outcome gate had kept; the gate's complete-case "
-                    "selection and freeze_per_bin_cohort must agree."
-                )
-            fit = fit_per_bin_rate_model(design, MU_UNCERTAINTY)
-            if fit is None:
-                n_unfit[outcome] += 1
-                logger.info("  %s / %s: unfit", "_".join(map(str, keys)), outcome)
-                continue
-            rows.append(
-                {
-                    "outcome": outcome,
-                    "model": MU_UNCERTAINTY.name,
-                    "per_bin_design": PER_BIN_DESIGN,
-                    "post_outcome_gate": True,
-                    "post_outcome_gate_rule": POST_OUTCOME_GATE_RULE,
-                    "outcome_time_semantics": OUTCOME_TIME_SEMANTICS,
-                    **gate_audit,
-                    **dict(zip(SESSION_COLUMNS, keys, strict=True)),
-                    **{k: v for k, v in fit.items() if k != "predicted"},
-                }
-            )
-    # Surface survivor bias: if many (session x population) cells failed to fit,
-    # the median RRs for that population come from a biased survivor subset.
-    for outcome in POPULATIONS_TO_FIT:
-        att, bad = attempted[outcome], n_unfit[outcome]
-        if att and bad:
-            frac = bad / att
-            (logger.warning if frac > 0.2 else logger.info)(
-                "population %s: %d/%d session cells unfit (%.0f%%)",
-                outcome,
-                bad,
-                att,
-                100 * frac,
-            )
-    result = pd.DataFrame(rows)
-    result.attrs["post_outcome_gate_audit"] = gate_audit_rows
-    return result
-
-
-def _cohort_records(
-    models: pd.DataFrame,
-    stop_fitted: pd.DataFrame,
-    *,
-    n_postjoin: int,
-    n_sessions_postjoin: int,
-    qvals_gap: int,
-) -> list[dict]:
-    """Stop-grain cohort record per population for the MU-uncertainty ladder.
-
-    ``n_in = n_postjoin + qvals_gap`` (== pre-join stops on a full run); the inner
-    qvals-join drop is the mechanism-B ``n_drop_qvals_gap``; ``immobility<=0`` / NaN
-    stop-level predictors on ``stop_fitted`` are ``n_drop_own_predictor_missing``; the
-    first-exposure drop, subset, and per-bin gates fall into
-    ``n_excluded_session``. ``sessions_in`` is the post-join (pre-exposure-drop)
-    session count so it matches ``n_in``'s stop population. Reconciles by
-    construction.
-    """
-    stop_level = [
-        c for c in _design_columns(MU_UNCERTAINTY) if c in stop_fitted.columns
-    ]
-    own_missing = stop_own_missing(stop_fitted, stop_level)
-    records = []
-    for outcome in POPULATIONS_TO_FIT:
-        sub = (
-            models[(models.model == MU_UNCERTAINTY.name) & (models.outcome == outcome)]
-            if len(models)
-            else models
-        )
-        records.append(
-            fitted_cohort_record(
-                MU_UNCERTAINTY.name,
-                outcome,
-                "stop",
-                sub,
-                count_column="n_stops",
-                n_in=n_postjoin + int(qvals_gap),
-                sessions_in=n_sessions_postjoin,
-                own_missing=own_missing,
-                n_qvals_gap=int(qvals_gap),
-                drop_notes=(
-                    "qvals inner-join -> qvals_gap (mechanism B); immobility<=0 / NaN "
-                    "stop-level predictor -> own; first-exposure/subset/physical "
-                    "post-outcome bin gate -> excluded"
-                ),
-            )
-        )
-    return records
 
 
 def _write_outputs(
@@ -475,16 +252,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     # Hash the inputs now, not at write time: the fit runs long enough that a
     # table could be regenerated mid-run and be certified as this fit's input.
     fit_inputs = record_inputs(inputs)
-    qcols = qvals[
-        [
-            "stop_id",
-            "outcome_known_time",
-            "trial_reward",
-            *VALUE_COVARIATES,
-            "rpe_postoutcome",
-            *RL_COVARIATES,
-        ]
-    ]
     # Guard the stop_id join before the inner join hides its casualties
     # (see assert_qvals_aligned). It must see the WHOLE stop table: it claims
     # every qvals row falling inside the epoch's span, so checking it against a
@@ -503,48 +270,18 @@ def main(argv: Sequence[str] | None = None) -> None:
         cohort_report["counts_before"],
     )
     n_before = len(stop)
-    stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
+    stop = join_uncertainty_qvals(stop, qvals)
     n_postjoin = len(stop)  # inner-join (qvals-gap, mechanism B) drop = n_before - this
     # Session count BEFORE the first-exposure drop, so the audit's sessions_in
     # matches n_in's stop population (n_in includes the first-exposure stops as
     # excluded, not removed).
     n_sessions_postjoin = stop.groupby(list(SESSION_COLUMNS)).ngroups
-    frac = len(stop) / n_before
-    if frac < 0.5:
-        raise ValueError(
-            f"qvals join kept only {frac:.1%} of stops -- check qvals_table stop_id convention"
-        )
-    logger.info(
-        "qvals join: %d -> %d stops (%.0f%% kept)", n_before, len(stop), 100 * frac
-    )
-    stop = _drop_exposure_sessions(stop)
+    stop = drop_exposure_sessions(stop)
     if args.max_per_animal is not None:
         stop = subset_max_per_animal(stop, args.max_per_animal, sort_sessions=True)
     # z-score the RL decision variables AFTER the drop/subset so the per-SD scale
-    # is the SD of exactly the rows that get fit (disparate/tiny scale: DeltaV
-    # ~0.2, updates ~0.05). The nominal block + RPE stay per-unit.
-    for c in RL_COVARIATES:
-        frac_valid = stop[c].notna().mean()
-        if frac_valid < 0.7:
-            logger.warning(
-                "RL covariate %r is non-NaN on only %.0f%% of fitted rows; its SD "
-                "(hence the per-SD rate ratio) is set by that minority and rows with "
-                "NaN drop from every model listwise",
-                c,
-                100 * frac_valid,
-            )
-    # ddof=1: these coefficients are reported per *sample* SD of the fitted rows.
-    stop, z_reference = attach_standardized(
-        stop, RL_COVARIATES, support_label=FIT_SUPPORT_LABEL, ddof=1
-    )
-    for c in RL_COVARIATES:
-        sd = z_reference[c]["std"]
-        if not np.isfinite(sd) or sd == 0:
-            raise ValueError(
-                f"RL covariate {c!r} has degenerate SD ({sd}); cannot z-score"
-            )
-        # The fitted design carries the standardized values under the raw name.
-        stop[c] = stop.pop(f"{c}_z")
+    # is the SD of exactly the rows that get fit.
+    stop, z_reference = standardize_rl_covariates(stop)
 
     n_sessions = stop.groupby(list(SESSION_COLUMNS)).ngroups
     logger.info(
@@ -563,7 +300,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # immobility<=0 / NaN stop-level predictors on the fitted frame -> own; the
     # first-exposure drop, subset, and per-bin gates -> excluded.
     audit_qvals = 0 if smoke else (n_before - n_postjoin)  # smoke: N/A
-    audit_records = _cohort_records(
+    audit_records = uncertainty_cohort_records(
         models,
         stop,
         n_postjoin=n_postjoin,

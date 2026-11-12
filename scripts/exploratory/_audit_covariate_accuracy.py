@@ -37,8 +37,6 @@ Diagnostic (prints a report); does not exit non-zero.
 from __future__ import annotations
 
 import argparse
-import importlib.util
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -54,12 +52,10 @@ RC = REPLAY_CONTENT_DIR
 
 
 def _fur():
-    """Load fit_uncertainty_rate for its covariate sets (scripts/ isn't a package)."""
-    path = Path(__file__).parents[1] / "behavior" / "rate" / "fit_uncertainty_rate.py"
-    spec = importlib.util.spec_from_file_location("fur", path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    """The uncertainty rate fit's module, for its covariate sets."""
+    from continuum_swr_replay.analysis.behavior.rate import uncertainty_rate
+
+    return uncertainty_rate
 
 
 def _within_epoch_pos(df: pd.DataFrame) -> pd.Series:

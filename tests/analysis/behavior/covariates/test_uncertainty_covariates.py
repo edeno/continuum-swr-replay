@@ -9,9 +9,7 @@ not mutate its input.
 from __future__ import annotations
 
 import functools
-import importlib.util
 import warnings
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -26,21 +24,11 @@ from continuum_swr_replay.analysis.behavior.covariates import (
 from continuum_swr_replay.analysis.behavior.model_specs import (
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
+from continuum_swr_replay.analysis.behavior.rate import uncertainty_rate as fur
 from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.io import read_table, table_exists
 from continuum_swr_replay.tables.session_keys import subset_max_per_animal
 from tests.support._event_end_fixtures import with_event_ends
-
-_SPEC = importlib.util.spec_from_file_location(
-    "fit_uncertainty_rate",
-    Path(__file__).resolve().parents[4]
-    / "scripts"
-    / "behavior"
-    / "rate"
-    / "fit_uncertainty_rate.py",
-)
-fur = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(fur)
 
 
 def _frame(rows: list[dict]) -> pd.DataFrame:
@@ -851,7 +839,7 @@ def test_runner_smoke():
         ]
     ]
     stop = stop.merge(qcols, on="stop_id", how="inner", validate="many_to_one")
-    stop = fur._drop_exposure_sessions(stop)
+    stop = fur.drop_exposure_sessions(stop)
     stop = subset_max_per_animal(stop, 1, sort_sessions=True)
 
     models = fur.fit_uncertainty_rate(stop, onsets)

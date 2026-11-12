@@ -15,6 +15,7 @@ import json
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.behavior.rate import uncertainty_rate as unc
 from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
 from continuum_swr_replay.data_loaders import epoch_register
 from scripts.behavior.rate import fit_uncertainty_rate as mod
@@ -32,46 +33,6 @@ def _register(path, rows: list[tuple[str, str, str, str, bool]]) -> None:
         ],
         columns=list(epoch_register.COLUMNS),
     ).to_csv(path, index=False)
-
-
-def test_the_register_s_first_exposure_sessions_are_dropped_and_no_other(
-    tmp_path, monkeypatch
-):
-    """The register names the session, not its place in the stop table.
-
-    ``a``'s exposure (20200101 02_r1) goes and its same-day 04_r2 stays; ``b``'s
-    exposure is excluded from the register, so the stop table lacks it and
-    ``b``'s first stop-table session (20200105) stays, as peanut's does.
-    """
-    path = tmp_path / "epoch_register.csv"
-    _register(
-        path,
-        [
-            ("a20200101_.nwb", "02_r1", "analysed", "", True),
-            ("a20200101_.nwb", "04_r2", "analysed", "", False),
-            ("a20200102_.nwb", "02_r1", "analysed", "", False),
-            ("b20200104_.nwb", "02_r1", "excluded", "NO_TRIAL_INTERVALS", True),
-            ("b20200105_.nwb", "02_r1", "analysed", "", False),
-            ("b20200106_.nwb", "02_r1", "analysed", "", False),
-        ],
-    )
-    monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
-    sessions = [
-        ("a", 20200101, "02_r1"),
-        ("a", 20200101, "04_r2"),
-        ("a", 20200102, "02_r1"),
-        ("b", 20200105, "02_r1"),
-        ("b", 20200106, "02_r1"),
-    ]
-    stop = pd.DataFrame(
-        [(*session, stop_id) for stop_id, session in enumerate(sessions * 2)],
-        columns=["animal", "session_date", "epoch", "stop_id"],
-    )
-
-    out = mod._drop_exposure_sessions(stop)
-
-    assert out["stop_id"].tolist() == [1, 2, 3, 4, 6, 7, 8, 9]
-    assert out.columns.equals(stop.columns)
 
 
 def _cohort_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -99,13 +60,13 @@ def _cohort_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
             "stop_id": stops["stop_id"],
             "outcome_known_time": [0.0] * n,
             "trial_reward": [0.0] * n,
-            **{c: [0.0] * n for c in mod.VALUE_COVARIATES},
+            **{c: [0.0] * n for c in unc.VALUE_COVARIATES},
             "rpe_postoutcome": [0.0] * n,
             # distinct per stop, so every cohort's fitted rows have a finite
             # non-zero SD for the z-scoring the runner insists on
             **{
                 c: [float(i + offset) for i in range(n)]
-                for offset, c in enumerate(mod.RL_COVARIATES)
+                for offset, c in enumerate(unc.RL_COVARIATES)
             },
         }
     )
@@ -164,7 +125,7 @@ def stubbed_run(monkeypatch, replay_content_root, tmp_path):
         seen["n_sessions_postjoin"] = counts["n_sessions_postjoin"]
         return []
 
-    monkeypatch.setattr(mod, "_cohort_records", _records)
+    monkeypatch.setattr(mod, "uncertainty_cohort_records", _records)
     return seen, replay_content_root
 
 

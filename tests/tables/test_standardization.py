@@ -308,12 +308,13 @@ def test_runner_references_written(tmp_path):
     ``save_reference`` call fails here rather than passing silently.
     """
     from continuum_swr_replay.analysis.behavior.coupling import swr_power
+    from continuum_swr_replay.analysis.behavior.rate import uncertainty_rate
     from scripts.behavior.coupling import fit_swr_power_model
     from scripts.behavior.rate import fit_uncertainty_rate
 
     frame = pd.DataFrame({"a": [1.0, 2.0, 4.0, 8.0]})
     _, flat_reference = attach_standardized(
-        frame.copy(), ["a"], support_label=fit_uncertainty_rate.FIT_SUPPORT_LABEL
+        frame.copy(), ["a"], support_label=uncertainty_rate.FIT_SUPPORT_LABEL
     )
     empty_audit = pd.DataFrame({"animal": ["chimi"]})
 

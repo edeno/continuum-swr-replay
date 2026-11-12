@@ -131,7 +131,9 @@ def test_contrast_records_attribute_qvals_and_own():
 def test_uncertainty_records_reconcile_and_sessions_in_is_pre_exposure_drop():
     """The uncertainty audit must report sessions_in for the post-join (pre-exposure-drop)
     population so it matches n_in, and attribute the qvals-join drop to qvals_gap."""
-    from scripts.behavior.rate import fit_uncertainty_rate as mod
+    from continuum_swr_replay.analysis.behavior.rate import (
+        uncertainty_rate as mod,
+    )
 
     # Fitted frame = 2 sessions (one first-exposure session already dropped upstream).
     rng = np.random.default_rng(0)
@@ -172,7 +174,7 @@ def test_uncertainty_records_reconcile_and_sessions_in_is_pre_exposure_drop():
             for a, d in [("a", 2), ("b", 3)]
         ]
     )
-    recs = mod._cohort_records(
+    recs = mod.uncertainty_cohort_records(
         models,
         stop_fitted,
         n_postjoin=100,
