@@ -140,7 +140,7 @@ Analysis functions for manipulating and characterizing detected events.
 
 Summary statistics of the immobile non-local events.
 
-`compute_swr_overlap_class_counts`, `overlap_class_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `content_occupancy_shares`, `n_animals_non_swr_more_at_well`
+`compute_swr_overlap_class_counts`, `overlap_class_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `n_animals_non_swr_more_at_well`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/gamma_power.py`
 
@@ -492,7 +492,7 @@ Stage 6: replay content × reward outcome → behavioral change.
 
 Content occupancy of non-local events — where the decoded activity represents.
 
-`animal_from_epoch_id`, `find_sessions`, `session_content_distances`, `quadrant_fractions`, `arm_occupancy`, `analyze`, `group_shares`, `non_swr_shares_by_animal`, `render`, `main`
+`animal_from_epoch_id`, `find_sessions`, `session_content_distances`, `arm_occupancy`, `analyze`, `group_shares`, `non_swr_shares_by_animal`, `render`, `main`
 
 ### `scripts/content/analyze_uncertainty_content.py`
 
