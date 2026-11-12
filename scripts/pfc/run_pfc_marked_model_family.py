@@ -112,6 +112,7 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     class_eligibility,
     fit_marked_family_ladder,
     fit_marked_family_slope_null,
+    fitted_unit_indices,
     load_session_recommended_event_marks,
     load_session_stop_patch_switch_marks,
     model_set_of,
@@ -835,20 +836,16 @@ def run_analysis(
         ):
             raise RuntimeError("SWR events input changed during preparation")
         _check_prepared_window(context.spline_basis, context.lags)
-        # With a prior on the baseline columns every unit with a spike has a
-        # finite fit; a unit with no spike in the fitted bins carries no
-        # information about any coefficient, so it is left out and counted.
+        # The units left out are counted in the sidecar.
         n_units_recorded = int(context.counts.shape[1])
-        kept_units = np.arange(n_units_recorded)
-        if baseline_penalty_sigma is not None:
-            kept_units = np.flatnonzero(context.counts.sum(axis=0) > 0)
-            if len(kept_units) < n_units_recorded:
-                logger.info(
-                    "Leaving out %d of %d units with no spike in the fitted bins",
-                    n_units_recorded - len(kept_units),
-                    n_units_recorded,
-                )
-                context = replace(context, counts=context.counts[:, kept_units])
+        kept_units = fitted_unit_indices(context.counts, baseline_penalty_sigma)
+        if len(kept_units) < n_units_recorded:
+            logger.info(
+                "Leaving out %d of %d units with no spike in the fitted bins",
+                n_units_recorded - len(kept_units),
+                n_units_recorded,
+            )
+            context = replace(context, counts=context.counts[:, kept_units])
 
         common_extra = {
             "nwb_file_name": nwb_file_name,

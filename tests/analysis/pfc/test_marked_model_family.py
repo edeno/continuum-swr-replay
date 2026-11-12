@@ -49,6 +49,7 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     build_marked_family_ladder,
     build_recommended_event_mark_table,
     fit_marked_family_ladder,
+    fitted_unit_indices,
     stop_patch_switch_marks,
 )
 
@@ -1320,3 +1321,16 @@ def test_class_eligibility_names_the_short_class_and_the_rare_level():
     )
     with pytest.raises(ModelIneligibleError, match="at least 10 events at each level"):
         build_marked_family_ladder(events, fit_mask, basis, lags, binary)
+
+
+def test_a_unit_without_a_spike_is_left_out_only_under_a_baseline_prior():
+    counts = np.array(
+        [
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 2.0],
+            [0.0, 3.0, 0.0, 0.0],
+        ]
+    )
+
+    np.testing.assert_array_equal(fitted_unit_indices(counts, 3.0), [1, 3])
+    np.testing.assert_array_equal(fitted_unit_indices(counts, None), [0, 1, 2, 3])

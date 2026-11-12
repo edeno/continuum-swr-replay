@@ -6,7 +6,8 @@ small family of question-specific, jointly adjusted designs.  A family shares
 one full fit across all of its target marks and compares each target with the
 otherwise identical model lacking only that target's temporal block.
 
-There are no p-values or neuron-selection rules here.  The outputs are
+There are no p-values here, and no neuron selection beyond leaving out a unit
+with no spike when the baseline carries a prior (:func:`fitted_unit_indices`).  The outputs are
 descriptive effect kernels and blocked held-out prediction changes, plus an
 optional shuffled-mark reference for each slope kernel (``slope_permutations``
 draws; 0, i.e. none, in the shipped follow-up run).  The models use only event/content tables already shipped
@@ -2201,6 +2202,33 @@ def fit_marked_family_slope_null(
         "slope_null_batch_size": int(batch),
         "slope_null_seconds": time.perf_counter() - started,
     }
+
+
+def fitted_unit_indices(
+    counts: NDArray, baseline_penalty_sigma: float | None
+) -> NDArray:
+    """The units a session's family is fit on, as indices of the recorded units.
+
+    With a prior on the per-stop baseline columns every unit with a spike has a
+    finite fit; a unit with no spike in the fitted bins carries no information
+    about any coefficient, so it is left out. Without that prior every unit is
+    kept.
+
+    Parameters
+    ----------
+    counts : NDArray, shape (n_fit_bins, n_units)
+        Spike counts on the fitted bins.
+    baseline_penalty_sigma : float or None
+        Ridge prior SD on the per-stop baseline columns (``None``: free).
+
+    Returns
+    -------
+    NDArray of int, shape (n_kept,)
+        Kept unit indices, ascending.
+    """
+    if baseline_penalty_sigma is None:
+        return np.arange(counts.shape[1])
+    return np.flatnonzero(counts.sum(axis=0) > 0)
 
 
 def fit_marked_family_ladder(
