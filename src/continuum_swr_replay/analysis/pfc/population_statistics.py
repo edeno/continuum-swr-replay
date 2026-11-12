@@ -19,8 +19,9 @@ is finite, and *called* when that p-value is below ``alpha``
 (:func:`~continuum_swr_replay.analysis.pfc.load_population.tested_and_called`;
 SWRs without replay are tested the same way on
 :data:`SWR_WITHOUT_REPLAY_P_COLUMN`). The fractions of
-units are descriptive, pooled over sessions and animals: they are not
-population inference. A unit's *peak* for a curve is its
+units are descriptive, pooled over sessions and animals (an animal's own
+fraction is the mean over its sessions of theirs, :func:`called_fraction_by_animal`):
+they are not population inference. A unit's *peak* for a curve is its
 ``<curve>: peak_log_modulation``, the fit's largest log-rate change over the
 reported window, signed.
 
@@ -302,12 +303,18 @@ def called_fraction_by_animal(
     alpha: float,
     columns: Mapping[str, str] = HELDOUT_P_COLUMNS,
 ) -> pd.DataFrame:
-    """The share of each animal's tested units called for one test.
+    """The share of each animal's tested units called for one test, unit ->
+    session -> animal.
+
+    Each session's share is its called units over its tested units; the
+    animal's is the mean over its sessions with a tested unit, so every
+    session of an animal weighs the same however many units it holds.
 
     Parameters
     ----------
     population : pd.DataFrame, shape (n_units, n_columns)
-        The unit table, with ``animal``.
+        The unit table, with ``animal`` and the session's ``nwb_file_name`` and
+        ``epoch_name``.
     name : str
         A key of ``columns``.
     alpha : float
@@ -318,26 +325,44 @@ def called_fraction_by_animal(
 
     Returns
     -------
-    fractions : pd.DataFrame, shape (n_animals, 3)
-        Indexed by animal, in sorted order: ``n_called``, ``n_tested`` and
-        ``fraction`` as in :func:`called_fractions`, over the animal's units.
+    fractions : pd.DataFrame, shape (n_animals, 4)
+        Indexed by animal, in sorted order: ``n_called`` and ``n_tested``,
+        summed over the animal's units; ``n_sessions``, its sessions with a
+        tested unit; ``fraction``, the mean of those sessions' shares.
 
     Raises
     ------
-    ZeroDivisionError
+    ValueError
         If an animal has no unit tested for ``name``.
     """
-    rows = {}
-    for animal, frame in population.groupby("animal"):
-        n_called, n_tested = significant_fraction(
-            frame, alpha=alpha, columns={name: columns[name]}
-        )[name]
-        rows[animal] = {
-            "n_called": n_called,
-            "n_tested": n_tested,
-            "fraction": n_called / n_tested,
+    tested, called = tested_and_called(population[columns[name]], alpha)
+    units = pd.DataFrame(
+        {
+            "animal": population["animal"].to_numpy(),
+            "nwb_file_name": population["nwb_file_name"].to_numpy(),
+            "epoch_name": population["epoch_name"].to_numpy(),
+            "called": called,
+            "tested": tested,
         }
-    return pd.DataFrame.from_dict(rows, orient="index")
+    )
+    untested = sorted(set(units["animal"]) - set(units.loc[tested, "animal"]))
+    if untested:
+        raise ValueError(f"animals with no unit tested for {name}: {untested}")
+    sessions = (
+        units[tested]
+        .groupby(["animal", "nwb_file_name", "epoch_name"])[["called", "tested"]]
+        .sum()
+    )
+    sessions["fraction"] = sessions["called"] / sessions["tested"]
+    by_animal = sessions.groupby("animal")
+    return pd.DataFrame(
+        {
+            "n_called": by_animal["called"].sum().astype(int),
+            "n_tested": by_animal["tested"].sum().astype(int),
+            "n_sessions": by_animal.size(),
+            "fraction": by_animal["fraction"].mean(),
+        }
+    ).rename_axis(None)
 
 
 def bh_called_fraction(population: pd.DataFrame, name: str, alpha: float) -> float:
@@ -1132,8 +1157,9 @@ def swr_without_replay_called_by_animal(
     fractions : pd.DataFrame, shape (n_groups_with_animals, 1)
         Indexed by group of sessions (``subset``: ``"all"`` or
         ``"min_events"``) and ``animal``, for the animals with a tested unit in
-        the group: ``called_fraction``, the animal's called units as a share of
-        its tested units.
+        the group: ``called_fraction``, the mean over the animal's sessions of
+        each session's called units as a share of its tested units
+        (:func:`called_fraction_by_animal`).
     """
     subsets = _swr_without_replay_subsets(population, sessions, min_events)
     new_tested, _ = tested_and_called(population[SWR_WITHOUT_REPLAY_P_COLUMN], alpha)

@@ -190,7 +190,8 @@ def swr_without_replay_values(
                 own["called_fraction"],
                 "fraction",
                 "pct",
-                f"the same for {animal}'s tested units {where}",
+                f"the same for {animal}'s tested units {where}: the mean over "
+                "its sessions of each session's share",
             )
         add(
             f"swr_no_replay_overlap_tested_{subset}",

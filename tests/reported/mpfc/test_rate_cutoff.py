@@ -34,6 +34,7 @@ def _population() -> pd.DataFrame:
                 ],
                 n // 4,
             ),
+            "epoch_name": "02_r1",
             "non_local_SWR + non_local_no_SWR vs. non_local: heldout_delta_dev": (
                 rng.normal(size=n)
             ),

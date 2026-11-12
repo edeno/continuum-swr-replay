@@ -110,6 +110,7 @@ def population() -> pd.DataFrame:
             "nwb_file_name": np.where(
                 chimi, "chimi20200212_.nwb", "wilbur20210329_.nwb"
             ),
+            "epoch_name": "02_r1",
             "min_heldout_model": ["constant"] * 5
             + ["SWR"] * 4
             + ["non_local"] * 2

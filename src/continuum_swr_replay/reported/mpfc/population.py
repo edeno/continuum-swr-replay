@@ -428,7 +428,8 @@ def called_fraction_values(
                 "fraction",
                 "pct",
                 f"share of {animal}'s tested units at raw empirical p < {ALPHA:g} for "
-                "the engagement test",
+                "the engagement test: the mean over its sessions of each session's "
+                "share",
             )
         )
     values.append(

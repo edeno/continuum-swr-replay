@@ -173,22 +173,42 @@ def test_called_fractions_are_over_the_tested_units():
     assert fractions.loc["non_local", "n_called"] == 0
 
 
-def test_called_fraction_by_animal_uses_each_animals_own_tested_units():
-    population = _units(5, engagement=[0.01, NAN, 0.5, 0.01, 0.01]).assign(
-        animal=["a", "a", "b", "b", "b"]
+def _sessions(population: pd.DataFrame, animals: list, epochs: list) -> pd.DataFrame:
+    """``population`` with each unit's animal and session (a day per animal)."""
+    return population.assign(
+        animal=animals, nwb_file_name=[f"{a}_day" for a in animals], epoch_name=epochs
+    )
+
+
+def test_called_fraction_by_animal_averages_each_animals_sessions():
+    population = _sessions(
+        _units(5, engagement=[0.01, NAN, 0.5, 0.01, 0.01]),
+        ["a", "a", "b", "b", "b"],
+        ["02_r1", "02_r1", "02_r1", "02_r1", "04_r2"],
     )
     fractions = stats.called_fraction_by_animal(population, "engagement", ALPHA)
     assert list(fractions.index) == ["a", "b"]
-    # a: one tested unit, called; b: two of three
+    # a: one tested unit, called; b: one of two in its first session, one of
+    # one in its second: the mean of 1/2 and 1 is 3/4 (pooled, two of three)
     assert fractions.loc["a", "fraction"] == 1.0
     assert fractions.loc["a", "n_tested"] == 1
-    assert fractions.loc["b", "fraction"] == pytest.approx(2 / 3)
+    assert fractions.loc["b", "fraction"] == pytest.approx(3 / 4)
+    assert (fractions.loc["b", "n_called"], fractions.loc["b", "n_tested"]) == (2, 3)
+    assert fractions.loc["b", "n_sessions"] == 2
     # the other tests are read from their own columns: nothing is called for SWR
     assert (
         stats.called_fraction_by_animal(population, "SWR", ALPHA)["fraction"]
         .eq(0)
         .all()
     )
+
+
+def test_called_fraction_by_animal_refuses_an_animal_without_a_tested_unit():
+    population = _sessions(
+        _units(3, engagement=[0.01, NAN, NAN]), ["a", "b", "b"], ["02_r1"] * 3
+    )
+    with pytest.raises(ValueError, match=r"no unit tested for engagement: \['b'\]"):
+        stats.called_fraction_by_animal(population, "engagement", ALPHA)
 
 
 def test_bh_called_fraction_adjusts_the_tested_units_p_values():
