@@ -18,6 +18,7 @@ import pytest
 
 import scripts.detection.report_inventory_comparison as report
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
+from tests.analysis.inventory_comparison.test_inventory_pooling import rows, session
 
 # the runner's simulated run, built once for this module
 from tests.integration.test_run_inventory_comparison import (  # noqa: F401
@@ -32,35 +33,6 @@ from tests.integration.test_run_inventory_comparison import (  # noqa: F401
 )
 
 MEMORYLESS_INVENTORIES = {"memoryless", "memoryless_criteria"}
-DEFAULTS = {object: "", np.int64: 0, np.float64: 0.0, np.bool_: True, "Int64": pd.NA}
-
-
-def rows(name: str, records: list[dict]) -> pd.DataFrame:
-    """Table ``name`` as the runner types it; unnamed columns take a default."""
-    dtypes = inventory_run.TABLE_DTYPES[name]
-    return pd.DataFrame(
-        {
-            column: pd.Series(
-                [record.get(column, DEFAULTS[dtype]) for record in records],
-                dtype=dtype,
-            )
-            for column, dtype in dtypes.items()
-        }
-    )
-
-
-def session(epoch: str, **values) -> dict:
-    return {"animal": "sim", "day": 20200101, "epoch": epoch, **values}
-
-
-def observed(epochs_detectors: dict[tuple[str, str], bool]) -> pd.DataFrame:
-    return rows(
-        "observations",
-        [
-            session(epoch, detector=detector, available=available)
-            for (epoch, detector), available in epochs_detectors.items()
-        ],
-    )
 
 
 TWO_SESSIONS = [
@@ -112,31 +84,6 @@ class TestAnAnimalPoolsItsSessions:
         assert row.proportion_matched == pytest.approx(0.18)
         assert row.unavailable_sessions == "sim20200101_06_r3"
 
-    def test_a_detector_unavailable_in_a_session_leaves_its_counts(self):
-        counts = rows(
-            "counts",
-            [
-                session("02_r1", detector="kay", n_native=4, n_eligible=4),
-                session("04_r2", detector="kay", n_native=6, n_eligible=6),
-                session("06_r3", detector="kay", n_native=7, n_eligible=7),
-            ],
-        )
-        availability = report.detector_availability(
-            observed(
-                {
-                    ("02_r1", "kay"): True,
-                    ("04_r2", "kay"): True,
-                    ("06_r3", "kay"): False,
-                }
-            )
-        )
-
-        row = report.counts_by_animal(
-            report.counts_by_session(counts, availability)
-        ).iloc[0]
-        assert (row.n_sessions, row.n_native, row.n_eligible) == (2, 10, 10)
-        assert row.unavailable_sessions == "sim20200101_06_r3"
-
     def test_the_swr_matrix_fraction_is_over_the_summed_eligible(self):
         matrix = rows(
             "swr_matrix",
@@ -162,48 +109,6 @@ class TestAnAnimalPoolsItsSessions:
         assert (row.n_eligible, row.n_non_swr) == (20, 13)
         assert row.non_swr_fraction == pytest.approx(13 / 20)
         assert row.unavailable_sessions == "sim20200101_06_r3"
-
-
-class TestUnknownMembership:
-    CELLS = rows(
-        "cells",
-        [
-            session(
-                "02_r1",
-                cell="swr_matched_by_no_decoder",
-                detector="kay",
-                event_key=f"kay:{number}",
-                membership=membership,
-            )
-            for number, membership in enumerate(
-                ["matched", "unmatched", "unknown", "unknown"]
-            )
-        ],
-    )
-    SOURCES = {"swr_matched_by_no_decoder": ["kay"]}
-
-    def test_never_enters_an_unmatched_count(self):
-        availability = report.detector_availability(observed({("02_r1", "kay"): True}))
-
-        by_session = report.cells_by_session(self.CELLS, availability, self.SOURCES)
-        by_animal = report.cells_by_animal(by_session)
-
-        for table in (by_session, by_animal):
-            row = table.iloc[0]
-            assert (row.n_matched, row.n_unmatched, row.n_unknown) == (1, 1, 2)
-            assert row.n_events == 4
-
-    def test_a_session_without_its_source_detector_is_listed(self):
-        availability = report.detector_availability(
-            observed({("02_r1", "kay"): True, ("04_r2", "kay"): False})
-        )
-
-        by_session = report.cells_by_session(self.CELLS, availability, self.SOURCES)
-        row = report.cells_by_animal(by_session).iloc[0]
-
-        assert len(by_session) == 2
-        assert (row.n_sessions, row.n_unmatched, row.n_unknown) == (1, 1, 2)
-        assert row.unavailable_sessions == "sim20200101_04_r2"
 
 
 class TestTheLabelTablesPoolOnTheMatrixPopulation:
@@ -283,16 +188,6 @@ class TestTheLabelTablesPoolOnTheMatrixPopulation:
             2,
             0,
         )
-
-
-def test_a_detector_with_no_observation_row_is_refused():
-    counts = rows("counts", [session("02_r1", detector="kay")])
-    availability = report.detector_availability(observed({("02_r1", "yu"): True}))
-
-    with pytest.raises(
-        ValueError, match="No observation row for kay in sim20200101_02_r1"
-    ):
-        report.counts_by_session(counts, availability)
 
 
 def test_a_run_with_no_ok_epoch_gives_empty_tables(tmp_path, monkeypatch):

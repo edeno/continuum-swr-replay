@@ -66,6 +66,12 @@ from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
 from continuum_swr_replay.analysis.inventory_comparison.feature_run import (  # noqa: E402
     read_inputs,
 )
+from continuum_swr_replay.analysis.inventory_comparison.pooling import (  # noqa: E402
+    MEMBERSHIPS,
+    pool_sessions,
+    ratio,
+    summed,
+)
 from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
     ALL,
     NO_SHARED_EXPOSURE,
@@ -107,7 +113,6 @@ from continuum_swr_replay.visualization.inventory_examples import (  # noqa: E40
     detector_color,
 )
 from scripts.detection._report import (  # noqa: E402
-    MEMBERSHIPS,
     PENDING,
     PENDING_DETECTORS,
     PENDING_SENTENCE,
@@ -115,10 +120,7 @@ from scripts.detection._report import (  # noqa: E402
     QUANTILES,
     caption_with_pending,
     per_session,
-    pool_sessions,
-    ratio,
     read_run,
-    summed,
     with_pending,
 )
 

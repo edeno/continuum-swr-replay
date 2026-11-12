@@ -31,4 +31,6 @@ with per-detector denominators.
   grid and table layout, which the runner and every reader of its runs share.
 - ``feature_run``: the event features run's tables, and the comparison's and
   memoryless run's tables its readers read beside it.
+- ``pooling``: sessions pooled within an animal, the rule of every per-animal
+  table of the comparison's reports, and the counts and cells tables built by it.
 """

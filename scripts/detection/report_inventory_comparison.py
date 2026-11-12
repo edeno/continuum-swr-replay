@@ -14,7 +14,9 @@ Every table comes per session (one analysed epoch, nested in its animal) and
 per animal. An animal pools its sessions by summing counts and seconds and
 takes proportions from those sums (``n_matched`` over ``n_eligible``), never
 by averaging the sessions' proportions. A session where the comparison was
-unavailable is not summed; it is listed in ``unavailable_sessions``. An
+unavailable is not summed; it is listed in ``unavailable_sessions``. The
+pooling, and the counts and cells tables the events summary reads, are
+``analysis.inventory_comparison.pooling``'s. An
 ``unknown`` membership or label is counted apart, never as ``unmatched`` or
 ``non-SWR``. Durations, overlap lengths, IoU and component sizes are given as
 distributions of the events or pairs pooled within the animal.
@@ -29,7 +31,7 @@ Usage:
 
 import argparse
 import sys
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from itertools import combinations
 from pathlib import Path
 from types import MappingProxyType
@@ -50,6 +52,17 @@ import matplotlib.ticker  # noqa: E402
 from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
     inventory_run,
 )
+from continuum_swr_replay.analysis.inventory_comparison.pooling import (  # noqa: E402
+    cells_by_animal,
+    cells_by_session,
+    counts_by_animal,
+    counts_by_session,
+    detector_availability,
+    pool_sessions,
+    ratio,
+    session_names,
+    summed,
+)
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
@@ -60,7 +73,6 @@ from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from scripts.detection._report import (  # noqa: E402
-    MEMBERSHIPS,
     PENDING,
     PENDING_DETECTORS,
     PENDING_SENTENCE,
@@ -68,11 +80,7 @@ from scripts.detection._report import (  # noqa: E402
     QUANTILES,
     caption_with_pending,
     per_session,
-    pool_sessions,
-    ratio,
     read_run,
-    session_names,
-    summed,
     with_pending,
 )
 
@@ -347,28 +355,6 @@ def epoch_status(manifest: Mapping) -> pd.DataFrame:
     )
 
 
-def detector_availability(observations: pd.DataFrame) -> pd.DataFrame:
-    """Per session and detector, whether it observed any of the epoch.
-
-    Returns
-    -------
-    DataFrame
-        ``animal``, ``day``, ``epoch``, ``detector``, ``available``, and
-        ``reason``: the observation table's reasons where nothing was
-        observed, else empty.
-    """
-    keys = [*SESSION, "detector"]
-    available = observations.groupby(keys).available.any().rename("available")
-    reasons = (
-        observations[~observations.available]
-        .groupby(keys)
-        .reason.agg(lambda reason: "; ".join(sorted(set(reason))))
-    )
-    out = pd.concat([available, reasons.reindex(available.index)], axis=1)
-    out["reason"] = out.reason.where(~out.available, "").fillna("")
-    return out.reset_index()
-
-
 def _distribution(
     frame: pd.DataFrame, keys: Sequence[str], columns: Sequence[str], count: str
 ) -> pd.DataFrame:
@@ -382,58 +368,6 @@ def _distribution(
     if frame.empty:
         return pd.DataFrame(columns=[*keys, *named])
     return frame.groupby(list(keys)).agg(**named).reset_index()
-
-
-def counts_by_session(counts: pd.DataFrame, availability: pd.DataFrame) -> pd.DataFrame:
-    """The runner's counts with each detector's session availability.
-
-    Raises
-    ------
-    ValueError
-        A detector has counts in a session but no observation row there.
-    """
-    merged = counts.merge(
-        availability[[*SESSION, "detector", "available"]],
-        on=[*SESSION, "detector"],
-        how="left",
-        validate="one_to_one",
-    )
-    unobserved = merged.available.isna()
-    if unobserved.any():
-        missing = merged[unobserved]
-        raise ValueError(
-            "No observation row for "
-            + ", ".join(
-                f"{detector} in {session}"
-                for detector, session in zip(
-                    missing.detector, session_names(missing), strict=True
-                )
-            )
-            + "; its availability is unknown."
-        )
-    return merged.astype({"available": np.bool_})
-
-
-COUNT_SUMS = (
-    "n_native",
-    "n_eligible",
-    "n_moving",
-    "n_set_aside",
-    "exposure_s",
-    "n_in_exposure",
-)
-
-
-def counts_by_animal(by_session: pd.DataFrame) -> pd.DataFrame:
-    """Each detector's counts summed over each animal's available sessions."""
-    pooled = pool_sessions(
-        by_session, by=["detector"], sums=COUNT_SUMS, available=by_session.available
-    )
-    notes = by_session.groupby("detector").native_note.first()
-    return pooled.assign(
-        rate_per_s=ratio(pooled.n_in_exposure, pooled.exposure_s),
-        native_note=pooled.detector.map(notes).fillna(""),
-    )
 
 
 DIRECTIONAL_SUMS = (
@@ -573,64 +507,6 @@ def match_strength_by_animal(by_session: pd.DataFrame) -> pd.DataFrame:
         available=by_session.available,
     )
     return _with_proportions(pooled)
-
-
-def cells_by_session(
-    cells: pd.DataFrame,
-    availability: pd.DataFrame,
-    sources: Mapping[str, Collection[str]],
-) -> pd.DataFrame:
-    """Each cell's memberships counted per session and source detector.
-
-    One row per session, cell and source detector, zeros where the detector
-    found no events. ``n_unknown`` is counted apart from ``n_unmatched``.
-
-    Raises
-    ------
-    ValueError
-        A membership is not one of :data:`MEMBERSHIPS`, or a cell's events
-        are of a session or detector the observations do not name.
-    """
-    strange = set(cells.membership) - set(MEMBERSHIPS)
-    if strange:
-        raise ValueError(f"Memberships {sorted(strange)} are not {MEMBERSHIPS}.")
-    keys = [*SESSION, "cell", "detector"]
-    skeleton = availability[[*SESSION, "detector", "available"]].merge(
-        pd.DataFrame(
-            [(cell, d) for cell, detectors in sources.items() for d in detectors],
-            columns=["cell", "detector"],
-        ),
-        on="detector",
-    )
-    counted = (
-        cells.assign(
-            **{f"n_{m}": cells.membership == m for m in MEMBERSHIPS},
-        )
-        .groupby(keys)
-        .agg(
-            n_events=("event_key", "size"),
-            **{f"n_{m}": (f"n_{m}", "sum") for m in MEMBERSHIPS},
-        )
-        .reset_index()
-    )
-    out = skeleton.merge(counted, on=keys, how="outer", indicator=True)
-    if (out._merge == "right_only").any():
-        raise ValueError("Cell events of a session or detector no observation names.")
-    counts = ["n_events", *(f"n_{m}" for m in MEMBERSHIPS)]
-    out[counts] = out[counts].fillna(0).astype(np.int64)
-    return out.drop(columns="_merge")[[*keys, "available", *counts]].sort_values(
-        keys, ignore_index=True
-    )
-
-
-def cells_by_animal(by_session: pd.DataFrame) -> pd.DataFrame:
-    """Each cell's counts summed over the sessions its source detector observed."""
-    return pool_sessions(
-        by_session,
-        by=["cell", "detector"],
-        sums=["n_events", *(f"n_{m}" for m in MEMBERSHIPS)],
-        available=by_session.available,
-    )
 
 
 def swr_matrix_by_animal(matrix: pd.DataFrame) -> pd.DataFrame:

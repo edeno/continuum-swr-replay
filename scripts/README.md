@@ -37,7 +37,8 @@ them importable.
 - `_report.py` — not a script: what the two detection-comparison reports share (the
   pending marking of the memoryless inventories, caption and quantile wording,
   `read_run`, which reads a run's `ok` epochs through `runs.io.read_manifest` and
-  `ok_table_paths`, pooling sessions within an animal), imported as `scripts.detection._report`.
+  `ok_table_paths`), imported as `scripts.detection._report`. Both reports pool sessions
+  within an animal through `analysis/inventory_comparison/pooling.py`.
 - `run_artifact_detection.py` — the artifact mask: LFP and spike artifacts in every
   epoch's CA1 data, on CPU (S blocks, reference and CA1 steps, synchronous spike
   lines; `docs/design/2026-10-09-artifact-detection.md`).
