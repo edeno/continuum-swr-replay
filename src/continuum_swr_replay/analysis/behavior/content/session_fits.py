@@ -5,6 +5,8 @@ at which grain, and what a session's row carries are decided here once, so a
 runner and any check of its fits produce the same rows:
 
 - :func:`fit_model_per_session` fits one rung of the content ladder;
+- :func:`fit_conditional_logit_robustness` refits the content ladder's rungs as
+  a conditional logit on each event's dominant candidate;
 - :func:`fit_contrast_ladder` fits the is_swr-contrast ladder, per rung and
   population, and books each one's cohort audit.
 """
@@ -22,11 +24,13 @@ from .._fit_diagnostics import fit_flag_counts
 from ..cohort_audit import cohort_record, drop_profile, estimator_skip_note
 from ..contrast_aggregation import LOG_EVENT_LENGTH, prepare_session
 from ..fitting import (
+    conditional_logit_or_reason,
     fit_conditional_logit,
     fit_conditional_poisson,
     fit_null_model_conditional_logit,
 )
-from ..tables.table_contracts import CV_RESULT_COLUMNS
+from ..model_specs import rung_predictors
+from ..tables.table_contracts import CV_RESULT_COLUMNS, validate_and_match_fit_results
 from .cohort import CONTRAST_POPULATIONS, contrast_fit_cohort
 from .dirichlet_multinomial import (
     DEFAULT_MIN_EVENTS_SESSION_PHI,
@@ -255,6 +259,139 @@ def fit_model_per_session(
         return pd.DataFrame()
 
     return pd.DataFrame(results)
+
+
+#: One row per (rung, session) the conditional-logit robustness fit refused.
+LOGIT_SKIP_COLUMNS = ("model", *SESSION_COLUMNS, "reason")
+
+
+def fit_conditional_logit_robustness(
+    long_df: pd.DataFrame,
+    primary_fits: pd.DataFrame,
+    hierarchy: dict,
+    model_names: list[str],
+    *,
+    leaf_only: bool,
+    response_col: str,
+    event_col: str,
+    response_renormalized: bool = False,
+) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
+    """Refit the content ladder's rungs as a conditional logit on the dominant arm.
+
+    Each rung with predictors is fit per session, on the primary ladder's
+    sessions only. A session whose fit fails with an expected fit error
+    (:func:`~continuum_swr_replay.analysis.behavior.fitting.conditional_logit_or_reason`)
+    is skipped and recorded with its reason; matching then keeps every logit
+    rung on the sessions all of them fitted, which must be a subset of the
+    primary ladder's. An unexpected error propagates.
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        The content ladder's fitting cohort.
+    primary_fits : pd.DataFrame
+        One rung's matched primary fits: every rung of the ladder has the same
+        sessions.
+    hierarchy : dict
+        Rung name -> ``ModelSpec``.
+    model_names : list of str
+        The ladder's rungs, in order.
+    leaf_only : bool
+        Whether the ladder is fit over the six leaf arms.
+    response_col, event_col : str
+        The response and the event key.
+    response_renormalized : bool, optional
+        Whether the response was rescaled to the leaf arms; recorded on each row.
+
+    Returns
+    -------
+    logit_outputs : dict of str to pd.DataFrame
+        Matched per-rung logit fits.
+    logit_skips : pd.DataFrame
+        One row per rung and session the logit fitter refused, with columns
+        :data:`LOGIT_SKIP_COLUMNS`. Empty when nothing was skipped.
+
+    Raises
+    ------
+    RuntimeError
+        If a matched logit rung holds a session outside the primary ladder's.
+    """
+    shared_sessions = set(
+        primary_fits[list(SESSION_COLUMNS)].itertuples(index=False, name=None)
+    )
+    long_session_index = pd.MultiIndex.from_frame(long_df[list(SESSION_COLUMNS)])
+    matched_long_df = long_df.loc[long_session_index.isin(shared_sessions)]
+    logit_outputs: dict[str, pd.DataFrame] = {}
+    logit_skips: list[dict] = []
+    logger.info("Fitting conditional logit robustness checks...")
+    expected_logit_models = tuple(
+        model_name for model_name in model_names if hierarchy[model_name].predictors
+    )
+    for model_name in expected_logit_models:
+        predictors = rung_predictors(hierarchy[model_name], leaf_only)
+
+        model_logit_results = []
+        for keys, group in matched_long_df.groupby(list(SESSION_COLUMNS)):
+            # The resolved response column is forwarded: patch fits use
+            # ``patch_count_hard``, which the fitter's default is not.
+            r, reason = conditional_logit_or_reason(
+                group,
+                predictors=predictors,
+                event_col=event_col,
+                response_col=response_col,
+            )
+            if r is None:
+                logger.warning(
+                    "%s logit: no fit for session %s (%s)",
+                    model_name,
+                    "/".join(map(str, keys)),
+                    reason,
+                )
+                logit_skips.append(
+                    {
+                        "model": model_name,
+                        **dict(zip(SESSION_COLUMNS, keys, strict=True)),
+                        "reason": reason,
+                    }
+                )
+                continue
+            r["model"] = model_name
+            r["response_col"] = response_col
+            r["response_renormalized"] = response_renormalized
+            for col, val in zip(SESSION_COLUMNS, keys, strict=True):
+                r[col] = val
+            model_logit_results.append(r)
+
+        logit_outputs[model_name] = pd.DataFrame(model_logit_results)
+
+    if expected_logit_models:
+        # Matching keeps only the sessions every logit rung fitted, so a
+        # session skipped at one rung leaves them all and the rungs stay
+        # comparable like for like.
+        logit_outputs = validate_and_match_fit_results(
+            logit_outputs,
+            requested_model_names=expected_logit_models,
+            cohort=matched_long_df,
+            event_col=event_col,
+        )
+        for model_name, logit_df in logit_outputs.items():
+            logit_sessions = set(
+                logit_df[list(SESSION_COLUMNS)].itertuples(index=False, name=None)
+            )
+            if not logit_sessions <= shared_sessions:
+                raise RuntimeError(
+                    "Requested conditional-logit robustness fits include "
+                    f"sessions outside the primary cohort for {model_name}; "
+                    "no output will be published"
+                )
+            logger.info(
+                "  %s logit: %d of %d primary sessions staged",
+                model_name,
+                len(logit_df),
+                len(shared_sessions),
+            )
+
+    return logit_outputs, pd.DataFrame(logit_skips, columns=LOGIT_SKIP_COLUMNS)
 
 
 def resolve_concentration_cols(

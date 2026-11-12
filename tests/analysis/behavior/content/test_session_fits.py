@@ -12,18 +12,25 @@ from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import
     concentration_cols_for_cohort,
 )
 from continuum_swr_replay.analysis.behavior.content.session_fits import (
+    LOGIT_SKIP_COLUMNS,
+    fit_conditional_logit_robustness,
     fit_contrast_ladder,
     fit_contrast_session,
     fit_model_per_session,
     resolve_concentration_cols,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import leaf_only_cohort
+from continuum_swr_replay.analysis.behavior.model_specs import (
+    ModelSpec,
+    leaf_only_cohort,
+)
 from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
     CV_RESULT_COLUMNS,
 )
 from tests.support._content_tables import (
     dm_contrast_session,
     dm_session,
+    fail_logit_for,
+    logit_session,
     simulated_session,
     with_event_length,
 )
@@ -189,6 +196,84 @@ def test_dm_session_with_a_refused_design_is_an_audited_skip() -> None:
     skips = result.attrs["estimator_skips"]
     assert [skip["session"] for skip in skips] == ["chimi/20200212/04_r2"]
     assert skips[0]["reason"].startswith("dm_design:")
+
+
+# ── The conditional-logit robustness fits ──
+
+_LOGIT_LADDER = {
+    "N": ModelSpec("N", (), "uniform null", None),
+    "X": ModelSpec("X", ("is_current_arm",), "current", "N"),
+    "Y": ModelSpec("Y", ("is_current_arm", "is_prev_arm"), "current + prev", "X"),
+}
+
+
+def _logit_cohort() -> pd.DataFrame:
+    return pd.concat(
+        [logit_session("02_r1", seed=0), logit_session("04_r2", seed=1)],
+        ignore_index=True,
+    )
+
+
+def _robustness(cohort: pd.DataFrame, primary_epochs=("02_r1", "04_r2")):
+    primary = cohort[["animal", "session_date", "epoch"]].drop_duplicates()
+    return fit_conditional_logit_robustness(
+        cohort,
+        primary[primary["epoch"].isin(primary_epochs)],
+        _LOGIT_LADDER,
+        ["N", "X", "Y"],
+        leaf_only=False,
+        response_col="arm_fraction",
+        event_col="event_id",
+        response_renormalized=True,
+    )
+
+
+def test_the_logit_fits_cover_the_primary_sessions_of_every_rung_with_predictors():
+    """The null rung has nothing to fit; a session outside the primary ladder's
+    is not fit at all; each row records what it was fit on."""
+    logit, skips = _robustness(_logit_cohort(), primary_epochs=("02_r1",))
+
+    assert set(logit) == {"X", "Y"}
+    for model, frame in logit.items():
+        assert frame["epoch"].tolist() == ["02_r1"]
+        assert frame["model"].tolist() == [model]
+        assert frame["response_col"].tolist() == ["arm_fraction"]
+        assert frame["response_renormalized"].tolist() == [True]
+    assert skips.empty
+    assert tuple(skips.columns) == LOGIT_SKIP_COLUMNS
+
+
+def test_a_session_the_logit_fit_refuses_is_skipped_and_recorded(monkeypatch):
+    fail_logit_for(
+        monkeypatch,
+        "04_r2",
+        2,
+        ValueError("need covariance of parameters for computing"),
+    )
+
+    logit, skips = _robustness(_logit_cohort())
+
+    assert skips.to_dict("records") == [
+        {
+            "model": "Y",
+            "animal": "chimi",
+            "session_date": "20200212",
+            "epoch": "04_r2",
+            "reason": "ValueError: need covariance of parameters for computing",
+        }
+    ]
+    # X fitted 04_r2, but the session leaves every logit rung so the rungs
+    # stay on one common set -- a subset of the primary ladder's sessions.
+    assert set(logit) == {"X", "Y"}
+    for frame in logit.values():
+        assert frame["epoch"].tolist() == ["02_r1"]
+
+
+def test_an_unexpected_logit_error_still_propagates(monkeypatch):
+    fail_logit_for(monkeypatch, "04_r2", 2, KeyError("a coding bug"))
+
+    with pytest.raises(KeyError, match="a coding bug"):
+        _robustness(_logit_cohort())
 
 
 # ── The is_swr-contrast ladder ──

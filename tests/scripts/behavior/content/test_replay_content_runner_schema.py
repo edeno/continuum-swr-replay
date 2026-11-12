@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.behavior.content import session_fits
 from continuum_swr_replay.analysis.behavior.fit_provenance import check_fit_provenance
 from continuum_swr_replay.analysis.events.swr_source import SwrSourceError
 from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
@@ -528,7 +529,7 @@ def test_a_logit_rung_with_no_fitted_session_aborts_without_publishing(
         ),
     )
     monkeypatch.setattr(
-        runner,
+        session_fits,
         "conditional_logit_or_reason",
         lambda *args, **kwargs: (None, "refused"),
     )
@@ -553,7 +554,7 @@ def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypat
         ),
     )
     monkeypatch.setattr(
-        runner,
+        session_fits,
         "conditional_logit_or_reason",
         lambda group, **kwargs: (
             {

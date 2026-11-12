@@ -212,6 +212,35 @@ def dm_session(
     return df
 
 
+def logit_session(epoch: str, seed: int) -> pd.DataFrame:
+    """One session of 60 events with a current-arm and a previous-arm effect."""
+    df = simulate_with_event_covariates(
+        {"is_current_arm": 0.7, "is_prev_arm": -0.3}, n_events=60, L_e=20, seed=seed
+    )
+    df["arm_fraction"] = df["arm_count_hard"] / df.groupby("event_id")[
+        "arm_count_hard"
+    ].transform("sum")
+    df["event_id"] = epoch + "_" + df["event_id"].astype(str)
+    df["animal"] = "chimi"
+    df["session_date"] = "20200212"
+    df["epoch"] = epoch
+    return df
+
+
+def fail_logit_for(monkeypatch, epoch: str, n_predictors: int, error: Exception):
+    """Make ConditionalLogit raise ``error`` for one session at one rung."""
+    from continuum_swr_replay.analysis.behavior import fitting
+
+    real = fitting.ConditionalLogit
+
+    def picky(y, X, groups):
+        if X.shape[1] == n_predictors and str(groups[0]).startswith(epoch):
+            raise error
+        return real(y, X, groups=groups)
+
+    monkeypatch.setattr(fitting, "ConditionalLogit", picky)
+
+
 def dm_contrast_session(n_events: int = 60, *, epoch: str, seed: int) -> pd.DataFrame:
     """One session of nine-arm counts drawn at a known within-event concentration.
 

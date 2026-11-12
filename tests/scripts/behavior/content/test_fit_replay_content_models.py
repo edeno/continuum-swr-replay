@@ -22,8 +22,8 @@ from continuum_swr_replay.analysis.behavior.content import fit_outputs
 from continuum_swr_replay.analysis.behavior.content.cohort import (
     zero_response_event_ids,
 )
-from continuum_swr_replay.analysis.behavior.content.simulation import (
-    simulate_with_event_covariates,
+from continuum_swr_replay.analysis.behavior.content.session_fits import (
+    LOGIT_SKIP_COLUMNS,
 )
 from continuum_swr_replay.analysis.behavior.fit_provenance import (
     check_fit_provenance,
@@ -39,6 +39,8 @@ from scripts.behavior.content import fit_replay_content_models as mod
 from tests.support._content_tables import (
     canonical_arm_table,
     dm_session,
+    fail_logit_for,
+    logit_session,
     simulated_session,
 )
 
@@ -779,20 +781,6 @@ def test_a_refused_dm_session_is_named_in_the_published_cohort_audit(tmp_path) -
 # ── Conditional-logit robustness: a refused session is skipped, not fatal ──
 
 
-def _logit_session(epoch: str, seed: int) -> pd.DataFrame:
-    df = simulate_with_event_covariates(
-        {"is_current_arm": 0.7, "is_prev_arm": -0.3}, n_events=60, L_e=20, seed=seed
-    )
-    df["arm_fraction"] = df["arm_count_hard"] / df.groupby("event_id")[
-        "arm_count_hard"
-    ].transform("sum")
-    df["event_id"] = epoch + "_" + df["event_id"].astype(str)
-    df["animal"] = "chimi"
-    df["session_date"] = "20200212"
-    df["epoch"] = epoch
-    return df
-
-
 _LOGIT_LADDER = {
     "X": ModelSpec("X", ("is_current_arm",), "current", None),
     "Y": ModelSpec("Y", ("is_current_arm", "is_prev_arm"), "current + prev", "X"),
@@ -801,7 +789,7 @@ _LOGIT_LADDER = {
 
 def _logit_fixture(tmp_path):
     cohort_df = pd.concat(
-        [_logit_session("02_r1", seed=0), _logit_session("04_r2", seed=1)],
+        [logit_session("02_r1", seed=0), logit_session("04_r2", seed=1)],
         ignore_index=True,
     )
     args = _args(logit=True)
@@ -826,66 +814,10 @@ def _logit_fixture(tmp_path):
     return args, config, cohort
 
 
-def _fail_logit_for(monkeypatch, epoch: str, n_predictors: int, error: Exception):
-    """Make ConditionalLogit raise ``error`` for one session at one rung."""
-    from continuum_swr_replay.analysis.behavior import fitting
-
-    real = fitting.ConditionalLogit
-
-    def picky(y, X, groups):
-        if X.shape[1] == n_predictors and str(groups[0]).startswith(epoch):
-            raise error
-        return real(y, X, groups=groups)
-
-    monkeypatch.setattr(fitting, "ConditionalLogit", picky)
-
-
-def test_a_session_the_logit_fit_refuses_is_skipped_and_recorded(
-    tmp_path, monkeypatch
-) -> None:
-    args, config, cohort = _logit_fixture(tmp_path)
-    model_results, _ = mod._fit_content_ladder(args, config, cohort)
-    _fail_logit_for(
-        monkeypatch,
-        "04_r2",
-        2,
-        ValueError("need covariance of parameters for computing"),
-    )
-
-    logit, skips = mod._fit_conditional_logit_robustness(
-        args, config, cohort, model_results
-    )
-
-    assert skips.to_dict("records") == [
-        {
-            "model": "Y",
-            "animal": "chimi",
-            "session_date": "20200212",
-            "epoch": "04_r2",
-            "reason": "ValueError: need covariance of parameters for computing",
-        }
-    ]
-    # X fitted 04_r2, but the session leaves every logit rung so the rungs
-    # stay on one common set -- a subset of the primary ladder's sessions.
-    assert set(logit) == {"X", "Y"}
-    for frame in logit.values():
-        assert frame["epoch"].tolist() == ["02_r1"]
-    assert set(model_results["X"]["epoch"]) == {"02_r1", "04_r2"}
-
-
-def test_an_unexpected_logit_error_still_propagates(tmp_path, monkeypatch) -> None:
-    args, config, cohort = _logit_fixture(tmp_path)
-    model_results, _ = mod._fit_content_ladder(args, config, cohort)
-    _fail_logit_for(monkeypatch, "04_r2", 2, KeyError("a coding bug"))
-
-    with pytest.raises(KeyError, match="a coding bug"):
-        mod._fit_conditional_logit_robustness(args, config, cohort, model_results)
-
-
 def test_logit_skips_are_published_beside_the_logit_fits(tmp_path, monkeypatch) -> None:
     args, config, cohort = _logit_fixture(tmp_path)
     model_results, skips = mod._fit_content_ladder(args, config, cohort)
-    _fail_logit_for(monkeypatch, "04_r2", 2, np.linalg.LinAlgError("singular"))
+    fail_logit_for(monkeypatch, "04_r2", 2, np.linalg.LinAlgError("singular"))
 
     mod._audit_compare_and_publish(
         args, config, cohort, model_results, skips, cli=["fit.py"]
@@ -917,4 +849,4 @@ def test_a_logit_run_with_no_skips_publishes_an_empty_record(tmp_path) -> None:
 
     published = pd.read_csv(config.output_dir / "logit" / "logit_skipped_sessions.csv")
     assert published.empty
-    assert tuple(published.columns) == mod.LOGIT_SKIP_COLUMNS
+    assert tuple(published.columns) == LOGIT_SKIP_COLUMNS
