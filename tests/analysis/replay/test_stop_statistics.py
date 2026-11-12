@@ -77,6 +77,49 @@ def test_still_immobile_is_measured_from_the_start_of_the_stop():
     assert stats.still_immobile_fraction(stops, 4) == 0.25
 
 
+def test_the_onset_rate_clock_is_the_stops_span_less_excluded_time():
+    """The exposure of a stop in each bin is its span there less the excluded
+    seconds in it, not its first ``immobility_duration_s`` seconds."""
+    # Session a: [10, 12] holds excluded time [10.5, 11.0]; [20, 21] holds none.
+    # Session b: [5, 6] lies under a's excluded clock times but has none itself.
+    stops = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b"],
+            "session_date": 1,
+            "epoch": "02_r1",
+            "stop_start": [10.0, 20.0, 5.0],
+            "stop_end": [12.0, 21.0, 5.5],
+            "immobility_duration_s": [1.5, 1.0, 0.5],
+        }
+    )
+    excluded = pd.DataFrame(
+        {
+            "animal": ["a"],
+            "session_date": [1],
+            "epoch": ["02_r1"],
+            "start_time": [10.5],
+            "end_time": [11.0],
+        }
+    )
+    # onsets 0.2 s and 1.6 s in; one before its stop began and one past the
+    # window are left out
+    onsets = pd.DataFrame({"t_since_stop_onset": [0.2, 1.6, -0.1, 2.0, 0.3]})
+
+    course = stats.onset_rate_time_course(stops, onsets, 2.0, 0.5, excluded)
+
+    np.testing.assert_allclose(course.index, [0.25, 0.75, 1.25, 1.75])
+    assert course.index.name == "time_s"
+    assert course["n_onsets"].tolist() == [2, 0, 0, 1]
+    # [0, .5): all three stops; [.5, 1): stop 1 is excluded, stop 2 is not,
+    # stop 3 has ended; [1, 1.5) and [1.5, 2): stop 1 alone
+    np.testing.assert_allclose(course["exposure_s"], [1.5, 0.5, 0.5, 0.5])
+    np.testing.assert_allclose(course["rate"], [2 / 1.5, 0.0, 0.0, 2.0])
+    # past every stop's end there is no exposure, and no rate
+    longer = stats.onset_rate_time_course(stops, onsets, 3.0, 0.5, excluded)
+    assert longer["exposure_s"].iloc[-1] == 0.0
+    assert np.isnan(longer["rate"].iloc[-1])
+
+
 def _boundary_stops() -> pd.DataFrame:
     """Ten stops in two sessions, rows out of time order.
 

@@ -12,6 +12,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.events.analysed_time import (
+    excluded_intervals_by_session,
+)
 from continuum_swr_replay.analysis.events.cohort_selection import select_stop_cohort
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
@@ -23,6 +26,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     aggregate_to_timebins,
     arrival_spanning_stop_ids,
 )
+from continuum_swr_replay.intervals import covered_seconds
 
 
 def stop_cohort_counts(stops: pd.DataFrame) -> dict[str, int]:
@@ -120,6 +124,80 @@ def still_immobile_fraction(stops: pd.DataFrame, at_s: float) -> float:
         stop_start``, is at least ``at_s`` seconds.
     """
     return float((stops["stop_end"] - stops["stop_start"] >= at_s).mean())
+
+
+def onset_rate_time_course(
+    stops: pd.DataFrame,
+    onsets: pd.DataFrame,
+    window_s: float,
+    bin_s: float,
+    excluded_intervals: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """The rate at which events begin at each time since their stop began.
+
+    The count of onsets in each bin of time since the stop began, over the
+    seconds of immobility the stops hold in that bin. The clock is the stop's
+    own, ``stop_end - stop_start``: a stop covers the bin ``[e, e + bin_s)``
+    from ``stop_start + e`` to its end, less the excluded seconds there. Its
+    ``immobility_duration_s`` is already net of excluded time, so it is not a
+    length on this clock. Fewer, longer stops reach the later bins, which the
+    exposure accounts for; :func:`still_immobile_fraction` says how many.
+
+    Parameters
+    ----------
+    stops : pd.DataFrame
+        Stops with the session columns, ``stop_start`` and ``stop_end``, in
+        seconds.
+    onsets : pd.DataFrame
+        The onsets of one population in those stops, with
+        ``t_since_stop_onset`` (seconds); one outside ``[0, window_s)`` is
+        left out.
+    window_s : float
+        The time since the stop began that the bins span, in seconds.
+    bin_s : float
+        The bin width, in seconds.
+    excluded_intervals : pd.DataFrame, optional
+        Each session's excluded time: the session columns, ``start_time`` and
+        ``end_time``, in seconds. None (the default) reads it from the SWR
+        source
+        (:func:`~continuum_swr_replay.analysis.events.analysed_time.excluded_intervals_by_session`).
+
+    Returns
+    -------
+    time_course : pd.DataFrame, shape (n_bins, 3)
+        One row per bin, indexed by ``time_s``, the bin's centre: ``n_onsets``;
+        ``exposure_s``, the seconds of immobility in the bin over all the
+        stops; and ``rate``, their ratio in events per second (NaN where no
+        stop is immobile).
+    """
+    if excluded_intervals is None:
+        excluded_intervals = excluded_intervals_by_session(stops)
+    t = onsets["t_since_stop_onset"].to_numpy()
+    t = t[(t >= 0) & (t < window_s)]
+    edges = np.arange(0, window_s + bin_s, bin_s)
+    n_onsets, _ = np.histogram(t, edges)
+    keys = ["animal", "session_date", "epoch"]
+    exposure = np.zeros(len(edges) - 1)
+    for session, stops_g in stops.groupby(keys, sort=False):
+        session_excluded = excluded_intervals.loc[
+            (excluded_intervals[keys] == pd.Series(session, index=keys)).all(axis=1)
+        ]
+        start = stops_g["stop_start"].to_numpy(dtype=float)
+        span = stops_g["stop_end"].to_numpy(dtype=float) - start
+        for k, (low, high) in enumerate(zip(edges[:-1], edges[1:], strict=True)):
+            lo, hi = start + low, start + np.minimum(span, high)
+            inside = hi > lo
+            exposure[k] += (hi - lo)[inside].sum() - covered_seconds(
+                lo[inside], hi[inside], session_excluded
+            ).sum()
+    return pd.DataFrame(
+        {
+            "n_onsets": n_onsets,
+            "exposure_s": exposure,
+            "rate": n_onsets / np.where(exposure > 0, exposure, np.nan),
+        },
+        index=pd.Index(edges[:-1] + bin_s / 2, name="time_s"),
+    )
 
 
 def outcome_boundary_statistics(

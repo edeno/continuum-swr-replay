@@ -28,7 +28,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
-    excluded_intervals_by_session,
     require_swr_source,
 )
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
@@ -51,6 +50,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MODEL_PER_BIN_RATE,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
+    TMAX,
 )
 from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
     baseline_rate_statistics,
@@ -59,10 +59,11 @@ from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: 
     reward_kernel_by_lag,
     self_history_kernel_by_lag,
 )
-from continuum_swr_replay.figure_utilities import save_figure  # noqa: E402
-from continuum_swr_replay.intervals import (  # noqa: E402
-    covered_seconds,
+from continuum_swr_replay.analysis.replay.stop_statistics import (  # noqa: E402
+    onset_rate_time_course,
+    still_immobile_fraction,
 )
+from continuum_swr_replay.figure_utilities import save_figure  # noqa: E402
 from continuum_swr_replay.paths import (
     figure_dir,
     model_dir,
@@ -114,6 +115,8 @@ TIME_RUNG = "M5_time"
 # toward the newest outcomes, not lag 1 alone); the "IMMEDIATE" name is legacy.
 IMMEDIATE_TERM = REWARD_HISTORY_COLUMNS[0]
 SLOW_TERM = REWARD_HISTORY_COLUMNS[-1]
+# The descriptive time course's bin, in seconds.
+DESCRIPTIVE_BIN_S = 0.1
 # Panel B's margin beyond the lowest and highest whisker: a factor in RR, applied
 # as its log on the beta axis.
 RR_MARGIN_FACTOR = 1.15
@@ -126,62 +129,14 @@ def _gated_coefficient(df, oc, term):
     return fits.loc[gate_term_sessions(fits, term).kept, f"coef_{term}"]
 
 
-def _lag_exposure(stop, edges):
-    """Immobility seconds per lag bin since stop onset, excluded time left out.
-
-    The clock is the stop's own (``stop_end - stop_start``): a stop covers lag
-    bin ``[e, e + dt)`` from ``stop_start + e`` to its end, less the excluded
-    seconds there (``analysed_time.excluded_intervals_by_session``). Its
-    ``immobility_duration_s`` is already net of excluded time, so it is not a
-    length on this clock.
-    """
-    excluded = excluded_intervals_by_session(stop)
-    keys = ["animal", "session_date", "epoch"]
-    denom = np.zeros(len(edges) - 1)
-    for session, stops_g in stop.groupby(keys, sort=False):
-        session_excluded = excluded.loc[
-            (excluded[keys] == pd.Series(session, index=keys)).all(axis=1)
-        ]
-        start = stops_g["stop_start"].to_numpy(dtype=float)
-        span = stops_g["stop_end"].to_numpy(dtype=float) - start
-        for k, (low, high) in enumerate(zip(edges[:-1], edges[1:], strict=True)):
-            lo, hi = start + low, start + np.minimum(span, high)
-            inside = hi > lo
-            denom[k] += (hi - lo)[inside].sum() - covered_seconds(
-                lo[inside], hi[inside], session_excluded
-            ).sum()
-    return denom
-
-
-def _timecourse(stop, onsets, oc, dt=0.1, tmax=4.0):
-    """Descriptive onset rate (events / s of immobility) vs time since stop onset.
-
-    Numerator = onset-count histogram over t_since_stop_onset; denominator =
-    immobility-seconds per t-bin (:func:`_lag_exposure`: each stop's span in
-    the bin, excluded time left out). The denominator already makes this a
-    proper rate despite varying stop durations; what changes with tc is the
-    *support* (fewer, longer, more-rewarded stops survive) — see the survival
-    overlay.
-    """
-    t = POPULATIONS[oc](onsets)["t_since_stop_onset"].to_numpy()
-    t = t[(t >= 0) & (t < tmax)]
-    edges = np.arange(0, tmax + dt, dt)
-    num, _ = np.histogram(t, edges)
-    denom = _lag_exposure(stop, edges)
-    rate = num / np.where(denom > 0, denom, np.nan)
-    return edges[:-1] + dt / 2, rate
-
-
-def _survival(stop, tmax=4.0, dt=0.1):
-    """Fraction of stops still immobile at each tc (the support of the curve),
-    on the stops' own clock (``stop_end - stop_start``)."""
-    span = (stop["stop_end"] - stop["stop_start"]).to_numpy()
-    span = span[span > 0]
+def _survival(stop, tmax=TMAX, dt=DESCRIPTIVE_BIN_S):
+    """Share of stops still immobile at each tc (the support of the curve), on
+    the stops' own clock (``stop_statistics.still_immobile_fraction``)."""
     tc = np.arange(dt / 2, tmax, dt)
-    return tc, np.array([(span > t).mean() for t in tc])
+    return tc, np.array([still_immobile_fraction(stop, t) for t in tc])
 
 
-def _shade_low_support(ax, stop, thresh=0.2, tmax=4.0):
+def _shade_low_support(ax, stop, thresh=0.2, tmax=TMAX):
     """Grey the tc region where <thresh of stops survive (curve is a thin subset)."""
     tc, surv = _survival(stop, tmax)
     below = tc[surv < thresh]
@@ -198,9 +153,18 @@ def _shade_low_support(ax, stop, thresh=0.2, tmax=4.0):
 
 
 def _panel_timecourse(ax, stop, onsets):
+    """Descriptive onset rate (events per second of immobility) against time
+    since the stop began (``stop_statistics.onset_rate_time_course``). The
+    exposure makes it a rate whatever the stops' durations; what changes with
+    time is the support (fewer, longer, more-rewarded stops), shown by the
+    survival overlay."""
     for oc in POPS4:
-        tc, rate = _timecourse(stop, onsets, oc)
-        ax.plot(tc, rate, color=STYLE[oc][1], label=STYLE[oc][0], lw=1.8)
+        course = onset_rate_time_course(
+            stop, POPULATIONS[oc](onsets), TMAX, DESCRIPTIVE_BIN_S
+        )
+        ax.plot(
+            course.index, course["rate"], color=STYLE[oc][1], label=STYLE[oc][0], lw=1.8
+        )
     ax.set_xlabel("time since stop onset (s)")
     ax.set_ylabel("onset rate (events / s)")
     ax.set_title("A0. Within-stop time course (descriptive)")
