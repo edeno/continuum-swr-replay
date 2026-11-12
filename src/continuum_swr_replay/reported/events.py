@@ -1012,7 +1012,7 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
 
 # --- one class or two -----------------------------------------------------------
 
-#: The properties of the step test (``measure_ripple_class_structure.PROPERTIES``)
+#: The properties of the step test (``class_or_continuum.STEP_PROPERTIES``)
 #: other than spike evidence, by their word in ``step_fits.csv``.
 _OTHER_STEP_PROPERTIES = {
     "duration": "duration",

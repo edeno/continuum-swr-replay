@@ -59,7 +59,7 @@ from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
     inventory_run,
 )
 from continuum_swr_replay.analysis.inventory_comparison.features import (  # noqa: E402
-    interval_rows,
+    _grid_rows,
 )
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     format_epoch_identifier,
@@ -90,54 +90,12 @@ from continuum_swr_replay.visualization.palettes import COLORS  # noqa: E402
 OUT_NAME = "ripple_class_structure"
 SEED = 20261027
 
-POWERS = {
-    "peak": "ripple_z_max",
-    "mean": "ripple_z_mean",
-    "criterion": "ripple_z_criterion",
-}
-"""The ripple-power variables: the event's peak and mean of the z-scored Kay
-consensus (the decode grid's ``SWR_zscore`` over the event's rows), and the Kay
-criterion around the event (``class_or_continuum.kay_criterion``)."""
-
-#: word -> (label, how y is read from the event frame, the rows it is defined on)
-PROPERTIES: dict[str, tuple[str, Any, str]] = {
-    "duration": ("log event duration (s)", lambda e: np.log(e.event_duration_s), "all"),
-    "extent": (
-        "log(1 + spatial extent, cm)",
-        lambda e: np.log1p(e.spatial_extent_cm),
-        "all",
-    ),
-    "speed": (
-        "log(1 + replay speed, cm/s)",
-        lambda e: np.log1p(e.replay_speed_median_cm_s),
-        "all",
-    ),
-    "posterior": ("posterior peak (mean)", lambda e: e.posterior_peak_mean, "all"),
-    "hpd": ("log HPD coverage (cm)", lambda e: np.log(e.hpd_coverage_cm), "all"),
-    "spikes": ("log(1 + spikes)", lambda e: np.log1p(e.n_spikes), "all"),
-    "evidence": (
-        "spike evidence (nats/spike)",
-        lambda e: e.dll_per_spike,
-        "remote",
-    ),
-    "breadth": ("log arms visited", lambda e: np.log(e.n_unique_arms), "all"),
-}
-
 
 def out_dir() -> Path:
     return processed_data_dir() / OUT_NAME
 
 
 # --- stage measure -------------------------------------------------------------
-
-
-def _grid_rows(time: np.ndarray, starts: np.ndarray, ends: np.ndarray):
-    """The decode-grid rows of each event: the event features run's rule
-    (``features._grid_rows``): every sample in ``[start, end]``, less the grid's
-    last sample, which holds no span."""
-    first, n_rows = interval_rows(time, starts, ends)
-    n_rows = np.clip(np.minimum(first + n_rows, time.size - 1) - first, 0, None)
-    return first, n_rows
 
 
 def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
@@ -147,18 +105,16 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
     dot = analysed_time.read_verified_dot_with_swr_source(
         inventory_run.decode_path(identifier), expected_sha256
     )
-    time = dot.index.to_numpy(dtype=np.float64)
-    z = dot["SWR_zscore"].to_numpy(dtype=np.float64)
-    swr = dot["SWR_event"].to_numpy() > 0
-    first, n_rows = _grid_rows(
-        time, events.event_start_s.to_numpy(), events.event_end_s.to_numpy()
-    )
-    if (n_rows == 0).any():
-        raise ValueError(f"{identifier}: an event holds no grid row")
-    last = first + n_rows - 1
-    peak = np.array([z[a : b + 1].max() for a, b in zip(first, last, strict=True)])
-    mean = np.array([z[a : b + 1].mean() for a, b in zip(first, last, strict=True)])
-    in_swr = np.array([swr[a : b + 1].any() for a, b in zip(first, last, strict=True)])
+    first, n_rows = _grid_rows(dot.index.to_numpy(dtype=np.float64), events)
+    try:
+        power = cc.event_ripple_power(
+            dot["SWR_zscore"].to_numpy(dtype=np.float64),
+            dot["SWR_event"].to_numpy() > 0,
+            first,
+            n_rows,
+        )
+    except ValueError as error:
+        raise ValueError(f"{identifier}: {error}") from error
     return pd.DataFrame(
         {
             "event_id": events.event_id.to_numpy(),
@@ -166,10 +122,7 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
             "decode_sha256": expected_sha256,
             "first_row": first,
             "n_rows": n_rows,
-            "ripple_z_max": peak,
-            "ripple_z_mean": mean,
-            "ripple_z_criterion": cc.kay_criterion(z, first, last),
-            "rows_hold_swr": in_swr,
+            **power,
         }
     )
 
@@ -322,51 +275,6 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
 # --- test 1 -------------------------------------------------------------------------
 
 
-def _groups(events: pd.DataFrame):
-    yield from events.groupby("animal")
-    yield "pooled", events
-
-
-def distribution_table(events: pd.DataFrame) -> pd.DataFrame:
-    rows = []
-    for animal, frame in _groups(events):
-        for word, column in POWERS.items():
-            x = frame[column].to_numpy()
-            x = x[np.isfinite(x)]
-            dip, p_value = cc.dip_test(x)
-            modes = cc.kde_modes(x)
-            label = frame.loc[np.isfinite(frame[column]), "is_swr"].to_numpy()
-            rows.append(
-                {
-                    "animal": animal,
-                    "power": word,
-                    "n_events": x.size,
-                    "dip": dip,
-                    "dip_p": p_value,
-                    "sarle": cc.sarle_bimodality(x),
-                    "mean": x.mean(),
-                    "sd": x.std(),
-                    "skew": float(pd.Series(x).skew()),
-                    "n_modes": modes.size,
-                    "main_mode_z": modes[0],
-                    "other_modes_z": ";".join(f"{m:.3f}" for m in modes[1:]),
-                    "share_at_or_above_threshold": float(
-                        (x >= cc.KAY_ZSCORE_THRESHOLD).mean()
-                    ),
-                    "median_non_swr": float(np.median(x[~label])),
-                    "median_swr": float(np.median(x[label])),
-                    "robust_sd_non_swr": _robust_sd(x[~label]),
-                    "robust_sd_swr": _robust_sd(x[label]),
-                    "swr_share": float(label.mean()),
-                }
-            )
-    return pd.DataFrame(rows)
-
-
-def _robust_sd(x: np.ndarray) -> float:
-    return float(1.4826 * np.median(np.abs(x - np.median(x))))
-
-
 SEPARATION_FACTORS = (1.0, 2.0, 3.0, 4.0)
 """Two-class mixtures with the labels' separation times these factors."""
 
@@ -424,9 +332,11 @@ def plot_distributions(
 ) -> None:
     animals = sorted(events.animal.unique())
     fig, axes = plt.subplots(
-        len(POWERS), len(animals), figsize=(3.0 * len(animals), 2.4 * len(POWERS))
+        len(cc.RIPPLE_POWERS),
+        len(animals),
+        figsize=(3.0 * len(animals), 2.4 * len(cc.RIPPLE_POWERS)),
     )
-    for i, (word, column) in enumerate(POWERS.items()):
+    for i, (word, column) in enumerate(cc.RIPPLE_POWERS.items()):
         for j, animal in enumerate(animals):
             ax = axes[i, j]
             frame = events[(events.animal == animal) & np.isfinite(events[column])]
@@ -460,76 +370,6 @@ def plot_distributions(
 
 
 # --- test 2 -------------------------------------------------------------------------
-
-
-def property_frame(events: pd.DataFrame, word: str) -> pd.DataFrame:
-    _, read, rows = PROPERTIES[word]
-    frame = events if rows == "all" else events[events.remote]
-    frame = frame.assign(y=read(frame), log_duration=np.log(frame.event_duration_s))
-    return frame[np.isfinite(frame.y)]
-
-
-def design_rows(frame: pd.DataFrame, power: str, window: float):
-    """The rows a version compares on, its label, and the range."""
-    x = frame[POWERS[power]].to_numpy()
-    if power == "criterion":
-        low = cc.KAY_ZSCORE_THRESHOLD - window
-        high = cc.KAY_ZSCORE_THRESHOLD + window
-        keep = (x >= low) & (x <= high)
-        label = x[keep] >= cc.KAY_ZSCORE_THRESHOLD
-    else:
-        low, high = cc.common_support(x, frame.is_swr.to_numpy())
-        keep = (x >= low) & (x <= high)
-        label = frame.is_swr.to_numpy()[keep]
-    return keep, label, low, high
-
-
-def step_table(
-    events: pd.DataFrame, windows: Sequence[float], knots: Sequence[int]
-) -> pd.DataFrame:
-    rows = []
-    for word in PROPERTIES:
-        for animal, all_rows in events.groupby("animal"):
-            frame = property_frame(all_rows, word)
-            for power in POWERS:
-                for window in windows if power == "criterion" else (np.nan,):
-                    keep, label, low, high = design_rows(frame, power, window)
-                    sub = frame[keep]
-                    for covariate in ("none", "log_duration"):
-                        if covariate != "none" and word == "duration":
-                            continue
-                        for n_knots in knots:
-                            fit = cc.fit_step(
-                                sub.y,
-                                sub[POWERS[power]],
-                                label,
-                                sub.epoch_id,
-                                covariate=None
-                                if covariate == "none"
-                                else sub.log_duration,
-                                n_knots=n_knots,
-                            )
-                            rows.append(
-                                {
-                                    "property": word,
-                                    "animal": animal,
-                                    "power": power,
-                                    "window_z": window,
-                                    "covariate": covariate,
-                                    "n_knots": n_knots,
-                                    "range_low_z": low,
-                                    "range_high_z": high,
-                                    "n_property_events": len(frame),
-                                    "rows_fraction": len(sub) / len(frame),
-                                    **fit.__dict__,
-                                    "has_step": fit.has_step,
-                                    **cc.overall_step_share(fit, frame.y, frame.is_swr),
-                                    "label_agrees_with_is_swr": float(
-                                        (label == sub.is_swr.to_numpy()).mean()
-                                    ),
-                                }
-                            )
-    return pd.DataFrame(rows)
 
 
 def step_simulation(n_reps: int, window: float, n_knots: int) -> pd.DataFrame:
@@ -600,12 +440,12 @@ def plot_property(events: pd.DataFrame, word: str, window: float, path: Path) ->
     """Binned means of the property against ripple power, by label, per animal."""
     animals = sorted(events.animal.unique())
     fig, axes = plt.subplots(3, len(animals), figsize=(3.0 * len(animals), 7.2))
-    for i, power in enumerate(POWERS):
+    for i, power in enumerate(cc.RIPPLE_POWERS):
         for j, animal in enumerate(animals):
             ax = axes[i, j]
-            frame = property_frame(events[events.animal == animal], word)
-            keep, label, low, high = design_rows(frame, power, window)
-            x = frame[POWERS[power]]
+            frame = cc.property_frame(events[events.animal == animal], word)
+            keep, label, low, high = cc.design_rows(frame, power, window)
+            x = frame[cc.RIPPLE_POWERS[power]]
             span = (
                 (low - 1.0, high + 1.0)
                 if power != "criterion"
@@ -616,7 +456,7 @@ def plot_property(events: pd.DataFrame, word: str, window: float, path: Path) ->
             for is_swr, name in ((False, "Non-Local"), (True, "SWR")):
                 rows = frame[in_view & (frame.is_swr == is_swr)]
                 bins = pd.cut(
-                    rows[POWERS[power]], np.unique(edges), include_lowest=True
+                    rows[cc.RIPPLE_POWERS[power]], np.unique(edges), include_lowest=True
                 )
                 stats = rows.groupby(bins, observed=True).y.agg(["mean", "sem", "size"])
                 stats = stats[stats["size"] >= 20]
@@ -637,10 +477,10 @@ def plot_property(events: pd.DataFrame, word: str, window: float, path: Path) ->
             ax.set_xlabel(f"ripple {power} (z)", fontsize=8)
             ax.tick_params(labelsize=7)
             if j == 0:
-                ax.set_ylabel(PROPERTIES[word][0], fontsize=8)
+                ax.set_ylabel(cc.STEP_PROPERTIES[word][0], fontsize=8)
     axes[0, 0].legend(fontsize=7, frameon=False)
     fig.suptitle(
-        f"{PROPERTIES[word][0]} by ripple power and label; grey: rows compared; "
+        f"{cc.STEP_PROPERTIES[word][0]} by ripple power and label; grey: rows compared; "
         "dashed: Kay threshold",
         fontsize=9,
     )
@@ -808,7 +648,7 @@ def run_analyze(args: argparse.Namespace) -> None:
     labels.to_csv(folder / "labels.csv", index=False)
     print(labels.to_string(), flush=True)
 
-    distribution = distribution_table(events)
+    distribution = cc.distribution_table(events)
     distribution.to_csv(folder / "distribution.csv", index=False)
     print(distribution.to_string(), flush=True)
     plot_distributions(events, distribution, figures / "ripple_power_distributions.png")
@@ -824,7 +664,7 @@ def run_analyze(args: argparse.Namespace) -> None:
     )
 
     windows = (args.window, *args.sensitivity_windows)
-    steps = step_table(events, windows, (args.n_knots, *args.sensitivity_knots))
+    steps = cc.step_table(events, windows, (args.n_knots, *args.sensitivity_knots))
     steps.to_csv(folder / "step_fits.csv", index=False)
     main = steps[
         (steps.n_knots == args.n_knots)
@@ -841,7 +681,7 @@ def run_analyze(args: argparse.Namespace) -> None:
         .to_string(),
         flush=True,
     )
-    for word in PROPERTIES:
+    for word in cc.STEP_PROPERTIES:
         plot_property(events, word, args.window, figures / f"step_{word}.png")
 
     step_sim = step_simulation(args.n_step_reps, args.window, args.n_knots)
@@ -886,7 +726,7 @@ def run_analyze(args: argparse.Namespace) -> None:
             "n_step_reps": args.n_step_reps,
             "seed": SEED,
             "properties": {
-                w: p[0] + f" ({p[2]} events)" for w, p in PROPERTIES.items()
+                w: p[0] + f" ({p[2]} events)" for w, p in cc.STEP_PROPERTIES.items()
             },
         },
     }

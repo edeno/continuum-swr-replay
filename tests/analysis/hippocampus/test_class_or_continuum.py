@@ -222,3 +222,164 @@ def test_discontinuity_design_on_one_continuum_and_a_planted_step():
         # over many more repeats); six repeats allow one or two misses
         assert covers >= 4
         assert positive >= 5 if step > 0 else positive <= 2
+
+
+# --- the events' tests -------------------------------------------------------------
+
+
+def test_event_ripple_power_reads_each_event_s_rows():
+    z = _trace(-1, 0.5, 2, 2.5, 2, 1, -1, 0.5, 3, 3, 0.2, -1)
+    swr = np.zeros(z.size, dtype=bool)
+    swr[2:5] = True
+    first = np.array([1, 5, 8])
+    n_rows = np.array([2, 3, 1])
+
+    power = cc.event_ripple_power(z, swr, first, n_rows)
+
+    np.testing.assert_allclose(power["ripple_z_max"], [2.0, 1.0, 3.0])
+    np.testing.assert_allclose(power["ripple_z_mean"], [1.25, 0.5 / 3, 3.0])
+    np.testing.assert_array_equal(power["rows_hold_swr"], [True, False, False])
+    np.testing.assert_allclose(
+        power["ripple_z_criterion"], cc.kay_criterion(z, first, first + n_rows - 1)
+    )
+    with pytest.raises(ValueError, match="holds no grid row"):
+        cc.event_ripple_power(z, swr, first, np.array([2, 0, 1]))
+
+
+def test_robust_sd_is_the_scaled_median_absolute_deviation():
+    # median 2; deviations 1, 0, 0, 2, 7 -> median 1
+    assert cc.robust_sd(np.array([1.0, 2.0, 2.0, 4.0, 9.0])) == pytest.approx(1.4826)
+
+
+def _power_events() -> pd.DataFrame:
+    rng = np.random.default_rng(3)
+    frames = []
+    for animal, n in (("a", 120), ("b", 80)):
+        is_swr = np.arange(n) % 4 == 0
+        peak = rng.normal(1.0, 1.0, n) + 2.0 * is_swr
+        frames.append(
+            pd.DataFrame(
+                {
+                    "animal": animal,
+                    "is_swr": is_swr,
+                    "ripple_z_max": peak,
+                    "ripple_z_mean": peak - 1.0,
+                    "ripple_z_criterion": peak + 0.5,
+                }
+            )
+        )
+    events = pd.concat(frames, ignore_index=True)
+    events.loc[3, "ripple_z_mean"] = np.nan
+    return events
+
+
+def test_the_distribution_table_has_a_row_per_animal_pooled_and_power():
+    events = _power_events()
+    table = cc.distribution_table(events)
+
+    assert list(zip(table.animal, table.power, strict=True)) == [
+        (a, p) for a in ("a", "b", "pooled") for p in ("peak", "mean", "criterion")
+    ]
+    row = table[(table.animal == "a") & (table.power == "mean")].iloc[0]
+    # the event without a mean is left out of that row only
+    x = events.loc[(events.animal == "a") & events.ripple_z_mean.notna()]
+    assert row.n_events == 119
+    assert row["mean"] == pytest.approx(x.ripple_z_mean.mean())
+    assert row.sd == pytest.approx(x.ripple_z_mean.std(ddof=0))
+    assert row.median_swr == pytest.approx(x.ripple_z_mean[x.is_swr].median())
+    assert row.robust_sd_non_swr == pytest.approx(
+        cc.robust_sd(x.ripple_z_mean[~x.is_swr].to_numpy())
+    )
+    assert row.swr_share == pytest.approx(x.is_swr.mean())
+    assert row.share_at_or_above_threshold == pytest.approx(
+        (x.ripple_z_mean >= cc.KAY_ZSCORE_THRESHOLD).mean()
+    )
+    pooled = table[(table.animal == "pooled") & (table.power == "peak")].iloc[0]
+    assert pooled.n_events == 200
+    assert pooled.dip_p == pytest.approx(cc.dip_test(events.ripple_z_max.to_numpy())[1])
+
+
+def test_a_property_frame_reads_its_property_on_its_events():
+    events = pd.DataFrame(
+        {
+            "event_duration_s": [0.05, 0.1, 0.2],
+            "n_spikes": [0, 9, 3],
+            "dll_per_spike": [0.5, np.nan, -0.2],
+            "remote": [True, True, False],
+        }
+    )
+    spikes = cc.property_frame(events, "spikes")
+    np.testing.assert_allclose(spikes.y, np.log1p([0, 9, 3]))
+    np.testing.assert_allclose(spikes.log_duration, np.log([0.05, 0.1, 0.2]))
+    # spike evidence is defined on the remote events, and a NaN is left out
+    evidence = cc.property_frame(events, "evidence")
+    assert evidence.index.tolist() == [0]
+    assert evidence.y.tolist() == [0.5]
+
+
+def test_design_rows_on_the_criterion_window_and_the_common_support():
+    t = cc.KAY_ZSCORE_THRESHOLD
+    frame = pd.DataFrame(
+        {
+            "ripple_z_criterion": [t - 1.5, t - 1.6, t, t + 1.5, t + 1.0],
+            "ripple_z_max": [0.0, 1.0, 2.0, 3.0, 4.0],
+            "is_swr": [False, False, True, True, False],
+        }
+    )
+    keep, label, low, high = cc.design_rows(frame, "criterion", 1.5)
+    # the window's bounds are in it
+    assert keep.tolist() == [True, False, True, True, True]
+    assert label.tolist() == [False, True, True, True]
+    assert (low, high) == (t - 1.5, t + 1.5)
+
+    keep, label, low, high = cc.design_rows(frame, "peak", np.nan)
+    assert (low, high) == cc.common_support(frame.ripple_z_max, frame.is_swr)
+    assert keep.tolist() == list(
+        (frame.ripple_z_max >= low) & (frame.ripple_z_max <= high)
+    )
+    assert label.tolist() == frame.is_swr[keep].tolist()
+
+
+def test_the_step_table_fits_every_setting_of_each_animal():
+    rng = np.random.default_rng(5)
+    frames = []
+    for animal in ("a", "b"):
+        d = _simulated_sessions(rng, 0.0, n=4).rename(
+            columns={
+                "power_peak": "ripple_z_max",
+                "power_mean": "ripple_z_mean",
+                "power_criterion": "ripple_z_criterion",
+            }
+        )
+        n = len(d)
+        frames.append(
+            d.assign(
+                animal=animal,
+                epoch_id=d.group,
+                event_duration_s=np.exp(d.log_duration),
+                spatial_extent_cm=rng.uniform(0, 100, n),
+                replay_speed_median_cm_s=rng.uniform(0, 500, n),
+                posterior_peak_mean=rng.uniform(0, 1, n),
+                hpd_coverage_cm=rng.uniform(5, 100, n),
+                n_spikes=rng.integers(1, 30, n),
+                dll_per_spike=rng.normal(0, 1, n),
+                n_unique_arms=rng.integers(1, 4, n),
+                remote=np.arange(n) % 2 == 0,
+            )
+        )
+    events = pd.concat(frames, ignore_index=True)
+
+    steps = cc.step_table(events, windows=(1.5,), knots=(5,))
+
+    # per animal: 3 powers x 2 covariates for 7 properties, 3 for duration
+    assert len(steps) == 2 * (7 * 6 + 3)
+    assert set(steps.covariate[steps.property == "duration"]) == {"none"}
+    assert steps.window_z[steps.power != "criterion"].isna().all()
+    n_animal = (events.animal == "a").sum()
+    evidence = steps[(steps.property == "evidence") & (steps.animal == "a")]
+    assert (
+        evidence.n_property_events == (events.remote & (events.animal == "a")).sum()
+    ).all()
+    duration = steps[(steps.property == "duration") & (steps.animal == "a")]
+    assert (duration.n_property_events == n_animal).all()
+    assert steps.rows_fraction.between(0, 1).all()
