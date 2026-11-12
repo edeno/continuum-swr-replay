@@ -106,6 +106,8 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         - ``n_non_swr``, ``n_swr_contained``, ``n_swr_partial``: the events of
           each class.
         - ``non_swr_fraction``: the share overlapping no SWR, pooled over animals.
+        - ``swr_contained_fraction``, ``swr_partial_fraction``: the shares
+          lying inside an SWR and overlapping one in part, pooled the same way.
         - ``non_swr_fraction_animal_min``, ``non_swr_fraction_animal_max``: the
           lowest and highest of the animals' own shares. An animal's share of
           a class is the mean over its epochs of each epoch's share of its
@@ -152,6 +154,8 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         "n_swr_contained": counts["swr_contained"],
         "n_swr_partial": counts["swr_partial"],
         "non_swr_fraction": counts["non_swr"] / counts["total"],
+        "swr_contained_fraction": counts["swr_contained"] / counts["total"],
+        "swr_partial_fraction": counts["swr_partial"] / counts["total"],
         "non_swr_fraction_animal_min": non_swr.min(),
         "non_swr_fraction_animal_max": non_swr.max(),
         "n_animals": len(shares),

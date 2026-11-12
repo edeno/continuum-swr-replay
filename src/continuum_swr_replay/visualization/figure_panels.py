@@ -1118,6 +1118,7 @@ def plot_swr_overlap_class_bar(
 
 def plot_event_timing_offsets(
     offsets: pd.DataFrame,
+    medians: dict[str, float],
     median_labels: dict[str, str],
     axes: list[plt.Axes] | None = None,
     *,
@@ -1147,11 +1148,15 @@ def plot_event_timing_offsets(
     ----------
     offsets : pd.DataFrame, shape (n_overlapping_events, 2)
         ``start_offset_s`` and ``end_offset_s`` (seconds).
+    medians : dict
+        For each of those columns, its median in seconds
+        (:func:`~continuum_swr_replay.analysis.hippocampus.event_statistics.boundary_offset_statistics`'s
+        ``start_offset_median_s`` / ``end_offset_median_s``). The dashed line
+        is drawn there; it is not computed here.
     median_labels : dict
         For each of those columns, its median in milliseconds, already rounded
         and printed (``"+4"``). Written in the panel's corner as
-        ``median <label> ms``. The dashed line is drawn at the median of the
-        column; the label is not computed here.
+        ``median <label> ms``.
     axes : list of matplotlib.axes.Axes, optional
         Two axes [left, right]. If None, a standalone 1x2 figure
         is created.
@@ -1204,7 +1209,7 @@ def plot_event_timing_offsets(
             density=True,
         )
 
-        median_ms = float(np.median(values_ms))
+        median_ms = 1000.0 * medians[col]
         ax.axvline(
             0.0,
             color="grey",

@@ -377,8 +377,14 @@ def test_figure02_panels_b_and_d_print_the_digits_of_the_events_summary(offline)
         "63%\nnon-SWR",
     ]
     plot_event_timing_offsets(
-        panels["offsets"], panels["offset_medians"], axes=[ax_start, ax_end]
+        panels["offsets"],
+        panels["offset_median_s"],
+        panels["offset_medians"],
+        axes=[ax_start, ax_end],
     )
+    # the dashed lines are at the summary's medians, 2.5 and -4.5 ms
+    np.testing.assert_allclose(ax_start.get_lines()[-1].get_xdata(), [2.5, 2.5])
+    np.testing.assert_allclose(ax_end.get_lines()[-1].get_xdata(), [-4.5, -4.5])
     assert [text.get_text() for text in ax_start.texts] == ["median +3 ms"]
     assert [text.get_text() for text in ax_end.texts] == ["median −5 ms"]
     plt.close(fig)

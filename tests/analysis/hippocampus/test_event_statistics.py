@@ -60,6 +60,8 @@ def test_overlap_class_statistics_count_events_animals_and_epochs():
         2,
     )
     assert result["non_swr_fraction"] == pytest.approx(5 / 9)
+    assert result["swr_contained_fraction"] == pytest.approx(2 / 9)
+    assert result["swr_partial_fraction"] == pytest.approx(2 / 9)
     assert result["non_swr_fraction_animal_min"] == pytest.approx(2 / 5)
     assert result["non_swr_fraction_animal_max"] == pytest.approx(3 / 4)
     assert (result["n_animals"], result["n_epochs"]) == (2, 3)

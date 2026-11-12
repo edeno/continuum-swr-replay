@@ -411,6 +411,8 @@ def event_table_panels(
         - ``offsets``: one row per SWR-overlapping event, with
           ``start_offset_s`` and ``end_offset_s``, its start and end minus its
           matched SWR's, in seconds (panel d's histograms).
+        - ``offset_median_s``: for each of those columns, its median in
+          seconds, where panel d draws its dashed line.
         - ``offset_medians``: for each of those columns, its median in whole
           milliseconds, printed as the events summary prints
           ``start_offset_median_ms`` and ``end_offset_median_ms``, with a plus
@@ -438,10 +440,14 @@ def event_table_panels(
     return {
         "class_counts": class_counts,
         "class_percents": {
-            cls: format_number(class_counts[cls] / class_counts["total"], "pctnum")
+            cls: format_number(classes[f"{cls}_fraction"], "pctnum")
             for cls in CLASS_ORDER
         },
         "offsets": offsets,
+        "offset_median_s": {
+            f"{bound}_offset_s": medians[f"{bound}_offset_median_s"]
+            for bound in ("start", "end")
+        },
         "offset_medians": {
             f"{bound}_offset_s": _with_plus(
                 format_number(1000 * medians[f"{bound}_offset_median_s"], "int")
@@ -518,6 +524,7 @@ def _render_figure(inputs: dict, window_sec: float = 0.4):
     class_counts = inputs["class_counts"]
     class_percents = inputs["class_percents"]
     offsets = inputs["offsets"]
+    offset_median_s = inputs["offset_median_s"]
     offset_medians = inputs["offset_medians"]
     triggered_curves = inputs["triggered_curves"]
     error_df = inputs["error_df"]
@@ -635,7 +642,9 @@ def _render_figure(inputs: dict, window_sec: float = 0.4):
 
     ax_d_start = fig.add_subplot(gs_cde[:, 1])
     ax_d_end = fig.add_subplot(gs_cde[:, 2], sharey=ax_d_start)
-    plot_event_timing_offsets(offsets, offset_medians, axes=[ax_d_start, ax_d_end])
+    plot_event_timing_offsets(
+        offsets, offset_median_s, offset_medians, axes=[ax_d_start, ax_d_end]
+    )
     ax_d_end.tick_params(labelleft=False)
     ax_d_end.set_ylabel("")
 
