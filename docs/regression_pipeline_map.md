@@ -800,7 +800,7 @@ Measure each event's start distance and the theta-like share of duration-matched
 
 One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
-`out_dir`, `measure_epoch`, `epoch_identifier`, `run_measure`, `sha256_file`, `files_digest`, `load_events`, `distribution_table`, `distribution_simulation`, `plot_distributions`, `property_frame`, `design_rows`, `step_table`, `step_simulation`, `plot_property`, `spot_check_events`, `plot_spot_checks`, `run_analyze`, `main`
+`out_dir`, `measure_epoch`, `epoch_identifier`, `run_measure`, `load_events`, `distribution_table`, `distribution_simulation`, `plot_distributions`, `property_frame`, `design_rows`, `step_table`, `step_simulation`, `plot_property`, `spot_check_events`, `plot_spot_checks`, `run_analyze`, `main`
 
 ### `scripts/detection/report_event_features.py`
 
