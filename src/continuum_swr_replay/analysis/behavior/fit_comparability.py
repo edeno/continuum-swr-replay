@@ -2,21 +2,27 @@
 
 AIC, BIC and deviance differences between two rungs mean something only when
 the two fits used the same rows on the same likelihood scale. This module owns
-that rule; every AIC or BIC difference over sessions applies it, in the rate and
-content ladders alike
+that rule (:func:`why_not_comparable`) and the pairing of two rungs' fits by
+session it applies to (:func:`pair_rung_fits`); every AIC or BIC difference over
+sessions uses both, in the rate and content ladders alike
 (:func:`~continuum_swr_replay.analysis.behavior.coefficient_statistics.aic_difference_statistics`,
 :func:`~continuum_swr_replay.analysis.behavior.content.model_comparison.compare_nested_models`).
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import pandas as pd
+
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 __all__ = [
     "COHORT_SIZE_COLUMNS",
     "COHORT_SIZE_REASON",
     "COMPARABILITY_COLUMNS",
     "INVALIDATING_METADATA_COLUMNS",
+    "pair_rung_fits",
     "why_not_comparable",
 ]
 
@@ -100,3 +106,53 @@ def why_not_comparable(paired: pd.DataFrame, suffixes: tuple[str, str]) -> pd.Da
             differs &= paired[a].notna() & paired[b].notna()
         differing[column] = differs.astype(bool)
     return pd.DataFrame(differing, index=paired.index, dtype=bool)
+
+
+def pair_rung_fits(
+    parent: pd.DataFrame,
+    child: pd.DataFrame,
+    columns: Sequence[str],
+    optional: Sequence[str] = (),
+    on: Sequence[str] = SESSION_COLUMNS,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Each session's parent and child fits side by side, and which compare.
+
+    Parameters
+    ----------
+    parent, child : pd.DataFrame
+        Per-session fits of the two rungs, at most one row per session, each
+        with the ``on`` columns and ``columns``.
+    columns : sequence of str
+        The fit columns to pair (for example ``["aic"]``).
+    optional : sequence of str, optional
+        Further columns, paired where both rungs carry them. Every column of
+        :data:`COMPARABILITY_COLUMNS` both rungs carry is paired too, after
+        these, so that :func:`why_not_comparable` can judge the pair.
+    on : sequence of str, optional
+        The session columns the two are merged on.
+
+    Returns
+    -------
+    paired : pd.DataFrame, shape (n_sessions, n_columns)
+        One row per session both rungs fit, in ``parent``'s order: the ``on``
+        columns, then each paired column of the parent with suffix
+        ``_parent`` and of the child with suffix ``_child``.
+    differs : pd.DataFrame of bool, shape (n_sessions, n_checked)
+        :func:`why_not_comparable` of ``paired``: a session can be compared
+        when no column is True.
+
+    Raises
+    ------
+    pandas.errors.MergeError
+        If either rung holds two rows for one session.
+    """
+    extra = [*optional, *(c for c in COMPARABILITY_COLUMNS if c not in optional)]
+    fit_columns = [*columns, *(c for c in extra if c in parent and c in child)]
+    keys = list(on)
+    paired = parent[keys + fit_columns].merge(
+        child[keys + fit_columns],
+        on=keys,
+        suffixes=("_parent", "_child"),
+        validate="1:1",
+    )
+    return paired, why_not_comparable(paired, ("_parent", "_child"))

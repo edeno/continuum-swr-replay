@@ -99,6 +99,12 @@ class TestCompareNestedModels:
         assert row["lr_stat"] == 12.0
         assert row["df_diff"] == 2
 
+    def test_two_fits_of_one_session_are_refused_not_crossed(self):
+        parent = _make_fit_results(ll=-50, aic=100, bic=110, n_params=2)
+        child = _make_fit_results(ll=-44, aic=90, bic=105, n_params=4)
+        with pytest.raises(pd.errors.MergeError):
+            compare_nested_models(parent, pd.concat([child, child]))
+
     def test_a_worse_child_has_a_positive_delta_aic(self):
         """Parent AIC=90, child AIC=104 → delta_aic = 104 - 90 = +14: the
         parent's AIC is lower, so the parent wins and the difference is

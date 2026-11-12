@@ -36,10 +36,7 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     typical_session_se,
     unidentified_for_term,
 )
-from continuum_swr_replay.analysis.behavior.fit_comparability import (
-    COMPARABILITY_COLUMNS,
-    why_not_comparable,
-)
+from continuum_swr_replay.analysis.behavior.fit_comparability import pair_rung_fits
 from continuum_swr_replay.analysis.shared_statistics import (
     BootstrapInterval,
     animal_medians,
@@ -538,13 +535,8 @@ def aic_difference_statistics(
     pandas.errors.MergeError
         If either set of fits holds two rows for one session.
     """
-    session = list(SESSION_COLUMNS)
-    carried = [c for c in COMPARABILITY_COLUMNS if c in child and c in parent]
-    columns = [*session, "aic", *carried]
-    paired = child[columns].merge(
-        parent[columns], on=session, suffixes=("_child", "_parent"), validate="1:1"
-    )
-    paired = paired[~why_not_comparable(paired, ("_child", "_parent")).any(axis=1)]
+    paired, differs = pair_rung_fits(parent, child, ["aic"])
+    paired = paired[~differs.any(axis=1)]
     return session_median_statistics(
         paired["aic_child"] - paired["aic_parent"], paired["animal"]
     )

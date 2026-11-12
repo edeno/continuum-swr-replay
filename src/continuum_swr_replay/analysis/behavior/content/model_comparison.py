@@ -37,7 +37,7 @@ from ..fit_comparability import (
     COHORT_SIZE_COLUMNS,
     COHORT_SIZE_REASON,
     INVALIDATING_METADATA_COLUMNS,
-    why_not_comparable,
+    pair_rung_fits,
 )
 from ..model_specs import MODEL_HIERARCHY
 
@@ -106,7 +106,9 @@ def compare_nested_models(
     Returns
     -------
     pd.DataFrame
-        One row per session with delta_aic, delta_bic, lr_stat, lr_pvalue.
+        One row per session with delta_aic, delta_bic, lr_stat, lr_pvalue
+        (the two rungs paired by
+        :func:`~continuum_swr_replay.analysis.behavior.fit_comparability.pair_rung_fits`).
         ``delta_aic`` is ``AIC(child) - AIC(parent)`` and ``delta_bic`` the
         same for BIC: negative means the child is better. ``lr_stat`` is
         ``2 * (llf_child - llf_parent)``.
@@ -123,33 +125,27 @@ def compare_nested_models(
         the arrival clock is fit on the arrival window rather than the whole
         frozen cohort, and on ``stop_cohort`` because an at-well fit and an
         all-stops fit are about different populations.
+
+    Raises
+    ------
+    pandas.errors.MergeError
+        If either rung holds two rows for one session.
     """
     if session_cols is None:
         session_cols = list(SESSION_COLUMNS)
 
-    # Cohort-size columns present in BOTH frames are carried through so the
-    # guard below can invalidate a comparison whose rungs were fit to different
-    # rows.
-    count_cols = [
-        col
-        for col in COHORT_SIZE_COLUMNS
-        if col in parent_results.columns and col in child_results.columns
-    ]
-    # The scale the two rungs were fit at travels with the comparison. A delta
-    # AIC means one thing when each event contributed a single observation and
-    # another when it contributed thirty autocorrelated timebins, and a summary
-    # that does not carry the estimator cannot say which.
-    meta_cols = [
-        col
-        for col in METADATA_COLUMNS
-        if col in parent_results.columns and col in child_results.columns
-    ]
-    fit_cols = ["llf", "aic", "bic", "n_params", *count_cols, *meta_cols]
-
-    merged = parent_results[session_cols + fit_cols].merge(
-        child_results[session_cols + fit_cols],
+    # The cohort sizes travel with the comparison so that it can be invalidated
+    # where the rungs were fit to different rows, and the scale the two rungs
+    # were fit at travels with it too. A delta AIC means one thing when each
+    # event contributed a single observation and another when it contributed
+    # thirty autocorrelated timebins, and a summary that does not carry the
+    # estimator cannot say which.
+    merged, differs = pair_rung_fits(
+        parent_results,
+        child_results,
+        ["llf", "aic", "bic", "n_params"],
+        optional=[*COHORT_SIZE_COLUMNS, *METADATA_COLUMNS],
         on=session_cols,
-        suffixes=("_parent", "_child"),
     )
 
     if len(merged) == 0:
@@ -172,7 +168,6 @@ def compare_nested_models(
 
     # Invalidate all comparison metrics for a session whose two fits cannot be
     # compared: fit to different rows, or with incommensurable likelihoods.
-    differs = why_not_comparable(merged, ("_parent", "_child"))
     for column in differs.columns[differs.any()]:
         logging.warning(
             "%d/%d sessions %s [%s] — invalidating those comparisons.",
