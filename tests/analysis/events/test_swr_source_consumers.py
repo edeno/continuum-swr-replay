@@ -309,14 +309,15 @@ def test_the_contfrag_tables_build_on_the_sources_labels(
 
 
 def test_the_contfrag_covariate_refresh_builds_on_the_sources_labels(
-    source, saved_decode, monkeypatch, offline
+    source, saved_decode, monkeypatch
 ):
-    script = offline("scripts.tables.refresh_contfrag_behavioral_covariates")
+    from continuum_swr_replay.analysis.contfrag import prepare_data
+
     seen: list = []
-    monkeypatch.setattr(script, "validate_dot_event_contract", recorder(seen))
+    monkeypatch.setattr(prepare_data, "validate_dot_event_contract", recorder(seen))
 
     with pytest.raises(_Stop):
-        script._rebuild_session(
+        prepare_data._rebuild_session(
             saved_decode,
             event_source="SWR",
             contingency=pd.DataFrame(),
