@@ -198,11 +198,18 @@ offset. Its limitation is exactly that offset — see below.
   `scripts/behavior/rate/plot_per_bin_rate_models.py`
   (→ `reward_kernel_basis.png`, `selfhistory_autocorr.png`) and
   `scripts/behavior/rate/plot_per_bin_rate_summary.py` (→ `per_bin_rate_ladder_summary.png`).
-  Both draw the summary's statistics over the summary's sessions: the reward
-  kernel and the single basis coefficients over the sessions the per-term gate
-  keeps, the fitted time course of `M5_time` between its interior knots
-  (`rate_fit_statistics.fitted_time_course`), AIC steps differenced within
-  session, and the time courses' support over the well-anchored stops. The
+  Each panel draws a package function's numbers over the sessions the summary
+  reads such numbers over: the reward kernel and the single basis coefficients
+  over the sessions the per-term gate keeps; the SWR-coupled against non-SWR
+  lag-1 kernel over the sessions in which both streams' three reward terms pass
+  the gate (`rate_fit_statistics.paired_lag_one_reward_kernels`, annotated with
+  `paired_lag_one_kernel_statistics`, the summary's `rate_paired_*` values); the
+  fitted time course of `M5_time` between its interior knots
+  (`rate_fit_statistics.fitted_time_course`); AIC steps differenced within
+  session; and the time courses' support over the well-anchored stops. Not
+  every panel is a reported value: the descriptive onset rate, the self-history
+  kernel by lag and each rung's change in AIC from M0 are not, and each
+  script's docstring names which are. The
   descriptive PSTH `scripts/exploratory/_timeresolved_psth.py`
   (→ `rate_timecourse_vs_pump.png`) reads the onset/dense tables directly.
 

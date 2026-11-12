@@ -974,7 +974,7 @@ Check that the penalised solver reproduces maximum likelihood at lambda = 0.
 
 Write the before/after audit of the mPFC unit-GLM stop cohort.
 
-`read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `try_read_sidecars`, `same_events_precondition`, `event_count_agreement`, `shared_statistic_differences`, `matched_control_arrays`, `matched_control_significance`, `fitter_table`, `session_fit_counts_table`, `worker_time_table`, `peak_shrinkage`, `shrinkage_table`, `implied_prior_per_lag`, `empirical_bayes_sigma`, `heldout_fraction_table`, `restrict_to_sessions`, `legacy_fdr_table`, `separated_column_table`, `engagement_overlap_table`, `null_window_table`, `fold_spread_table`, `sigma_sensitivity_table`, `estimator_provenance_table`, `rerun_sections`, `build_report`, `geometry_section`, `build_estimator_report`, `main`
+`read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `try_read_sidecars`, `same_events_precondition`, `event_count_agreement`, `shared_statistic_differences`, `matched_control_arrays`, `matched_control_significance`, `fitter_table`, `session_fit_counts_table`, `worker_time_table`, `curves_lacking_shrinkage_columns`, `peak_shrinkage`, `shrinkage_table`, `implied_prior_per_lag`, `empirical_bayes_sigma`, `heldout_fraction_table`, `restrict_to_sessions`, `legacy_fdr_table`, `separated_column_table`, `engagement_overlap_table`, `null_window_table`, `fold_spread_table`, `sigma_sensitivity_table`, `estimator_provenance_table`, `rerun_sections`, `build_report`, `geometry_section`, `build_estimator_report`, `main`
 
 ### `scripts/pfc/compare_pfc_event_set_bundles.py`
 
@@ -1152,7 +1152,7 @@ Summary statistics of the event-history kernels of the duration-aware rate fits.
 
 Summary statistics of the per-bin event-rate ladder's fits.
 
-`frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `reward_gated_fits`, `reward_kernel_by_lag`, `reward_kernel_animal_medians`, `self_history_kernel_by_lag`, `lag_one_reward_kernels`, `reward_kernel_statistics`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
+`frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `reward_gated_fits`, `reward_kernel_by_lag`, `reward_kernel_animal_medians`, `self_history_kernel_by_lag`, `lag_one_reward_kernels`, `reward_kernel_statistics`, `paired_lag_one_reward_kernels`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/stop_statistics.py`
 
