@@ -766,8 +766,9 @@ def print_model_results(
         "session median/p descriptive):"
     )
     # ``anim>0``: animals whose own median is positive, of the animals.
-    # ``SE``: the median model SE over the sessions with a coefficient (a session
-    # that cannot inform the term reports a NaN coefficient and an infinite SE).
+    # ``SE``: the median session SE over the sessions with a coefficient, the
+    # event-clustered one where the fit wrote a finite one and the model SE
+    # otherwise (``contrast_aggregation.typical_session_se``).
     # ``unident``: sessions that cannot inform the predictor at all (NaN
     # coefficient, named in ``unidentified_terms``); they are in no median here.
     header = (
@@ -1791,7 +1792,8 @@ def _audit_compare_and_publish(
                 n_drop_zero_response=buckets["n_drop_zero_response"],
                 n_excluded_session=n_before - n_drops - n_modeled,
                 n_sessions_flagged_nonconverged=(
-                    int((mdf["converged"] == False).sum())  # noqa: E712
+                    # a fit with no convergence flag has not converged
+                    int((~mdf["converged"].eq(True)).sum())
                     if "converged" in mdf.columns
                     else 0
                 ),
