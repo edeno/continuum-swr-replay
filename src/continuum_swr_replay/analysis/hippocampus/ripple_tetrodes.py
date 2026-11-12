@@ -5,11 +5,9 @@ is not reporting CA1's ripples, whatever its own ripple-band power. Kay's
 consensus sums raw squared envelopes, so such a tetrode, if loud, can carry
 the consensus on its own. In j16, electrode groups 0, 10 and 22 did exactly
 that on every day: they carried 5-7 times the ripple-band power of the other
-tetrodes and most of j16's events without SWR features
-(``.claude/research/refresh_artifact_detector/followup/followup_c1c_report.md``).
+tetrodes and most of j16's events without SWR features.
 
-The rule, stated before its effect was measured (``followup/c1c_rule.json``)
-and ported from ``followup/scripts/c1c_consensus.py``. For each CA1 band
+The rule, stated before its effect was measured. For each CA1 band
 tetrode ``c`` (the stored band holds one channel per tetrode in every epoch
 of the cohort, so a column is its tetrode):
 
@@ -60,20 +58,18 @@ __all__ = [
 COUPLING_CUT = 1.0
 """Robust z. A mechanism constant: a rise of less than one robust SD while the
 rest of CA1 ripples. Evidence: j16's groups 0, 10 and 22 score -0.12 to 0.81 in
-all 58 epochs, and every other j16 tetrode scores at least 1.78
-(``c1c_rule.json``, ``cut_basis``)."""
+all 58 epochs, and every other j16 tetrode scores at least 1.78."""
 
 LOO_THRESHOLD_Z = 5.0
 """z of the other tetrodes' consensus: the moments the rest of CA1 ripples
 strongly. Stated before any effect was measured. Evidence: at 5 the rule drops
 all 174 culprit tetrode-epochs and 2 weakly rippling ones; 25 % lower (3.75)
-drops 61 rippling ones, 25 % higher (6.25) none
-(``followup/justification_report.md`` §3.3)."""
+drops 61 rippling ones, 25 % higher (6.25) none."""
 
 LOO_SMOOTHING_SIGMA_S = 0.004
 """Seconds: the consensus is smoothed as Kay smooths its own (``smoothing_sigma``
 0.004 in the SWR inventory's settings). Evidence: 3 or 5 ms drops 1 or 4
-weakly rippling tetrode-epochs and every culprit (§3.3)."""
+weakly rippling tetrode-epochs and every culprit."""
 
 LOO_SMOOTHING_TRUNCATE = 8.0
 """The Gaussian kernel reaches 8 SD on each side, as in the prototype."""

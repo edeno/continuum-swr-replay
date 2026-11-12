@@ -60,9 +60,9 @@ CONDITIONAL_FIT_MAXITER = 1000
 # BFGS stops when the gradient of the per-row MEAN log-likelihood is below 1e-5.
 # On the total log-likelihood that allows a gradient of 1e-5 x n_rows, and in a
 # weakly informed direction a small gradient hides a large gap: the optimum
-# lies g' H^-1 g / 2 higher (H the information). F3 measured gaps of up to 4.8
-# log-likelihood units on the shipped content fits, every one flagged converged
-# (``.claude/research/refresh_followup/f3_optimizer_report.md``). Newton steps
+# lies g' H^-1 g / 2 higher (H the information). Gaps of up to 4.8
+# log-likelihood units were measured on the shipped content fits, every one
+# flagged converged. Newton steps
 # use the exact curvature and close that gap in a few steps. The Newton
 # decrement g' H^-1 g / 2 is the gain the next step predicts; the fit is at its
 # optimum once it is below NEWTON_DECREMENT_TOL.

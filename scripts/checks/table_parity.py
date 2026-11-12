@@ -5,8 +5,7 @@ The parity check of a change that must not move any table. ``regen`` rebuilds
 every canonical table -- the replay tables (stop, qvals, event, event-arm,
 event-patch, event-sequence, event-onset, stop-timebin) and the ContFrag SWR
 and MUA tables -- into a new root, with the same builders, flags and order as
-the 2026-10-11 rebuild the live tables come from
-(``.claude/research/refresh_r13/r13c_report.md``): stop bootstrap -> qvals ->
+the 2026-10-11 rebuild the live tables come from: stop bootstrap -> qvals ->
 one replay shard per animal (beside the time-bin build) -> assemble -> ContFrag
 SWR and MUA. ``diff`` compares two roots table by table: values exactly on
 each table's row key (``tables.parity.diff_table`` with ``atol=0``), and also

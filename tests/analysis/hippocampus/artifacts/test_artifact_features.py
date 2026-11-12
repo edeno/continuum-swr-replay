@@ -1,7 +1,6 @@
 """The artifact detector's features, each against its definition by hand.
 
-The definitions are the prototype's (``.claude/research/refresh_artifact_detector/
-scripts/artdet_lfp*.py``, ``artdet_spikes.py``, ``artdet_detector.py``):
+The definitions are the prototype's:
 
 - robust units: a statistic over its per-channel MAD x 1.4826;
 - S: 150-250 Hz Welch power per 1-s window (15 Hann segments of 64 ms), each

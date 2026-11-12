@@ -2,11 +2,7 @@
 
 Every LFP threshold is in robust per-channel units: a statistic over its own
 epoch MAD x 1.4826 (:func:`robust_scale`), never absolute LFP units. The
-definitions are the validated prototype's
-(``.claude/research/refresh_artifact_detector/scripts/``: ``artdet_lfp.py`` for
-the 1-s window spectra, ``artdet_lfp2.py`` and ``artdet_lfp3.py`` for J5 and
-L20, ``artdet_spikes.py`` and ``artdet_detector.py`` for the marks and the spike
-lines). The detector (``detect.py``) passes the LFP as float32, as the
+definitions are the validated prototype's. The detector (``detect.py``) passes the LFP as float32, as the
 prototype did, so its thresholds see the same numbers.
 
 Shapes: ``n_time`` LFP samples, ``n_channels`` CA1 channels, ``n_references``

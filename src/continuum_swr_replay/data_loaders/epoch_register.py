@@ -16,10 +16,8 @@ The register is ``epoch_register.csv`` beside this module, one row per
 (:class:`Reason`, empty for an analysed epoch) and its ``evidence``. An
 ``epoch`` of ``*`` covers every epoch of a session none of whose run epochs is
 known (no NWB file, or no run epoch in it). The register was generated once, on
-2026-10-05, from the exclusion audit (``.claude/research/refresh_exclusions/
-exclusions_table.csv``: 553 run epochs and 4 sessions with none, 557 rows) and
-the populate plan (``.claude/research/refresh_populate/populate_matrix.csv``);
-it is hand-maintained from then on. ``docs/epoch_register.md`` is generated from
+2026-10-05, from the exclusion audit (553 run epochs and 4 sessions with none,
+557 rows) and the populate plan; it is hand-maintained from then on. ``docs/epoch_register.md`` is generated from
 it (``scripts/checks/write_epoch_register_doc.py``), and a unit test holds the two
 together.
 
