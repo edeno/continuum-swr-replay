@@ -1,7 +1,7 @@
 """Regression test: ``_process_session`` must not drop zero-event
 sessions before building the stop table.
 
-Both prep scripts used to do::
+Both table drivers used to do::
 
     event_table = build_event_table(...)
     if len(event_table) == 0:
@@ -14,7 +14,7 @@ contract explicitly includes "zero-event bouts" and the rate model
 fits ``n_selected_events`` per stop over a denominator that must include
 zero-event stops.
 
-This test extracts the prep-script ``_process_session`` AST and
+This test extracts each driver's ``_process_session`` AST and
 verifies that the call to ``build_(_contfrag)_stop_table`` is
 *not* gated behind a ``return None`` on empty ``event_table``.
 """
@@ -88,7 +88,7 @@ def _stop_call_index_and_event_return_index(
             "build_stop_table",
         ),
         (
-            "scripts/tables/prepare_contfrag_replay_content_data.py",
+            "src/continuum_swr_replay/analysis/contfrag/prepare_data.py",
             "build_contfrag_stop_table",
         ),
     ],

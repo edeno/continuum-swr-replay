@@ -2,30 +2,25 @@
 
 ``prepare_data.find_sessions`` serves ``prepare_replay_content_data.py``,
 ``build_timebin_tables.py`` and ``regenerate_stop_table.py``; the ContFrag
-script has its own ``find_sessions``, which ``refresh_contfrag_behavioral_
-covariates.py`` also uses. Each lists the register's analysed epochs, and
-refuses to start when one of them has no decode, rather than building tables
-that silently cover fewer epochs than the register.
+build has its own ``find_sessions`` (``analysis.contfrag.prepare_data``), which
+the behavioral-covariate refresh also uses. Each lists the register's analysed
+epochs, and refuses to start when one of them has no decode, rather than
+building tables that silently cover fewer epochs than the register.
 
 Offline: the register's selection is replaced by a frame of the epochs a test
-names, the decodes are empty files under ``tmp_path`` (the data root), and the ContFrag script
-is imported with ``spyglass`` stubbed in ``sys.modules``.
+names, and the decodes are empty files under ``tmp_path`` (the data root).
 """
 
 from __future__ import annotations
 
-import importlib
-import sys
-import types
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.tables import prepare_data as pdm
+from continuum_swr_replay.analysis.contfrag import prepare_data as contfrag_prepare
 from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
-
-CONTFRAG_SCRIPT = "scripts.tables.prepare_contfrag_replay_content_data"
 
 
 def _analysed(*keys: tuple[str, str]):
@@ -48,23 +43,6 @@ def _decode(root: Path, identifier: str, dot_suffix: str, *, results: bool) -> N
     (root / f"{identifier}_environment.pkl").write_bytes(b"")
     if results:
         (root / f"{identifier}_results.nc").write_bytes(b"")
-
-
-@pytest.fixture
-def contfrag_prepare(monkeypatch):
-    """The ContFrag script, imported offline with ``spyglass`` stubbed."""
-    common = types.ModuleType("spyglass.common")
-    common.PositionIntervalMap = type("PositionIntervalMap", (), {})
-    monkeypatch.setitem(sys.modules, "spyglass", types.ModuleType("spyglass"))
-    monkeypatch.setitem(sys.modules, "spyglass.common", common)
-    fresh = CONTFRAG_SCRIPT not in sys.modules
-
-    yield importlib.import_module(CONTFRAG_SCRIPT)
-
-    if fresh:
-        sys.modules.pop(CONTFRAG_SCRIPT, None)
-        parent, _, child = CONTFRAG_SCRIPT.rpartition(".")
-        vars(sys.modules[parent]).pop(child, None)
 
 
 # --------------------------------------------------------------------------
@@ -139,13 +117,11 @@ def test_an_analysed_epoch_without_its_decode_stops_the_replay_build(
 
 
 # --------------------------------------------------------------------------
-# The ContFrag script's find_sessions
+# The ContFrag build's find_sessions
 # --------------------------------------------------------------------------
 
 
-def test_contfrag_sessions_are_the_registers_analysed_epochs(
-    contfrag_prepare, tmp_path, monkeypatch
-):
+def test_contfrag_sessions_are_the_registers_analysed_epochs(tmp_path, monkeypatch):
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
         contfrag_prepare, "analysed_epochs", _analysed(("a20200101_.nwb", "02_r1"))
@@ -172,7 +148,7 @@ def test_contfrag_sessions_are_the_registers_analysed_epochs(
 
 
 def test_an_analysed_epoch_without_its_hpc_contfrag_decode_stops_the_build(
-    contfrag_prepare, tmp_path, monkeypatch
+    tmp_path, monkeypatch
 ):
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
@@ -189,7 +165,7 @@ def test_an_analysed_epoch_without_its_hpc_contfrag_decode_stops_the_build(
 
 
 def test_a_cortical_contfrag_build_keeps_the_analysed_epochs_it_decoded(
-    contfrag_prepare, tmp_path, monkeypatch
+    tmp_path, monkeypatch
 ):
     """mPFC and OFC are recorded in some sessions only: an analysed epoch with no
     decode for the area is outside that area's cohort, not missing."""

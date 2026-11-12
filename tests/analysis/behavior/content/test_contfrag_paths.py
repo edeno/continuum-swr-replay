@@ -1,22 +1,19 @@
 """Regression tests for the ContFrag prep ↔ fitter filename contract.
 
 These tests pin the path-resolution logic so the wiring between
-``prepare_contfrag_replay_content_data.py`` (which writes
-``event_arm_table_{source}_{brain_area}.pkl``) and
+``analysis.contfrag.prepare_data`` (which writes
+``event_arm_table_{source}_{brain_area}``) and
 ``fit_replay_content_models.py`` (which resolves
 ``--event-source`` + ``--brain-area`` into matching reads + a
 distinct ``models_{source}_{brain_area}/`` output dir, through
 ``analysis.behavior.content.fit_outputs.resolve_contfrag_paths``) cannot
 silently regress.
 
-The helpers exercised here are pure string formatting; they do not
-import any decoder dependencies, so the tests run on any machine.
+The helpers exercised here are pure string formatting, so the tests run
+on any machine.
 """
 
 from __future__ import annotations
-
-import ast
-from pathlib import Path
 
 import pytest
 
@@ -26,38 +23,8 @@ from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
 from continuum_swr_replay.analysis.behavior.model_specs import (
     default_content_model_names,
 )
-from continuum_swr_replay.paths import MODEL_SUBDIRS
-
-REPO_ROOT = Path(__file__).resolve().parents[4]
-SCRIPTS_DIR = REPO_ROOT / "scripts"
-
-
-def _load_script_helper(filename: str, attr_name: str):
-    """Import one named top-level function from a ``scripts/`` file.
-
-    Parses the script with ``ast`` and exec's only the requested
-    function's source so the test does not have to import the
-    surrounding ``main()`` / decoder modules (which would pull in
-    Spyglass, networkx, etc., and slow the unit suite). The function sees
-    the one module global the helpers read, ``paths.MODEL_SUBDIRS``.
-    """
-    src = (SCRIPTS_DIR / filename).read_text()
-    tree = ast.parse(src)
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name == attr_name:
-            wrapper = ast.Module(body=[node], type_ignores=[])
-            ast.fix_missing_locations(wrapper)
-            ns: dict = {"MODEL_SUBDIRS": MODEL_SUBDIRS}
-            exec(compile(wrapper, filename, "exec"), ns)  # noqa: S102
-            return ns[attr_name]
-    raise AttributeError(f"{attr_name!r} not found in {filename}")
-
-
-_load_script_module = _load_script_helper
-
-
-contfrag_table_basenames = _load_script_module(
-    "tables/prepare_contfrag_replay_content_data.py", "contfrag_table_basenames"
+from continuum_swr_replay.analysis.contfrag.prepare_data import (
+    contfrag_table_basenames,
 )
 
 

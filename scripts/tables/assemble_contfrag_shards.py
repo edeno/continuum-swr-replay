@@ -9,15 +9,15 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
-from prepare_contfrag_replay_content_data import (
-    contfrag_table_basenames,
-    publish_contfrag_tables,
-)
 
 from continuum_swr_replay.analysis.behavior import build_event_patch_table
 from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
     validate_event_arm_table,
     validate_event_patch_table,
+)
+from continuum_swr_replay.analysis.contfrag.prepare_data import (
+    contfrag_table_basenames,
+    publish_contfrag_tables,
 )
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids

@@ -19,11 +19,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from prepare_contfrag_replay_content_data import (
-    contfrag_table_basenames,
-    find_sessions,
-    publish_contfrag_tables,
-)
 
 from continuum_swr_replay.analysis.behavior import build_event_patch_table
 from continuum_swr_replay.analysis.behavior.covariates import load_contingency
@@ -36,6 +31,11 @@ from continuum_swr_replay.analysis.behavior.tables.summaries import (
 from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
     validate_event_arm_table,
     validate_event_patch_table,
+)
+from continuum_swr_replay.analysis.contfrag.prepare_data import (
+    contfrag_table_basenames,
+    find_sessions,
+    publish_contfrag_tables,
 )
 from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_arm_table,

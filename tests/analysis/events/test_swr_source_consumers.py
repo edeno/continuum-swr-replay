@@ -295,14 +295,15 @@ def test_the_stop_only_bootstrap_builds_on_the_sources_labels(
 
 
 def test_the_contfrag_tables_build_on_the_sources_labels(
-    source, saved_decode, monkeypatch, offline
+    source, saved_decode, monkeypatch
 ):
-    script = offline("scripts.tables.prepare_contfrag_replay_content_data")
+    from continuum_swr_replay.analysis.contfrag import prepare_data
+
     seen: list = []
-    monkeypatch.setattr(script, "validate_dot_event_contract", recorder(seen))
+    monkeypatch.setattr(prepare_data, "validate_dot_event_contract", recorder(seen))
 
     with pytest.raises(_Stop):
-        script._process_session(saved_decode, "SWR")
+        prepare_data._process_session(saved_decode, "SWR")
 
     assert_source_labels(seen[0])
 
@@ -310,9 +311,7 @@ def test_the_contfrag_tables_build_on_the_sources_labels(
 def test_the_contfrag_covariate_refresh_builds_on_the_sources_labels(
     source, saved_decode, monkeypatch, offline
 ):
-    monkeypatch.syspath_prepend(str(REPO / "scripts" / "tables"))
-    offline("prepare_contfrag_replay_content_data")
-    script = offline("refresh_contfrag_behavioral_covariates")
+    script = offline("scripts.tables.refresh_contfrag_behavioral_covariates")
     seen: list = []
     monkeypatch.setattr(script, "validate_dot_event_contract", recorder(seen))
 
