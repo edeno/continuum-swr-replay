@@ -20,7 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +32,7 @@ from continuum_swr_replay.tables.io import write_atomically, write_table
 
 __all__ = [
     "array_sha256",
+    "files_sha256",
     "json_ready",
     "replace_outputs",
     "sha256_file",
@@ -45,6 +46,20 @@ def sha256_file(path: str | Path, *, chunk_bytes: int = 1 << 20) -> str:
     with Path(path).open("rb") as stream:
         for chunk in iter(lambda: stream.read(chunk_bytes), b""):
             digest.update(chunk)
+    return digest.hexdigest()
+
+
+def files_sha256(paths: Iterable[str | Path]) -> str:
+    """One hex sha256 over a set of files: each file's name, then its sha256.
+
+    The files are taken in sorted path order, so the digest does not depend on
+    the order given. It changes when a file's bytes or name change, or a file
+    is added or removed; the folders the files sit in do not enter it.
+    """
+    digest = hashlib.sha256()
+    for path in sorted(Path(path) for path in paths):
+        digest.update(path.name.encode())
+        digest.update(bytes.fromhex(sha256_file(path)))
     return digest.hexdigest()
 
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import math
 import re
@@ -14,6 +13,7 @@ from typing import Any
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.code_record import CodeRecord, commit_label
 from continuum_swr_replay.reported.questions import tag_problems
+from continuum_swr_replay.runs.io import files_sha256, sha256_file
 
 SCHEMA_VERSION = 6
 """The layout of a summary file. Bump it when a field is added or renamed.
@@ -410,25 +410,20 @@ def _shown(path: Path, root: Path) -> str:
 
 def file_record(path: Path, root: Path) -> dict[str, Any]:
     """An input file's path (relative to ``root`` when under it) and sha256."""
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    return {"path": _shown(path, root), "sha256": digest}
+    return {"path": _shown(path, root), "sha256": sha256_file(path)}
 
 
 def files_record(
     name: str, paths: Iterable[Path], root: Path, note: str = ""
 ) -> dict[str, Any]:
     """Many input files as one record: their count and one sha256 over each
-    file's name and sha256, in sorted order."""
-    digest = hashlib.sha256()
+    file's name and sha256, in sorted order (``runs.io.files_sha256``)."""
     paths = sorted(paths)
-    for path in paths:
-        digest.update(path.name.encode())
-        digest.update(hashlib.sha256(path.read_bytes()).digest())
     folder = _shown(paths[0].parent, root) if paths else ""
     record: dict[str, Any] = {
         "path": f"{folder}/{name}",
         "n_files": len(paths),
-        "sha256": digest.hexdigest(),
+        "sha256": files_sha256(paths),
     }
     if note:
         record["note"] = note
