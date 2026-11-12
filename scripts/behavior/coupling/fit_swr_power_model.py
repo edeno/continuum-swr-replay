@@ -57,12 +57,12 @@ from continuum_swr_replay.analysis.behavior.coupling.swr_power import (
     POWER_COL,
     POWER_PERCENTILES,
     PREDICTORS,
+    assemble_power_frame,
     duration_power_correlation,
     fit_power_model,
     power_cohort_records,
     power_distribution_statistics,
 )
-from continuum_swr_replay.analysis.behavior.covariates import add_uncertainty_covariates
 from continuum_swr_replay.analysis.behavior.fit_provenance import (
     record_inputs,
     write_fit_provenance,
@@ -96,39 +96,7 @@ def _assemble() -> pd.DataFrame:
     # is_swr and ripple_power_z must come from the configured SWR source
     require_swr_source(ev, what=str(table_path("event_table")))
     require_swr_source(stop, what=str(table_path("stop_table")))
-    stop = add_uncertainty_covariates(stop)
-    # Many events per stop, one row per stop on both right-hand tables.
-    # Without validate= a duplicated stop_id would silently multiply
-    # events into the per-event OLS instead of raising.
-    df = ev.merge(
-        stop[
-            [
-                "stop_id",
-                "known_reward_outcome_lag_1",
-                "patch_switch_fraction_last5_completed_trips",
-            ]
-        ],
-        on="stop_id",
-        how="left",
-        validate="many_to_one",
-    )
-    df = df.merge(
-        cont[
-            [
-                "stop_id",
-                "outcome_known_time",
-                "trial_reward",
-                "task_reward_probability_chosen_arm",
-                "rpe_postoutcome",
-                "task_reward_probability_patch_mean_gap_best_vs_second",
-                "reward_belief_mean_chosen_arm_preoutcome",
-            ]
-        ],
-        on="stop_id",
-        how="left",
-        validate="many_to_one",
-    )
-    return df
+    return assemble_power_frame(ev, stop, cont)
 
 
 def _write_outputs(

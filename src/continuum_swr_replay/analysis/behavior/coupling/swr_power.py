@@ -9,9 +9,10 @@ session is fit only on its events that begin at or after
 ``outcome_known_time``, and only when both a rewarded and an omitted outcome
 survive that gate and the complete-case filter.
 
-Also here: the distribution of the power over all non-local events (its
-percentiles, its bimodality, its mean and SD by SWR class) and its correlation
-with event duration, and the event-grain cohort record of the fit.
+Also here: the per-event frame the model is fit on (:func:`assemble_power_frame`),
+the distribution of the power over all non-local events (its percentiles, its
+bimodality, its mean and SD by SWR class) and its correlation with event
+duration, and the event-grain cohort record of the fit.
 
 The fit is the conditional power-vs-covariates relationship only; it is not a
 marked point process (no joint intensity, no history dependence of the power).
@@ -26,6 +27,7 @@ from continuum_swr_replay.analysis.behavior.cohort_audit import fitted_cohort_re
 from continuum_swr_replay.analysis.behavior.covariate_timing import (
     assert_predictor_timing,
 )
+from continuum_swr_replay.analysis.behavior.covariates import add_uncertainty_covariates
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS
 from continuum_swr_replay.analysis.hippocampus.class_or_continuum import (
     sarle_bimodality,
@@ -345,6 +347,57 @@ _QVALS_PREDICTORS = (
     "task_reward_probability_patch_mean_gap_best_vs_second",
     "reward_belief_mean_chosen_arm_preoutcome",
 )
+
+#: Stop-table covariates joined onto each event.
+STOP_COVARIATES = (
+    "known_reward_outcome_lag_1",
+    "patch_switch_fraction_last5_completed_trips",
+)
+
+
+def assemble_power_frame(
+    events: pd.DataFrame, stops: pd.DataFrame, qvals: pd.DataFrame
+) -> pd.DataFrame:
+    """The per-event frame the power model is fit on.
+
+    Each event gets its stop's :data:`STOP_COVARIATES` (after
+    :func:`~continuum_swr_replay.analysis.behavior.covariates.add_uncertainty_covariates`)
+    and its stop's qvals columns (``outcome_known_time``, the trial's reward and
+    the behavioral model's values and RPE, under their canonical names). Both
+    are left joins validated many-to-one on ``stop_id``, so a duplicated stop
+    raises instead of multiplying events; an event with no qvals row keeps NaN
+    there (the mechanism-B tail :func:`power_cohort_records` books).
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        The event table, one row per non-local event, with ``stop_id``.
+    stops : pd.DataFrame
+        The stop table, one row per stop.
+    qvals : pd.DataFrame
+        The qvals table, one row per stop.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``events`` with the joined columns, in the event table's row order.
+    """
+    stops = add_uncertainty_covariates(stops)
+    # Many events per stop, one row per stop on both right-hand tables.
+    # Without validate= a duplicated stop_id would silently multiply
+    # events into the per-event OLS instead of raising.
+    df = events.merge(
+        stops[["stop_id", *STOP_COVARIATES]],
+        on="stop_id",
+        how="left",
+        validate="many_to_one",
+    )
+    return df.merge(
+        qvals[["stop_id", *_QVALS_PREDICTORS]],
+        on="stop_id",
+        how="left",
+        validate="many_to_one",
+    )
 
 
 def power_cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:

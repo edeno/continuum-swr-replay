@@ -341,3 +341,64 @@ def test_duration_power_correlation_drops_incomplete_events():
     assert corr["log_duration_corr"] == pytest.approx(1.0)
     assert corr["corr"] == pytest.approx(np.corrcoef([1, 2, 4], [1, 2, 3])[0, 1])
     assert corr["corr"] < 1.0
+
+
+def _power_stops() -> pd.DataFrame:
+    """Two stops of one session, each after a completed trip, valid for
+    ``add_uncertainty_covariates``."""
+    stops = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": 1,
+            "epoch": "02_r1",
+            "stop_idx": [0, 1],
+            "stop_id": [10, 11],
+            "is_stay": [1.0, 0.0],
+            "is_rewarded_outcome": [1.0, 0.0],
+            "completed_trial_reward": [1.0, 0.0],
+            "occupancy_well_arm": [0.0, 1.0],
+            "completed_trial_id": pd.array([0, 1], dtype="Int64"),
+            "completed_trial_arm": [0.0, 1.0],
+            "patch_switch_fraction_last5_completed_trips": [0.0, 0.0],
+            "leaky_q_value_diff": [0.0, 0.0],
+            "prev_arm": [0.0, 1.0],
+            "did_last_completed_trip_switch_patch": [0.0, 0.0],
+        }
+    )
+    for lag in range(1, 11):
+        stops[f"known_reward_outcome_lag_{lag}"] = np.nan
+    stops["known_reward_outcome_lag_1"] = [1.0, 0.0]
+    return stops
+
+
+def test_each_event_gets_its_stops_covariates_and_qvals_row():
+    # Events 1 and 2 at stop 10, event 3 at stop 11; only stop 10 has a qvals row.
+    events = pd.DataFrame(
+        {
+            "event_id": [3, 1, 2],
+            "stop_id": [11, 10, 10],
+            "ripple_power_z": [0.3, 0.1, 0.2],
+        }
+    )
+    qvals = pd.DataFrame({"stop_id": [10], **{c: [7.0] for c in mod._QVALS_PREDICTORS}})
+
+    frame = mod.assemble_power_frame(events, _power_stops(), qvals)
+
+    assert list(frame["event_id"]) == [3, 1, 2]
+    assert list(frame["known_reward_outcome_lag_1"]) == [0.0, 1.0, 1.0]
+    assert list(frame.columns) == [
+        *events.columns,
+        *mod.STOP_COVARIATES,
+        *mod._QVALS_PREDICTORS,
+    ]
+    for column in mod._QVALS_PREDICTORS:
+        assert frame[column].isna().tolist() == [True, False, False]
+
+
+def test_a_duplicated_stop_raises_instead_of_multiplying_events():
+    events = pd.DataFrame({"event_id": [1], "stop_id": [10]})
+    qvals = pd.DataFrame(
+        {"stop_id": [10, 10], **{c: [1.0, 2.0] for c in mod._QVALS_PREDICTORS}}
+    )
+    with pytest.raises(pd.errors.MergeError):
+        mod.assemble_power_frame(events, _power_stops(), qvals)
