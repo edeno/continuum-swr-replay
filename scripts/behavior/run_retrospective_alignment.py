@@ -51,6 +51,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     record_inputs,
     write_fit_provenance,
 )
+from continuum_swr_replay.analysis.statistics import session_median_statistics
 from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
@@ -361,18 +362,19 @@ def main(argv: Sequence[str] | None = None) -> None:
         diff_col = f"real_minus_shuffled_{metric}"
         if real_col not in out.columns:
             continue
-        med_real = float(out[real_col].median())
-        med_diff = float(out[diff_col].median())
-        finite_metric = np.isfinite(pd.to_numeric(out[diff_col], errors="coerce"))
-        n_pos = int((out.loc[finite_metric, diff_col] > 0).sum())
-        n_finite = int(finite_metric.sum())
+        real, diff = (
+            pd.to_numeric(out[column], errors="coerce").dropna()
+            for column in (real_col, diff_col)
+        )
+        real_summary = session_median_statistics(real, out.loc[real.index, "animal"])
+        diff_summary = session_median_statistics(diff, out.loc[diff.index, "animal"])
         logging.info(
             "  %-25s  real=%.3f  Δ vs shuffle=%+.3f  pos=%d/%d",
             metric,
-            med_real,
-            med_diff,
-            n_pos,
-            n_finite,
+            real_summary["median"],
+            diff_summary["median"],
+            diff_summary["n_positive"],
+            diff_summary["n_sessions"],
         )
 
 
