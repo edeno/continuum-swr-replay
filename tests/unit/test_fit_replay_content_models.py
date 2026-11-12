@@ -433,6 +433,8 @@ def test_the_printed_se_skips_a_session_that_cannot_inform_the_term(capsys) -> N
     mdf = pd.DataFrame(
         {
             "animal": ["a", "a", "b", "b", "c"],
+            "session_date": list(range(5)),
+            "epoch": "02_r1",
             "coef_is_candidate_arm_0": [0.5, 0.6, np.nan, np.nan, 0.7],
             "bse_is_candidate_arm_0": [0.1, 0.2, np.inf, np.inf, 0.3],
             "unidentified_terms": [

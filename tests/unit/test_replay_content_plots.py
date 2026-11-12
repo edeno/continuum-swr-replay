@@ -58,6 +58,9 @@ def test_the_forest_stars_are_the_corrected_signed_rank_p() -> None:
     # Were y tested, the family of two would give x q = 0.0156: one star.
     results = pd.DataFrame(
         {
+            "animal": ["a", "a", "a", "a", "b", "b", "b", "b"],
+            "session_date": list(range(8)),
+            "epoch": "02_r1",
             "coef_x": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
             "coef_y": [0.1, 0.2, 0.3] + [float("nan")] * 5,
         }

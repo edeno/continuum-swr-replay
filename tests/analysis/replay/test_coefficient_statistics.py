@@ -88,6 +88,75 @@ def test_the_signed_rank_p_is_of_the_sessions_against_zero():
     assert np.isnan(stats.coefficient_statistics(fits, "beta")["signed_rank_p"])
 
 
+def _family_fits() -> pd.DataFrame:
+    """Six sessions of three animals (sizes 2, 3, 1) and three terms."""
+    return pd.DataFrame(
+        {
+            "animal": ["a", "a", "b", "b", "b", "c"],
+            "session_date": list(range(6)),
+            "epoch": "02_r1",
+            "coef_x": [1.0, 2.0, 3.0, 4.0, 10.0, 6.0],
+            "bse_x": [0.1, 0.2, 0.3, 0.4, 0.5, np.inf],
+            "coef_y": [-1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            "coef_w": [1.0, 2.0, NAN, NAN, 3.0, 4.0],
+            "bse_w": [0.2, 0.2, np.inf, np.inf, 0.4, 0.6],
+            "unidentified_terms": [
+                "",
+                "",
+                "w:separated_to_minus_inf",
+                "w:no_within_event_variation",
+                "",
+                "",
+            ],
+        }
+    )
+
+
+def test_the_family_has_one_row_per_term_with_a_column_in_the_order_given():
+    table = stats.coefficient_family_statistics(_family_fits(), ["x", "y", "w", "z"])
+    assert list(table.index) == ["x", "y", "w"]  # z has no column
+
+
+def test_the_family_summarizes_each_term_over_its_own_sessions():
+    table = stats.coefficient_family_statistics(_family_fits(), ["x", "y", "w"])
+    x = table.loc["x"]
+    assert x["n_sessions"] == 6
+    assert x["median"] == 3.5  # the mean is 13 / 3
+    assert x["animal_median"] == 4.0  # a 1.5, b 4 (of 3, 4, 10), c 6
+    assert x["n_animals_same_sign"] == 3
+    # sorted 1, 2, 3, 4, 6, 10: positions 1.25 and 3.75
+    assert x["quartile_25"] == 2.25
+    assert x["quartile_75"] == 5.5
+    assert x["bse_median"] == pytest.approx(0.35)
+    assert x["n_unidentified"] == 0
+    w = table.loc["w"]
+    assert w["n_sessions"] == 4
+    # the median SE over the four sessions with a coefficient, not the infinite two
+    assert w["bse_median"] == pytest.approx(0.3)
+    assert w["n_unidentified"] == 2
+
+
+def test_the_family_corrects_only_the_terms_with_a_signed_rank_p():
+    table = stats.coefficient_family_statistics(_family_fits(), ["x", "y", "w"])
+    # x: six positive, p = 2 / 64. y: the negative has the smallest rank,
+    # p = 4 / 64. w: four sessions, no p.
+    assert table.loc["x", "signed_rank_p"] == pytest.approx(0.03125)
+    assert table.loc["y", "signed_rank_p"] == pytest.approx(0.0625)
+    assert np.isnan(table.loc["w", "signed_rank_p"])
+    # A family of two: 0.03125 * 2 and 0.0625 * 2 / 2. Were w a test, both
+    # would be 0.09375.
+    assert table.loc["x", "signed_rank_p_adjusted"] == pytest.approx(0.0625)
+    assert table.loc["y", "signed_rank_p_adjusted"] == pytest.approx(0.0625)
+    assert np.isnan(table.loc["w", "signed_rank_p_adjusted"])
+
+
+def test_the_family_without_standard_errors_or_records_has_no_se_and_none_unidentified():
+    fits = _family_fits().drop(columns=["bse_x", "unidentified_terms"])
+    x = stats.coefficient_family_statistics(fits, ["x"]).loc["x"]
+    assert np.isnan(x["bse_median"])
+    assert x["n_unidentified"] == 0
+
+
 def test_exp_of_the_two_medians_are_separate_numbers():
     fits = _coefficients(["a"] * 3 + ["b"], [0.0, 0.0, 0.0, 2.0])
     result = stats.coefficient_statistics(fits, "beta")

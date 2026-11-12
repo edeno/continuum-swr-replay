@@ -76,8 +76,6 @@ from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
-from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import (
@@ -85,6 +83,9 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     select_event_cohort,
 )
 from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
+from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+    coefficient_family_statistics,
+)
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     attach_has_qvals_row,
     cohort_record,
@@ -99,9 +100,6 @@ from continuum_swr_replay.analysis.replay.content_response import (
     RESPONSE_CHOICES,
     resolve_response_choice,
     resolve_response_column,
-)
-from continuum_swr_replay.analysis.replay.contrast_aggregation import (
-    unidentified_for_term,
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
@@ -754,40 +752,22 @@ def print_model_results(
         print("  (null model — uniform allocation)")
         return
 
-    # Coefficients with FDR correction
-    raw_pvals = []
-    coef_info = {}
-    for pred in predictors:
-        col = f"coef_{pred}"
-        if col not in mdf.columns:
-            continue
-        vals = mdf[col].dropna()
-        coef_info[pred] = vals
-        if len(vals) >= 5:
-            try:
-                _, p = wilcoxon(vals)
-                raw_pvals.append((pred, p))
-            except ValueError:
-                pass
-
-    corrected_map = {}
-    if raw_pvals:
-        _, corrected, _, _ = multipletests([x[1] for x in raw_pvals], method="fdr_bh")
-        corrected_map = {x[0]: c for x, c in zip(raw_pvals, corrected, strict=True)}
-
     # PRIMARY evidence is at the animal level, matching the SWR-contrast ladder
     # (see contrast_aggregation's module docstring). Sessions within an animal are
     # not independent and the corpus is unbalanced -- two animals supply over half
     # the sessions and one supplies 6% -- so a session-level median is largely a
     # statement about those two, and a session-level p treats correlated
     # observations as independent. The per-animal median is balanced across
-    # animals, and with n=5 the sign consistency IS the claim; the Wilcoxon stays
-    # for cross-session consistency but is descriptive, not the population test.
-    n_animals = mdf["animal"].nunique() if "animal" in mdf.columns else 0
+    # animals, and with n=5 the sign consistency IS the claim; the signed-rank p
+    # (FDR-corrected over the rung's predictors) stays for cross-session
+    # consistency but is descriptive, not the population test.
     print(
-        f"\nCoefficients (animal-level primary, n={n_animals} animals; "
+        f"\nCoefficients (animal-level primary, n={mdf['animal'].nunique()} animals; "
         "session median/p descriptive):"
     )
+    # ``agree``: animals whose own median has the sign of the session median.
+    # ``SE``: the median model SE over the sessions with a coefficient (a session
+    # that cannot inform the term reports a NaN coefficient and an infinite SE).
     # ``unident``: sessions that cannot inform the predictor at all (NaN
     # coefficient, named in ``unidentified_terms``); they are in no median here.
     header = (
@@ -796,37 +776,14 @@ def print_model_results(
     )
     print(header)
     print(f"  {'-' * (len(header) - 2)}")
-    for pred in predictors:
-        if pred not in coef_info:
-            continue
-        vals = coef_info[pred]
-        se_col = f"bse_{pred}"
-        # Over the sessions with a coefficient: a session that cannot inform the
-        # term reports it with a NaN coefficient and an infinite SE.
-        se = (
-            mdf.loc[vals.index, se_col].median()
-            if se_col in mdf.columns
-            else float("nan")
-        )
-        p = corrected_map.get(pred)
-        p_str = f"{p:.2e}" if p is not None else "—"
-        if n_animals:
-            per_animal = (
-                mdf.dropna(subset=[f"coef_{pred}"])
-                .groupby("animal")[f"coef_{pred}"]
-                .median()
-            )
-            animal_med = per_animal.median()
-            n_pos = int((per_animal > 0).sum())
-            # Sign consistency is reported toward the effect's own direction, so
-            # "5/5" always means unanimous rather than "unanimously positive".
-            agree = f"{max(n_pos, len(per_animal) - n_pos)}/{len(per_animal)}"
-        else:
-            animal_med, agree = float("nan"), "—"
-        n_unidentified = int(unidentified_for_term(mdf, pred).sum())
+    for pred, row in coefficient_family_statistics(mdf, predictors).iterrows():
+        p = row["signed_rank_p_adjusted"]
+        p_str = f"{p:.2e}" if np.isfinite(p) else "—"
+        agree = f"{int(row['n_animals_same_sign'])}/{int(row['n_animals'])}"
         print(
-            f"  {pred:<25} {animal_med:10.3f} {agree:>7} {vals.median():9.3f} "
-            f"{se:8.3f} {p_str:>10} {n_unidentified:>7d}"
+            f"  {pred:<25} {row['animal_median']:10.3f} {agree:>7} "
+            f"{row['median']:9.3f} {row['bse_median']:8.3f} {p_str:>10} "
+            f"{int(row['n_unidentified']):>7d}"
         )
 
 

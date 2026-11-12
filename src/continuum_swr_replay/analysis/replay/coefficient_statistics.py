@@ -32,8 +32,10 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     pct_significant_sessions,
     separated_for_term,
     session_se,
+    unidentified_for_term,
 )
 from continuum_swr_replay.analysis.statistics import (
+    benjamini_hochberg,
     session_median_statistics,
     signed_rank_p,
 )
@@ -164,6 +166,64 @@ def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
         "exp_animal_median": float(np.exp(statistics["animal_median"])),
         "signed_rank_p": signed_rank_p(values),
     }
+
+
+def coefficient_family_statistics(
+    fits: pd.DataFrame, terms: Sequence[str]
+) -> pd.DataFrame:
+    """Several terms' coefficients across sessions, their p-values corrected
+    together.
+
+    No session is left out for separation: this is the ungated summary of one
+    rung's fits (:func:`gated_coefficient_statistics` is the gated one).
+
+    Parameters
+    ----------
+    fits : pd.DataFrame, shape (n_sessions, n_columns)
+        One row per session, with the session columns, ``coef_<term>`` and
+        optionally ``bse_<term>`` and ``unidentified_terms``.
+    terms : sequence of str
+        The terms. A term without a ``coef_<term>`` column has no row.
+
+    Returns
+    -------
+    statistics : pd.DataFrame, shape (n_terms_with_a_column, n_statistics)
+        Indexed by ``term``, in the order of ``terms``. The names of
+        :func:`coefficient_statistics` over the sessions with a coefficient,
+        and:
+
+        - ``quartile_25``, ``quartile_75``: the sessions' 25th and 75th
+          percentiles (linear interpolation).
+        - ``bse_median``: the median of ``bse_<term>`` over those sessions; NaN
+          when the fits carry no ``bse_<term>``.
+        - ``n_unidentified``: sessions that, by the fit's own record, cannot
+          inform the term (``unidentified_terms``); 0 when the fits do not
+          record it.
+        - ``signed_rank_p_adjusted``: ``signed_rank_p`` Benjamini-Hochberg
+          corrected over the terms that have one
+          (:func:`~continuum_swr_replay.analysis.statistics.benjamini_hochberg`);
+          NaN where ``signed_rank_p`` is.
+    """
+    rows = {}
+    for term in terms:
+        column = f"coef_{term}"
+        if column not in fits.columns:
+            continue
+        known = fits[column].dropna()
+        bse = fits.get(f"bse_{term}")
+        rows[term] = {
+            **coefficient_statistics(fits, column),
+            "quartile_25": float(known.quantile(0.25)),
+            "quartile_75": float(known.quantile(0.75)),
+            "bse_median": float("nan")
+            if bse is None
+            else float(bse[known.index].median()),
+            "n_unidentified": int(unidentified_for_term(fits, term).sum()),
+        }
+    table = pd.DataFrame.from_dict(rows, orient="index").rename_axis("term")
+    if not table.empty:
+        table["signed_rank_p_adjusted"] = benjamini_hochberg(table["signed_rank_p"])
+    return table
 
 
 def gated_coefficient_statistics(fits: pd.DataFrame, term: str) -> dict[str, float]:

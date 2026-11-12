@@ -11,10 +11,12 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+    coefficient_family_statistics,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
-from continuum_swr_replay.analysis.statistics import benjamini_hochberg, signed_rank_p
 from continuum_swr_replay.visualization.palettes import COLORS
 
 
@@ -131,38 +133,19 @@ def plot_coefficient_forest(
     else:
         fig = None
 
-    # Collect coefficients and test against 0
-    raw_pvals = []
-    medians = []
-    q25s = []
-    q75s = []
-    labels = []
-
-    for pred in predictors:
-        col = f"coef_{pred}"
-        if col not in model_results.columns:
-            continue
-        vals = model_results[col].dropna()
-        if len(vals) < 3:
-            continue
-
-        medians.append(vals.median())
-        q25s.append(vals.quantile(0.25))
-        q75s.append(vals.quantile(0.75))
-        labels.append(pred.replace("is_", "").replace("_x_", "×"))
-
-        raw_pvals.append(signed_rank_p(vals))
-
-    if not labels:
+    # The per-predictor summary the fitting run prints, FDR-corrected across the
+    # rung's predictors; a predictor with fewer than three sessions is not drawn.
+    statistics = coefficient_family_statistics(model_results, predictors)
+    statistics = statistics[statistics["n_sessions"] >= 3]
+    if statistics.empty:
         return fig
-
-    # FDR correction across the plotted predictors that have a p
-    corrected = benjamini_hochberg(raw_pvals)
+    labels = [pred.replace("is_", "").replace("_x_", "×") for pred in statistics.index]
+    corrected = statistics["signed_rank_p_adjusted"].to_numpy()
 
     y_pos = range(len(labels))
-    medians = np.array(medians)
-    q25s = np.array(q25s)
-    q75s = np.array(q75s)
+    medians = statistics["median"].to_numpy()
+    q25s = statistics["quartile_25"].to_numpy()
+    q75s = statistics["quartile_75"].to_numpy()
 
     ax.barh(
         y_pos,
