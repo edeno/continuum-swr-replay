@@ -1034,7 +1034,7 @@ error_rates,under_crediting_floor10,C,state_space,state_space,all,,,
 agreement,estimator_agreement,A,both,both,all,,0.9963898916967509,
 agreement,estimator_agreement,B,both,both,all,,0.9895348837209302,
 agreement,estimator_agreement,C,both,both,all,,1.0,
-provenance,produced_by,,,,,,,scripts/qa/sweep_memoryless_heldout.py
+provenance,produced_by,,,,,,,scripts/detection/sweep_memoryless_heldout.py
 provenance,produced_at,,,,,,,2026-09-25T18:25:39+00:00
 provenance,git_commit,,,,,,,eda6849e28b0
 provenance,n_seeds,,,,,,8.0,

@@ -45,6 +45,6 @@ sweep,zero_jump_disagreements_shuffled,1.0,579450.0
 sweep,n_cells,4536.0,4536.0
 sweep,cells_with_replay_count_differing,31.0,326.0
 sweep,cells_with_published_count_differing,34.0,459.0
-provenance,produced_by,scripts/qa/compare_memoryless_to_reference.py,scripts/qa/compare_memoryless_to_reference.py
+provenance,produced_by,scripts/checks/compare_memoryless_to_reference.py,scripts/checks/compare_memoryless_to_reference.py
 provenance,git_commit,c04552626019,c04552626019
 provenance,n_sweep_seeds,8,8

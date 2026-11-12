@@ -560,7 +560,7 @@ parts,n_trials_more_in_context,jump_200ms,,state_space_canonical,7.0,
 parts,n_trials,jump_200ms,,state_space_continuous,96.0,
 parts,n_trials_fewer_in_context,jump_200ms,,state_space_continuous,2.0,
 parts,n_trials_more_in_context,jump_200ms,,state_space_continuous,3.0,
-provenance,produced_by,,,,,scripts/qa/sweep_memoryless_controls.py
+provenance,produced_by,,,,,scripts/detection/sweep_memoryless_controls.py
 provenance,produced_at,,,,,2026-09-25T18:47:00+00:00
 provenance,git_commit,,,,,077bd1a1aa49
 provenance,n_seeds,,,,8.0,

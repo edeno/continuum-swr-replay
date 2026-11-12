@@ -567,7 +567,7 @@ timing_by_duration,state_space_end_error_ms_q75,,0.12,,2.263801231918272,
 timing_by_duration,state_space_end_error_ms_q75,,0.2,,-0.11482880778856952,
 timing_by_duration,state_space_end_error_ms_q75,,0.3,,3.053446270063098,
 timing_by_duration,state_space_end_error_ms_q75,,0.5,,1.0415814166044868,
-provenance,produced_by,,,,,scripts/qa/sweep_memoryless_detection.py
+provenance,produced_by,,,,,scripts/detection/sweep_memoryless_detection.py
 provenance,produced_at,,,,,2026-09-25T16:00:52+00:00
 provenance,git_commit,,,,,4a5d51980792
 provenance,n_cells_total,,,,,4536
