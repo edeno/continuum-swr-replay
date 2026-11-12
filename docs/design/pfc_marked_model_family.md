@@ -47,7 +47,8 @@ contract-1 corpus showed reward, switch and previous-arm "effects" as large
 intercept is the reference well's level and the typical-event kernel is the
 response at the reference well after an unrewarded, known outcome. Contract 2
 lacked `well_unknown`: mixed-stop bins (a median 43 % of fitted bins over the
-75 sessions of `marked_family_baseline_prior/`) were coded exactly like the
+75 sessions of `marked_family_baseline_prior/`, measured 2026-10-29; no script
+re-derives it) were coded exactly like the
 reference well, so contract-2 typical kernels mix the two levels. A model
 whose target is a stop-level context mark other than the reward outcome
 (`trips_to_patch_switch`, `next_trip_switches_patch`) adds that mark as a
@@ -90,10 +91,11 @@ before the numerator and denominator are formed; their structural zeros never
 become zero uncertainty, value, reward, or recency. An all-trunk event has an
 undefined leaf-content mark and stays in the ordinary event population while
 contributing zero to that centered marked regressor. All-trunk events are the
-dominant missing source (7,315 of 59,843 well-anchored events, 12.2 %); a
+dominant missing source (7,315 of 59,843 well-anchored events, 12.2 %, measured
+2026-09-18 on the tables of that date; no script re-derives these counts); a
 leaf-weighted mark is also undefined, rarely, when the arm-level source is
 itself undefined for the event on every leaf (32 well-anchored events with
-leaf content for the Beta belief, 0.05 %), so not every missing value is an
+leaf content for the Beta belief, 0.05 %, same measurement), so not every missing value is an
 all-trunk event.
 `content_weighted_recent_reward` uses the source column's convention for a
 never-visited arm, which is `0.0` (zero rewards from zero visits); the novelty
@@ -130,7 +132,8 @@ nonzero variation in both. An ineligible session × model gets a provenance
 marker, not a partial fit.
 
 In `spatial_role`, `current_patch_fraction` contains `current_arm_fraction` by
-construction (median within-session × class r = 0.68 on the canonical table),
+construction (median within-session × class r = 0.68 on the canonical table,
+measured 2026-09-18; no script re-derives it),
 so its two leave-one-block-out comparisons are not independent evidence and
 must be read together.
 

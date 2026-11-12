@@ -63,12 +63,13 @@ The conditional-Poisson likelihood on `arm_count_hard` is
 `Σ_e [ Σ_a c_ea·η_ea − L_e·log Σ_a exp(η_ea) ]`: it reads an event's `L_e`
 decoded bins as `L_e` independent categorical draws. The decoder runs at 500 Hz,
 so `L_e` is a bin count, and the bins are not independent — a replay is a smooth
-trajectory. Measured on the 65,913-event canonical cohort: median 32 bins per
+trajectory. Measured on 2026-09-05 on the 65,913-event canonical cohort of that
+date (no script in the repository re-derives these numbers): median 32 bins per
 event (SWR 45, non-SWR 26), **66 % of events keep one MAP arm for the entire
 event**, `P(arm_t = arm_{t−1})` mean 0.935, median 1 run per event, and Pearson
 dispersion of `M4` at the (event, arm) grain ≈ 28.
 
-The consequences were measured directly by refitting real sessions through the
+The consequences were measured directly, on 2026-09-05, by refitting real sessions through the
 same fitter with one draw per event instead of hard counts: standard errors on
 `reward_fraction_candidate_arm_last10_visits` moved from 0.07–0.12 to 0.40–0.73
 (**~6×**), and `ΔAIC = AIC(M3) − AIC(M2)` collapsed from −317…−10 to
@@ -132,7 +133,8 @@ terms, for the within-stop time course, which also differs between the streams.
 The leaf-only rungs (`C4`, `C13`, `CS5`, `CS5b`, `CS6`, and the `CS5nt`/`CS6nt`
 twins) fit the six reward-site arms and renormalize each event's response to unit
 mass over them, so an event with **no** leaf mass has no response and is dropped.
-That is 8,134 of 65,913 events (12.3 %), and they are not a random subset: their
+Measured on 2026-09-05 on the canonical cohort of that date (no script
+re-derives these numbers), that was 8,134 of 65,913 events (12.3 %), and they are not a random subset: their
 SWR share is 0.449 against 0.401 in the cohort overall, and their median length
 is 24 bins against 33 for the events that are kept. Among the events that are kept, pre-renormalization median
 leaf mass is 0.88 for SWR events and 1.00 for non-SWR ones — the renormalization
@@ -230,7 +232,8 @@ CPS2 + swr_x_is_last_rewarded_noncurrent_patch
   (predicted content vs `periswitch_index_trials`), never signed-rank on one loading.
 - **`CS4`/`CS5`/`CS2` are expected-sparse / noisy** (inherit the M7 caveat: the
   SWR × per-arm-reward/value subset is ~2% of events; `is_prev_arm` is 83%
-  collinear with `is_next` and was bidirectional/null before). Do NOT present at
+  collinear with `is_next` and was bidirectional/null before; both numbers were
+  recorded by 2026-07-03 and no script re-derives them). Do NOT present at
   the same confidence as the robust `CS1`/`CS3`.
 - **`C4`/`CS5` complete-case shrinkage:**
   `reward_belief_mean_candidate_arm_preoutcome` and
