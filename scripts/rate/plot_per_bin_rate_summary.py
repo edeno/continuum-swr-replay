@@ -35,6 +35,9 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     POPULATIONS,
     attach_is_swr_to_onsets,
 )
+from continuum_swr_replay.analysis.replay.coefficient_statistics import (  # noqa: E402
+    fit_rows,
+)
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
@@ -48,8 +51,10 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     TMAX,
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
-    reward_kernel_rate_ratios,
     self_history_rate_ratios,
+)
+from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
+    reward_kernel_by_lag,
 )
 from continuum_swr_replay.figure_utilities import save_figure  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
@@ -292,15 +297,16 @@ def _panel_reward1(ax, df):
 def _panel_reward_kernel(ax, df):
     """Reward kernel reconstructed from the raised-cosine basis coefficients.
 
-    The fitted features are bump-weighted reward fractions, so an outcome at lag
-    ``j`` contributes ``sum_k coef_k * B[k, j] / sum_j' B[k, j']`` to the log rate.
+    The median over the sessions the reward gate keeps of each session's kernel
+    (``rate_fit_statistics.reward_kernel_by_lag``), the sessions the summary
+    reads the kernel over.
     """
     lags = np.arange(1, REWARD_HISTORY_N_LAGS + 1)
     for oc in POPS4:
-        sessions = df[(df.model == FULL) & (df.outcome == oc)]
+        kernel = reward_kernel_by_lag(fit_rows(df, model=FULL, outcome=oc))
         ax.plot(
-            lags,
-            reward_kernel_rate_ratios(sessions),
+            kernel.index,
+            kernel["median"],
             marker="o",
             color=STYLE[oc][1],
             label=STYLE[oc][0],

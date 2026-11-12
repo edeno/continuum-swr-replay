@@ -269,6 +269,64 @@ def test_the_late_kernel_is_read_from_lag_three_on():
     }
 
 
+def test_the_kernel_by_lag_is_the_median_and_quartiles_of_the_gated_sessions():
+    # log lag-1 kernels 0.1, 0.2, 0.4, 0.8 in the kept sessions; a fifth
+    # session's reward term is separated, a sixth has no reward coefficients
+    lag_one = [0.8, 0.1, 9.0, 0.4, NAN, 0.2]
+    separated = ["", "", REWARD_HISTORY_COLUMNS[0], "", "", ""]
+    kernel = stats.reward_kernel_by_lag(
+        _fits(_first_bump(lag_one), separated=separated)
+    )
+    assert list(kernel.index) == list(range(1, REWARD_HISTORY_N_LAGS + 1))
+    assert kernel.index.name == "lag"
+    e = np.exp([0.1, 0.2, 0.4, 0.8])
+    assert kernel.loc[1, "median"] == pytest.approx((e[1] + e[2]) / 2)  # not e ** 0.3
+    assert kernel.loc[1, "lower_quartile"] == pytest.approx(e[0] + 0.75 * (e[1] - e[0]))
+    assert kernel.loc[1, "upper_quartile"] == pytest.approx(e[2] + 0.25 * (e[3] - e[2]))
+    # the first bump has no weight at lag 10
+    assert kernel.loc[REWARD_HISTORY_N_LAGS].tolist() == [1.0, 1.0, 1.0]
+    # the medians are the ones the kernel statistics report
+    summary = stats.reward_kernel_statistics(
+        _fits(_first_bump(lag_one), separated=separated)
+    )
+    np.testing.assert_array_equal(
+        kernel["median"],
+        [summary[f"rate_ratio_lag_{lag}"] for lag in kernel.index],
+    )
+
+
+def test_the_kernel_by_lag_reconstructs_each_session_before_the_median():
+    """The per-column medians of these coefficients come from three different
+    sessions, so a kernel reconstructed from them is no fitted session's."""
+    coefs = np.array([[2.0, -0.2, -1.5], [0.1, 1.0, 2.0], [-1.0, -3.0, 0.3]])
+    kernel = stats.reward_kernel_by_lag(_fits(coefs))
+    per_session = np.exp(coefs @ WEIGHTS)
+    np.testing.assert_allclose(kernel["median"], np.median(per_session, axis=0))
+    from_median_coefficients = np.exp(np.median(coefs, axis=0) @ WEIGHTS)
+    assert abs(kernel.loc[1, "median"] - from_median_coefficients[0]) > 0.05
+
+
+def test_the_animal_kernels_are_the_median_log_kernel_of_each_animals_kept_sessions():
+    # animal a: 0.2, 0.6 -> e ** 0.4 (the median of the two rate ratios would be
+    # (e ** 0.2 + e ** 0.6) / 2); animal b: -0.3, and a separated 5.0 left out
+    fits = _fits(
+        _first_bump([0.2, -0.3, 0.6, 5.0]),
+        animals=["a", "b", "a", "b"],
+        separated=["", "", "", REWARD_HISTORY_COLUMNS[2]],
+    )
+    animals = stats.reward_kernel_animal_medians(fits)
+    assert list(animals.index) == ["a", "b"]
+    assert animals.index.name == "animal"
+    assert list(animals.columns) == list(range(1, REWARD_HISTORY_N_LAGS + 1))
+    assert animals.loc["a", 1] == pytest.approx(np.exp(0.4))
+    assert animals.loc["b", 1] == pytest.approx(np.exp(-0.3))
+    assert (animals[REWARD_HISTORY_N_LAGS] == 1.0).all()
+    # their median at lag 1 is the animal-balanced value the statistics report
+    assert np.exp(np.median(np.log(animals[1]))) == pytest.approx(
+        stats.reward_kernel_statistics(fits)["lag_one_animal_rate_ratio"]
+    )
+
+
 def test_the_paired_test_compares_lag_one_kernels_within_session():
     rng = np.random.default_rng(0)
     n = 20

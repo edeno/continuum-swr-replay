@@ -47,7 +47,6 @@ __all__ = [
     "reconstruct_reward_kernels",
     "reconstruct_self_history_kernels",
     "reward_basis_from_lags",
-    "reward_kernel_rate_ratios",
     "reward_kernel_weights",
     "self_history_rate_ratios",
 ]
@@ -422,36 +421,6 @@ def reconstruct_self_history_kernels(
     coefs = np.atleast_2d(np.asarray(coefs, dtype=float))
     coefs = coefs[~np.isnan(coefs).any(axis=1)]
     return coefs @ raised_cosine_history_basis(n_lags, n_basis)
-
-
-def reward_kernel_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
-    """Across-session median of the per-session reconstructed reward kernel.
-
-    Each session's kernel is reconstructed from that session's own basis
-    coefficients and the median is then taken per lag. Reconstructing from
-    across-session median coefficients instead would summarize a session that
-    was never fit: the bumps are strongly collinear, so their marginal medians
-    describe no fitted kernel.
-
-    Parameters
-    ----------
-    sessions : pd.DataFrame
-        One row per session for a single (model, outcome), carrying
-        ``coef_reward_history_rcos_*``. Sessions with any NaN basis coefficient
-        contribute nothing.
-
-    Returns
-    -------
-    np.ndarray, shape (REWARD_HISTORY_N_LAGS,)
-        Median rate ratio at each lag ``1..REWARD_HISTORY_N_LAGS``.
-    """
-    columns = [f"coef_{c}" for c in REWARD_HISTORY_COLUMNS]
-    kernels = reconstruct_reward_kernels(
-        sessions[columns].to_numpy(dtype=float),
-        REWARD_HISTORY_N_LAGS,
-        REWARD_HISTORY_N_BASIS,
-    )
-    return np.median(np.exp(kernels), axis=0)
 
 
 def self_history_rate_ratios(

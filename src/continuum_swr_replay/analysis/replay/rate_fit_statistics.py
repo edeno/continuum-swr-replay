@@ -44,7 +44,6 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (
     reconstruct_reward_kernels,
-    reward_kernel_rate_ratios,
 )
 from continuum_swr_replay.analysis.statistics import (
     session_median_statistics,
@@ -200,6 +199,72 @@ def _gated_reward_kernels(fits: pd.DataFrame) -> tuple[pd.DataFrame, np.ndarray]
     return gated, kernels
 
 
+def _rate_ratios_by_lag(log_kernels: np.ndarray) -> pd.DataFrame:
+    """The median and quartiles over sessions of per-session kernels, as rate ratios.
+
+    ``log_kernels`` has shape (n_sessions, n_lags), log rate ratios. The result
+    is indexed by ``lag``, from 1, with ``median``, ``lower_quartile`` and
+    ``upper_quartile`` (numpy's linear percentiles) of ``exp(kernel)``.
+    """
+    rate_ratios = np.exp(log_kernels)
+    lower, upper = np.percentile(rate_ratios, [25, 75], axis=0)
+    return pd.DataFrame(
+        {
+            "median": np.median(rate_ratios, axis=0),
+            "lower_quartile": lower,
+            "upper_quartile": upper,
+        },
+        index=pd.RangeIndex(1, log_kernels.shape[1] + 1, name="lag"),
+    )
+
+
+def reward_kernel_by_lag(fits: pd.DataFrame) -> pd.DataFrame:
+    """The reconstructed reward kernel at each lag, over the gated sessions.
+
+    Each session's kernel is reconstructed from its own three basis
+    coefficients, and the median is then taken lag by lag. The basis
+    coefficients are strongly collinear, so a kernel reconstructed from their
+    across-session medians would be no fitted session's.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Per-session fits of one rung and population that carries the reward
+        block (:func:`reward_gated_fits`).
+
+    Returns
+    -------
+    kernel : pd.DataFrame, shape (REWARD_HISTORY_N_LAGS, 3)
+        Indexed by ``lag`` (trials back, from 1): ``median``,
+        ``lower_quartile`` and ``upper_quartile`` over the sessions the reward
+        gate keeps of the session's kernel, as a rate ratio.
+    """
+    _, kernels = _gated_reward_kernels(fits)
+    return _rate_ratios_by_lag(kernels)
+
+
+def reward_kernel_animal_medians(fits: pd.DataFrame) -> pd.DataFrame:
+    """Each animal's median reconstructed reward kernel, over its gated sessions.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Per-session fits of one rung and population (:func:`reward_gated_fits`).
+
+    Returns
+    -------
+    kernels : pd.DataFrame, shape (n_animals, REWARD_HISTORY_N_LAGS)
+        Indexed by ``animal``, one column per lag from 1: ``exp`` of the median
+        over the animal's kept sessions of the log kernel at that lag. These are
+        the animal medians whose median is ``lag_one_animal_rate_ratio`` of
+        :func:`reward_kernel_statistics` at lag 1.
+    """
+    gated, kernels = _gated_reward_kernels(fits)
+    lags = pd.RangeIndex(1, kernels.shape[1] + 1, name="lag")
+    log_kernels = pd.DataFrame(kernels, index=gated["animal"].to_numpy(), columns=lags)
+    return np.exp(log_kernels.groupby(level=0).median()).rename_axis("animal")
+
+
 def lag_one_reward_kernels(fits: pd.DataFrame) -> pd.DataFrame:
     """Each gated session's reconstructed reward kernel at lag 1.
 
@@ -253,7 +318,7 @@ def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
     gated, kernels = _gated_reward_kernels(fits)
     lag_one = pd.Series(kernels[:, 0], index=gated.index)
     lag_one_statistics = session_median_statistics(lag_one, gated["animal"])
-    rate_ratios = reward_kernel_rate_ratios(gated)
+    rate_ratios = _rate_ratios_by_lag(kernels)["median"].to_numpy()
     late = rate_ratios[FIRST_LATE_REWARD_LAG - 1 :]
     n_fitted = int(fits[_REWARD_COEFFICIENTS].notna().all(axis=1).sum())
     return {
