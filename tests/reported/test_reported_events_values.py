@@ -395,7 +395,11 @@ def test_class_distribution_values_count_the_animals_with_one_mode():
         builder.class_distribution_values(distribution.iloc[1:], "s")
 
 
-def test_class_step_values_name_the_properties_with_the_most_steps():
+def step_fits() -> pd.DataFrame:
+    """Step fits of every analysed animal at the main settings: 1 animal with a
+    step in duration, 3 in spatial extent and in replay speed, 2 in spike
+    evidence, none in the other properties; spike evidence's shares are
+    0.5, -0.1, 0.3, 0.2, 0.9 (median 0.3, 4 positive)."""
     animals = list(analysed_animals())
     with_step = {"duration": 1, "extent": 3, "speed": 3, "evidence": 2}
     evidence_shares = [0.5, -0.1, 0.3, 0.2, 0.9]
@@ -404,7 +408,7 @@ def test_class_step_values_name_the_properties_with_the_most_steps():
         for i, animal in enumerate(animals):
             share = evidence_shares[i] if prop == "evidence" else -1.0
             rows.append((prop, animal, i < with_step.get(prop, 0), share))
-    steps = pd.DataFrame(
+    return pd.DataFrame(
         rows, columns=["property", "animal", "has_step", "step_share_overall"]
     ).assign(
         n_knots=builder.STEP_KNOTS,
@@ -412,6 +416,11 @@ def test_class_step_values_name_the_properties_with_the_most_steps():
         window_z=builder.STEP_WINDOW_Z,
         covariate="none",
     )
+
+
+def test_class_step_values_name_the_properties_with_the_most_steps():
+    animals = list(analysed_animals())
+    steps = step_fits()
     values = _by_key(builder.class_step_values(steps, "s"))
     assert {key: value.value for key, value in values.items()} == {
         "step_other_properties_criterion_animals_max": 3,

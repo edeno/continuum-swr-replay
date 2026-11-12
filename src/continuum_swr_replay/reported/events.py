@@ -1143,6 +1143,33 @@ def class_step_evidence_values(steps: pd.DataFrame, source: str) -> list[Value]:
     ]
 
 
+def class_step_values_with_staleness(
+    manifest: dict,
+    spike_evidence_sha256: str,
+    event_table_stale: str | None,
+    steps: pd.DataFrame,
+    source: str,
+    what: str,
+) -> list[Value]:
+    """The step test's values (:func:`class_step_values` and
+    :func:`class_step_evidence_values`), pending where the step fits are stale.
+
+    Every value is pending with ``event_table_stale`` (the step fits were made
+    from another event table); spike evidence's values are also pending when the
+    step fits' ``manifest`` does not record the current spike-evidence run
+    (``spike_evidence_sha256``, :func:`spike_evidence_staleness`; ``what`` names
+    the step fits' folder in the note).
+    """
+    evidence_stale = spike_evidence_staleness(manifest, spike_evidence_sha256, what)
+    return [
+        *pend(class_step_values(steps, source), event_table_stale),
+        *pend(
+            pend(class_step_evidence_values(steps, source), event_table_stale),
+            evidence_stale,
+        ),
+    ]
+
+
 # --- properties ---------------------------------------------------------------
 
 #: (word, column, scale, unit, style, the expected direction for non-SWR against
@@ -1703,16 +1730,14 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             class_stale,
         )
     )
-    steps = pd.read_csv(folder / "step_fits.csv")
-    summary.add(*pend(class_step_values(steps, source), class_stale))
-    # spike evidence's step is also stale when the spike-evidence run has changed
-    evidence_stale = spike_evidence_staleness(
-        _manifest(folder), spike_evidence_record["sha256"], rel(folder)
-    )
     summary.add(
-        *pend(
-            pend(class_step_evidence_values(steps, source), class_stale),
-            evidence_stale,
+        *class_step_values_with_staleness(
+            _manifest(folder),
+            spike_evidence_record["sha256"],
+            class_stale,
+            pd.read_csv(folder / "step_fits.csv"),
+            source,
+            rel(folder),
         )
     )
     summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]

@@ -12,6 +12,7 @@ import pytest
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.reported.events import (
     _PROPERTIES,
+    class_step_values_with_staleness,
     default_inputs,
     event_table_staleness,
     gamma_db_values,
@@ -20,6 +21,7 @@ from continuum_swr_replay.reported.events import (
     spike_evidence_staleness,
 )
 from continuum_swr_replay.reported.values import Value, pend
+from tests.reported.test_reported_events_values import step_fits
 
 CURRENT = "a" * 64
 
@@ -175,3 +177,60 @@ def test_property_intervals_name_their_skipped_strata_and_refuse_many_nans():
     )
     with pytest.raises(ValueError, match="does not count"):
         property_interval_values(old, "s")
+
+
+_EVIDENCE_KEYS = {
+    "step_evidence_criterion_animals",
+    "step_evidence_criterion_animals_same_sign",
+    "step_evidence_criterion_share_median",
+}
+
+
+def _step_pending(manifest: dict, event_table_stale: str | None) -> dict:
+    """Each step value's pending note, from the hand-made step fits."""
+    values = class_step_values_with_staleness(
+        manifest, CURRENT, event_table_stale, step_fits(), "s", "steps"
+    )
+    pending = {value.key: value.pending for value in values}
+    assert len(pending) == len(values)
+    assert set(pending) == {
+        *_EVIDENCE_KEYS,
+        "step_other_properties_criterion_animals_max",
+    }
+    return pending
+
+
+@pytest.mark.parametrize(
+    ("spike_evidence", "note"),
+    [
+        ({"sha256": CURRENT}, None),
+        (
+            {"sha256": "c" * 64},
+            "steps was made from another spike-evidence run than the current one "
+            "(sha256 cccccccccccc, current aaaaaaaaaaaa); rerun it before citing",
+        ),
+        (None, "steps records no spike-evidence SHA-256; rerun it before citing"),
+    ],
+)
+def test_only_spike_evidence_steps_are_pending_for_another_spike_evidence_run(
+    spike_evidence, note
+):
+    inputs = {"event_table": {"sha256": CURRENT}}
+    if spike_evidence is not None:
+        inputs["spike_evidence"] = spike_evidence
+    pending = _step_pending({"inputs": inputs}, None)
+    assert pending == {
+        "step_other_properties_criterion_animals_max": None,
+        **dict.fromkeys(_EVIDENCE_KEYS, note),
+    }
+
+
+def test_every_step_value_is_pending_for_another_event_table():
+    manifest = {"inputs": {"spike_evidence": {"sha256": CURRENT}}}
+    assert set(_step_pending(manifest, "stale table").values()) == {"stale table"}
+    # both notes reach spike evidence's values when both inputs have changed
+    pending = _step_pending({"inputs": {}}, "stale table")
+    assert pending["step_other_properties_criterion_animals_max"] == "stale table"
+    assert {pending[key] for key in _EVIDENCE_KEYS} == {
+        "stale table; steps records no spike-evidence SHA-256; rerun it before citing"
+    }
