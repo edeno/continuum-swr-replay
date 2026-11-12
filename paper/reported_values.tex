@@ -170,12 +170,12 @@
 \newcommand{\DetectionSweepStateSpaceFraction}{91}  % detection.sweep_state_space_fraction: over the whole grid, share the state-space detector reports under its own criteria
 \newcommand{\DetectionSweepStateSpaceOnlyFraction}{73}  % detection.sweep_state_space_only_fraction: share of the swept replays reported by the state-space detector and not by the sliding-window detector
 
-% --- events (commit 7eabc1b9c82a)
+% --- events (commit 93ac9014034d)
 \newcommand{\EventsAnimals}{5}  % events.animals: animals in the event table
-\newcommand{\EventsAnimalsNonSwrMajority}{4}  % events.animals_non_swr_majority: animals in which more than half the events are non-SWR
-\newcommand{\EventsAnimalsNonSwrMoreAtWell}{5}  % events.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content
-\newcommand{\EventsAnimalsNonSwrPlurality}{5}  % events.animals_non_swr_plurality: animals in which non-SWR is the largest of the three overlap classes
-\newcommand{\EventsArmsAnimalsInDirection}{5}  % events.arms_animals_in_direction: animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median
+\newcommand{\EventsAnimalsNonSwrMajority}{4}  % events.animals_non_swr_majority: animals whose share of non-SWR events (the mean over their epochs) is above one half
+\newcommand{\EventsAnimalsNonSwrMoreAtWell}{5}  % events.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's sessions of the session's share
+\newcommand{\EventsAnimalsNonSwrPlurality}{5}  % events.animals_non_swr_plurality: animals whose share of non-SWR events is the largest of their three overlap-class shares (each the mean over the animal's epochs)
+\newcommand{\EventsArmsAnimalsInDirection}{5}  % events.arms_animals_in_direction: animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsArmsDifferenceHigh}{+2.0}  % events.arms_difference_high: upper bound of that interval
 \newcommand{\EventsArmsDifferenceLow}{+1.0}  % events.arms_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of arms the decoded position visits
 \newcommand{\EventsArmsMatchedDifference}{+0.98}  % events.arms_matched_difference: SWR minus non-SWR difference of median number of arms the decoded position visits at matched duration (within ten duration-quantile strata, averaged by stratum size)
@@ -200,7 +200,7 @@
 \newcommand{\EventsCareyOverlapNoSpikeShareMedian}{0}  % events.carey_overlap_no_spike_share_median: median over carey events overlapping a non-local event of the share of their rows with No-Spike above 0.8
 \newcommand{\EventsCareyOverlapNonlocalShareMedian}{87}  % events.carey_overlap_nonlocal_share_median: median over carey events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\EventsCareyOverlapUncertainShareMedian}{9}  % events.carey_overlap_uncertain_share_median: median over carey events overlapping a non-local event of the share of their rows with no state above 0.8
-\newcommand{\EventsDurationAnimalsInDirection}{5}  % events.duration_animals_in_direction: animals whose non-SWR median event duration is lower than their SWR median
+\newcommand{\EventsDurationAnimalsInDirection}{5}  % events.duration_animals_in_direction: animals whose non-SWR median event duration is lower than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsDurationDifferenceHigh}{+54}  % events.duration_difference_high: upper bound of that interval
 \newcommand{\EventsDurationDifferenceLow}{+38}  % events.duration_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median event duration
 \newcommand{\EventsDurationMedianNonSwr}{48}  % events.duration_median_non_swr: median event duration of immobile non-SWR non-local events
@@ -209,7 +209,7 @@
 \newcommand{\EventsEpochs}{242}  % events.epochs: epochs in the event table
 \newcommand{\EventsEvidenceAnimals}{5}  % events.evidence_animals: animals in the spike-evidence run
 \newcommand{\EventsEvidenceEpochs}{242}  % events.evidence_epochs: epochs in the spike-evidence run
-\newcommand{\EventsExtentAnimalsInDirection}{5}  % events.extent_animals_in_direction: animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median
+\newcommand{\EventsExtentAnimalsInDirection}{5}  % events.extent_animals_in_direction: animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsExtentDifferenceHigh}{+58}  % events.extent_difference_high: upper bound of that interval
 \newcommand{\EventsExtentDifferenceLow}{+29}  % events.extent_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median spatial extent of the decoded content
 \newcommand{\EventsExtentMatchedDifference}{+35}  % events.extent_matched_difference: SWR minus non-SWR difference of median spatial extent of the decoded content at matched duration (within ten duration-quantile strata, averaged by stratum size)
@@ -217,10 +217,10 @@
 \newcommand{\EventsExtentMatchedDifferenceLow}{+24}  % events.extent_matched_difference_low: lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate
 \newcommand{\EventsExtentMedianNonSwr}{8.0}  % events.extent_median_non_swr: median spatial extent of the decoded content of immobile non-SWR non-local events
 \newcommand{\EventsExtentMedianSwr}{50}  % events.extent_median_swr: median spatial extent of the decoded content of immobile SWR-overlapping non-local events
-\newcommand{\EventsFastGammaAnimalsAboveRestNonSwr}{5}  % events.fast_gamma_animals_above_rest_non_swr: animals whose median non-SWR event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level
-\newcommand{\EventsFastGammaAnimalsAboveRestSwr}{5}  % events.fast_gamma_animals_above_rest_swr: animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level
-\newcommand{\EventsFastGammaAnimalsBelowRunningNonSwr}{5}  % events.fast_gamma_animals_below_running_non_swr: animals whose median non-SWR event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level
-\newcommand{\EventsFastGammaAnimalsBelowRunningSwr}{0}  % events.fast_gamma_animals_below_running_swr: animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level
+\newcommand{\EventsFastGammaAnimalsAboveRestNonSwr}{5}  % events.fast_gamma_animals_above_rest_non_swr: animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
+\newcommand{\EventsFastGammaAnimalsAboveRestSwr}{5}  % events.fast_gamma_animals_above_rest_swr: animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
+\newcommand{\EventsFastGammaAnimalsBelowRunningNonSwr}{5}  % events.fast_gamma_animals_below_running_non_swr: animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
+\newcommand{\EventsFastGammaAnimalsBelowRunningSwr}{0}  % events.fast_gamma_animals_below_running_swr: animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
 \newcommand{\EventsFastGammaDbAnimalsAboveRestNonSwr}{5}  % events.fast_gamma_db_animals_above_rest_non_swr: animals whose median over epochs of that change (non-SWR events) is above 0 dB
 \newcommand{\EventsFastGammaDbAnimalsAboveRestSwr}{5}  % events.fast_gamma_db_animals_above_rest_swr: animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB
 \newcommand{\EventsFastGammaDbMedianNonSwr}{+0.52}  % events.fast_gamma_db_median_non_swr: median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers
@@ -239,7 +239,7 @@
 \newcommand{\EventsHeldoutSwrPerSpike}{0.60}  % events.heldout_swr_per_spike: held-out evidence per held-out spike for immobile Non-Local Continuous bouts with an SWR, against the animal's position: mean over animals
 \newcommand{\EventsHeldoutSwrPerSpikeCiHigh}{0.74}  % events.heldout_swr_per_spike_ci_high: upper bound of its 95 % t-interval over animals
 \newcommand{\EventsHeldoutSwrPerSpikeCiLow}{0.45}  % events.heldout_swr_per_spike_ci_low: lower bound of its 95 % t-interval over animals
-\newcommand{\EventsHpdAnimalsInDirection}{4}  % events.hpd_animals_in_direction: animals whose non-SWR median highest-density-region coverage is lower than their SWR median
+\newcommand{\EventsHpdAnimalsInDirection}{4}  % events.hpd_animals_in_direction: animals whose non-SWR median highest-density-region coverage is lower than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsHpdDifferenceHigh}{+53}  % events.hpd_difference_high: upper bound of that interval
 \newcommand{\EventsHpdDifferenceLow}{\ensuremath{-}5.3}  % events.hpd_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median highest-density-region coverage
 \newcommand{\EventsHpdMatchedDifference}{+38}  % events.hpd_matched_difference: SWR minus non-SWR difference of median highest-density-region coverage at matched duration (within ten duration-quantile strata, averaged by stratum size)
@@ -261,8 +261,8 @@
 \newcommand{\EventsKarlssonOverlapUncertainShareMedian}{13}  % events.karlsson_overlap_uncertain_share_median: median over karlsson events overlapping a non-local event of the share of their rows with no state above 0.8
 \newcommand{\EventsKayEvents}{41{,}151}  % events.kay_events: kay events compared with the non-local detector
 \newcommand{\EventsKayNoNonlocalFraction}{17}  % events.kay_no_nonlocal_fraction: share of kay events that overlap no non-local event
-\newcommand{\EventsKayNoNonlocalFractionAnimalMax}{28}  % events.kay_no_nonlocal_fraction_animal_max: highest per-animal share of kay events overlapping no non-local event
-\newcommand{\EventsKayNoNonlocalFractionAnimalMin}{8}  % events.kay_no_nonlocal_fraction_animal_min: lowest per-animal share of kay events overlapping no non-local event
+\newcommand{\EventsKayNoNonlocalFractionAnimalMax}{29}  % events.kay_no_nonlocal_fraction_animal_max: highest per-animal share of kay events overlapping no non-local event (the mean over the animal's epochs)
+\newcommand{\EventsKayNoNonlocalFractionAnimalMin}{8}  % events.kay_no_nonlocal_fraction_animal_min: lowest per-animal share of kay events overlapping no non-local event (an animal's share is the mean over its epochs of the epoch's share)
 \newcommand{\EventsKayNoNonlocalMixedFraction}{26}  % events.kay_no_nonlocal_mixed_fraction: of kay events overlapping no non-local event, the share with neither state in more than half their rows
 \newcommand{\EventsKayNoNonlocalMostlyLocalFraction}{74}  % events.kay_no_nonlocal_mostly_local_fraction: of kay events overlapping no non-local event, the share with Local above 0.8 in more than half their rows
 \newcommand{\EventsKayNoNonlocalMostlyNoSpikeFraction}{1}  % events.kay_no_nonlocal_mostly_no_spike_fraction: of kay events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows
@@ -274,7 +274,7 @@
 \newcommand{\EventsKayOverlapNonlocalShareMedian}{88}  % events.kay_overlap_nonlocal_share_median: median over kay events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\EventsKayOverlapUncertainShareMedian}{9}  % events.kay_overlap_uncertain_share_median: median over kay events overlapping a non-local event of the share of their rows with no state above 0.8
 \newcommand{\EventsKayTimeS}{4127}  % events.kay_time_s: seconds Kay's SWRs span (compared events): what an SWR-triggered analysis examines
-\newcommand{\EventsMaxStepAnimalsInDirection}{5}  % events.max_step_animals_in_direction: animals whose non-SWR median largest step of the decoded position is lower than their SWR median
+\newcommand{\EventsMaxStepAnimalsInDirection}{5}  % events.max_step_animals_in_direction: animals whose non-SWR median largest step of the decoded position is lower than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsMaxStepDifferenceHigh}{+22}  % events.max_step_difference_high: upper bound of that interval
 \newcommand{\EventsMaxStepDifferenceLow}{+7.8}  % events.max_step_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median largest step of the decoded position
 \newcommand{\EventsMaxStepMatchedDifference}{+24}  % events.max_step_matched_difference: SWR minus non-SWR difference of median largest step of the decoded position at matched duration (within ten duration-quantile strata, averaged by stratum size)
@@ -282,10 +282,10 @@
 \newcommand{\EventsMaxStepMatchedDifferenceLow}{+14}  % events.max_step_matched_difference_low: lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate
 \newcommand{\EventsMaxStepMedianNonSwr}{2.0}  % events.max_step_median_non_swr: median largest step of the decoded position of immobile non-SWR non-local events
 \newcommand{\EventsMaxStepMedianSwr}{14}  % events.max_step_median_swr: median largest step of the decoded position of immobile SWR-overlapping non-local events
-\newcommand{\EventsMuaAnimalsAboveRestNonSwr}{5}  % events.mua_animals_above_rest_non_swr: animals whose median non-SWR event MUA rate is above the median, over the same events, of each event's own epoch's median quiet-rest level
-\newcommand{\EventsMuaAnimalsAboveRestSwr}{5}  % events.mua_animals_above_rest_swr: animals whose median SWR-overlapping event MUA rate is above the median, over the same events, of each event's own epoch's median quiet-rest level
-\newcommand{\EventsMuaAnimalsBelowRunningNonSwr}{1}  % events.mua_animals_below_running_non_swr: animals whose median non-SWR event MUA rate is below the median, over the same events, of each event's own epoch's median running level
-\newcommand{\EventsMuaAnimalsBelowRunningSwr}{0}  % events.mua_animals_below_running_swr: animals whose median SWR-overlapping event MUA rate is below the median, over the same events, of each event's own epoch's median running level
+\newcommand{\EventsMuaAnimalsAboveRestNonSwr}{5}  % events.mua_animals_above_rest_non_swr: animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
+\newcommand{\EventsMuaAnimalsAboveRestSwr}{5}  % events.mua_animals_above_rest_swr: animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
+\newcommand{\EventsMuaAnimalsBelowRunningNonSwr}{1}  % events.mua_animals_below_running_non_swr: animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
+\newcommand{\EventsMuaAnimalsBelowRunningSwr}{0}  % events.mua_animals_below_running_swr: animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
 \newcommand{\EventsMuaEvents}{40{,}732}  % events.mua_events: mua events compared with the non-local detector
 \newcommand{\EventsMuaMedianNonSwr}{0.79}  % events.mua_median_non_swr: median z-scored MUA rate of immobile non-SWR non-local events (event mean)
 \newcommand{\EventsMuaMedianSwr}{2.37}  % events.mua_median_swr: median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean)
@@ -302,7 +302,7 @@
 \newcommand{\EventsMuaOverlapUncertainShareMedian}{13}  % events.mua_overlap_uncertain_share_median: median over mua events overlapping a non-local event of the share of their rows with no state above 0.8
 \newcommand{\EventsMuaRestReference}{\ensuremath{-}0.84}  % events.mua_rest_reference: median over epochs of the epoch's median z-scored MUA rate in quiet rest
 \newcommand{\EventsMuaRunningReference}{0.56}  % events.mua_running_reference: median over epochs of the epoch's median z-scored MUA rate while running
-\newcommand{\EventsMultimodalAnimalsInDirection}{4}  % events.multimodal_animals_in_direction: animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median
+\newcommand{\EventsMultimodalAnimalsInDirection}{4}  % events.multimodal_animals_in_direction: animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsMultimodalDifferenceHigh}{+0.13}  % events.multimodal_difference_high: upper bound of that interval
 \newcommand{\EventsMultimodalDifferenceLow}{+0.013}  % events.multimodal_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median multimodal fraction of the posterior
 \newcommand{\EventsMultimodalMatchedDifference}{+0.072}  % events.multimodal_matched_difference: SWR minus non-SWR difference of median multimodal fraction of the posterior at matched duration (within ten duration-quantile strata, averaged by stratum size)
@@ -310,7 +310,7 @@
 \newcommand{\EventsMultimodalMatchedDifferenceLow}{+0.0050}  % events.multimodal_matched_difference_low: lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate
 \newcommand{\EventsMultimodalMedianNonSwr}{0.03}  % events.multimodal_median_non_swr: median multimodal fraction of the posterior of immobile non-SWR non-local events
 \newcommand{\EventsMultimodalMedianSwr}{0.11}  % events.multimodal_median_swr: median multimodal fraction of the posterior of immobile SWR-overlapping non-local events
-\newcommand{\EventsNonSwrCloseAnimalsAboveBaseline}{5}  % events.non_swr_close_animals_above_baseline: animals whose median nonSWR-close event scores above their median quiet window, per spike
+\newcommand{\EventsNonSwrCloseAnimalsAboveBaseline}{5}  % events.non_swr_close_animals_above_baseline: animals whose median nonSWR-close event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsNonSwrCloseDllPerSpikeMedian}{0.49}  % events.non_swr_close_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events
 \newcommand{\EventsNonSwrCloseEpochsAboveBaseline}{242}  % events.non_swr_close_epochs_above_baseline: epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike
 \newcommand{\EventsNonSwrCloseEpochsScored}{242}  % events.non_swr_close_epochs_scored: epochs with a scored nonSWR-close event
@@ -324,9 +324,9 @@
 \newcommand{\EventsNonSwrContentRemotePathFraction}{41}  % events.non_swr_content_remote_path_fraction: share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions
 \newcommand{\EventsNonSwrContentRemoteWellFraction}{45}  % events.non_swr_content_remote_well_fraction: share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions
 \newcommand{\EventsNonSwrFraction}{57}  % events.non_swr_fraction: share of immobile non-local events overlapping no SWR, pooled over animals
-\newcommand{\EventsNonSwrFractionAnimalMax}{65}  % events.non_swr_fraction_animal_max: highest per-animal share of non-SWR events
-\newcommand{\EventsNonSwrFractionAnimalMin}{47}  % events.non_swr_fraction_animal_min: lowest per-animal share of non-SWR events
-\newcommand{\EventsNonSwrRemoteAnimalsAboveBaseline}{5}  % events.non_swr_remote_animals_above_baseline: animals whose median nonSWR-remote event scores above their median quiet window, per spike
+\newcommand{\EventsNonSwrFractionAnimalMax}{65}  % events.non_swr_fraction_animal_max: highest per-animal share of non-SWR events (the mean over the animal's epochs)
+\newcommand{\EventsNonSwrFractionAnimalMin}{46}  % events.non_swr_fraction_animal_min: lowest per-animal share of non-SWR events (an animal's share is the mean over its epochs of the epoch's share)
+\newcommand{\EventsNonSwrRemoteAnimalsAboveBaseline}{5}  % events.non_swr_remote_animals_above_baseline: animals whose median nonSWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsNonSwrRemoteDllPerSpikeMedian}{0.71}  % events.non_swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events
 \newcommand{\EventsNonSwrRemoteEpochsAboveBaseline}{242}  % events.non_swr_remote_epochs_above_baseline: epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike
 \newcommand{\EventsNonSwrRemoteEpochsScored}{242}  % events.non_swr_remote_epochs_scored: epochs with a scored nonSWR-remote event
@@ -357,7 +357,7 @@
 \newcommand{\EventsNonlocalTimeOutsideWidloskiS}{6098}  % events.nonlocal_time_outside_widloski_s: seconds of non-local event time that the Widloski detector's events do not cover
 \newcommand{\EventsNonlocalTimeS}{6562}  % events.nonlocal_time_s: seconds of non-local event time (compared events), summed over epochs
 \newcommand{\EventsOccupancyEpochs}{242}  % events.occupancy_epochs: epochs in the content-occupancy table
-\newcommand{\EventsPauseAnimalsInDirection}{5}  % events.pause_animals_in_direction: animals whose non-SWR median pause fraction is higher than their SWR median
+\newcommand{\EventsPauseAnimalsInDirection}{5}  % events.pause_animals_in_direction: animals whose non-SWR median pause fraction is higher than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsPauseDifferenceHigh}{\ensuremath{-}0.059}  % events.pause_difference_high: upper bound of that interval
 \newcommand{\EventsPauseDifferenceLow}{\ensuremath{-}0.090}  % events.pause_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median pause fraction
 \newcommand{\EventsPauseMatchedDifference}{\ensuremath{-}0.050}  % events.pause_matched_difference: SWR minus non-SWR difference of median pause fraction at matched duration (within ten duration-quantile strata, averaged by stratum size)
@@ -365,7 +365,7 @@
 \newcommand{\EventsPauseMatchedDifferenceLow}{\ensuremath{-}0.079}  % events.pause_matched_difference_low: lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate
 \newcommand{\EventsPauseMedianNonSwr}{1.00}  % events.pause_median_non_swr: median pause fraction of immobile non-SWR non-local events
 \newcommand{\EventsPauseMedianSwr}{0.93}  % events.pause_median_swr: median pause fraction of immobile SWR-overlapping non-local events
-\newcommand{\EventsPeakAnimalsInDirection}{4}  % events.peak_animals_in_direction: animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median
+\newcommand{\EventsPeakAnimalsInDirection}{4}  % events.peak_animals_in_direction: animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsPeakDifferenceHigh}{+0.0095}  % events.peak_difference_high: upper bound of that interval
 \newcommand{\EventsPeakDifferenceLow}{\ensuremath{-}0.12}  % events.peak_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median posterior peak (mean over the event)
 \newcommand{\EventsPeakMatchedDifference}{\ensuremath{-}0.091}  % events.peak_matched_difference: SWR minus non-SWR difference of median posterior peak (mean over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size)
@@ -374,7 +374,7 @@
 \newcommand{\EventsPeakMedianNonSwr}{0.90}  % events.peak_median_non_swr: median posterior peak (mean over the event) of immobile non-SWR non-local events
 \newcommand{\EventsPeakMedianSwr}{0.82}  % events.peak_median_swr: median posterior peak (mean over the event) of immobile SWR-overlapping non-local events
 \newcommand{\EventsRestHours}{40}  % events.rest_hours: hours of analysed immobility the non-local detector observed (exposure), summed over epochs
-\newcommand{\EventsReversalsAnimalsInDirection}{5}  % events.reversals_animals_in_direction: animals whose non-SWR median number of direction reversals is lower than their SWR median
+\newcommand{\EventsReversalsAnimalsInDirection}{5}  % events.reversals_animals_in_direction: animals whose non-SWR median number of direction reversals is lower than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsReversalsDifferenceHigh}{+3.0}  % events.reversals_difference_high: upper bound of that interval
 \newcommand{\EventsReversalsDifferenceLow}{+2.0}  % events.reversals_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of direction reversals
 \newcommand{\EventsReversalsMatchedDifference}{+1.7}  % events.reversals_matched_difference: SWR minus non-SWR difference of median number of direction reversals at matched duration (within ten duration-quantile strata, averaged by stratum size)
@@ -382,10 +382,10 @@
 \newcommand{\EventsReversalsMatchedDifferenceLow}{+0.94}  % events.reversals_matched_difference_low: lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate
 \newcommand{\EventsReversalsMedianNonSwr}{0}  % events.reversals_median_non_swr: median number of direction reversals of immobile non-SWR non-local events
 \newcommand{\EventsReversalsMedianSwr}{3}  % events.reversals_median_swr: median number of direction reversals of immobile SWR-overlapping non-local events
-\newcommand{\EventsRippleAnimalsAboveRestNonSwr}{5}  % events.ripple_animals_above_rest_non_swr: animals whose median non-SWR event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level
-\newcommand{\EventsRippleAnimalsAboveRestSwr}{5}  % events.ripple_animals_above_rest_swr: animals whose median SWR-overlapping event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level
-\newcommand{\EventsRippleAnimalsBelowRunningNonSwr}{1}  % events.ripple_animals_below_running_non_swr: animals whose median non-SWR event ripple power is below the median, over the same events, of each event's own epoch's median running level
-\newcommand{\EventsRippleAnimalsBelowRunningSwr}{0}  % events.ripple_animals_below_running_swr: animals whose median SWR-overlapping event ripple power is below the median, over the same events, of each event's own epoch's median running level
+\newcommand{\EventsRippleAnimalsAboveRestNonSwr}{5}  % events.ripple_animals_above_rest_non_swr: animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
+\newcommand{\EventsRippleAnimalsAboveRestSwr}{5}  % events.ripple_animals_above_rest_swr: animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
+\newcommand{\EventsRippleAnimalsBelowRunningNonSwr}{0}  % events.ripple_animals_below_running_non_swr: animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
+\newcommand{\EventsRippleAnimalsBelowRunningSwr}{0}  % events.ripple_animals_below_running_swr: animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
 \newcommand{\EventsRippleMedianNonSwr}{0.50}  % events.ripple_median_non_swr: median z-scored ripple power of immobile non-SWR non-local events (event mean)
 \newcommand{\EventsRippleMedianSwr}{2.35}  % events.ripple_median_swr: median z-scored ripple power of immobile SWR-overlapping non-local events (event mean)
 \newcommand{\EventsRipplePeakAnimalsUnimodal}{5}  % events.ripple_peak_animals_unimodal: animals in which Hartigan's dip test does not reject one mode of the events' peak ripple power (p at or above 0.05)
@@ -393,10 +393,10 @@
 \newcommand{\EventsRipplePeakModeAnimalMin}{0.90}  % events.ripple_peak_mode_animal_min: lowest per-animal location of the main KDE mode of the events' peak ripple power
 \newcommand{\EventsRippleRestReference}{\ensuremath{-}0.60}  % events.ripple_rest_reference: median over epochs of the epoch's median z-scored ripple power in quiet rest
 \newcommand{\EventsRippleRunningReference}{0.33}  % events.ripple_running_reference: median over epochs of the epoch's median z-scored ripple power while running
-\newcommand{\EventsSlowGammaAnimalsAboveRestNonSwr}{5}  % events.slow_gamma_animals_above_rest_non_swr: animals whose median non-SWR event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level
-\newcommand{\EventsSlowGammaAnimalsAboveRestSwr}{5}  % events.slow_gamma_animals_above_rest_swr: animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level
-\newcommand{\EventsSlowGammaAnimalsBelowRunningNonSwr}{0}  % events.slow_gamma_animals_below_running_non_swr: animals whose median non-SWR event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level
-\newcommand{\EventsSlowGammaAnimalsBelowRunningSwr}{0}  % events.slow_gamma_animals_below_running_swr: animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level
+\newcommand{\EventsSlowGammaAnimalsAboveRestNonSwr}{5}  % events.slow_gamma_animals_above_rest_non_swr: animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
+\newcommand{\EventsSlowGammaAnimalsAboveRestSwr}{5}  % events.slow_gamma_animals_above_rest_swr: animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
+\newcommand{\EventsSlowGammaAnimalsBelowRunningNonSwr}{1}  % events.slow_gamma_animals_below_running_non_swr: animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
+\newcommand{\EventsSlowGammaAnimalsBelowRunningSwr}{0}  % events.slow_gamma_animals_below_running_swr: animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
 \newcommand{\EventsSlowGammaDbAnimalsAboveRestNonSwr}{3}  % events.slow_gamma_db_animals_above_rest_non_swr: animals whose median over epochs of that change (non-SWR events) is above 0 dB
 \newcommand{\EventsSlowGammaDbAnimalsAboveRestSwr}{5}  % events.slow_gamma_db_animals_above_rest_swr: animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB
 \newcommand{\EventsSlowGammaDbMedianNonSwr}{+0.36}  % events.slow_gamma_db_median_non_swr: median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers
@@ -405,7 +405,7 @@
 \newcommand{\EventsSlowGammaMedianSwr}{0.36}  % events.slow_gamma_median_swr: median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean)
 \newcommand{\EventsSlowGammaRestReference}{\ensuremath{-}0.28}  % events.slow_gamma_rest_reference: median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest
 \newcommand{\EventsSlowGammaRunningReference}{\ensuremath{-}0.30}  % events.slow_gamma_running_reference: median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running
-\newcommand{\EventsSpeedAnimalsInDirection}{5}  % events.speed_animals_in_direction: animals whose non-SWR median replay speed (median over the event) is lower than their SWR median
+\newcommand{\EventsSpeedAnimalsInDirection}{5}  % events.speed_animals_in_direction: animals whose non-SWR median replay speed (median over the event) is lower than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsSpeedDifferenceHigh}{+230}  % events.speed_difference_high: upper bound of that interval
 \newcommand{\EventsSpeedDifferenceLow}{+110}  % events.speed_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median replay speed (median over the event)
 \newcommand{\EventsSpeedMatchedDifference}{+180}  % events.speed_matched_difference: SWR minus non-SWR difference of median replay speed (median over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size)
@@ -413,7 +413,7 @@
 \newcommand{\EventsSpeedMatchedDifferenceLow}{+110}  % events.speed_matched_difference_low: lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate
 \newcommand{\EventsSpeedMedianNonSwr}{320}  % events.speed_median_non_swr: median replay speed (median over the event) of immobile non-SWR non-local events
 \newcommand{\EventsSpeedMedianSwr}{490}  % events.speed_median_swr: median replay speed (median over the event) of immobile SWR-overlapping non-local events
-\newcommand{\EventsStartDistanceAnimalsInDirection}{3}  % events.start_distance_animals_in_direction: animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median
+\newcommand{\EventsStartDistanceAnimalsInDirection}{3}  % events.start_distance_animals_in_direction: animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsStartDistanceDifferenceHigh}{+16}  % events.start_distance_difference_high: upper bound of that interval
 \newcommand{\EventsStartDistanceDifferenceLow}{\ensuremath{-}11}  % events.start_distance_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position)
 \newcommand{\EventsStartDistanceMatchedDifference}{\ensuremath{-}13}  % events.start_distance_matched_difference: SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) at matched duration (within ten duration-quantile strata, averaged by stratum size)
@@ -432,7 +432,7 @@
 \newcommand{\EventsSwrContentRemotePathFraction}{73}  % events.swr_content_remote_path_fraction: share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions
 \newcommand{\EventsSwrContentRemoteWellFraction}{21}  % events.swr_content_remote_well_fraction: share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions
 \newcommand{\EventsSwrOverlappingEvents}{32{,}701}  % events.swr_overlapping_events: immobile non-local events overlapping an SWR
-\newcommand{\EventsSwrRemoteAnimalsAboveBaseline}{5}  % events.swr_remote_animals_above_baseline: animals whose median SWR-remote event scores above their median quiet window, per spike
+\newcommand{\EventsSwrRemoteAnimalsAboveBaseline}{5}  % events.swr_remote_animals_above_baseline: animals whose median SWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsSwrRemoteDllPerSpikeMedian}{1.18}  % events.swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events
 \newcommand{\EventsSwrRemoteEpochsAboveBaseline}{242}  % events.swr_remote_epochs_above_baseline: epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike
 \newcommand{\EventsSwrRemoteEpochsScored}{242}  % events.swr_remote_epochs_scored: epochs with a scored SWR-remote event
@@ -440,12 +440,12 @@
 \newcommand{\EventsSwrRemoteScored}{20{,}879}  % events.swr_remote_scored: SWR-remote events scored
 \newcommand{\EventsSwrRemoteSpikesMedian}{118}  % events.swr_remote_spikes_median: median spike count of SWR-remote events
 \newcommand{\EventsSwrRemoteTetrodesMedian}{15}  % events.swr_remote_tetrodes_median: median number of tetrodes with a spike in SWR-remote events
-\newcommand{\EventsThetaAnimalsAboveRestNonSwr}{2}  % events.theta_animals_above_rest_non_swr: animals whose median non-SWR event theta power is above the median, over the same events, of each event's own epoch's median quiet-rest level
-\newcommand{\EventsThetaAnimalsAboveRestSwr}{2}  % events.theta_animals_above_rest_swr: animals whose median SWR-overlapping event theta power is above the median, over the same events, of each event's own epoch's median quiet-rest level
-\newcommand{\EventsThetaAnimalsBelowRunningNonSwr}{5}  % events.theta_animals_below_running_non_swr: animals whose median non-SWR event theta power is below the median, over the same events, of each event's own epoch's median running level
-\newcommand{\EventsThetaAnimalsBelowRunningSwr}{5}  % events.theta_animals_below_running_swr: animals whose median SWR-overlapping event theta power is below the median, over the same events, of each event's own epoch's median running level
-\newcommand{\EventsThetaLikeAnimalsAboveRestMatchedNonSwr}{2}  % events.theta_like_animals_above_rest_matched_non_swr: animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows
-\newcommand{\EventsThetaLikeAnimalsAboveRestMatchedSwr}{1}  % events.theta_like_animals_above_rest_matched_swr: animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows
+\newcommand{\EventsThetaAnimalsAboveRestNonSwr}{1}  % events.theta_animals_above_rest_non_swr: animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
+\newcommand{\EventsThetaAnimalsAboveRestSwr}{1}  % events.theta_animals_above_rest_swr: animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
+\newcommand{\EventsThetaAnimalsBelowRunningNonSwr}{5}  % events.theta_animals_below_running_non_swr: animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
+\newcommand{\EventsThetaAnimalsBelowRunningSwr}{5}  % events.theta_animals_below_running_swr: animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
+\newcommand{\EventsThetaLikeAnimalsAboveRestMatchedNonSwr}{2}  % events.theta_like_animals_above_rest_matched_non_swr: animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share
+\newcommand{\EventsThetaLikeAnimalsAboveRestMatchedSwr}{1}  % events.theta_like_animals_above_rest_matched_swr: animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share
 \newcommand{\EventsThetaLikeFractionNonSwr}{13}  % events.theta_like_fraction_non_swr: share of immobile non-SWR non-local events whose theta power reaches their epoch's median running level
 \newcommand{\EventsThetaLikeFractionRestMatchedNonSwr}{12}  % events.theta_like_fraction_rest_matched_non_swr: share of quiet-rest windows, matched in duration to the non-SWR events, whose theta reaches the epoch's median running theta
 \newcommand{\EventsThetaLikeFractionRestMatchedSwr}{12}  % events.theta_like_fraction_rest_matched_swr: share of quiet-rest windows, matched in duration to the SWR-overlapping events, whose theta reaches the epoch's median running theta

@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `cb5c16baa03a` | yes | 32 | 0 |
 | `detection.json` | `cb5c16baa03a` | yes | 132 | 0 |
-| `events.json` | `7eabc1b9c82a` | yes | 331 | 0 |
+| `events.json` | `93ac9014034d` | yes | 331 | 0 |
 | `behavior.json` | `afa8dfd15e22` | yes | 922 | 0 |
 | `mpfc.json` | `afa8dfd15e22` | yes | 604 | 0 |
 
@@ -230,13 +230,13 @@ Sources:
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsAnimals` | 5 |  | animals in the event table | `events.event_cohort_values` | 2b |
-| `\EventsAnimalsNonSwrMajority` | 4 |  | animals in which more than half the events are non-SWR | `events.event_cohort_values` | 2b |
-| `\EventsAnimalsNonSwrPlurality` | 5 |  | animals in which non-SWR is the largest of the three overlap classes | `events.event_cohort_values` | 2b |
+| `\EventsAnimalsNonSwrMajority` | 4 |  | animals whose share of non-SWR events (the mean over their epochs) is above one half | `events.event_cohort_values` | 2b |
+| `\EventsAnimalsNonSwrPlurality` | 5 |  | animals whose share of non-SWR events is the largest of their three overlap-class shares (each the mean over the animal's epochs) | `events.event_cohort_values` | 2b |
 | `\EventsEpochs` | 242 |  | epochs in the event table | `events.event_cohort_values` | 2b |
 | `\EventsKayTimeS` | 4127 | s | seconds Kay's SWRs span (compared events): what an SWR-triggered analysis examines | `events.left_out_values` | 2 |
 | `\EventsNonSwrFraction` | 57 % |  | share of immobile non-local events overlapping no SWR, pooled over animals | `events.event_cohort_values` | 2b |
-| `\EventsNonSwrFractionAnimalMax` | 65 % |  | highest per-animal share of non-SWR events | `events.event_cohort_values` | 2b |
-| `\EventsNonSwrFractionAnimalMin` | 47 |  | lowest per-animal share of non-SWR events | `events.event_cohort_values` | 2b |
+| `\EventsNonSwrFractionAnimalMax` | 65 % |  | highest per-animal share of non-SWR events (the mean over the animal's epochs) | `events.event_cohort_values` | 2b |
+| `\EventsNonSwrFractionAnimalMin` | 46 |  | lowest per-animal share of non-SWR events (an animal's share is the mean over its epochs of the epoch's share) | `events.event_cohort_values` | 2b |
 | `\EventsNonlocalEvents` | 75,675 |  | immobile non-local events in the canonical event table (whole event below 4 cm/s) | `events.event_cohort_values` | 2b |
 | `\EventsNonlocalEventsNonSwr` | 42,974 |  | of those, events overlapping no SWR (overlap_class non_swr) | `events.event_cohort_values` | 2b |
 | `\EventsNonlocalEventsOutsideKay` | 42,962 |  | non-local events no Kay SWR overlaps (detector comparison memberships) | `events.left_out_values` | 2 |
@@ -297,8 +297,8 @@ Sources:
 | `\EventsKarlssonOverlapUncertainShareMedian` | 13 % |  | median over karlsson events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
 | `\EventsKayEvents` | 41,151 |  | kay events compared with the non-local detector | `events.other_detector_values` | 2 |
 | `\EventsKayNoNonlocalFraction` | 17 % |  | share of kay events that overlap no non-local event | `events.other_detector_values` | 2 |
-| `\EventsKayNoNonlocalFractionAnimalMax` | 28 % |  | highest per-animal share of kay events overlapping no non-local event | `events.other_detector_values` | 2 |
-| `\EventsKayNoNonlocalFractionAnimalMin` | 8 |  | lowest per-animal share of kay events overlapping no non-local event | `events.other_detector_values` | 2 |
+| `\EventsKayNoNonlocalFractionAnimalMax` | 29 % |  | highest per-animal share of kay events overlapping no non-local event (the mean over the animal's epochs) | `events.other_detector_values` | 2 |
+| `\EventsKayNoNonlocalFractionAnimalMin` | 8 |  | lowest per-animal share of kay events overlapping no non-local event (an animal's share is the mean over its epochs of the epoch's share) | `events.other_detector_values` | 2 |
 | `\EventsKayNoNonlocalMixedFraction` | 26 % |  | of kay events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` | 2 |
 | `\EventsKayNoNonlocalMostlyLocalFraction` | 74 % |  | of kay events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` | 2 |
 | `\EventsKayNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of kay events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` | 2 |
@@ -395,10 +395,10 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3c |
-| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3c |
-| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3c |
-| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` | 3c |
 | `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3c |
 | `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3c |
 | `\EventsRipplePeakAnimalsUnimodal` | 5 |  | animals in which Hartigan's dip test does not reject one mode of the events' peak ripple power (p at or above 0.05) | `events.class_distribution_values` |  |
@@ -435,10 +435,10 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.gamma_z_values` |  |
-| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.gamma_z_values` |  |
-| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.gamma_z_values` |  |
-| `\EventsFastGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.gamma_z_values` |  |
+| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
+| `\EventsFastGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
 | `\EventsFastGammaDbAnimalsAboveRestNonSwr` | 5 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsFastGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsFastGammaDbMedianNonSwr` | +0.52 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
@@ -447,26 +447,26 @@ Sources:
 | `\EventsFastGammaMedianSwr` | 0.11 | z | median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.gamma_z_values` |  |
 | `\EventsFastGammaRestReference` | −0.43 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest | `events.gamma_z_values` |  |
 | `\EventsFastGammaRunningReference` | −0.14 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running | `events.gamma_z_values` |  |
-| `\EventsMuaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event MUA rate is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsMuaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event MUA rate is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsMuaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event MUA rate is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
-| `\EventsMuaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event MUA rate is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
 | `\EventsMuaMedianNonSwr` | 0.79 | z | median z-scored MUA rate of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
 | `\EventsMuaMedianSwr` | 2.37 | z | median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
 | `\EventsMuaRestReference` | −0.84 | z | median over epochs of the epoch's median z-scored MUA rate in quiet rest | `events.brain_state_values` |  |
 | `\EventsMuaRunningReference` | 0.56 | z | median over epochs of the epoch's median z-scored MUA rate while running | `events.brain_state_values` |  |
-| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3c |
-| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3c |
-| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3c |
-| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` | 3c |
 | `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3c |
 | `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3c |
 | `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3c |
 | `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3c |
-| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.gamma_z_values` |  |
-| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.gamma_z_values` |  |
-| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.gamma_z_values` |  |
-| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.gamma_z_values` |  |
+| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
+| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
 | `\EventsSlowGammaDbAnimalsAboveRestNonSwr` | 3 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsSlowGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsSlowGammaDbMedianNonSwr` | +0.36 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
@@ -475,12 +475,12 @@ Sources:
 | `\EventsSlowGammaMedianSwr` | 0.36 | z | median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.gamma_z_values` |  |
 | `\EventsSlowGammaRestReference` | −0.28 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest | `events.gamma_z_values` |  |
 | `\EventsSlowGammaRunningReference` | −0.30 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running | `events.gamma_z_values` |  |
-| `\EventsThetaAnimalsAboveRestNonSwr` | 2 |  | animals whose median non-SWR event theta power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsThetaAnimalsAboveRestSwr` | 2 |  | animals whose median SWR-overlapping event theta power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsThetaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event theta power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
-| `\EventsThetaAnimalsBelowRunningSwr` | 5 |  | animals whose median SWR-overlapping event theta power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
-| `\EventsThetaLikeAnimalsAboveRestMatchedNonSwr` | 2 |  | animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows | `events.rest_theta_values` |  |
-| `\EventsThetaLikeAnimalsAboveRestMatchedSwr` | 1 |  | animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows | `events.rest_theta_values` |  |
+| `\EventsThetaAnimalsAboveRestNonSwr` | 1 |  | animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsAboveRestSwr` | 1 |  | animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsBelowRunningSwr` | 5 |  | animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
+| `\EventsThetaLikeAnimalsAboveRestMatchedNonSwr` | 2 |  | animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share | `events.rest_theta_values` |  |
+| `\EventsThetaLikeAnimalsAboveRestMatchedSwr` | 1 |  | animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share | `events.rest_theta_values` |  |
 | `\EventsThetaLikeFractionNonSwr` | 13 % |  | share of immobile non-SWR non-local events whose theta power reaches their epoch's median running level | `events.brain_state_values` |  |
 | `\EventsThetaLikeFractionRestMatchedNonSwr` | 12 % |  | share of quiet-rest windows, matched in duration to the non-SWR events, whose theta reaches the epoch's median running theta | `events.rest_theta_values` |  |
 | `\EventsThetaLikeFractionRestMatchedSwr` | 12 % |  | share of quiet-rest windows, matched in duration to the SWR-overlapping events, whose theta reaches the epoch's median running theta | `events.rest_theta_values` |  |
@@ -577,12 +577,12 @@ Sources:
 | `\EventsHeldoutSwrPerSpike` | 0.60 | nats per spike | held-out evidence per held-out spike for immobile Non-Local Continuous bouts with an SWR, against the animal's position: mean over animals | `events.heldout_by_swr_values` | 2 |
 | `\EventsHeldoutSwrPerSpikeCiHigh` | 0.74 | nats per spike | upper bound of its 95 % t-interval over animals | `events.heldout_by_swr_values` | 2 |
 | `\EventsHeldoutSwrPerSpikeCiLow` | 0.45 | nats per spike | lower bound of its 95 % t-interval over animals | `events.heldout_by_swr_values` | 2 |
-| `\EventsNonSwrCloseAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-close event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-close event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrCloseDllPerSpikeMedian` | 0.49 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrCloseEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrCloseEpochsScored` | 242 |  | epochs with a scored nonSWR-close event | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-remote event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteDllPerSpikeMedian` | 0.71 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteEpochsScored` | 242 |  | epochs with a scored nonSWR-remote event | `events.spike_evidence_values` | 2 |
@@ -590,7 +590,7 @@ Sources:
 | `\EventsStepEvidenceCriterionAnimals` | 3 |  | animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error | `events.class_step_evidence_values` |  |
 | `\EventsStepEvidenceCriterionAnimalsSameSign` | 5 |  | animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval | `events.class_step_evidence_values` |  |
 | `\EventsStepEvidenceCriterionShareMedian` | +0.20 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | `events.class_step_evidence_values` |  |
-| `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteDllPerSpikeMedian` | 1.18 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteEpochsScored` | 242 |  | epochs with a scored SWR-remote event | `events.spike_evidence_values` | 2 |
@@ -643,7 +643,7 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsNonSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-remote event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteDllPerSpikeMedian` | 0.71 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteEpochsScored` | 242 |  | epochs with a scored nonSWR-remote event | `events.spike_evidence_values` | 2 |
@@ -651,7 +651,7 @@ Sources:
 | `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteSpikesMedian` | 36 | spikes | median spike count of nonSWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteTetrodesMedian` | 11 | tetrodes | median number of tetrodes with a spike in nonSWR-remote events | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteDllPerSpikeMedian` | 1.18 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteEpochsScored` | 242 |  | epochs with a scored SWR-remote event | `events.spike_evidence_values` | 2 |
@@ -670,7 +670,7 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content | `events.content_occupancy_values` | 2 |
+| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's sessions of the session's share | `events.content_occupancy_values` | 2 |
 | `\EventsNonSwrContentAtWellFraction` | 58 % |  | share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 | `\EventsNonSwrContentNearOffFraction` | 1 % |  | share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 | `\EventsNonSwrContentOwnWellFraction` | 13 % |  | share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
@@ -701,14 +701,14 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content | `events.content_occupancy_values` | 2 |
+| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's sessions of the session's share | `events.content_occupancy_values` | 2 |
 | `\EventsNonSwrContentAtWellFraction` | 58 % |  | share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 | `\EventsNonSwrContentNearOffFraction` | 1 % |  | share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 | `\EventsNonSwrContentOwnWellFraction` | 13 % |  | share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 | `\EventsNonSwrContentRemotePathFraction` | 41 % |  | share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 | `\EventsNonSwrContentRemoteWellFraction` | 45 % |  | share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 | `\EventsOccupancyEpochs` | 242 |  | epochs in the content-occupancy table | `events.content_occupancy_values` | 2 |
-| `\EventsStartDistanceAnimalsInDirection` | 3 |  | animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median | `events.start_distance_values` | 3 |
+| `\EventsStartDistanceAnimalsInDirection` | 3 |  | animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.start_distance_values` | 3 |
 | `\EventsStartDistanceDifferenceHigh` | +16 | cm | upper bound of that interval | `events.property_interval_values` | 3 |
 | `\EventsStartDistanceDifferenceLow` | −11 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) | `events.property_interval_values` | 3 |
 | `\EventsStartDistanceMatchedDifference` | −13 | cm | SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
@@ -734,7 +734,7 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsSpeedAnimalsInDirection` | 5 |  | animals whose non-SWR median replay speed (median over the event) is lower than their SWR median | `events.property_values` | 3e |
+| `\EventsSpeedAnimalsInDirection` | 5 |  | animals whose non-SWR median replay speed (median over the event) is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` | 3e |
 | `\EventsSpeedDifferenceHigh` | +230 | cm/s | upper bound of that interval | `events.property_interval_values` | 3e |
 | `\EventsSpeedDifferenceLow` | +110 | cm/s | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median replay speed (median over the event) | `events.property_interval_values` | 3e |
 | `\EventsSpeedMatchedDifference` | +180 | cm/s | SWR minus non-SWR difference of median replay speed (median over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3e |
@@ -756,7 +756,7 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsArmsAnimalsInDirection` | 5 |  | animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median | `events.property_values` | 3 |
+| `\EventsArmsAnimalsInDirection` | 5 |  | animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` | 3 |
 | `\EventsArmsDifferenceHigh` | +2.0 |  | upper bound of that interval | `events.property_interval_values` | 3 |
 | `\EventsArmsDifferenceLow` | +1.0 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of arms the decoded position visits | `events.property_interval_values` | 3 |
 | `\EventsArmsMatchedDifference` | +0.98 |  | SWR minus non-SWR difference of median number of arms the decoded position visits at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
@@ -764,7 +764,7 @@ Sources:
 | `\EventsArmsMatchedDifferenceLow` | +0.82 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3 |
 | `\EventsArmsMedianNonSwr` | 1 |  | median number of arms the decoded position visits of immobile non-SWR non-local events | `events.property_values` | 3 |
 | `\EventsArmsMedianSwr` | 3 |  | median number of arms the decoded position visits of immobile SWR-overlapping non-local events | `events.property_values` | 3 |
-| `\EventsExtentAnimalsInDirection` | 5 |  | animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median | `events.property_values` | 3 |
+| `\EventsExtentAnimalsInDirection` | 5 |  | animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` | 3 |
 | `\EventsExtentDifferenceHigh` | +58 | cm | upper bound of that interval | `events.property_interval_values` | 3 |
 | `\EventsExtentDifferenceLow` | +29 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median spatial extent of the decoded content | `events.property_interval_values` | 3 |
 | `\EventsExtentMatchedDifference` | +35 | cm | SWR minus non-SWR difference of median spatial extent of the decoded content at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
@@ -785,7 +785,7 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsMaxStepAnimalsInDirection` | 5 |  | animals whose non-SWR median largest step of the decoded position is lower than their SWR median | `events.property_values` | 3 |
+| `\EventsMaxStepAnimalsInDirection` | 5 |  | animals whose non-SWR median largest step of the decoded position is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` | 3 |
 | `\EventsMaxStepDifferenceHigh` | +22 | cm | upper bound of that interval | `events.property_interval_values` | 3 |
 | `\EventsMaxStepDifferenceLow` | +7.8 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median largest step of the decoded position | `events.property_interval_values` | 3 |
 | `\EventsMaxStepMatchedDifference` | +24 | cm | SWR minus non-SWR difference of median largest step of the decoded position at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
@@ -793,7 +793,7 @@ Sources:
 | `\EventsMaxStepMatchedDifferenceLow` | +14 | cm | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3 |
 | `\EventsMaxStepMedianNonSwr` | 2.0 | cm | median largest step of the decoded position of immobile non-SWR non-local events | `events.property_values` | 3 |
 | `\EventsMaxStepMedianSwr` | 14 | cm | median largest step of the decoded position of immobile SWR-overlapping non-local events | `events.property_values` | 3 |
-| `\EventsPauseAnimalsInDirection` | 5 |  | animals whose non-SWR median pause fraction is higher than their SWR median | `events.property_values` | 3 |
+| `\EventsPauseAnimalsInDirection` | 5 |  | animals whose non-SWR median pause fraction is higher than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` | 3 |
 | `\EventsPauseDifferenceHigh` | −0.059 |  | upper bound of that interval | `events.property_interval_values` | 3 |
 | `\EventsPauseDifferenceLow` | −0.090 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median pause fraction | `events.property_interval_values` | 3 |
 | `\EventsPauseMatchedDifference` | −0.050 |  | SWR minus non-SWR difference of median pause fraction at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
@@ -801,7 +801,7 @@ Sources:
 | `\EventsPauseMatchedDifferenceLow` | −0.079 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3 |
 | `\EventsPauseMedianNonSwr` | 1.00 |  | median pause fraction of immobile non-SWR non-local events | `events.property_values` | 3 |
 | `\EventsPauseMedianSwr` | 0.93 |  | median pause fraction of immobile SWR-overlapping non-local events | `events.property_values` | 3 |
-| `\EventsReversalsAnimalsInDirection` | 5 |  | animals whose non-SWR median number of direction reversals is lower than their SWR median | `events.property_values` | 3 |
+| `\EventsReversalsAnimalsInDirection` | 5 |  | animals whose non-SWR median number of direction reversals is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` | 3 |
 | `\EventsReversalsDifferenceHigh` | +3.0 |  | upper bound of that interval | `events.property_interval_values` | 3 |
 | `\EventsReversalsDifferenceLow` | +2.0 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of direction reversals | `events.property_interval_values` | 3 |
 | `\EventsReversalsMatchedDifference` | +1.7 |  | SWR minus non-SWR difference of median number of direction reversals at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
@@ -822,7 +822,7 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsHpdAnimalsInDirection` | 4 |  | animals whose non-SWR median highest-density-region coverage is lower than their SWR median | `events.property_values` |  |
+| `\EventsHpdAnimalsInDirection` | 4 |  | animals whose non-SWR median highest-density-region coverage is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` |  |
 | `\EventsHpdDifferenceHigh` | +53 | cm | upper bound of that interval | `events.property_interval_values` |  |
 | `\EventsHpdDifferenceLow` | −5.3 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median highest-density-region coverage | `events.property_interval_values` |  |
 | `\EventsHpdMatchedDifference` | +38 | cm | SWR minus non-SWR difference of median highest-density-region coverage at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` |  |
@@ -830,7 +830,7 @@ Sources:
 | `\EventsHpdMatchedDifferenceLow` | −1.3 | cm | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` |  |
 | `\EventsHpdMedianNonSwr` | 44 | cm | median highest-density-region coverage of immobile non-SWR non-local events | `events.property_values` |  |
 | `\EventsHpdMedianSwr` | 80 | cm | median highest-density-region coverage of immobile SWR-overlapping non-local events | `events.property_values` |  |
-| `\EventsMultimodalAnimalsInDirection` | 4 |  | animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median | `events.property_values` |  |
+| `\EventsMultimodalAnimalsInDirection` | 4 |  | animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` |  |
 | `\EventsMultimodalDifferenceHigh` | +0.13 |  | upper bound of that interval | `events.property_interval_values` |  |
 | `\EventsMultimodalDifferenceLow` | +0.013 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median multimodal fraction of the posterior | `events.property_interval_values` |  |
 | `\EventsMultimodalMatchedDifference` | +0.072 |  | SWR minus non-SWR difference of median multimodal fraction of the posterior at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` |  |
@@ -838,7 +838,7 @@ Sources:
 | `\EventsMultimodalMatchedDifferenceLow` | +0.0050 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` |  |
 | `\EventsMultimodalMedianNonSwr` | 0.03 |  | median multimodal fraction of the posterior of immobile non-SWR non-local events | `events.property_values` |  |
 | `\EventsMultimodalMedianSwr` | 0.11 |  | median multimodal fraction of the posterior of immobile SWR-overlapping non-local events | `events.property_values` |  |
-| `\EventsPeakAnimalsInDirection` | 4 |  | animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median | `events.property_values` |  |
+| `\EventsPeakAnimalsInDirection` | 4 |  | animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` |  |
 | `\EventsPeakDifferenceHigh` | +0.0095 |  | upper bound of that interval | `events.property_interval_values` |  |
 | `\EventsPeakDifferenceLow` | −0.12 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median posterior peak (mean over the event) | `events.property_interval_values` |  |
 | `\EventsPeakMatchedDifference` | −0.091 |  | SWR minus non-SWR difference of median posterior peak (mean over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` |  |
@@ -860,7 +860,7 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsDurationAnimalsInDirection` | 5 |  | animals whose non-SWR median event duration is lower than their SWR median | `events.property_values` |  |
+| `\EventsDurationAnimalsInDirection` | 5 |  | animals whose non-SWR median event duration is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` |  |
 | `\EventsDurationDifferenceHigh` | +54 | ms | upper bound of that interval | `events.property_interval_values` |  |
 | `\EventsDurationDifferenceLow` | +38 | ms | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median event duration | `events.property_interval_values` |  |
 | `\EventsDurationMedianNonSwr` | 48 | ms | median event duration of immobile non-SWR non-local events | `events.property_values` |  |

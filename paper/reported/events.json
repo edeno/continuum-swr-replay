@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "7eabc1b9c82a",
+ "commit": "93ac9014034d",
  "code": {
-  "head": "7eabc1b9c82a079db538e2861fa73a8a8e95a879",
+  "head": "93ac9014034d90822e5463d862a4e59a8acef48d",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -79,8 +79,8 @@
     "code_sha256": "b176291217c441d363af87c9125922bea7ce9d9aac090708279b800405bd919a"
    },
    "src/continuum_swr_replay/analysis/hippocampus/event_statistics.py": {
-    "sha256": "4ffa84afc56ca50446ab4af0d99994180a148225b47e43309f66d481f892f7ed",
-    "code_sha256": "b806d30e9e5d3b9b8a71bd4c682138e5b96de86154f4c37782988e516ac2ca67"
+    "sha256": "1ebcb5224373b2d16ec60d571151ad9477c630dff80e113c0249d82a2cf577a5",
+    "code_sha256": "a687bcf6438e81aa5baea073a0bcf2f4936101d3537389a05a526756d6ca3146"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/__init__.py": {
     "sha256": "be00f35a8fd3f9b5f8f01cffbb8b160bc1c4dcd8b1b3095c1ebf390cb8eb5146",
@@ -119,8 +119,8 @@
     "code_sha256": "4c5ce7aefdaec2986c15bb844ac865127194b243b527466266a091689a0546ea"
    },
    "src/continuum_swr_replay/analysis/hippocampus/property_contrast.py": {
-    "sha256": "5f55bfb1d36251935b566c4878227117dc50351344ca80087cf9f44c5419d1a6",
-    "code_sha256": "e53523fad9db75eaaa6cb848e7cce1887d37897078a5d223a3b859067e68d97f"
+    "sha256": "4f5b4bd1353cca1e978a6bc2ede6c152d3e4c1bbf93373f73702d2dd073b70c7",
+    "code_sha256": "e8713e884fb347eab43b6cca9a495c92233ec8e3f5fdd742c14042522aadf3cc"
    },
    "src/continuum_swr_replay/analysis/hippocampus/swr_detectors.py": {
     "sha256": "c4cc4566bad69e89f41cfb8b586d2c9e3e0f3691f8cb06fce976b7b3f4d5811d",
@@ -155,8 +155,8 @@
     "code_sha256": "08f662c154b3d0b293a1167fde834ea633106038b36f6420cf6e180a6edb6bd3"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/nonlocal_comparison.py": {
-    "sha256": "524d9e602715b9f456416fdd61e7545c2dea60a88aa5e2e685c383306e89ffd0",
-    "code_sha256": "3afa3c314460c3f6f73aee7828c0deffdcff58e3948e2ea7f89de86cbefa61c3"
+    "sha256": "1cf79565bace924600d13a6170cea56d1dac8361f6c7df39035b7db92597b384",
+    "code_sha256": "7329b080e29fc929d9169d32bf94bd8e7f495d417179f1cf072bca5668a41c74"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/overlap.py": {
     "sha256": "a0eeab4df008e1021e79a025ad27f3c8c3d91844ec59d1c69f568f1922afb39f",
@@ -179,8 +179,8 @@
     "code_sha256": "d1a3f3d6fccad518c38e97f521088cc7e82969619d48cc99f8e95f455fed5598"
    },
    "src/continuum_swr_replay/analysis/shared_statistics.py": {
-    "sha256": "98c4c5e52d91cd42d56f847833ceb1d1c6644ce654bb62606f1391eb8730ac8b",
-    "code_sha256": "d87ca2c7db81e7a87a59c9cdb8af06ba80289acb64786df79dff0ea2379b8c7b"
+    "sha256": "37602fc9313d70c87ceea3fddeb6965d15542fc653a7739d2c7172705bd35bd8",
+    "code_sha256": "55a34fc5f5bdc43ef6fc495674ebf3556685947520171d09e1a3da9336c8ec0a"
    },
    "src/continuum_swr_replay/data_loaders/__init__.py": {
     "sha256": "5cab95c4ae3bdc8ed0ae23bd91ca9bb9d1457b81b46d07f7371364d003198f50",
@@ -243,8 +243,8 @@
     "code_sha256": "c7716a28226699b2539fd24eba997b4dc08d181903aee9b116e26434a06bd398"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "f92f467518b541137764e64e9d8348d9e7750afdf3d60bf0aaeb4fb6beb12b7a",
-    "code_sha256": "2591ce8f759cd1ea62192f454e36f706ad6d9a50a3f3a385351a8279d20f9946"
+    "sha256": "62998d8594b22fa3b99f0acfe3a3ea797ce73213fc4521c9e90fd950fa5c10b2",
+    "code_sha256": "add3737cc0a74d127440e69cedb6fefd1dddd70a57b4edabd042d3e45394c861"
    },
    "src/continuum_swr_replay/reported/values.py": {
     "sha256": "ac38ca536c16eb9686c6868837e6144ccec635914f0f54369180778954409625",
@@ -421,7 +421,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals in which more than half the events are non-SWR",
+   "description": "animals whose share of non-SWR events (the mean over their epochs) is above one half",
    "questions": [
     "2b.2"
    ],
@@ -437,7 +437,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR content is at a well more often than their SWR content",
+   "description": "animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's sessions of the session's share",
    "questions": [
     "2d.1",
     "2c.8"
@@ -454,7 +454,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals in which non-SWR is the largest of the three overlap classes",
+   "description": "animals whose share of non-SWR events is the largest of their three overlap-class shares (each the mean over the animal's epochs)",
    "questions": [
     "2b.2"
    ],
@@ -470,7 +470,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median",
+   "description": "animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2d.3"
    ],
@@ -847,7 +847,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median event duration is lower than their SWR median",
+   "description": "animals whose non-SWR median event duration is lower than their SWR median, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2d.6"
    ],
@@ -985,7 +985,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median",
+   "description": "animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2d.3"
    ],
@@ -1113,7 +1113,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level",
+   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
     "2c.1"
    ],
@@ -1127,7 +1127,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level",
+   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
     "2c.1"
    ],
@@ -1141,7 +1141,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level",
+   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
     "2c.1"
    ],
@@ -1155,7 +1155,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level",
+   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
     "2c.1"
    ],
@@ -1441,7 +1441,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median highest-density-region coverage is lower than their SWR median",
+   "description": "animals whose non-SWR median highest-density-region coverage is lower than their SWR median, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2d.5"
    ],
@@ -1749,11 +1749,11 @@
    "pending": null
   },
   "kay_no_nonlocal_fraction_animal_max": {
-   "value": 0.27984862819299905,
+   "value": 0.29347544198679854,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest per-animal share of kay events overlapping no non-local event",
+   "description": "highest per-animal share of kay events overlapping no non-local event (the mean over the animal's epochs)",
    "questions": [
     "2b.3"
    ],
@@ -1765,11 +1765,11 @@
    "pending": null
   },
   "kay_no_nonlocal_fraction_animal_min": {
-   "value": 0.08077918539708484,
+   "value": 0.08301542790536776,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest per-animal share of kay events overlapping no non-local event",
+   "description": "lowest per-animal share of kay events overlapping no non-local event (an animal's share is the mean over its epochs of the epoch's share)",
    "questions": [
     "2b.3"
    ],
@@ -1961,7 +1961,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median largest step of the decoded position is lower than their SWR median",
+   "description": "animals whose non-SWR median largest step of the decoded position is lower than their SWR median, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2d.4"
    ],
@@ -2089,7 +2089,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event MUA rate is above the median, over the same events, of each event's own epoch's median quiet-rest level",
+   "description": "animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
     "2c.1"
    ],
@@ -2103,7 +2103,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event MUA rate is above the median, over the same events, of each event's own epoch's median quiet-rest level",
+   "description": "animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
     "2c.1"
    ],
@@ -2117,7 +2117,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event MUA rate is below the median, over the same events, of each event's own epoch's median running level",
+   "description": "animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
     "2c.1"
    ],
@@ -2131,7 +2131,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event MUA rate is below the median, over the same events, of each event's own epoch's median running level",
+   "description": "animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
     "2c.1"
    ],
@@ -2369,7 +2369,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median",
+   "description": "animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2d.5"
    ],
@@ -2481,7 +2481,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median nonSWR-close event scores above their median quiet window, per spike",
+   "description": "animals whose median nonSWR-close event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2c.3"
    ],
@@ -2706,11 +2706,11 @@
    "pending": null
   },
   "non_swr_fraction_animal_max": {
-   "value": 0.65432256416805,
+   "value": 0.6452377482054695,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest per-animal share of non-SWR events",
+   "description": "highest per-animal share of non-SWR events (the mean over the animal's epochs)",
    "questions": [
     "2b.2"
    ],
@@ -2722,11 +2722,11 @@
    "pending": null
   },
   "non_swr_fraction_animal_min": {
-   "value": 0.4654143496541435,
+   "value": 0.45927827844605673,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest per-animal share of non-SWR events",
+   "description": "lowest per-animal share of non-SWR events (an animal's share is the mean over its epochs of the epoch's share)",
    "questions": [
     "2b.2"
    ],
@@ -2742,7 +2742,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median nonSWR-remote event scores above their median quiet window, per spike",
+   "description": "animals whose median nonSWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2c.3",
     "2c.7"
@@ -3247,7 +3247,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median pause fraction is higher than their SWR median",
+   "description": "animals whose non-SWR median pause fraction is higher than their SWR median, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2d.4"
    ],
@@ -3375,7 +3375,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median",
+   "description": "animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2d.5"
    ],
@@ -3503,7 +3503,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median number of direction reversals is lower than their SWR median",
+   "description": "animals whose non-SWR median number of direction reversals is lower than their SWR median, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2d.4"
    ],
@@ -3631,7 +3631,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level",
+   "description": "animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
     "2c.1",
     "2b.5"
@@ -3648,7 +3648,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level",
+   "description": "animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
     "2c.1",
     "2b.5"
@@ -3661,11 +3661,11 @@
    "pending": null
   },
   "ripple_animals_below_running_non_swr": {
-   "value": 1,
+   "value": 0,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event ripple power is below the median, over the same events, of each event's own epoch's median running level",
+   "description": "animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
     "2c.1",
     "2b.5"
@@ -3682,7 +3682,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event ripple power is below the median, over the same events, of each event's own epoch's median running level",
+   "description": "animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
     "2c.1",
     "2b.5"
@@ -3809,7 +3809,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level",
+   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
     "2c.1"
    ],
@@ -3823,7 +3823,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level",
+   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
     "2c.1"
    ],
@@ -3833,11 +3833,11 @@
    "pending": null
   },
   "slow_gamma_animals_below_running_non_swr": {
-   "value": 0,
+   "value": 1,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level",
+   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
     "2c.1"
    ],
@@ -3851,7 +3851,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level",
+   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
     "2c.1"
    ],
@@ -3977,7 +3977,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median replay speed (median over the event) is lower than their SWR median",
+   "description": "animals whose non-SWR median replay speed (median over the event) is lower than their SWR median, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2d.2"
    ],
@@ -4105,7 +4105,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median",
+   "description": "animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2d.1"
    ],
@@ -4413,7 +4413,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-remote event scores above their median quiet window, per spike",
+   "description": "animals whose median SWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median",
    "questions": [
     "2c.3",
     "2c.7"
@@ -4545,11 +4545,11 @@
    "pending": null
   },
   "theta_animals_above_rest_non_swr": {
-   "value": 2,
+   "value": 1,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event theta power is above the median, over the same events, of each event's own epoch's median quiet-rest level",
+   "description": "animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
     "2c.1"
    ],
@@ -4559,11 +4559,11 @@
    "pending": null
   },
   "theta_animals_above_rest_swr": {
-   "value": 2,
+   "value": 1,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event theta power is above the median, over the same events, of each event's own epoch's median quiet-rest level",
+   "description": "animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
     "2c.1"
    ],
@@ -4577,7 +4577,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event theta power is below the median, over the same events, of each event's own epoch's median running level",
+   "description": "animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
     "2c.1"
    ],
@@ -4591,7 +4591,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event theta power is below the median, over the same events, of each event's own epoch's median running level",
+   "description": "animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
     "2c.1"
    ],
@@ -4605,7 +4605,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows",
+   "description": "animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share",
    "questions": [
     "2c.1"
    ],
@@ -4619,7 +4619,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows",
+   "description": "animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share",
    "questions": [
     "2c.1"
    ],
