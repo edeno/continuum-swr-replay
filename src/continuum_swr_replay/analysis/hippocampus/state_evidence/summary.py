@@ -31,8 +31,15 @@ value, and the inference takes the animal as the unit of replication.
   of its epochs' values. With A animals:
   - ``{p}animal_estimate`` is the mean of the animal summaries, each animal
     weighted equally;
-  - ``{p}animal_ci_lo`` / ``{p}animal_ci_hi`` is its 95 % t-interval,
-    mean +/- t(0.975, A - 1) SD / sqrt(A);
+  - ``{p}animal_ci_lo`` / ``{p}animal_ci_hi`` is its 95 % interval from the
+    nested bootstrap (:func:`nested_mean_intervals`: animals, then epochs
+    within each): the estimate +/- t(0.975, A - 1) sqrt(A / (A - 1)) times the
+    replicates' SD
+    (:func:`~continuum_swr_replay.analysis.shared_statistics.bootstrap_interval`).
+    The percentiles of the replicates would under-cover with five animals
+    (Saravanan, Berman & Sober 2020, section 3.1.3). With one epoch per
+    animal this interval is the t-interval over the animal summaries;
+    resampling the epochs within each animal widens it;
   - ``{p}p_animal_t`` is the two-sided one-sample t-test of the animal
     summaries, A - 1 degrees of freedom (:func:`animal_t_test`; with balanced
     data, the intercept test of a random-intercept model);
@@ -41,14 +48,8 @@ value, and the inference takes the animal as the unit of replication.
   - The interval and the test are NaN with fewer than two animals.
 - **Secondary.**
   - ``{p}epoch_estimate`` with ``{p}epoch_ci_lo`` / ``{p}epoch_ci_hi``: the
-    mean of the epoch values, each epoch weighted equally, with a 95 %
-    hierarchical bootstrap CI (:func:`hierarchical_bootstrap_ci`: animals, then
-    epochs within each). It under-covers with few animals. Saravanan, Berman &
-    Sober (2020, section 3.1.3) find the hierarchical bootstrap's false-positive
-    rate above the nominal 5 % with few subjects, falling toward it as
-    subjects are added, while testing one summary per subject keeps 5 %. On
-    the five pilot animals the CI was about 0.63 times as wide as the
-    t-interval, as expected for five values: 1.96 sqrt(4/5) / t(0.975, 4).
+    mean of the epoch values, each epoch weighted equally, with its 95 %
+    interval from the same replicates by the same rule.
   - ``{p}p_epoch_signflip``: the sign-flip p over epochs (:func:`sign_flip_p`),
     which treats the epochs as independent and so ignores the animals.
 - **Column scheme.** The prefix ``{p}`` says what the columns describe: "" a
@@ -60,7 +61,7 @@ value, and the inference takes the animal as the unit of replication.
   Calibration bins carry only the estimates and their intervals.
 - **Descriptive.** Window-level counts, medians, quartiles, shares > 0 and
   means, pooled over epochs.
-- **Calibration verdicts read the t-interval.** ``rises`` and ``top_positive``
+- **Calibration verdicts read the animal-level interval.** ``rises`` and ``top_positive``
   say "yes" when it lies above 0, else "no", but only when the top and the
   bottom probability bins each hold at least :data:`MIN_BIN_WINDOWS` windows,
   pooled over epochs (otherwise :data:`TOO_FEW_WINDOWS`), and at least two
@@ -92,6 +93,11 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
     Seed,
     _with_keys,
     keyed_rng,
+)
+from continuum_swr_replay.analysis.shared_statistics import (
+    bootstrap_interval,
+    nested_bootstrap_draw,
+    nested_codes,
 )
 
 ENCODING_LABELS = {
@@ -292,7 +298,7 @@ def stratified_bootstrap_ci(
 
     Window level: the strata keep their sizes but windows are treated as
     independent, so with nested data it ignores the nesting and is not for
-    inference (:func:`hierarchical_bootstrap_ci` is). Non-finite values are
+    inference (:func:`nested_mean_intervals` is). Non-finite values are
     dropped; NaNs when fewer than two are left.
     """
     x = np.asarray(x, dtype=float)
@@ -507,20 +513,28 @@ def epoch_slopes(
     return out[keep]
 
 
-def hierarchical_bootstrap_ci(
+def nested_mean_intervals(
     summaries: NDArray, animals: NDArray, *, n_boot: int = 10_000, seed: Seed
-) -> tuple[float, float]:
-    """95 % hierarchical bootstrap CI of the mean of per-epoch summaries.
+) -> dict[str, float]:
+    """95 % intervals of the animal-level and epoch-weighted means of per-epoch
+    summaries, from one nested bootstrap.
 
-    Saravanan, Berman & Sober (2020). Each replicate resamples the animals with
-    replacement and then, within each resampled animal, its epochs with
-    replacement; its statistic is the mean over every resampled epoch, the same
-    epoch-weighted mean as the estimate. Vectorized over replicates.
+    Each replicate is one draw of
+    :func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_draw`
+    with the epochs as the sessions (each its own row): the animals with
+    replacement, then each drawn animal's epochs with replacement. On it, the
+    animal-level mean is the mean over the drawn animals (each as often as it
+    was drawn) of each one's mean over its drawn epochs, and the epoch-weighted
+    mean the mean over every drawn epoch. Each interval is
+    :func:`~continuum_swr_replay.analysis.shared_statistics.bootstrap_interval`
+    of the statistic on the data and its replicates over the animals: the
+    statistic plus or minus t(0.975, A - 1) sqrt(A / (A - 1)) times the
+    replicates' SD.
 
     Windows are not resampled. Each epoch enters through its summary over its
     windows, whose spread across epochs already contains the windows' sampling
     noise; resampling them as well would add that noise a second time. The epoch
-    is the unit of inference.
+    is the unit within an animal.
 
     Parameters
     ----------
@@ -530,30 +544,57 @@ def hierarchical_bootstrap_ci(
         Each epoch's animal.
     n_boot : int, optional
     seed : int or sequence
+        The replicates come from ``keyed_rng(seed, "hierarchical")``.
 
     Returns
     -------
-    ci_lo, ci_hi : float
-        NaN when fewer than two epochs are left.
+    dict
+        ``animal_estimate``, ``animal_ci_lo``, ``animal_ci_hi``,
+        ``epoch_estimate``, ``epoch_ci_lo`` and ``epoch_ci_hi``. The estimates
+        are NaN without any epoch, the intervals with fewer than two animals.
     """
-    summaries = np.asarray(summaries, dtype=float)
-    finite = np.isfinite(summaries)
-    values, animals = summaries[finite], np.asarray(animals)[finite]
-    if values.size < 2:
-        return (float("nan"), float("nan"))
-    codes, names = pd.factorize(animals)
+    values = np.asarray(summaries, dtype=float)
+    finite = np.isfinite(values)
+    values, animals = values[finite], np.asarray(animals)[finite]
+    nan = float("nan")
+    if values.size == 0:
+        return dict.fromkeys(
+            [
+                "animal_estimate",
+                "animal_ci_lo",
+                "animal_ci_hi",
+                "epoch_estimate",
+                "epoch_ci_lo",
+                "epoch_ci_hi",
+            ],
+            nan,
+        )
+    animal_codes, epoch_codes = nested_codes(animals, np.arange(values.size))
+    n_animals = int(animal_codes.max()) + 1
+    animal_estimate = float(_animal_summaries(values, animals).mean())
+    epoch_estimate = float(values.mean())
     stream = keyed_rng(seed, "hierarchical")
-    picks = stream.integers(0, len(names), size=(n_boot, len(names)))
-    total = np.zeros(n_boot)
-    count = np.zeros(n_boot)
-    for k in range(len(names)):
-        own = values[codes == k]
-        replicate = np.nonzero(picks == k)[0]  # one entry for each draw of animal k
-        draws = stream.integers(0, own.size, size=(replicate.size, own.size))
-        np.add.at(total, replicate, own[draws].sum(1))
-        np.add.at(count, replicate, own.size)
-    lo, hi = np.percentile(total / count, [2.5, 97.5])
-    return float(lo), float(hi)
+    draws = [
+        nested_bootstrap_draw(animal_codes, epoch_codes, stream) for _ in range(n_boot)
+    ]
+    epochs_drawn = np.stack([draw.rows for draw in draws]).astype(float)
+    animals_drawn = np.stack([draw.animals for draw in draws]).astype(float)
+    member = np.eye(n_animals)[animal_codes]  # (n_epochs, n_animals)
+    sums = epochs_drawn @ (member * values[:, None])
+    counts = epochs_drawn @ member
+    own_means = np.divide(sums, counts, out=np.zeros_like(sums), where=counts > 0)
+    animal_draws = (animals_drawn * own_means).sum(1) / animals_drawn.sum(1)
+    epoch_draws = (epochs_drawn @ values) / epochs_drawn.sum(1)
+    animal = bootstrap_interval(animal_estimate, animal_draws, n_animals)
+    epoch = bootstrap_interval(epoch_estimate, epoch_draws, n_animals)
+    return {
+        "animal_estimate": animal_estimate,
+        "animal_ci_lo": animal.low,
+        "animal_ci_hi": animal.high,
+        "epoch_estimate": epoch_estimate,
+        "epoch_ci_lo": epoch.low,
+        "epoch_ci_hi": epoch.high,
+    }
 
 
 def _animal_summaries(values: NDArray, animals: NDArray) -> NDArray:
@@ -565,18 +606,15 @@ def _animal_summaries(values: NDArray, animals: NDArray) -> NDArray:
 
 
 class AnimalTTest(NamedTuple):
-    """The animal-level inference of :func:`animal_t_test`.
+    """The animal-level test of :func:`animal_t_test`.
 
-    ``estimate`` is the mean of the A animal summaries; ``ci_lo`` / ``ci_hi``
-    its 95 % t-interval, mean +/- t(0.975, A - 1) SD / sqrt(A); ``p`` the
-    two-sided one-sample t-test p against 0, with A - 1 degrees of freedom.
-    ``zero_variance``: every animal summary is the same, so the interval has
-    no width and there is no test (``p`` is NaN).
+    ``estimate`` is the mean of the A animal summaries; ``p`` the two-sided
+    one-sample t-test p against 0, with A - 1 degrees of freedom.
+    ``zero_variance``: every animal summary is the same, so there is no test
+    (``p`` is NaN). Its interval is :func:`nested_mean_intervals`'.
     """
 
     estimate: float
-    ci_lo: float
-    ci_hi: float
     p: float
     zero_variance: bool
 
@@ -586,26 +624,24 @@ def _t_inference(by_animal: NDArray) -> AnimalTTest:
     nan = float("nan")
     n = by_animal.size
     if n == 0:
-        return AnimalTTest(nan, nan, nan, nan, False)
+        return AnimalTTest(nan, nan, False)
     estimate = float(by_animal.mean())
     if n < 2:
-        return AnimalTTest(estimate, nan, nan, nan, False)
+        return AnimalTTest(estimate, nan, False)
     if np.ptp(by_animal) == 0:  # identical: their float SD can be ~1e-17, not 0
-        return AnimalTTest(estimate, estimate, estimate, nan, True)
+        return AnimalTTest(estimate, nan, True)
     sem = float(by_animal.std(ddof=1) / np.sqrt(n))
-    half = float(student_t.ppf(0.975, n - 1)) * sem
     p = float(2 * student_t.sf(abs(estimate / sem), df=n - 1))
-    return AnimalTTest(estimate, estimate - half, estimate + half, p, False)
+    return AnimalTTest(estimate, p, False)
 
 
 def animal_t_test(summaries: NDArray, animals: NDArray) -> AnimalTTest:
-    """The mean of the animal summaries, its t-interval and its t-test against 0.
+    """The mean of the animal summaries and its t-test against 0.
 
     Each animal enters once, as the mean of its epochs' summaries, however
-    many epochs it has (one is enough). With A animals the interval and the
-    two-sided test have A - 1 degrees of freedom; with balanced data the test
-    is the intercept test of a random-intercept model of epochs within
-    animals.
+    many epochs it has (one is enough). With A animals the two-sided test has
+    A - 1 degrees of freedom; with balanced data it is the intercept test of a
+    random-intercept model of epochs within animals.
 
     Parameters
     ----------
@@ -617,8 +653,8 @@ def animal_t_test(summaries: NDArray, animals: NDArray) -> AnimalTTest:
     Returns
     -------
     AnimalTTest
-        ``estimate`` (NaN without any animal), ``ci_lo``, ``ci_hi`` and ``p``
-        (NaN with fewer than two animals), and ``zero_variance``.
+        ``estimate`` (NaN without any animal), ``p`` (NaN with fewer than two
+        animals), and ``zero_variance``.
     """
     values = np.asarray(summaries, dtype=float)
     finite = np.isfinite(values)
@@ -636,12 +672,13 @@ def _epoch_statistics(
 ) -> dict[str, Any]:
     """The inference on per-epoch values, keyed by column name (module notes).
 
-    Primary: ``animal_estimate`` with its t-interval ``animal_ci_lo`` /
-    ``animal_ci_hi``, ``p_animal_t`` and ``zero_variance`` (:func:`animal_t_test`),
-    and ``animals_pos`` / ``epochs_pos`` ("k/A" and "k/N" > 0). Secondary:
-    ``epoch_estimate`` with its hierarchical bootstrap CI ``epoch_ci_lo`` /
-    ``epoch_ci_hi``, and ``p_epoch_signflip`` unless ``signflip`` is False.
-    Non-finite values are dropped.
+    Primary: ``animal_estimate`` with its interval ``animal_ci_lo`` /
+    ``animal_ci_hi`` (:func:`nested_mean_intervals`), ``p_animal_t`` and
+    ``zero_variance`` (:func:`animal_t_test`), and ``animals_pos`` /
+    ``epochs_pos`` ("k/A" and "k/N" > 0). Secondary: ``epoch_estimate`` with
+    its interval ``epoch_ci_lo`` / ``epoch_ci_hi`` from the same replicates, and
+    ``p_epoch_signflip`` unless ``signflip`` is False. Non-finite values are
+    dropped.
     """
     values = np.asarray(summaries, dtype=float)
     animal = np.asarray(animals)
@@ -649,18 +686,18 @@ def _epoch_statistics(
     values, animal = values[finite], animal[finite]
     by_animal = _animal_summaries(values, animal)
     test = _t_inference(by_animal)
-    lo, hi = hierarchical_bootstrap_ci(values, animal, n_boot=n_boot, seed=seed)
+    intervals = nested_mean_intervals(values, animal, n_boot=n_boot, seed=seed)
     level: dict[str, Any] = {
         "animal_estimate": test.estimate,
-        "animal_ci_lo": test.ci_lo,
-        "animal_ci_hi": test.ci_hi,
+        "animal_ci_lo": intervals["animal_ci_lo"],
+        "animal_ci_hi": intervals["animal_ci_hi"],
         "p_animal_t": test.p,
         "zero_variance": test.zero_variance,
         "animals_pos": f"{int((by_animal > 0).sum())}/{by_animal.size}",
         "epochs_pos": f"{int((values > 0).sum())}/{values.size}",
-        "epoch_estimate": float(values.mean()) if values.size else float("nan"),
-        "epoch_ci_lo": lo,
-        "epoch_ci_hi": hi,
+        "epoch_estimate": intervals["epoch_estimate"],
+        "epoch_ci_lo": intervals["epoch_ci_lo"],
+        "epoch_ci_hi": intervals["epoch_ci_hi"],
     }
     if signflip:
         level["p_epoch_signflip"] = sign_flip_p(values, n_flips=n_flips, seed=seed)
@@ -703,7 +740,7 @@ def _verdict(enough: bool, holds: bool) -> str:
 
 
 def _ci_verdict(enough: bool, ci_lo: float) -> str:
-    """The verdict that the animal-level t-interval lies above 0, or why none.
+    """The verdict that the animal-level interval lies above 0, or why none.
 
     :data:`TOO_FEW_WINDOWS` without ``enough`` windows; :data:`TOO_FEW_ANIMALS`
     when fewer than two animals give the interval (it is NaN).
@@ -745,7 +782,7 @@ def bout_animal_summaries(
 
     An animal's summary is the mean of its epochs' summaries over windows, the
     median or the mean by metric (:func:`epoch_summary_kind`): the values whose
-    mean and t-interval :func:`bout_statistics` reports as ``animal_*`` and
+    mean and interval :func:`bout_statistics` reports as ``animal_*`` and
     ``diff_animal_*``.
 
     Parameters
@@ -946,22 +983,22 @@ def calibration_statistics(
     - **Primary, animal level:**
       - A bin's ``animal_estimate`` is the mean over animals of each animal's
         mean epoch summary in the bin (``epoch_summary``,
-        :func:`epoch_summary_kind`), with its t-interval ``animal_ci_lo`` /
-        ``animal_ci_hi``.
+        :func:`epoch_summary_kind`), with its interval ``animal_ci_lo`` /
+        ``animal_ci_hi`` (:func:`nested_mean_intervals`).
       - A curve's slope is each epoch's own OLS slope (:func:`epoch_slopes`,
         which takes only epochs with two bins of :data:`MIN_BIN_WINDOWS`
         windows), inferred under the prefix ``slope_`` (the module's column
         scheme).
-      - The verdicts read the t-interval. They need the top and the bottom
+      - The verdicts read the animal-level interval. They need the top and the bottom
         bins to hold at least :data:`MIN_BIN_WINDOWS` windows each, pooled
         (``n_top``, ``n_bottom``); otherwise they read
         :data:`TOO_FEW_WINDOWS`, and :data:`TOO_FEW_ANIMALS` when fewer than
         two animals give the interval.
-      - ``rises`` is "yes" when the slope's t-interval lies above 0, else "no".
-      - ``top_positive`` is "yes" when the top bin's t-interval
+      - ``rises`` is "yes" when the slope's interval lies above 0, else "no".
+      - ``top_positive`` is "yes" when the top bin's interval
         (``top_animal_ci_lo``) lies above 0, else "no".
     - **Secondary:** a bin's epoch-weighted ``epoch_estimate`` with its
-      hierarchical bootstrap CI ``epoch_ci_lo`` / ``epoch_ci_hi``; all of a
+      interval ``epoch_ci_lo`` / ``epoch_ci_hi``; all of a
       bin's estimates again over the other epoch summary (``other_``); a
       curve's ``top_other_animal_estimate``, ``slope_epoch_*`` and
       ``slope_p_epoch_signflip``.
@@ -983,7 +1020,7 @@ def calibration_statistics(
     metrics : mapping, optional
         State -> metric columns; default :data:`CALIBRATION_METRICS`.
     n_boot, n_boot_window_level : int, optional
-        Resamples of the hierarchical and of the window-level bootstraps.
+        Resamples of the nested and of the window-level bootstraps.
     window_level : bool, optional
         Add the window-level columns (default False).
 
@@ -1169,9 +1206,9 @@ def coordinated_silence(
       coding's predicted ratio are ratios of the epoch's own sums of
       silent-run counts: counts, so a mean-type summary (:data:`EPOCH_SUMMARY`).
       - ``obs_animal_estimate`` is the observed ratios' mean over animals, with
-        its t-interval ``obs_animal_ci_lo`` / ``obs_animal_ci_hi``; the
-        secondary ``obs_epoch_*`` are their epoch-weighted mean and bootstrap
-        CI.
+        its interval ``obs_animal_ci_lo`` / ``obs_animal_ci_hi``; the
+        secondary ``obs_epoch_*`` are their epoch-weighted mean and its
+        interval (:func:`nested_mean_intervals`).
       - ``pred_{e}_animal_estimate`` is encoding ``e``'s prediction, its mean
         over animals (``pred_{e}_epoch_estimate``, over epochs).
       - Each epoch's observed - predicted is inferred under the prefix

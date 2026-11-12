@@ -253,15 +253,16 @@ CAVEATS = [
     "run.",
     "Inference is at the animal level, each animal's summary being the mean of "
     "its epochs' values: animal_estimate (the mean over animals, each weighted "
-    "equally) with its 95 % t-interval animal_ci_lo / animal_ci_hi and the "
-    "two-sided t-test p_animal_t (A - 1 degrees of freedom, so 4 with five "
-    "animals), with k of A animals and k of N epochs. Secondary: epoch_estimate "
-    "(each epoch weighted equally) with its hierarchical bootstrap CI (animals, "
-    "then epochs within each; Saravanan, Berman & Sober 2020), which under-covers "
-    "with few animals (about 0.63 times the t-interval's width with the five "
-    "pilot animals), and p_epoch_signflip, a sign-flip test over epochs that "
-    "ignores the animals.",
-    "A calibration verdict (rises, top_positive) reads the animal t-interval. "
+    "equally) with its 95 % interval animal_ci_lo / animal_ci_hi from the nested "
+    "bootstrap (animals, then epochs within each): the estimate +/- t(0.975, A - 1) "
+    "sqrt(A / (A - 1)) times the replicates' SD, because the replicates' "
+    "percentiles under-cover with few animals (Saravanan, Berman & Sober 2020); "
+    "and the two-sided t-test p_animal_t (A - 1 degrees of freedom, so 4 with "
+    "five animals), with k of A animals and k of N epochs. Secondary: "
+    "epoch_estimate (each epoch weighted equally) with its interval from the same "
+    "replicates by the same rule, and p_epoch_signflip, a sign-flip test over "
+    "epochs that ignores the animals.",
+    "A calibration verdict (rises, top_positive) reads the animal-level interval. "
     "It needs at least 10 windows in the top and in the bottom probability bins, "
     "pooled over epochs, else it reads 'too few windows' ('too few animals' when "
     "fewer than two animals give the interval); an epoch's slope needs two bins "
@@ -1164,7 +1165,7 @@ def figure_bouts(windows: pd.DataFrame, bouts: pd.DataFrame, path: Path) -> None
     Per state x regime, two columns: the bouts' values and their paired
     differences from their matched windows. A dot is one animal's summary
     (the mean of its epochs' medians or means, by metric); the diamond is the
-    mean over animals with its 95 % t-interval, hollow with no bar when there
+    mean over animals with its 95 % interval, hollow with no bar when there
     is none; the faint bars are the windows' 5-95 % and 25-75 % ranges.
 
     Parameters
@@ -1238,7 +1239,7 @@ def figure_bouts(windows: pd.DataFrame, bouts: pd.DataFrame, path: Path) -> None
         "Held-out spike evidence in confident bouts (P > 0.8), against matched "
         "random windows (same regime, same length)\nTime-held-out running-only "
         "encoding, spike-mark part; dot = an animal, diamond = mean over animals "
-        "with its 95 % t-interval; grey = the windows' 5-95 % and 25-75 %",
+        "with its 95 % interval; grey = the windows' 5-95 % and 25-75 %",
         fontsize=9,
     )
     fig.savefig(path, dpi=150)
@@ -1283,7 +1284,7 @@ def _plot_estimates(
 
 
 def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
-    """Epoch-level evidence by the state's probability, hierarchical 95 % CIs."""
+    """Epoch-level evidence by the state's probability, with 95 % intervals."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -1323,7 +1324,7 @@ def figure_calibration(bins: pd.DataFrame, path: Path) -> None:
     fig.suptitle(
         "Calibration: held-out evidence in random 20 ms windows against the state's "
         "mean posterior\nMean over animals of each animal's mean epoch bin median "
-        "(log-likelihood ratios) or mean (shares); 95 % t-interval over animals; "
+        "(log-likelihood ratios) or mean (shares); 95 % nested-bootstrap interval; "
         f"bins with < {MIN_BIN_WINDOWS} windows omitted",
         fontsize=9,
     )
@@ -1373,7 +1374,7 @@ def figure_silence(silence: pd.DataFrame, path: Path) -> None:
     axes[0].legend(fontsize=6.5, frameon=False, loc="upper left")
     fig.suptitle(
         "Held-out coordinated silence (random 20 ms windows): mean over animals, "
-        "95 % t-interval",
+        "95 % nested-bootstrap interval",
         fontsize=9,
     )
     fig.savefig(path, dpi=150)

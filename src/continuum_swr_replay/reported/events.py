@@ -981,7 +981,9 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 row.animal_ci_lo,
                 "quantity",
                 "dec2",
-                "lower bound of its 95 % t-interval over animals",
+                f"lower bound of its 95 % interval (nested bootstrap of the animals "
+                f"and their epochs, small-sample t correction over the {total} "
+                "animals)",
                 "nats per spike",
             ),
             make(
@@ -989,7 +991,7 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 row.animal_ci_hi,
                 "quantity",
                 "dec2",
-                "upper bound of its 95 % t-interval over animals",
+                "upper bound of that interval",
                 "nats per spike",
             ),
             make(

@@ -112,13 +112,13 @@ each epoch enters as one value, and the animal is the unit of replication.
   ``EPOCH_SUMMARY``; the other summary is reported as secondary. A calibration
   curve's value is the epoch's own slope.
 - The primary inference is at the animal level: the mean of the animal
-  summaries (each the mean of the animal's epoch values), its t-interval and
-  its t-test, both with A - 1 degrees of freedom, with k of A animals and k of
-  N epochs.
-- Secondary: the epoch-weighted mean with its hierarchical bootstrap CI
-  (animals, then epochs within each; Saravanan, Berman & Sober 2020), which
-  under-covers with few animals, and the sign-flip p over epochs, which
-  ignores the animals.
+  summaries (each the mean of the animal's epoch values), its 95 % interval
+  from the nested bootstrap (animals, then epochs within each) with a
+  small-sample t correction over the A animals, and its t-test with A - 1
+  degrees of freedom, with k of A animals and k of N epochs.
+- Secondary: the epoch-weighted mean with its interval from the same
+  replicates by the same rule, and the sign-flip p over epochs, which ignores
+  the animals.
 - A calibration verdict needs at least 10 windows in the top and in the
   bottom probability bins, pooled; otherwise it reads "too few windows".
 - Window-level statistics are descriptive. The ``_window_level`` CIs and
@@ -160,7 +160,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     epoch_slopes,
     epoch_summaries,
     epoch_summary_kind,
-    hierarchical_bootstrap_ci,
+    nested_mean_intervals,
     ols_slope_ci,
     paired_bouts,
     rate_calibration,
@@ -243,13 +243,13 @@ __all__ = [
     "epoch_summary_kind",
     "event_likelihood",
     "held_out_evidence",
-    "hierarchical_bootstrap_ci",
     "interior_bin_mask",
     "keyed_rng",
     "load_detector",
     "load_encoding",
     "matched_windows",
     "nearest_interior_bins",
+    "nested_mean_intervals",
     "null_partners",
     "ols_slope_ci",
     "paired_bouts",

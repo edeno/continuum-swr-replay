@@ -8,7 +8,7 @@ and its matched window, by its full span
 (:func:`~continuum_swr_replay.analysis.hippocampus.state_evidence.split_non_local_by_swr`):
 "SWR" when some bin of the bout is in an SWR of the decode frame read through
 the SWR source (``read_dot_with_swr_source``), else "no SWR". ``bout_statistics``
-then runs on each subset as on any state (animal-level t-interval, the paired
+then runs on each subset as on any state (animal-level interval, the paired
 bout - matched-window difference) over the primary metrics, their per-held-out-
 spike versions and MAP_S's distance from the animal.
 

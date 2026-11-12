@@ -215,7 +215,9 @@ def state_evidence_values(
                 row["animal_ci_lo"],
                 "quantity",
                 "sig2",
-                "lower bound of its 95 % t-interval over animals",
+                f"lower bound of its 95 % interval (nested bootstrap of the animals "
+                f"and their epochs, small-sample t correction over the {total} "
+                "animals)",
                 "nats per window",
             ),
             make(
@@ -223,7 +225,7 @@ def state_evidence_values(
                 row["animal_ci_hi"],
                 "quantity",
                 "sig2",
-                "upper bound of its 95 % t-interval over animals",
+                "upper bound of that interval",
                 "nats per window",
             ),
             make(
