@@ -233,6 +233,8 @@ def test_trunk_values_summarize_over_animals():
         [
             {
                 "animal": animal,
+                "session_date": "d1",
+                "epoch": "02_r1",
                 "event_id": f"{animal}-{int(is_swr)}",
                 "is_swr": is_swr,
                 "candidate_arm": candidate,
@@ -247,21 +249,25 @@ def test_trunk_values_summarize_over_animals():
     )
     values = {v.key: v for v in trunk_values(arm, "x")}
     # all trunks, SWR: 0.5, 0.3, 0.8; non-SWR: 0.2, 0.6, 0.3 (b's is higher)
-    assert values["trunk_share_swr"].value == pytest.approx(0.5)
+    assert values["trunk_share_swr"].value == pytest.approx(1.6 / 3)
     assert "over the 3 animals" in values["trunk_share_swr"].description
-    assert values["trunk_share_non_swr"].value == pytest.approx(0.3)
+    assert values["trunk_share_non_swr"].value == pytest.approx(1.1 / 3)
     assert values["trunk_share_animals_swr_higher"].value == 2
     # the current patch's trunk, SWR: 0.2, 0.1, 0.6; non-SWR: 0.1, 0.3, 0.05
-    assert values["trunk_share_current_patch_swr"].value == pytest.approx(0.2)
-    assert values["trunk_share_current_patch_non_swr"].value == pytest.approx(0.1)
+    assert values["trunk_share_current_patch_swr"].value == pytest.approx(0.3)
+    assert values["trunk_share_current_patch_non_swr"].value == pytest.approx(0.15)
     assert values["trunk_share_current_patch_animals_swr_higher"].value == 2
     # the other trunks, SWR: 0.3, 0.2, 0.2; non-SWR: 0.1, 0.3, 0.25 (only a's rises)
-    assert values["trunk_share_other_patches_swr"].value == pytest.approx(0.2)
-    assert values["trunk_share_other_patches_non_swr"].value == pytest.approx(0.25)
+    assert values["trunk_share_other_patches_swr"].value == pytest.approx(0.7 / 3)
+    assert values["trunk_share_other_patches_non_swr"].value == pytest.approx(0.65 / 3)
     assert values["trunk_share_other_patches_animals_swr_higher"].value == 1
     # SWR: 0.2 / 0.5, 0.1 / 0.3, 0.6 / 0.8; non-SWR: 0.1 / 0.2, 0.3 / 0.6, 0.05 / 0.3
-    assert values["trunk_current_patch_fraction_swr"].value == pytest.approx(0.4)
-    assert values["trunk_current_patch_fraction_non_swr"].value == pytest.approx(0.5)
+    assert values["trunk_current_patch_fraction_swr"].value == pytest.approx(
+        (0.4 + 1 / 3 + 0.75) / 3
+    )
+    assert values["trunk_current_patch_fraction_non_swr"].value == pytest.approx(
+        (0.5 + 0.5 + 1 / 6) / 3
+    )
 
 
 def _fits(differences: dict[str, list[float]]) -> pd.DataFrame:

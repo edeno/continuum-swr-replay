@@ -179,8 +179,9 @@ LEAF_RUNGS = tuple(dict.fromkeys(rung for step in LEAF_STEPS.values() for rung i
 def trunk_values(arm: pd.DataFrame, source: str) -> list[Value]:
     """Question 3.1: SWR content shifts onto the trunk arms, and which trunk.
 
-    Each animal's mean share over its events, SWR and non-SWR; the value is the
-    median over animals, with the animals where the SWR share is higher.
+    Each animal's mean share, SWR and non-SWR, event -> session -> animal; the
+    value is the mean over animals, with the animals where the SWR share is
+    higher.
     """
     make = value_factory(trunk_values, source, TAGS["anchoring"])
     events = content_statistics.trunk_shares(arm)
@@ -199,19 +200,22 @@ def trunk_values(arm: pd.DataFrame, source: str) -> list[Value]:
         values += [
             make(
                 f"trunk_share{word}_swr",
-                shares.loc[column, "swr_median"],
+                shares.loc[column, "swr_mean"],
                 "fraction",
                 "pct",
-                f"SWR events: mean share of an event's content on {label}, median "
-                f"over the {shares.loc[column, 'n_animals']} animals (at-well events)",
+                f"SWR events: share of an event's content on {label}, mean over "
+                f"the {shares.loc[column, 'n_animals']} animals of each animal's "
+                "mean over its sessions of the session's mean over events "
+                "(at-well events)",
             ),
             make(
                 f"trunk_share{word}_non_swr",
-                shares.loc[column, "non_swr_median"],
+                shares.loc[column, "non_swr_mean"],
                 "fraction",
                 "pct",
-                f"non-SWR events: mean share of an event's content on {label}, "
-                "median over animals",
+                f"non-SWR events: share of an event's content on {label}, mean "
+                "over animals of each animal's mean over its sessions of the "
+                "session's mean over events",
             ),
             make(
                 f"trunk_share{word}_animals_swr_higher",
@@ -230,7 +234,9 @@ def trunk_values(arm: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"{'SWR' if flag else 'non-SWR'} events: the current patch's trunk "
                 "as a share of all trunk content (1/3 if the three trunks shared it "
-                "evenly), median over animals",
+                "evenly): each animal's ratio of its mean shares (means over "
+                "its sessions of the sessions' means over events), mean over "
+                "animals",
             )
         )
     return values

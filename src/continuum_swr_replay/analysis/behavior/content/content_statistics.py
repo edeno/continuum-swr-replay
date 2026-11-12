@@ -5,8 +5,10 @@ and candidate arm; the event table, one row per event) or fitted contrasts and
 returns named numbers: how much of an event's content sits on the trunk arms,
 how long SWR and non-SWR events are, and what the Dirichlet concentration
 contrast between them amounts to. SWR status is the tables' ``is_swr``. A share
-is a fraction of one event's content; "animals" statistics count the animals
-whose own value meets the stated condition.
+is a fraction of one event's content, averaged event -> session -> animal: the
+mean over a session's events, the mean over an animal's sessions, the mean over
+animals. "Animals" statistics count the animals whose own value meets the
+stated condition.
 """
 
 from __future__ import annotations
@@ -19,11 +21,18 @@ from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
     TRUNK_ARMS,
 )
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 PATCH_TRUNK = {TRACK_SEGMENT_TO_PATCH[arm]: arm for arm in TRUNK_ARMS}
 """The trunk arm of each patch (``TRACK_SEGMENT_TO_PATCH``): patch -> trunk arm."""
 
-TRUNK_COLUMNS = ["animal", "event_id", "is_swr", "candidate_arm", "is_current_arm"]
+TRUNK_COLUMNS = [
+    *SESSION_COLUMNS,
+    "event_id",
+    "is_swr",
+    "candidate_arm",
+    "is_current_arm",
+]
 """The event-arm columns :func:`trunk_shares` reads, besides the response."""
 
 TRUNK_RESPONSE = "arm_fraction"
@@ -46,7 +55,9 @@ def trunk_shares(arm: pd.DataFrame) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        One row per event: ``event_id``, ``animal``, ``is_swr``, ``trunk``
+        One row per event: ``event_id``, the session columns
+        (:data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`),
+        ``is_swr``, ``trunk``
         (its share on the trunk arms), ``current_patch_trunk`` (on the trunk of
         the patch holding the current arm) and ``other_trunks`` (on the other
         two). Each share is a fraction of the event's content.
@@ -84,7 +95,9 @@ def trunk_shares(arm: pd.DataFrame) -> pd.DataFrame:
     )
     events = frame.groupby("event_id", sort=False).sum()
     events["other_trunks"] = events["trunk"] - events["current_patch_trunk"]
-    meta = arm.drop_duplicates("event_id").set_index("event_id")[["animal", "is_swr"]]
+    meta = arm.drop_duplicates("event_id").set_index("event_id")[
+        [*SESSION_COLUMNS, "is_swr"]
+    ]
     events = events.join(meta)
     events["is_swr"] = events["is_swr"].astype(bool)
     return events.reset_index()
@@ -92,9 +105,13 @@ def trunk_shares(arm: pd.DataFrame) -> pd.DataFrame:
 
 def _animal_mean_shares(events: pd.DataFrame) -> pd.DataFrame:
     """Each animal's mean share on each trunk part over its SWR and its non-SWR
-    events: indexed by ``animal`` and ``is_swr``, one column per part. Refuses
-    an animal without events of both kinds."""
-    means = events.groupby(["animal", "is_swr"])[list(TRUNK_PARTS)].mean()
+    events, event -> session -> animal: the mean over its sessions of each
+    session's mean over its events of the kind (a session without an event of
+    the kind is not in that kind's mean). Indexed by ``animal`` and
+    ``is_swr``, one column per part. Refuses an animal without events of both
+    kinds."""
+    sessions = events.groupby([*SESSION_COLUMNS, "is_swr"])[list(TRUNK_PARTS)].mean()
+    means = sessions.groupby(["animal", "is_swr"]).mean()
     n_classes = means.groupby("animal").size()
     if (n_classes != 2).any():
         raise ValueError(
@@ -107,7 +124,8 @@ def _animal_mean_shares(events: pd.DataFrame) -> pd.DataFrame:
 def trunk_share_statistics(events: pd.DataFrame) -> pd.DataFrame:
     """How much of an event's content sits on the trunks, in SWR and non-SWR events.
 
-    An animal's share is the mean over its events.
+    An animal's share is the mean over its sessions of each session's mean over
+    its events.
 
     Parameters
     ----------
@@ -119,7 +137,7 @@ def trunk_share_statistics(events: pd.DataFrame) -> pd.DataFrame:
     statistics : pd.DataFrame
         One row per part of the trunk content (:data:`TRUNK_PARTS`):
 
-        - ``swr_median``, ``non_swr_median``: the median over animals of the
+        - ``swr_mean``, ``non_swr_mean``: the mean over animals of the
           animal's share in SWR and in non-SWR events.
         - ``n_animals``: the animals, each with events of both kinds.
         - ``n_animals_swr_higher``: of those, animals whose SWR share is above
@@ -135,8 +153,8 @@ def trunk_share_statistics(events: pd.DataFrame) -> pd.DataFrame:
     for part in TRUNK_PARTS:
         table = per_animal[part].unstack("is_swr")
         rows[part] = {
-            "swr_median": table[True].median(),
-            "non_swr_median": table[False].median(),
+            "swr_mean": table[True].mean(),
+            "non_swr_mean": table[False].mean(),
             "n_animals": len(table),
             "n_animals_swr_higher": int((table[True] > table[False]).sum()),
         }
@@ -156,9 +174,10 @@ def current_patch_trunk_fraction(events: pd.DataFrame) -> dict[str, float]:
     Returns
     -------
     fractions : dict
-        ``swr`` and ``non_swr``: the median over animals of the animal's mean
-        current-patch trunk share divided by its mean share on all trunks, in
-        SWR and in non-SWR events.
+        ``swr`` and ``non_swr``: the mean over animals of the animal's mean
+        current-patch trunk share divided by its mean share on all trunks
+        (each animal's mean over its sessions of the sessions' means over
+        events), in SWR and in non-SWR events.
 
     Raises
     ------
@@ -169,7 +188,7 @@ def current_patch_trunk_fraction(events: pd.DataFrame) -> dict[str, float]:
     fractions = {}
     for name, is_swr in (("swr", True), ("non_swr", False)):
         means = per_animal.xs(is_swr, level="is_swr")
-        fractions[name] = (means["current_patch_trunk"] / means["trunk"]).median()
+        fractions[name] = (means["current_patch_trunk"] / means["trunk"]).mean()
     return fractions
 
 
