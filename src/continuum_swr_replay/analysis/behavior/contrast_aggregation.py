@@ -680,10 +680,11 @@ def aggregate_contrast(
         # Session-level fit-diagnostics counts (informational; NOT drops). These stay
         # FIT-level -- they answer "how many fits had any unidentified term", which is
         # a different question from the per-term drop above. Counted over ALL modeled
-        # session-fits for this (model, population). NaN/absent flags (older res
-        # without diagnostics) are treated as not-flagged.
+        # session-fits for this (model, population). A fit with no convergence
+        # flag has not converged; a missing separation flag is not separated.
+        # Absent columns (older res without diagnostics) count nothing.
         n_nonconverged = (
-            int((s_all["converged"] == False).sum())  # noqa: E712 (NaN must not count)
+            int((~s_all["converged"].eq(True)).sum())
             if "converged" in s_all.columns
             else 0
         )

@@ -161,6 +161,15 @@ def test_separated_session_is_dropped() -> None:
     assert row["coef_session_median"] == pytest.approx(0.33)
 
 
+def test_a_missing_convergence_flag_is_not_converged() -> None:
+    """One fit reports it did not converge and two have no flag: three are counted."""
+    fits = _session_fits(converged=[False, None, float("nan")] + [True] * 5)
+
+    row = aggregate_contrast(fits, SPECS, level="rate", sd=_GATE_SD).iloc[0]
+
+    assert row["n_sessions_flagged_nonconverged"] == 3
+
+
 def test_legacy_frame_without_predictor_sds_uses_the_raw_coefficient() -> None:
     """A frame with no ``sd_`` column has only the raw coefficient to judge on.
 

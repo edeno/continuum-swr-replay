@@ -500,6 +500,26 @@ def test_mu_summary_marks_fit_flags_and_balances_animal_medians():
     assert overall["relative_weight"] == pytest.approx(np.exp(2.5))
 
 
+def test_mu_summary_flags_a_fit_with_no_convergence_flag():
+    mu = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b"],
+            "session_date": [1, 2, 1],
+            "epoch": ["e", "e", "e"],
+            "coef_reward_belief_variance_candidate_arm_preoutcome_z": [1.0, 3.0, 5.0],
+            "bse_reward_belief_variance_candidate_arm_preoutcome_z": [0.1] * 3,
+            "converged": [True, np.nan, True],
+            "separated": [False, False, False],
+        }
+    )
+
+    summary = summarize_mu_coefficients(mu)
+
+    assert list(summary["session"]["fit_quality"]) == ["clean", "flagged", "clean"]
+    clean = summary["overall"].query("cohort == 'clean'").iloc[0]
+    assert clean["coefficient"] == 3.0  # animals a 1 (its second fit left out), b 5
+
+
 def test_figure_loader_rejects_pre_leaf_support_result_bundle(tmp_path):
     """A stale result CSV bundle cannot outlive the corrected model/table guard."""
     pd.DataFrame({"placeholder": []}).to_pickle(tmp_path / "trial_leaf_table.pkl")

@@ -646,7 +646,8 @@ def summarize_mu_coefficients(mu_results: pd.DataFrame) -> dict[str, pd.DataFram
     sessions = mu_results.copy()
     sessions["session_id"] = _session_id(sessions)
     sessions["fit_quality"] = np.where(
-        sessions["converged"].astype(bool) & ~sessions["separated"].astype(bool),
+        # A fit with no convergence flag has not converged.
+        sessions["converged"].eq(True) & ~sessions["separated"].astype(bool),
         "clean",
         "flagged",
     )
