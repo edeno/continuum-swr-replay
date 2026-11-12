@@ -545,6 +545,27 @@ def test_pct_sig_session_uses_the_model_se_when_no_cluster_column_exists() -> No
     assert row["pct_sig_session"] == pytest.approx(1.0)
 
 
+# ── The session signed-rank p and its correction across rungs ──
+
+
+def test_a_rung_with_too_few_differences_is_left_out_of_the_correction() -> None:
+    """Eight positive sessions give p = 2 / 2 ** 8. The second rung keeps six
+    sessions, one with a coefficient of exactly zero: five differences, too few
+    for a p, so the first rung's family is itself alone and its q is its p."""
+    fits = _session_fits()
+    second = _session_fits(model=["G6_rpe"] * 8).iloc[:6].copy()
+    second.loc[second.index[0], "coef_rpe_postoutcome"] = 0.0
+    specs = [*SPECS, ("G6_rpe", "non_local", "rpe_postoutcome")]
+
+    out = aggregate_contrast(pd.concat([fits, second]), specs, level="rate", sd=SD)
+
+    assert list(out["n_sessions"]) == [8, 6]
+    assert out["session_signrank_p"].iloc[0] == pytest.approx(2 / 2**8)
+    assert out["session_signrank_p"].isna().iloc[1]
+    assert out["session_signrank_fdr_q"].iloc[0] == pytest.approx(2 / 2**8)
+    assert out["session_signrank_fdr_q"].isna().iloc[1]
+
+
 # ── Per-SD units come from the fit, not from a reader's own recomputation ──
 
 _ARM_UNITS = {

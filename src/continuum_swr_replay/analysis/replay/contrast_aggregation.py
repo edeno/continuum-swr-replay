@@ -41,11 +41,14 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
-from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
+from continuum_swr_replay.analysis.statistics import (
+    benjamini_hochberg,
+    session_median_statistics,
+    signed_rank_p,
+)
 from continuum_swr_replay.paths import (
     STANDARDIZATION_REFERENCE,
     replay_content_dir,
@@ -629,8 +632,7 @@ def aggregate_contrast(
         session_se_median = (
             np.nan if se_per_session is None else float(se_per_session.median())
         )
-        per_animal = s.groupby("animal")[ccol].median()
-        srp = wilcoxon(coef)[1] if len(coef) > 5 else np.nan
+        summary = session_median_statistics(coef, s["animal"])
         # Session-level fit-diagnostics counts (informational; NOT drops). These stay
         # FIT-level -- they answer "how many fits had any unidentified term", which is
         # a different question from the per-term drop above. Counted over ALL modeled
@@ -653,26 +655,26 @@ def aggregate_contrast(
                 "population": pop,
                 "term": term,
                 "n_sessions": gate.n_kept,
-                "n_animals": int(per_animal.size),
+                "n_animals": summary["n_animals"],
                 "n_dropped": gate.n_dropped,
                 "n_unidentified": gate.n_unidentified,
                 "n_sessions_flagged_nonconverged": n_nonconverged,
                 "n_sessions_flagged_separated": n_separated,
-                "coef_animal_median": float(per_animal.median()),
-                "n_animals_pos": int((per_animal > 0).sum()),
-                "coef_session_median": float(coef.median()),
+                "coef_animal_median": summary["animal_median"],
+                "n_animals_pos": summary["n_animals_positive"],
+                "coef_session_median": summary["median"],
                 "typical_session_se": session_se_median,
                 "se_source": se_source,
                 "std_unit": unit,
                 "std_factor": factor,
-                "std_coef_animal_median": float(per_animal.median()) * factor,
-                "std_coef_session_median": float(coef.median()) * factor,
+                "std_coef_animal_median": summary["animal_median"] * factor,
+                "std_coef_session_median": summary["median"] * factor,
                 "std_typical_session_se": session_se_median * factor,
-                "pct_positive_session": float((coef > 0).mean()),
+                "pct_positive_session": summary["positive_fraction"],
                 "pct_sig_session": pct_significant_sessions(
                     coef, se_per_session, s[pcol] if pcol in s else None
                 ),
-                "session_signrank_p": srp,
+                "session_signrank_p": signed_rank_p(coef),
             }
         )
     df = pd.DataFrame(rows)
@@ -691,13 +693,9 @@ def aggregate_contrast(
             n_dropped_total,
         )
     # BH-FDR of the (descriptive) session signed-rank p, across rungs per population.
-    df["session_signrank_fdr_q"] = np.nan
-    for _, g in df.groupby("population"):
-        v = g["session_signrank_p"].notna()
-        if v.sum():
-            df.loc[g.index[v], "session_signrank_fdr_q"] = multipletests(
-                g.loc[v, "session_signrank_p"], method="fdr_bh"
-            )[1]
+    df["session_signrank_fdr_q"] = df.groupby("population")[
+        "session_signrank_p"
+    ].transform(benjamini_hochberg)
     return df
 
 
