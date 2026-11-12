@@ -237,8 +237,12 @@ def test_descriptions_state_the_clip_and_what_is_resampled(population_and_curves
     assert len(fractions) == 12
     for value in fractions:
         assert "clipped to the range 0 to 1" in value.description, value.key
-    # the intervals resample recording days (NWB files), not sessions
+    # the intervals resample the animals, their recording days (NWB files, not
+    # epochs) and the days' units
     intervals = [v for key, v in values.items() if "_ci_low_" in key]
     assert len(intervals) == 36
     for value in intervals:
-        assert "recording-day resamples" in value.description, value.key
+        assert (
+            "nested resamples (the animals, then each drawn animal's recording days"
+            in value.description
+        ), value.key

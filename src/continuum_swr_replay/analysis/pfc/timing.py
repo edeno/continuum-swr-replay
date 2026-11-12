@@ -21,8 +21,11 @@ measures it on simulated responses of known onset, read by
 
 The population curve is the mean over units of each curve multiplied by the
 sign of its own peak (so a suppression counts as a response of the same
-size), with a percentile interval from resampling the units' groups (their
-sessions, or their recording days).
+size), with a percentile interval from the nested bootstrap
+(:func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_draw`:
+the animals, then each drawn animal's groups of units, its sessions or its
+recording days, then each drawn group's units). An animal's own curve is the
+mean over its groups of each group's sign-aligned mean curve.
 
 The timing statistics of the units called for an event class
 (:func:`called_response_timing`, :func:`called_response_timing_by_animal`,
@@ -38,6 +41,11 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+
+from continuum_swr_replay.analysis.shared_statistics import (
+    nested_bootstrap_draw,
+    nested_codes,
+)
 
 
 class PeakOnset(NamedTuple):
@@ -257,8 +265,7 @@ class PopulationTiming(NamedTuple):
         Its peak lag (the lag of its largest absolute value) and half-maximum
         onset, in seconds.
     peak_lag_interval, onset_lag_interval : tuple of float
-        2.5th and 97.5th percentiles over the resamples of the groups, in
-        seconds.
+        2.5th and 97.5th percentiles over the nested resamples, in seconds.
     steepest_lag : float
         Its steepest approach to the peak (:func:`steepest_approach_lag`), s.
     steepest_lag_interval : tuple of float
@@ -290,6 +297,7 @@ def population_timing(
     curves: NDArray,
     peak: NDArray,
     groups: NDArray,
+    animals: NDArray,
     lag_time: NDArray,
     *,
     n_boot: int = 1_000,
@@ -297,12 +305,14 @@ def population_timing(
     fraction: float = 0.5,
     baseline: str | tuple[float, float] = "zero",
 ) -> PopulationTiming:
-    """Timing of the sign-aligned population curve, resampling groups of units.
+    """Timing of the sign-aligned population curve, with nested-bootstrap intervals.
 
-    Each bootstrap draw resamples the groups (``groups``: the units' sessions,
-    or their recording days) with replacement and averages every unit of every
-    drawn group, a group drawn twice counting twice; the aligned mean curve of
-    the draw gives one peak lag and one onset.
+    Each bootstrap draw is one replicate of the nested bootstrap
+    (:func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_draw`):
+    the animals with replacement, then each drawn animal's groups (``groups``:
+    the units' sessions, or their recording days), then each drawn group's
+    units; the mean of the drawn units' aligned curves, a unit drawn twice
+    counting twice, gives one peak lag and one onset.
 
     Parameters
     ----------
@@ -310,10 +320,13 @@ def population_timing(
     peak : NDArray, shape (n_units,)
         Signed peaks, from :func:`peak_and_onset`.
     groups : NDArray, shape (n_units,)
-        The label each unit is resampled by.
+        Each unit's group, the middle level of the resampling; a group belongs
+        to one animal.
+    animals : NDArray, shape (n_units,)
+        Each unit's animal.
     lag_time : NDArray, shape (n_lags,)
     n_boot : int
-        Resamples of the groups.
+        Bootstrap replicates.
     seed : int
         Seed of the resampling.
     fraction, baseline
@@ -324,7 +337,9 @@ def population_timing(
     PopulationTiming
     """
     curves = np.asarray(curves, dtype=float)
-    resampled = _resampled_mean_curves(curves, peak, groups, n_boot=n_boot, seed=seed)
+    resampled = _resampled_mean_curves(
+        curves, peak, groups, animals, n_boot=n_boot, seed=seed
+    )
     if resampled is None:
         nan_pair = (float("nan"), float("nan"))
         empty = np.full(curves.shape[0], np.nan)
@@ -351,28 +366,35 @@ def population_timing(
 
 
 def _resampled_mean_curves(
-    curves: NDArray, peak: NDArray, groups: NDArray, *, n_boot: int, seed: int
+    curves: NDArray,
+    peak: NDArray,
+    groups: NDArray,
+    animals: NDArray,
+    *,
+    n_boot: int,
+    seed: int,
 ) -> tuple[NDArray, NDArray, int] | None:
-    """The sign-aligned mean curve, shape (n_lags,), its ``n_boot`` resamples of
-    the groups, shape (n_boot, n_lags), and the number of groups; None when
-    there is no group."""
+    """The sign-aligned mean curve, shape (n_lags,), its ``n_boot`` nested
+    resamples (animals, groups, units), shape (n_boot, n_lags), and the number of
+    groups; None when there is no unit."""
     aligned = curves * np.sign(np.asarray(peak, dtype=float))[None, :]
-    labels, group_index = np.unique(np.asarray(groups), return_inverse=True)
-    n_groups = len(labels)
-    if n_groups == 0:
+    if aligned.shape[1] == 0:
         return None
-
-    # Per-session sums make every resample one weighted average.
+    animal_codes, group_codes = nested_codes(animals, groups)
+    n_groups = int(group_codes.max()) + 1
+    # The mean over units, summed group by group.
     sums = np.zeros((n_groups, curves.shape[0]))
-    np.add.at(sums, group_index, aligned.T)
-    sizes = np.bincount(group_index, minlength=n_groups).astype(float)
-    curve = sums.sum(axis=0) / sizes.sum()
+    np.add.at(sums, group_codes, aligned.T)
+    curve = sums.sum(axis=0) / aligned.shape[1]
 
     rng = np.random.default_rng(seed)
-    draws = rng.integers(0, n_groups, size=(n_boot, n_groups))
-    weights = np.zeros((n_boot, n_groups))
-    np.add.at(weights, (np.arange(n_boot)[:, None], draws), 1.0)
-    boot_curves = (weights @ sums) / (weights @ sizes)[:, None]
+    counts = np.stack(
+        [
+            nested_bootstrap_draw(animal_codes, group_codes, rng).rows
+            for _ in range(n_boot)
+        ]
+    ).astype(float)  # (n_boot, n_units)
+    boot_curves = (counts @ aligned.T) / counts.sum(axis=1)[:, None]
     return curve, boot_curves, n_groups
 
 
@@ -467,6 +489,7 @@ def population_rise_timing(
     curves: NDArray,
     peak: NDArray,
     groups: NDArray,
+    animals: NDArray,
     lag_time: NDArray,
     *,
     n_boot: int,
@@ -476,7 +499,7 @@ def population_rise_timing(
 
     The timing of the mean curve measured from its value at the first lag
     (:func:`population_timing` with ``baseline="window_start"``), with 95 %
-    intervals from resampling ``groups``.
+    intervals from the nested bootstrap of animals, ``groups`` and units.
 
     Parameters
     ----------
@@ -485,11 +508,13 @@ def population_rise_timing(
     peak : NDArray, shape (n_units,)
         Signed peaks, from :func:`peak_and_onset`.
     groups : NDArray, shape (n_units,)
-        The label each unit is resampled by.
+        Each unit's group, the middle level of the resampling.
+    animals : NDArray, shape (n_units,)
+        Each unit's animal.
     lag_time : NDArray, shape (n_lags,)
         Lag of each row, in seconds, ascending.
     n_boot, seed : int
-        Resamples of ``groups`` behind the intervals, and their seed.
+        Bootstrap replicates behind the intervals, and their seed.
 
     Returns
     -------
@@ -513,6 +538,7 @@ def population_rise_timing(
             curves,
             peak,
             groups,
+            animals,
             lag_time,
             n_boot=n_boot,
             seed=seed,
@@ -536,13 +562,19 @@ def _rise_statistics(rise: PopulationTiming) -> dict[str, float]:
 
 
 def called_response_timing_by_animal(
-    curves: NDArray, lag_time: NDArray, called: NDArray, animals: NDArray
+    curves: NDArray,
+    lag_time: NDArray,
+    called: NDArray,
+    groups: NDArray,
+    animals: NDArray,
 ) -> pd.DataFrame:
     """When each animal's own mean response starts, by direction of the peak.
 
     The called units are split by the sign of their peak; within each
-    direction, every animal with such a unit has its own sign-aligned mean
-    curve (:func:`sign_aligned_mean`), whose start is read by three rules.
+    direction, every animal with such a unit has its own curve, unit -> group
+    -> animal: the mean over its groups of each group's sign-aligned mean
+    curve (:func:`sign_aligned_mean`), so every group of an animal weighs the
+    same however many units it holds. Its start is read by three rules.
 
     Parameters
     ----------
@@ -552,6 +584,8 @@ def called_response_timing_by_animal(
         Lag of each row, in seconds, ascending.
     called : NDArray of bool, shape (n_units,)
         The units called for the event class.
+    groups : NDArray, shape (n_units,)
+        Each unit's group (its session, or its recording day).
     animals : NDArray, shape (n_units,)
         Each unit's animal.
 
@@ -574,7 +608,15 @@ def called_response_timing_by_animal(
         chosen = called & (np.sign(timing.peak) == sign)
         for animal in np.unique(animals[chosen]):
             own = chosen & (animals == animal)
-            own_curve = sign_aligned_mean(curves[:, own], timing.peak[own])
+            own_curve = np.mean(
+                [
+                    sign_aligned_mean(curves[:, mine], timing.peak[mine])
+                    for mine in (
+                        own & (groups == group) for group in np.unique(groups[own])
+                    )
+                ],
+                axis=0,
+            )
             onset = peak_and_onset(own_curve, lag_time).onset_lag[0]
             rise = peak_and_onset(own_curve, lag_time, baseline="window_start")
             steepest = steepest_approach_lag(own_curve, lag_time)[0]
@@ -614,8 +656,8 @@ def called_response_timing(
     and is in neither direction. For each direction, the timing is given per
     unit (medians and shares over units) and for the population: the
     sign-aligned mean curve of those units (:func:`population_timing`), with
-    95 % intervals from resampling ``groups``. Lags are reported in ms,
-    relative to event onset.
+    95 % intervals from the nested bootstrap of animals, ``groups`` and units.
+    Lags are reported in ms, relative to event onset.
 
     Parameters
     ----------
@@ -628,11 +670,12 @@ def called_response_timing(
     called : NDArray of bool, shape (n_units,)
         The units called for the event class.
     groups : NDArray, shape (n_units,)
-        The label each unit is resampled by (its recording day).
+        Each unit's group (its recording day): the middle level of the
+        resampling and of each animal's own curve.
     animals : NDArray, shape (n_units,)
         Each unit's animal.
     n_boot, seed : int
-        Resamples of ``groups`` behind the intervals, and their seed.
+        Bootstrap replicates behind the intervals, and their seed.
 
     Returns
     -------
@@ -660,7 +703,7 @@ def called_response_timing(
           is not at the first lag (a peak there has no approach).
 
         For the sign-aligned mean curve (each with ``_ci_low`` and
-        ``_ci_high``, the 2.5th and 97.5th percentiles over the resamples,
+        ``_ci_high``, the 2.5th and 97.5th percentiles over the replicates,
         except the two ``fraction`` statistics and ``size_vs_control``):
 
         - ``population_peak_ms``, ``population_onset_ms``,
@@ -695,7 +738,9 @@ def called_response_timing(
         (:func:`called_response_timing_by_animal` of the same units).
     """
     timing = peak_and_onset(curves, lag_time)
-    by_animal = called_response_timing_by_animal(curves, lag_time, called, animals)
+    by_animal = called_response_timing_by_animal(
+        curves, lag_time, called, groups, animals
+    )
     rows = {}
     for direction, sign in DIRECTIONS.items():
         chosen = called & (np.sign(timing.peak) == sign)
@@ -726,11 +771,12 @@ def called_response_timing(
         row["rise_onset_median_ms"] = np.nanmedian(rise_ms)
         steepest_ms = steepest_approach_lag(curves[:, chosen], lag_time) * _MS
         row["steepest_median_ms"] = np.nanmedian(steepest_ms)
-        # One resampling of the days, read from zero and from the first lag.
+        # One resampling, read from zero and from the first lag.
         resampled = _resampled_mean_curves(
             curves[:, chosen],
             timing.peak[chosen],
             groups[chosen],
+            animals[chosen],
             n_boot=n_boot,
             seed=seed,
         )

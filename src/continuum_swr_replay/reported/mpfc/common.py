@@ -44,9 +44,17 @@ ANIMAL_WORDS = {
 }
 
 
-#: Recording-day resamples behind the population timing intervals, and their seed.
+#: Nested-bootstrap replicates behind the population timing intervals, and their
+#: seed.
 TIMING_BOOTSTRAP_DRAWS = 1_000
 TIMING_BOOTSTRAP_SEED = 0
+#: What those replicates resample.
+TIMING_RESAMPLES = (
+    "nested resamples (the animals, then each drawn animal's recording days, then "
+    "each drawn day's units)"
+)
+#: An animal's own mean curve, in the timing values.
+OWN_CURVE = "the mean over its recording days of each day's sign-aligned mean curve"
 
 
 def _finite_adder(

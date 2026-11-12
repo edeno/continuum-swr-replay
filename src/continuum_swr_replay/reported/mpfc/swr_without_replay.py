@@ -19,6 +19,7 @@ from continuum_swr_replay.reported.mpfc.common import (
     ANIMAL_WORDS,
     TIMING_BOOTSTRAP_DRAWS,
     TIMING_BOOTSTRAP_SEED,
+    TIMING_RESAMPLES,
     _finite_adder,
 )
 from continuum_swr_replay.reported.values import (
@@ -311,13 +312,13 @@ def swr_without_replay_values(
                     "rise_onset_ms_ci_low",
                     "ms",
                     "int",
-                    "2.5th percentile over recording-day resamples of the rise onset",
+                    f"2.5th percentile over {TIMING_RESAMPLES} of the rise onset",
                 ),
                 (
                     "rise_onset_ms_ci_high",
                     "ms",
                     "int",
-                    "97.5th percentile over recording-day resamples of the rise onset",
+                    f"97.5th percentile over {TIMING_RESAMPLES} of the rise onset",
                 ),
                 (
                     "rise_size",

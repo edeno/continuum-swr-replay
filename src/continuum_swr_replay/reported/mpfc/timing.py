@@ -17,8 +17,10 @@ from continuum_swr_replay.analysis.pfc.load_population import (
 from continuum_swr_replay.reported.mpfc.common import (
     ANIMAL_WORDS,
     CLASS_LABELS,
+    OWN_CURVE,
     TIMING_BOOTSTRAP_DRAWS,
     TIMING_BOOTSTRAP_SEED,
+    TIMING_RESAMPLES,
     _finite_adder,
 )
 from continuum_swr_replay.reported.values import (
@@ -55,9 +57,10 @@ def timing_values(
       half-maximum onset (:func:`~continuum_swr_replay.analysis.pfc.timing.peak_and_onset`),
       their medians and the shares before event onset;
     - for the population, the peak lag and onset of the sign-aligned mean
-      curve, with a 95 % interval from resampling recording days (NWB files),
-      and the animals
-      whose own mean curve has its onset before event onset.
+      curve, with a 95 % interval from the nested bootstrap (animals, their
+      recording days, those days' units), and the animals whose own mean curve
+      (the mean over its days of each day's mean curve) has its onset before
+      event onset.
 
     Beside them: the share of the units with a matched quiet-rest control curve
     whose curve peaks before onset (the floor for a peak lag drawn by noise),
@@ -98,7 +101,7 @@ def timing_values(
             "quantity",
             "int",
             f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} "
-            f"recording-day resamples (seed {TIMING_BOOTSTRAP_SEED})",
+            f"{TIMING_RESAMPLES} (seed {TIMING_BOOTSTRAP_SEED})",
             "ms",
         )
         add(
@@ -267,7 +270,7 @@ def timing_values(
                         "quantity",
                         "dec2",
                         f"{'2.5th' if bound == 'low' else '97.5th'} percentile of that "
-                        f"over {TIMING_BOOTSTRAP_DRAWS:,} recording-day resamples",
+                        f"over {TIMING_BOOTSTRAP_DRAWS:,} {TIMING_RESAMPLES}",
                         "log rate",
                     )
             add(
@@ -312,7 +315,7 @@ def timing_values(
                 "count",
                 "count",
                 f"of those animals, how many have the half-maximum onset of their own "
-                f"mean curve of {who} before event onset",
+                f"mean curve of {who} ({OWN_CURVE}) before event onset",
             )
             add(
                 f"timing_population_steepest_animals_negative_{stem}",
@@ -320,7 +323,7 @@ def timing_values(
                 "count",
                 "count",
                 f"of those animals, how many have the steepest approach of their own "
-                f"mean curve of {who} before event onset",
+                f"mean curve of {who} ({OWN_CURVE}) before event onset",
             )
             add(
                 f"timing_population_rise_onset_animals_negative_{stem}",
@@ -328,7 +331,7 @@ def timing_values(
                 "count",
                 "count",
                 f"of those animals, how many have the rise onset of their own mean curve "
-                f"of {who} before event onset",
+                f"of {who} ({OWN_CURVE}) before event onset",
             )
 
     paired = timing.paired_peak_lag_statistics(

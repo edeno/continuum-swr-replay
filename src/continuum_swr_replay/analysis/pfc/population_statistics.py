@@ -1199,13 +1199,14 @@ def swr_without_replay_timing_statistics(
     Over the units called for SWRs without replay, split by the sign of each
     unit's peak, the rise timing of their sign-aligned mean curve
     (:func:`~continuum_swr_replay.analysis.pfc.timing.population_rise_timing`),
-    resampling recording days (``nwb_file_name``).
+    with intervals from the nested bootstrap of animals, their recording days
+    (``nwb_file_name``) and those days' units.
 
     Parameters
     ----------
     population : pd.DataFrame, shape (n_units, n_columns)
-        The extended unit table, with ``nwb_file_name``, ``epoch_name`` and
-        ``SWR_no_non_local: p_heldout``.
+        The extended unit table, with ``animal``, ``nwb_file_name``,
+        ``epoch_name`` and ``SWR_no_non_local: p_heldout``.
     curves : NDArray, shape (n_lags, n_units)
         Each unit's curve for SWRs without replay.
     lag_time : NDArray, shape (n_lags,)
@@ -1217,7 +1218,7 @@ def swr_without_replay_timing_statistics(
     min_events : int
         The floor on a session's SWRs without replay for the second group.
     n_boot, seed : int
-        Recording-day resamples, and their seed.
+        Bootstrap replicates, and their seed.
 
     Returns
     -------
@@ -1239,6 +1240,7 @@ def swr_without_replay_timing_statistics(
     subsets = _swr_without_replay_subsets(population, sessions, min_events)
     _, new_called = tested_and_called(population[SWR_WITHOUT_REPLAY_P_COLUMN], alpha)
     days = population["nwb_file_name"].astype(str).to_numpy()
+    animals = population["animal"].to_numpy()
     peak = peak_and_onset(curves, lag_time).peak
     rows = {}
     for subset, keep in subsets.items():
@@ -1251,6 +1253,7 @@ def swr_without_replay_timing_statistics(
                     curves[:, chosen],
                     peak[chosen],
                     days[chosen],
+                    animals[chosen],
                     lag_time,
                     n_boot=n_boot,
                     seed=seed,
