@@ -802,7 +802,6 @@ CONTRAST_SCRIPT = REPO / "scripts" / "figures" / "plot_swr_contrast_coefs.py"
 # ``main()``, which gates on ``Processed-Data`` and reads the fits) are left out.
 _CONTRAST_FUNCTIONS = {
     "forest",
-    "animal_ci",
     "rate_figure",
     "content_arm_figure",
     "content_patch_figure",
@@ -811,6 +810,7 @@ _CONTRAST_NAMES = {
     "ANIM",
     "CMAP",
     "RNG",
+    "N_BOOTSTRAP",
     "SWR",
     "NON",
     "handles",
@@ -831,6 +831,9 @@ def _contrast_plotting_namespace() -> dict:
     """
     import matplotlib.pyplot as plt
 
+    from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+        animal_median_bootstrap,
+    )
     from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 
     tree = ast.parse(CONTRAST_SCRIPT.read_text())
@@ -866,6 +869,7 @@ def _contrast_plotting_namespace() -> dict:
         "pd": pd,
         "plt": plt,
         "analysed_animals": analysed_animals,
+        "animal_median_bootstrap": animal_median_bootstrap,
         "std_factor": std_factor,
         "sessions": sessions,
     }

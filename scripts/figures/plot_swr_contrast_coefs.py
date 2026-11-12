@@ -3,7 +3,8 @@
 For each effect: every session's coefficient is a faint jittered dot (colored by
 animal); the 5 larger dots are per-animal medians; the black bar is the
 across-animal median; the horizontal whisker is its 95% CI (bootstrap over the 5
-per-animal medians -- the animal is the inferential unit, n=5). Continuous-predictor
+per-animal medians -- the animal is the inferential unit, n=5;
+``coefficient_statistics.animal_median_bootstrap``, 4000 draws). Continuous-predictor
 coefficients are shown STANDARDIZED (per 1 SD of the predictor: raw_coef * SD, which
 is exact for these Poisson GLMs) so effect sizes are comparable across predictors,
 value constructs, and the two ladders. Binary-predictor terms (marked with a dagger)
@@ -34,6 +35,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+    animal_median_bootstrap,
+)
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     gate_term_sessions,
     load_fit_time_sd_reference,
@@ -139,6 +143,7 @@ def _per_sd_units(artifacts: dict[str, Path]):
 ANIM = list(analysed_animals())
 CMAP = dict(zip(ANIM, plt.cm.tab10(np.linspace(0, 0.5, 5)), strict=True))
 RNG = np.random.default_rng(0)
+N_BOOTSTRAP = 4000
 
 
 def sessions(df, mod, pop, term, sd):
@@ -180,14 +185,6 @@ def sessions(df, mod, pop, term, sd):
     }
 
 
-def animal_ci(medians, n_boot=4000):
-    v = np.asarray([m for m in medians if np.isfinite(m)])
-    if len(v) < 2:
-        return np.nan, np.nan
-    boot = [np.median(RNG.choice(v, len(v), replace=True)) for _ in range(n_boot)]
-    return np.percentile(boot, [2.5, 97.5])
-
-
 def forest(ax, df, rows, title, sd):
     y = np.arange(len(rows))[::-1]
     allv = []
@@ -199,27 +196,30 @@ def forest(ax, df, rows, title, sd):
         if not s:
             labels[-1] += " (not reported)"
             continue
-        amed = []
-        for a in ANIM:
-            v = s.get(a, np.empty(0))
-            if not len(v):
-                amed.append(np.nan)
-                continue
-            allv.append(v)
+        drawn = [a for a in ANIM if len(s.get(a, ()))]
+        for a in drawn:
+            allv.append(s[a])
             ax.scatter(
-                v,
-                yi + RNG.uniform(-0.28, 0.28, len(v)),
+                s[a],
+                yi + RNG.uniform(-0.28, 0.28, len(s[a])),
                 s=6,
                 color=CMAP[a],
                 alpha=0.20,
                 edgecolors="none",
                 zorder=2,
             )
-            m = np.median(v)
-            amed.append(m)
+        summary = animal_median_bootstrap(
+            pd.Series(np.concatenate([s[a] for a in drawn])),
+            pd.Series(np.repeat(drawn, [len(s[a]) for a in drawn])),
+            rng=RNG,
+            n_draws=N_BOOTSTRAP,
+            percentiles=(2.5, 97.5),
+        )
+        for a in drawn:
+            m = summary["animal_medians"][a]
             ax.plot(m, yi, "o", ms=7, color=CMAP[a], mec="k", mew=0.6, zorder=5)
-        gm = np.nanmedian(amed)
-        lo, hi = animal_ci(amed)
+        gm = summary["animal_median"]
+        lo, hi = summary["percentiles"]
         ax.plot([lo, hi], [yi, yi], color="k", lw=1.4, zorder=4)
         ax.plot([gm, gm], [yi - 0.34, yi + 0.34], color="k", lw=2.6, zorder=6)
     ax.axvline(0, color="0.4", lw=1, ls="--", zorder=1)
