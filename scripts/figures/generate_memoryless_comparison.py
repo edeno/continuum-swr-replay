@@ -1072,15 +1072,8 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
             "The caption says the jump half passes fewer of the shortest replays "
             "than of the longest; the summary's pass rates by duration disagree."
         )
-    timing = sweep_statistics.sweep_timing_statistics(summary)
-    if not (
-        timing["sliding_start_early_min_ms"] > 0
-        and timing["sliding_end_late_min_ms"] > 0
-    ):
-        raise RuntimeError(
-            "The caption says the sliding window starts early and ends late at "
-            "every duration; the summary's median timing errors disagree."
-        )
+    # refuses a sweep whose sliding window does not start early and end late
+    sweep_statistics.sweep_timing_statistics(summary)
     errors = sweep_statistics.sweep_by_duration(
         summary, "timing_by_duration", TIMING_MEASURES
     )

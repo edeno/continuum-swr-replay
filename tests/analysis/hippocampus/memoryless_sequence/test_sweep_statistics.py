@@ -215,15 +215,40 @@ def test_sweep_timing_statistics_refuse_a_row_with_no_duration():
         stats.sweep_timing_statistics(changed)
 
 
-def test_sweep_timing_statistics_do_not_skip_a_missing_error():
-    row = (SWEEP["measure"] == "sliding_end_error_ms_median") & (
-        SWEEP["duration_s"] == 0.1
-    )
+def _with_timing_error(measure: str, duration_s: float, value: float) -> pd.DataFrame:
+    row = (SWEEP["measure"] == measure) & (SWEEP["duration_s"] == duration_s)
     changed = SWEEP.copy()
-    changed.loc[row, "value"] = np.nan
+    changed.loc[row, "value"] = value
+    return changed
+
+
+def test_sweep_timing_statistics_do_not_skip_a_missing_error():
+    changed = _with_timing_error("state_space_end_error_ms_median", 0.1, np.nan)
     result = stats.sweep_timing_statistics(changed)
-    assert np.isnan(result["sliding_end_late_min_ms"])
-    assert np.isnan(result["sliding_end_late_max_ms"])
+    assert np.isnan(result["state_space_edge_error_max_ms"])
+    # the sliding window's errors are all there
+    assert result["sliding_end_late_min_ms"] == 18.0
+
+
+@pytest.mark.parametrize(
+    ("measure", "value"),
+    [
+        # a start on time, or late, at 100 ms
+        ("sliding_start_error_ms_median", 0.0),
+        ("sliding_start_error_ms_median", 3.0),
+        # an end on time, or early
+        ("sliding_end_error_ms_median", 0.0),
+        ("sliding_end_error_ms_median", -3.0),
+        # a missing error is not early or late
+        ("sliding_start_error_ms_median", np.nan),
+        ("sliding_end_error_ms_median", np.nan),
+    ],
+)
+def test_sweep_timing_statistics_refuse_a_sliding_window_not_early_and_late(
+    measure, value
+):
+    with pytest.raises(ValueError, match="starts early and ends late"):
+        stats.sweep_timing_statistics(_with_timing_error(measure, 0.1, value))
 
 
 # --- the controls ---------------------------------------------------------------

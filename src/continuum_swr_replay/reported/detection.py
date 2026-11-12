@@ -444,15 +444,8 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
     domain = sweep_statistics.sweep_measures(summary, "overall_in_domain")
     grid = sweep_statistics.sweep_grid_statistics(summary)
     jump_pass = sweep_statistics.sweep_jump_pass_statistics(summary)
+    # refuses a sweep whose sliding window does not start early and end late
     timing = sweep_statistics.sweep_timing_statistics(summary)
-    if (
-        not timing["sliding_start_early_min_ms"] > 0
-        or not timing["sliding_end_late_min_ms"] > 0
-    ):
-        raise ValueError(
-            "the caption says the sliding window starts early and ends late at "
-            "every duration; the sweep's median timing errors disagree"
-        )
     durations = (timing["shortest_duration_s"], timing["longest_duration_s"])
     jump_durations = (jump_pass["shortest_duration_s"], jump_pass["longest_duration_s"])
     if jump_durations != durations:

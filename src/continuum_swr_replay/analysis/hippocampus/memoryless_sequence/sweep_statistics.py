@@ -211,7 +211,9 @@ def sweep_jump_pass_statistics(summary: pd.DataFrame) -> dict[str, float]:
 
 
 def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
-    """Where each detector puts a replay's start and end, over true durations.
+    """Where each detector puts a replay's start and end, over true durations:
+    the sliding window starting early and ending late at every one, or the
+    summary is refused.
 
     A timing error is reported minus true, on the replays both detectors
     reported: the sliding window starts early when its start error is negative
@@ -251,8 +253,10 @@ def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
     Raises
     ------
     ValueError
-        If a measure has no row or a row with no ``duration_s``, or the
-        measures are not all at the same durations.
+        If a measure has no row or a row with no ``duration_s``, the measures
+        are not all at the same durations, or at some duration the sliding
+        window's median start error is not below zero or its median end error
+        not above zero (a missing one is neither).
     """
     errors = sweep_by_duration(
         summary,
@@ -280,6 +284,11 @@ def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
     state_space = errors[
         ["state_space_start_error_ms_median", "state_space_end_error_ms_median"]
     ].to_numpy()
+    if not (-start.max() > 0 and end.min() > 0):
+        raise ValueError(
+            "replay sweep summary: expected the sliding window starts early and ends "
+            "late at every duration; its median timing errors disagree"
+        )
     return {
         "shortest_duration_s": float(durations[0]),
         "longest_duration_s": float(durations[-1]),
