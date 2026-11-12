@@ -81,9 +81,9 @@ def plot_model_hierarchy_comparison(
     ax.set_xticks(range(len(steps)))
     ax.set_xticklabels(steps, rotation=45, ha="right")
     ax.set_ylabel(
-        "ΔAIC, child − parent (negative = child better)"
+        "ΔAIC (child − parent)\nnegative = child better"
         if scale_label is None
-        else f"ΔAIC, child − parent, {scale_label} (negative = child better)"
+        else f"ΔAIC (child − parent), {scale_label}\nnegative = child better"
     )
     ax.set_title("Model Hierarchy Comparison")
 

@@ -39,14 +39,14 @@ COMPARISON = pd.DataFrame(
 @pytest.mark.parametrize(
     "scale_label,expected",
     [
-        (None, "ΔAIC, child − parent (negative = child better)"),
+        (None, "ΔAIC (child − parent)\nnegative = child better"),
         (
             "event-scale (quasi)",
-            "ΔAIC, child − parent, event-scale (quasi) (negative = child better)",
+            "ΔAIC (child − parent), event-scale (quasi)\nnegative = child better",
         ),
         (
             "timebin-scale",
-            "ΔAIC, child − parent, timebin-scale (negative = child better)",
+            "ΔAIC (child − parent), timebin-scale\nnegative = child better",
         ),
     ],
 )
