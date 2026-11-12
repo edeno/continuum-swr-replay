@@ -59,13 +59,15 @@ bandit task (regular) - after depletion". It was never ingested, so it is
 `NOT_INGESTED`, like wilbur20210401. That one is a regular session Spyglass ingested
 only in part, and its re-ingestion is blocked.
 
-The listed first-exposure session is wilbur20210326, admitted by
-`FIRST_EXPOSURE_DESCRIPTIONS` in `data_loaders/constants.py`. Four epochs are an
-animal's first exposure to the task (200 trials, p(R) 100 % then 50 %):
-j1620210706_02_r1, senor20201027_02_r1, chimi20200212_02_r1 and
-wilbur20210326_03_r1. All four are included. Only wilbur20210326's session
-description, "Spatial bandit task (regular) - exploration session", needs the
-allowlist.
+An animal's first-exposure session is its first spatial-bandit run session: p(R) of
+1 at all six ports for 100 trials, then 0.5 at all six for the next 100 (Comrie et
+al. 2024, bioRxiv, doi:10.1101/2024.09.23.613567, Methods). The register's
+`first_exposure` column marks it, one epoch per animal, whatever the epoch's status
+(`epoch_register.first_exposure_epochs()` reads it); each marked row's evidence says
+what showed it. The listed first-exposure session of the rule is wilbur20210326,
+admitted by `FIRST_EXPOSURE_DESCRIPTIONS` in `data_loaders/constants.py`: only its
+session description, "Spatial bandit task (regular) - exploration session", needs
+the allowlist.
 
 ## Statuses
 

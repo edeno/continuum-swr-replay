@@ -167,12 +167,11 @@ FIRST_EXPOSURE_DESCRIPTIONS: dict[str, str] = {
 }
 """First-exposure sessions ``get_epoch_info`` admits under their own description.
 
-Four epochs are an animal's first exposure to the task (200 trials, p(R) 100 %
-then 50 %): j1620210706_02_r1, senor20201027_02_r1, chimi20200212_02_r1 and
-wilbur20210326_03_r1. The project analyses all four. Three sessions carry the
-regular description; wilbur20210326's is "Spatial bandit task (regular) -
-exploration session", so it is admitted here, by name and description. Nothing
-else is.
+Which epoch is each animal's first exposure is the epoch register's
+``first_exposure`` column (``epoch_register.first_exposure_epochs``). The other
+first-exposure sessions carry the regular description; wilbur20210326's is
+"Spatial bandit task (regular) - exploration session", so it is admitted here,
+by name and description. Nothing else is.
 """
 
 WELL_PATCH_MAPPING = {
