@@ -80,7 +80,7 @@ Within-stop time-binned tables (Part B).
 
 The analysed-time read point: a decode frame held to the one analysed-time rule.
 
-`stamp_swr_source`, `require_swr_source`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot_with_swr_source`, `analysed_bins`, `swr_intervals`
+`stamp_swr_source`, `require_swr_source`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot_with_swr_source`, `analysed_bins`, `immobile_analysed_bins`, `swr_intervals`
 
 ### `src/continuum_swr_replay/analysis/events/artifact_intervals.py`
 
@@ -118,6 +118,12 @@ An epoch's run-speed baseline, shared by the decoders and the read path.
 
 `run_speed_baseline`
 
+### `src/continuum_swr_replay/analysis/events/gallery_sample.py`
+
+The event gallery's sample: each event's category and ambiguity, and the draw.
+
+`event_catalog`, `stratified_sample`, `group_seed`, `select_events`
+
 ### `src/continuum_swr_replay/analysis/events/immobility.py`
 
 Canonical whole-event immobility rules for neural event cohorts.
@@ -128,7 +134,7 @@ Canonical whole-event immobility rules for neural event cohorts.
 
 Non-local event detection and the SWR-overlap classification of those events.
 
-`get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `get_overlap_times`, `classify_swr_overlap`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
+`get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `nonlocal_event_bins_by_swr`, `get_overlap_times`, `classify_swr_overlap`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
 
 ### `src/continuum_swr_replay/analysis/events/swr_source.py`
 
@@ -212,7 +218,7 @@ Raw-data quality statistics for hippocampal clusterless decoding.
 
 Analysis of decoded posterior distributions.
 
-`get_conditional_non_local_posterior`, `load_conditional_posterior`, `get_map_step_distance`, `step_distance_from_nodes`, `map_estimate_to_map_nodes`, `track_distance_cm`, `get_map_speed`, `get_posterior_stats`
+`get_conditional_non_local_posterior`, `load_conditional_posterior`, `get_map_step_distance`, `step_distance_from_nodes`, `map_estimate_to_map_nodes`, `track_distance_cm`, `normalized_replay_position_by_swr`, `get_map_speed`, `get_posterior_stats`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/property_contrast.py`
 
@@ -224,7 +230,7 @@ Uncertainty of the SWR against non-SWR property contrasts: a nested bootstrap.
 
 Quality metrics for hippocampal decoding analysis.
 
-`compute_local_decoding_error`, `compute_state_fraction_during_movement`, `compute_non_local_during_movement`, `compute_behavior_state_breakdown`, `compute_bout_nonlocal_dominance`, `compute_running_error_tail`, `compute_error_by_track_segment`, `compute_no_spike_firing_correspondence`, `compute_non_local_event_context`, `compute_local_state_collapse_details`, `compute_calibration_curve`, `compute_session_quality_summary`
+`compute_local_decoding_error`, `local_decoding_error_statistics`, `compute_state_fraction_during_movement`, `compute_non_local_during_movement`, `compute_behavior_state_breakdown`, `compute_bout_nonlocal_dominance`, `compute_running_error_tail`, `compute_error_by_track_segment`, `compute_no_spike_firing_correspondence`, `compute_non_local_event_context`, `compute_local_state_collapse_details`, `compute_calibration_curve`, `calibration_curve_statistics`, `state_fractions_by_movement`, `compute_session_quality_summary`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/result_loading.py`
 
@@ -252,9 +258,9 @@ Each non-local event's start distance, and the theta of duration-matched quiet r
 
 ### `src/continuum_swr_replay/analysis/hippocampus/triggered_analysis.py`
 
-Event-triggered analysis utilities for extracting signal windows around events.
+Event-triggered analysis: signal windows around events, and their averages.
 
-`get_signal_windows`
+`get_signal_windows`, `compute_triggered_average_curves`
 
 ### `src/continuum_swr_replay/tables/event_ids.py`
 
@@ -458,7 +464,7 @@ The (stop x bin) point-process design and the bases it is built on.
 
 The duration-aware per-bin history design on real events, and its readouts.
 
-`attach_event_ends`, `at_risk_events`, `build_design`, `history_kernels`, `lag_support`, `onset_offset_collinearity`, `fit_pooled_history`
+`attach_event_ends`, `at_risk_events`, `build_design`, `stack_sessions`, `history_kernels`, `lag_support`, `onset_offset_collinearity`, `fit_pooled_history`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/duration_history_simulation.py`
 
@@ -470,13 +476,13 @@ Simulated non-local events with duration, for the per-bin history design.
 
 Per-bin conditional-intensity Poisson model for replay event onsets (Family B).
 
-`freeze_per_bin_cohort`, `apply_arrival_window`, `require_frozen_per_bin_design`, `fit_per_bin_rate_model`, `cross_validate_per_bin_rate_model`, `per_bin_rate_gof`
+`freeze_per_bin_cohort`, `apply_arrival_window`, `require_frozen_per_bin_design`, `fit_per_bin_rate_model`, `fit_per_bin_glm`, `cross_validate_per_bin_rate_model`, `per_bin_rate_gof`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/per_stop_rate_model.py`
 
 Poisson rate model for replay event occurrence.
 
-`fit_per_stop_rate_model`, `cross_validate_per_stop_rate_model`
+`fit_per_stop_rate_model`, `cross_validate_per_stop_rate_model`, `incomplete_stops`, `fit_per_stop_rate_hierarchy`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/ridge_history_cv.py`
 
@@ -552,7 +558,7 @@ Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
 
 Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
 
-`fit_cross_history`, `main`
+`main`
 
 ### `scripts/behavior/rate/fit_cross_history_ridge_cv.py`
 
@@ -570,13 +576,13 @@ Duration-aware self- and cross-history of the per-bin event rate.
 
 Fit the per-bin conditional-intensity ladder (Family B) and persist it.
 
-`fit_input_paths`, `fit_per_bin_rate_models`, `main`
+`fit_input_paths`, `main`
 
 ### `scripts/behavior/rate/fit_per_stop_rate_models.py`
 
 Fit the per-stop replay-rate hierarchy (R0-R1) and persist it.
 
-`fit_input_paths`, `fit_per_stop_rate_hierarchy`, `main`
+`fit_input_paths`, `main`
 
 ### `scripts/behavior/rate/fit_swr_contrast_rate.py`
 
@@ -588,7 +594,7 @@ Fit the per-bin non-local rate models, `is_swr` version (see docs/models_table.m
 
 Fit the per-bin replay rate vs behavioral-uncertainty / value, by population.
 
-`fit_input_paths`, `fit_uncertainty_rate`, `main`
+`fit_input_paths`, `main`
 
 ### `scripts/behavior/rate/plot_model_checking.py`
 
@@ -1190,11 +1196,23 @@ Which sessions of a rung pair can be compared by an information criterion.
 
 `why_not_comparable`
 
+### `src/continuum_swr_replay/analysis/behavior/rate/cross_history.py`
+
+Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
+
+`fit_direction`, `fit_cross_history`
+
 ### `src/continuum_swr_replay/analysis/behavior/rate/history_kernel_statistics.py`
 
 Summary statistics of the event-history kernels of the duration-aware rate fits.
 
 `lag_ms`, `lag_index`, `measurable_kernel`, `kernel_peak`, `self_history_statistics`, `self_history_range_statistics`, `cross_history_statistics`
+
+### `src/continuum_swr_replay/analysis/behavior/rate/per_bin_rate_ladder.py`
+
+The per-bin rate ladder (Family B) fit over sessions, and its cohort audit.
+
+`ladder_design`, `fit_ladder_session`, `fit_per_bin_rate_models`, `stop_level_design_columns`, `per_bin_cohort_records`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/post_outcome.py`
 
@@ -1206,10 +1224,22 @@ What a per-bin rate model may see once the trial's outcome is known.
 
 Summary statistics of the per-bin event-rate ladder's fits.
 
-`frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `reward_gated_fits`, `reward_kernel_by_lag`, `reward_kernel_animal_medians`, `self_history_kernel_by_lag`, `reward_kernel_statistics`, `paired_lag_one_reward_kernels`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
+`frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `reward_gated_fits`, `reward_kernel_by_lag`, `reward_kernel_animal_medians`, `self_history_kernel_by_lag`, `reward_kernel_statistics`, `paired_lag_one_reward_kernels`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `model_checking_examples`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/stop_statistics.py`
 
 Summary statistics of the immobility stops and of where event onsets fall in them.
 
 `stop_cohort_counts`, `dwell_statistics`, `still_immobile_fraction`, `onset_rate_time_course`, `outcome_boundary_statistics`, `onset_time_statistics`, `reward_history_incomplete_statistics`
+
+### `src/continuum_swr_replay/analysis/behavior/rate/swr_contrast_rate.py`
+
+The per-bin ``is_swr``-contrast rate ladders, fit over sessions, and their audit.
+
+`primary_union`, `fit_post_outcome_cohort`, `fit_contrast_session`, `fit_contrast_sessions`, `join_contrast_qvals`, `home_cohort`, `contrast_cohort_records`, `covariate_sds`, `max_relative_sd_difference`, `contrast_term_diagnostics`, `cohort_sd_reference`, `aggregate_contrast_fits`
+
+### `src/continuum_swr_replay/analysis/behavior/rate/uncertainty_rate.py`
+
+The per-bin replay rate vs behavioral uncertainty and value, by population.
+
+`drop_exposure_sessions`, `fit_uncertainty_rate`, `uncertainty_cohort_records`, `join_uncertainty_qvals`, `standardize_rl_covariates`
