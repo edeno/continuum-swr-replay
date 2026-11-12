@@ -21,6 +21,7 @@ from continuum_swr_replay.runs.io import (
     array_sha256,
     json_ready,
     ok_table_paths,
+    read_manifest,
     sha256_file,
     write_json,
 )
@@ -159,3 +160,25 @@ def test_ok_table_paths_are_the_ok_epochs_tables_sorted_and_may_be_none(tmp_path
     ]
     manifest.write_text(json.dumps({"epochs": {"e3": {"status": "failed"}}}))
     assert ok_table_paths(tmp_path, "features") == []
+
+
+def test_a_manifest_naming_another_folder_is_refused_only_when_asked(tmp_path):
+    """``names_folder``: a run folder copied or renamed from another run is not
+    read as this one; without it the run id is not checked (the state-evidence
+    run records none)."""
+    run_dir = tmp_path / "run0001"
+    run_dir.mkdir()
+    path = run_dir / "manifest.json"
+    path.write_text(json.dumps({"run_id": "run0002", "epochs": {}}))
+
+    assert read_manifest(run_dir)["run_id"] == "run0002"
+    with pytest.raises(ValueError, match="run0002.*run0001"):
+        read_manifest(run_dir, names_folder=True)
+    path.write_text(json.dumps({"epochs": {}}))
+    with pytest.raises(ValueError, match="None"):
+        read_manifest(run_dir, names_folder=True)
+    path.write_text(json.dumps({"run_id": "run0001", "epochs": {}}))
+    assert read_manifest(run_dir, names_folder=True) == {
+        "run_id": "run0001",
+        "epochs": {},
+    }

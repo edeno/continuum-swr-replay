@@ -48,7 +48,6 @@ What this module fixes
 
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,7 +71,7 @@ from continuum_swr_replay.analysis.events.eligibility import (
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.intervals import subtract_intervals
 from continuum_swr_replay.paths import artifact_intervals_root, swr_inventory_root
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import read_manifest, sha256_file
 
 __all__ = [
     "ARTIFACT_INTERVALS_RUN_ID",
@@ -264,24 +263,18 @@ def swr_inventory_paths(
 
 
 def inventory_manifest() -> dict[str, Any]:
-    """The SWR inventory run's manifest, checked to name its folder.
+    """The SWR inventory run's manifest, checked to name its folder
+    (``runs.io.read_manifest``).
 
     Raises
     ------
     SwrSourceError
-        If the run folder has no manifest, or it names another run.
+        If the run folder has no readable manifest, or it names another run.
     """
-    directory = swr_inventory_dir()
-    manifest_path = directory / "manifest.json"
-    if not manifest_path.exists():
-        raise SwrSourceError(f"no SWR inventory manifest at {manifest_path}")
-    manifest: dict[str, Any] = json.loads(manifest_path.read_text())
-    if manifest.get("run_id") != directory.name:
-        raise SwrSourceError(
-            f"{manifest_path} is run {manifest.get('run_id')!r}, not the folder's "
-            f"{directory.name!r}"
-        )
-    return manifest
+    try:
+        return read_manifest(swr_inventory_dir(), names_folder=True)
+    except ValueError as error:
+        raise SwrSourceError(f"SWR inventory: {error}") from error
 
 
 def swr_epoch_id_of_session(animal: str, day: object, epoch: object) -> str:

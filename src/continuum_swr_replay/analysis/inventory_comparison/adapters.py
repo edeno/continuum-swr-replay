@@ -270,12 +270,7 @@ def _run_files(
     manifest_path = run_dir / "manifest.json"
     if not manifest_path.exists():
         raise _Unavailable(f"no manifest at {manifest_path}")
-    manifest = read_manifest(run_dir)
-    if manifest.get("run_id") != run_dir.name:
-        raise ValueError(
-            f"{manifest_path} is run {manifest.get('run_id')!r}, not the folder's "
-            f"{run_dir.name!r}."
-        )
+    manifest = read_manifest(run_dir, names_folder=True)
     record = manifest.get("epochs", {}).get(epoch_id)
     if record is None:
         raise _Unavailable(f"{epoch_id} is not in run {run_dir.name}")

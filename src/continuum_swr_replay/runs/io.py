@@ -191,14 +191,24 @@ def output_path(identifier: str, output_dir: Path, name: str) -> Path:
     return output_dir / f"{identifier}_{name}.parquet"
 
 
-def read_manifest(run_dir: Path) -> dict:
+def read_manifest(run_dir: Path, *, names_folder: bool = False) -> dict:
     """The run's ``manifest.json``, with its record of each epoch.
+
+    Parameters
+    ----------
+    run_dir : Path
+        The run folder.
+    names_folder : bool, optional
+        Also require the manifest's ``run_id`` to be the folder's name, so a
+        folder copied or renamed from another run is not read as this one. A
+        runner whose run id names its folder records it; the state-evidence
+        run records none.
 
     Raises
     ------
     ValueError
-        If the run has no manifest, it cannot be read as JSON, or it holds no
-        ``epochs`` record.
+        If the run has no manifest, it cannot be read as JSON, it holds no
+        ``epochs`` record, or (with `names_folder`) it names another run.
     """
     path = run_dir / "manifest.json"
     try:
@@ -207,6 +217,11 @@ def read_manifest(run_dir: Path) -> dict:
         raise ValueError(f"no readable run manifest at {path}: {error}") from error
     if not isinstance(manifest, dict) or not isinstance(manifest.get("epochs"), dict):
         raise ValueError(f"no readable run manifest at {path}: no epochs record")
+    if names_folder and manifest.get("run_id") != run_dir.name:
+        raise ValueError(
+            f"{path} is run {manifest.get('run_id')!r}, not the folder's "
+            f"{run_dir.name!r}"
+        )
     return manifest
 
 
