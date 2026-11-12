@@ -57,6 +57,7 @@ from .._fit_diagnostics import (
     count_fit_quality_warnings,
     fit_flag_counts,
     fit_status,
+    fold_flag_counts,
 )
 from ..cohort_audit import cohort_record
 from ..model_specs import MODEL_PER_STOP_RATE
@@ -277,8 +278,7 @@ def cross_validate_per_stop_rate_model(
 
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=seed)
     fold_ll = []
-    n_nonconverged = 0
-    n_separated = 0
+    fold_statuses = []
     for train, test in kf.split(X):
         if np.linalg.matrix_rank(X[train]) < X.shape[1]:
             return None
@@ -298,8 +298,7 @@ def cross_validate_per_stop_rate_model(
             term_names=["Intercept", *predictors],
             nuisance_terms=NUISANCE_TERMS,
         )
-        n_nonconverged += not status["converged"]
-        n_separated += status["separated"]
+        fold_statuses.append([status])
         mu = np.exp(np.clip(X[test] @ res.params + offset[test], -30, 30))
         ll = poisson.logpmf(y[test], mu)
         if not np.all(np.isfinite(ll)):
@@ -310,13 +309,13 @@ def cross_validate_per_stop_rate_model(
     # metric (nan) rather than dropping the fold -- dropping a fold changes the
     # held-out set and makes CV metrics non-comparable across rungs. The fold counts
     # are reported alongside so the invalidation is visible.
-    invalid = (n_nonconverged > 0) or (n_separated > 0)
+    flags = fold_flag_counts(fold_statuses)
+    invalid = any(flags.values())
     return {
         "cv_ll_per_stop_mean": np.nan if invalid else float(np.mean(fold_ll)),
         "cv_ll_per_stop_std": np.nan if invalid else float(np.std(fold_ll)),
         "cv_n_folds": n_folds,
-        "cv_n_nonconverged_folds": int(n_nonconverged),
-        "cv_n_separated_folds": int(n_separated),
+        **flags,
     }
 
 

@@ -20,6 +20,7 @@ from .._fit_diagnostics import (
     NUISANCE_TERMS,
     capture_fit_warnings,
     fit_status,
+    fold_flag_counts,
 )
 
 logger = logging.getLogger(__name__)
@@ -109,8 +110,7 @@ def cross_validate_conditional_poisson(
 
     ll_per_event = []
     ll_per_timebin = []
-    n_nonconverged = 0
-    n_separated = 0
+    fold_statuses = []
 
     for train_idx, test_idx in gkf.split(df, y, groups):
         y_train = y[train_idx]
@@ -150,8 +150,7 @@ def cross_validate_conditional_poisson(
                 term_names=predictors,
                 nuisance_terms=NUISANCE_TERMS,
             )
-            n_nonconverged += status["converged"] is not True
-            n_separated += status["separated"]
+            fold_statuses.append([status])
 
             # Compute held-out conditional LL
             fold_ll = _held_out_conditional_ll(
@@ -170,15 +169,15 @@ def cross_validate_conditional_poisson(
 
     # Any nonconverged/separated fold invalidates the metric (nan) rather than
     # dropping the fold; the counts are reported alongside.
-    invalid = (n_nonconverged > 0) or (n_separated > 0)
+    flags = fold_flag_counts(fold_statuses)
+    invalid = any(flags.values())
     return {
         "cv_ll_per_event_mean": np.nan if invalid else float(np.mean(ll_per_event)),
         "cv_ll_per_event_std": np.nan if invalid else float(np.std(ll_per_event)),
         "cv_ll_per_timebin_mean": np.nan if invalid else float(np.mean(ll_per_timebin)),
         "cv_ll_per_timebin_std": np.nan if invalid else float(np.std(ll_per_timebin)),
         "cv_n_folds": len(ll_per_event),
-        "cv_n_nonconverged_folds": int(n_nonconverged),
-        "cv_n_separated_folds": int(n_separated),
+        **flags,
     }
 
 

@@ -47,6 +47,7 @@ from .._fit_diagnostics import (
     capture_fit_warnings,
     count_fit_quality_warnings,
     fit_status,
+    fold_flag_counts,
 )
 from ..model_specs import (
     ARRIVAL_CLOCK_COLUMN,
@@ -515,8 +516,7 @@ def cross_validate_per_bin_rate_model(
     fold_means: list[float] = []
     sum_diff = 0.0
     n_events_total = 0
-    n_nonconverged = 0
-    n_separated = 0
+    fold_statuses = []
     for train_idx, _test_idx in kf.split(stops):
         train_stops = set(stops[train_idx])
         is_train = df["stop_id"].isin(train_stops).to_numpy()
@@ -566,8 +566,7 @@ def cross_validate_per_bin_rate_model(
             term_names=[str(t) for t in res0.params.index],
             nuisance_terms=NUISANCE_TERMS,
         )
-        n_nonconverged += (not s_res["converged"]) or (not s_res0["converged"])
-        n_separated += s_res["separated"] or s_res0["separated"]
+        fold_statuses.append([s_res, s_res0])
         y = te["count"].to_numpy(dtype=float)
         ll = poisson.logpmf(y, mu)
         ll0 = poisson.logpmf(y, mu0)
@@ -581,15 +580,15 @@ def cross_validate_per_bin_rate_model(
     # Any nonconverged/separated fold invalidates the whole CV metric (nan) rather
     # than dropping the fold -- dropping a fold changes the held-out set and makes CV
     # scores non-comparable across rungs. Counts are reported alongside.
-    invalid = (n_nonconverged > 0) or (n_separated > 0)
+    flags = fold_flag_counts(fold_statuses)
+    invalid = any(flags.values())
     bits = sum_diff / (n_events_total * np.log(2)) if n_events_total else np.nan
     return {
         "cv_ll_per_bin_mean": np.nan if invalid else float(np.mean(fold_means)),
         "cv_ll_per_bin_std": np.nan if invalid else float(np.std(fold_means)),
         "cv_bits_per_event": np.nan if invalid else float(bits),
         "cv_n_folds": n_folds,
-        "cv_n_nonconverged_folds": int(n_nonconverged),
-        "cv_n_separated_folds": int(n_separated),
+        **flags,
     }
 
 

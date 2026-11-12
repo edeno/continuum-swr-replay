@@ -13,6 +13,9 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
+from continuum_swr_replay.analysis.behavior._fit_diagnostics import (
+    flagged_nonconverged,
+)
 from continuum_swr_replay.analysis.behavior.covariates.qvals_table import (
     QVALS_STANDARDIZED_COLS,
 )
@@ -224,7 +227,7 @@ def _validate_model_bundle(
             f"{directory} model results lack a 'converged' column; a dropped or "
             "renamed column must not silently bypass the convergence gate"
         )
-    if (~results["converged"].eq(True)).any():
+    if flagged_nonconverged(results).any():
         raise ValueError(
             f"{directory} contains published fits that did not converge or have no "
             "convergence flag; a bundle fitted before the conditional-Poisson null "

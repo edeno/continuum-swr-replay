@@ -22,7 +22,9 @@ from continuum_swr_replay.analysis.behavior._fit_diagnostics import (
     count_fit_quality_warnings,
     fit_flag_counts,
     fit_status,
+    flagged_nonconverged,
     flagged_separated,
+    fold_flag_counts,
 )
 
 
@@ -328,3 +330,45 @@ def test_flagged_separated_is_true_only_where_the_flag_is_true():
     flagged = flagged_separated(fits)
     assert list(flagged) == [True, False, False, False]
     assert list(flagged.index) == [10, 11, 12, 13]
+
+
+def test_flagged_nonconverged_is_true_wherever_the_flag_is_not_true():
+    fits = pd.DataFrame(
+        {"converged": [True, False, np.nan, None]}, index=[10, 11, 12, 13]
+    )
+    flagged = flagged_nonconverged(fits)
+    assert list(flagged) == [False, True, True, True]
+    assert list(flagged.index) == [10, 11, 12, 13]
+
+
+def _status(converged, separated=False):
+    return {"converged": converged, "separated": separated, "separated_terms": ()}
+
+
+def test_fold_flag_counts_count_folds_not_fits():
+    folds = [
+        # model and baseline both fine
+        [_status(True), _status(True)],
+        # two bad fits in one fold: one fold, not two
+        [_status(False), _status(None)],
+        # converged unknown (a conditional fit without captured warnings)
+        [_status(None)],
+        # separated in the baseline only, and in both
+        [_status(True), _status(True, separated=True)],
+        [_status(True, separated=True), _status(True, separated=True)],
+    ]
+    assert fold_flag_counts(folds) == {
+        "cv_n_nonconverged_folds": 2,
+        "cv_n_separated_folds": 2,
+    }
+
+
+def test_fold_flag_counts_of_clean_or_no_folds_are_zero():
+    assert fold_flag_counts([[_status(True)], [_status(True)]]) == {
+        "cv_n_nonconverged_folds": 0,
+        "cv_n_separated_folds": 0,
+    }
+    assert fold_flag_counts([]) == {
+        "cv_n_nonconverged_folds": 0,
+        "cv_n_separated_folds": 0,
+    }

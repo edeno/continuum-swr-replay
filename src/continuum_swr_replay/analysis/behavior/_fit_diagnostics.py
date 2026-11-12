@@ -342,8 +342,63 @@ def fit_flag_counts(fits: pd.DataFrame) -> dict[str, int]:
     """
     nonconverged, separated = FLAG_FIELDS
     return {
-        nonconverged: (
-            int((~fits["converged"].eq(True)).sum()) if "converged" in fits else 0
-        ),
+        nonconverged: int(flagged_nonconverged(fits).sum())
+        if "converged" in fits
+        else 0,
         separated: int(flagged_separated(fits).sum()) if "separated" in fits else 0,
+    }
+
+
+def flagged_nonconverged(fits: pd.DataFrame) -> pd.Series:
+    """Per-fit mask: has this fit not converged?
+
+    Parameters
+    ----------
+    fits : pd.DataFrame, shape (n_fits, n_columns)
+        Per-session fits with ``converged``.
+
+    Returns
+    -------
+    nonconverged : pd.Series of bool, shape (n_fits,)
+        On ``fits``' index: True where ``converged`` is not True. A missing
+        flag has not converged.
+    """
+    return ~fits["converged"].eq(True)
+
+
+#: The counts of flagged cross-validation folds, by the names a CV result
+#: carries them under (:func:`fold_flag_counts`).
+FOLD_FLAG_FIELDS = ("cv_n_nonconverged_folds", "cv_n_separated_folds")
+
+
+def fold_flag_counts(fold_statuses: Sequence[Sequence[dict]]) -> dict[str, int]:
+    """The cross-validation folds flagged as not converged and as separated.
+
+    A cross-validated metric with any flagged fold is void (NaN), not computed
+    on the remaining folds: dropping a fold changes the held-out set, and the
+    metric would no longer compare across rungs.
+
+    Parameters
+    ----------
+    fold_statuses : sequence of sequence of dict
+        Per fold, the :func:`fit_status` of each fit the fold scores (the
+        model, and its baseline where the score is a difference).
+
+    Returns
+    -------
+    counts : dict
+        The :data:`FOLD_FLAG_FIELDS`: the folds in which any fit's
+        ``converged`` is not True (a missing flag has not converged), and the
+        folds in which any fit is ``separated``. The metric is void when
+        either is positive.
+    """
+    nonconverged, separated = FOLD_FLAG_FIELDS
+    return {
+        nonconverged: sum(
+            any(status["converged"] is not True for status in fold)
+            for fold in fold_statuses
+        ),
+        separated: sum(
+            any(status["separated"] for status in fold) for fold in fold_statuses
+        ),
     }
