@@ -173,3 +173,30 @@ def test_the_animals_must_be_indexed_as_the_values():
         stats.session_median_statistics(
             values, pd.Series(["a", "a", "b"], index=[0, 1, 7])
         )
+
+
+def test_a_missing_value_is_refused():
+    # Counted, it would be a session that is neither positive nor negative.
+    values = pd.Series([1.0, np.nan, -3.0])
+    with pytest.raises(ValueError, match="missing"):
+        stats.session_median_statistics(values, pd.Series(["a", "a", "b"]))
+
+
+def test_an_animal_without_a_session_is_not_an_animal_of_the_summary():
+    # The category c has no session; a 1.5 and b -3 are the animals.
+    values = pd.Series([1.0, 2.0, -3.0])
+    animal = pd.Series(pd.Categorical(["a", "a", "b"], categories=["a", "b", "c"]))
+    result = stats.session_median_statistics(values, animal)
+    assert result["n_animals"] == 2
+    assert result["animal_median"] == -0.75
+    assert result["n_animals_positive"] == 1
+    assert result["n_animals_negative"] == 1
+
+
+def test_a_zero_session_median_has_the_sign_of_the_zero_animals_only():
+    # sorted: -2, 0, 0, 3 -> median 0; animal medians a 0, b -2, c 1.5
+    values = pd.Series([0.0, -2.0, 0.0, 3.0])
+    animal = pd.Series(["a", "b", "c", "c"])
+    result = stats.session_median_statistics(values, animal)
+    assert result["median"] == 0.0
+    assert result["n_animals_same_sign"] == 1  # a, whose own median is 0

@@ -89,9 +89,10 @@ def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str,
     Parameters
     ----------
     values : pd.Series, shape (n_sessions,)
-        One number per session, none missing.
+        One number per session, none missing. An infinite value is a value.
     animal : pd.Series, shape (n_sessions,)
-        Each session's animal, indexed as ``values``.
+        Each session's animal, indexed as ``values``. An animal (a category of
+        a categorical) with no session is not an animal of the summary.
 
     Returns
     -------
@@ -107,18 +108,26 @@ def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str,
         - ``n_animals_positive``, ``n_animals_negative``: animals whose own
           median is above and below zero.
         - ``n_animals_same_sign``: animals whose own median has the sign of
-          ``median``.
+          ``median``. Zero has its own sign: when ``median`` is exactly zero,
+          these are the animals whose own median is exactly zero.
 
     Raises
     ------
     ValueError
         If ``animal`` is not indexed as ``values`` (a session without an
-        animal would be left out of the animals' medians).
+        animal would be left out of the animals' medians), or a value is
+        missing (it would count as a session that is neither positive nor
+        negative).
     """
     if not values.index.equals(animal.index):
         raise ValueError("values and animal are not indexed alike")
+    if values.isna().any():
+        raise ValueError(
+            f"{int(values.isna().sum())} of {len(values)} values are missing: "
+            "drop them before summarizing"
+        )
     median = float(values.median())
-    per_animal = values.groupby(animal).median()
+    per_animal = values.groupby(animal, observed=True).median()
     return {
         "n_sessions": len(values),
         "median": median,
