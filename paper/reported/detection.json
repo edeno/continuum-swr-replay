@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "ffa1ceafb7cc",
+ "commit": "0fe0fadd443c",
  "code": {
-  "head": "ffa1ceafb7cc93640cbacf9d957e029afb2a0b3a",
+  "head": "0fe0fadd443cb462393fb816cf6a87ea3c3f98a9",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -131,16 +131,16 @@
     "code_sha256": "c7716a28226699b2539fd24eba997b4dc08d181903aee9b116e26434a06bd398"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "cd7c960d9f1dd609ae3ce40ff46d065eb4ea6f0983b7f0e645e8ffc2a90f69a8",
-    "code_sha256": "b42cf7db9de97a92d47fca6ad77c0b01666df8bbddaa2e8a6e045a6224f30b45"
+    "sha256": "c4f9f2dd45c130a75fce821e2cd2e6eca2fc15fae7b1c1d15d14040ed47eae99",
+    "code_sha256": "15e0000464a3e8ec2777f1defde055d09e7ca6dbae1f120cac0a60dec7dad166"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/runs/io.py": {
-    "sha256": "87e79ce1d88152dc4d57fa43574f78f88ea719281bc6919387ee34e045e2d8f0",
-    "code_sha256": "7f33457ee1dd4d6eb9f6822107d7e903e09ba12775aa0abdcdeb4c82eb8e7e45"
+    "sha256": "d5082e37f49efa97fc6b136cc9b779eda29121ec621825bff2f2e01ed31b2302",
+    "code_sha256": "6ec2a9c12b93ff42adf9cb23a0979765acb1ff7b358138876a5bdd507ea3cf1a"
    },
    "src/continuum_swr_replay/runs/provenance.py": {
     "sha256": "0517671a2cd647305bd9f067de18ce9af20c57664d96d3537fface7c19dc38e5",
@@ -175,16 +175,16 @@
     "code_sha256": "7d4ad5263497e07ebb529319eeef4dac87b29e5fa76dccd4973cb6eb0cb7fe09"
    },
    "paper/reported/inputs/detection/detection_sweep_summary.csv": {
-    "sha256": "008e03c479c120ffbb298a7de058f905d6d97500c0b930abfb1071788c5a4362",
-    "code_sha256": "008e03c479c120ffbb298a7de058f905d6d97500c0b930abfb1071788c5a4362"
+    "sha256": "cee111d572c1166e1cf83e33dfd4112836e547b755f49a9e327d457a12c8a342",
+    "code_sha256": "cee111d572c1166e1cf83e33dfd4112836e547b755f49a9e327d457a12c8a342"
    },
    "paper/reported/inputs/detection/detection_controls_summary.csv": {
-    "sha256": "b8c16c04c0a365b91a1af61dfb57a0369633db3e68c3414192dd09d0397d5b3d",
-    "code_sha256": "b8c16c04c0a365b91a1af61dfb57a0369633db3e68c3414192dd09d0397d5b3d"
+    "sha256": "2f3937682ea6b920e330d6a8946b906bbb0920d08f650bdf857f8a7a2e8909de",
+    "code_sha256": "2f3937682ea6b920e330d6a8946b906bbb0920d08f650bdf857f8a7a2e8909de"
    },
    "paper/reported/inputs/detection/detection_heldout_summary.csv": {
-    "sha256": "f41a5358c5fa87994538616414f18cde3d0cc2c1f894335b9ab64676e500e2c4",
-    "code_sha256": "f41a5358c5fa87994538616414f18cde3d0cc2c1f894335b9ab64676e500e2c4"
+    "sha256": "801d4ab6a8af8e561d9736bf72d0cd900710233adaa15f621601c94608a45603",
+    "code_sha256": "801d4ab6a8af8e561d9736bf72d0cd900710233adaa15f621601c94608a45603"
    }
   }
  },
@@ -211,15 +211,15 @@
   },
   {
    "path": "paper/reported/inputs/detection/detection_sweep_summary.csv",
-   "sha256": "008e03c479c120ffbb298a7de058f905d6d97500c0b930abfb1071788c5a4362"
+   "sha256": "cee111d572c1166e1cf83e33dfd4112836e547b755f49a9e327d457a12c8a342"
   },
   {
    "path": "paper/reported/inputs/detection/detection_controls_summary.csv",
-   "sha256": "b8c16c04c0a365b91a1af61dfb57a0369633db3e68c3414192dd09d0397d5b3d"
+   "sha256": "2f3937682ea6b920e330d6a8946b906bbb0920d08f650bdf857f8a7a2e8909de"
   },
   {
    "path": "paper/reported/inputs/detection/detection_heldout_summary.csv",
-   "sha256": "f41a5358c5fa87994538616414f18cde3d0cc2c1f894335b9ab64676e500e2c4"
+   "sha256": "801d4ab6a8af8e561d9736bf72d0cd900710233adaa15f621601c94608a45603"
   }
  ],
  "values": {
