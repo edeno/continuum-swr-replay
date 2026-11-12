@@ -160,3 +160,29 @@ def test_a_pooled_target_class_is_kept(tmp_path):
     units, _, _, _ = summarize.load_bundles(tmp_path)
 
     assert set(units["event_class"]) == {"pooled"}
+
+
+def test_the_figure_draws_the_shuffled_band_the_summary_reads(tmp_path, monkeypatch):
+    lag = np.linspace(-0.2, 0.2, 5)
+    key = ("m", "non_local_no_SWR", "t")
+    bump = np.array([0.0, 0.0, 1.0, 0.0, 0.0])
+    curves = {key: {"a1": bump, "b1": 0.5 * bump}}
+    # a1 holds three draws (0, 1, 2 at every lag), b1 two (zeros): the band is
+    # over the first two draws, whose population curves are 0 and 0.5.
+    nulls = {
+        key: {
+            "a1": np.repeat(np.arange(3.0)[:, None], 5, axis=1),
+            "b1": np.zeros((2, 5)),
+        }
+    }
+    animal_of = {"a1": "a", "b1": "b"}
+    close = summarize.plt.close
+    figures = []
+    monkeypatch.setattr(summarize.plt, "close", figures.append)
+
+    summarize.plot_model("m", curves, lag, animal_of, tmp_path, nulls)
+
+    band = figures[0].axes[0].collections[0].get_paths()[0].vertices[:, 1]
+    assert band.min() == pytest.approx(np.percentile([0.0, 0.5], 2.5))
+    assert band.max() == pytest.approx(np.percentile([0.0, 0.5], 97.5))
+    close(figures[0])

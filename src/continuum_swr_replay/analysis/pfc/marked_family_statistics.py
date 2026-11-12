@@ -9,11 +9,12 @@ and writes the summary the mpfc summary builder reads.
 
 - :func:`animal_balanced_fraction_positive`: the share of units whose held-out
   deviance improves with a target's kernel, and the deltas' scale.
-- :func:`animal_balanced_curve`: the population curve of per-session curves.
+- :func:`animal_balanced_curve`: the population curve of per-session curves,
+  and :func:`animal_curve_sem` its standard error over animals.
 - :func:`population_curve_summary`: its peak, its pre- and post-onset means
   and how many sessions and animals share their signs.
-- :func:`null_band_summary`: the population curve against the same curve over
-  shuffled-mark refits.
+- :func:`shuffled_band`: the same curve over shuffled-mark refits, and its
+  per-lag band; :func:`null_band_summary` sets the population curve against it.
 - :func:`mark_correlations`: the within-session correlation of every pair of
   marks, from the bundles' sidecars.
 - :func:`complete_bundle_records`: the complete bundles of a directory, the
@@ -25,6 +26,7 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -224,7 +226,8 @@ def population_curve_summary(
     pandas.DataFrame
         One row per key with ``peak_value`` (log rate per SD at the lag where
         the population curve is largest in magnitude), ``peak_lag_ms``,
-        ``sem_at_peak`` over animal means (NaN with one animal),
+        ``sem_at_peak`` (:func:`animal_curve_sem` at that lag; NaN with one
+        animal),
         ``sessions_same_sign`` (fraction of
         session-mean curves sharing the peak's sign at that lag) and
         ``animals_same_sign`` (count of animals whose mean curve does, of
@@ -256,7 +259,6 @@ def population_curve_summary(
         post_mean = float(mean[post].mean())
         sign = np.sign(mean[peak])
         animal_means = {a: float(curve[peak]) for a, curve in per_animal.items()}
-        animal_values = np.array(list(animal_means.values()))
         animal_post = [float(curve[post].mean()) for curve in per_animal.values()]
         out.append(
             {
@@ -268,11 +270,7 @@ def population_curve_summary(
                 "pre_onset_mean": pre_mean,
                 "post_onset_mean": post_mean,
                 "post_minus_pre": post_mean - pre_mean,
-                "sem_at_peak": (
-                    float(animal_values.std(ddof=1) / np.sqrt(len(animal_values)))
-                    if len(animal_values) > 1
-                    else float("nan")
-                ),
+                "sem_at_peak": float(animal_curve_sem(per_animal)[peak]),
                 "sessions_same_sign": float(np.mean(np.sign(stack[:, peak]) == sign)),
                 "animals_same_sign": int(
                     sum(np.sign(v) == sign for v in animal_means.values())
@@ -315,6 +313,102 @@ def animal_balanced_curve(
     return np.mean(np.stack(list(per_animal.values())), axis=0), per_animal
 
 
+def animal_curve_sem(per_animal: dict[str, np.ndarray]) -> np.ndarray:
+    """Standard error over animals of the animals' mean curves, at each lag.
+
+    Parameters
+    ----------
+    per_animal : dict
+        ``animal -> curve``, shape (n_lags,), as :func:`animal_balanced_curve`
+        returns them.
+
+    Returns
+    -------
+    NDArray, shape (n_lags,)
+        The sample standard deviation over animals (``ddof=1``) over the
+        square root of the number of animals; NaN with one animal.
+    """
+    stack = np.stack(list(per_animal.values()))  # (n_animals, n_lags)
+    if len(stack) < 2:
+        return np.full(stack.shape[1], np.nan)
+    return stack.std(axis=0, ddof=1) / np.sqrt(len(stack))
+
+
+class ShuffledBand(NamedTuple):
+    """A population curve beside the same curve over shuffled-mark refits.
+
+    Attributes
+    ----------
+    sessions : list of str
+        Sessions with both an observed curve and null draws, sorted.
+    n_draws : int
+        Draws used: the fewest any of those sessions holds, so that draw ``r``
+        of every session forms population draw ``r``.
+    observed : NDArray, shape (n_lags,)
+        The observed population curve over those sessions.
+    observed_animals : dict
+        ``animal -> its mean observed curve``.
+    draws : NDArray, shape (n_draws, n_lags)
+        Each draw's population curve.
+    draw_animals : dict
+        ``animal -> its mean over sessions of each draw``, shape
+        (n_draws, n_lags).
+    low, high : NDArray, shape (n_lags,)
+        The 2.5th and 97.5th percentiles of ``draws`` at each lag.
+    """
+
+    sessions: list[str]
+    n_draws: int
+    observed: np.ndarray
+    observed_animals: dict[str, np.ndarray]
+    draws: np.ndarray
+    draw_animals: dict[str, np.ndarray]
+    low: np.ndarray
+    high: np.ndarray
+
+
+def shuffled_band(
+    observed_by_session: dict[str, np.ndarray],
+    null_by_session: dict[str, np.ndarray],
+    animal_of: dict[str, str],
+) -> ShuffledBand | None:
+    """The population curve and its shuffled-mark band, over the same sessions.
+
+    Both are aggregated unit -> session -> animal
+    (:func:`animal_balanced_curve`) over the sessions that carry both an
+    observed curve and null draws, each session's draws cut to the fewest any
+    of them holds.
+
+    Parameters
+    ----------
+    observed_by_session : dict
+        ``session -> observed curve``, shape (n_lags,).
+    null_by_session : dict
+        ``session -> null draws``, shape (n_draws, n_lags).
+    animal_of : dict
+        ``session -> animal``.
+
+    Returns
+    -------
+    ShuffledBand or None
+        None when no session carries both.
+    """
+    sessions = sorted(set(null_by_session) & set(observed_by_session))
+    if not sessions:
+        return None
+    n_draws = min(null_by_session[s].shape[0] for s in sessions)
+    observed, observed_animals = animal_balanced_curve(
+        {s: observed_by_session[s] for s in sessions}, animal_of
+    )
+    draws, draw_animals = animal_balanced_curve(
+        {s: null_by_session[s][:n_draws] for s in sessions}, animal_of
+    )
+    low, high = np.nanpercentile(draws, [2.5, 97.5], axis=0)
+    return ShuffledBand(
+        sessions, n_draws, observed, observed_animals, draws, draw_animals, low, high
+    )
+
+
 def null_band_summary(
     curves: dict,
     nulls: dict,
@@ -325,8 +419,8 @@ def null_band_summary(
     For each (model, class, target), the observed population curve and each
     shuffled draw's population curve are aggregated the same way, unit ->
     session -> animal, over the sessions that carry a null (draw ``r`` of
-    every session forms population draw ``r``). The band is the per-lag
-    2.5th and 97.5th percentile over draws.
+    every session forms population draw ``r``; :func:`shuffled_band`). The
+    band is the per-lag 2.5th and 97.5th percentile over draws.
 
     The observed peak is the lag of the largest ``|curve|``, so comparing it
     with the band at that lag selects the most extreme of many lags. The
@@ -368,17 +462,10 @@ def null_band_summary(
     """
     out = []
     for key, by_session in nulls.items():
-        sessions = sorted(set(by_session) & set(curves.get(key, {})))
-        if not sessions:
+        band = shuffled_band(curves.get(key, {}), by_session, animal_of)
+        if band is None:
             continue
-        n_draws = min(by_session[s].shape[0] for s in sessions)
-        observed, observed_animals = animal_balanced_curve(
-            {s: curves[key][s] for s in sessions}, animal_of
-        )
-        null, null_animals = animal_balanced_curve(
-            {s: by_session[s][:n_draws] for s in sessions}, animal_of
-        )
-        low, high = np.nanpercentile(null, [2.5, 97.5], axis=0)
+        observed, null, low, high = band.observed, band.draws, band.low, band.high
         peak = int(np.argmax(np.abs(observed)))
         observed_max = float(np.abs(observed).max())
         null_max = np.nanmax(np.abs(null), axis=1)
@@ -386,9 +473,9 @@ def null_band_summary(
         window = observed.mean()
         window_low, window_high = np.nanpercentile(null.mean(axis=1), [2.5, 97.5])
         animals_outside = 0
-        for animal, curve in observed_animals.items():
+        for animal, curve in band.observed_animals.items():
             animal_low, animal_high = np.nanpercentile(
-                null_animals[animal][:, peak], [2.5, 97.5]
+                band.draw_animals[animal][:, peak], [2.5, 97.5]
             )
             animals_outside += int(not animal_low <= curve[peak] <= animal_high)
         model, event_class, target = key
@@ -410,10 +497,10 @@ def null_band_summary(
                 "window_band_low": float(window_low),
                 "window_band_high": float(window_high),
                 "window_outside_band": bool(not window_low <= window <= window_high),
-                "n_draws": int(n_draws),
-                "n_null_sessions": len(sessions),
+                "n_draws": int(band.n_draws),
+                "n_null_sessions": len(band.sessions),
                 "animals_peak_outside_band": animals_outside,
-                "n_null_animals": len(observed_animals),
+                "n_null_animals": len(band.observed_animals),
             }
         )
     return pd.DataFrame(out)

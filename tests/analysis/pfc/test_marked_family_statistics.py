@@ -178,6 +178,58 @@ def test_observed_curve_and_reference_share_the_animal_weighting():
     )
 
 
+def test_animal_curve_sem_is_over_animals_at_each_lag():
+    # Animal means at lag 0: 1, 2, 4 (mean 7/3, sample SD sqrt(7/3)); at lag 1
+    # all equal.
+    per_animal = {
+        "a": np.array([1.0, 5.0]),
+        "b": np.array([2.0, 5.0]),
+        "c": np.array([4.0, 5.0]),
+    }
+
+    sem = stats.animal_curve_sem(per_animal)
+
+    np.testing.assert_allclose(sem, [np.sqrt(7 / 3) / np.sqrt(3), 0.0])
+    assert np.isnan(stats.animal_curve_sem({"a": np.array([1.0, 5.0])})).all()
+
+
+def test_animal_curve_sem_at_the_peak_is_the_summary_sem():
+    lag = np.linspace(-0.2, 0.2, 5)
+    key = ("m", "non_local_no_SWR", "t")
+    bump = np.array([0.0, 0.0, 1.0, 0.0, 0.0])
+    animal_of = {"a1": "a", "a2": "a", "b1": "b"}
+    by_session = {"a1": 0.9 * bump, "a2": 0.5 * bump, "b1": 0.2 * bump}
+
+    peaks = stats.population_curve_summary({key: by_session}, lag, animal_of)
+    _, per_animal = stats.animal_balanced_curve(by_session, animal_of)
+
+    # animal a: 0.7, animal b: 0.2 -> SEM 0.25 at the peak lag
+    assert peaks.iloc[0].sem_at_peak == pytest.approx(0.25)
+    assert stats.animal_curve_sem(per_animal)[2] == pytest.approx(0.25)
+
+
+def test_shuffled_band_keeps_shared_sessions_and_the_fewest_draws():
+    animal_of = {"a1": "a", "a2": "a", "b1": "b"}
+    observed = {"a1": np.array([1.0, 0.0]), "b1": np.array([3.0, 0.0])}
+    # a1 holds 3 draws, b1 2; a2 has draws but no observed curve.
+    nulls = {
+        "a1": np.array([[0.0, 0.0], [2.0, 0.0], [100.0, 0.0]]),
+        "a2": np.full((2, 2), 50.0),
+        "b1": np.array([[0.0, 0.0], [4.0, 0.0]]),
+    }
+
+    band = stats.shuffled_band(observed, nulls, animal_of)
+
+    assert band.sessions == ["a1", "b1"]
+    assert band.n_draws == 2
+    np.testing.assert_allclose(band.observed, [2.0, 0.0])
+    # draw 0: (0 + 0) / 2; draw 1: (2 + 4) / 2; a1's third draw is dropped
+    np.testing.assert_allclose(band.draws[:, 0], [0.0, 3.0])
+    np.testing.assert_allclose(band.low, [0.075, 0.0])
+    np.testing.assert_allclose(band.high, [2.925, 0.0])
+    assert stats.shuffled_band(observed, {"a2": nulls["a2"]}, animal_of) is None
+
+
 def test_max_statistic_call_is_the_plus_one_p_not_the_interpolated_percentile():
     key = ("m", "non_local_no_SWR", "t")
     animal_of = {"a1": "a"}

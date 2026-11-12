@@ -56,9 +56,7 @@ Work that is deferred on purpose. Each item says when it should be done.
   audit-only tables are still computed in the scripts.
   These still hold their own copy; make each call the function, comparing its
   output before and after on the cluster:
-  - mpfc: `scripts/pfc/summarize_pfc_marked_family.py` (`plot_model` computes its
-    own SEM over animals and its own null band, without the draw-count truncation
-    `null_band_summary` applies); `scripts/figures/generate_figure04.py`
+  - mpfc: `scripts/figures/generate_figure04.py`
     (`plot_population_average`: a pooled unit mean and SEM, not the summary's
     animal-balanced mean).
   - behavior: `scripts/behavior/coupling/fit_swr_power_model.py` (percentiles, mean

@@ -72,10 +72,12 @@ from continuum_swr_replay.analysis.pfc.marked_family_statistics import (
     MAX_P_THRESHOLD,
     animal_balanced_curve,
     animal_balanced_fraction_positive,
+    animal_curve_sem,
     complete_bundle_records,
     mark_correlations,
     null_band_summary,
     population_curve_summary,
+    shuffled_band,
 )
 from continuum_swr_replay.analysis.pfc.marked_glm import (
     EXTENDED_MARKED_EVENT_CLASSES,
@@ -308,9 +310,11 @@ def plot_model(
 ) -> Path:
     """One figure per model: rows are targets, columns are its classes.
 
-    The shuffled-mark band (grey) sits behind the observed population curve
-    when the bundles carry nulls; a target's marginal-tier population curve,
-    when fit, is overlaid dashed.
+    The shuffled-mark band (grey, :func:`shuffled_band`, the band
+    :func:`null_band_summary` reads) sits behind the observed population curve
+    when the bundles carry nulls; the population curve's band is its standard
+    error over animals (:func:`animal_curve_sem`, none with one animal); a
+    target's marginal-tier population curve, when fit, is overlaid dashed.
     """
     nulls = nulls or {}
     keys = [k for k in curves if k[0] == model]
@@ -344,27 +348,20 @@ def plot_model(
                     alpha=0.8,
                     label=f"{animal} (n={len(group)})",
                 )
-            null = nulls.get((model, event_class, target))
-            if null:
-                draws, _ = animal_balanced_curve(
-                    {s: v for s, v in null.items() if s in by_session}, animal_of
-                )
-                low, high = np.nanpercentile(draws, [2.5, 97.5], axis=0)
+            band = shuffled_band(
+                by_session, nulls.get((model, event_class, target), {}), animal_of
+            )
+            if band is not None:
                 ax.fill_between(
                     lag_time * 1000,
-                    low,
-                    high,
+                    band.low,
+                    band.high,
                     color="0.75",
                     lw=0,
                     label="shuffled 95 %",
                 )
             mean, animal_curves = animal_balanced_curve(by_session, animal_of)
-            animal_stack = np.stack(list(animal_curves.values()))
-            sem = (
-                animal_stack.std(0, ddof=1) / np.sqrt(len(animal_stack))
-                if len(animal_stack) > 1
-                else 0
-            )
+            sem = animal_curve_sem(animal_curves)
             ax.fill_between(
                 lag_time * 1000, mean - sem, mean + sem, color="k", alpha=0.15, lw=0
             )
