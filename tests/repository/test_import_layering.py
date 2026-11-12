@@ -30,6 +30,18 @@ reported as a plain edge rather than as an ``ImportError`` from a cycle:
   package does not reach into those analysis packages. Today each of them
   imports hippocampus, so a back edge is also a cycle; these rules hold
   hippocampus below them even if one stops importing it.
+- ``behavior_subpackages_import_one_way``: inside ``analysis.behavior`` the
+  subpackages import in the order ``covariates``, ``choice``, ``tables``, then
+  ``rate`` and ``content`` (:data:`BEHAVIOR_SUBPACKAGE_RANK`): one imports only
+  subpackages before it, so ``rate`` and ``content`` never import each other.
+- ``behavior_top_level_imports_no_subpackage``: a module at the top level of
+  ``analysis.behavior`` imports no subpackage, except that the modules of
+  :data:`BEHAVIOR_TOP_LEVEL_MAY_IMPORT_COVARIATES` import ``covariates``. The
+  package's own ``__init__`` names every export for type checkers and is not a
+  module of that kind.
+- ``analysis_and_visualization_import_no_reported``: nothing in ``analysis`` or
+  ``visualization`` imports ``reported``; the analysis does not depend on the
+  reporting.
 - ``no_package_cycles``: the package graph is acyclic.
 
 Imports inside functions count: a function-local import is how a cycle is
@@ -54,6 +66,21 @@ from tests.support._imports import (
 #: Package nodes, besides the foundation, that ``analysis.events`` may import.
 EVENTS_MAY_IMPORT = frozenset(
     {"analysis.events", "analysis.constants", "analysis.shared_statistics"}
+)
+
+#: The ``analysis.behavior`` subpackages, ranked: one imports only those of a
+#: lower rank. ``rate`` and ``content`` share a rank, so neither imports the other.
+BEHAVIOR_SUBPACKAGE_RANK = {
+    "covariates": 0,
+    "choice": 1,
+    "tables": 2,
+    "rate": 3,
+    "content": 3,
+}
+
+#: Top-level ``analysis.behavior`` modules that read the ``covariates`` subpackage.
+BEHAVIOR_TOP_LEVEL_MAY_IMPORT_COVARIATES = frozenset(
+    {"cohort_audit", "covariate_timing", "contrast_aggregation"}
 )
 
 
@@ -83,6 +110,22 @@ def _cycle_edges(graph: dict[str, set[str]]) -> set[tuple[str, str]]:
 
 def _starts_with(module: str, *prefixes: str) -> bool:
     return any(module == p or module.startswith(f"{p}.") for p in prefixes)
+
+
+def _behavior_part(module: str) -> tuple[str | None, str | None]:
+    """``(subpackage, top-level module)`` of an ``analysis.behavior`` module.
+
+    A subpackage module gives ``(subpackage, None)``, a top-level module
+    ``(None, module)``; the package's own ``__init__`` and anything outside
+    ``analysis.behavior`` give ``(None, None)``.
+    """
+    prefix = "analysis.behavior."
+    if not module.startswith(prefix):
+        return None, None
+    first = module[len(prefix) :].split(".")[0]
+    if first in BEHAVIOR_SUBPACKAGE_RANK:
+        return first, None
+    return None, first
 
 
 def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
@@ -137,6 +180,29 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
             for a, b in edges
             if _starts_with(a, "analysis.hippocampus")
             and _starts_with(b, "analysis.pfc", "analysis.inventory_comparison")
+        },
+        "behavior_subpackages_import_one_way": {
+            (a, b)
+            for a, b in edges
+            if (sa := _behavior_part(a)[0]) is not None
+            and (sb := _behavior_part(b)[0]) is not None
+            and sa != sb
+            and BEHAVIOR_SUBPACKAGE_RANK[sb] >= BEHAVIOR_SUBPACKAGE_RANK[sa]
+        },
+        "behavior_top_level_imports_no_subpackage": {
+            (a, b)
+            for a, b in edges
+            if (top := _behavior_part(a)[1]) is not None
+            and (sub := _behavior_part(b)[0]) is not None
+            and not (
+                top in BEHAVIOR_TOP_LEVEL_MAY_IMPORT_COVARIATES and sub == "covariates"
+            )
+        },
+        "analysis_and_visualization_import_no_reported": {
+            (a, b)
+            for a, b in edges
+            if _starts_with(a, "analysis", "visualization")
+            and _starts_with(b, "reported")
         },
         "no_package_cycles": _cycle_edges(package_graph(root)),
     }
@@ -274,4 +340,67 @@ def test_events_rule_allows_only_foundation_constants_and_itself(
     assert rule_violations(root)["events_imports_only_foundation"] == {
         ("analysis.events.e", "analysis.hippocampus.h"),
         ("analysis.events.e", "scripts.qa.tool"),
+    }
+
+
+def test_behavior_and_reporting_rules_see_a_planted_import(tmp_path: Path) -> None:
+    """Each new rule reports the import it forbids and none of its neighbours.
+
+    Forbidden: ``choice`` importing ``tables``, ``rate`` and ``content``
+    importing each other (one of them inside a function), a top-level module
+    other than the three allowed ones importing a subpackage, one of the three
+    importing ``choice``, and ``analysis`` and ``visualization`` importing
+    ``reported``. Allowed, so not reported: ``choice`` importing
+    ``covariates``, ``tables`` importing ``choice``, ``rate`` importing
+    ``tables``, ``cohort_audit`` importing ``covariates``, a top-level module
+    importing a top-level module, and ``reported`` importing ``analysis``.
+    """
+    root = tmp_path / "continuum_swr_replay"
+    behavior = root / "analysis" / "behavior"
+    for package in ("covariates", "choice", "tables", "rate", "content"):
+        (behavior / package).mkdir(parents=True)
+        (behavior / package / "__init__.py").write_text("")
+    for package in (root / "reported", root / "visualization"):
+        package.mkdir()
+        (package / "__init__.py").write_text("")
+    for init in (root, root / "analysis", behavior):
+        (init / "__init__.py").write_text("")
+    base = "continuum_swr_replay.analysis.behavior"
+    (behavior / "covariates" / "c.py").write_text("")
+    (behavior / "choice" / "k.py").write_text(
+        f"from {base}.covariates import c\nfrom {base}.tables import t\n"
+    )
+    (behavior / "tables" / "t.py").write_text(f"from {base}.choice import k\n")
+    (behavior / "rate" / "r.py").write_text(
+        f"from {base}.tables import t\ndef f():\n    from ..content import q\n"
+    )
+    (behavior / "content" / "q.py").write_text(f"from {base}.rate import r\n")
+    (behavior / "cohort_audit.py").write_text(f"from {base}.covariates import c\n")
+    (behavior / "contrast_aggregation.py").write_text(f"from {base}.choice import k\n")
+    (behavior / "fitting.py").write_text(
+        f"from {base}.covariates import c\nfrom {base} import cohort_audit\n"
+    )
+    (root / "reported" / "values.py").write_text(
+        "from continuum_swr_replay.analysis.behavior import fitting\n"
+    )
+    (root / "analysis" / "shared.py").write_text(
+        "from continuum_swr_replay.reported import values\n"
+    )
+    (root / "visualization" / "v.py").write_text(
+        "from continuum_swr_replay.reported import values\n"
+    )
+
+    found = rule_violations(root)
+    assert found["behavior_subpackages_import_one_way"] == {
+        ("analysis.behavior.choice.k", "analysis.behavior.tables.t"),
+        ("analysis.behavior.rate.r", "analysis.behavior.content.q"),
+        ("analysis.behavior.content.q", "analysis.behavior.rate.r"),
+    }
+    assert found["behavior_top_level_imports_no_subpackage"] == {
+        ("analysis.behavior.contrast_aggregation", "analysis.behavior.choice.k"),
+        ("analysis.behavior.fitting", "analysis.behavior.covariates.c"),
+    }
+    assert found["analysis_and_visualization_import_no_reported"] == {
+        ("analysis.shared", "reported.values"),
+        ("visualization.v", "reported.values"),
     }

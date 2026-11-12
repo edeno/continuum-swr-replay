@@ -237,9 +237,10 @@ layers below it, never from a layer above:
    analysis does not depend on the reporting. Nothing in `src/` imports `scripts/`.
 
 There are no package cycles. `tests/repository/test_import_layering.py` enforces all of
-this except three rules that hold today but are not tested: those for `reported/`,
-that `analysis/constants.py` imports only the foundation, and that
-`analysis/shared_statistics.py` imports nothing from the package. It also keeps
+this except three rules that hold today but are not tested: that `reported/` imports
+only the foundation and `analysis/`, that `analysis/constants.py` imports only the
+foundation, and that `analysis/shared_statistics.py` imports nothing from the package.
+It does keep `analysis/` and `visualization/` from importing `reported/`. It also keeps
 `data_loaders/` from importing `analysis/`, `hippocampus/` from importing `behavior/`,
 and the covariate builders from importing `model_specs.py`, and has no allowlist: any
 violation fails.
@@ -247,8 +248,9 @@ violation fails.
 Inside `analysis/behavior/` the subpackages import in one direction: `covariates/`,
 then `choice/`, then `tables/`, then `rate/` and `content/`, which do not import
 each other; each may import the modules at the package's top level, which hold
-what several subpackages share (the package docstring lists them). No test
-checks this direction; the package-cycle rule sees `analysis/behavior/` as one node.
+what several subpackages share (the package docstring lists them); a top-level module
+imports no subpackage, except that `cohort_audit`, `covariate_timing` and
+`contrast_aggregation` import `covariates/`. The layering test checks both.
 
 Where each moved, renamed or split module went (2026-10 and 2026-11) is recorded in
 [history/2026-module-moves.md](history/2026-module-moves.md).
