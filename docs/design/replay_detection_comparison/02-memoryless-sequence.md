@@ -726,20 +726,27 @@ shared events are in the summary under their own `detector`.
 
 - **Our additional detections carry spatial information in cells they never saw.**
   Among informative events (at least 5 evaluation spikes expected along the content),
-  true replays only our detector reported have held-out support in 93-97% of cases in
-  the interleaved folds and 87% in the half-coverage fold; shared replays in 100%.
-- **The test did not support events without content, on few of them.** None of the 19
-  informative place-less burst events has support; at a floor of 2 expected spikes, 4
-  of 75 do. Jumping bursts, which do represent places, 57-62%. On the no-replay
+  true replays only our detector reported have held-out support in
+  <!--v:detection.heldout_ours_only_support_min-->93<!--/v-->–<!--v:detection.heldout_ours_only_support_max-->97<!--/v-->% of cases in
+  the interleaved folds and <!--v:detection.heldout_ours_only_support_fold_c-->87<!--/v-->% in the half-coverage
+  fold; shared replays in <!--v:detection.heldout_shared_support-->100<!--/v-->%.
+- **The test did not support events without content, on few of them.** None of the
+  <!--v:detection.heldout_placeless_informative_events-->19<!--/v--> informative place-less burst events has
+  support; at a floor of 2 expected spikes, <!--v:detection.heldout_placeless_loose_supported_events-->4<!--/v-->
+  of <!--v:detection.heldout_placeless_loose_events-->75<!--/v--> do. Jumping bursts, which do represent places,
+  <!--v:detection.heldout_jumping_support_min-->57<!--/v-->–<!--v:detection.heldout_jumping_support_max-->63<!--/v-->%. On the no-replay
   stretches neither detector reported an event from discovery cells, so no event of
   pure local coding reached the test: the false-support rate rests on place-less
   bursts alone.
 - **The content estimate barely matters here.** Ours and the sliding window's agree on
-  99% or more of the events informative under both.
+  <!--v:detection.heldout_estimator_agreement_min-->99<!--/v-->% or more of the events informative under both.
 - **The sliding window reported no event our detector missed**, so there is no
   comparator-only class to test.
-- **Power is the limit.** Only 6-7% of the replays only our detector reported are
-  informative at all, against 16-23% of shared ones: most additional detections are
+- **Power is the limit.** Only
+  <!--v:detection.heldout_ours_only_informative_min-->6<!--/v-->–<!--v:detection.heldout_ours_only_informative_max-->7<!--/v-->% of the
+  replays only our detector reported are informative at all, against
+  <!--v:detection.heldout_shared_informative_min-->16<!--/v-->–<!--v:detection.heldout_shared_informative_max-->23<!--/v-->% of shared
+  ones: most additional detections are
   too short or too sparse for a dozen evaluation cells to judge, so an event without
   support is mostly one that cannot be judged, not one shown false.
 - Events are labelled by their time inside the injected activity's parts: half or

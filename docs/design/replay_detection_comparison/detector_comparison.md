@@ -69,7 +69,9 @@ sliding-window step, whether decoding was sorted or clusterless, the denominator
 "% decoded", and the bin at which reconstruction error was measured. Two uses here:
 
 **Sweep values for 04's threshold robustness.** The literature range bounds what a
-"modest relaxation and tightening" means. Reported values after correction (count with a value, then min / median / max;
+"modest relaxation and tightening" means. The table was computed on 2026-09-21 from the
+survey of that date, and no script re-derives it (the survey summary, `paper/reported/survey.json`,
+holds the ranges and modes the paper quotes). Reported values after correction (count with a value, then min / median / max;
 `#N/A` and "not reported" excluded). Several speed values gate analysis rather than
 detection, so that row overstates how many papers gate detection on speed:
 
