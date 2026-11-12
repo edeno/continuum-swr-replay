@@ -3,7 +3,7 @@
 This module produces event tables from externally-defined events (SWR or
 high-MUA times), using the ContFrag classifier's decoded posterior for
 content analysis. The key difference from the NonLocal tables
-(``analysis.behavior.tables_*``) is that events come from external detectors,
+(``analysis.behavior.tables.tables_*``) is that events come from external detectors,
 not from model-detected non-local probability thresholding.
 
 The ContFrag model has 2 states (Continuous, Fragmented), both of which
