@@ -46,7 +46,6 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import (
@@ -62,6 +61,7 @@ from continuum_swr_replay.analysis.replay.learning import (
     cross_session_role_summary,
     fit_is_stay_logistic_per_session,
     fit_is_stay_pooled_gee,
+    pooled_gee_role_summary,
     stop_replay_summary,
 )
 from continuum_swr_replay.paths import replay_content_dir, table_path
@@ -388,8 +388,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "===== Pooled GEE (Binomial, cluster-robust SE), stratum=%s =====",
         args.content_stratum,
     )
-    p_inter = converged_gee["p_inter"].fillna(1.0).to_numpy()
-    _, p_fdr_gee, _, _ = multipletests(p_inter, method="fdr_bh")
+    p_fdr_gee = pooled_gee_role_summary(gee_df)["p_fdr"]
     for (_, row), p_corr in zip(converged_gee.iterrows(), p_fdr_gee, strict=True):
         logging.info(
             "  role=%-25s n_sess=%d  n_stops=%d  β_inter=%+.3f (SE=%.3f)  p=%.2e  p_FDR=%.2e",
