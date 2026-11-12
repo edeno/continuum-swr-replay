@@ -294,7 +294,8 @@ def _fit_diagnostics(results: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
 
     The quantities the fitter equivalence audit is run on: the parameters and
     the three fit criteria, plus the rank and the convergence record that say
-    whether the numbers mean anything.
+    whether the numbers mean anything. A result with no ``converged`` flag is
+    recorded as not converged.
 
     Parameters
     ----------
@@ -316,7 +317,7 @@ def _fit_diagnostics(results: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
             "aic": float(result.aic),
             "df_resid": float(result.df_resid),
             "df_model": float(result.df_model),
-            "converged": bool(getattr(result, "converged", True)),
+            "converged": bool(getattr(result, "converged", False)),
             "n_iter": int(
                 getattr(result, "n_iter", None)
                 if getattr(result, "n_iter", None) is not None

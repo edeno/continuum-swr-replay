@@ -23,6 +23,9 @@ from continuum_swr_replay.analysis.pfc.design import (
     event_onset_counts,
 )
 from continuum_swr_replay.analysis.pfc.fit import (
+    _fit_diagnostics as fit_diagnostics_of,
+)
+from continuum_swr_replay.analysis.pfc.fit import (
     _fit_immobility_models,
     fit_models_batched,
     fitter_provenance,
@@ -43,6 +46,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (
     prior_binds,
 )
 from continuum_swr_replay.analysis.pfc.session import (
+    _failed_models,
     _prefit_session,
     process_neuron,
     shipped_fit_counts,
@@ -2597,15 +2601,45 @@ class TestShippedFitCounts:
         assert counts["n_nonconverged_model_fits"] == 1
         assert counts["n_neurons_with_nonconverged_model"] == 1
 
-    def test_a_result_with_no_convergence_flag_is_read_as_converged(self):
-        # ``fit_regularized`` results carry no flag; absence is not failure.
+    def test_a_result_with_no_convergence_flag_is_read_as_not_converged(self):
+        # statsmodels' gradient and regularized fits carry no flag; a fit that
+        # cannot say it converged is not counted as one that did.
         class Bare:
             pass
 
-        counts = shipped_fit_counts([{"m0": Bare()}])
+        counts = shipped_fit_counts([{"m0": Bare(), "m1": self._Fit(True)}])
 
-        assert counts["n_model_fits"] == 1
-        assert counts["n_nonconverged_model_fits"] == 0
+        assert counts["n_model_fits"] == 2
+        assert counts["n_nonconverged_model_fits"] == 1
+        assert counts["n_neurons_with_nonconverged_model"] == 1
+
+
+class TestMissingConvergenceFlag:
+    """A fit result with no ``converged`` attribute is a fit that did not converge."""
+
+    class _Bare:
+        params = np.array([0.1, -0.2])
+        deviance = 1.0
+        llf = -2.0
+        aic = 8.0
+        df_resid = 10.0
+        df_model = 1.0
+
+    class _Converged(_Bare):
+        converged = True
+
+    def test_failed_models_holds_the_model_without_a_flag(self):
+        failed = _failed_models({"bare": self._Bare(), "ok": self._Converged()})
+
+        assert failed == {"bare"}
+
+    def test_fit_diagnostics_records_no_flag_as_not_converged(self):
+        diagnostics = fit_diagnostics_of(
+            {"bare": self._Bare(), "ok": self._Converged()}
+        )
+
+        assert diagnostics["bare"]["converged"] is False
+        assert diagnostics["ok"]["converged"] is True
 
     def test_a_real_prefit_reports_counts_consistent_with_its_fits(
         self,

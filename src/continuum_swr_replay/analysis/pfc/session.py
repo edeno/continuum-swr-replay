@@ -468,11 +468,14 @@ def _firing_rates(
 
 
 def _failed_models(results: Mapping[str, Any]) -> set[str]:
-    """Models whose fit has NaN parameters or never converged."""
+    """Models whose fit has NaN parameters or never converged.
+
+    A result with no ``converged`` flag counts as not converged.
+    """
     return {
         name
         for name, res in results.items()
-        if np.any(np.isnan(res.params)) or not bool(getattr(res, "converged", True))
+        if np.any(np.isnan(res.params)) or not bool(getattr(res, "converged", False))
     }
 
 
@@ -669,7 +672,8 @@ def shipped_fit_counts(
     (the neuron's other models are reported as usual). The NaNs say a number is
     missing but not how many, or over how many neurons, so unless the count is
     taken here -- once, over the results that will actually be read -- there is
-    no record of what a session dropped.
+    no record of what a session dropped. A result with no ``converged`` flag
+    counts as not converged.
 
     A neuron with no fit at all (no spikes on the fitted bins) enters neither
     total, which is why ``n_model_fits`` is reported beside the failures rather
@@ -694,7 +698,7 @@ def shipped_fit_counts(
         if fits is None:
             continue
         failures = sum(
-            not bool(getattr(fit, "converged", True)) for fit in fits.values()
+            not bool(getattr(fit, "converged", False)) for fit in fits.values()
         )
         n_model_fits += len(fits)
         n_nonconverged += failures
