@@ -30,12 +30,15 @@ its sibling `select_event_cohort` (event grain), on the canonical
 **The two grains need different predicates to mean the same thing.**
 `occupancy_state` is not the same statement about a stop as about an event. A
 stop is labelled `mixed` whenever its sampled states differ; an event is
-`at_well` only when its whole window is at one well. 14,845 of the 107,400
-canonical stops are `mixed`, and they hold **18,274 of the 59,699 content
-events (30.6%)** — so a naive stop-grain `occupancy_state == "at_well"` filter
+`at_well` only when its whole window is at one well. Measured on 2026-09-12 on
+the 218-session canonical tables of that date (no script re-derives the counts
+in this section), 14,845 of the 107,400 canonical stops were `mixed`, and they
+held **18,274 of the 59,699 content events (30.6%)**; today's stop table has
+<!--v:behavior.stops_mixed-->16,061<!--/v--> `mixed` stops of
+<!--v:behavior.stops_total-->120,320<!--/v-->. So a naive stop-grain `occupancy_state == "at_well"` filter
 would make the rate and content cohorts **cross** rather than nest.
 
-Measured, those `mixed` stops are at-well bouts. Of the 14,743 (99.3%) that
+In that measurement, those `mixed` stops were at-well bouts. Of the 14,743 (99.3%) that
 have a last-well arrival at all, **every one** begins *after* it — median
 0.73 s after, p10 0.22 s (the other 102 begin before the session's first
 arrival, so they have no clock, not a late one). Their nearest-well distance
@@ -46,14 +49,17 @@ And **96.8%** of their events (18,274 of 18,883) are themselves event-grain
 stop-grain predicate is therefore *well-anchored* — a bout that begins after
 arriving at a well and sits at it.
 
-**The counts** (canonical tables, schema `v5_dio_poke_trials`):
+**The counts** (measured 2026-09-12 on the canonical tables of that date, schema
+`v5_dio_poke_trials`; today's stop table holds
+<!--v:behavior.stops_total-->120,320<!--/v--> stops, of which
+<!--v:behavior.stops_well_anchored-->93,560<!--/v--> are well-anchored):
 
 - stop table: **107,400** stops → **84,069 well-anchored** (69,224 `at_well` +
   14,845 `mixed`), 22,850 `in_transit`, 481 `unknown`.
 - arm event table: **65,913** events → **59,699 at-well** (90.6%).
 
-What reaches the shipped rate fits from those 84,069: Family A models **84,064**
-stops on `R0` (5 dropped for a missing own predictor), Family B
+What reached the rate fits of that date from those 84,069: Family A modelled
+**84,064** stops on `R0` (today <!--v:behavior.per_stop_audit_stops_modeled-->93,555<!--/v-->) (5 dropped for a missing own predictor), Family B
 **83,549** over **6,777,953** bins (the same 5, plus 515 with no arrival clock,
 which the arrival rungs put into the frozen union). Counts from
 `models_per_stop_rate/all_models_cohort_audit.csv` and
@@ -62,8 +68,8 @@ side by side in
 [`2026-09-12-rate-cohort-atwell.md`](../../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md).
 
 **Nesting, and its residual.** Every event in the content cohort lies in a stop
-in the rate cohort. The converse does not hold exactly: 609 events sit in
-well-anchored stops without being event-grain `at_well` (446 `in_transit`, 144
+in the rate cohort. The converse does not hold exactly: in the 2026-09-12
+measurement, 609 events sat in well-anchored stops without being event-grain `at_well` (446 `in_transit`, 144
 `mixed`, 19 `unknown`) — **1.0%** of the 60,308 events those stops hold. So
 `content ⊂ rate` holds up to that residual, which is in the rate cohort and not
 the content one by design.
@@ -115,20 +121,27 @@ event dropped just outside a stop's leading edge could have covered bins that
 *are* fit; those bins are fit with its contribution zero, and the count of such
 events is written to every provenance sidecar
 (`n_{nonlocal,ripple}_dropped_overlapping_fit`) rather than assumed away.
-Corpus-wide that is **6 non-local events and 4 SWRs** out of the 15,143 and
-11,997 that are kept. Across the 71 mPFC sessions the bin mask keeps
-**92.3%** of the immobile bins (19,732,623 of 21,384,252), and the onset rule
-keeps **91.9%** of the non-local events (15,143 of 16,477) and 93.6% of the SWRs
-(11,997 of 12,821); the per-session table is in
+Measured on 2026-09-14 on the 71-session bundles of that date, before the
+artifact rule existed (the PFC cohort is now <!--v:mpfc.sessions-->75<!--/v-->
+sessions), that was **6 non-local events and 4 SWRs** corpus-wide out of the
+15,143 and 11,997 that were kept; the bin mask kept **92.3%** of the immobile
+bins (19,732,623 of 21,384,252), and the onset rule kept **91.9%** of the
+non-local events (15,143 of 16,477) and 93.6% of the SWRs (11,997 of 12,821);
+the per-session table is in
 [`2026-09-14-pfc-atwell-cohort.md`](../../.claude/docs/reviews/2026-09-14-pfc-atwell-cohort.md);
 those counts were measured on bundles cut with the earlier run-time event
-construction, which on this population labels the same events the same way —
+construction, which on that population labelled the same events the same way —
 identical event count and identical SWR-coupled count in **71 of 71** sessions,
 median per-session SWR fraction **0.447** either way, and an identical SWR
-population wherever the two constructions were run side by side.
-Reading the canonical table therefore buys traceability, not a different split;
-`scripts/pfc/diagnose_pfc_event_definition.py` recomputes the comparison for any
-session.
+population wherever the two constructions were run side by side (measured
+2026-09-14 with `scripts/pfc/diagnose_pfc_event_definition.py`, before the
+artifact rule existed).
+Reading the canonical table therefore buys traceability, not a different split.
+The script recomputes the comparison for any session; its old construction
+applies no analysed-time rule, so in a session where that rule drops an event
+the two now differ for that reason alone. Re-run on 2026-11-12 on
+`wilbur20210329_02_r1`, it found the same 212 events under both, 84 of them
+SWR-coupled, none reclassified.
 The unit GLM also draws a **matched non-event control** from that same fit
 mask, one window per kept non-local event: the control onset is drawn uniformly
 from the legal sample times of the *same* contiguous run of fitted bins the
@@ -196,7 +209,8 @@ matched axes it is the identity. What it trimmed is recorded per session under
 immobility stop while the content ladders fit only at-well events, so "non-SWR
 replay is not reward-gated" (a rate claim) and every content claim about
 non-SWR replay were statements about different populations. And the difference
-is not neutral: in-transit stops hold **7.0%** of the corpus's immobility time
+is not neutral: measured on 2026-09-12 on the tables of that date (no script
+re-derives it), in-transit stops held **7.0%** of the corpus's immobility time
 (9,093 s of 129,997 s) but **11.9%** of the non-SWR non-local onsets (4,690 of
 39,510) and only **3.3%** of the SWR-coupled ones (859 of 26,403). Per second
 of immobility that is **1.79x** the well-anchored non-SWR onset rate (0.516 vs
@@ -210,8 +224,8 @@ in-transit population is never pooled with a well-anchored one. The in-transit
 population is thin: 50 of the 218 sessions of September 2026 had any (a dated
 count, not computed by a summary).
 
-The restriction is not balanced across the SWR contrast (3.3% of SWR events are
-off-well against 13.0% of non-SWR events) — expected, since SWR events
+The restriction is not balanced across the SWR contrast (in the same 2026-09-12
+measurement, 3.3% of SWR events were off-well against 13.0% of non-SWR events) — expected, since SWR events
 concentrate at wells — so the cohort belongs in Methods.
 
 **The estimator: a penalised Poisson GLM.** The mPFC unit GLMs are fit by a
@@ -219,7 +233,8 @@ batched Poisson IRLS in JAX, one call per model for every unit of a session,
 with a Gaussian prior on the event-basis coefficients and the intercept left
 free. The prior is a stated scientific assumption, not a regularisation
 convenience. It exists because 23% of units had at least one model whose
-unpenalised fit *separates*: the peri-event basis is a cubic B-spline with
+unpenalised fit *separates* (measured on 2026-09-15 on the maximum-likelihood
+bundles of that date; no script re-derives it): the peri-event basis is a cubic B-spline with
 50 ms knots, and a basis column whose support holds no spikes drives its
 coefficient without bound. Such a fit has no maximum-likelihood estimate at
 all, and the design stays full rank throughout, so no rank-deficiency gate can
@@ -231,23 +246,30 @@ Its standard deviation is `DEFAULT_PENALTY_SIGMA` in `analysis/pfc/batched_glm.p
 *curve* is not that number: the basis is a partition of unity, so the prior on
 the kernel at one lag is wider than σ by `sqrt(sum_b B_b(lag)^2)` and the prior
 on a modulation held across the reported window is narrower by `sqrt(n_basis)`.
-On the shipped 11-function basis those are **2.066 per lag** (95 % of the prior
-mass between a rate multiplier of **×0.017 and ×57** at one lag) and **0.905
-sustained** (**×0.17 to ×5.9** held across the reported window). Both are
+On the shipped 11-function basis those are
+**<!--v:mpfc.prior_sd_per_lag-->2.07<!--/v--> per lag** (95 % of the prior mass
+between a rate multiplier of **×<!--v:mpfc.prior_multiplier_per_lag_low-->0.017<!--/v-->
+and ×<!--v:mpfc.prior_multiplier_per_lag_high-->57<!--/v-->** at one lag) and
+**<!--v:mpfc.prior_sd_sustained-->0.90<!--/v--> sustained**
+(**×<!--v:mpfc.prior_multiplier_sustained_low-->0.17<!--/v--> to
+×<!--v:mpfc.prior_multiplier_sustained_high-->5.9<!--/v-->** held across the
+reported window). Both are
 computed by `implied_prior_sd` and recorded in every bundle's sidecar
-(`penalty_sigma_log_rate`, `implied_prior_sd`); the figures here are quoted
-from those sidecars, not restated by hand.
+(`penalty_sigma_log_rate`, `implied_prior_sd`); the figures here are the mpfc
+summary's, read from those sidecars, not restated by hand.
 
-Measured against that choice on the shipped 71-session batch (10,907 units past
-the 1 Hz gate): the corpus's own spread — the unpenalised peaks' standard
+Measured against that choice on 2026-09-15 by `scripts/pfc/compare_pfc_cohorts.py`
+on the 71-session batch of that date (10,907 units past the 1 Hz gate): the corpus's own spread — the unpenalised peaks' standard
 deviation with their estimation error deconvolved, divided by what one unit of σ
-buys at one lag — implies **σ = 1.05** (SWR), **1.15** (non-SWR), **1.28**
+buys at one lag — implied **σ = 1.05** (SWR), **1.15** (non-SWR), **1.28**
 (SWR-coupled replay) and **1.12** (the replay-split non-SWR curve) per
 coefficient, and **0.66** for the matched control. The shipped prior is about
-three times wider, which is the intent: it binds on **1.7 / 2.1 / 2.8 / 1.8 /
-1.2 %** of well-posed units for those five curves, and the median peak moves by
+three times wider, which is the intent: it bound on **1.7 / 2.1 / 2.8 / 1.8 /
+1.2 %** of well-posed units for those five curves, and the median peak moved by
 0.009–0.028 on the log-rate scale against a standard error near 0.20–0.31. The audit reports that table beside the chosen value for whatever
-tree it is run on. Under the prior every unit x
+tree it is run on; on the current bundles the prior binds on
+<!--v:mpfc.prior_binds_percent_min-->2.6<!--/v-->–<!--v:mpfc.prior_binds_percent_max-->4.9<!--/v-->%
+of well-posed units, depending on the curve. Under the prior every unit x
 model converges; a unit that still fails is non-estimable and reported as NaN
 everywhere, counted. Sensitivity bundles at other priors are written under
 `_sigma<value>` names.
@@ -310,8 +332,9 @@ and per-class total/tested/excluded window counts are in the sidecar. The
 `control_null_event_policy` provenance field prevents older all-event/thinner-null
 bundles from being pooled with this fixed-subset estimand.
 
-**What the draw costs, measured** (`scripts/pfc/measure_pfc_null_geometry.py`,
-reported in the batch audit). *Placement.* Control windows are found by
+**What the draw costs, measured** (`scripts/pfc/measure_pfc_null_geometry.py`;
+the population numbers below are the mpfc summary's, the per-session ones are from a
+run of the script on 2026-11-12). *Placement.* Control windows are found by
 enumerating legal same-bout, real-event-free onset bins and requiring the onsets
 to be distinct; the auxiliary duration-matching windows of two controls may
 overlap one another, because duration only constrains where an onset may be
@@ -319,26 +342,36 @@ drawn and never enters the onset-only design. The former disjoint-window policy
 made an exact count-matched draw impossible in dense bouts — 0/40 usable draws
 for several classes on the first corrected smoke — which is the worse trade. The
 price is a drawn regressor whose onsets can bunch where a real one's never do:
-on three rebuilt sessions the drawn sets match the real class's median spacing
-closely (j16 non-local 1,310 ms drawn against 1,257 ms real; SWR 2,898 against
-2,895) but **1.2–6.6 %** of consecutive drawn onsets sit closer than the earlier
+on three rebuilt sessions (`j1620210710_02_r1`, `chimi20200223_06_r3`,
+`wilbur20210329_02_r1`; 20 draws each, 2026-11-12) the drawn sets' median
+spacing is within about a third of the real class's (non-local 1,348 / 1,684 / 3,259 ms drawn against
+1,252 / 1,317 / 2,704 ms real; SWR 1,692 / 3,684 / 5,366 against 1,667 / 2,798 /
+5,688) but **1.5–6.2 %** of consecutive drawn onsets sit closer than the earlier
 window's own duration, against **0 %** of real ones, and the closest drawn pair
-is 4–33 ms apart against 24–86 ms real. *Engagement-null overlap.* The
+is 5–47 ms apart against 36–68 ms real. *Engagement-null overlap.* The
 engagement null's draws are independent of the shipped control they are entered
-beside and may land on it, which two real classes never do: over the 71 sessions
-they overlap it on a **median 11.0 % of their windows** (5.4–52.9 % across
-sessions, one draw as high as 59.4 %, worst session `senor20201101_14_r7`). That
-much of the added regressor is a copy of its own baseline, so the engagement
-p-value is anti-conservative by about that much. *Units called without a gain.*
-A one-sided empirical p-value can be small while the unit's own held-out
-improvement is zero or negative — the draws simply did worse: **7.0–10.0 %** of
-the units at raw p < .05 are in that state per class (engagement 9.3 %, 250 of
-2,696). They are evidence against a content-free regressor of the same size, not
-evidence of out-of-fold prediction. *Events the test could not use.* Corpus-wide
-**0.3–1.4 %** of a class's events have no legal within-bout control and enter
-neither the observed nor the null side; the worst single session/class is
-`senor20201101_14_r7` / SWR, which excludes 40 of 162 (24.7 %), so a p-value
-there describes three quarters of that class's events.
+beside and may land on it, which two real classes never do: over the
+<!--v:mpfc.sessions-->75<!--/v--> sessions they overlap it on a **median
+<!--v:mpfc.engagement_null_overlap_median-->11 %<!--/v--> of their windows**
+(<!--v:mpfc.engagement_null_overlap_session_min-->5<!--/v-->–<!--v:mpfc.engagement_null_overlap_session_max-->36 %<!--/v-->
+across sessions; in the 2026-11-12 run one draw reached 47.4 %, worst session
+`j1620210709_10_r5`). That much of the added regressor is a copy of its own
+baseline, so the engagement p-value is anti-conservative by about that much.
+*Units called without a gain.* A one-sided empirical p-value can be small while
+the unit's own held-out improvement is zero or negative — the draws simply did
+worse:
+<!--v:mpfc.class_called_flat_fraction_min@pctnum-->4<!--/v-->–<!--v:mpfc.class_called_flat_fraction_max-->8 %<!--/v-->
+of the units at raw p < .05 are in that state per event class (engagement 7.3 %,
+259 of 3,531, in the 2026-11-12 run). They are evidence against a content-free
+regressor of the same size, not evidence of out-of-fold prediction. *Events the
+test could not use.* Corpus-wide
+**<!--v:mpfc.unmatchable_percent_class_min-->0.27<!--/v-->–<!--v:mpfc.unmatchable_percent_class_max-->0.60<!--/v-->%**
+of a class's events have no legal within-bout control and enter neither the
+observed nor the null side; the worst single session/class
+(`j1620210709_10_r5` / `non_local_SWR` in the 2026-11-12 run) excludes
+<!--v:mpfc.unmatchable_worst_excluded-->8<!--/v--> of
+<!--v:mpfc.unmatchable_worst_total-->102<!--/v-->, so a p-value there describes the
+rest of that class's events.
 
 The fraction of units with raw empirical `p < .05` is an explicitly
 descriptive implementation preview. Units within a session and animal are not
