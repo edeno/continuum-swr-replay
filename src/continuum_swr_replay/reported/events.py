@@ -824,7 +824,9 @@ def _remote_too(tags: Tags, word: str) -> Tags:
 def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     """Questions 2c.2, 2c.3, 2c.4 and 2c.5: each event group's spike evidence against matched
     quiet windows (``baseline``). Event-level medians, pooled over epochs; the
-    run scores every event and quiet window (no cap). The remote groups' values
+    run scores every event and every quiet window with at least one spike (no cap;
+    the evidence is per spike, so a quiet window without spikes has none). The
+    remote groups' values
     also answer question 2c.7, whether remote events pass these tests."""
     make = value_factory(spike_evidence_values, source, TAGS["spike"])
     values = [

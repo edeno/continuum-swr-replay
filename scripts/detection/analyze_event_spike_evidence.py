@@ -381,7 +381,14 @@ def event_metrics(
     pos: np.ndarray,
     gpi_peak_pos: float,
 ) -> dict | None:
-    """Compute the per-event reality metrics (track-distance bins)."""
+    """Compute the per-event reality metrics (track-distance bins).
+
+    Returns None for a window with fewer than two valid bins or with no spikes: the
+    evidence is per spike, so a window without spikes has none to score. This is
+    deliberate for quiet (baseline) windows too, so the quiet-window reference is the
+    windows with at least one spike (2026-11-12: 5,280 of 30,447 quiet windows have none;
+    no event window does).
+    """
     mt, at = mape[s : e + 1], lin[s : e + 1]
     valid = np.isfinite(mt) & np.isfinite(at)
     if valid.sum() < 2 or n_spikes == 0:
