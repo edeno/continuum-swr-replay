@@ -504,7 +504,7 @@ Run the replay-content analysis suite on one event source and save fits.
 
 Fit the replay content model hierarchy on pre-computed data.
 
-`fit_n_categories`, `content_fit_inputs`, `prepare_canonical_fit_request`, `fit_model_per_session`, `print_model_results`, `format_comparison_table`, `run_content_fit`, `main`
+`fit_n_categories`, `content_fit_inputs`, `print_model_results`, `format_comparison_table`, `run_content_fit`, `main`
 
 ### `scripts/behavior/content/fit_swr_contrast_content.py`
 
@@ -1136,11 +1136,23 @@ Across-session summaries of what the per-session fits wrote.
 
 `fit_rows`, `require_one_fit_per_session`, `coefficient_statistics`, `coefficient_family_statistics`, `animal_median_bootstrap`, `gated_coefficient_statistics`, `gated_exp_median_ratio`, `paired_coefficient_statistics`, `gated_coefficient_difference_statistics`, `aic_difference_statistics`, `separated_fraction`, `known_fraction`, `fits_carrying`, `term_separation_statistics`, `rung_separation_range`, `audited_drop_statistics`, `group_range`
 
+### `src/continuum_swr_replay/analysis/behavior/content/cohort.py`
+
+The events a content ladder is fit on, and where the others went.
+
+`prepare_canonical_fit_request`, `CohortSelection`, `select_content_cohort`, `zero_response_event_ids`, `content_cohort_record`
+
 ### `src/continuum_swr_replay/analysis/behavior/content/content_statistics.py`
 
 Summary statistics of what the non-local events represent.
 
 `trunk_shares`, `trunk_share_statistics`, `current_patch_trunk_fraction`, `event_length_statistics`, `concentration_contrast_statistics`
+
+### `src/continuum_swr_replay/analysis/behavior/content/session_fits.py`
+
+Fit one content rung on every session of a cohort.
+
+`fit_model_per_session`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/history_kernel_statistics.py`
 
