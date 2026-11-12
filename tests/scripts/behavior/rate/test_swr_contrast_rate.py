@@ -1,10 +1,5 @@
 """Cohort gating and separation flagging in the is_swr-contrast rate runner.
 
-Two guards:
-
-* ``_fit`` -- the separation flag is judged on the effect scale, so a
-  small-SD design column with an ordinary effect is not mistaken for a
-  quasi-separated fit just because its per-unit coefficient is large.
 * ``_fit_one_session`` -- the gated stops cost only the rungs that need a
   post-outcome covariate: those are fit on a second cohort together with their
   ladder's null, while the nested ladder keeps every stop.
@@ -38,39 +33,6 @@ from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
 from scripts.behavior.rate import fit_swr_contrast_rate as mod
 from tests.support._event_end_fixtures import with_event_ends
 from tests.support._executor_fixtures import InlineExecutor, completion_order
-
-
-def test_small_sd_predictor_with_ordinary_effect_is_not_flagged_separated():
-    """|coef| = 12 on a column with SD 0.03 is a 0.36-log-unit effect, not separation.
-
-    The legacy ``|coef| >= 10`` rule flagged exactly this design; the effect-scale
-    rule (``bse * SD``) does not.
-    """
-    rng = np.random.default_rng(0)
-    n = 4000
-    x = rng.normal(0.0, 0.03, n)
-    exposure = np.full(n, 0.015)
-    rate = np.exp(np.log(2.0) + 12.0 * x)
-    design = pd.DataFrame(
-        {
-            "stop_id": np.repeat(np.arange(n // 10), 10),
-            "exposure": exposure,
-            "x": x,
-            "count": rng.poisson(rate * exposure),
-        }
-    ).astype({"count": float})
-
-    row, reason = mod._fit(design, "x", ["x"])
-
-    assert reason is None
-    assert row["coef_x"] == pytest.approx(12.0, abs=3.0)
-    # The design column's SD is small, so the per-unit coefficient is large ...
-    assert abs(row["coef_x"]) >= 10.0
-    # ... but the effect-scale standard error is far below the separation bound.
-    assert row["bse_x"] * x.std() < 1.0
-    assert row["separated"] is False
-    assert row["converged"] is True
-
 
 # ── Two cohorts per ladder ──
 

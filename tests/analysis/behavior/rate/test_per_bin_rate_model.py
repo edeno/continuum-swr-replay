@@ -25,6 +25,7 @@ from continuum_swr_replay.analysis.behavior import (
 )
 from continuum_swr_replay.analysis.behavior.rate.per_bin_rate_model import (
     _design_columns,
+    fit_per_bin_glm,
 )
 
 
@@ -799,3 +800,36 @@ def test_arrival_window_refuses_an_unfrozen_arrival_clock():
     design.loc[0, "time_since_last_well_arrival_s"] = np.nan
     with pytest.raises(ValueError, match="freeze the"):
         apply_arrival_window(design)
+
+
+def test_small_sd_predictor_with_ordinary_effect_is_not_flagged_separated():
+    """|coef| = 12 on a column with SD 0.03 is a 0.36-log-unit effect, not separation.
+
+    The legacy ``|coef| >= 10`` rule flagged exactly this design; the effect-scale
+    rule (``bse * SD``) does not.
+    """
+    rng = np.random.default_rng(0)
+    n = 4000
+    x = rng.normal(0.0, 0.03, n)
+    exposure = np.full(n, 0.015)
+    rate = np.exp(np.log(2.0) + 12.0 * x)
+    design = pd.DataFrame(
+        {
+            "stop_id": np.repeat(np.arange(n // 10), 10),
+            "binj": np.tile(np.arange(10), n // 10),
+            "exposure": exposure,
+            "x": x,
+            "count": rng.poisson(rate * exposure),
+        }
+    ).astype({"count": float})
+
+    row, reason = fit_per_bin_glm(design, "count ~ x", ["x"], name="x")
+
+    assert reason is None
+    assert row["coef_x"] == pytest.approx(12.0, abs=3.0)
+    # The design column's SD is small, so the per-unit coefficient is large ...
+    assert abs(row["coef_x"]) >= 10.0
+    # ... but the effect-scale standard error is far below the separation bound.
+    assert row["bse_x"] * x.std() < 1.0
+    assert row["separated"] is False
+    assert row["converged"] is True

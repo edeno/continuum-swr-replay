@@ -69,10 +69,6 @@ from pathlib import Path  # noqa: E402
 
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
-import statsmodels.api as sm  # noqa: E402
-import statsmodels.formula.api as smf  # noqa: E402
-from patsy import PatsyError  # noqa: E402
-from statsmodels.tools.sm_exceptions import PerfectSeparationError  # noqa: E402
 
 from continuum_swr_replay.analysis.behavior import (  # noqa: E402
     BIN_S,
@@ -84,12 +80,6 @@ from continuum_swr_replay.analysis.behavior import (  # noqa: E402
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
     freeze_per_bin_cohort,
-)
-from continuum_swr_replay.analysis.behavior._fit_diagnostics import (  # noqa: E402
-    NUISANCE_TERMS,
-    capture_fit_warnings,
-    count_fit_quality_warnings,
-    fit_status,
 )
 from continuum_swr_replay.analysis.behavior.cohort_audit import (  # noqa: E402
     fitted_cohort_record,
@@ -134,6 +124,9 @@ from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (
     at_risk_events,
     attach_event_ends,
 )
+from continuum_swr_replay.analysis.behavior.rate.per_bin_rate_model import (  # noqa: E402
+    fit_per_bin_glm,
+)
 from continuum_swr_replay.analysis.behavior.rate.post_outcome import (  # noqa: E402
     mask_post_outcome_covariates,
 )
@@ -163,7 +156,7 @@ from continuum_swr_replay.tables.session_keys import (  # noqa: E402
 )
 
 # Only the benign exp()-overflow RuntimeWarning (quasi-separated coefs -> rate ratios)
-# is silenced. Convergence/separation are recorded per fit as flags inside _fit (see
+# is silenced. Convergence/separation are recorded per fit as flags by the fitter (see
 # analysis.behavior._fit_diagnostics), not blanket-ignored.
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -218,109 +211,18 @@ def fit_input_paths() -> dict[str, Path]:
 
 
 STRATA = ("non_local", "non_local_swr", "non_local_no_swr")
-MIN_BINS, MIN_EVENTS = 200, 20
-_EXPECTED = (
-    np.linalg.LinAlgError,
-    ValueError,
-    RuntimeError,
-    PerfectSeparationError,
-    PatsyError,
-)
 
 
-def _fit(
-    design: pd.DataFrame, formula: str, need_cols: list[str]
-) -> tuple[dict | None, str | None]:
-    """Poisson GLM `count ~ formula` with a log(exposure) offset.
+def _fit(design: pd.DataFrame, formula: str, need_cols: list[str], name: str):
+    """One rung's tidy row and skip reason (:func:`fit_per_bin_glm`).
 
-    ``design`` must already be frozen to the ladder's common cohort
-    (:func:`freeze_per_bin_cohort` over the union of every rung's columns), so
-    every rung of a ladder is fit to the same rows and their AIC / deviance are
-    comparable. An incomplete design is a caller bug and raises rather than
-    being quietly subset here.
-
-    Returns ``(row, reason)``: ``reason`` is ``None`` on success, else a short tag
-    for the skip -- ``missing:<cols>`` (a needed column is absent -> a config/upstream
-    bug, distinct from a data skip), ``too_few``, ``no_reward_contrast``, or the
-    caught exception's class name. The caller tallies these so drop-outs are visible
-    (a silently-shrunk per-model session count would bias the downstream aggregate).
+    ``design`` must already be frozen to the ladder's common cohort; the
+    per-bin ``predicted`` series is not tidy data and is left out of the row.
     """
-    missing = [c for c in need_cols if c not in design.columns]
-    if missing:
-        return None, f"missing:{','.join(missing)}"
-    nan_cols = {
-        c: int(design[c].isna().sum())
-        for c in (*need_cols, "exposure")
-        if design[c].isna().any()
-    }
-    if nan_cols:
-        raise ValueError(
-            f"is_swr-contrast rate design has missing values in {nan_cols}; "
-            "freeze the ladder's common cohort with freeze_per_bin_cohort() "
-            "before fitting (a per-rung drop would split the ladder's cohort)."
-        )
-    n_bad = int((design["exposure"] <= 0).sum())
-    if n_bad:
-        raise ValueError(
-            f"is_swr-contrast rate design has {n_bad} row(s) with exposure <= 0; "
-            "freeze the ladder's common cohort with freeze_per_bin_cohort()."
-        )
-    df = design
-    n_events = int((df["count"] > 0).sum())
-    if len(df) < MIN_BINS or n_events < MIN_EVENTS:
-        return None, "too_few"
-    if (
-        REWARD_HISTORY_COLUMNS[0] in need_cols
-        and df[REWARD_HISTORY_COLUMNS[0]].nunique() < 2
-    ):
-        return None, "no_reward_contrast"  # reward terms unidentified without contrast
-    offset = np.log(df["exposure"].to_numpy(dtype=float))
-    try:
-        with capture_fit_warnings() as caught:
-            res = smf.glm(
-                f"count ~ {formula}",
-                data=df,
-                family=sm.families.Poisson(),
-                offset=offset,
-            ).fit()
-    except _EXPECTED as e:
-        return None, type(e).__name__
-    predictor_sd = np.asarray(res.model.exog, dtype=float).std(axis=0)
-    term_names = [str(t) for t in res.params.index]
-    status = fit_status(
-        res,
-        "glm",
-        predictor_sd=predictor_sd,
-        term_names=term_names,
-        nuisance_terms=NUISANCE_TERMS,
-    )
-    out = {f"coef_{k}": v for k, v in res.params.items()}
-    # Within-session coefficient uncertainty: carry SE + p per term so downstream
-    # aggregation can weight/annotate (mirrors the content contrast runner). These
-    # are model-based (non-robust) SEs; clustered/robust inference is a follow-up.
-    out.update({f"bse_{k}": v for k, v in res.bse.items()})
-    out.update({f"pval_{k}": v for k, v in res.pvalues.items()})
-    out.update(
-        {
-            f"sd_{name}": float(s)
-            for name, s in zip(term_names, predictor_sd, strict=True)
-        }
-    )
-    out.update(
-        n_bins=int(res.nobs),
-        n_events=n_events,
-        llf=float(res.llf),
-        aic=float(res.aic),
-        n_params=int(len(res.params)),
-        # distinct stops that contributed >=1 retained bin -- the stop-grain modeled count.
-        n_stops=int(df["stop_id"].nunique()),
-        converged=status["converged"],
-        separated=status["separated"],
-        # "|"-joined so the tuple survives a round trip through pickle and CSV.
-        separated_terms="|".join(status["separated_terms"]),
-        n_convergence_warnings=count_fit_quality_warnings(caught),
-    )
-    return out, None
+    fit, reason = fit_per_bin_glm(design, f"count ~ {formula}", need_cols, name=name)
+    if fit is None:
+        return None, reason
+    return {k: v for k, v in fit.items() if k != "predicted"}, None
 
 
 # Each ladder's null rung: the companion fit that gives a post-outcome rung a
@@ -393,7 +295,7 @@ def _fit_post_outcome_cohort(
     skips: dict = {}
     for name in (*rungs, LADDER_NULL[ladder]):
         formula, need = specs[name]
-        fit, reason = _fit(frozen, formula, [*need, *tag_cols])
+        fit, reason = _fit(frozen, formula, [*need, *tag_cols], name)
         if fit is not None:
             rows.append(
                 {
@@ -478,7 +380,7 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
         for name, (formula, need) in G_SPECS.items():
             if name in POST_OUTCOME_RATE_RUNGS:
                 continue
-            fit, reason = _fit(designs[pop], formula, need)
+            fit, reason = _fit(designs[pop], formula, need, name)
             if fit is not None:
                 rows.append(
                     {
@@ -517,7 +419,7 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
     for name, (formula, need) in S_SPECS.items():
         if name in POST_OUTCOME_RATE_RUNGS:
             continue
-        fit, reason = _fit(stacked, formula, [*need, "is_swr"])
+        fit, reason = _fit(stacked, formula, [*need, "is_swr"], name)
         if fit is not None:
             rows.append(
                 {

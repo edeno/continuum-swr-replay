@@ -276,16 +276,55 @@ def fit_per_bin_rate_model(
 ) -> dict | None:
     """Fit one session's per-bin Poisson GLM for ``spec``.
 
+    :func:`fit_per_bin_glm` on ``spec.formula()`` and the spec's design
+    columns; see it for the parameters, the gates and the returned dict.
+
+    Returns
+    -------
+    dict | None
+        The fit, or ``None`` when :func:`fit_per_bin_glm` skips it.
+    """
+    fit, _reason = fit_per_bin_glm(
+        design,
+        spec.formula(),
+        _design_columns(spec),
+        name=spec.name,
+        min_bins=min_bins,
+        min_events=min_events,
+    )
+    return fit
+
+
+def fit_per_bin_glm(
+    design: pd.DataFrame,
+    formula: str,
+    columns: Sequence[str],
+    *,
+    name: str,
+    min_bins: int = 200,
+    min_events: int = 20,
+) -> tuple[dict | None, str | None]:
+    """Fit one session's per-bin Poisson GLM ``formula`` with a log(exposure) offset.
+
+    The one per-bin fitter: :func:`fit_per_bin_rate_model` calls it with a
+    ladder spec, and the ``is_swr``-contrast ladder, whose rungs are written as
+    formula strings, calls it directly.
+
     Parameters
     ----------
     design : pd.DataFrame
         One session's :func:`per_bin_design.aggregate_to_timebins` output, already
         frozen by :func:`freeze_per_bin_cohort`, shape ``(n_bins, n_columns)``.
         Must carry ``count``, ``exposure``, ``stop_id``, ``binj`` plus the
-        columns the spec's formula references, all complete.
-    spec : PerBinRateModelSpec
-        The model to fit. ``spec.formula()`` is fit with a ``log(exposure)``
-        offset.
+        ``columns``, all complete.
+    formula : str
+        ``"count ~ ..."``, fit with a ``log(exposure)`` offset.
+    columns : sequence of str
+        The columns ``formula`` references; ``count`` is added when absent.
+        Reward coefficients are gated when ``reward_history_rcos_0`` is one of
+        them.
+    name : str
+        The rung's name, for the log.
     min_bins : int
         Minimum number of bins required to attempt a fit.
     min_events : int
@@ -293,18 +332,22 @@ def fit_per_bin_rate_model(
 
     Returns
     -------
-    dict | None
+    fit : dict | None
         ``coef_{term}`` / ``bse_{term}`` / ``pval_{term}`` / ``rr_{term}``
         (``rr = exp(coef)``) for every fitted term, plus ``n_bins``,
         ``n_events``, ``n_params``, ``llf``, ``aic``, ``deviance``,
-        ``dispersion`` (= ``deviance / df_resid``), and ``predicted`` (the
-        per-bin fitted mean count as a ``pd.Series`` indexed by the design
-        rows, for :func:`per_bin_rate_gof`). ``None`` if columns are
-        missing, too few bins/events, fewer than two distinct
-        ``reward_history_rcos_0`` values when reward terms are present, or
-        statsmodels raises a genuine numerical failure
-        (rank deficiency / convergence error -> caught -> ``None``, never a
-        crash).
+        ``dispersion`` (= ``deviance / df_resid``), ``n_stops``, ``sd_{term}``,
+        the convergence and separation flags, and ``predicted`` (the per-bin
+        fitted mean count as a ``pd.Series`` indexed by the design rows, for
+        :func:`per_bin_rate_gof`). ``None`` when the fit is skipped.
+    reason : str | None
+        ``None`` for a fit; otherwise why it was skipped:
+        ``missing:<columns>`` (a needed column is absent, a configuration
+        error rather than a data skip), ``too_few`` (fewer than ``min_bins``
+        bins or ``min_events`` event bins), ``no_reward_contrast`` (fewer than
+        two distinct ``reward_history_rcos_0`` values when reward terms are
+        present), or the class name of the numerical failure statsmodels
+        raised (rank deficiency / convergence error -> caught, never a crash).
 
     Raises
     ------
@@ -321,48 +364,44 @@ def fit_per_bin_rate_model(
     large-magnitude coefficient -- not ``None``. That is expected at the short
     self-history lags where the model is poorly identified.
     """
-    needed = [*_design_columns(spec), "exposure"]
+    needed = [*dict.fromkeys([*columns, "count"]), "exposure"]
     missing = [c for c in needed if c not in design.columns]
     if missing:
-        logger.warning("Missing columns for %s: %s", spec.name, missing)
-        return None
+        logger.warning("Missing columns for %s: %s", name, missing)
+        return None, f"missing:{','.join(missing)}"
 
-    require_frozen_per_bin_design(design, needed, name=spec.name)
+    require_frozen_per_bin_design(design, needed, name=name)
     df = design[[*needed, "stop_id", "binj"]]
     n_events = int((df["count"] > 0).sum())
     if len(df) < min_bins or n_events < min_events:
         logger.debug(
             "%s: too few data (%d bins, %d events; need %d/%d)",
-            spec.name,
+            name,
             len(df),
             n_events,
             min_bins,
             min_events,
         )
-        return None
+        return None, "too_few"
     # Reward coefficients are unidentified without contrast in the first
     # reward-history basis component (the recent-reward fraction).
     immediate = REWARD_HISTORY_COLUMNS[0]
-    if (spec.reward_basis or spec.reward_time_interaction) and (
-        df[immediate].nunique() < 2
-    ):
-        logger.debug(
-            "%s: <2 %s levels, reward terms unidentified", spec.name, immediate
-        )
-        return None
+    if immediate in needed and df[immediate].nunique() < 2:
+        logger.debug("%s: <2 %s levels, reward terms unidentified", name, immediate)
+        return None, "no_reward_contrast"
 
     offset = np.log(df["exposure"].to_numpy(dtype=float))
     try:
         with capture_fit_warnings() as caught:
             result = smf.glm(
-                spec.formula(),
+                formula,
                 data=df,
                 family=sm.families.Poisson(),
                 offset=offset,
             ).fit()
     except EXPECTED_FIT_ERRORS as exc:
-        logger.warning("Per-bin GLM failed for %s: %r", spec.name, exc)
-        return None
+        logger.warning("Per-bin GLM failed for %s: %r", name, exc)
+        return None, type(exc).__name__
     # Effect-scale separation: the per-bin design carries spline bases whose columns
     # are far from O(1), so the legacy |coef| rule mis-flags them.
     predictor_sd = np.asarray(result.model.exog, dtype=float).std(axis=0)
@@ -410,7 +449,7 @@ def fit_per_bin_rate_model(
         # fitted mean count per bin, indexed by retained rows (GOF input).
         "predicted": result.fittedvalues,
     }
-    return output
+    return output, None
 
 
 def cross_validate_per_bin_rate_model(
