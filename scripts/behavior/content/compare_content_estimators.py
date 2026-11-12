@@ -787,7 +787,7 @@ def plot_log_phi_by_session(
     axes[0].legend(fontsize=6, frameon=False, ncol=5, title="animal", title_fontsize=6)
     fig.suptitle(
         f"Dirichlet-multinomial concentration, {rung} "
-        "(band = animal-bootstrap 2.5–97.5%)",
+        "(band = nested-bootstrap 2.5–97.5%)",
         fontsize=10,
     )
     path.parent.mkdir(parents=True, exist_ok=True)
