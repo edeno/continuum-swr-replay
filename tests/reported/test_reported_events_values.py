@@ -17,7 +17,9 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.reported import events as builder
 from continuum_swr_replay.reported.values import Value
-from tests.analysis.inventory_comparison.test_inventory_nonlocal_comparison import _write_run
+from tests.analysis.inventory_comparison.test_inventory_nonlocal_comparison import (
+    _write_run,
+)
 
 NAN = np.nan
 
