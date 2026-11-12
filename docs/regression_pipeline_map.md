@@ -212,7 +212,7 @@ Analysis of decoded posterior distributions.
 
 Uncertainty of the SWR against non-SWR property contrasts: a nested bootstrap.
 
-`nested_bootstrap_counts`, `weighted_median`, `duration_strata`, `matched_difference`, `bootstrap_contrasts`, `percentile_intervals`
+`duration_strata`, `matched_difference`, `bootstrap_contrasts`, `percentile_intervals`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/quality_metrics.py`
 
