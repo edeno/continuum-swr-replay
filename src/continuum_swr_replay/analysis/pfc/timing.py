@@ -43,6 +43,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.shared_statistics import (
+    animal_balanced_curve,
     nested_bootstrap_draw,
     nested_codes,
 )
@@ -573,8 +574,10 @@ def called_response_timing_by_animal(
     The called units are split by the sign of their peak; within each
     direction, every animal with such a unit has its own curve, unit -> group
     -> animal: the mean over its groups of each group's sign-aligned mean
-    curve (:func:`sign_aligned_mean`), so every group of an animal weighs the
-    same however many units it holds. Its start is read by three rules.
+    curve (:func:`sign_aligned_mean`;
+    :func:`~continuum_swr_replay.analysis.shared_statistics.animal_balanced_curve`),
+    so every group of an animal weighs the same however many units it holds.
+    Its start is read by three rules.
 
     Parameters
     ----------
@@ -606,17 +609,19 @@ def called_response_timing_by_animal(
     directions, names, rows = [], [], []
     for direction, sign in DIRECTIONS.items():
         chosen = called & (np.sign(timing.peak) == sign)
-        for animal in np.unique(animals[chosen]):
-            own = chosen & (animals == animal)
-            own_curve = np.mean(
-                [
-                    sign_aligned_mean(curves[:, mine], timing.peak[mine])
-                    for mine in (
-                        own & (groups == group) for group in np.unique(groups[own])
-                    )
-                ],
-                axis=0,
+        if not chosen.any():
+            continue
+        by_group = {
+            (animal, group): sign_aligned_mean(curves[:, mine], timing.peak[mine])
+            for animal, group in sorted(
+                set(zip(animals[chosen], groups[chosen], strict=True))
             )
+            for mine in [chosen & (animals == animal) & (groups == group)]
+        }
+        _, per_animal = animal_balanced_curve(
+            by_group, {key: key[0] for key in by_group}
+        )
+        for animal, own_curve in per_animal.items():
             onset = peak_and_onset(own_curve, lag_time).onset_lag[0]
             rise = peak_and_onset(own_curve, lag_time, baseline="window_start")
             steepest = steepest_approach_lag(own_curve, lag_time)[0]
