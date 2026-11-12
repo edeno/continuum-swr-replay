@@ -1249,9 +1249,11 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
     -------
     pandas.DataFrame
         One row per (unit, curve): ``peak_penalised``, ``peak_mle``,
-        ``peak_mle_se``, ``mle_converged``, ``mle_separated`` and
-        ``prior_binds``, plus the unit's animal. Empty when the bundles carry
-        none of those columns.
+        ``peak_mle_se``, ``prior_binds``, ``units`` (the unpenalised fit's
+        status,
+        :func:`~continuum_swr_replay.analysis.pfc.population_statistics.fit_status`:
+        a unit with no convergence flag has not converged) and the unit's
+        animal. Empty when the bundles carry none of those columns.
     """
     rows = []
     for curve in CURVE_NAMES:
@@ -1259,20 +1261,14 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
             "peak_penalised": f"{curve}: peak_log_modulation",
             "peak_mle": f"{curve}: peak_log_modulation_mle",
             "peak_mle_se": f"{curve}: peak_log_modulation_mle_se",
-            "mle_separated": f"{curve}: mle_separated",
             "prior_binds": f"{curve}: prior_binds",
         }
-        if not set(columns.values()) <= set(after.columns):
+        if not {*columns.values(), f"{curve}: mle_separated"} <= set(after.columns):
             continue
         frame = after[list(columns.values())].rename(
             columns={value: key for key, value in columns.items()}
         )
-        convergence_column = f"{curve}: mle_converged"
-        frame["mle_converged"] = (
-            after[convergence_column].to_numpy(dtype=bool)
-            if convergence_column in after
-            else True
-        )
+        frame["units"] = population_statistics.fit_status(after, curve).to_numpy()
         frame.insert(0, "curve", curve)
         frame["animal"] = after["animal"].to_numpy()
         rows.append(frame)
@@ -1283,9 +1279,8 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
                 "peak_penalised",
                 "peak_mle",
                 "peak_mle_se",
-                "mle_converged",
-                "mle_separated",
                 "prior_binds",
+                "units",
                 "animal",
                 "delta",
             ]
@@ -1302,20 +1297,14 @@ def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
     so its row is reported -- it is where a prior is supposed to do the work --
     but "the prior binds" is counted only where a maximum-likelihood peak
     exists to be moved. ``prior_binds_pct`` is ``n_prior_binds`` as a percent
-    of the row's own units.
+    of the row's own units; on the well-posed row it is the share
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.prior_binding_percent`
+    reports, since the rows are
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.fit_status`.
     """
     if frame.empty:
         return frame
-    table = frame.copy()
-    table["units"] = np.select(
-        [
-            ~table["mle_converged"].fillna(False).astype(bool),
-            table["mle_separated"].fillna(False).astype(bool),
-        ],
-        ["nonconverged", "separated"],
-        default="well posed",
-    )
-    grouped = table.groupby(["curve", "units"], dropna=False)
+    grouped = frame.groupby(["curve", "units"], dropna=False)
 
     def finite_statistic(
         values: pd.Series, statistic: object, *, absolute: bool = False
@@ -1405,13 +1394,7 @@ def empirical_bayes_sigma(
     per_lag_per_sigma = per_lag_sd / penalty_sigma
     rows = []
     for curve, block in frame.groupby("curve"):
-        converged = block.get(
-            "mle_converged", pd.Series(True, index=block.index, dtype=bool)
-        )
-        well_posed = block[
-            converged.fillna(False).astype(bool)
-            & ~block["mle_separated"].fillna(False).astype(bool)
-        ]
+        well_posed = block[block["units"] == "well posed"]
         peaks = well_posed["peak_mle"].to_numpy(dtype=float)
         errors = well_posed["peak_mle_se"].to_numpy(dtype=float)
         usable = np.isfinite(peaks) & np.isfinite(errors)

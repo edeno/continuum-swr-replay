@@ -81,6 +81,30 @@ def test_fit_count_statistics_sum_sessions():
     }
 
 
+def test_fit_status_reads_a_missing_flag_as_false():
+    population = pd.DataFrame(
+        {
+            # 0 well posed; 1 separated; 2 did not converge and is separated
+            # (not converged comes first); 3 has no convergence flag; 4 has no
+            # separation flag
+            "SWR: mle_converged": [True, True, False, NAN, True],
+            "SWR: mle_separated": [False, True, True, False, NAN],
+        },
+        index=[10, 11, 12, 13, 14],
+    )
+    status = stats.fit_status(population, "SWR")
+    assert list(status.index) == [10, 11, 12, 13, 14]
+    assert list(status) == [
+        "well posed",
+        "separated",
+        "nonconverged",
+        "nonconverged",
+        "well posed",
+    ]
+    # no convergence column at all: no unit has converged
+    assert (stats.fit_status(population, "no_SWR") == "nonconverged").all()
+
+
 def test_prior_binding_percent_is_over_the_well_posed_units():
     population = pd.DataFrame(
         {

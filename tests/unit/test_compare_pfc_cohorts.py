@@ -1150,6 +1150,7 @@ def _write_ridge_bundle(
         frame[f"{curve}: peak_log_modulation"] = peak
         frame[f"{curve}: peak_log_modulation_mle"] = mle_peak
         frame[f"{curve}: peak_log_modulation_mle_se"] = 0.1
+        frame[f"{curve}: mle_converged"] = True
         frame[f"{curve}: mle_separated"] = bool(separated)
         frame[f"{curve}: prior_binds"] = abs(peak - mle_peak) > 0.1
     for pair in NESTED_MODEL_PAIRS:
@@ -1290,6 +1291,24 @@ class TestPeakShrinkage:
         # than its own standard error, so the prior plainly binds.
         assert swr["prior_binds"].all()
 
+    def test_a_unit_with_no_convergence_flag_has_not_converged(self, estimator_trees):
+        _, after = estimator_trees
+        population, _, _ = __import__(
+            "continuum_swr_replay.analysis.pfc.load_population",
+            fromlist=["load_population_data"],
+        ).load_population_data(after, min_firing_rate=0.0)
+        population["SWR: mle_converged"] = population["SWR: mle_converged"].astype(
+            object
+        )
+        population.loc[0, "SWR: mle_converged"] = np.nan
+        population = population.drop(columns="no_SWR: mle_converged")
+
+        frame = peak_shrinkage(population)
+
+        swr = frame.loc[frame["curve"] == "SWR", "units"].tolist()
+        assert swr == ["nonconverged", "well posed", "well posed", "well posed"]
+        assert (frame.loc[frame["curve"] == "no_SWR", "units"] == "nonconverged").all()
+
     def test_the_summary_separates_the_units_whose_mle_does_not_exist(
         self, estimator_trees, recwarn
     ):
@@ -1319,8 +1338,7 @@ class TestPeakShrinkage:
                 "peak_penalised": 1.0,
                 "peak_mle": [1.5, 1.0, 1.0, 30.0, 30.0],
                 "peak_mle_se": 0.1,
-                "mle_converged": True,
-                "mle_separated": [False, False, False, True, True],
+                "units": ["well posed"] * 3 + ["separated"] * 2,
                 "prior_binds": [True, False, False, True, True],
                 "animal": "chimi",
             }
@@ -1496,7 +1514,7 @@ class TestEmpiricalBayesSigma:
                 "curve": "SWR",
                 "peak_mle": peaks,
                 "peak_mle_se": 0.6,
-                "mle_separated": False,
+                "units": "well posed",
             }
         )
 
@@ -1514,7 +1532,7 @@ class TestEmpiricalBayesSigma:
                 "curve": ["SWR"] * 3,
                 "peak_mle": [0.5, -0.5, 40.0],
                 "peak_mle_se": [0.1, 0.1, 12.0],
-                "mle_separated": [False, False, True],
+                "units": ["well posed", "well posed", "separated"],
             }
         )
 

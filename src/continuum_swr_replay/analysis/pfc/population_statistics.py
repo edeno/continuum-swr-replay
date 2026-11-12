@@ -5,9 +5,10 @@ Each statistic takes a table an analysis wrote (the unit table of
 or a table of what the bundles' provenance records per session) and returns
 named numbers: a dict, or a table with one row per group. They are the
 statistics the mpfc summary reports (``continuum_swr_replay.reported.mpfc``
-names and describes them). Two functions select units instead:
-:func:`called_units` returns a mask and :func:`units_at_or_above_rate` the
-rows of the units at or above a firing rate. The timing statistics of the
+names and describes them). Three functions select or classify units instead:
+:func:`called_units` returns a mask, :func:`units_at_or_above_rate` the rows
+of the units at or above a firing rate, and :func:`fit_status` whether each
+unit's unpenalised fit of a curve is well posed. The timing statistics of the
 peri-event curves are in :mod:`~continuum_swr_replay.analysis.pfc.timing`;
 :func:`swr_without_replay_timing_statistics` applies one of them to the units
 called for SWRs without replay.
@@ -145,14 +146,49 @@ def fit_count_statistics(fits: pd.DataFrame) -> dict[str, float]:
     }
 
 
+def fit_status(population: pd.DataFrame, curve: str) -> pd.Series:
+    """Whether each unit's unpenalised fit of a curve has a peak to compare with.
+
+    Parameters
+    ----------
+    population : pd.DataFrame, shape (n_units, n_columns)
+        The unit table, with ``<curve>: mle_converged`` and
+        ``<curve>: mle_separated``.
+    curve : str
+        The curve (``"SWR"``, ``"non_local_SWR"``, ...).
+
+    Returns
+    -------
+    status : pd.Series of str, shape (n_units,)
+        On ``population``'s index: ``"nonconverged"`` when the unpenalised fit
+        did not converge, else ``"separated"`` when it has a separated column,
+        else ``"well posed"``. A missing flag, or a missing column, counts as
+        False: a unit with no convergence flag has not converged.
+    """
+
+    def flag(column: str) -> NDArray:
+        """The flag, True only where it is recorded True."""
+        if column not in population:
+            return np.zeros(len(population), dtype=bool)
+        # ``== True`` reads a missing flag as False.
+        return population[column].eq(True).to_numpy()
+
+    converged = flag(f"{curve}: mle_converged")
+    separated = flag(f"{curve}: mle_separated")
+    return pd.Series(
+        np.select([~converged, separated], ["nonconverged", "separated"], "well posed"),
+        index=population.index,
+    )
+
+
 def prior_binding_percent(population: pd.DataFrame, curves: Sequence[str]) -> pd.Series:
     """How often the prior moves a curve's peak, per curve.
 
-    A unit is well posed for a curve when its unpenalised fit converged
-    (``<curve>: mle_converged``) and has no separated column
-    (``<curve>: mle_separated``). The prior binds on it when its penalised peak
-    differs from the unpenalised one by more than that peak's standard error
-    (``<curve>: prior_binds``). A missing flag counts as False.
+    A unit is well posed for a curve when its unpenalised fit converged and
+    has no separated column (:func:`fit_status`). The prior binds on it when
+    its penalised peak differs from the unpenalised one by more than that
+    peak's standard error (``<curve>: prior_binds``; a missing flag counts as
+    False).
 
     Parameters
     ----------
@@ -170,10 +206,7 @@ def prior_binding_percent(population: pd.DataFrame, curves: Sequence[str]) -> pd
     """
     shares = {}
     for curve in curves:
-        # ``== True`` reads a missing flag as False.
-        converged = population[f"{curve}: mle_converged"].eq(True)
-        separated = population[f"{curve}: mle_separated"].eq(True)
-        well_posed = converged & ~separated
+        well_posed = fit_status(population, curve).eq("well posed")
         binds = population[f"{curve}: prior_binds"].eq(True)
         shares[curve] = 100 * (binds & well_posed).sum() / well_posed.sum()
     return pd.Series(shares)
