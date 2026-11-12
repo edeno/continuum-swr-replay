@@ -27,6 +27,10 @@ from continuum_swr_replay.analysis.behavior.content.model_comparison import (
     compare_nested_models,
     summarize_comparison,
 )
+from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
+    LOG_PHI_EVENT_LENGTH,
+    LOG_PHI_IS_SWR,
+)
 from continuum_swr_replay.analysis.behavior.model_specs import MODEL_HIERARCHY
 from continuum_swr_replay.reported.behavior.common import (
     TAGS,
@@ -136,18 +140,18 @@ def _content_specs() -> dict[str, tuple[str, str, str, str]]:
     ):
         model, term = _POOLED_RUNGS[word]
         specs[f"dm_{word}"] = ("_dm", model, "all", term)
-    specs["dm_breadth"] = ("_dm", "C2_base", "all", "log_phi_is_swr")
+    specs["dm_breadth"] = ("_dm", "C2_base", "all", LOG_PHI_IS_SWR)
     specs["dm_breadth_length_adjusted"] = (
         "_dm_len",
         "C2_base",
         "all",
-        "log_phi_is_swr",
+        LOG_PHI_IS_SWR,
     )
     specs["dm_breadth_length_term"] = (
         "_dm_len",
         "C2_base",
         "all",
-        "log_phi_log_n_nonlocal_bins_z",
+        LOG_PHI_EVENT_LENGTH,
     )
     return specs
 
@@ -434,7 +438,8 @@ def breadth_derived_values(
             contrast["ratio"],
             "quantity",
             "sig2",
-            "exp of the concentration contrast log_phi_is_swr on C2_base: an SWR event's Dirichlet concentration over a non-SWR event's",
+            f"exp of the concentration contrast {LOG_PHI_IS_SWR} on C2_base: an SWR "
+            "event's Dirichlet concentration over a non-SWR event's",
             "ratio",
         ),
         make(
@@ -566,10 +571,10 @@ def estimator_values(
                 )
     boot = bootstrap[
         (bootstrap["model"] == "C2_base")
-        & (bootstrap["term"] == "log_phi_is_swr")
+        & (bootstrap["term"] == LOG_PHI_IS_SWR)
         & (bootstrap["estimator"] == ESTIMATORS["dm"])
     ]
-    _require(len(boot) == 1, f"C2_base log_phi_is_swr: {len(boot)} bootstrap rows")
+    _require(len(boot) == 1, f"C2_base {LOG_PHI_IS_SWR}: {len(boot)} bootstrap rows")
     for end, bound in (("low", "lower"), ("high", "upper")):
         values.append(
             make(
@@ -577,7 +582,7 @@ def estimator_values(
                 boot[end].iloc[0],
                 "quantity",
                 "sig2s",
-                f"C2_base log_phi_is_swr, {ESTIMATORS['dm']}: {bound} bound of the "
+                f"C2_base {LOG_PHI_IS_SWR}, {ESTIMATORS['dm']}: {bound} bound of the "
                 f"{_estimator_interval(boot)}",
                 "log concentration",
                 tags=TAGS["estimators_anchoring"],
