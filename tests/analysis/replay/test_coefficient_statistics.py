@@ -157,6 +157,59 @@ def test_the_family_without_standard_errors_or_records_has_no_se_and_none_uniden
     assert x["n_unidentified"] == 0
 
 
+def _animal_values(values, animals) -> tuple[pd.Series, pd.Series]:
+    index = pd.RangeIndex(len(values))
+    return (
+        pd.Series(values, index=index, dtype=float),
+        pd.Series(animals, index=index),
+    )
+
+
+def test_the_bootstrap_resamples_the_animal_medians_with_one_draw_call():
+    values, animal = _animal_values(
+        [0.0, 0.0, 4.0, 1.0, NAN, 3.0], ["b", "b", "b", "a", "a", "a"]
+    )
+    rng = np.random.default_rng(7)
+    result = stats.animal_median_bootstrap(
+        values, animal, rng=rng, n_draws=200, percentiles=(0, 50, 100)
+    )
+    assert result["n_sessions"] == 5
+    assert result["n_animals"] == 2
+    # a: median of 1 and 3 (the NaN left out); b: of 0, 0, 4. Sorted by animal.
+    pd.testing.assert_series_equal(
+        result["animal_medians"],
+        pd.Series([2.0, 0.0], index=pd.Index(["a", "b"])),
+        check_names=False,
+    )
+    assert result["animal_median"] == 1.0  # the mean of two medians
+    # A draw of two animals has median 0, 1 or 2; 200 draws hold both ends and
+    # the middle is the most common.
+    np.testing.assert_array_equal(result["percentiles"], [0.0, 1.0, 2.0])
+    # the generator moved by exactly one (n_draws, n_animals) draw
+    reference = np.random.default_rng(7)
+    reference.integers(0, 2, size=(200, 2))
+    assert rng.bit_generator.state == reference.bit_generator.state
+
+
+def test_the_bootstrap_of_one_animal_is_its_median_and_of_none_draws_nothing():
+    values, animal = _animal_values([1.0, 5.0, 2.0], ["a", "a", "a"])
+    one = stats.animal_median_bootstrap(
+        values, animal, rng=np.random.default_rng(0), n_draws=50, percentiles=(5, 95)
+    )
+    np.testing.assert_array_equal(one["percentiles"], [2.0, 2.0])
+
+    rng = np.random.default_rng(0)
+    before = rng.bit_generator.state
+    empty, animal = _animal_values([NAN, NAN], ["a", "b"])
+    none = stats.animal_median_bootstrap(
+        empty, animal, rng=rng, n_draws=50, percentiles=(5, 95)
+    )
+    assert none["n_animals"] == 0
+    assert np.isnan(none["animal_median"])
+    assert np.isnan(none["percentiles"]).all()
+    assert rng.bit_generator.state == before
+
+
 def test_exp_of_the_two_medians_are_separate_numbers():
     fits = _coefficients(["a"] * 3 + ["b"], [0.0, 0.0, 0.0, 2.0])
     result = stats.coefficient_statistics(fits, "beta")

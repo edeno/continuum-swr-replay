@@ -68,6 +68,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 from continuum_swr_replay.analysis.replay._fit_diagnostics import (  # noqa: E402
     SEPARATION_COEF_ABS,
 )
+from continuum_swr_replay.analysis.replay.coefficient_statistics import (  # noqa: E402
+    animal_median_bootstrap,
+)
 from continuum_swr_replay.analysis.replay.content_response import (  # noqa: E402
     renormalize_fraction_over_candidates,
 )
@@ -114,6 +117,9 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_CONTENT_ARM_LADDER as ARM_LADDER,
+)
+from continuum_swr_replay.analysis.statistics import (  # noqa: E402
+    session_median_statistics,
 )
 from continuum_swr_replay.paths import figure_dir, replay_content_dir
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
@@ -762,15 +768,10 @@ def n_unpaired_triples(coefficients: pd.DataFrame) -> int:
     return int(coefficients.loc[bad, [*SC, "model", "term"]].drop_duplicates().shape[0])
 
 
-def _per_animal_medians(frame: pd.DataFrame, column: str) -> pd.Series:
-    """Each animal's median of ``column`` over its own sessions."""
-    return frame.groupby("animal", sort=True)[column].median().dropna()
-
-
-def _animal_balanced_median(frame: pd.DataFrame, column: str) -> float:
-    """Median over animals of each animal's per-session median."""
-    per_animal = _per_animal_medians(frame, column)
-    return float(per_animal.median()) if len(per_animal) else float("nan")
+def _animal_summary(frame: pd.DataFrame, column: str) -> dict[str, float]:
+    """``session_median_statistics`` of one column over the rows that have it."""
+    values = frame[column].dropna()
+    return session_median_statistics(values, frame.loc[values.index, "animal"])
 
 
 def _wide_by_estimator(coefficients: pd.DataFrame) -> pd.DataFrame:
@@ -826,9 +827,10 @@ def summarize(coefficients: pd.DataFrame) -> pd.DataFrame:
         & (identified["term"] == LOG_PHI_IS_SWR)
     ]
     per_rung_log_phi = {
-        name: _per_animal_medians(group, "coef")
+        name: _animal_summary(group, "coef")
         for name, group in log_phi.groupby("model", sort=False)
     }
+    no_log_phi = _animal_summary(log_phi.iloc[:0], "coef")
 
     records = []
     for (model, term), group in wide.groupby(["model", "term"], sort=True):
@@ -839,28 +841,23 @@ def summarize(coefficients: pd.DataFrame) -> pd.DataFrame:
         }
         for estimator in ESTIMATORS:
             label = ESTIMATOR_LABELS[estimator]
-            coef = group[f"coef_{label}"]
-            per_animal = _per_animal_medians(group.assign(_c=coef), "_c")
-            record[f"n_sessions_{label}"] = int(coef.notna().sum())
-            record[f"n_animals_{label}"] = int(len(per_animal))
-            record[f"median_coef_{label}"] = (
-                float(per_animal.median()) if len(per_animal) else np.nan
-            )
-            record[f"n_animals_pos_{label}"] = int((per_animal > 0).sum())
-            record[f"median_delta_aic_{label}"] = _animal_balanced_median(
+            coef = _animal_summary(group, f"coef_{label}")
+            record[f"n_sessions_{label}"] = coef["n_sessions"]
+            record[f"n_animals_{label}"] = coef["n_animals"]
+            record[f"median_coef_{label}"] = coef["animal_median"]
+            record[f"n_animals_pos_{label}"] = coef["n_animals_positive"]
+            record[f"median_delta_aic_{label}"] = _animal_summary(
                 group, f"delta_aic_vs_parent_{label}"
-            )
+            )["animal_median"]
             if estimator != CONDITIONAL_POISSON_COUNT:
-                record[f"median_{se_ratio_column(label)}"] = _animal_balanced_median(
+                record[f"median_{se_ratio_column(label)}"] = _animal_summary(
                     group, se_ratio_column(label)
-                )
-        animal_log_phi = per_rung_log_phi.get(model, pd.Series(dtype=float))
-        record["dm_log_phi_is_swr_animal_median"] = (
-            float(animal_log_phi.median()) if len(animal_log_phi) else np.nan
-        )
-        record["dm_log_phi_is_swr_n_animals"] = int(len(animal_log_phi))
-        record["dm_log_phi_is_swr_n_animals_neg"] = int((animal_log_phi < 0).sum())
-        record["dm_log_phi_is_swr_n_animals_pos"] = int((animal_log_phi > 0).sum())
+                )["animal_median"]
+        animal_log_phi = per_rung_log_phi.get(model, no_log_phi)
+        record["dm_log_phi_is_swr_animal_median"] = animal_log_phi["animal_median"]
+        record["dm_log_phi_is_swr_n_animals"] = animal_log_phi["n_animals"]
+        record["dm_log_phi_is_swr_n_animals_neg"] = animal_log_phi["n_animals_negative"]
+        record["dm_log_phi_is_swr_n_animals_pos"] = animal_log_phi["n_animals_positive"]
         records.append(record)
     return pd.DataFrame(records)
 
@@ -874,10 +871,10 @@ def bootstrap_animals(
 ) -> pd.DataFrame:
     """Animal bootstrap of the animal-balanced median, per (rung, term, estimator).
 
-    The animals present are resampled with replacement; the statistic on each
-    draw is the median over the resampled animals of each animal's per-session
-    median coefficient. Sessions within an animal are not independent, so the
-    animal is the resampling unit.
+    The coefficient's
+    :func:`~continuum_swr_replay.analysis.replay.coefficient_statistics.animal_median_bootstrap`
+    in each (rung, term, estimator), the groups taken in sorted order from one
+    generator.
 
     Parameters
     ----------
@@ -918,28 +915,31 @@ def bootstrap_animals(
     for (model, term, estimator), group in identified.groupby(
         ["model", "term", "estimator"], sort=True
     ):
-        per_animal = _per_animal_medians(group, "coef").to_numpy(dtype=float)
-        n_animals = len(per_animal)
-        record = {
-            "model": model,
-            "term": term,
-            "estimator": estimator,
-            "n_animals": int(n_animals),
-            "n_sessions": int(group["coef"].notna().sum()),
-            "statistic": float(np.median(per_animal)) if n_animals else np.nan,
-            "n_bootstrap": int(n_draws),
-            "seed": int(seed),
-        }
-        if n_animals == 0:
-            record.update(dict.fromkeys(percentile_names, np.nan))
-        else:
-            draws = rng.integers(0, n_animals, size=(n_draws, n_animals))
-            statistics = np.median(per_animal[draws], axis=1)
-            for name, value in zip(
-                percentile_names, np.percentile(statistics, percentiles), strict=True
-            ):
-                record[name] = float(value)
-        records.append(record)
+        bootstrap = animal_median_bootstrap(
+            group["coef"],
+            group["animal"],
+            rng=rng,
+            n_draws=n_draws,
+            percentiles=percentiles,
+        )
+        records.append(
+            {
+                "model": model,
+                "term": term,
+                "estimator": estimator,
+                "n_animals": bootstrap["n_animals"],
+                "n_sessions": bootstrap["n_sessions"],
+                "statistic": bootstrap["animal_median"],
+                **{
+                    name: float(value)
+                    for name, value in zip(
+                        percentile_names, bootstrap["percentiles"], strict=True
+                    )
+                },
+                "n_bootstrap": int(n_draws),
+                "seed": int(seed),
+            }
+        )
     return pd.DataFrame(records, columns=columns)
 
 

@@ -226,6 +226,73 @@ def coefficient_family_statistics(
     return table
 
 
+def animal_median_bootstrap(
+    values: pd.Series,
+    animal: pd.Series,
+    *,
+    rng: np.random.Generator,
+    n_draws: int,
+    percentiles: Sequence[float],
+) -> dict[str, object]:
+    """An animal bootstrap of the median over animals of each animal's median.
+
+    The animals are resampled with replacement; each draw's statistic is the
+    median of the resampled animals' own medians. Sessions within an animal
+    are not independent, so the animal is the resampling unit.
+
+    Parameters
+    ----------
+    values : pd.Series, shape (n_sessions,)
+        One number per session. A missing value is left out.
+    animal : pd.Series, shape (n_sessions,)
+        Each session's animal, indexed as ``values``.
+    rng : numpy.random.Generator
+        The draws' source. All ``n_draws`` resamples are drawn in one call,
+        ``rng.integers(0, n_animals, size=(n_draws, n_animals))``, so a caller
+        that shares one generator over several summaries gets reproducible
+        draws in the order it makes the calls; nothing is drawn when no animal
+        has a value.
+    n_draws : int
+        Bootstrap resamples.
+    percentiles : sequence of float
+        Percentiles of the resampled statistic, in [0, 100] (linear
+        interpolation).
+
+    Returns
+    -------
+    bootstrap : dict
+        - ``n_sessions``: the sessions with a value.
+        - ``n_animals``: the animals with one.
+        - ``animal_medians``: each animal's median, a ``pd.Series`` indexed by
+          animal in sorted order.
+        - ``animal_median``: the median over animals of those medians
+          (:func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`).
+        - ``percentiles``: the resampled statistic's ``percentiles``, a
+          ``numpy.ndarray`` of shape ``(len(percentiles),)``; NaN when no
+          animal has a value. With one animal every draw is that animal, so
+          each percentile is its median.
+    """
+    known = values.dropna()
+    known_animal = animal[known.index]
+    animal_medians = known.groupby(known_animal, sort=True, observed=True).median()
+    n_animals = len(animal_medians)
+    if n_animals == 0:
+        spread = np.full(len(percentiles), np.nan)
+    else:
+        per_animal = animal_medians.to_numpy(dtype=float)
+        draws = rng.integers(0, n_animals, size=(n_draws, n_animals))
+        spread = np.percentile(np.median(per_animal[draws], axis=1), percentiles)
+    return {
+        "n_sessions": len(known),
+        "n_animals": n_animals,
+        "animal_medians": animal_medians,
+        "animal_median": session_median_statistics(known, known_animal)[
+            "animal_median"
+        ],
+        "percentiles": np.asarray(spread, dtype=float),
+    }
+
+
 def gated_coefficient_statistics(fits: pd.DataFrame, term: str) -> dict[str, float]:
     """One term's coefficient across the sessions the per-term gate keeps.
 
