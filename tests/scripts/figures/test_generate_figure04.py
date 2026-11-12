@@ -155,6 +155,12 @@ def _synthetic_inputs(non_swr_peak=1.6, n_units=150):
         size=n_units,
         p=[0.48, 0.14, 0.33, 0.05],
     )
+    # Panel c groups the units by session and animal: five animals of two
+    # sessions each.
+    session = np.arange(n_units) % 10
+    pop_df["animal"] = [f"animal{s // 2}" for s in session]
+    pop_df["nwb_file_name"] = [f"animal{s // 2}2020010{s % 2}_.nwb" for s in session]
+    pop_df["epoch_name"] = "02_r1"
     return {
         "lag_time": lag_time,
         "spline_basis": basis,
@@ -501,11 +507,49 @@ def test_panel_c_curves_are_relative_to_each_units_value_at_the_window_start():
     bump = np.exp(-0.5 * (lag_time / 0.05) ** 2)
     curves = np.stack([bump - 0.5, bump + 0.2], axis=1)
     modulations = {"swr": curves, "no_swr": curves}
+    pop_df = pd.DataFrame(
+        {
+            "nwb_file_name": ["a20200101_.nwb", "b20200101_.nwb"],
+            "epoch_name": ["02_r1", "02_r1"],
+            "animal": ["a", "b"],
+        }
+    )
     fig, ax = plt.subplots()
 
-    figure04.plot_population_average(modulations, lag_time, ax)
+    figure04.plot_population_average(modulations, pop_df, lag_time, ax)
 
     mean_line = ax.get_lines()[0]
     np.testing.assert_allclose(mean_line.get_ydata(), bump - bump[0], atol=1e-12)
     assert "-200 ms" in ax.get_ylabel()
+    plt.close(fig)
+
+
+def test_panel_c_draws_the_mean_over_animals_with_the_sem_over_animals():
+    # Animal a holds three units in two sessions, animal b one unit. Each
+    # unit's curve is flat after -200 ms at its own level.
+    lag_time = np.array([-0.2, 0.0, 0.2])
+    levels = np.array([1.0, 3.0, 5.0, 8.0])  # a1, a1, a2, b1
+    curves = np.outer([0.0, 1.0, 1.0], levels)
+    modulations = {"swr": curves, "no_swr": curves}
+    pop_df = pd.DataFrame(
+        {
+            "nwb_file_name": ["a20200101_.nwb"] * 2
+            + ["a20200102_.nwb", "b20200101_.nwb"],
+            "epoch_name": ["02_r1"] * 4,
+            "animal": ["a", "a", "a", "b"],
+        }
+    )
+    fig, ax = plt.subplots()
+
+    figure04.plot_population_average(modulations, pop_df, lag_time, ax)
+
+    # Session a1 is 2, a2 is 5, so animal a is 3.5 and b is 8: the mean over
+    # animals is 5.75 (the unit mean would be 4.25), the SEM |8 - 3.5| / 2.
+    np.testing.assert_allclose(ax.get_lines()[0].get_ydata(), [0.0, 5.75, 5.75])
+    (band, _) = ax.collections
+    upper = band.get_paths()[0].vertices[:, 1].max()
+    assert upper == pytest.approx(5.75 + 2.25)
+    assert "mean over animals" in ax.get_ylabel()
+    assert ax.get_legend().get_title().get_text() == "± SEM over animals"
+    assert ax.get_title() == "Mean over 2 animals (4 units)"
     plt.close(fig)

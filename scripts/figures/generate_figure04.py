@@ -17,9 +17,10 @@ Composite figure with 4 panels in 3 rows:
         across the whole population.
 
     Row 3 (panels c, d):
-        c: Population average modulation curves (mean ± SEM) for SWR vs
-           non-SWR replay, each unit's curve relative to its own value at
-           −200 ms (the reference of the Part 4 timing values).
+        c: Population modulation curves for SWR vs non-SWR replay, each
+           unit's curve relative to its own value at −200 ms (the reference
+           of the Part 4 timing values), averaged unit -> session -> animal:
+           the mean over animals, ± SEM over animals.
         d: Consolidated statistics — fraction of neurons whose event
            regressor improves held-out deviance beyond the matched
            non-event control's null, and the distribution of the best
@@ -367,23 +368,41 @@ def plot_population_heatmaps(swr_mod, no_swr_mod, lag_time, axes):
 # ---------------------------------------------------------------------------
 
 
-def plot_population_average(modulations, lag_time, ax):
-    """Plot population mean ± SEM modulation on provided ax.
+def plot_population_average(modulations, pop_df, lag_time, ax):
+    """Plot the animal-balanced population modulation ± SEM over animals.
 
     Each unit's curve is taken relative to its own value at the window's first
     lag (−200 ms), the reference the Part 4 timing values use, so the panel shows
     the event-locked change rather than the whole-window level that low-rate
-    units carry.
+    units carry. The curves are then reduced unit -> session -> animal
+    (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.animal_balanced_unit_curve`):
+    every animal weighs the same however many of the units are its, and the
+    band is the standard error over animals.
+
+    Parameters
+    ----------
+    modulations : dict[str, np.ndarray], each (n_lag, n_neuron)
+        Population modulation curves, keys ``swr`` and ``no_swr``.
+    pop_df : pd.DataFrame
+        One row per unit, in the order of the columns of ``modulations``, with
+        ``nwb_file_name``, ``epoch_name`` and ``animal``.
+    lag_time : np.ndarray, shape (n_lag,)
+        Lags of ``modulations``, in seconds.
+    ax : matplotlib.axes.Axes
+        The panel's axes.
     """
     lag_ms = lag_time * 1000
+    sessions = (pop_df["nwb_file_name"] + "_" + pop_df["epoch_name"]).to_numpy()
+    animals = pop_df["animal"].to_numpy()
 
     for name, color, label in [
         ("swr", COLORS["SWR"], "SWR"),
         ("no_swr", COLORS["Non-Local"], "Non-SWR replay"),
     ]:
         arr = modulations[name] - modulations[name][:1]
-        mean = np.nanmean(arr, axis=1)
-        sem = np.nanstd(arr, axis=1) / np.sqrt(arr.shape[1])
+        mean, sem = population_statistics.animal_balanced_unit_curve(
+            arr, sessions, animals
+        )
 
         ax.plot(lag_ms, mean, color=color, linewidth=1.5, label=label)
         ax.fill_between(lag_ms, mean - sem, mean + sem, color=color, alpha=0.2)
@@ -391,10 +410,13 @@ def plot_population_average(modulations, lag_time, ax):
     ax.axhline(0, color="k", linewidth=0.5, linestyle="--")
     ax.axvline(0, color="k", linewidth=0.5, linestyle="--")
     ax.set_xlabel("Time from event (ms)")
-    ax.set_ylabel(f"Log firing rate change\nre {lag_ms[0]:.0f} ms")
+    ax.set_ylabel(f"Log firing rate change re {lag_ms[0]:.0f} ms\n(mean over animals)")
     ax.set_xlim(lag_ms[0], lag_ms[-1])
-    ax.legend(frameon=False)
-    ax.set_title(f"Population (n={modulations['swr'].shape[1]:,})")
+    ax.legend(title="± SEM over animals", frameon=False)
+    ax.set_title(
+        f"Mean over {pop_df['animal'].nunique()} animals "
+        f"({modulations['swr'].shape[1]:,} units)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -749,7 +771,9 @@ def assemble_figure(
     event_times : dict[str, pd.DataFrame]
         Event interval tables for the example neuron's PSTHs.
     pop_df : pd.DataFrame
-        One row per population unit (held-out p-values, best model).
+        One row per population unit (held-out p-values, best model, and the
+        ``nwb_file_name``, ``epoch_name`` and ``animal`` panel c groups by),
+        in the order of the columns of ``modulations``.
     modulations : dict[str, np.ndarray], each (n_lag, n_neuron)
         Population modulation curves, keys ``swr`` and ``no_swr``.
     pop_lag_time : np.ndarray, shape (n_lag,)
@@ -831,9 +855,9 @@ def assemble_figure(
     # The narrow gap gives panel d the room without shrinking panel c.
     gs_cd = gs[2].subgridspec(1, 2, width_ratios=[1.0, 1.4], wspace=0.1)
 
-    # Panel c: population average modulation
+    # Panel c: population modulation, mean over animals
     ax_c = fig.add_subplot(gs_cd[0])
-    plot_population_average(modulations, pop_lag_time, ax_c)
+    plot_population_average(modulations, pop_df, pop_lag_time, ax_c)
 
     # Panel d: consolidated stats — % beating the control null + best model.
     # A small wspace, so each bar plot is wide enough for its four category
