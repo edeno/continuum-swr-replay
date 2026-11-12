@@ -62,9 +62,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     placements,
 )
 from continuum_swr_replay.analysis.inventory_comparison.heldout import (
-    COVERAGE_FLOOR,
     event_classes,
     heldout_score,
+    heldout_summary,
     interleaved_folds,
     nearest_window_content,
     poor_coverage_fold,
@@ -74,7 +74,6 @@ from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.io import write_table
 
 N_PERMUTATIONS = 100
-COVERAGE_SENSITIVITY = (2.0, COVERAGE_FLOOR, 10.0)
 PLACEMENT_SEED = 2
 
 SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_heldout_summary.csv")
@@ -349,111 +348,6 @@ def run_no_replay_fold(fold, discovery, evaluation, n_recordings) -> list[dict]:
     return rows
 
 
-def summarize(table: pd.DataFrame) -> pd.DataFrame:
-    """Support rates by fold, estimator, class and truth, and the error rates."""
-    rows = []
-
-    def add(summary, measure, fold, estimator, detector, event_class, truth, value):
-        rows.append(
-            {
-                "summary": summary,
-                "measure": measure,
-                "fold": fold,
-                "estimator": estimator,
-                "detector": detector,
-                "event_class": event_class,
-                "truth": truth,
-                "value": float(value),
-            }
-        )
-
-    keys = ["fold", "estimator", "detector"]
-    for (fold, estimator, detector, event_class, truth), group in table.groupby(
-        [*keys, "event_class", "truth"]
-    ):
-        where = (fold, estimator, detector, event_class, truth)
-        add("by_class", "n_events_all", *where, len(group))
-        add(
-            "by_class",
-            "informative_share",
-            *where,
-            (group.coverage >= COVERAGE_FLOOR).mean(),
-        )
-        add("by_class", "median_gain", *where, group.gain_vs_animal.median())
-        add("by_class", "median_coverage", *where, group.coverage.median())
-        for floor in COVERAGE_SENSITIVITY:
-            suffix = "" if floor == COVERAGE_FLOOR else f"_floor{floor:g}"
-            informative = group[group.coverage >= floor]
-            add("by_class", f"n_events{suffix}", *where, len(informative))
-            add(
-                "by_class",
-                f"support_rate{suffix}",
-                *where,
-                informative.supported.mean() if len(informative) else np.nan,
-            )
-
-    kinds = {
-        "false_support_rate": ["local", "no_content", "silent_gap"],
-        "support_rate_with_content": ["continuous_replay", "non_local"],
-        "support_rate_mixed": ["mixed"],
-    }
-    for (fold, estimator, detector), group in table.groupby(keys):
-        for floor in COVERAGE_SENSITIVITY:
-            suffix = "" if floor == COVERAGE_FLOOR else f"_floor{floor:g}"
-            informative = group[group.coverage >= floor]
-            for measure, truths in kinds.items():
-                chosen = informative[informative.truth.isin(truths)]
-                where = (fold, estimator, detector, "all", "")
-                add("error_rates", f"n_{measure}{suffix}", *where, len(chosen))
-                add(
-                    "error_rates",
-                    f"{measure}{suffix}",
-                    *where,
-                    chosen.supported.mean() if len(chosen) else np.nan,
-                )
-            with_content = informative[
-                informative.truth.isin(kinds["support_rate_with_content"])
-            ]
-            add(
-                "error_rates",
-                f"under_crediting{suffix}",
-                fold,
-                estimator,
-                detector,
-                "all",
-                "",
-                1 - with_content.supported.mean() if len(with_content) else np.nan,
-            )
-
-    # the two estimators' verdicts on the same event, among events informative
-    # under both
-    verdicts = (
-        table[table.coverage >= COVERAGE_FLOOR]
-        .pivot_table(
-            index=["fold", "trial", "detector", "event"],
-            columns="estimator",
-            values="supported",
-            aggfunc="first",
-        )
-        .reindex(columns=["state_space", "sliding_window"])
-        .dropna()
-    )
-    for fold, group in verdicts.groupby(level="fold"):
-        add(
-            "agreement",
-            "estimator_agreement",
-            fold,
-            "both",
-            "both",
-            "all",
-            "",
-            (group["state_space"] == group["sliding_window"]).mean(),
-        )
-    summary = pd.DataFrame(rows)
-    summary["note"] = ""
-    return summary
-
-
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-seeds", type=int, default=8)
@@ -487,7 +381,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "n_recordings": args.n_recordings,
     }
     write_table(table, args.out)
-    summary = summarize(table)
+    summary = heldout_summary(table)
     for measure in ("produced_by", "produced_at", "git_commit"):
         summary.loc[len(summary)] = {
             "summary": "provenance",

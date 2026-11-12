@@ -85,6 +85,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep import 
     run_sliding_window,
     run_state_space,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_summaries import (
+    replay_sweep_summary,
+    share,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     dispersion_cm,
 )
@@ -94,16 +98,6 @@ from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.io import write_table
 
 SAME_PLACE_CM = 15.0
-
-IN_DOMAIN_PATH_CM = 45.0
-IN_DOMAIN_DURATION_S = 0.12
-"""The smallest swept path and duration the published replay definition can
-accept. Dispersion must exceed 12 cm and a uniform traverse of length L has
-dispersion L / sqrt(12), so a path under about 42 cm cannot qualify however
-well it is decoded; duration must exceed 100 ms. Three quarters of the grid
-lies outside this, by design, to show where each procedure's limit is -- but
-the aggregate over the whole grid is not a rate of anything the published
-method claims to detect."""
 
 SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_sweep_summary.csv")
 """Aggregated results, small enough to keep in the repository.
@@ -383,273 +377,6 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
     return row
 
 
-def share(numerator: float, denominator: float) -> float:
-    """A rate that is undefined, not zero, when nothing was counted."""
-    return float(numerator / denominator) if denominator > 0 else np.nan
-
-
-def melted(frame: pd.DataFrame, id_vars: list[str], summary: str) -> pd.DataFrame:
-    """One block of the long-format summary, its grouping columns kept."""
-    return frame.melt(id_vars=id_vars, var_name="measure", value_name="value").assign(
-        summary=summary
-    )
-
-
-def summarize(table: pd.DataFrame) -> pd.DataFrame:
-    """The aggregates quoted from the sweep, in one long-format table.
-
-    Built here so the numbers in the write-up and the numbers in the sweep
-    cannot drift apart.
-    """
-    # the shuffle never moves a sequence's bounds, so the duration panels read
-    # every accepted sequence that is the injection, before the shuffle
-    found = table[
-        table.sliding_matches_before_shuffle & table.state_space_matches
-    ].copy()
-    found["sliding_duration_ratio"] = found.sliding_duration_s / found.duration_s
-    found["state_space_duration_ratio"] = (
-        found.state_space_duration_s / found.duration_s
-    )
-    missed = table[table.state_space_matches & ~table.sliding_matches]
-
-    parts = []
-
-    by_path_duration = (
-        table.groupby(["path_cm", "duration_s"])[
-            [
-                "sliding_found",
-                "sliding_matches",
-                "sliding_matches_before_shuffle",
-                "sliding_matches_spread_only",
-                "sliding_any_candidate",
-                "state_space_found",
-                "state_space_matches",
-                "state_space_replay_matches",
-            ]
-        ]
-        .mean()
-        .reset_index()
-    )
-    parts.append(
-        melted(
-            by_path_duration,
-            ["path_cm", "duration_s"],
-            "detection_rate_by_path_and_duration",
-        )
-    )
-
-    # the published replay definition applied to the state-space detector's
-    # own events, by path, so the dispersion floor can be read off the file
-    by_path = (
-        # before the shuffle, sliding_matches_before_shuffle is the like-for-like
-        # partner of state_space_replay_matches: both are the duration and
-        # dispersion criteria alone
-        table.groupby("path_cm")[
-            [
-                "sliding_matches",
-                "sliding_matches_before_shuffle",
-                "state_space_replay_matches",
-            ]
-        ]
-        .mean()
-        .join(
-            table[table.state_space_matches]
-            .groupby("path_cm")
-            .state_space_dispersion_cm.median()
-            .rename("state_space_median_dispersion_cm")
-        )
-        .reset_index()
-    )
-    parts.append(melted(by_path, ["path_cm"], "by_path"))
-
-    # each half of the significance test, among the replays reported before
-    # it, by duration: a short replay covers its path in few windows, so its
-    # jumps are large and the jump half is where it fails
-    reported = table[table.sliding_matches_before_shuffle]
-    shuffle_by_duration = (
-        reported.assign(
-            sliding_spread_pass=reported.sliding_p_spread.le(SIGNIFICANCE_LEVEL),
-            sliding_jump_pass=reported.sliding_p_jump.le(SIGNIFICANCE_LEVEL),
-        )
-        .groupby("duration_s")[["sliding_spread_pass", "sliding_jump_pass"]]
-        .mean()
-        .reset_index()
-    )
-    parts.append(
-        melted(shuffle_by_duration, ["duration_s"], "shuffle_pass_rate_by_duration")
-    )
-
-    by_duration = (
-        found.groupby("duration_s")[
-            ["sliding_duration_ratio", "state_space_duration_ratio"]
-        ]
-        .median()
-        .reset_index()
-    )
-    parts.append(
-        melted(by_duration, ["duration_s"], "median_duration_ratio_by_duration")
-    )
-
-    found["distance_bin_cm"] = pd.cut(
-        found.distance_from_animal_cm, [0, 40, 80, 120, 200]
-    ).astype(str)
-    by_distance = (
-        found.groupby("distance_bin_cm", observed=True)[
-            [
-                "sliding_duration_ratio",
-                "sliding_local_fraction",
-                "state_space_duration_ratio",
-            ]
-        ]
-        .median()
-        .reset_index()
-    )
-    parts.append(
-        melted(by_distance, ["distance_bin_cm"], "median_by_distance_from_animal")
-    )
-
-    overall = pd.DataFrame(
-        {
-            "measure": [
-                "n_cells",
-                "sliding_found",
-                "sliding_matches",
-                "sliding_matches_before_shuffle",
-                "sliding_matches_spread_only",
-                "sliding_shuffle_spread_pass_rate",
-                "sliding_shuffle_jump_pass_rate",
-                "missed_failed_shuffle",
-                "sliding_any_candidate",
-                "state_space_found",
-                "state_space_matches",
-                "state_space_replay_matches",
-                "found_by_state_space_only",
-                "found_by_sliding_window_only",
-                "found_by_sliding_window_only_before_shuffle",
-                "sliding_accepted_but_not_the_injection",
-                "sliding_cells_with_several_accepted_overlaps",
-                "state_space_reports_in_several_intervals",
-                "missed_with_candidate_below_dispersion",
-                "missed_with_no_candidate",
-                "missed_median_spread_pass_rate",
-            ],
-            "value": [
-                float(len(table)),
-                float(table.sliding_found.mean()),
-                float(table.sliding_matches.mean()),
-                float(table.sliding_matches_before_shuffle.mean()),
-                float(table.sliding_matches_spread_only.mean()),
-                # each half's pass rate among the injected replays the
-                # detector reported before the shuffle
-                float(
-                    table[table.sliding_matches_before_shuffle]
-                    .sliding_p_spread.le(SIGNIFICANCE_LEVEL)
-                    .mean()
-                ),
-                float(
-                    table[table.sliding_matches_before_shuffle]
-                    .sliding_p_jump.le(SIGNIFICANCE_LEVEL)
-                    .mean()
-                ),
-                float(missed.sliding_matches_before_shuffle.mean()),
-                float(table.sliding_any_candidate.mean()),
-                float(table.state_space_found.mean()),
-                float(table.state_space_matches.mean()),
-                float(table.state_space_replay_matches.mean()),
-                float((table.state_space_matches & ~table.sliding_matches).mean()),
-                float((table.sliding_matches & ~table.state_space_matches).mean()),
-                float(
-                    (
-                        table.sliding_matches_before_shuffle
-                        & ~table.state_space_matches
-                    ).mean()
-                ),
-                share(
-                    (table.sliding_found & ~table.sliding_matches_before_shuffle).sum(),
-                    table.sliding_found.sum(),
-                ),
-                float(table.sliding_n_accepted.gt(1).mean()),
-                share(
-                    table.state_space_n_intervals.gt(1).sum(),
-                    table.state_space_found.sum(),
-                ),
-                float(
-                    (
-                        missed.sliding_n_candidates.gt(0)
-                        & missed.sliding_best_dispersion_cm.lt(
-                            CONFIG.dispersion_threshold_cm
-                        )
-                    ).mean()
-                ),
-                float(missed.sliding_n_candidates.eq(0).mean()),
-                float(missed.sliding_spread_ok.median()),
-            ],
-        }
-    )
-    overall["summary"] = "overall"
-    parts.append(overall)
-
-    in_domain = table[
-        (table.path_cm >= IN_DOMAIN_PATH_CM)
-        & (table.duration_s >= IN_DOMAIN_DURATION_S)
-    ]
-    domain = pd.DataFrame(
-        {
-            "measure": [
-                "n_cells",
-                "sliding_matches",
-                "sliding_matches_before_shuffle",
-                "sliding_matches_spread_only",
-                "state_space_matches",
-                "state_space_replay_matches",
-            ],
-            "value": [
-                float(len(in_domain)),
-                float(in_domain.sliding_matches.mean()),
-                float(in_domain.sliding_matches_before_shuffle.mean()),
-                float(in_domain.sliding_matches_spread_only.mean()),
-                float(in_domain.state_space_matches.mean()),
-                float(in_domain.state_space_replay_matches.mean()),
-            ],
-        }
-    )
-    domain["summary"] = "overall_in_domain"
-    parts.append(domain)
-
-    # where each detector puts an event's start and end against the truth, on
-    # the replays both reported: signed, so absorbed local coding shows as an
-    # early start or a late end rather than only as a longer event
-    timing = []
-    for duration_s, group in found.groupby("duration_s"):
-        row = {"duration_s": duration_s}
-        for detector in ("sliding", "state_space"):
-            for edge in ("start", "end"):
-                error_ms = 1000.0 * group[f"{detector}_{edge}_error_s"]
-                for name, quantile in (("q25", 0.25), ("median", 0.5), ("q75", 0.75)):
-                    row[f"{detector}_{edge}_error_ms_{name}"] = float(
-                        error_ms.quantile(quantile)
-                    )
-        timing.append(row)
-    parts.append(melted(pd.DataFrame(timing), ["duration_s"], "timing_by_duration"))
-
-    # the grouping column is not called "aggregate": that name shadows
-    # DataFrame.aggregate, so frame.aggregate == "x" compares a method and
-    # quietly selects nothing
-    table = pd.concat(parts, ignore_index=True)
-    table["note"] = ""
-    return table[
-        [
-            "summary",
-            "measure",
-            "path_cm",
-            "duration_s",
-            "distance_bin_cm",
-            "value",
-            "note",
-        ]
-    ]
-
-
 def main(argv: Sequence[str] | None = None) -> None:
     # the CPU unless JAX_PLATFORMS names another
     default_jax_platforms("cpu")
@@ -761,7 +488,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "track": "linear",
     }
     write_table(table, args.out)
-    summary = summarize(table)
+    summary = replay_sweep_summary(table)
     provenance = {
         "produced_by": table.attrs["produced_by"],
         "produced_at": table.attrs["produced_at"],

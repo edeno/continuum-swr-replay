@@ -55,7 +55,6 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import sweep
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (
-    SEGMENTATION_LABELS,
     bound_errors,
     part_agreement,
     recovered_parts,
@@ -76,6 +75,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_control
     trials,
     truth_path,
     usable_intervals,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_summaries import (
+    controls_summary,
 )
 from continuum_swr_replay.paths import detection_comparison_dir
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
@@ -305,110 +307,6 @@ def run_no_replay(n_recordings: int) -> list[dict]:
     return rows
 
 
-def summarize(trial_table: pd.DataFrame, no_replay: pd.DataFrame) -> pd.DataFrame:
-    """The aggregates the figure and the spec quote, in one long-format table."""
-    rows = []
-
-    def add(summary, measure, condition, level, detector, value):
-        rows.append(
-            {
-                "summary": summary,
-                "measure": measure,
-                "condition": condition,
-                "level": level,
-                "detector": detector,
-                "value": float(value),
-            }
-        )
-
-    exposure_min = (
-        no_replay.groupby(["recording", "stretch"]).exposure_s.first().sum() / 60
-    )
-    add("no_replay", "immobile_minutes", "no_replay", np.nan, "", exposure_min)
-    for detector, group in no_replay.groupby("detector"):
-        add(
-            "no_replay", "n_events", "no_replay", np.nan, detector, group.n_events.sum()
-        )
-        add(
-            "no_replay",
-            "events_per_minute",
-            "no_replay",
-            np.nan,
-            detector,
-            group.n_events.sum() / exposure_min,
-        )
-        add(
-            "no_replay",
-            "time_share",
-            "no_replay",
-            np.nan,
-            detector,
-            group.event_time_s.sum() / (60 * exposure_min),
-        )
-
-    bursts = trial_table[trial_table.condition.str.endswith("burst")]
-    for (condition, level, detector), group in bursts.groupby(
-        ["condition", "level", "detector"]
-    ):
-        add("bursts", "called_rate", condition, level, detector, group.called.mean())
-        if detector == "state_space_canonical":
-            for share in ("continuous_share", "fragmented_share"):
-                add("bursts", share, condition, level, detector, group[share].mean())
-    for (condition, detector), group in bursts.groupby(["condition", "detector"]):
-        add("bursts", "called_rate", condition, np.nan, detector, group.called.mean())
-        for rate_hz, at_rate in group.groupby("peak_rate_hz"):
-            add(
-                "bursts",
-                f"called_rate_at_{rate_hz:g}hz",
-                condition,
-                np.nan,
-                detector,
-                at_rate.called.mean(),
-            )
-
-    multi = trial_table[~trial_table.condition.str.endswith("burst")]
-    for (condition, level, detector), group in multi.groupby(
-        ["condition", "level", "detector"]
-    ):
-        add(
-            "parts",
-            "part_recovery",
-            condition,
-            level,
-            detector,
-            (group.n_recovered / group.n_parts).mean(),
-        )
-        add(
-            "parts",
-            "part_recovery_alone",
-            condition,
-            level,
-            detector,
-            (group.n_recovered_alone / group.n_parts).mean(),
-        )
-        for label in SEGMENTATION_LABELS:
-            add(
-                "parts",
-                f"segmentation_{label}",
-                condition,
-                level,
-                detector,
-                (group.segmentation == label).mean(),
-            )
-    for (condition, detector), group in multi.groupby(["condition", "detector"]):
-        # paired by trial: pooled recovery can rise while some trials lose parts
-        change = group.n_recovered - group.n_recovered_alone
-        add("parts", "n_trials", condition, np.nan, detector, len(group))
-        for measure, count in (
-            ("n_trials_fewer_in_context", (change < 0).sum()),
-            ("n_trials_more_in_context", (change > 0).sum()),
-        ):
-            add("parts", measure, condition, np.nan, detector, count)
-    table = pd.DataFrame(rows)
-    table["note"] = ""
-    return table
-
-
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-seeds", type=int, default=8)
@@ -437,7 +335,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "n_recordings": args.n_recordings,
     }
     write_table(table, args.out)
-    summary = summarize(trial_table, no_replay)
+    summary = controls_summary(trial_table, no_replay)
     for measure in ("produced_by", "produced_at", "git_commit"):
         summary.loc[len(summary)] = {
             "summary": "provenance",

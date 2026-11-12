@@ -1,12 +1,14 @@
 """Held-out evidence: an event's discovery content scored on evaluation cells."""
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.inventory_comparison.heldout import (
     event_classes,
     expected_log_likelihood,
     heldout_score,
+    heldout_summary,
     interleaved_folds,
     nearest_window_content,
     poor_coverage_fold,
@@ -177,3 +179,166 @@ class TestFolds:
         assert evaluation.max() < 12
         assert not np.intersect1d(discovery, evaluation).size
         assert discovery.min() == 1 and discovery.max() == 24
+
+
+def heldout_row(**overrides):
+    base = {
+        "fold": "A",
+        "trial": "t",
+        "detector": "state_space",
+        "event": 0,
+        "event_class": "ours_only",
+        "truth": "continuous_replay",
+        "estimator": "state_space",
+        "coverage": 6.0,
+        "gain_vs_animal": 1.0,
+        "supported": True,
+    }
+    return base | overrides
+
+
+class TestHeldoutSummary:
+    def summary(self, table):
+        out = heldout_summary(pd.DataFrame(table))
+        return out.set_index(
+            ["summary", "measure", "estimator", "detector", "event_class", "truth"]
+        ).value
+
+    def test_each_detector_counts_its_own_events(self):
+        """A shared event is scored once per detector; neither count doubles."""
+        table = [
+            heldout_row(event_class="shared", detector="state_space"),
+            heldout_row(
+                event_class="shared", detector="sliding_window", supported=False
+            ),
+        ]
+
+        values = self.summary(table)
+
+        assert (
+            values[
+                "by_class",
+                "n_events",
+                "state_space",
+                "state_space",
+                "shared",
+                "continuous_replay",
+            ]
+            == 1
+        )
+        assert (
+            values[
+                "by_class",
+                "support_rate",
+                "state_space",
+                "sliding_window",
+                "shared",
+                "continuous_replay",
+            ]
+            == 0
+        )
+
+    def test_a_floor_with_no_informative_event_is_written_as_none(self):
+        values = self.summary([heldout_row(coverage=3.0)])
+
+        assert (
+            values[
+                "by_class",
+                "n_events",
+                "state_space",
+                "state_space",
+                "ours_only",
+                "continuous_replay",
+            ]
+            == 0
+        )
+        assert np.isnan(
+            values[
+                "by_class",
+                "support_rate",
+                "state_space",
+                "state_space",
+                "ours_only",
+                "continuous_replay",
+            ]
+        )
+        assert (
+            values[
+                "by_class",
+                "n_events_floor2",
+                "state_space",
+                "state_space",
+                "ours_only",
+                "continuous_replay",
+            ]
+            == 1
+        )
+
+    def test_false_support_counts_local_coding_and_contentless_bursts(self):
+        table = [
+            heldout_row(event=0, truth="local", supported=True),
+            heldout_row(event=1, truth="no_content", supported=False),
+            heldout_row(event=2, truth="mixed", supported=True),
+        ]
+
+        values = self.summary(table)
+
+        assert (
+            values[
+                "error_rates",
+                "false_support_rate",
+                "state_space",
+                "state_space",
+                "all",
+                "",
+            ]
+            == 0.5
+        )
+        assert (
+            values[
+                "error_rates",
+                "n_false_support_rate",
+                "state_space",
+                "state_space",
+                "all",
+                "",
+            ]
+            == 2
+        )
+        assert (
+            values[
+                "error_rates",
+                "support_rate_mixed",
+                "state_space",
+                "state_space",
+                "all",
+                "",
+            ]
+            == 1.0
+        )
+
+    def test_agreement_compares_the_same_event_under_both_estimators(self):
+        table = [
+            heldout_row(event=0, estimator="state_space", supported=True),
+            heldout_row(event=0, estimator="sliding_window", supported=True),
+            heldout_row(event=1, estimator="state_space", supported=True),
+            heldout_row(event=1, estimator="sliding_window", supported=False),
+        ]
+
+        values = self.summary(table)
+
+        assert (
+            values["agreement", "estimator_agreement", "both", "both", "all", ""] == 0.5
+        )
+
+    def test_an_event_in_a_silent_gap_counts_as_without_content(self):
+        table = [
+            heldout_row(event=0, truth="silent_gap", supported=True),
+            heldout_row(event=1, truth="no_content", supported=False),
+        ]
+
+        values = self.summary(table)
+        where = ("error_rates", "state_space", "state_space", "all", "")
+
+        assert values[where[0], "n_false_support_rate", *where[1:]] == 2
+        assert values[where[0], "false_support_rate", *where[1:]] == 0.5

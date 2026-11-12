@@ -1,7 +1,6 @@
-"""The controls sweep's own helpers: truth, geometry, per-trial scoring, summary."""
+"""The controls sweep's own helpers: truth, geometry, per-trial scoring."""
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
@@ -142,57 +141,6 @@ class TestScoreTrial:
 
         assert not any(row["called"] for row in rows)
         assert rows[0]["continuous_share"] == pytest.approx(0.25)
-
-
-class TestSummary:
-    def test_immobile_time_is_counted_once_per_stretch(self):
-        no_replay = pd.DataFrame(
-            [
-                {
-                    "recording": 0,
-                    "stretch": stretch,
-                    "exposure_s": 30.0,
-                    "detector": detector,
-                    "n_events": 1 if detector == "state_space_canonical" else 0,
-                    "event_time_s": 0.3 if detector == "state_space_canonical" else 0.0,
-                }
-                for stretch in range(2)
-                for detector in controls.DETECTORS
-            ]
-        )
-        trials = pd.DataFrame(
-            columns=["condition", "level", "detector", "called", "peak_rate_hz"]
-        )
-
-        summary = controls.summarize(trials, no_replay)
-        rows = summary.set_index(["measure", "detector"]).value
-
-        assert rows["immobile_minutes", ""] == pytest.approx(1.0)
-        assert rows["events_per_minute", "state_space_canonical"] == pytest.approx(2.0)
-        assert rows["time_share", "state_space_canonical"] == pytest.approx(0.01)
-
-    def test_losses_to_the_context_are_counted_even_when_pooled_recovery_rises(self):
-        no_replay = pd.DataFrame(
-            columns=["recording", "stretch", "exposure_s", "detector", "n_events"]
-        )
-        trials = pd.DataFrame(
-            {
-                "condition": "chain_elsewhere",
-                "level": 0.1,
-                "detector": "sliding_published",
-                "n_parts": 2,
-                "n_recovered": [1, 2, 2],
-                "n_recovered_alone": [2, 0, 2],
-                "segmentation": "other",
-            }
-        )
-
-        summary = controls.summarize(trials, no_replay)
-        rows = summary[summary.level.isna()].set_index("measure").value
-
-        assert rows["n_trials"] == 3
-        assert rows["n_trials_fewer_in_context"] == 1
-        assert rows["n_trials_more_in_context"] == 1
 
 
 class TestPartAlone:
