@@ -65,6 +65,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     MIN_FIRING_RATE_HZ,
     at_or_above_rate,
     load_population_data,
+    significant_fraction,
 )
 from continuum_swr_replay.analysis.pfc.modulation import curve_peaks
 from continuum_swr_replay.analysis.statistics import benjamini_hochberg
@@ -502,7 +503,12 @@ def gate_counts(
 
 
 def significance_table(frame: pd.DataFrame, alpha: float) -> pd.DataFrame:
-    """FDR-significant fraction per test, overall and per animal."""
+    """FDR-significant fraction per test, overall and per animal.
+
+    A unit is tested when its q is finite and significant when it is below
+    ``alpha``, counted by
+    :func:`~continuum_swr_replay.analysis.pfc.load_population.significant_fraction`.
+    """
     rows = []
     groups = [("all", frame)] + [
         (animal, sub) for animal, sub in frame.groupby("animal", sort=True)
@@ -521,10 +527,7 @@ def significance_table(frame: pd.DataFrame, alpha: float) -> pd.DataFrame:
                     }
                 )
                 continue
-            q = sub[column].to_numpy(dtype=float)
-            tested = np.isfinite(q)
-            n_tested = int(tested.sum())
-            n_sig = int((q[tested] < alpha).sum())
+            n_sig, n_tested = significant_fraction(sub, alpha, {test: column})[test]
             rows.append(
                 {
                     "animal": animal,
@@ -984,6 +987,7 @@ def matched_control_significance(frame: pd.DataFrame, alpha: float) -> pd.DataFr
     BH is applied within the pooled population, which is where the two tests
     are read; the per-animal rows are that same correction sliced by animal,
     so they are comparable with the pooled row rather than separate families.
+    The fractions are counted as in :func:`significance_table`.
     """
     frame = frame.copy()
     for test in MATCHED_CONTROL_TESTS:
@@ -999,10 +1003,9 @@ def matched_control_significance(frame: pd.DataFrame, alpha: float) -> pd.DataFr
     ]
     for animal, sub in groups:
         for test in MATCHED_CONTROL_TESTS:
-            q = sub[f"{test}: fdr_q"].to_numpy(dtype=float)
-            tested = np.isfinite(q)
-            n_tested = int(tested.sum())
-            n_sig = int((q[tested] < alpha).sum())
+            n_sig, n_tested = significant_fraction(
+                sub, alpha, {test: f"{test}: fdr_q"}
+            )[test]
             rows.append(
                 {
                     "animal": animal,
@@ -1441,7 +1444,8 @@ def legacy_fdr_table(before: pd.DataFrame, alpha: float) -> pd.DataFrame:
 
     The caller restricts ``before`` to the sessions the after tree holds
     (:func:`restrict_to_sessions`); without that the two tables below describe
-    different populations and must not be read side by side.
+    different populations and must not be read side by side. The fractions
+    are counted as in :func:`significance_table`.
     """
     rows = []
     for scope, frame in [("all", before), *sorted(before.groupby("animal"))]:
@@ -1451,13 +1455,10 @@ def legacy_fdr_table(before: pd.DataFrame, alpha: float) -> pd.DataFrame:
             if column not in frame:
                 row[f"{test}_pct"] = np.nan
                 continue
-            q = frame[column].to_numpy(dtype=float)
-            tested = np.isfinite(q)
-            row[f"{test}_n_tested"] = int(tested.sum())
+            n_sig, n_tested = significant_fraction(frame, alpha, {test: column})[test]
+            row[f"{test}_n_tested"] = n_tested
             row[f"{test}_pct"] = (
-                round(100.0 * (q[tested] < alpha).sum() / tested.sum(), 1)
-                if tested.any()
-                else np.nan
+                round(100.0 * n_sig / n_tested, 1) if n_tested else np.nan
             )
         rows.append(row)
     return pd.DataFrame(rows)
