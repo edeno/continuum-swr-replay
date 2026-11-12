@@ -55,13 +55,13 @@ from continuum_swr_replay.analysis.hippocampus.gamma_power import (
     zscore_on,
 )
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
+from continuum_swr_replay.analysis.inventory_comparison.feature_run import ok_epochs
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.paths import (
     processed_data_dir,
     replay_content_dir,
-    swr_inventory_root,
     table_path,
 )
 from continuum_swr_replay.runs.io import sha256_file
@@ -179,11 +179,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--out-name", default="event_gamma")
     args = parser.parse_args(argv)
 
-    swr_manifest = json.loads(
-        (
-            swr_inventory_root() / swr_source.SWR_INVENTORY_RUN_ID / "manifest.json"
-        ).read_text()
-    )
+    swr_manifest = swr_source.inventory_manifest()
     event_table = table_path("event_table", replay_content_dir())
     event_table_sha256 = sha256_file(event_table)
     events = pd.read_parquet(
@@ -197,16 +193,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     jobs = [
         (
             identifier,
-            record,
+            swr_manifest["epochs"][identifier],
             by_epoch[identifier],
             args.overwrite,
             args.out_name,
             event_table_sha256,
         )
-        for identifier, record in sorted(swr_manifest["epochs"].items())
-        if record.get("status") == "ok"
-        and identifier in by_epoch
-        and (not args.epoch_id or identifier in args.epoch_id)
+        for identifier in ok_epochs(swr_manifest)
+        if identifier in by_epoch and (not args.epoch_id or identifier in args.epoch_id)
     ]
     out_dir(args.out_name).mkdir(parents=True, exist_ok=True)
     print(f"{len(jobs)} epochs")
