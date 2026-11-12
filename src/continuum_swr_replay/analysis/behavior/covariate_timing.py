@@ -2,9 +2,9 @@
 
 The single in-code home for "when is this covariate known relative to the response?".
 The three availability frozensets are DERIVED from ``COVARIATE_DEFINITIONS``
-(each covariate's ``Availability`` field) — the provenance audit at
-``.claude/docs/reviews/06_covariate_provenance.csv`` is a cross-check reference,
-not the source; editing that CSV does not change enforcement. Two distinct leaks
+(each covariate's ``Availability`` field) — the covariate-provenance CSV that
+``tests/analysis/behavior/test_provenance_csv.py`` reads is a cross-check
+reference, not the source; editing that CSV does not change enforcement. Two distinct leaks
 get two distinct remedies (see :func:`assert_predictor_timing`):
 
 - **POST_OUTCOME** — carries a current-trip value update

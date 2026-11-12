@@ -501,9 +501,8 @@ def _collapse_physical_pokes_to_port_experiences(
     # OMISSION_KNOWN_LATENCY_SEC = 0.30 s, and
     # ``outcome_known_times_from_task_visits`` raises if any recovered pump
     # lands later than that after its visit's first poke-in. Measured over the
-    # 218-session corpus, latency from arrival is p99 91 ms with a maximum of
-    # 236 ms (.claude/docs/reviews/2026-09-03-regression-pipeline-review.md),
-    # so the guard has headroom over every observed pump.
+    # 218-session corpus (2026-09-03), latency from arrival is p99 91 ms with a
+    # maximum of 236 ms, so the guard has headroom over every observed pump.
     unmatched = list(physical_pokes.attrs.get("unmatched_pump_events", ()))
     unmatched_well = [PUMP_EVENT_TO_WELL.get(str(name)) for name, _ in unmatched]
     recovered_pumps: set[int] = set()

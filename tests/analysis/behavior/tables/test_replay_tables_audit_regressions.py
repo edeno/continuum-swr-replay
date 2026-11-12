@@ -11,8 +11,6 @@ passed all 203 subsystem tests. These pin the values those mutations changed.
 confirmed covariate-timing defects. Each is marked ``xfail(strict=True)`` so the
 suite stays green while the defect stands, and turns red the moment a fix lands
 without the marker being removed.
-
-See ``.claude/docs/reviews/`` for the audit report.
 """
 
 from __future__ import annotations
