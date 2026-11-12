@@ -14,7 +14,10 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2
 
-from continuum_swr_replay.analysis.statistics import signed_rank_p
+from continuum_swr_replay.analysis.statistics import (
+    session_median_statistics,
+    signed_rank_p,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .model_specs import MODEL_HIERARCHY
@@ -296,17 +299,13 @@ def summarize_comparison(
     # per-animal median delta-AIC is balanced across animals, and how many animals
     # agree on the sign is the claim a reader should weigh.
     if "animal" in comparison_df.columns:
-        per_animal = (
-            comparison_df.assign(_d=daic)
-            .dropna(subset=["_d"])
-            .groupby("animal")["_d"]
-            .median()
+        known = daic.notna()
+        animals = session_median_statistics(
+            daic[known], comparison_df.loc[known, "animal"]
         )
-        result["delta_aic_animal_median"] = (
-            float(per_animal.median()) if len(per_animal) else np.nan
-        )
-        result["n_animals"] = int(per_animal.size)
-        result["n_animals_child_better"] = int((per_animal > 0).sum())
+        result["delta_aic_animal_median"] = animals["animal_median"]
+        result["n_animals"] = animals["n_animals"]
+        result["n_animals_child_better"] = animals["n_animals_positive"]
     else:
         result["delta_aic_animal_median"] = np.nan
         result["n_animals"] = 0

@@ -167,6 +167,17 @@ class TestSummarizeComparison:
         result = summarize_comparison(comparisons, "M0", "M1")
         assert np.isnan(result["wilcoxon_p"])
 
+    def test_the_animal_view_is_the_median_of_each_animal_s_median(self):
+        """Animal b has only a NaN session, so it is not an animal of the
+        summary: a's median is 2, c's is -1, their median 0.5."""
+        comparisons = _make_comparison_df([3.0, 1.0, np.nan, 4.0, -6.0]).assign(
+            animal=["a", "a", "b", "c", "c"]
+        )
+        result = summarize_comparison(comparisons, "M0", "M1")
+        assert result["delta_aic_animal_median"] == pytest.approx(0.5)
+        assert result["n_animals"] == 2
+        assert result["n_animals_child_better"] == 1
+
     def test_counts_child_better_aic_threshold(self):
         """child_better_aic counts sessions with delta_aic > 2."""
         comparisons = _make_comparison_df([5.0, 3.0, 1.0, -1.0, -5.0])
