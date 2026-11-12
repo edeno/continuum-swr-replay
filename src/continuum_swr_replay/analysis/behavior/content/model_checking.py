@@ -148,7 +148,7 @@ def cross_validate_conditional_poisson(
                 term_names=predictors,
                 nuisance_terms=NUISANCE_TERMS,
             )
-            n_nonconverged += status["converged"] is False
+            n_nonconverged += status["converged"] is not True
             n_separated += status["separated"]
 
             # Compute held-out conditional LL
