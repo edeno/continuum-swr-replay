@@ -27,6 +27,7 @@ from continuum_swr_replay.analysis.behavior.content.model_comparison import (
     compare_nested_models,
     summarize_comparison,
 )
+from continuum_swr_replay.analysis.behavior.model_specs import MODEL_HIERARCHY
 from continuum_swr_replay.reported.behavior.common import TAGS, _gate_note, _require
 from continuum_swr_replay.reported.values import (
     Tags,
@@ -168,8 +169,12 @@ ESTIMATORS = {
     "dm": "dirichlet_multinomial",
 }
 
-#: Leaf-ladder steps: key word -> (parent, child).
-LEAF_STEPS = {"uncertainty": ("M4", "Mu"), "value": ("M4", "Mv"), "both": ("Mu", "Mvu")}
+#: Leaf-ladder steps: key word -> (parent, child), the parent the one the child's
+#: model spec names.
+LEAF_STEPS = {
+    word: (MODEL_HIERARCHY[child].parent, child)
+    for word, child in {"uncertainty": "Mu", "value": "Mv", "both": "Mvu"}.items()
+}
 
 #: The leaf ladder's rung files the summary reads: the steps' rungs, each once,
 #: in the order the steps name them.
