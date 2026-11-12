@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stop-level context of the mPFC replay response, pooled across sessions (Q8).
+"""Stop-level context of the mPFC replay response, pooled across sessions (Part 4).
 
 Two steps (``analysis/pfc/stop_context.py``; design
 ``.claude/docs/plans/pfc-response-followups/design-stop-level-context.md``):
