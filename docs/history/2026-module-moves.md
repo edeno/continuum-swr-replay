@@ -6,6 +6,7 @@ went, for code outside this repository (notebooks, old scripts) and for outputs 
 provenance records an old path. It is not current instruction: the layout today is in
 [../README.md](../README.md) ("Code layout") and [../../scripts/README.md](../../scripts/README.md).
 There are no compatibility shims: an old import path raises `ModuleNotFoundError`.
+The last section lists the dated audits the indexes once cited.
 
 An old path is marked "(removed: ...)" so that `tests/repository/test_doc_paths_resolve.py`
 does not look for it; every new path is checked.
@@ -257,7 +258,6 @@ An old path is marked "(removed: moved)" so the doc-path test does not look for 
 | `scripts/qa/diagnose_pfc_event_definition.py` (removed: moved) | `scripts/pfc/diagnose_pfc_event_definition.py` |
 | `scripts/qa/memoryless_reference.py` (removed: moved) | `scripts/checks/_memoryless_reference.py` (2026-10-25: a module, not a script) |
 
-
 ## Runners renamed, 2026-10-17
 
 The two behaviour analyses left `scripts/pfc/` and took names for what they do. Their
@@ -275,3 +275,26 @@ root of `replay_content/`, and the per-event ripple-power model to its own folde
 `models_per_event_swr_power/`. Nothing is left at the old `models_per_bin_rate/` paths
 (the "Phase D disk move" entry of
 [the code-organization plan](../../.claude/docs/plans/code-organization/PLAN.md)).
+
+## Dated audits the docs once cited
+
+These point-in-time audits are in `.claude/docs/reviews/`. The indexes and
+`docs/rate_models.md` cited them until 2026-11-12; they no longer do, because the rule
+each one checked is in a design doc and the current numbers are in `paper/reported/`.
+A design doc may still link one as its dated source. Their numbers describe the data
+of their date.
+
+- [2026-09-06-rate-refit-arrival-clock.md](../../.claude/docs/reviews/2026-09-06-rate-refit-arrival-clock.md)
+  — the rate refit that added the arrival clock; why the retired per-lag reward step
+  was not a like-for-like comparison.
+- [2026-09-12-rate-cohort-atwell.md](../../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md)
+  — the rate ladders on the three stop cohorts (218 sessions), when the well-anchored
+  cohort became the canonical one ([../design/cohort_and_timing_rules.md](../design/cohort_and_timing_rules.md)).
+- [2026-09-13-stage5b-stage6-atwell.md](../../.claude/docs/reviews/2026-09-13-stage5b-stage6-atwell.md)
+  — the retrospective alignment and the stay/leave analysis moved onto that cohort.
+- [2026-09-14-pfc-atwell-cohort.md](../../.claude/docs/reviews/2026-09-14-pfc-atwell-cohort.md)
+  and [2026-09-15-pfc-canonical-rerun.md](../../.claude/docs/reviews/2026-09-15-pfc-canonical-rerun.md)
+  — the mPFC unit GLM moved onto that cohort, then rerun on the canonical event table.
+- [2026-09-19-pfc-marked-family-summary.md](../../.claude/docs/reviews/2026-09-19-pfc-marked-family-summary.md)
+  — the population summary of the 2026-09-19 marked-family corpus
+  ([../design/pfc_marked_model_family.md](../design/pfc_marked_model_family.md), "Artifacts").

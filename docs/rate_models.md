@@ -33,8 +33,8 @@ one-population null tested against its split.
 > the SWR-coupled non-local stream — so an in-transit cell showing no effect is
 > an absence of evidence, not evidence of absence, and its paired tests have no
 > power. Every number below is from the well-anchored
-> fit unless it is explicitly labelled all-stops. Every number below is read from `paper/reported/behavior.json`. The cohort comparison is
-> [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md).
+> fit unless it is explicitly labelled all-stops. Every number below is read from `paper/reported/behavior.json`. The cohort rule is in
+> [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md).
 
 ## Family A — per-stop rate (the literature-comparable layer)
 
@@ -92,9 +92,7 @@ one-population null tested against its split.
   fit on — that step is **<!--v:behavior.per_stop_delta_aic_animal_non_local-->−4.3<!--/v-->** (non-local), **<!--v:behavior.per_stop_delta_aic_animal_non_local_swr-->−2.6<!--/v-->** (non-local w/ SWR),
   **<!--v:behavior.per_stop_delta_aic_animal_swr-->−2.7<!--/v-->** (detected SWR) and **<!--v:behavior.per_stop_delta_aic_animal_non_local_no_swr-->+0.88<!--/v-->** (non-local, no SWR) animal-balanced,
   and **<!--v:behavior.per_stop_delta_aic_session_non_local-->−4.2<!--/v-->** / **<!--v:behavior.per_stop_delta_aic_session_non_local_swr-->−3.1<!--/v-->** / **<!--v:behavior.per_stop_delta_aic_session_swr-->−4.3<!--/v-->** / **<!--v:behavior.per_stop_delta_aic_session_non_local_no_swr-->+0.88<!--/v-->** session-pooled, over <!--v:behavior.per_stop_sessions_non_local-->241<!--/v-->
-  sessions each
-  ([2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
-  "Family A — per-stop reward step"). The block earns its parameters in three
+  sessions each. The block earns its parameters in three
   populations but not in the non-SWR one: **<!--v:behavior.per_stop_child_better_fraction_non_local-->74 %<!--/v-->** of sessions are
   child-better on the pooled non-local stream (<!--v:behavior.per_stop_animals_child_better_non_local-->5<!--/v-->/5 animals) against **<!--v:behavior.per_stop_child_better_fraction_non_local_no_swr-->46 %<!--/v-->**
   on the non-SWR one (<!--v:behavior.per_stop_animals_child_better_non_local_no_swr-->2<!--/v-->/5 animals), whose median step is on the wrong side of zero.
@@ -176,9 +174,7 @@ offset. Its limitation is exactly that offset — see below.
   costs <!--v:behavior.rate_audit_stops_common_drop-->575<!--/v--> of the <!--v:behavior.rate_audit_stops_in-->93,560<!--/v--> well-anchored stops (plus <!--v:behavior.rate_audit_stops_own_drop-->5<!--/v--> with a missing own
   predictor and <!--v:behavior.rate_audit_stops_modeled_session_excluded-->38<!--/v--> in gated-out sessions), leaving **<!--v:behavior.rate_stops-->92,942<!--/v--> stops** in every rung of every population, over
   <!--v:behavior.rate_bins-->7,280,203<!--/v--> at-risk bins for the non-local populations and <!--v:behavior.rate_bins_swr-->7,359,637<!--/v--> for detected SWR
-  (each detector's own events set its at-risk bins) (`models_per_bin_rate/per_bin_rate_cohort_audit.csv`;
-  [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
-  "Cohort size"). Those are the well-anchored stops carrying no
+  (each detector's own events set its at-risk bins) (`models_per_bin_rate/per_bin_rate_cohort_audit.csv`). Those are the well-anchored stops carrying no
   arrival clock, which the arrival rungs put into the union. The freeze bites harder where
   rungs need different covariates — the `is_swr`-contrast ladder, whose audit
   reports the largest `n_drop_common_cohort_other`. There and in
@@ -190,9 +186,9 @@ offset. Its limitation is exactly that offset — see below.
   additive rung `M7r_time_histcos_rew` is fit on **<!--v:behavior.rate_full_sessions_swr-->242<!--/v--> / <!--v:behavior.rate_full_sessions_non_local-->242<!--/v--> / <!--v:behavior.rate_full_sessions_non_local_swr-->242<!--/v--> / <!--v:behavior.rate_full_sessions_non_local_no_swr-->242<!--/v-->**
   sessions (detected SWR / non-local, all / non-local w/ SWR / non-local, no
   SWR) and `M5_time` on <!--v:behavior.rate_time_sessions_swr-->242<!--/v--> / <!--v:behavior.rate_time_sessions_non_local-->242<!--/v--> / <!--v:behavior.rate_time_sessions_non_local_swr-->242<!--/v--> / <!--v:behavior.rate_time_sessions_non_local_no_swr-->242<!--/v--> (fitted rows of
-  `models_per_bin_rate/all_models.pkl`; the reward-quantity `n` per population is
-  in
-  [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md)).
+  `models_per_bin_rate/all_models.pkl`). The reward-kernel values are over the sessions
+  whose reward terms all pass the per-term separation gate: <!--v:behavior.rate_kernel_sessions_swr-->239<!--/v--> / <!--v:behavior.rate_kernel_sessions_non_local-->240<!--/v--> / <!--v:behavior.rate_kernel_sessions_non_local_swr-->213<!--/v--> / <!--v:behavior.rate_kernel_sessions_non_local_no_swr-->215<!--/v-->
+  in the same order.
   Quote the per-rung, per-population `n`, not a flat <!--v:behavior.rate_sessions-->242<!--/v-->.
 - **Runner / output:** `scripts/behavior/rate/fit_per_bin_rate_models.py`
   (`--workers N` fans sessions over processes) →
@@ -269,9 +265,8 @@ offset. Its limitation is exactly that offset — see below.
 
   (Everything in this bullet is the well-anchored fit over <!--v:behavior.rate_sessions-->242<!--/v--> sessions — see
   the `rate_kernel_*` values under question 3.3 in
-  [../paper/reported/questions.md](../paper/reported/questions.md) for the full kernel and
-  [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md)
-  for what the cohort moved. The smooth reward basis has no per-lag parameter, so the
+  [../paper/reported/questions.md](../paper/reported/questions.md) for the full kernel, and
+  the `rate_allstops_*` values there for the all-stops sensitivity. The smooth reward basis has no per-lag parameter, so the
   lag-1 boost is smaller than the retired per-lag specification reported; the
   ordering and the dissociation are unchanged. The audited SWR-contrast
   ladder publishes **<!--v:behavior.rate_contrast_audited_rows-->32<!--/v--> aggregate rows** under the per-term separation rule —
@@ -351,9 +346,7 @@ distances between the normalized curves of <!--v:behavior.rate_clock_ks_non_loca
 (non-local no-SWR), <!--v:behavior.rate_clock_ks_swr-->0.09<!--/v--> (detected SWR) and <!--v:behavior.rate_clock_ks_non_local_swr-->0.09<!--/v--> (non-local with SWR). Detected
 SWR is no exception — its supported arrival-clock maximum is at <!--v:behavior.rate_arrival_peak_s_swr-->3.11<!--/v--> s. The all-stops sensitivity reads <!--v:behavior.rate_allstops_time_peak_s_low-->2.53<!--/v-->–<!--v:behavior.rate_allstops_time_peak_s_high-->3.00<!--/v--> s against
 <!--v:behavior.rate_allstops_arrival_peak_s_low-->3.04<!--/v-->–<!--v:behavior.rate_allstops_arrival_peak_s_high-->5.79<!--/v--> s with KS distances <!--v:behavior.rate_allstops_clock_ks_low-->0.08<!--/v-->–<!--v:behavior.rate_allstops_clock_ks_high-->0.09<!--/v-->; the arrival-clock band is much wider there, so the cross-clock
-agreement turns partly on the cohort
-([2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
-"Arrival clock vs stop clock, by cohort").
+agreement turns partly on the cohort.
 
 Read over the **full** [0, 8] s window, a median arrival-clock curve's argmax
 can land on the 0 s grid point, where the window holds almost no exposure; that
@@ -391,9 +384,7 @@ populations is partly a contrast between windows. The imbalance is smaller than
 it was on all stops (<!--v:behavior.rate_allstops_arrival_event_share_swr@pctnum-->91<!--/v--> / <!--v:behavior.rate_allstops_arrival_event_share_non_local_swr@pctnum-->91<!--/v--> / <!--v:behavior.rate_allstops_arrival_event_share_non_local@pctnum-->86<!--/v--> / **<!--v:behavior.rate_allstops_arrival_event_share_non_local_no_swr@pct-->81 %<!--/v-->**), because the bouts the
 window discards most are the in-transit ones the cohort no longer holds (their
 retention is <!--v:behavior.rate_intransit_arrival_event_share_low-->0.18<!--/v-->–<!--v:behavior.rate_intransit_arrival_event_share_high-->0.37<!--/v--> on the in-transit fit). Both the cohort audit and the runner log report it per
-population (`result.attrs["arrival_clock_cohort"]`;
-[2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
-"Arrival-window retention").
+population (`result.attrs["arrival_clock_cohort"]`).
 
 **The arrival rungs are themselves rarely cross-validated.** On the
 well-anchored fit `cv_bits_per_event` is NaN in <!--v:behavior.rate_arrival_time_cv_nan_fraction_non_local-->92 %<!--/v--> (`M5a_time_arrival`) and
@@ -613,8 +604,7 @@ What the ladder actually shows (<!--v:behavior.rate_sessions-->242<!--/v--> sess
   should be read against: those rungs were not scored on the same rows as their
   parent — the per-lag columns are NaN early in an epoch, so the reward rung was
   fit on fewer bins than the null it was compared against — so that step was
-  never a like-for-like model comparison
-  ([2026-09-06-rate-refit-arrival-clock.md](../.claude/docs/reviews/2026-09-06-rate-refit-arrival-clock.md)).
+  never a like-for-like model comparison.
 - **Within-session non-stationarity is not tested here.** The cumulative
   point-process residual within a session makes slow excursions; because each
   per-session intercept pins the residual at both ends (a Brownian bridge), the

@@ -382,7 +382,7 @@ them importable.
   explicit `--output-dir` (use `Processed-Data/pfc_response_followups/marked_family`).
   Recommended-set output goes to `pfc_marked_model_family/` under the
   processed-data root; the bundles there are the 71-session corpus of
-  2026-09-19 (`.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md`), fit
+  2026-09-19 (`docs/design/pfc_marked_model_family.md`, "Artifacts"), fit
   before the analysed-time rule under bundle contract 1 -- a default-directory
   rerun under contract 2 removes them as stale, so do not point a run there.
 - `summarize_pfc_marked_family.py` aggregates those bundles unit → session →

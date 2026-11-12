@@ -15,7 +15,7 @@ it stops drifting; add new docs to the matching home.
 | reference | `docs/task_description.md`, `docs/cached_trials_for_testing.md`, `docs/known_issues/` | task/data background |
 | cohort | `docs/epoch_register.md` | which run epochs are analysed, and the reason for every other one (mirrors `data_loaders/epoch_register.py`) |
 | **design spec** (scientific/methodological) | **`docs/design/`** | analysis designs — human-discoverable for collaborators/reviewers |
-| history | `docs/history/` | where moved code and data went; not current instruction |
+| history | `docs/history/` | where moved code and data went, and the dated audits the docs once cited; not current instruction |
 | implementation plan (agent process) | `.claude/docs/plans/` | phased execution plans |
 | review (code/methods output) | `.claude/docs/reviews/` | point-in-time review reports, and the dated audits (before/after refit comparisons, regeneration and parity checks) |
 | exploratory notes + figures | `.claude/research/` | scratch analyses; `*_outputs/` figures |
@@ -211,7 +211,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     the non-local 15 ms minimum is really 7 samples (12 ms span), 1.1 % of events;
     fix at the next full rebuild.
 - [history/2026-module-moves.md](history/2026-module-moves.md) — *history*: where each
-  module, script and data file moved in 2026.
+  module, script and data file moved in 2026, and the dated audits the docs once cited.
 
 ## Code layout
 
@@ -320,8 +320,7 @@ Three tiers:
    cohort in the filename: `*_allstops` (every immobility stop) and
    `*_intransit` (in-transit stops only, thin — 50 of 218 sessions). Every
    fitted row and provenance sidecar records its `stop_cohort`. See
-   [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md) and
-   [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md).
+   [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md).
 
    (These dir names are terse — a descriptive rename and un-mix of the content directories
    has been considered and deferred; the names above are the ones the runners write.)
@@ -345,7 +344,7 @@ Three tiers:
    | `replay_content/stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/behavior/run_stay_leave.py` | the per-stop replay summary and the stay/leave models (question 3.5) |
    | `replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/behavior/run_retrospective_alignment.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
    | `pfc_marked_kernels/{epoch_identifier}_{mark}_marked_kernels.pkl` + `.lag_time.npy`, `.{class}.typical.npy`, `.{class}.mark_slope.npy`, `.mark_label_shuffle_reference.npz`, `.provenance.json` | `scripts/pfc/run_pfc_marked_kernels.py` | the content-marked kernels of [design/pfc_marked_event_kernels.md](design/pfc_marked_event_kernels.md). One bundle per session × mark (`current_arm_fraction`, or `current_arm_fraction_posterior` as a sensitivity): the pickle holds the per-neuron statistics (held-out deviance of the joint full model and of each class's reduced model, the class's held-out improvement, the label-shuffle tail fraction and usable-shuffle count, convergence flags); the `.npy` companions hold the reported lag axis and, per replay class (`non_local_SWR`, `non_local_no_SWR`), the typical-event kernel and the content mark-slope kernel; the `.npz` holds that class's shuffled held-out improvements; the sidecar the provenance. **No bundle exists on disk** |
-   | `pfc_marked_model_family/{epoch_identifier}_{model}_marked_family.pkl` + `.lag_time.npy`, `.{class}.typical.npy`, `.{class}.{target}.slope.npy`, `.provenance.json` | `scripts/pfc/run_pfc_marked_model_family.py` | the no-p-value descriptive family in [design/pfc_marked_model_family.md](design/pfc_marked_model_family.md): one bundle per session × eligible model, with all recorded units, target-specific blocked-held-out deviance changes, typical-event and one-SD target kernels, exact mark scales/ranks/device/timing in provenance, and sidecar-only markers for ineligible or no-unit sessions. The bundles on disk are the **2026-09-19 corpus batch** (71 sessions × 12 models, 816 bundles + 36 ineligible markers, git 4d69b83, base σ 3 / mark σ 0.5), fit before the analysed-time rule and the current cohort: [2026-09-19-pfc-marked-family-corpus.md](../.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md), population summary (unit → session → animal, `scripts/pfc/summarize_pfc_marked_family.py`, figures under `paper/figures/pfc_marked_family/`) in [2026-09-19-pfc-marked-family-summary.md](../.claude/docs/reviews/2026-09-19-pfc-marked-family-summary.md); the prior choice and why a family `typical` curve is not the Figure 4 kernel are in [2026-09-18-pfc-marked-family-smoke.md](../.claude/docs/reviews/2026-09-18-pfc-marked-family-smoke.md) |
+   | `pfc_marked_model_family/{epoch_identifier}_{model}_marked_family.pkl` + `.lag_time.npy`, `.{class}.typical.npy`, `.{class}.{target}.slope.npy`, `.provenance.json` | `scripts/pfc/run_pfc_marked_model_family.py` | the no-p-value descriptive family in [design/pfc_marked_model_family.md](design/pfc_marked_model_family.md): one bundle per session × eligible model, with all recorded units, target-specific blocked-held-out deviance changes, typical-event and one-SD target kernels, exact mark scales/ranks/device/timing in provenance, and sidecar-only markers for ineligible or no-unit sessions. The bundles on disk are the **2026-09-19 corpus batch** (71 sessions × 12 models, 816 bundles + 36 ineligible markers, git 4d69b83 on `feature/pfc-marked-event-kernels`, base σ 3 / mark σ 0.5), fit before the analysed-time rule and the current cohort ([design/pfc_marked_model_family.md](design/pfc_marked_model_family.md), "Artifacts"); its population summary (unit → session → animal) is written by `scripts/pfc/summarize_pfc_marked_family.py`, figures under `paper/figures/pfc_marked_family/`; the prior choice and why a family `typical` curve is not the Figure 4 kernel are in the same design doc ("What the first smoke showed") |
 
    All five are fit on the **well-anchored stop cohort**, the same population as the
    rate and content ladders, and an unsuffixed PFC artifact is that cohort; `_allstops`
@@ -421,11 +420,9 @@ Three tiers:
    modulation magnitude quoted from the split model before that date, including from the
    backup tree, is mislabelled; whole-model comparisons never read a block and are
    unaffected. See
-   [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md),
-   [2026-09-14-pfc-atwell-cohort.md](../.claude/docs/reviews/2026-09-14-pfc-atwell-cohort.md) and
-   [2026-09-13-stage5b-stage6-atwell.md](../.claude/docs/reviews/2026-09-13-stage5b-stage6-atwell.md).
-   The earlier canonical-events rerun is in
-   [2026-09-15-pfc-canonical-rerun.md](../.claude/docs/reviews/2026-09-15-pfc-canonical-rerun.md).
+   [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md); the dated audits
+   of the cohort change and of the canonical-events rerun are listed in
+   [history/2026-module-moves.md](history/2026-module-moves.md).
 
    The batched fitter runs on GPU through the project's `cuda` extra, and the decoders'
    GPU cluster needs `dask-cuda` and `cuda-bindings` (which dask-cuda imports without
