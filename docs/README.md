@@ -127,6 +127,9 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     Dirichlet-multinomial, on one 218-session cohort: what each assumes,
     simulation recovery, which conclusions are estimator-dependent, and the
     `log_phi_is_swr` concentration result. Its values answer questions 3.1, 3.6 and 3.7.
+  - [design/pfc_unit_glm_estimator.md](design/pfc_unit_glm_estimator.md) — the mPFC
+    unit GLM's prior on the event kernels and its held-out test against a matched-control
+    null: why it replaced maximum likelihood, the checks it passed, and its known limits.
   - [design/pfc_marked_event_kernels.md](design/pfc_marked_event_kernels.md)
     — the content-marked mPFC replay kernels: the `current_arm_fraction` mark
     and its within-session/class scaling, the jointly fit ordinary + duration +
@@ -399,10 +402,9 @@ Three tiers:
    R11 re-decode**, at git `110c9ae` on 2026-10-11/12 (logs in `logs/pfc_refresh2_20261011/`).
    The estimator's first batch, at `db01df0` (2026-09-16/17), replaced the
    maximum-likelihood tree, which is kept whole at
-   `Processed-Data/_pre_ridge_backup_20260915/`. That before/after is audited in
-   [2026-09-18-pfc-ridge-heldout.md](../.claude/docs/reviews/2026-09-18-pfc-ridge-heldout.md):
-   the two inferences call comparable fractions of a comparable population, which are **not**
-   comparable test by test. In the current bundles (`paper/reported/mpfc.json`),
+   `Processed-Data/_pre_ridge_backup_20260915/`. Why the estimator changed, the checks it
+   passed, and why the two inferences are **not** comparable test by test are in
+   [design/pfc_unit_glm_estimator.md](design/pfc_unit_glm_estimator.md). In the current bundles (`paper/reported/mpfc.json`),
    non-converged fits are **<!--v:mpfc.nonconverged_percent-->0.26<!--/v-->%** of model fits (<!--v:mpfc.nonconverged_model_fits-->432<!--/v--> of <!--v:mpfc.model_fits-->166,968<!--/v-->,
    over <!--v:mpfc.nonconverged_neurons-->48<!--/v--> neurons). The prior binds on
    <!--v:mpfc.prior_binds_percent_min-->2.6<!--/v-->–<!--v:mpfc.prior_binds_percent_max-->4.9<!--/v-->% of well-posed units per curve. The null's geometry, by the rules of
