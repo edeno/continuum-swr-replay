@@ -63,7 +63,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.runs.io import ok_epochs, sha256_file
+from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -136,6 +136,40 @@ def epoch_gamma(
     }
 
 
+def epochs_to_measure(
+    events: pd.DataFrame,
+) -> list[tuple[str, dict[str, Any], pd.DataFrame]]:
+    """Each epoch of the event table, with its SWR-inventory record and its events.
+
+    The epochs are the ones the SWR source served the table's SWRs from, so
+    every one has a record: ``ok``, or ``partial`` with a Kay inventory
+    (``swr_source.swr_inventory_record``, the source's one rule).
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        The canonical event table's rows, with the session keys.
+
+    Returns
+    -------
+    list of (str, dict, pd.DataFrame)
+        ``(epoch_id, record, the epoch's events)``, sorted by epoch id.
+
+    Raises
+    ------
+    swr_source.SwrSourceError
+        If the SWR source cannot serve an epoch of the table.
+    """
+    by_epoch = {
+        format_epoch_identifier(f"{animal}{day}_.nwb", epoch, "HPC"): frame
+        for (animal, day, epoch), frame in events.groupby(KEYS)
+    }
+    return [
+        (identifier, swr_source.swr_inventory_record(identifier), frame)
+        for identifier, frame in sorted(by_epoch.items())
+    ]
+
+
 def _written_from(ref_path: Path) -> str | None:
     """The event-table SHA-256 an epoch's written reference records, if any."""
     if not ref_path.exists():
@@ -178,28 +212,23 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--out-name", default="event_gamma")
     args = parser.parse_args(argv)
 
-    swr_manifest = swr_source.inventory_manifest()
     event_table = table_path("event_table", replay_content_dir())
     event_table_sha256 = sha256_file(event_table)
     events = pd.read_parquet(
         event_table,
         columns=[*KEYS, "event_id", "event_start_s", "event_end_s", "is_swr"],
     )
-    by_epoch = {
-        format_epoch_identifier(f"{animal}{day}_.nwb", epoch, "HPC"): frame
-        for (animal, day, epoch), frame in events.groupby(KEYS)
-    }
     jobs = [
         (
             identifier,
-            swr_manifest["epochs"][identifier],
-            by_epoch[identifier],
+            record,
+            frame,
             args.overwrite,
             args.out_name,
             event_table_sha256,
         )
-        for identifier in ok_epochs(swr_manifest)
-        if identifier in by_epoch and (not args.epoch_id or identifier in args.epoch_id)
+        for identifier, record, frame in epochs_to_measure(events)
+        if not args.epoch_id or identifier in args.epoch_id
     ]
     out_dir(args.out_name).mkdir(parents=True, exist_ok=True)
     print(f"{len(jobs)} epochs")
