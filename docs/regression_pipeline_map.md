@@ -866,7 +866,7 @@ Check that the penalised solver reproduces maximum likelihood at lambda = 0.
 
 Write the before/after audit of the mPFC unit-GLM stop cohort.
 
-`read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `try_read_sidecars`, `same_events_precondition`, `event_count_agreement`, `shared_statistic_differences`, `matched_control_arrays`, `matched_control_significance`, `fitter_table`, `session_fit_counts_table`, `worker_time_table`, `curve_peaks`, `peak_shrinkage`, `shrinkage_table`, `implied_prior_per_lag`, `empirical_bayes_sigma`, `heldout_fraction_table`, `restrict_to_sessions`, `legacy_fdr_table`, `separated_column_table`, `engagement_overlap_table`, `null_window_table`, `fold_spread_table`, `sigma_sensitivity_table`, `estimator_provenance_table`, `rerun_sections`, `build_report`, `geometry_section`, `build_estimator_report`, `main`
+`read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `try_read_sidecars`, `same_events_precondition`, `event_count_agreement`, `shared_statistic_differences`, `matched_control_arrays`, `matched_control_significance`, `fitter_table`, `session_fit_counts_table`, `worker_time_table`, `peak_shrinkage`, `shrinkage_table`, `implied_prior_per_lag`, `empirical_bayes_sigma`, `heldout_fraction_table`, `restrict_to_sessions`, `legacy_fdr_table`, `separated_column_table`, `engagement_overlap_table`, `null_window_table`, `fold_spread_table`, `sigma_sensitivity_table`, `estimator_provenance_table`, `rerun_sections`, `build_report`, `geometry_section`, `build_estimator_report`, `main`
 
 ### `scripts/pfc/compare_pfc_event_set_bundles.py`
 
@@ -924,7 +924,7 @@ Fit the recommended descriptive mPFC marked-kernel model family.
 
 ### `scripts/pfc/run_pfc_stop_context.py`
 
-Stop-level context of the mPFC replay response, pooled across sessions (Q8).
+Stop-level context of the mPFC replay response, pooled across sessions (Part 4).
 
 `default_output_dir`, `bundle_path`, `pfc_left_out`, `selected_sessions`, `current_table_hashes`, `cached_is_current`, `assemble`, `unit_table`, `select_units`, `fit`, `get_command_line_arguments`, `main`
 
@@ -932,7 +932,7 @@ Stop-level context of the mPFC replay response, pooled across sessions (Q8).
 
 Population summary of the mPFC marked-model family bundles.
 
-`MixedContractError`, `load_bundles`, `mark_correlations`, `usable_delta`, `animal_balanced_fraction_positive`, `population_curve_summary`, `animal_balanced_curve`, `null_band_summary`, `summary_table`, `joint_versus_marginal`, `plot_model`, `build_report`, `main`
+`MixedContractError`, `load_bundles`, `summary_table`, `joint_versus_marginal`, `plot_model`, `build_report`, `main`
 
 ### `scripts/qa/_memoryless_reference.py`
 
