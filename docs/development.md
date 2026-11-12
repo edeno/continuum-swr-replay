@@ -439,7 +439,8 @@ Each builder's statistics:
 
 - events: `analysis/hippocampus/event_statistics.py`, `analysis/inventory_comparison/nonlocal_comparison.py`;
 - mpfc: `analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`;
-- detection: `analysis/hippocampus/memoryless_sequence/sweep_statistics.py` and `event_table.py`;
+- detection: `analysis/hippocampus/memoryless_sequence/sweep_statistics.py`, `recording_statistics.py`
+  and `event_table.py`;
 - behavior: `analysis/replay/coefficient_statistics.py` (a per-session fit summarized over sessions and
   animals; the other modules build on it), `rate_fit_statistics.py`, `stop_statistics.py`,
   `content_statistics.py`, `history_kernel_statistics.py`, and the stay/leave summaries in `learning.py`.

@@ -232,7 +232,9 @@ them importable.
 - `generate_memoryless_comparison.py` — supplemental figure: the ported Widloski & Foster
   sliding-window detector against the state-space detector on the Figure 1 simulation, with
   the sweep summary below; every verdict in its titles and caption is read from the data,
-  and the sweeps' panels and checks read `memoryless_sequence/sweep_statistics.py`, the
+  the labeled recording's verdicts and numbers from `memoryless_sequence/recording_statistics.py`
+  (written to `docs/design/replay_detection_comparison/memoryless_comparison_recording.json`)
+  and the sweeps' panels and checks from `memoryless_sequence/sweep_statistics.py`, the
   functions the detection summary reports from → `paper/figures/memoryless_comparison/`.
 - `generate_inventory_examples.py` — seeded draws from each cell of one inventory comparison run
   (`--run-id`), each event on one time axis: spikes, the state-space posterior, the Widloski window

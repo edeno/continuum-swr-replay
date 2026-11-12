@@ -54,11 +54,6 @@ Work that is deferred on purpose. Each item says when it should be done.
   `scripts/pfc/` reports take a statistic whole from them or compute their own.
   These still hold their own copy; make each call the function, comparing its
   output before and after on the cluster:
-  - detection: `scripts/figures/generate_memoryless_comparison.py` still computes the
-    labeled recording's numbers (`recording_numbers`: the duration ratio, the local
-    fraction, the best dispersion, the bound error, the draws from passing), which the
-    detection summary reads from the JSON it writes. Its sweep, controls and held-out
-    numbers are `memoryless_sequence/sweep_statistics.py`'s.
   - behavior: `scripts/rate/plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`,
     `plot_model_checking.py` and `fit_per_bin_rate_models.py` (the arrival-window
     shares), against `analysis/replay/coefficient_statistics.py`,

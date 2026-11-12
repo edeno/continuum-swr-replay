@@ -4,10 +4,10 @@ detector against the Widloski & Foster detector on simulated replays.
 Every value is read from an output an analysis already wrote; nothing is
 refitted or re-decoded here. This module names and describes the values. A
 statistic an input already holds is copied from it; the statistics of the sweeps'
-summaries and of the pilot's events are computed in
-``analysis.hippocampus.memoryless_sequence`` (``sweep_statistics`` and
-``event_table``); here only the size of an input (its epochs, its animals) is
-counted. The inputs (:class:`DetectionInputs`):
+summaries, of the labeled recording and of the pilot's events are computed in
+``analysis.hippocampus.memoryless_sequence`` (``sweep_statistics``,
+``recording_statistics`` and ``event_table``); here only the size of an input
+(its epochs, its animals) is counted. The inputs (:class:`DetectionInputs`):
 
 - the held-out tetrode test per decoder state
   (``Processed-Data/_refresh_20261016/state_evidence``, from
@@ -18,8 +18,9 @@ counted. The inputs (:class:`DetectionInputs`):
   from ``scripts/detection/sweep_memoryless_{detection,controls,heldout}.py``),
   for the memoryless-comparison caption's panels (g-q);
 - the one labeled recording of that caption's panels (a-f)
-  (``docs/design/replay_detection_comparison/memoryless_comparison_recording.json``,
-  written by ``scripts/figures/generate_memoryless_comparison.py``);
+  (``docs/design/replay_detection_comparison/memoryless_comparison_recording.json``:
+  ``memoryless_sequence.recording_statistics.recording_numbers``, written by
+  ``scripts/figures/generate_memoryless_comparison.py``);
 - the sliding-window detector's first real-data pilot epoch (a
   ``replay_detection_comparison/memoryless`` run, from
   ``scripts/detection/run_memoryless_detection.py``), for the caption's
@@ -294,7 +295,8 @@ def pilot_stray_window_values(
 
 def recording_values(numbers: dict, source: str) -> list[Value]:
     """Panels (a-f): what each detector made of the labeled events of one
-    simulated recording, as the figure script computed them."""
+    simulated recording (``recording_statistics.recording_numbers``, which the
+    figure script writes)."""
     make = value_factory(recording_values, source, TAGS["memoryless"])
     if not numbers["outbound_draws_from_passing"] > 1:
         raise ValueError(

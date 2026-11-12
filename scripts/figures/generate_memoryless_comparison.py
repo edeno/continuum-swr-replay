@@ -18,7 +18,9 @@ The figure's caption is prose this script does not write, and no draft of it is
 kept in the repository. Its numbers are reported values
 (`continuum_swr_replay.reported.detection`): the sweep's from the sweeps' CSVs, the
 labeled recording's (a-f) from the JSON this script writes
-(:data:`RECORDING_NUMBERS_PATH`). Where the prose commits to a verdict
+(:data:`RECORDING_NUMBERS_PATH`), which holds
+``memoryless_sequence.recording_statistics.recording_numbers``; the panels' titles
+and marks read the same module. Where the prose commits to a verdict
 -- an event missed, declined, found, passing or failing the significance test --
 the script checks it and stops rather than draw a figure the caption contradicts.
 
@@ -45,7 +47,6 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     sweep_statistics,
 )
@@ -64,13 +65,26 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_si
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.recording_statistics import (
+    ZOOMED_EVENTS,
+    accepted_overlapping,
+    best_dispersion_cm,
+    bound_error_ms,
+    decoded_center_cm,
+    duration_ratio,
+    is_reported,
+    local_fraction,
+    local_fraction_of_event,
+    outside_pieces,
+    recording_numbers,
+    shuffle_of,
+    state_space_intervals,
+    stray_window_dispersions,
+    verdict,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
-    NO_CENTER,
-    dispersion_cm,
 )
 from continuum_swr_replay.figure_utilities import (
     TWO_COLUMN,
@@ -98,8 +112,9 @@ CONTROLS_SUMMARY_PATH = Path(
 RECORDING_NUMBERS_PATH = Path(
     "docs/design/replay_detection_comparison/memoryless_comparison_recording.json"
 )
-"""The numbers the caption states about the one labeled recording (a-f),
-which this script computes; Part 1's reported values read them."""
+"""The numbers the caption states about the one labeled recording (a-f)
+(``recording_statistics.recording_numbers``), which this script writes; Part 1's
+reported values read them."""
 
 HELDOUT_SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/detection_heldout_summary.csv"
@@ -167,145 +182,12 @@ EVENT_LABELS = [
 """Labels for the simulation's events. A star marks one added here; the rest
 come with the package's simulation."""
 
-NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
-NON_LOCAL_MINIMUM_DURATION_S = 0.015
-"""The project's non-local event threshold and nominal minimum, applied with a
-timestamp-span test (:func:`state_space_intervals`): non-local probability
-above 0.8 over a first-to-last span of at least 15 ms, i.e. 9 samples on this
-script's 2 ms grid. ``get_confident_times`` counts samples instead (7 on the
-real decode grid; ``docs/known_issues/nonlocal_minimum_duration_rounding.md``).
-The span test is kept so the published comparison does not change.
-
-The state-space model is otherwise left on the library's defaults. Figure 1
-sets a discrete transition stickiness, but stickiness is a Dirichlet
-concentration read only by the EM M-step, and this comparison calls `fit`
-rather than `estimate_parameters`, so passing one would change nothing here
-and would read as tuning.
-"""
-
 BLACK, ORANGE, SKY, GREEN, YELLOW, BLUE, VERMILION, PURPLE = WONG[:8]
 
 SLIDING = "sliding-window detector"
 STATE_SPACE = "state-space detector"
 """One name each, used in both figures. Neither says "our": a figure should
 name a method, not a side."""
-
-
-def state_space_intervals(decoded: dict) -> list[tuple[float, float]]:
-    """When the switching state-space model calls the representation non-local.
-
-    The comparison needs this. Every event the sliding-window detector misses
-    has to be an event some detector can find, or the figure shows the limits
-    of the data rather than the limits of the method.
-
-    Reads the detector fitted in :func:`simulate_and_decode`, which is also the
-    one whose place fields the sliding-window likelihood was given, so the two
-    procedures differ in how they use the encoding model and not in what it is.
-    """
-    time = decoded["time"]
-    results = decoded["detector"].predict(
-        position_time=time,
-        position=decoded["position"],
-        spike_times=decoded["spike_times"],
-        time=time,
-    )
-    probability = np.asarray(
-        results.acausal_state_probabilities.sel(
-            states=["Non-Local Continuous", "Non-Local Fragmented"]
-        )
-        .sum("states")
-        .values
-    ).squeeze()
-    if not np.isfinite(probability).all() or probability.max() <= 0.0:
-        raise RuntimeError(
-            "The state-space model returned no probability mass; its state "
-            "probabilities must sum to one at every time."
-        )
-
-    above = probability > NON_LOCAL_PROB_THRESHOLD
-    edges = np.diff(above.astype(np.int8), prepend=0, append=0)
-    return [
-        (time[start], time[stop])
-        for start, stop in zip(
-            np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1, strict=True
-        )
-        if time[stop] - time[start] >= NON_LOCAL_MINIMUM_DURATION_S
-    ]
-
-
-def candidates_overlapping(decoded: dict, event: int) -> list[int]:
-    """Every candidate sequence that overlaps a labeled event, accepted or not."""
-    candidates = decoded["candidates"]
-    event_start, event_end = decoded["event_times"][event]
-    return [
-        i
-        for i, (start, stop) in enumerate(candidates.runs)
-        if decoded["midpoint_s"][start] < event_end
-        and event_start < decoded["midpoint_s"][stop]
-    ]
-
-
-def accepted_overlapping(decoded: dict, event: int) -> list[int]:
-    """The subset that met the duration and dispersion criteria."""
-    is_replay = decoded["candidates"].is_replay
-    return [i for i in candidates_overlapping(decoded, event) if is_replay[i]]
-
-
-def is_reported(decoded: dict) -> np.ndarray:
-    """Per candidate: replay under the whole published definition."""
-    reported = np.zeros(len(decoded["candidates"].runs), dtype=bool)
-    for i, result in decoded["shuffles"].items():
-        reported[i] = result.passes
-    return reported
-
-
-def reported_overlapping(decoded: dict, event: int) -> list[int]:
-    """The subset that also beat the place-cell identity shuffle: replay under
-    the whole published definition."""
-    return [
-        i for i in accepted_overlapping(decoded, event) if decoded["shuffles"][i].passes
-    ]
-
-
-def verdict(decoded: dict, event: int) -> str:
-    """What the sliding-window detector did with one labeled event.
-
-    ``found`` when a sequence overlapping it meets the whole published
-    definition; ``failed the shuffle`` when one met the duration and
-    dispersion criteria but not the significance test; ``declined`` when a
-    candidate was assembled but none was accepted; ``missed`` when no
-    candidate overlaps it at all. Read from the data, so a panel title cannot
-    drift away from the panel.
-    """
-    if reported_overlapping(decoded, event):
-        return "found"
-    if accepted_overlapping(decoded, event):
-        return "failed the shuffle"
-    if candidates_overlapping(decoded, event):
-        return "declined"
-    return "missed"
-
-
-def duration_ratio(decoded: dict, event: int) -> float:
-    """How much longer the detector calls an event than the event really is.
-
-    Over the longest accepted sequence overlapping it, whether or not it then
-    passes the shuffle, which never moves a sequence's bounds. Raises when
-    there is none, so a title cannot be formatted from a detection that did
-    not happen.
-    """
-    accepted = accepted_overlapping(decoded, event)
-    if not accepted:
-        raise RuntimeError(
-            f"No accepted sequence overlaps event {event} ({EVENT_LABELS[event]!r}); "
-            "the figure's titles and caption assume one. Re-read the data before "
-            "regenerating."
-        )
-    candidates = decoded["candidates"]
-    event_start, event_end = decoded["event_times"][event]
-    return float(
-        max(candidates.duration_s[i] for i in accepted) / (event_end - event_start)
-    )
 
 
 def outcome_title(decoded: dict, event: int, label: str) -> str:
@@ -316,102 +198,6 @@ def outcome_title(decoded: dict, event: int, label: str) -> str:
     if what == "failed the shuffle":
         return f"{label}: {duration_ratio(decoded, event):.1f}x long, fails shuffle"
     return f"{label}: {what}"
-
-
-def shuffle_of(decoded: dict, event: int):
-    """The shuffle result of the longest accepted sequence overlapping ``event``."""
-    accepted = accepted_overlapping(decoded, event)
-    longest = max(accepted, key=lambda i: decoded["candidates"].duration_s[i])
-    return decoded["shuffles"][longest]
-
-
-def draws_from_passing(result) -> int:
-    """How many more draws below the observed value than a pass allows.
-
-    As the reference tests it, a half passes when ``(1 + k) / (n + 1) <= 0.05``
-    with ``k`` the draws strictly below the observed value: at most 4 of 100.
-    Zero means the candidate passes; one means a single draw decided it.
-    """
-    allowed = int(np.floor(SIGNIFICANCE_LEVEL * (result.n_shuffles + 1) + 1e-9)) - 1
-    worst = max(
-        int(np.count_nonzero(result.null_spread_cm < result.observed_spread_cm)),
-        int(np.count_nonzero(result.null_jump_cm < result.observed_jump_cm)),
-    )
-    return max(0, worst - allowed)
-
-
-def decoded_center_cm(decoded: dict) -> np.ndarray:
-    """Center of each window, NaN where the window has none."""
-    center = decoded["candidates"].decisions.center_index
-    out = np.full(center.size, np.nan)
-    present = center >= 0
-    out[present] = decoded["place_bin_centers_cm"][center[present]]
-    return out
-
-
-def local_fraction_of_event(decoded: dict, event: int) -> float:
-    """Share of the accepted event overlapping ``event`` that is local coding.
-
-    Over the longest accepted sequence, the one :func:`duration_ratio` reads.
-    """
-    accepted = accepted_overlapping(decoded, event)
-    if not accepted:
-        raise RuntimeError(f"No accepted sequence overlaps event {event}.")
-    longest = max(accepted, key=lambda i: decoded["candidates"].duration_s[i])
-    return local_fraction(decoded, longest)
-
-
-def best_dispersion_cm(decoded: dict, event: int) -> float:
-    """The largest dispersion any candidate overlapping ``event`` reached."""
-    dispersion = decoded["candidates"].dispersion_cm
-    return max(
-        (float(dispersion[i]) for i in candidates_overlapping(decoded, event)),
-        default=float("nan"),
-    )
-
-
-def outside_pieces(decoded: dict, sequence: int) -> np.ndarray:
-    """Windows of a sequence that were kept but belong to none of its pieces.
-
-    A single kept window between two runs is dropped before the merge, as the
-    reference drops it, yet still counts toward the merged sequence's
-    dispersion. Returns window indices.
-    """
-    candidates = decoded["candidates"]
-    start, stop = candidates.runs[sequence]
-    in_piece = np.zeros(stop - start + 1, dtype=bool)
-    for piece in candidates.pieces[sequence]:
-        first, last = candidates.pre_merge_runs[piece]
-        in_piece[first - start : last - start + 1] = True
-    kept = candidates.decisions.gates.kept[start : stop + 1]
-    return start + np.flatnonzero(kept & ~in_piece)
-
-
-def stray_window_dispersions(decoded: dict) -> tuple[float, float, int]:
-    """The stray-window event's dispersion with and without the windows
-    outside its pieces, and the sequence they come from.
-
-    Over the longest accepted sequence overlapping it, the one the panel shows.
-    """
-    accepted = accepted_overlapping(decoded, STRAY_WINDOW_EVENT)
-    if not accepted:
-        raise RuntimeError(
-            "The caption says the stray-window event is called replay; no "
-            "accepted sequence overlaps it. Rewrite the caption."
-        )
-    candidates = decoded["candidates"]
-    sequence = max(accepted, key=lambda i: candidates.duration_s[i])
-    start, stop = candidates.runs[sequence]
-    center = candidates.decisions.center_index[start : stop + 1].copy()
-    center[np.isin(np.arange(start, stop + 1), outside_pieces(decoded, sequence))] = (
-        NO_CENTER
-    )
-    center[~candidates.decisions.gates.kept[start : stop + 1]] = NO_CENTER
-    return (
-        float(candidates.dispersion_cm[sequence]),
-        dispersion_cm(center, decoded["bin_distance_cm"]),
-        sequence,
-    )
 
 
 CAPTION_SETTINGS = {
@@ -484,12 +270,6 @@ def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> Non
                 "little dispersion, but a candidate overlapping it clears the "
                 "threshold. Rewrite the caption."
             )
-    zoomed = (
-        CONTINUOUS_OUTBOUND_EVENT,
-        SHORT_REPLAY_EVENT,
-        SHORT_PATH_EVENT,
-        REMOTE_STATIONARY_EVENT,
-    )
     full, pieces, sequence = stray_window_dispersions(decoded)
     stray_start = decoded["stray_window"].stray_window_start_s
     stray_index = int(
@@ -508,7 +288,7 @@ def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> Non
             f"windows {outside_pieces(decoded, sequence).tolist()} outside the "
             f"pieces against the placed one, {stray_index}. Rewrite the caption."
         )
-    if not np.isfinite(bound_error_ms(decoded, zoomed)):
+    if not np.isfinite(bound_error_ms(decoded, ZOOMED_EVENTS)):
         raise RuntimeError(
             "The caption says the state-space detector reports all four zoomed "
             "events; it does not. Rewrite the caption."
@@ -545,46 +325,6 @@ def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> Non
             "The caption says the state-space detector reports no non-local event "
             "over the stray-window event; it reports one. Rewrite the caption."
         )
-
-
-def local_fraction(decoded: dict, sequence: int, tolerance_cm: float = 15.0) -> float:
-    """Share of a sequence's kept windows whose center is the animal's own place.
-
-    Kept windows only, as the sweep scores them: a window inside a merged gap
-    was rejected and is not one of the event's decoded positions.
-    """
-    candidates = decoded["candidates"]
-    start, stop = candidates.runs[sequence]
-    center_cm = decoded_center_cm(decoded)[start : stop + 1]
-    animal_cm = np.interp(
-        decoded["midpoint_s"][start : stop + 1], decoded["time"], decoded["position"]
-    )
-    kept = candidates.assembly.kept[start : stop + 1]
-    return float(np.mean(np.abs(center_cm[kept] - animal_cm[kept]) < tolerance_cm))
-
-
-def bound_error_ms(decoded: dict, events: tuple[int, ...]) -> float:
-    """Largest error in either bound of the state-space model's reports.
-
-    The caption used to state a round number for this. It is read off the
-    data now, over exactly the events the figure shows.
-    """
-    worst = 0.0
-    for event in events:
-        start_s, end_s = decoded["event_times"][event]
-        overlapping = [
-            (a, b)
-            for a, b in decoded["state_space_intervals"]
-            if a < end_s and start_s < b
-        ]
-        if not overlapping:
-            return float("nan")
-        worst = max(
-            worst,
-            abs(overlapping[0][0] - start_s),
-            abs(overlapping[-1][1] - end_s),
-        )
-    return 1000 * worst
 
 
 def plot_overview(ax, decoded: dict) -> None:
@@ -1510,63 +1250,8 @@ def check_heldout_claims(heldout: pd.DataFrame) -> None:
                 )
 
 
-def recording_numbers(decoded: dict) -> dict[str, float | int]:
-    """The numbers the caption states about the one labeled recording (a-f).
-
-    The caption no longer interpolates them: they go to
-    :data:`RECORDING_NUMBERS_PATH`, ``continuum_swr_replay.reported.detection``
-    reads them into Part 1's summary, and the emitter writes them into the
-    caption's markers. Durations in ms, distances in cm, shares in [0, 1].
-    """
-    outbound = shuffle_of(decoded, CONTINUOUS_OUTBOUND_EVENT)
-    inbound = shuffle_of(decoded, CONTINUOUS_INBOUND_EVENT)
-    short = shuffle_of(decoded, SHORT_REPLAY_EVENT)
-    stray_full, stray_pieces, stray_sequence = stray_window_dispersions(decoded)
-    stray = decoded["shuffles"][stray_sequence]
-    zoomed = (
-        CONTINUOUS_OUTBOUND_EVENT,
-        SHORT_REPLAY_EVENT,
-        SHORT_PATH_EVENT,
-        REMOTE_STATIONARY_EVENT,
-    )
-    return {
-        "outbound_duration_ratio": duration_ratio(decoded, CONTINUOUS_OUTBOUND_EVENT),
-        "outbound_local_fraction": local_fraction_of_event(
-            decoded, CONTINUOUS_OUTBOUND_EVENT
-        ),
-        "outbound_p_spread": float(outbound.p_spread),
-        "outbound_p_jump": float(outbound.p_jump),
-        "outbound_draws_from_passing": draws_from_passing(outbound),
-        "inbound_p_spread": float(inbound.p_spread),
-        "inbound_p_jump": float(inbound.p_jump),
-        "short_replay_duration_ratio": duration_ratio(decoded, SHORT_REPLAY_EVENT),
-        "short_replay_local_fraction": local_fraction_of_event(
-            decoded, SHORT_REPLAY_EVENT
-        ),
-        "short_replay_p_spread": float(short.p_spread),
-        "short_replay_p_jump": float(short.p_jump),
-        "short_path_dispersion_cm": best_dispersion_cm(decoded, SHORT_PATH_EVENT),
-        "remote_stationary_dispersion_cm": best_dispersion_cm(
-            decoded, REMOTE_STATIONARY_EVENT
-        ),
-        "state_space_bound_error_ms": bound_error_ms(decoded, zoomed),
-        "stray_window_distance_cm": abs(
-            decoded["stray_window_remote_cm"] - decoded["stray_window_local_cm"]
-        ),
-        "stray_window_local_fraction": local_fraction_of_event(
-            decoded, STRAY_WINDOW_EVENT
-        ),
-        "stray_window_duration_ms": 1000
-        * float(decoded["candidates"].duration_s[stray_sequence]),
-        "stray_window_dispersion_cm": stray_full,
-        "stray_window_pieces_dispersion_cm": stray_pieces,
-        "stray_window_p_spread": float(stray.p_spread),
-        "stray_window_p_jump": float(stray.p_jump),
-    }
-
-
 def write_recording_numbers(numbers: dict, n_neurons: int, path: Path) -> None:
-    """Save :func:`recording_numbers` with the provenance the sweeps' CSVs carry."""
+    """Save ``recording_numbers`` with the provenance the sweeps' CSVs carry."""
     path.write_text(
         json.dumps(
             {
