@@ -233,7 +233,11 @@ them importable.
   and diagnostic figures from the supported content-analysis artifacts.
 - `generate_supp_*.py`, `generate_event_gallery.py`, `run_event_gallery.sh`.
 - `plot_swr_contrast_coefs.py` — per-animal coefficient forest plots for the is_swr
-  rate + content contrast ladders (standardized effect sizes, all sessions + animal 95% CI) → `paper/figures/swr_contrast/`.
+  rate + content contrast ladders (standardized effect sizes) → `paper/figures/swr_contrast/`.
+  Each row draws the sessions the per-term gate keeps (`contrast_aggregation.gate_term_sessions`,
+  the audited table's sessions; a term the gate refuses is drawn empty, "not reported"), each
+  animal's median, and the median over animals with a 95% whisker: the 2.5th and 97.5th
+  percentiles of a bootstrap over the animals' medians (`coefficient_statistics.animal_median_bootstrap`).
 - `generate_memoryless_comparison.py` — supplemental figure: the ported Widloski & Foster
   sliding-window detector against the state-space detector on the Figure 1 simulation, with
   the sweep summary below; every verdict in its titles and caption is read from the data,
