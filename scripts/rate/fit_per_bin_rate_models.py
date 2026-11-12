@@ -141,6 +141,9 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
     _design_columns,
 )
+from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
+    arrival_window_statistics,
+)
 from continuum_swr_replay.paths import (  # noqa: E402
     model_dir,
     replay_content_dir,
@@ -435,26 +438,25 @@ def fit_per_bin_rate_models(
             {f"{m}/{o}": c for (m, o), c in sorted(cv_none_counts.items())},
         )
     for outcome, counts in arrival_cohort.items():
-        if not counts["n_bins_frozen"]:
+        # a population without event bins (a smoke run) has no window shares
+        if not counts["n_event_bins_frozen"]:
             continue
-        kept = counts["n_bins_frozen"] + counts["n_bins_dropped_arrival_clock"]
+        window = arrival_window_statistics(counts)
         logger.info(
             "  %s: the arrival clock cost the common cohort %d/%d bins (%.2f%%) "
             "and %d stops; its window then kept %d/%d bins (%.1f%%) and "
             "%d/%d event bins (%.1f%%)",
             outcome,
             counts["n_bins_dropped_arrival_clock"],
-            kept,
-            100.0 * counts["n_bins_dropped_arrival_clock"] / kept,
+            window["n_bins_before"],
+            100.0 * window["dropped_bin_fraction"],
             counts["n_stops_dropped_arrival_clock"],
             counts["n_bins_arrival_window"],
             counts["n_bins_frozen"],
-            100.0 * counts["n_bins_arrival_window"] / counts["n_bins_frozen"],
+            100.0 * window["bin_share"],
             counts["n_event_bins_arrival_window"],
             counts["n_event_bins_frozen"],
-            100.0
-            * counts["n_event_bins_arrival_window"]
-            / max(counts["n_event_bins_frozen"], 1),
+            100.0 * window["event_share"],
         )
     result = pd.DataFrame(rows)
     # Workers finish in any order, so the rows are sorted by their full key
