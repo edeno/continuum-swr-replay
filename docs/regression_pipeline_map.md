@@ -434,7 +434,7 @@ Per-session model fitting for the replay content model hierarchy.
 
 The (stop x bin) point-process design and the bases it is built on.
 
-`attach_is_swr_to_onsets`, `raised_cosine_history_basis`, `reward_basis_from_lags`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `reward_kernel_rate_ratios`, `self_history_rate_ratios`, `arrival_spanning_stop_ids`, `aggregate_to_timebins`
+`attach_is_swr_to_onsets`, `raised_cosine_history_basis`, `reward_basis_from_lags`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `arrival_spanning_stop_ids`, `aggregate_to_timebins`
 
 ### `src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py`
 
@@ -1152,10 +1152,10 @@ Summary statistics of the event-history kernels of the duration-aware rate fits.
 
 Summary statistics of the per-bin event-rate ladder's fits.
 
-`frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `reward_gated_fits`, `lag_one_reward_kernels`, `reward_kernel_statistics`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
+`frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `paired_coefficient_statistics`, `reward_gated_fits`, `reward_kernel_by_lag`, `reward_kernel_animal_medians`, `self_history_kernel_by_lag`, `lag_one_reward_kernels`, `reward_kernel_statistics`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
 
 ### `src/continuum_swr_replay/analysis/replay/stop_statistics.py`
 
 Summary statistics of the immobility stops and of where event onsets fall in them.
 
-`stop_cohort_counts`, `dwell_statistics`, `still_immobile_fraction`, `outcome_boundary_statistics`, `onset_time_statistics`, `reward_history_incomplete_statistics`
+`stop_cohort_counts`, `dwell_statistics`, `still_immobile_fraction`, `onset_rate_time_course`, `outcome_boundary_statistics`, `onset_time_statistics`, `reward_history_incomplete_statistics`

@@ -150,6 +150,8 @@ def _per_bin_fits() -> pd.DataFrame:
                     "aic": aic,
                     "cv_bits_per_event": aic / 100,
                     "ks_within_band": True,
+                    "ks_statistic": 0.1,
+                    "dispersion": 1.0,
                     "separated": model == "M5a_time_arrival"
                     and session < population["n_separated"],
                     "separated_terms": "",
