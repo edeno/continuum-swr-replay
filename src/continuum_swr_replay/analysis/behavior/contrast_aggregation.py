@@ -530,10 +530,12 @@ def session_se(fits: pd.DataFrame, term: str) -> tuple[pd.Series | None, str]:
     return chosen, source
 
 
-def typical_session_se(fits: pd.DataFrame, term: str) -> tuple[float, str]:
-    """Median of :func:`session_se`, and which SE that median is made of."""
-    se, source = session_se(fits, term)
-    return (np.nan if se is None else float(se.median())), source
+def typical_session_se(se: pd.Series | None) -> float:
+    """The median session SE: the median of :func:`session_se`'s per-session SE.
+
+    NaN when there is none (``se`` is None: the fits carry no standard error).
+    """
+    return np.nan if se is None else float(se.median())
 
 
 def pct_significant_sessions(
@@ -612,8 +614,8 @@ def gated_term_statistics(
     gate = gate_term_sessions(fits, term)
     kept = fits[gate.kept]
     coef = kept[f"coef_{term}"]
-    se, _ = session_se(kept, term)
-    session_se_median, se_source = typical_session_se(kept, term)
+    se, se_source = session_se(kept, term)
+    session_se_median = typical_session_se(se)
     return gate, {
         **session_median_statistics(coef, kept["animal"]),
         "signed_rank_p": signed_rank_p(coef),

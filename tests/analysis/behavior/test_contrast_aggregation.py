@@ -750,7 +750,7 @@ def test_dm_rows_report_the_model_se_they_actually_carry() -> None:
 
     assert source == "model"
     assert se.tolist() == [0.2] * 6
-    assert typical_session_se(rows, "log_phi_is_swr") == (0.2, "model")
+    assert typical_session_se(se) == 0.2
 
     aggregated = aggregate_contrast(rows, [("C0", "all", "log_phi_is_swr")], "arm")
     assert len(aggregated) == 1

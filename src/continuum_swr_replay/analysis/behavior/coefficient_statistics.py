@@ -31,6 +31,7 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     gate_term_sessions,
     gated_term_statistics,
     separated_for_term,
+    session_se,
     typical_session_se,
     unidentified_for_term,
 )
@@ -225,7 +226,9 @@ def coefficient_family_statistics(
             **coefficient_statistics(fits, column),
             "quartile_25": float(known.quantile(0.25)),
             "quartile_75": float(known.quantile(0.75)),
-            "bse_median": typical_session_se(fits.loc[known.index], term)[0],
+            "bse_median": typical_session_se(
+                session_se(fits.loc[known.index], term)[0]
+            ),
             "n_unidentified": int(unidentified_for_term(fits, term).sum()),
         }
     table = pd.DataFrame.from_dict(rows, orient="index").rename_axis("term")
