@@ -162,8 +162,8 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     run_epoch,
     window_midpoints_s,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
-    contiguous_runs,
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.epoch import (
+    observation_table,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
     canonical_swr_intervals,
@@ -329,39 +329,6 @@ def _one_value(frame: pd.DataFrame, column: str) -> Any:
             f"data_over_time holds {len(values)} values of {column!r}, not one."
         )
     return values[0]
-
-
-def observation_table(
-    time: np.ndarray,
-    swr_observed: np.ndarray,
-    config: MemorylessSequenceConfig,
-    missing_windows: np.ndarray,
-) -> pd.DataFrame:
-    """The stretches this epoch observed, independent of what it detected.
-
-    ``decoded_windows`` are the stretches of window midpoints the grid
-    supports, the final row, which no spike can reach, excluded, less the
-    windows holding a missing bin, each from its first to its last midpoint;
-    ``swr_labels`` are the stretches where SWR labels were observed.
-
-    Parameters
-    ----------
-    time : ndarray, shape (n_time,)
-        The decode grid.
-    swr_observed : ndarray, shape (n_stretches, 2)
-    config : MemorylessSequenceConfig
-    missing_windows : ndarray of bool, shape (n_windows,)
-        The windows holding a missing bin, which were not decoded.
-    """
-    midpoints = window_midpoints_s(time[:-1], config)
-    rows = [
-        ("decoded_windows", midpoints[first], midpoints[last])
-        for first, last in contiguous_runs(~np.asarray(missing_windows, dtype=bool))
-    ]
-    rows += [("swr_labels", start, end) for start, end in swr_observed]
-    return pd.DataFrame(rows, columns=["kind", "start_s", "end_s"]).astype(
-        {"kind": object, "start_s": np.float64, "end_s": np.float64}
-    )
 
 
 def run_one(

@@ -24,6 +24,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
     CandidateSequences,
+    contiguous_runs,
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
@@ -49,7 +50,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
     windows_holding,
 )
 
-__all__ = ["EpochDetection", "run_epoch"]
+__all__ = ["EpochDetection", "observation_table", "run_epoch"]
 
 
 @dataclass(frozen=True, eq=False)
@@ -244,4 +245,37 @@ def run_epoch(
         candidates=candidates,
         table=table,
         shuffle_draws=build_shuffle_draw_table(table, shuffle_results or {}),
+    )
+
+
+def observation_table(
+    time: np.ndarray,
+    swr_observed: np.ndarray,
+    config: MemorylessSequenceConfig,
+    missing_windows: np.ndarray,
+) -> pd.DataFrame:
+    """The stretches this epoch observed, independent of what it detected.
+
+    ``decoded_windows`` are the stretches of window midpoints the grid
+    supports, the final row, which no spike can reach, excluded, less the
+    windows holding a missing bin, each from its first to its last midpoint;
+    ``swr_labels`` are the stretches where SWR labels were observed.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode grid.
+    swr_observed : ndarray, shape (n_stretches, 2)
+    config : MemorylessSequenceConfig
+    missing_windows : ndarray of bool, shape (n_windows,)
+        The windows holding a missing bin, which were not decoded.
+    """
+    midpoints = window_midpoints_s(time[:-1], config)
+    rows = [
+        ("decoded_windows", midpoints[first], midpoints[last])
+        for first, last in contiguous_runs(~np.asarray(missing_windows, dtype=bool))
+    ]
+    rows += [("swr_labels", start, end) for start, end in swr_observed]
+    return pd.DataFrame(rows, columns=["kind", "start_s", "end_s"]).astype(
+        {"kind": object, "start_s": np.float64, "end_s": np.float64}
     )
