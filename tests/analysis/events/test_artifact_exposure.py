@@ -498,6 +498,7 @@ def test_every_rate_fit_drops_the_excluded_bins():
         rate / "plot_model_checking.py",
         # the per-session fits the runners call
         package / "behavior" / "rate" / "per_bin_rate_ladder.py",
+        package / "behavior" / "rate" / "swr_contrast_rate.py",
     ]
     for path in sorted(runners):
         tree = ast.parse(path.read_text())

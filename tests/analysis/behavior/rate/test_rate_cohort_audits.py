@@ -90,7 +90,9 @@ def test_per_bin_records_attribute_own_drops():
 
 
 def test_contrast_records_attribute_qvals_and_own():
-    from scripts.behavior.rate import fit_swr_contrast_rate as mod
+    from continuum_swr_replay.analysis.behavior.rate import (
+        swr_contrast_rate as mod,
+    )
 
     stop = _stop_table()
     # Post-join stop table carries the beta value scalars (non-NaN after the inner join).
@@ -112,7 +114,7 @@ def test_contrast_records_attribute_qvals_and_own():
             for a, d in [("a", 1), ("b", 2)]
         ]
     )
-    recs = mod._cohort_records(models, stop, n_qvals_dropped=7)
+    recs = mod.contrast_cohort_records(models, stop, n_qvals_dropped=7)
     assert all(_reconciles(r) for r in recs)
 
     by = {(r["model"], r["population"], r["cohort_mode"]): r for r in recs}
@@ -238,7 +240,9 @@ def test_contrast_ladder_rungs_share_one_cohort():
     """
     from threadpoolctl import threadpool_limits
 
-    from scripts.behavior.rate import fit_swr_contrast_rate as mod
+    from continuum_swr_replay.analysis.behavior.rate import (
+        swr_contrast_rate as mod,
+    )
 
     rng = np.random.default_rng(0)
     stop_rows, onset_rows = [], []
@@ -280,7 +284,7 @@ def test_contrast_ladder_rungs_share_one_cohort():
     )
     with threadpool_limits(limits=1), pytest.MonkeyPatch.context() as patch:
         patch.setattr(mod, "aggregate_to_timebins", design)
-        _, rows, skips, drops = mod._fit_one_session(
+        _, rows, skips, drops = mod.fit_contrast_session(
             ("a", 1, "02_r1"), stop, with_event_ends(pd.DataFrame(onset_rows))
         )
     fits = pd.DataFrame(rows)
@@ -302,7 +306,7 @@ def test_contrast_ladder_rungs_share_one_cohort():
             == 2 * cell.loc[cell.population == "non_local_swr", "n_bins"].iloc[0]
         )
 
-    records = mod._cohort_records(fits, stop, 7, drops)
+    records = mod.contrast_cohort_records(fits, stop, 7, drops)
     assert all(_reconciles(r) for r in records)
     by = {(r["model"], r["population"], r["cohort_mode"]): r for r in records}
     g0 = by[("G0_base", "all", "common")]
