@@ -144,8 +144,10 @@ def get_epoch_info() -> pd.DataFrame:
     pd.DataFrame
         Epoch information with columns:
         - animal, date, epoch, epoch_tag
-        - exposure (session number for that animal)
         - start_time, end_time
+
+        in (animal, date, epoch) order. An animal's first-exposure epoch is
+        the epoch register's to say (``epoch_register.first_exposure_epochs``).
 
     Notes
     -----
@@ -194,15 +196,7 @@ def get_epoch_info() -> pd.DataFrame:
     epoch_info["epoch"] = np.asarray(epoch, dtype=int)
     epoch_info["epoch_tag"] = epoch_tag
 
-    def _count_exposure(df: pd.DataFrame) -> pd.DataFrame:
-        df["exposure"] = np.arange(len(df)) + 1
-        return df
-
-    epoch_info = (
-        epoch_info.sort_values(["animal", "date", "epoch"])
-        .groupby("animal", group_keys=False)
-        .apply(_count_exposure)
-    )
+    epoch_info = epoch_info.sort_values(["animal", "date", "epoch"])
 
     interval_times = np.stack(
         (
