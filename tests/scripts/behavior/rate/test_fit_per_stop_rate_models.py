@@ -12,6 +12,7 @@ import importlib.util
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -199,3 +200,29 @@ def test_a_fit_without_a_true_convergence_flag_counts_as_not_converged(
 
     assert len(records) == len(fpsr.MODEL_PER_STOP_RATE) * len(fpsr.RESPONSE_COLS)
     assert {r["n_sessions_flagged_nonconverged"] for r in records} == {n_flagged}
+
+
+@pytest.mark.parametrize(
+    ("separated", "n_flagged"),
+    [(True, 1), (False, 0), (None, 0), (np.nan, 0), ("absent", 0)],
+)
+def test_a_fit_counts_as_separated_only_when_its_flag_is_true(
+    monkeypatch, separated, n_flagged
+):
+    """The cohort audit counts a fit as separated only when its flag is True:
+    a flag that is missing, None or NaN is not separated."""
+
+    def _fit(cohort, predictors, *, response_col):
+        fit = {"n_stops": len(cohort), "converged": True, "separated": separated}
+        if separated == "absent":
+            del fit["separated"]
+        return fit
+
+    monkeypatch.setattr(fpsr, "fit_per_stop_rate_model", _fit)
+
+    _rows, records = fpsr.fit_per_stop_rate_hierarchy(
+        _cohort_stop_table(), run_cv=False
+    )
+
+    assert len(records) == len(fpsr.MODEL_PER_STOP_RATE) * len(fpsr.RESPONSE_COLS)
+    assert {r["n_sessions_flagged_separated"] for r in records} == {n_flagged}

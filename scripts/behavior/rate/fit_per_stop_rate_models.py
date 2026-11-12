@@ -60,6 +60,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior._fit_diagnostics import fit_flag_counts
 from continuum_swr_replay.analysis.behavior.cohort_audit import (
     cohort_record,
     write_cohort_audit,
@@ -192,8 +193,7 @@ def fit_per_stop_rate_hierarchy(
                         "sessions_in": 0,
                         "sessions_modeled": 0,
                         "animals": set(),
-                        "n_nonconv": 0,
-                        "n_sep": 0,
+                        "flags": [],
                     },
                 )
                 a["sessions_in"] += 1
@@ -208,8 +208,12 @@ def fit_per_stop_rate_hierarchy(
                 a["n_modeled"] += int(res["n_stops"])
                 a["sessions_modeled"] += 1
                 a["animals"].add(keys[0])
-                a["n_nonconv"] += res.get("converged") is not True
-                a["n_sep"] += bool(res.get("separated"))
+                a["flags"].append(
+                    {
+                        "converged": res.get("converged"),
+                        "separated": res.get("separated"),
+                    }
+                )
                 row = {
                     "outcome": outcome,
                     "model": name,
@@ -245,8 +249,9 @@ def fit_per_stop_rate_hierarchy(
             n_excluded_session=(
                 a["n_in"] - a["n_own"] - a["n_common"] - a["n_modeled"]
             ),
-            n_sessions_flagged_nonconverged=a["n_nonconv"],
-            n_sessions_flagged_separated=a["n_sep"],
+            **fit_flag_counts(
+                pd.DataFrame(a["flags"], columns=["converged", "separated"])
+            ),
         )
         for (name, outcome), a in acc.items()
     ]
