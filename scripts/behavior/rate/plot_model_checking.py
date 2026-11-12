@@ -64,6 +64,9 @@ from continuum_swr_replay.analysis.behavior.rate.rate_fit_statistics import (  #
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     require_swr_source,
 )
+from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
+    select_stop_cohort,
+)
 from continuum_swr_replay.paths import (
     figure_dir,
     model_dir,
@@ -254,14 +257,23 @@ def plot_gof_ladder(df: pd.DataFrame) -> None:
 
 
 def _refit_session(
-    stop: pd.DataFrame, onsets: pd.DataFrame, keys: tuple, outcome: str
+    stop: pd.DataFrame,
+    onsets: pd.DataFrame,
+    keys: tuple,
+    outcome: str,
+    stop_cohort: str,
 ) -> tuple[pd.DataFrame, dict | None]:
     """Rebuild one session's design and full-model fit for the diagnostic plots.
+
+    The fit is the published one: the stops of the fit's ``stop_cohort``
+    (``select_stop_cohort``), and the cohort frozen over the whole ladder's
+    columns, as ``fit_per_bin_rate_models.py`` freezes it.
 
     Carries ``stop_start`` as an extra covariate (ignored by the fit) so the
     drift panel can order bins by true within-session time -- ``stop_id`` is a
     hash, not a temporal key.
     """
+    stop, _ = select_stop_cohort(stop, cohort=stop_cohort)
     mask = pd.Series(True, index=stop.index)
     for c, v in zip(SC, keys, strict=True):
         mask &= stop[c] == v
@@ -286,10 +298,9 @@ def _refit_session(
         at_risk_events=at_risk_events(onsets[om], outcome),
         offset_history=True,
     )
-    # Freeze the cohort before fitting (the fitter refuses an incomplete
-    # design). This design is built for one rung, not the whole ladder, so the
-    # freeze covers that rung's columns only.
-    design, _ = freeze_per_bin_cohort(design, [MODEL_PER_BIN_RATE[FULL]])
+    # ONE cohort for the whole ladder, as the runner freezes it: a stop missing
+    # another rung's column (the arrival clock) is not in the published fit.
+    design, _ = freeze_per_bin_cohort(design, MODEL_PER_BIN_RATE.values())
     fit = fit_per_bin_rate_model(design, MODEL_PER_BIN_RATE[FULL])
     return design, fit
 
@@ -484,8 +495,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     sparse_keys = tuple(ordered.iloc[sparse_pos][SC])
     if sparse_keys != examples["rich"]:
         examples["sparse"] = sparse_keys
+    (stop_cohort,) = df["stop_cohort"].unique()
     for tag, keys in examples.items():
-        design, fit = _refit_session(stop, onsets, keys, "non_local")
+        design, fit = _refit_session(stop, onsets, keys, "non_local", stop_cohort)
         if fit is None:
             print(f"  ({tag} example {keys} did not fit; skipped)")
             continue

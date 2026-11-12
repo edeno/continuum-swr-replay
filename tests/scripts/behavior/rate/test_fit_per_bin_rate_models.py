@@ -331,6 +331,44 @@ def test_cohort_audit_attributes_the_missing_arrival_clock(
             assert record["n_drop_common_cohort_other"] == 4, name
 
 
+def test_the_model_checking_refit_is_the_published_fit(
+    without_outcome_shift, monkeypatch
+):
+    """plot_model_checking's example refit uses the runner's cohort: the fit's
+    stop cohort, frozen over the whole ladder (a stop with no arrival clock is
+    not in the published fit), so it reproduces the published fit."""
+    import importlib
+
+    checking = importlib.import_module("scripts.behavior.rate.plot_model_checking")
+    monkeypatch.setattr(
+        checking,
+        "aggregate_to_timebins",
+        functools.partial(checking.aggregate_to_timebins, outcome_shift=False),
+    )
+    stop, onsets = _toy_tables(n_stops_without_arrival=2)
+    stop["occupancy_state"] = "at_well"
+    stop.loc[stop["stop_id"].isin([5, 6]), "occupancy_state"] = "in_transit"
+    at_well = stop[stop["occupancy_state"].eq("at_well")]
+    keys = ("a", 1, "02_r1")
+
+    with threadpool_limits(limits=1):
+        design, fit = checking._refit_session(
+            stop, onsets, keys, "non_local", "at_well"
+        )
+        published = fprm.fit_per_bin_rate_models(
+            at_well, onsets, run_cv=False, run_gof=False
+        )
+
+    assert set(design["stop_id"]) == set(range(24)) - {0, 1, 5, 6}
+    (row,) = published[
+        published["model"].eq(checking.FULL)
+        & published["outcome"].eq("non_local")
+        & published["animal"].eq("a")
+    ].itertuples()
+    assert fit["n_events"] == row.n_events
+    assert fit["llf"] == row.llf
+
+
 def _cohort_stop_table() -> pd.DataFrame:
     """Six stops of one session spanning the occupancy states."""
     return pd.DataFrame(
