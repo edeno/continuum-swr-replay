@@ -34,6 +34,7 @@ from continuum_swr_replay.analysis.pfc.fit import (
 from continuum_swr_replay.analysis.pfc.matched_control import make_matched_control_times
 from continuum_swr_replay.analysis.pfc.modulation import (
     NESTED_MODEL_PAIRS,
+    curve_peaks,
     get_frac_explained_deviance,
     get_frac_null_deviance,
     is_separated,
@@ -648,6 +649,24 @@ class TestPeakLogModulation:
                 lag_time,
                 half_window_s=-1.0,
             )
+
+
+class TestCurvePeaks:
+    def test_the_peak_is_the_curves_largest_excursion(self):
+        curves = np.zeros((5, 2))
+        curves[1, 0] = 2.0
+        curves[3, 1] = -3.0
+
+        np.testing.assert_array_equal(curve_peaks(curves), [2.0, -3.0])
+
+    def test_a_curve_that_is_not_estimable_has_no_peak(self):
+        curves = np.zeros((5, 2))
+        curves[2, 1] = np.nan
+
+        peaks = curve_peaks(curves)
+
+        assert peaks[0] == 0.0
+        assert np.isnan(peaks[1])
 
 
 class TestPeakModulationSe:

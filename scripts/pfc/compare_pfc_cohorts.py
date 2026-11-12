@@ -62,6 +62,7 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
+from continuum_swr_replay.analysis.pfc.modulation import curve_peaks
 from continuum_swr_replay.analysis.statistics import benjamini_hochberg
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import processed_data_dir
@@ -1214,27 +1215,6 @@ CURVE_NAMES = (
     "non_local_no_SWR",
     "matched_control",
 )
-
-
-def curve_peaks(curves: NDArray) -> NDArray:
-    """Peak log-modulation per unit: the curve's value where ``|curve|`` is largest.
-
-    Parameters
-    ----------
-    curves : NDArray, shape (n_report_lags, n_units)
-
-    Returns
-    -------
-    NDArray, shape (n_units,)
-        ``nan`` for a unit whose curve is not finite.
-    """
-    curves = np.asarray(curves, dtype=float)
-    peaks = np.full(curves.shape[1], np.nan)
-    usable = np.isfinite(curves).all(axis=0)
-    if usable.any():
-        block = curves[:, usable]
-        peaks[usable] = block[np.abs(block).argmax(axis=0), np.arange(block.shape[1])]
-    return peaks
 
 
 def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:

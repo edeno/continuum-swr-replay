@@ -43,7 +43,6 @@ from scripts.pfc.compare_pfc_cohorts import (
     build_report,
     bundle_sessions,
     coverage_summary,
-    curve_peaks,
     empirical_bayes_sigma,
     engagement_overlap_table,
     estimator_provenance_table,
@@ -1257,22 +1256,6 @@ def estimator_trees(tmp_path):
 
 
 class TestPeakShrinkage:
-    def test_the_peak_is_the_curves_largest_excursion(self):
-        curves = np.zeros((5, 2))
-        curves[1, 0] = 2.0
-        curves[3, 1] = -3.0
-
-        np.testing.assert_array_equal(curve_peaks(curves), [2.0, -3.0])
-
-    def test_a_curve_that_is_not_estimable_has_no_peak(self):
-        curves = np.zeros((5, 2))
-        curves[2, 1] = np.nan
-
-        peaks = curve_peaks(curves)
-
-        assert peaks[0] == 0.0
-        assert np.isnan(peaks[1])
-
     def test_the_shrinkage_is_read_off_each_bundles_own_columns(self, estimator_trees):
         _, after = estimator_trees
         population, _, _ = __import__(

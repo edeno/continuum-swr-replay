@@ -146,6 +146,31 @@ def peak_log_modulation(
     return PeakModulation(value=value, lag=lag, index=index)
 
 
+def curve_peaks(curves: NDArray) -> NDArray:
+    """Peak log-modulation per unit: the curve's value where ``|curve|`` is largest.
+
+    The shipped curve is ``spline_basis @ params`` over the reported window, so
+    this is what :func:`peak_log_modulation` returns for the coefficients that
+    produced it -- read off the curve the bundle actually ships.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_report_lags, n_units)
+
+    Returns
+    -------
+    NDArray, shape (n_units,)
+        ``nan`` for a unit whose curve is not finite.
+    """
+    curves = np.asarray(curves, dtype=float)
+    peaks = np.full(curves.shape[1], np.nan)
+    usable = np.isfinite(curves).all(axis=0)
+    if usable.any():
+        block = curves[:, usable]
+        peaks[usable] = block[np.abs(block).argmax(axis=0), np.arange(block.shape[1])]
+    return peaks
+
+
 def peak_modulation_se(
     covariance: NDArray, spline_basis: NDArray, peak_index: NDArray
 ) -> NDArray:

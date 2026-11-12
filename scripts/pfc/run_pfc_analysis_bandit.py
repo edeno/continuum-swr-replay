@@ -126,6 +126,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (  # noqa: E402
     REPORT_HALF_WINDOW_S,
     THREE_CLASS_MODEL,
     curve_coefficients,
+    curve_peaks,
     is_separated,
     peak_log_modulation,
     peak_modulation_se,
@@ -832,31 +833,6 @@ def extended_curves(
         _, block = curve_coefficients(name, n_basis, EXTENDED_CURVE_SOURCES)
         curves[name] = basis[report] @ params[:, block].T
     return curves
-
-
-def curve_peaks(curves: NDArray) -> NDArray:
-    """Peak log-modulation per unit: the curve's value where ``|curve|`` is largest.
-
-    The shipped curve is ``spline_basis @ params`` over the reported window, so
-    this is what a coefficient-level peak helper returns for the coefficients
-    that produced it -- read off the curve the bundle actually ships.
-
-    Parameters
-    ----------
-    curves : NDArray, shape (n_report_lags, n_units)
-
-    Returns
-    -------
-    NDArray, shape (n_units,)
-        ``nan`` for a unit whose curve is not finite.
-    """
-    curves = np.asarray(curves, dtype=float)
-    peaks = np.full(curves.shape[1], np.nan)
-    usable = np.isfinite(curves).all(axis=0)
-    if usable.any():
-        block = curves[:, usable]
-        peaks[usable] = block[np.abs(block).argmax(axis=0), np.arange(block.shape[1])]
-    return peaks
 
 
 def events_per_fold(context: dict[str, object], folds: NDArray) -> dict[str, list[int]]:
