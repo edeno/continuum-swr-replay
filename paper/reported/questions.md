@@ -15,11 +15,11 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `0fe0fadd443c` | yes | 32 | 0 |
-| `detection.json` | `0fe0fadd443c` | yes | 132 | 0 |
-| `events.json` | `0fe0fadd443c` | yes | 331 | 0 |
-| `behavior.json` | `0fe0fadd443c` | yes | 922 | 0 |
-| `mpfc.json` | `0fe0fadd443c` | yes | 604 | 0 |
+| `survey.json` | `cb5c16baa03a` | yes | 32 | 0 |
+| `detection.json` | `cb5c16baa03a` | yes | 132 | 0 |
+| `events.json` | `cb5c16baa03a` | yes | 331 | 0 |
+| `behavior.json` | `cb5c16baa03a` | yes | 922 | 0 |
+| `mpfc.json` | `cb5c16baa03a` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -225,7 +225,7 @@ Status: computed. Figures: 2, 2b. Values: 31.
 Sources:
 
 - Processed-Data/replay_content/event_table.parquet (canonical event table)
-- event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)
+- event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|

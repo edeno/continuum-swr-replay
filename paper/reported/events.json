@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "0fe0fadd443c",
+ "commit": "cb5c16baa03a",
  "code": {
-  "head": "0fe0fadd443cb462393fb816cf6a87ea3c3f98a9",
+  "head": "cb5c16baa03a97317b689ab84946f8bfbec6a1cc",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -79,8 +79,8 @@
     "code_sha256": "b176291217c441d363af87c9125922bea7ce9d9aac090708279b800405bd919a"
    },
    "src/continuum_swr_replay/analysis/hippocampus/event_statistics.py": {
-    "sha256": "12193493548f464a86c19cd8223b5f53efc84acd5f5af17268b76aeba244d225",
-    "code_sha256": "7b3ce9af742f1e4ddc6ce3f77716d5b08c72deb2cef74bf7406c3257b750852c"
+    "sha256": "4ffa84afc56ca50446ab4af0d99994180a148225b47e43309f66d481f892f7ed",
+    "code_sha256": "b806d30e9e5d3b9b8a71bd4c682138e5b96de86154f4c37782988e516ac2ca67"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/__init__.py": {
     "sha256": "be00f35a8fd3f9b5f8f01cffbb8b160bc1c4dcd8b1b3095c1ebf390cb8eb5146",
@@ -111,7 +111,7 @@
     "code_sha256": "b1b1c3f934d17a7c694b7b18ac7209f4ca782788ccfa0cc3735fed6aa85aacd8"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/sweep_statistics.py": {
-    "sha256": "770d5f102f9429ef8d2df5ccd4c315eb03a83b5656604f4ee5946f5241e53092",
+    "sha256": "85e92f208daf154268217895c3bbdc2dbe07c6a94ec661cfaef4d75a95874a95",
     "code_sha256": "98e379f7fa27902effde54b9ea189d5766d5344cfa33faef977443f98333f77a"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/window_statistics.py": {
@@ -127,7 +127,7 @@
     "code_sha256": "e9f0621674950782052037f7e14f41287d41de4ae3bf0b1413c63f211aa74f3f"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/__init__.py": {
-    "sha256": "78e6f85bcaabaa81a5939d33cfbf2945a989dfa8e26e6fbdf9867cd3be9fe902",
+    "sha256": "e68e469abea04db4ff0f35d4d3e2fe01f85fe186fffb89e6b936570f5a78554c",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/adapters.py": {
@@ -155,12 +155,16 @@
     "code_sha256": "08f662c154b3d0b293a1167fde834ea633106038b36f6420cf6e180a6edb6bd3"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/nonlocal_comparison.py": {
-    "sha256": "3533748e2d101fe7c91185152c003ab540b3d44d2486518b9978905972c81d9e",
-    "code_sha256": "0aa52ac3315d1ff87d074ae58ed3da724b0228f010c45e66570095e4fe8442f4"
+    "sha256": "524d9e602715b9f456416fdd61e7545c2dea60a88aa5e2e685c383306e89ffd0",
+    "code_sha256": "3afa3c314460c3f6f73aee7828c0deffdcff58e3948e2ea7f89de86cbefa61c3"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/overlap.py": {
     "sha256": "a0eeab4df008e1021e79a025ad27f3c8c3d91844ec59d1c69f568f1922afb39f",
     "code_sha256": "284adfb44f77efc4d73be65ba8c575fbfa9fc56bc5d23cf4c5ae63bda5844dab"
+   },
+   "src/continuum_swr_replay/analysis/inventory_comparison/pooling.py": {
+    "sha256": "c12cf71f40e7e9257738f17abfc27dfe8a3bc8b0d43a4e08ffc2aad7d7c397c0",
+    "code_sha256": "f4970e5dd69536fd74e76775e9462e42f19ec63bc5d497bd1a63d9db6bbcc6f3"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/recount.py": {
     "sha256": "fc0aa9792185dedb8c727ddda6ae9c952f03d051dd0cc2cfec980d43f8a5b431",
@@ -174,29 +178,33 @@
     "sha256": "6773cefbbd7c079ddcaa48f738068c9cf7fb8ab1bbaece8dde435037cd6d5b78",
     "code_sha256": "d1a3f3d6fccad518c38e97f521088cc7e82969619d48cc99f8e95f455fed5598"
    },
+   "src/continuum_swr_replay/analysis/shared_statistics.py": {
+    "sha256": "98c4c5e52d91cd42d56f847833ceb1d1c6644ce654bb62606f1391eb8730ac8b",
+    "code_sha256": "d87ca2c7db81e7a87a59c9cdb8af06ba80289acb64786df79dff0ea2379b8c7b"
+   },
    "src/continuum_swr_replay/data_loaders/__init__.py": {
     "sha256": "5cab95c4ae3bdc8ed0ae23bd91ca9bb9d1457b81b46d07f7371364d003198f50",
     "code_sha256": "c3b3d414ebf9ae3bf3b9ac658182312806f76afb2eaaf81f16f61338895323e9"
    },
    "src/continuum_swr_replay/data_loaders/constants.py": {
-    "sha256": "c21110fad5164d9869ea040e48913c3afe2f5debc7f52731d56f2b98a1270436",
+    "sha256": "4fac9f3ea30a5316d0f1547e55042541aa4a8e24322dc2bdd9a3e6e713ae097e",
     "code_sha256": "09c11436725a16c73cd9faf504a3ee37d71aa570917b5802e4d655865d2b295c"
    },
    "src/continuum_swr_replay/data_loaders/epoch_register.csv": {
-    "sha256": "dca699adef3bfa8cfc1aa4910cb84bf17d5a4197d7b3184ca3efcb2ba274d6f1",
-    "code_sha256": "dca699adef3bfa8cfc1aa4910cb84bf17d5a4197d7b3184ca3efcb2ba274d6f1"
+    "sha256": "ae56090ff70c84a8202d9a588a692c9818e1ec4bbe44a424e26832da4ff3c174",
+    "code_sha256": "ae56090ff70c84a8202d9a588a692c9818e1ec4bbe44a424e26832da4ff3c174"
    },
    "src/continuum_swr_replay/data_loaders/epoch_register.py": {
-    "sha256": "9edbf94d508423ef8bccc8780ea458b35df5d874b3075519703a8a312efdd5cc",
-    "code_sha256": "3fbdc1aaa24f78e2c8196a062589c6691f3d52419d3e976c0c7a5f4e27ba7dcd"
+    "sha256": "597327e7f51343d7559cab334ad8d01c8771e39fc82bc031245c25ed13e27db9",
+    "code_sha256": "cb06d737023792f37b127ea39a85bffff50c44cce96b949da2942142b6846157"
    },
    "src/continuum_swr_replay/data_loaders/spikes.py": {
     "sha256": "ddaeebc8b774802a821d06225852807e0343f02ce378992d949af07606e48775",
     "code_sha256": "986bd4f318dd67697d3171887a9c3f6941b1cc7906739187442a4bdfc850ba1b"
    },
    "src/continuum_swr_replay/data_loaders/utils.py": {
-    "sha256": "1f798ed63335fa32a63c491c8ddb4ed83350a330b30152a5b7bea65547fed35c",
-    "code_sha256": "818b503a3b74eaa381e35b614f36ef9b20683b2a8c2c67990ee9da0b65915897"
+    "sha256": "bf1bfcb41112287744d277c89721ae63a77f6bfaf8fa036d2a42654505eb276c",
+    "code_sha256": "d33bc1e67ec29dd1ed2be579d1dda0bf3ca254981e731e82456268969a6a1357"
    },
    "src/continuum_swr_replay/data_types.py": {
     "sha256": "b82e201d7c5c74970f5faae6a3322e573dc9ae1e828788ccb89046c120216f32",
@@ -235,11 +243,11 @@
     "code_sha256": "c7716a28226699b2539fd24eba997b4dc08d181903aee9b116e26434a06bd398"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "1a41ed7d8c634ea873e1a81bf624e8dea1a2bff74507ce3ee363bad244e7354e",
-    "code_sha256": "aa47352607ef7d66f1127c019055136d31a37ca583ec66e61e86e3ecf6f5c916"
+    "sha256": "1bc233f07cb770a1b9bce1c118d42641faff0c889205b514e3606d188424e85d",
+    "code_sha256": "b6c1b970b2f1e2998ec93fb24e64e0f530b5a549d1f149a30eddbcb8cfbc07b9"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "c4f9f2dd45c130a75fce821e2cd2e6eca2fc15fae7b1c1d15d14040ed47eae99",
+    "sha256": "ac38ca536c16eb9686c6868837e6144ccec635914f0f54369180778954409625",
     "code_sha256": "15e0000464a3e8ec2777f1defde055d09e7ca6dbae1f120cac0a60dec7dad166"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
@@ -329,12 +337,23 @@
    "sha256": "7045d747c109d3af1485cc0455f981c717e3c6e365b41bb5a14242e19cab5561"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/counts_by_animal.csv",
-   "sha256": "88d2e4bc011cc2ad5831084e646dac50e82b110f3a795999ac1837d22dc1f612"
+   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/manifest.json",
+   "sha256": "aeb729fde5b6d3c8dbd7c586a679fefb31d0b431b8ec2d42f9550c0b337fa6b9"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/cells_by_animal.csv",
-   "sha256": "343e537122112e3578b58ade3ca0f3df121dccfe6749ec06085a8b4649d0b0d3"
+   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/*_observations.parquet",
+   "n_files": 242,
+   "sha256": "8227eb344b7b821cb76142cbdb9b89c2550ea413040a7f6fdf84ba7d727d04d1"
+  },
+  {
+   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/*_counts.parquet",
+   "n_files": 242,
+   "sha256": "e350556746dc8a6bdd410e287a0131a15b0619f80fd1a4af92ecf66d2580c185"
+  },
+  {
+   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/*_cells.parquet",
+   "n_files": 242,
+   "sha256": "9dd3243e8c2e4b3247f1d06a89591b7aba5b8da47142599f66dc933ec2515dc2"
   },
   {
    "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_state_shares.parquet",
@@ -1933,7 +1952,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -2898,7 +2917,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -2914,12 +2933,12 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
   "nonlocal_events_outside_kay_per_hour": {
-   "value": 1068.1709758814895,
+   "value": 1068.1709759029147,
    "kind": "quantity",
    "style": "sig2",
    "unit": "per h",
@@ -2930,7 +2949,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -2946,7 +2965,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -2962,12 +2981,12 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
   "nonlocal_events_outside_trigger_per_hour": {
-   "value": 477.89475181365185,
+   "value": 477.8947518232373,
    "kind": "quantity",
    "style": "sig2",
    "unit": "per h",
@@ -2978,7 +2997,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -2994,7 +3013,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3010,12 +3029,12 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
   "nonlocal_events_outside_widloski_per_hour": {
-   "value": 1777.6660405375621,
+   "value": 1777.666040573218,
    "kind": "quantity",
    "style": "sig2",
    "unit": "per h",
@@ -3026,7 +3045,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3074,7 +3093,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3090,7 +3109,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3106,7 +3125,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3122,7 +3141,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3138,7 +3157,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3154,7 +3173,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3170,7 +3189,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3186,7 +3205,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3202,7 +3221,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3464,7 +3483,7 @@
    "pending": null
   },
   "rest_hours": {
-   "value": 40.220152925,
+   "value": 40.22015292419328,
    "kind": "quantity",
    "style": "sig2",
    "unit": "h",
@@ -3475,7 +3494,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
