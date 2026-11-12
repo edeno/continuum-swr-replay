@@ -214,9 +214,9 @@ them importable.
   (`qvals_table`) from the shared DataJoint RL-model and trial-timing schemas.
 - `run_retrospective_alignment.py` (was `pfc/run_stage5b_retrospective.py`, "Stage 5B") —
   does content during a stop match the arm visited next, against a visit-context shuffle
-  (Q4). `at_well` only, because its metrics need a current arm.
+  (Part 3, the events relate to behavior). `at_well` only, because its metrics need a current arm.
 - `run_stay_leave.py` (was `pfc/run_stage6_learning.py`, "Stage 6") — content × reward
-  outcome → stay or leave (Q4); `--stop-cohort all_stops` writes the `_allstops`
+  outcome → stay or leave (Part 3); `--stop-cohort all_stops` writes the `_allstops`
   sensitivity bundle. Output files keep their `stage5b_*` / `stage6_*` names.
 
 ## `figures/` — publication figures
@@ -254,7 +254,7 @@ them importable.
 ## `qa/` — parity, audits, checks and doc writers
 - `_report.py` — not a script: the run's command line (`_invocation`) and the markdown
   table (`_md`) that several QA and PFC reports share, imported as `scripts.qa._report`.
-- `run_refits.py` — reruns the CPU fits for Q2, Q3b and Q4 and the figures that read them,
+- `run_refits.py` — reruns the CPU fits for Part 3 (the events relate to behavior) and the figures that read them,
   in dependency order. Each run is pinned to its own CPUs from `--cpus` (default: all this
   process may use), and OMP/MKL/OpenBLAS/numba threads are capped per run. Runs are named
   `<question>.<analysis>[.<variant>]` (`rate.swr_contrast.at_well`); `--only
@@ -270,7 +270,7 @@ them importable.
   table builds beside them. The stop-only bootstrap refuses to replace a complete stop
   table, so use it on a data root without one. It does not run the artifact and SWR
   detection or the decodes (`--dry-run` lists them in order as prerequisites, and a
-  preflight checks they are on disk before a table run), the Q1 checks or the PFC unit
+  preflight checks they are on disk before a table run), the Part 1 and Part 2 checks or the PFC unit
   GLM.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`.
@@ -310,7 +310,7 @@ them importable.
   any saved `stage6_is_stay_logistic*.pkl`, using the runner's own statistic, so a
   before/after comparison across populations reads one implementation.
 
-## `pfc/` — PFC responses to the events (Q5) and their audits
+## `pfc/` — PFC responses to the events (Part 4, the events relate to mPFC) and their audits
 - `run_pfc_analysis_bandit.py` takes `--stop-cohort`: the well-anchored stop cohort the
   hippocampal rate and content ladders are read on is the default (`at_well`, canonical
   artifact names), and `all_stops` publishes an unrestricted sensitivity bundle under
@@ -391,7 +391,7 @@ them importable.
   `--summary-parquet` (default `<bundle-dir>/summary.parquet`, one row per
   model, tier, class, target and statistic).
 - `run_pfc_stop_context.py` — does the mPFC response to replay change with the
-  stop's context (Q8)? `assemble` builds, per session with a canonical mPFC
+  stop's context (Part 4)? `assemble` builds, per session with a canonical mPFC
   bundle, the unit × replay-event table (spikes in `[0, +200) ms` after onset,
   the stop's event-free fitted baseline, `is_rewarded_outcome`,
   `next_trip_switches_patch`, overlapping events) on the Figure 4 session
