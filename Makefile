@@ -3,11 +3,12 @@
 UV ?= uv
 RUN = $(UV) run --frozen
 SUMMARIES = survey detection events behavior mpfc
-# Extra arguments for release-check, for example ARGS=--code-only.
+# Extra arguments for release-check and refits, for example ARGS=--code-only or
+# ARGS=--dry-run.
 ARGS ?=
 
 .DEFAULT_GOAL := help
-.PHONY: help sync sync-dev format check figures summaries reported-values release-check manuscript
+.PHONY: help sync sync-dev format check figures refits summaries reported-values release-check manuscript
 
 help:
 	@echo "make sync             Install the locked analysis environment"
@@ -15,6 +16,8 @@ help:
 	@echo "make format           Format and lint-fix src/, scripts/ and tests/"
 	@echo "make check            Run the CI checks: format check, lint, full test suite"
 	@echo "make figures          Regenerate the main figures (needs the lab's processed data)"
+	@echo "make refits           Rerun the Part 3 fits and the figures that read them (needs the lab's processed data;"
+	@echo "                       ARGS=--dry-run lists the runs, ARGS=--with-tables adds the table rebuilds)"
 	@echo "make summaries        Rebuild paper/reported/<summary>.json (all but survey need the lab's processed data)"
 	@echo "make reported-values  Write the summaries' values into the LaTeX macros and the docs"
 	@echo "make release-check    Before a milestone: fail if a summary is stale or mis-tagged, or a cited value is pending"
@@ -39,6 +42,9 @@ check:
 
 figures:
 	$(RUN) python scripts/figures/generate_all_figures.py
+
+refits:
+	$(RUN) python scripts/qa/run_refits.py $(ARGS)
 
 summaries:
 	for summary in $(SUMMARIES); do \
