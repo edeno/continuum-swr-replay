@@ -197,8 +197,8 @@ What the comparison shows:
 
 `tests/analysis/events/test_swr_source_consumers.py` runs each reader on a frame whose stored labels
 disagree with the source, under a configured artifact run that masks one source SWR. Two
-static checks there keep it that way: no module outside the figure archive and an
-explained list names the stored ripples, and none unpickles a decode frame without the
+static checks there keep it that way: no module outside an explained list names
+the stored ripples, and none unpickles a decode frame without the
 source.
 
 ## What does not change here

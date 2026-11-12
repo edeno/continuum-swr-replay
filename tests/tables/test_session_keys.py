@@ -76,8 +76,6 @@ def test_no_module_level_session_constant_defined_elsewhere():
         for path in (repo / directory).rglob("*.py"):
             if path.name in {"session_keys.py", "covariate_registry.py"}:
                 continue
-            if "figures/archive" in str(path):
-                continue
             for number, line in enumerate(path.read_text().splitlines(), start=1):
                 if _MODULE_LEVEL_SESSION_CONST.match(line):
                     offenders.append(f"{path.relative_to(repo)}:{number}")

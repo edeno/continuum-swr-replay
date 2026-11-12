@@ -21,15 +21,10 @@ The authoritative status (and provenance) for each baseline lives in **[`manifes
 
 ### Scripts Used
 
-Baseline-specific scripts were created to save PDFs instead of displaying interactively:
-
-```bash
-# Figure 02 baselines (complete)
-uv run python scripts/figures/archive/generate_figure02_baseline.py
-
-# Figure 03 baselines (partial)
-uv run python scripts/figures/archive/generate_figure03_baseline.py
-```
+Baseline-specific scripts, `generate_figure02_baseline.py` (complete) and
+`generate_figure03_baseline.py` (partial), saved PDFs instead of displaying
+interactively. They were deleted with the retired figure scripts on 2026-11-12;
+the last commit that holds them is `6f9da3c6`, under `scripts/figures/archive/`.
 
 ### Data Requirements
 
@@ -102,4 +97,4 @@ The baseline-specific scripts (`generate_figure0X_baseline.py`) differ from the 
    plt.close()
    ```
 
-These scripts are temporary and should be removed after fresh baselines are generated from the original scripts.
+These scripts have been removed (see "Scripts Used"); fresh baselines are to be generated from the current figure scripts.

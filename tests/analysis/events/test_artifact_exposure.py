@@ -752,12 +752,10 @@ SWR_COLUMNS = re.compile(
 
 
 def _supported_scripts() -> list[Path]:
-    """Every script but the unsupported one-offs and the retired figures."""
-    skipped = (SCRIPTS / "exploratory", SCRIPTS / "figures" / "archive")
+    """Every script but the unsupported one-offs."""
+    skipped = SCRIPTS / "exploratory"
     return sorted(
-        path
-        for path in SCRIPTS.rglob("*.py")
-        if not any(path.is_relative_to(folder) for folder in skipped)
+        path for path in SCRIPTS.rglob("*.py") if not path.is_relative_to(skipped)
     )
 
 

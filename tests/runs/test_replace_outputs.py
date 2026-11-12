@@ -159,10 +159,10 @@ def test_every_run_id_option_is_checked():
     from pathlib import Path
 
     scripts = Path(__file__).resolve().parents[2] / "scripts"
-    skipped = (scripts / "exploratory", scripts / "figures" / "archive")
+    skipped = scripts / "exploratory"
     options, unchecked = [], []
     for path in sorted(scripts.rglob("*.py")):
-        if any(path.is_relative_to(folder) for folder in skipped):
+        if path.is_relative_to(skipped):
             continue
         for node in ast.walk(ast.parse(path.read_text())):
             if not (

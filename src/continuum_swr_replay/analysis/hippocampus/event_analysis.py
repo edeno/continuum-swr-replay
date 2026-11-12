@@ -65,8 +65,8 @@ def get_immobile_events(
     Notes
     -----
     The default ``"max"`` method is the canonical cohort rule shared by
-    Non-Local, SWR, and MUA events. The endpoints mode remains for the
-    archived figure scripts and should not define model cohorts.
+    Non-Local, SWR, and MUA events. The endpoints mode has no caller in
+    the repository and should not define model cohorts.
 
     Examples
     --------

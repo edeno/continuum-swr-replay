@@ -98,7 +98,6 @@ them importable.
 - `generate_memoryless_comparison.py` — supplemental figure: the Widloski & Foster detector against the state-space detector in simulation.
 - `generate_inventory_examples.py` — seeded example events from each cell of one inventory comparison run.
 - `generate_event_feature_examples.py` — seeded comparator-only and ours-only example events from one event features run.
-- `archive/` — retired figure scripts (not linted; kept for provenance).
 
 ## `workflows/` — runners that run other scripts
 - `run_refits.py` — reruns the CPU fits for Part 3 and the figures that read them, in dependency order (`make refits`; `--dry-run` lists the runs).

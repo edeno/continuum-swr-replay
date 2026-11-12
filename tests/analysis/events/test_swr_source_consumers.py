@@ -15,9 +15,9 @@ Every table built from these labels is published with the source's stamp, and
 every reader that combines a shipped table's SWR columns with the source's live
 labels refuses a table stamped with another source.
 
-The static checks at the end keep it that way: no module outside the figure
-archive, the decode writers and an explained list reads the stored ripples or
-a decode frame's pickle directly.
+The static checks at the end keep it that way: no module outside the decode
+writers and an explained list reads the stored ripples or a decode frame's
+pickle directly.
 
 Offline: the inventory and register are written under ``tmp_path``; scripts
 that import ``load_data`` are imported with ``spyglass`` stubbed, as
@@ -731,8 +731,7 @@ def test_the_figures_draw_the_sources_intervals(script):
 # Static: nothing else reads the stored ripples or a decode frame's pickle
 # --------------------------------------------------------------------------
 
-#: Files outside ``scripts/figures/archive`` that may name
-#: the stored Spyglass ripples, and why each is not an analysis read.
+#: Files that may name the stored Spyglass ripples, and why each is not an analysis read.
 STORED_RIPPLE_READERS = {
     "src/continuum_swr_replay/data_loaders/lfp.py": "the loader itself",
     "src/continuum_swr_replay/data_loaders/bandit_task.py": "load_data's decode input",
@@ -781,8 +780,7 @@ STORED_RIPPLE_READERS = {
     "scripts/figures/generate_event_gallery.py": "replaced by swr_intervals",
 }
 
-#: Files outside ``scripts/figures/archive`` that unpickle a
-#: decode frame without the source, and why none of them reads its SWRs.
+#: Files that unpickle a decode frame without the source, and why none of them reads its SWRs.
 DECODE_FRAME_READERS = {
     "src/continuum_swr_replay/analysis/events/analysed_time.py": "the reader",
     "scripts/detection/run_state_evidence.py": (
@@ -819,13 +817,9 @@ DECODE_FRAME_READERS = {
 
 
 def _python_files() -> list[Path]:
-    """Every module under src/ and scripts/ but the retired figure archive."""
-    archive = REPO / "scripts" / "figures" / "archive"
+    """Every module under src/ and scripts/."""
     return [
-        path
-        for folder in ("src", "scripts")
-        for path in (REPO / folder).rglob("*.py")
-        if not path.is_relative_to(archive)
+        path for folder in ("src", "scripts") for path in (REPO / folder).rglob("*.py")
     ]
 
 

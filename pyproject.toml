@@ -100,8 +100,6 @@ ignore = [
 # surfaces; ruff already recognizes TYPE_CHECKING imports as used given
 # the file's ``from __future__ import annotations``.
 "src/continuum_swr_replay/data_loaders/bandit_task.py" = ["E402"]
-# Archived figure scripts retained for historical reference; not linted.
-"scripts/figures/archive/**" = ["ALL"]
 
 [tool.mypy]
 python_version = "3.11"
