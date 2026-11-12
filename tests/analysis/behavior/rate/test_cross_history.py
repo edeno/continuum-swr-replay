@@ -1,4 +1,4 @@
-"""The cross-history runner fits a session only when its two cohorts compare."""
+"""The cross-history fit runs a session only when its two cohorts compare."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scripts.behavior.rate import fit_cross_history_rate as mod
+from continuum_swr_replay.analysis.behavior.rate import cross_history as mod
 
 
 def _session(n_stops: int = 40, seed: int = 0) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -47,14 +47,14 @@ def _session(n_stops: int = 40, seed: int = 0) -> tuple[pd.DataFrame, pd.DataFra
 
 
 # The synthetic stops carry neither the arrival clocks nor the outcome lags,
-# so the runner's designs opt out of both by name.
+# so the fit's designs opt out of both by name.
 _design = functools.partial(
     mod.aggregate_to_timebins, arrival_clocks=False, outcome_shift=False
 )
 
 
 def _design_missing_cross_history(*args, **kwargs):
-    """The runner's design, with the cross design missing one bin's cross history."""
+    """The fit's design, with the cross design missing one bin's cross history."""
     design = _design(*args, **kwargs)
     if "cross_onset_times" in kwargs:
         design.loc[design.index[0], "cross_hist_rcos_0"] = np.nan

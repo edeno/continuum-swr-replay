@@ -500,6 +500,7 @@ def test_every_rate_fit_drops_the_excluded_bins():
         package / "behavior" / "rate" / "per_bin_rate_ladder.py",
         package / "behavior" / "rate" / "swr_contrast_rate.py",
         package / "behavior" / "rate" / "uncertainty_rate.py",
+        package / "behavior" / "rate" / "cross_history.py",
     ]
     for path in sorted(runners):
         tree = ast.parse(path.read_text())
