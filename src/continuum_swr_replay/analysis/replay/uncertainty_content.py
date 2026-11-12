@@ -30,7 +30,10 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.statistics import signed_rank_p
+from continuum_swr_replay.analysis.statistics import (
+    session_median_statistics,
+    signed_rank_p,
+)
 from continuum_swr_replay.data_loaders.constants import LEAF_ARMS, port_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -642,6 +645,7 @@ def summarize_mu_coefficients(mu_results: pd.DataFrame) -> dict[str, pd.DataFram
     )
 
     summaries = []
+    overall_rows = []
     for cohort, subset in [
         ("all", sessions),
         ("clean", sessions[sessions["fit_quality"] == "clean"]),
@@ -655,11 +659,17 @@ def summarize_mu_coefficients(mu_results: pd.DataFrame) -> dict[str, pd.DataFram
             .assign(cohort=cohort)
         )
         summaries.append(animal)
+        known = subset[coefficient].dropna()
+        summary = session_median_statistics(known, subset.loc[known.index, "animal"])
+        overall_rows.append(
+            {
+                "cohort": cohort,
+                "coefficient": summary["animal_median"],
+                "n_animals": summary["n_animals"],
+            }
+        )
     animal_summary = pd.concat(summaries, ignore_index=True)
-    overall = animal_summary.groupby("cohort", observed=True, as_index=False).agg(
-        coefficient=("coefficient", "median"),
-        n_animals=("animal", "nunique"),
-    )
+    overall = pd.DataFrame(overall_rows)
     overall["relative_weight"] = np.exp(overall["coefficient"])
     return {"session": sessions, "animal": animal_summary, "overall": overall}
 
@@ -835,7 +845,9 @@ def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
 
     For each (population, predictor): the across-session median coefficient, the
     number of animals whose own median matches the overall sign (sign consistency,
-    of those present), the median per-session design condition number, and the
+    of those present; both from
+    :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`),
+    the median per-session design condition number, and the
     Wilcoxon signed-rank p
     (:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`, NaN below
     six non-zero coefficients). The Wilcoxon is **descriptive** —
@@ -849,17 +861,16 @@ def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
             values = pop_df[coef_col].dropna()
             if len(values) < 2:
                 continue
-            median = float(values.median())
-            per_animal = pop_df.groupby("animal", observed=True)[coef_col].median()
+            summary = session_median_statistics(
+                values, pop_df.loc[values.index, "animal"]
+            )
             rows.append(
                 {
                     "population": population,
                     "predictor": coef_col[len("coef_") :],
-                    "median": median,
-                    "n_animals_consistent": int(
-                        (np.sign(per_animal) == np.sign(median)).sum()
-                    ),
-                    "n_animals": int(per_animal.notna().sum()),
+                    "median": summary["median"],
+                    "n_animals_consistent": summary["n_animals_same_sign"],
+                    "n_animals": summary["n_animals"],
                     "median_cond_number": float(pop_df["cond_number"].median()),
                     "wilcoxon_p": signed_rank_p(values),
                     "n_sessions": int(len(values)),
