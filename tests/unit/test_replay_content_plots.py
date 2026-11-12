@@ -1,4 +1,4 @@
-"""Axis units of the replay-content hierarchy figure.
+"""Axis units of the replay-content hierarchy figure, and the forest plot's stars.
 
 A fraction fit's AIC is a quasi-likelihood quantity at the event scale and a
 count fit's is at the timebin scale; the two are not comparable, so the plotted
@@ -15,6 +15,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.visualization.replay_content_plots import (
+    plot_coefficient_forest,
     plot_model_hierarchy_comparison,
 )
 
@@ -47,5 +48,23 @@ def test_the_axis_names_the_scale_the_fit_was_on(scale_label, expected) -> None:
     try:
         plot_model_hierarchy_comparison(COMPARISON, ax=ax, scale_label=scale_label)
         assert ax.get_ylabel() == expected
+    finally:
+        plt.close("all")
+
+
+def test_the_forest_stars_are_the_corrected_signed_rank_p() -> None:
+    # x: eight positive sessions, p = 2 / 2 ** 8. y: three positive, too few
+    # for a p, so x is its own family and its q, 0.0078, earns two stars.
+    # Were y tested, the family of two would give x q = 0.0156: one star.
+    results = pd.DataFrame(
+        {
+            "coef_x": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+            "coef_y": [0.1, 0.2, 0.3] + [float("nan")] * 5,
+        }
+    )
+    _fig, ax = plt.subplots()
+    try:
+        plot_coefficient_forest(results, ["x", "y"], ax=ax)
+        assert [text.get_text() for text in ax.texts] == ["**"]
     finally:
         plt.close("all")

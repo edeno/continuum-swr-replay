@@ -10,12 +10,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import wilcoxon
-from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
+from continuum_swr_replay.analysis.statistics import benjamini_hochberg, signed_rank_p
 from continuum_swr_replay.visualization.palettes import COLORS
 
 
@@ -152,20 +151,13 @@ def plot_coefficient_forest(
         q75s.append(vals.quantile(0.75))
         labels.append(pred.replace("is_", "").replace("_x_", "×"))
 
-        try:
-            _, p = wilcoxon(vals)
-            raw_pvals.append(p)
-        except ValueError:
-            raw_pvals.append(1.0)
+        raw_pvals.append(signed_rank_p(vals))
 
     if not labels:
         return fig
 
-    # FDR correction
-    if raw_pvals:
-        _, corrected, _, _ = multipletests(raw_pvals, method="fdr_bh")
-    else:
-        corrected = []
+    # FDR correction across the plotted predictors that have a p
+    corrected = benjamini_hochberg(raw_pvals)
 
     y_pos = range(len(labels))
     medians = np.array(medians)
