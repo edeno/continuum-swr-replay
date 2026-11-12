@@ -167,24 +167,25 @@ def _animal_values(values, animals) -> tuple[pd.Series, pd.Series]:
 
 def test_the_bootstrap_resamples_the_animal_medians_with_one_draw_call():
     values, animal = _animal_values(
-        [0.0, 0.0, 4.0, 1.0, NAN, 3.0], ["b", "b", "b", "a", "a", "a"]
+        [0.0, 0.0, 4.0, 1.0, NAN, 3.0, 7.0], ["b", "b", "b", "a", "a", "a", "a"]
     )
     rng = np.random.default_rng(7)
     result = stats.animal_median_bootstrap(
         values, animal, rng=rng, n_draws=200, percentiles=(0, 50, 100)
     )
-    assert result["n_sessions"] == 5
+    assert result["n_sessions"] == 6
     assert result["n_animals"] == 2
-    # a: median of 1 and 3 (the NaN left out); b: of 0, 0, 4. Sorted by animal.
+    # a: median of 1, 3 and 7 (the NaN left out); b: of 0, 0, 4. Sorted by animal.
     pd.testing.assert_series_equal(
         result["animal_medians"],
-        pd.Series([2.0, 0.0], index=pd.Index(["a", "b"])),
+        pd.Series([3.0, 0.0], index=pd.Index(["a", "b"])),
         check_names=False,
     )
-    assert result["animal_median"] == 1.0  # the mean of two medians
-    # A draw of two animals has median 0, 1 or 2; 200 draws hold both ends and
-    # the middle is the most common.
-    np.testing.assert_array_equal(result["percentiles"], [0.0, 1.0, 2.0])
+    # the mean of the two animals' medians; the median over sessions is 2
+    assert result["animal_median"] == 1.5
+    # A draw of two animals has median 0, 1.5 or 3; 200 draws hold both ends
+    # and the middle is the most common.
+    np.testing.assert_array_equal(result["percentiles"], [0.0, 1.5, 3.0])
     # the generator moved by exactly one (n_draws, n_animals) draw
     reference = np.random.default_rng(7)
     reference.integers(0, 2, size=(200, 2))
