@@ -87,7 +87,10 @@ from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import require_covariate_schema
 from continuum_swr_replay.tables.io import read_table
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    subset_max_per_animal,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -225,13 +228,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         cohort_report["n_stops_after"],
     )
     if args.max_per_animal is not None:
-        keep = (
-            stop[list(SESSION_COLUMNS)]
-            .drop_duplicates()
-            .groupby("animal")
-            .head(args.max_per_animal)
-        )
-        stop = stop.merge(keep, on=list(SESSION_COLUMNS))
+        stop = subset_max_per_animal(stop, args.max_per_animal)
     onset_groups = dict(tuple(onsets.groupby(list(SESSION_COLUMNS), sort=False)))
     sessions = [
         (keys, stops_g, onset_groups[keys])

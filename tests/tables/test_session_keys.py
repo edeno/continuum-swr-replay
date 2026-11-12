@@ -15,6 +15,7 @@ from continuum_swr_replay.tables.session_keys import (
     n_sessions,
     session_key_frame,
     session_key_set,
+    subset_max_per_animal,
 )
 
 
@@ -126,3 +127,25 @@ def test_session_key_matches_columns_day():
     from continuum_swr_replay.analysis.behavior.tables.tables_event import _SessionKey
 
     assert _SessionKey._fields == SESSION_COLUMNS_DAY
+
+
+def test_subset_max_per_animal_keeps_each_animal_s_first_sessions():
+    """Unsorted, an animal's first sessions are those that appear first in the
+    frame; sorted, the first by session key. The kept rows stay in the frame's
+    order, every row of a kept session is kept, and an animal with fewer
+    sessions than the cap keeps them all."""
+    frame = pd.DataFrame(
+        {
+            "animal": ["b", "a", "a", "b", "a", "b", "c"],
+            "session_date": [2, 3, 1, 1, 3, 2, 5],
+            "epoch": ["02_r1"] * 7,
+            "row": [0, 1, 2, 3, 4, 5, 6],
+        }
+    )
+
+    unsorted = subset_max_per_animal(frame, 1)
+    assert unsorted["row"].tolist() == [0, 1, 4, 5, 6]
+    assert unsorted.index.tolist() == [0, 1, 2, 3, 4]
+
+    by_key = subset_max_per_animal(frame, 1, sort_sessions=True)
+    assert by_key["row"].tolist() == [2, 3, 6]

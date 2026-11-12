@@ -63,7 +63,10 @@ from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    subset_max_per_animal,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -215,13 +218,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     require_swr_source(event_table, what=str(event_path))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     if args.max_per_animal is not None:
-        keep = (
-            stop[list(SESSION_COLUMNS)]
-            .drop_duplicates()
-            .groupby("animal")
-            .head(args.max_per_animal)
-        )
-        stop = stop.merge(keep, on=list(SESSION_COLUMNS))
+        stop = subset_max_per_animal(stop, args.max_per_animal)
         logger.info(
             "smoke: %d sessions", len(stop[list(SESSION_COLUMNS)].drop_duplicates())
         )
