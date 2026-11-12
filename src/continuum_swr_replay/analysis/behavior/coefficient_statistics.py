@@ -43,8 +43,11 @@ from continuum_swr_replay.analysis.behavior.fit_comparability import (
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_medians,
     benjamini_hochberg,
+    nested_bootstrap_draw,
+    nested_codes,
     session_median_statistics,
     signed_rank_p,
+    weighted_median,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -243,11 +246,14 @@ def animal_median_bootstrap(
     n_draws: int,
     percentiles: Sequence[float],
 ) -> dict[str, object]:
-    """An animal bootstrap of the median over animals of each animal's median.
+    """A nested bootstrap of the median over animals of each animal's median.
 
-    The animals are resampled with replacement; each draw's statistic is the
-    median of the resampled animals' own medians. Sessions within an animal
-    are not independent, so the animal is the resampling unit.
+    Each draw is one replicate of the nested bootstrap
+    (:func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_draw`):
+    the animals with replacement, then each drawn animal's sessions with
+    replacement. Its statistic is the median over the drawn animals (an animal
+    drawn twice counting twice) of each one's median over its drawn sessions
+    (the sessions of an animal drawn twice pooled).
 
     Parameters
     ----------
@@ -256,13 +262,11 @@ def animal_median_bootstrap(
     animal : pd.Series, shape (n_sessions,)
         Each session's animal, indexed as ``values``.
     rng : numpy.random.Generator
-        The draws' source. All ``n_draws`` resamples are drawn in one call,
-        ``rng.integers(0, n_animals, size=(n_draws, n_animals))``, so a caller
-        that shares one generator over several summaries gets reproducible
-        draws in the order it makes the calls; nothing is drawn when no animal
-        has a value.
+        The draws' source, used for the draws in order, so a caller that shares
+        one generator over several summaries gets reproducible draws in the
+        order it makes the calls; nothing is drawn when no animal has a value.
     n_draws : int
-        Bootstrap resamples.
+        Bootstrap replicates.
     percentiles : sequence of float
         Percentiles of the resampled statistic, in [0, 100] (linear
         interpolation).
@@ -280,8 +284,8 @@ def animal_median_bootstrap(
           NaN when no animal has a value.
         - ``percentiles``: the resampled statistic's ``percentiles``, a
           ``numpy.ndarray`` of shape ``(len(percentiles),)``; NaN when no
-          animal has a value. With one animal every draw is that animal, so
-          each percentile is its median.
+          animal has a value. With one animal every draw is that animal, and
+          its sessions are still resampled.
     """
     known = values.dropna()
     medians = animal_medians(values, animal)
@@ -289,9 +293,31 @@ def animal_median_bootstrap(
     if n_animals == 0:
         spread = np.full(len(percentiles), np.nan)
     else:
-        per_animal = medians.to_numpy(dtype=float)
-        draws = rng.integers(0, n_animals, size=(n_draws, n_animals))
-        spread = np.percentile(np.median(per_animal[draws], axis=1), percentiles)
+        own = animal[known.index].to_numpy()
+        animal_codes, session_codes = nested_codes(own, np.arange(len(known)))
+        # Each animal's sessions, in ascending order of their values.
+        sessions = [
+            np.flatnonzero(animal_codes == a)[
+                np.argsort(known.to_numpy()[animal_codes == a], kind="stable")
+            ]
+            for a in range(n_animals)
+        ]
+        sorted_values = [known.to_numpy(dtype=float)[rows] for rows in sessions]
+        statistic = np.empty(n_draws)
+        for i in range(n_draws):
+            draw = nested_bootstrap_draw(animal_codes, session_codes, rng)
+            drawn = np.flatnonzero(draw.animals)
+            own_medians = np.array(
+                [
+                    weighted_median(sorted_values[a], draw.rows[sessions[a]])
+                    for a in drawn
+                ]
+            )
+            order = np.argsort(own_medians, kind="stable")
+            statistic[i] = weighted_median(
+                own_medians[order], draw.animals[drawn][order]
+            )
+        spread = np.percentile(statistic, percentiles)
     return {
         "n_sessions": len(known),
         "n_animals": n_animals,

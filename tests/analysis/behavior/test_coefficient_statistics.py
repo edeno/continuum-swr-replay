@@ -7,6 +7,10 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior import coefficient_statistics as stats
+from continuum_swr_replay.analysis.shared_statistics import (
+    nested_bootstrap_draw,
+    nested_codes,
+)
 
 NAN = np.nan
 
@@ -173,13 +177,16 @@ def _animal_values(values, animals) -> tuple[pd.Series, pd.Series]:
     )
 
 
-def test_the_bootstrap_resamples_the_animal_medians_with_one_draw_call():
+def test_the_bootstrap_resamples_the_animals_then_their_sessions():
     values, animal = _animal_values(
         [0.0, 0.0, 4.0, 1.0, NAN, 3.0, 7.0], ["b", "b", "b", "a", "a", "a", "a"]
     )
-    rng = np.random.default_rng(7)
     result = stats.animal_median_bootstrap(
-        values, animal, rng=rng, n_draws=200, percentiles=(0, 50, 100)
+        values,
+        animal,
+        rng=np.random.default_rng(7),
+        n_draws=200,
+        percentiles=(2.5, 50, 97.5),
     )
     assert result["n_sessions"] == 6
     assert result["n_animals"] == 2
@@ -191,21 +198,35 @@ def test_the_bootstrap_resamples_the_animal_medians_with_one_draw_call():
     )
     # the mean of the two animals' medians; the median over sessions is 2
     assert result["animal_median"] == 1.5
-    # A draw of two animals has median 0, 1.5 or 3; 200 draws hold both ends
-    # and the middle is the most common.
-    np.testing.assert_array_equal(result["percentiles"], [0.0, 1.5, 3.0])
-    # the generator moved by exactly one (n_draws, n_animals) draw
-    reference = np.random.default_rng(7)
-    reference.integers(0, 2, size=(200, 2))
-    assert rng.bit_generator.state == reference.bit_generator.state
+    # Each replicate is a nested draw of the six sessions (animal a is code 0,
+    # b code 1): the median over the drawn animals, each as often as drawn, of
+    # each one's median over its drawn sessions, each as often as drawn.
+    known = values.dropna()
+    animal_codes, session_codes = nested_codes(animal[known.index], np.arange(6))
+    rng = np.random.default_rng(7)
+    expected = []
+    for _ in range(200):
+        draw = nested_bootstrap_draw(animal_codes, session_codes, rng)
+        drawn = np.flatnonzero(draw.animals)
+        own = [
+            np.median(np.repeat(known[animal_codes == a], draw.rows[animal_codes == a]))
+            for a in drawn
+        ]
+        expected.append(np.median(np.repeat(own, draw.animals[drawn])))
+    np.testing.assert_allclose(
+        result["percentiles"], np.percentile(expected, (2.5, 50, 97.5))
+    )
+    # resampling the animals alone could give only 0, 1.5 or 3
+    assert not set(expected) <= {0.0, 1.5, 3.0}
 
 
-def test_the_bootstrap_of_one_animal_is_its_median_and_of_none_draws_nothing():
+def test_the_bootstrap_of_one_animal_resamples_its_sessions_and_of_none_draws_nothing():
     values, animal = _animal_values([1.0, 5.0, 2.0], ["a", "a", "a"])
     one = stats.animal_median_bootstrap(
         values, animal, rng=np.random.default_rng(0), n_draws=50, percentiles=(5, 95)
     )
-    np.testing.assert_array_equal(one["percentiles"], [2.0, 2.0])
+    # a resample of 1, 2 and 5 has median 1, 2 or 5
+    np.testing.assert_array_equal(one["percentiles"], [1.0, 5.0])
 
     rng = np.random.default_rng(0)
     before = rng.bit_generator.state

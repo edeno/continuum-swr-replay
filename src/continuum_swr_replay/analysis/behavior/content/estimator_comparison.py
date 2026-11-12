@@ -13,7 +13,8 @@ its standard error and the fit's AIC with the likelihood constants equalized
   cannot identify, as whole estimator triples;
 - :func:`summarize_estimators` gives one row per (rung, term) of animal-balanced
   medians;
-- :func:`bootstrap_animals` gives the animal bootstrap of those medians.
+- :func:`bootstrap_animals` gives the nested bootstrap (animals, then their
+  sessions) of those medians.
 """
 
 from __future__ import annotations
@@ -403,7 +404,7 @@ def bootstrap_animals(
     seed: int = BOOTSTRAP_SEED,
     percentiles: Sequence[float] = BOOTSTRAP_PERCENTILES,
 ) -> pd.DataFrame:
-    """Animal bootstrap of the animal-balanced median, per (rung, term, estimator).
+    """Nested bootstrap of the animal-balanced median, per (rung, term, estimator).
 
     The coefficient's
     :func:`~continuum_swr_replay.analysis.behavior.coefficient_statistics.animal_median_bootstrap`

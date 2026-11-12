@@ -3,8 +3,9 @@
 For each effect: the coefficient of every session the per-term gate keeps is a faint
 jittered dot (colored by animal; a term the gate refuses is drawn empty and labelled
 "(not reported)"); the 5 larger dots are per-animal medians; the black bar is the
-across-animal median; the horizontal whisker is its 95% CI (bootstrap over the 5
-per-animal medians -- the animal is the inferential unit, n=5;
+across-animal median; the horizontal whisker is its 95% CI (nested bootstrap: the
+animals, then each drawn animal's sessions, each draw's statistic the median over
+animals of their medians -- the animal is the inferential unit, n=5;
 ``coefficient_statistics.animal_median_bootstrap``, 4000 draws). Continuous-predictor
 coefficients are shown STANDARDIZED (per 1 SD of the predictor: raw_coef * SD, which
 is exact for these Poisson GLMs) so effect sizes are comparable across predictors,

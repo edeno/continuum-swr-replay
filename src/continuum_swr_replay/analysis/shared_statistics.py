@@ -261,7 +261,11 @@ def nested_bootstrap_draw(
     counts = np.zeros(animal.size, dtype=np.int64)
     order = np.argsort(session, kind="stable")
     bounds = np.searchsorted(session[order], np.arange(session_animal.size + 1))
-    for s in np.flatnonzero(session_draws):
+    # A session of one row draws it as often as the session is drawn (a
+    # one-category multinomial takes nothing from the generator).
+    single = np.diff(bounds) == 1
+    counts[order[bounds[:-1][single]]] = session_draws[single]
+    for s in np.flatnonzero((session_draws > 0) & ~single):
         members = order[bounds[s] : bounds[s + 1]]
         counts[members] = rng.multinomial(
             session_draws[s] * members.size, np.full(members.size, 1.0 / members.size)

@@ -37,9 +37,10 @@ from the COUNT matrix in both cases -- is added to the two conditional fits
 before ``aic_equalized`` is formed. ``pseudo_r2`` has a different null under
 each estimator and is deliberately not tabulated.
 
-Inference is the project's standard: five animals, sign consistency, and an
-animal bootstrap (resample the animals present with replacement, statistic =
-median over the resampled animals of each animal's per-session median).
+Inference is the project's standard: five animals, sign consistency, and a
+nested bootstrap (resample the animals present with replacement, then each
+drawn animal's sessions; statistic = median over the drawn animals of each
+one's median over its drawn sessions).
 
 Usage:
     uv run python scripts/behavior/content/compare_content_estimators.py
@@ -821,10 +822,11 @@ non-SWR event's timebins cluster on a few arms; **bottom,** the additive shift
 of that log concentration on SWR events, where a value below zero means SWR
 events are *more* concentrated (more redundant bins) and above zero means their
 mass is spread over more arms. Each line is one animal, plotted in session order
-within that animal. The grey band is the animal bootstrap's 2.5–97.5 percentile
+within that animal. The grey band is the nested bootstrap's 2.5–97.5 percentile
 interval and the grey line its median: the animals present are resampled with
-replacement for 2000 draws at **seed 0**, and each draw's statistic is the median
-over the resampled animals of each animal's per-session median.
+replacement, then each drawn animal's sessions, for 2000 draws at **seed 0**, and
+each draw's statistic is the median over the drawn animals of each one's median
+over its drawn sessions.
 """
 
 

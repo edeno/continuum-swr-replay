@@ -483,7 +483,8 @@ def estimator_values(
 ) -> list[Value]:
     """Questions 3.1, 3.6 and 3.7: the three-estimator comparison on one shared event
     set. Coefficients are animal-balanced medians as the comparison writes them;
-    intervals are its animal bootstrap's 2.5 and 97.5 percentiles."""
+    intervals are its nested bootstrap's (animals, then their sessions) 2.5 and
+    97.5 percentiles."""
     make = value_factory(estimator_values, source, TAGS["estimators"])
     values = []
     for word, (rung, term) in ESTIMATOR_TERMS.items():
@@ -531,7 +532,8 @@ def estimator_values(
                     boot["p2_5"].iloc[0],
                     "quantity",
                     "sig2s",
-                    f"{what}: animal bootstrap 2.5th percentile",
+                    f"{what}: 2.5th percentile of the nested bootstrap "
+                    "(animals, then their sessions)",
                     "log weight",
                 ),
                 make(
@@ -539,7 +541,8 @@ def estimator_values(
                     boot["p97_5"].iloc[0],
                     "quantity",
                     "sig2s",
-                    f"{what}: animal bootstrap 97.5th percentile",
+                    f"{what}: 97.5th percentile of the nested bootstrap "
+                    "(animals, then their sessions)",
                     "log weight",
                 ),
             ]
@@ -568,8 +571,9 @@ def estimator_values(
                 boot[column].iloc[0],
                 "quantity",
                 "sig2s",
-                f"C2_base log_phi_is_swr, {ESTIMATORS['dm']}: animal bootstrap "
-                f"{'2.5th' if end == 'low' else '97.5th'} percentile",
+                f"C2_base log_phi_is_swr, {ESTIMATORS['dm']}: "
+                f"{'2.5th' if end == 'low' else '97.5th'} percentile of the nested "
+                "bootstrap (animals, then their sessions)",
                 "log concentration",
                 tags=TAGS["estimators_anchoring"],
             )
