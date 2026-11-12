@@ -29,6 +29,7 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     build_marked_family_ladder,
     fit_marked_family_ladder,
 )
+from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 
 SAMPLING_FREQUENCY = 500.0
 DRIVEN_CLASS = "non_local_no_SWR"
@@ -624,7 +625,7 @@ def test_runner_round_trip_keeps_the_planted_peak_and_drops_silent_units(
     )
 
     artifact = runner.family_artifact_path(tmp_path, "rat20200101_01_r1_mPFC", model)
-    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    record = json.loads(fit_provenance_path(artifact).read_text())
     extra = record.get("extra", record)
     assert extra["bundle_status"] == "complete"
     assert extra["bundle_contract_version"] == 3
