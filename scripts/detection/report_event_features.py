@@ -100,6 +100,7 @@ from continuum_swr_replay.paths import (  # noqa: E402
 )
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
+from continuum_swr_replay.runs.io import ok_epochs  # noqa: E402
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 from continuum_swr_replay.visualization.inventory_examples import (  # noqa: E402
@@ -887,7 +888,7 @@ def memoryless_cohort_by_session(
                 scope,
                 bool(manifest["epochs"][identifier].get("memoryless_available")),
             )
-            for identifier in feature_run.ok_epochs(manifest)
+            for identifier in ok_epochs(manifest)
             for scope in ("candidates", "compared")
         ],
         columns=[*keys, "available"],

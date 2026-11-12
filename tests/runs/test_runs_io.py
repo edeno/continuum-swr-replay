@@ -1,4 +1,5 @@
-"""The runners' file writing (``runs.io``): strict JSON, atomic writes, hashes.
+"""The runners' file writing (``runs.io``): strict JSON, atomic writes, hashes,
+and a run's ``ok`` epochs' tables.
 
 ``replace_outputs`` and ``parse_run_id`` are tested in ``test_replace_outputs``.
 """
@@ -19,6 +20,7 @@ import pytest
 from continuum_swr_replay.runs.io import (
     array_sha256,
     json_ready,
+    ok_table_paths,
     sha256_file,
     write_json,
 )
@@ -136,3 +138,24 @@ def test_hashes(tmp_path):
     expected = hashlib.sha256(values.astype(np.float64).tobytes()).hexdigest()
     assert array_sha256(values) == expected
     assert array_sha256(values.T.copy().T) == expected  # C order, whatever the layout
+
+
+def test_ok_table_paths_are_the_ok_epochs_tables_sorted_and_may_be_none(tmp_path):
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "epochs": {
+                    "e2": {"status": "ok"},
+                    "e3": {"status": "failed"},
+                    "e1": {"status": "ok"},
+                }
+            }
+        )
+    )
+    assert ok_table_paths(tmp_path, "features") == [
+        tmp_path / "e1_features.parquet",
+        tmp_path / "e2_features.parquet",
+    ]
+    manifest.write_text(json.dumps({"epochs": {"e3": {"status": "failed"}}}))
+    assert ok_table_paths(tmp_path, "features") == []

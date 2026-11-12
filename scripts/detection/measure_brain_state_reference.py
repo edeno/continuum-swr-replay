@@ -31,11 +31,9 @@ from continuum_swr_replay.analysis.events import analysed_time
 from continuum_swr_replay.analysis.hippocampus.brain_state_reference import (
     brain_state_reference,
 )
-from continuum_swr_replay.analysis.inventory_comparison import (
-    feature_run,
-    inventory_run,
-)
+from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.paths import event_features_root, processed_data_dir
+from continuum_swr_replay.runs.io import ok_epochs, read_manifest
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 
@@ -62,12 +60,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--event-features-run", required=True)
     parser.add_argument("--n-workers", type=int, default=1)
     args = parser.parse_args(argv)
-    manifest = feature_run.read_manifest(
-        event_features_root() / args.event_features_run
-    )
+    manifest = read_manifest(event_features_root() / args.event_features_run)
     jobs = [
         (identifier, manifest["epochs"][identifier]["decode"]["sha256"])
-        for identifier in feature_run.ok_epochs(manifest)
+        for identifier in ok_epochs(manifest)
     ]
     with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
         rows = list(pool.map(_epoch, jobs))

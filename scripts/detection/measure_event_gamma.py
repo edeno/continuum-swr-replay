@@ -55,7 +55,6 @@ from continuum_swr_replay.analysis.hippocampus.gamma_power import (
     zscore_on,
 )
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
-from continuum_swr_replay.analysis.inventory_comparison.feature_run import ok_epochs
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.intervals import interval_mask
@@ -64,7 +63,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import ok_epochs, sha256_file
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 

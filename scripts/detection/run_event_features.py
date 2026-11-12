@@ -206,6 +206,7 @@ from continuum_swr_replay.runs.cli import (  # noqa: E402
 from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
 from continuum_swr_replay.runs.io import (  # noqa: E402
     json_ready,
+    output_path,
     replace_outputs,
     sha256_file,
     write_json,
@@ -433,7 +434,7 @@ def epoch_tables(
     }
 
     stored = {
-        name: read_table(inventory_run.output_path(identifier, inventory_dir, name))
+        name: read_table(output_path(identifier, inventory_dir, name))
         for name in INVENTORY_TABLES
     }
     _, matches = rebuild_matches(

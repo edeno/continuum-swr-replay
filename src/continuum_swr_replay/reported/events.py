@@ -57,10 +57,7 @@ from continuum_swr_replay.analysis.hippocampus import event_statistics
 from continuum_swr_replay.analysis.hippocampus.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
-from continuum_swr_replay.analysis.inventory_comparison import (
-    feature_run,
-    nonlocal_comparison,
-)
+from continuum_swr_replay.analysis.inventory_comparison import nonlocal_comparison
 from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_animals,
     analysed_epoch_ids,
@@ -86,6 +83,7 @@ from continuum_swr_replay.reported.values import (
     rel,
     value_factory,
 )
+from continuum_swr_replay.runs.io import ok_table_paths, read_manifest
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 TAGS = {
@@ -1674,9 +1672,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
 
     # the run's tables are read, and so recorded, for the epochs its manifest marks ok
     def run_tables(name: str) -> dict[str, object]:
-        return files_record(
-            f"*_{name}.parquet", feature_run.ok_table_paths(run, name), ROOT_DIR
-        )
+        return files_record(f"*_{name}.parquet", ok_table_paths(run, name), ROOT_DIR)
 
     summary.inputs += [
         run_tables("features"),
@@ -1748,5 +1744,5 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
 
 def _input_run(run_dir: Path, name: str) -> str:
     """The id of the input run ``name`` that the event features run read."""
-    run: str = feature_run.read_manifest(run_dir)["settings"]["input_runs"][name]
+    run: str = read_manifest(run_dir)["settings"]["input_runs"][name]
     return run

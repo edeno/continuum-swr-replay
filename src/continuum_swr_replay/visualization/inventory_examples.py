@@ -64,6 +64,7 @@ from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.device import xla_flags
+from continuum_swr_replay.runs.io import output_path
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.visualization.figure_utilities import WONG
 from continuum_swr_replay.visualization.palettes import COLORS
@@ -398,7 +399,7 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
     in_span = (band["time"] >= time[0]) & (band["time"] <= time[-1])
 
     def table(name: str) -> pd.DataFrame:
-        return read_table(inventory_run.output_path(identifier, run_dir, name))
+        return read_table(output_path(identifier, run_dir, name))
 
     return EpochInputs(
         identifier=identifier,

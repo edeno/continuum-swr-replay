@@ -1,4 +1,5 @@
-"""How a run writes its files: atomically, as strict JSON, and with their hashes.
+"""How a run writes its files: atomically, as strict JSON, and with their hashes;
+and how a reader finds a run's epochs.
 
 Every runner's outputs, manifests and caches are written through
 ``tables.io.write_atomically`` (the one atomic write, below this package so
@@ -7,6 +8,11 @@ half-written file under its final name, and a reader that trusts any file that
 exists (a resume, a cache) never reads one. :func:`replace_outputs` writes one
 epoch's files as a set. Records go through :func:`json_ready` before
 :func:`write_json`, which refuses NaN and infinity.
+
+A run folder holds ``manifest.json`` (:func:`read_manifest`) with a record of
+each epoch; only the epochs it marks ``ok`` are read (:func:`ok_epochs`), and
+each epoch's table is ``{identifier}_{name}.parquet`` (:func:`output_path`,
+:func:`ok_table_paths`).
 
 The module is named ``io`` like the standard-library module on purpose: the
 interpreter loads ``io`` at startup, so a tool run from inside this directory
@@ -34,6 +40,10 @@ __all__ = [
     "array_sha256",
     "files_sha256",
     "json_ready",
+    "ok_epochs",
+    "ok_table_paths",
+    "output_path",
+    "read_manifest",
     "replace_outputs",
     "sha256_file",
     "write_json",
@@ -174,3 +184,49 @@ def replace_outputs(
             path.unlink(missing_ok=True)
         raise
     return written
+
+
+def output_path(identifier: str, output_dir: Path, name: str) -> Path:
+    """Where an epoch's table `name` is in the run folder `output_dir`."""
+    return output_dir / f"{identifier}_{name}.parquet"
+
+
+def read_manifest(run_dir: Path) -> dict:
+    """The run's ``manifest.json``, with its record of each epoch.
+
+    Raises
+    ------
+    ValueError
+        If the run has no manifest, it cannot be read as JSON, or it holds no
+        ``epochs`` record.
+    """
+    path = run_dir / "manifest.json"
+    try:
+        manifest = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"no readable run manifest at {path}: {error}") from error
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("epochs"), dict):
+        raise ValueError(f"no readable run manifest at {path}: no epochs record")
+    return manifest
+
+
+def ok_epochs(manifest: Mapping) -> list[str]:
+    """The epochs the run's manifest marks ``ok``, sorted: the only epochs of a
+    run that are read. A failed epoch's tables, or tables a manifest does not
+    know, may still be in the run folder."""
+    return sorted(i for i, r in manifest["epochs"].items() if r["status"] == "ok")
+
+
+def ok_table_paths(run_dir: Path, name: str) -> list[Path]:
+    """Table ``name`` of each epoch the run's manifest marks ``ok``, in the
+    order of :func:`ok_epochs`; an empty list when it marks none.
+
+    Raises
+    ------
+    ValueError
+        If the run has no readable manifest (:func:`read_manifest`).
+    """
+    return [
+        output_path(identifier, run_dir, name)
+        for identifier in ok_epochs(read_manifest(run_dir))
+    ]

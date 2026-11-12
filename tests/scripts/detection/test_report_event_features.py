@@ -37,6 +37,7 @@ from continuum_swr_replay.paths import (
     inventory_comparison_root,
 )
 from continuum_swr_replay.paths import memoryless_root as memoryless_runs_root
+from continuum_swr_replay.runs.io import output_path
 from continuum_swr_replay.tables.io import write_table
 from tests.support._swr_inventory_fixtures import under_root
 
@@ -868,13 +869,11 @@ def _write_run(root) -> tuple:
             return frame[mask.to_numpy()].reset_index(drop=True)
 
         for name in feature_run.TABLE_DTYPES:
-            write_table(
-                of(tables[name]), feature_run.output_path(identifier, run_dir, name)
-            )
+            write_table(of(tables[name]), output_path(identifier, run_dir, name))
         for name in ("cells", "directional"):
             write_table(
                 of(tables[name]),
-                inventory_run.output_path(identifier, inventory_dir, name),
+                output_path(identifier, inventory_dir, name),
             )
         write_table(
             of(tables["memoryless_events"]),

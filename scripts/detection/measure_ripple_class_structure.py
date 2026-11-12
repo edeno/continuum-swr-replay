@@ -59,7 +59,6 @@ from continuum_swr_replay.analysis.hippocampus import (  # noqa: E402
     class_or_continuum as cc,
 )
 from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
-    feature_run,
     inventory_run,
 )
 from continuum_swr_replay.analysis.inventory_comparison.features import (  # noqa: E402
@@ -76,7 +75,12 @@ from continuum_swr_replay.reported.events import (  # noqa: E402
     EVENT_FEATURES_RUN,
     SPIKE_EVIDENCE_METRICS,
 )
-from continuum_swr_replay.runs.io import files_sha256, sha256_file  # noqa: E402
+from continuum_swr_replay.runs.io import (  # noqa: E402
+    files_sha256,
+    ok_table_paths,
+    read_manifest,
+    sha256_file,
+)
 from continuum_swr_replay.runs.provenance import (  # noqa: E402
     described_commit,
     produced_by,
@@ -177,7 +181,7 @@ def epoch_identifier(row: pd.Series) -> str:
 
 
 def run_measure(args: argparse.Namespace) -> None:
-    manifest = feature_run.read_manifest(event_features_root() / EVENT_FEATURES_RUN)
+    manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
     events = pd.read_parquet(table_path("event_table", replay_content_dir()))
     events = events.assign(epoch_id=events.apply(epoch_identifier, axis=1))
     by_epoch = dict(tuple(events.groupby("epoch_id")))
@@ -214,7 +218,7 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
     """The canonical events with their ripple power, spike counts and spike evidence.
 
     The spike counts are read from the features tables of the epochs the event
-    features run's manifest marks ``ok`` (``feature_run.ok_table_paths``)."""
+    features run's manifest marks ``ok`` (``runs.io.ok_table_paths``)."""
     event_table = table_path("event_table", replay_content_dir())
     events = pd.read_parquet(event_table)
     n_events = len(events)
@@ -226,7 +230,7 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
     criterion_paths = sorted((out_dir() / "criterion").glob("*.parquet"))
     criterion = pd.concat(map(pd.read_parquet, criterion_paths), ignore_index=True)
     run = event_features_root() / EVENT_FEATURES_RUN
-    feature_paths = feature_run.ok_table_paths(run, "features")
+    feature_paths = ok_table_paths(run, "features")
     features = pd.concat(
         (
             pd.read_parquet(

@@ -95,7 +95,7 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs import cli
-from continuum_swr_replay.runs.io import json_ready, sha256_file
+from continuum_swr_replay.runs.io import json_ready, output_path, sha256_file
 from continuum_swr_replay.tables.io import read_table, write_atomically, write_table
 from scripts.detection.run_memoryless_detection import run_one
 from tests.integration.test_run_inventory_comparison import (
@@ -390,9 +390,7 @@ def table(run_dir: Path, identifier: str, name: str) -> pd.DataFrame:
 
 def stored(inputs: Path, identifier: str, name: str) -> pd.DataFrame:
     return read_table(
-        inventory_run.output_path(
-            identifier, inventory_comparison_root() / INVENTORY_RUN, name
-        )
+        output_path(identifier, inventory_comparison_root() / INVENTORY_RUN, name)
     )
 
 
@@ -597,7 +595,7 @@ def test_memberships_that_do_not_reproduce_the_stored_tables_fail_the_epoch(
     earlier outputs are removed."""
     inventory_dir = tmp_path / "inventory"
     shutil.copytree(inventory_comparison_root() / INVENTORY_RUN, inventory_dir)
-    path = inventory_run.output_path(WORKED, inventory_dir, "directional")
+    path = output_path(WORKED, inventory_dir, "directional")
     directional = read_table(path)
     directional.loc[0, "n_source_events"] += 1
     write_atomically(path, lambda temporary: directional.to_parquet(temporary))

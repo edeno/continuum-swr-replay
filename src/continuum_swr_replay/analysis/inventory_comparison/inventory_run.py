@@ -6,7 +6,7 @@ reports and the example figures) read it by: the roster of nine inventories
 and the comparisons over them (:data:`ROSTER`, :data:`CELLS`,
 :data:`COMPARISONS`), the decode it reads and its grid (:func:`decode_path`,
 :func:`speed_trace`, :data:`SAMPLE_INTERVAL_S`), and every table an epoch
-writes (:data:`TABLE_DTYPES`, :func:`output_path`, :func:`stamped_tables`).
+writes (:data:`TABLE_DTYPES`, :func:`output_paths`, :func:`stamped_tables`).
 Design: ``docs/design/replay_detection_comparison/03-inventory-comparison.md``.
 """
 
@@ -57,6 +57,7 @@ from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import processed_data_dir
+from continuum_swr_replay.runs.io import output_path
 
 __all__ = [
     "CELLS",
@@ -73,7 +74,6 @@ __all__ = [
     "TABLE_DTYPES",
     "TRIGGERED",
     "decode_path",
-    "output_path",
     "output_paths",
     "speed_trace",
     "stamped_tables",
@@ -199,11 +199,6 @@ def speed_trace(dot: pd.DataFrame) -> tuple[NDArray, NDArray]:
             "step the recount counts gaps on."
         )
     return time, dot["head_speed"].to_numpy(dtype=np.float64)
-
-
-def output_path(identifier: str, output_dir: Path, name: str) -> Path:
-    """Where an epoch's table `name` is in the run folder `output_dir`."""
-    return output_dir / f"{identifier}_{name}.parquet"
 
 
 def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:

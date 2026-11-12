@@ -55,17 +55,18 @@ import pandas as pd
 
 matplotlib.use("Agg")
 
-from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
-    feature_run,
-    inventory_run,
-)
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.paths import (  # noqa: E402
     inventory_comparison_root,
     memoryless_root,
 )
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
-from continuum_swr_replay.runs.io import json_ready  # noqa: E402
+from continuum_swr_replay.runs.io import (  # noqa: E402
+    json_ready,
+    ok_epochs,
+    output_path,
+    read_manifest,
+)
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.visualization.inventory_examples import (  # noqa: E402
@@ -120,17 +121,11 @@ def write_examples(run_dir: Path, figure_dir: Path) -> list[dict[str, Any]]:
         Each draw's record, as the manifest holds it: ``status`` ``written``
         or ``not_written``.
     """
-    # an inventory run's manifest has the same epoch records as a feature run's
-    manifest = feature_run.read_manifest(run_dir)
+    manifest = read_manifest(run_dir)
     settings = manifest["settings"]
-    ok = feature_run.ok_epochs(manifest)
+    ok = ok_epochs(manifest)
     cells = pd.concat(
-        [
-            read_table(inventory_run.output_path(e, run_dir, "cells")).assign(
-                epoch_id=e
-            )
-            for e in ok
-        ],
+        [read_table(output_path(e, run_dir, "cells")).assign(epoch_id=e) for e in ok],
         ignore_index=True,
     )
     drawn = draw_examples(cells)

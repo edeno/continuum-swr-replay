@@ -41,16 +41,14 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events import analysed_time
-from continuum_swr_replay.analysis.inventory_comparison import (
-    feature_run,
-    inventory_run,
-)
+from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     STATE_SHARE_COLUMNS,
     PosteriorTraces,
     state_row_shares,
 )
 from continuum_swr_replay.paths import event_features_root
+from continuum_swr_replay.runs.io import ok_epochs, output_path, read_manifest
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 MANIFEST_NAME = "state_shares_manifest.json"
@@ -86,7 +84,7 @@ def epoch_state_shares(
             f"the decode grid has {len(dot)} rows; the run read {record['n_grid_rows']}"
         )
     features = pd.read_parquet(
-        feature_run.output_path(identifier, run_dir, "features"),
+        output_path(identifier, run_dir, "features"),
         columns=[*KEY_COLUMNS, "first_row", "n_rows", "ss_frac_rows_nonlocal"],
     )
     shares = state_row_shares(
@@ -141,14 +139,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     run_dir = event_features_root() / args.event_features_run
-    run_manifest = feature_run.read_manifest(run_dir)
+    run_manifest = read_manifest(run_dir)
     manifest_path = run_dir / MANIFEST_NAME
     previous = (
         json.loads(manifest_path.read_text())["epochs"]
         if manifest_path.exists()
         else {}
     )
-    ok = feature_run.ok_epochs(run_manifest)
+    ok = ok_epochs(run_manifest)
     todo = [
         i
         for i in ok

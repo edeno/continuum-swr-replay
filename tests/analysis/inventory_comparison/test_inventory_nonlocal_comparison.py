@@ -10,9 +10,6 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.inventory_comparison import (
-    feature_run,
-)
-from continuum_swr_replay.analysis.inventory_comparison import (
     nonlocal_comparison as comparison,
 )
 from continuum_swr_replay.analysis.inventory_comparison.features import (
@@ -171,27 +168,6 @@ def test_a_run_with_no_ok_epoch_is_refused(tmp_path):
     )
     with pytest.raises(ValueError, match="marks no epoch ok"):
         comparison.other_detector_events(tmp_path / "run")
-
-
-def test_ok_table_paths_are_the_ok_epochs_tables_sorted_and_may_be_none(tmp_path):
-    manifest = tmp_path / "manifest.json"
-    manifest.write_text(
-        json.dumps(
-            {
-                "epochs": {
-                    "e2": {"status": "ok"},
-                    "e3": {"status": "failed"},
-                    "e1": {"status": "ok"},
-                }
-            }
-        )
-    )
-    assert feature_run.ok_table_paths(tmp_path, "features") == [
-        tmp_path / "e1_features.parquet",
-        tmp_path / "e2_features.parquet",
-    ]
-    manifest.write_text(json.dumps({"epochs": {"e3": {"status": "failed"}}}))
-    assert feature_run.ok_table_paths(tmp_path, "features") == []
 
 
 def test_check_against_directional_refuses_other_counts(tmp_path):

@@ -2,16 +2,14 @@
 
 What ``scripts/detection/run_event_features.py`` writes for each epoch
 (:data:`TABLE_DTYPES`: ``features``, :data:`FEATURE_DTYPES`; ``pair_membership``;
-``rejection``) and where (:func:`output_path`), which the event features report
-and its example figures read; the run's manifest and the epochs it marks
-``ok``, the only ones read (:func:`read_manifest`, :func:`ok_epochs`), and a
-table of each of them (:func:`ok_table_paths`); and the
-inventory comparison's and the memoryless run's tables those two read beside a
-run (:func:`read_inputs`).
+``rejection``) and where (:func:`output_paths`), which the event features report
+and its example figures read; and the inventory comparison's and the memoryless
+run's tables those two read beside a run, for the epochs its manifest marks
+``ok`` (:func:`read_inputs`). The run's manifest and its ``ok`` epochs are read
+by ``runs.io`` (``read_manifest``, ``ok_epochs``, ``ok_table_paths``).
 Design: ``docs/design/replay_detection_comparison/04-event-features.md``.
 """
 
-import json
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
@@ -34,6 +32,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
 from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_DTYPES,
 )
+from continuum_swr_replay.runs.io import ok_epochs, output_path
 from continuum_swr_replay.tables.io import read_table
 
 __all__ = [
@@ -41,12 +40,8 @@ __all__ = [
     "FEATURE_DTYPES",
     "MS_DTYPES",
     "TABLE_DTYPES",
-    "ok_epochs",
-    "ok_table_paths",
-    "output_path",
     "output_paths",
     "read_inputs",
-    "read_manifest",
 ]
 
 MS_DTYPES: Mapping[str, object] = MappingProxyType(
@@ -119,11 +114,6 @@ TABLE_DTYPES: Mapping[str, Mapping[str, object]] = MappingProxyType(
 """Every table an epoch writes, with its columns and dtypes."""
 
 
-def output_path(identifier: str, output_dir: Path, name: str) -> Path:
-    """Where an epoch's table `name` is in the run folder `output_dir`."""
-    return output_dir / f"{identifier}_{name}.parquet"
-
-
 def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
     """Every table an epoch can write, by name."""
     return {name: output_path(identifier, output_dir, name) for name in TABLE_DTYPES}
@@ -146,47 +136,6 @@ CANDIDATE_COLUMNS: Mapping[str, object] = MappingProxyType(
 """The columns of the memoryless run's candidate tables the report reads."""
 
 
-def read_manifest(run_dir: Path) -> dict:
-    """The run's ``manifest.json``, with its record of each epoch.
-
-    Raises
-    ------
-    ValueError
-        If the run has no manifest, it cannot be read as JSON, or it holds no
-        ``epochs`` record.
-    """
-    path = run_dir / "manifest.json"
-    try:
-        manifest = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError) as error:
-        raise ValueError(f"no readable run manifest at {path}: {error}") from error
-    if not isinstance(manifest, dict) or not isinstance(manifest.get("epochs"), dict):
-        raise ValueError(f"no readable run manifest at {path}: no epochs record")
-    return manifest
-
-
-def ok_epochs(manifest: Mapping) -> list[str]:
-    """The epochs the run's manifest marks ``ok``, sorted: the only epochs of a
-    run that are read. A failed epoch's tables, or tables a manifest does not
-    know, may still be in the run folder."""
-    return sorted(i for i, r in manifest["epochs"].items() if r["status"] == "ok")
-
-
-def ok_table_paths(run_dir: Path, name: str) -> list[Path]:
-    """Table ``name`` of each epoch the run's manifest marks ``ok``, in the
-    order of :func:`ok_epochs`; an empty list when it marks none.
-
-    Raises
-    ------
-    ValueError
-        If the run has no readable manifest (:func:`read_manifest`).
-    """
-    return [
-        output_path(identifier, run_dir, name)
-        for identifier in ok_epochs(read_manifest(run_dir))
-    ]
-
-
 def read_inputs(
     manifest: Mapping, inventory_root: Path, memoryless_root: Path
 ) -> dict[str, pd.DataFrame]:
@@ -204,7 +153,7 @@ def read_inputs(
     tables = {
         name: typed_table(
             (
-                read_table(inventory_run.output_path(identifier, inventory_dir, name))
+                read_table(output_path(identifier, inventory_dir, name))
                 for identifier in ok
             ),
             inventory_run.TABLE_DTYPES[name],

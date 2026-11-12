@@ -1,7 +1,7 @@
 """The other detectors' events against the non-local detector's.
 
 Read from an event features run (``paths.event_features_root()``), for the
-epochs its manifest marks ``ok`` and no others (``feature_run.ok_epochs``):
+epochs its manifest marks ``ok`` and no others (``runs.io.ok_epochs``):
 every inventory's compared events (``*_features.parquet``), each event's
 membership against every other inventory (``*_pair_membership.parquet``) and
 its state shares (``*_state_shares.parquet``, from
@@ -23,9 +23,6 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay import intervals
-from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
-    ok_table_paths,
-)
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     STATE_SHARE_COLUMNS,
 )
@@ -37,6 +34,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     MEMORYLESS,
     STATE_SPACE,
 )
+from continuum_swr_replay.runs.io import ok_table_paths
 
 COVERINGS = {
     "kay": ("kay",),

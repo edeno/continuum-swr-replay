@@ -9,7 +9,6 @@ import pandas as pd
 import pytest
 
 import scripts.detection.measure_ripple_class_structure as structure
-from continuum_swr_replay.analysis.inventory_comparison import feature_run
 from continuum_swr_replay.paths import (
     event_features_root,
     event_spike_evidence_dir,
@@ -20,7 +19,7 @@ from continuum_swr_replay.reported.events import (
     EVENT_FEATURES_RUN,
     SPIKE_EVIDENCE_METRICS,
 )
-from continuum_swr_replay.runs.io import files_sha256
+from continuum_swr_replay.runs.io import files_sha256, output_path
 
 
 def _features(event_id: int, ripple_z_max: float) -> pd.DataFrame:
@@ -68,8 +67,8 @@ def _lay_out_inputs() -> None:
     run.mkdir(parents=True)
     epochs = {"e1": {"status": "ok"}, "e2": {"status": "failed"}}
     (run / "manifest.json").write_text(json.dumps({"epochs": epochs}))
-    _features(5, 2.0).to_parquet(feature_run.output_path("e1", run, "features"))
-    _features(5, 9.0).to_parquet(feature_run.output_path("e2", run, "features"))
+    _features(5, 2.0).to_parquet(output_path("e1", run, "features"))
+    _features(5, 9.0).to_parquet(output_path("e2", run, "features"))
     evidence = event_spike_evidence_dir() / "e1"
     evidence.mkdir(parents=True)
     pd.DataFrame(
@@ -95,7 +94,7 @@ def test_load_events_reads_the_features_of_the_ok_epochs_only(processed_data_roo
     assert record["inputs"]["event_features_run"] == {
         "run": EVENT_FEATURES_RUN,
         "n_files": 1,
-        "sha256": files_sha256([feature_run.output_path("e1", run, "features")]),
+        "sha256": files_sha256([output_path("e1", run, "features")]),
     }
     assert record["checks"]["peak_differs_from_features_run"] == 0
 

@@ -20,6 +20,7 @@ import pytest
 import scripts.figures.generate_inventory_examples as examples
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.runs.device import REQUIRED_XLA_FLAGS
+from continuum_swr_replay.runs.io import output_path
 from continuum_swr_replay.tables.io import write_table
 from continuum_swr_replay.visualization import inventory_examples
 
@@ -154,7 +155,7 @@ def test_a_draw_that_cannot_be_made_is_recorded_and_the_run_goes_on(
         table = cells([(cell, "kay", animal, "unmatched", 3)]).assign(
             epoch=identifier.split("_", 1)[1].removesuffix("_HPC")
         )
-        write_table(table, inventory_run.output_path(identifier, run_dir, "cells"))
+        write_table(table, output_path(identifier, run_dir, "cells"))
     (run_dir / "manifest.json").write_text(
         json.dumps(
             {
@@ -191,7 +192,7 @@ def test_a_draw_that_cannot_be_made_is_recorded_and_the_run_goes_on(
     # the first draw, of epoch one, disagrees; an earlier run left its figure
     first = inventory_examples.draw_examples(
         pd.concat(
-            pd.read_parquet(inventory_run.output_path(identifier, run_dir, "cells"))
+            pd.read_parquet(output_path(identifier, run_dir, "cells"))
             for identifier in epochs
         )
     ).iloc[0]

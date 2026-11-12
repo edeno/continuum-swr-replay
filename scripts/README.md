@@ -48,7 +48,7 @@ them importable.
 ## `detection/` — event detectors and the detection comparison
 - `_report.py` — not a script: what the two detection-comparison reports share (the
   pending marking of the memoryless inventories, caption and quantile wording,
-  `read_run`, which reads a run's `ok` epochs through `feature_run.read_manifest` and
+  `read_run`, which reads a run's `ok` epochs through `runs.io.read_manifest` and
   `ok_table_paths`, pooling sessions within an animal), imported as `scripts.detection._report`.
 - `run_artifact_detection.py` — the artifact mask: LFP and spike artifacts in every
   epoch's CA1 data, on CPU (S blocks, reference and CA1 steps, synchronous spike

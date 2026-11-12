@@ -17,15 +17,12 @@ from types import MappingProxyType
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
-    ok_table_paths,
-    read_manifest,
-)
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     MEMORYLESS,
     MEMORYLESS_CRITERIA,
     typed_table,
 )
+from continuum_swr_replay.runs.io import ok_table_paths, read_manifest
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
@@ -65,9 +62,7 @@ def read_run(
     """The run's manifest and every table of its ``ok`` epochs, concatenated.
 
     The manifest and its ``ok`` epochs' tables are read by
-    ``feature_run.read_manifest`` and ``feature_run.ok_table_paths``: an
-    inventory comparison run's manifest has the same epoch records as an event
-    features run's, and its tables the same file names.
+    ``runs.io.read_manifest`` and ``runs.io.ok_table_paths``.
 
     Parameters
     ----------
