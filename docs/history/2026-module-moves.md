@@ -113,6 +113,17 @@ unless they start with `scripts/`.
 | `scripts/detection/sweep_memoryless_detection.py` and `sweep_memoryless_controls.py`: their `summarize` functions | `hippocampus/memoryless_sequence/sweep_summaries.py` (new): `replay_sweep_summary`, `controls_summary` |
 | `scripts/detection/sweep_memoryless_heldout.py`: its `summarize` function | `inventory_comparison/heldout.py` (`heldout_summary`) |
 
+## Summary builders split by subject, 2026-11-12
+
+The two largest summary builders became packages, one module per subject. Every
+function kept its name and its body, and each value's `function` is unchanged;
+the package's `summarize` and `default_inputs` are what
+`scripts/reported/summarize.py` calls. Paths are under `src/continuum_swr_replay/`.
+
+| Old module | New home |
+|---|---|
+| `reported/behavior.py` (removed: split) | `reported/behavior/__init__.py` (`summarize`); `reported/behavior/inputs.py` (`BehaviorInputs`, `default_inputs`, `fit_staleness`, `_read_per_bin_fits`); `reported/behavior/common.py` (`TAGS`, `_gate_note`, `_require`); `reported/behavior/rate.py` (`per_bin_values`, `per_bin_detail_values`, `per_stop_values`, `rate_contrast_separation_values`, `rate_contrast_audit_values`, `cohort_audit_values`); `reported/behavior/history.py` (`duration_aware_history_values`); `reported/behavior/stops.py` (`stop_table_values`); `reported/behavior/content.py` (`content_contrast_values`, `breadth_derived_values`, `estimator_values`, `leaf_values`, `horserace_values`, `trunk_values`, `current_arm_paired_values`); `reported/behavior/choice.py` (`choice_values`, `stay_leave_values`); `reported/behavior/coupling.py` (`power_values`) |
+
 ## Package modules, 2026-10
 
 The code-organization branch (`470a393..2e55b21b`) moved, renamed or split the

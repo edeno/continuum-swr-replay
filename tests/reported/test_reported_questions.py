@@ -26,6 +26,7 @@ from continuum_swr_replay.reported import (
     events,
     values,
 )
+from continuum_swr_replay.reported.behavior import content
 from continuum_swr_replay.reported.questions import (
     ANSWERED,
     FIGURES,
@@ -163,6 +164,15 @@ def _builder(name: str):
     return importlib.import_module(f"continuum_swr_replay.reported.{name}")
 
 
+def _builder_trees(name: str) -> list[ast.Module]:
+    """The syntax tree of each file of a builder: its module, or every module of
+    its package."""
+    module = BUILDERS / f"{name}.py"
+    files = [module] if module.is_file() else sorted((BUILDERS / name).glob("*.py"))
+    assert files, name
+    return [ast.parse(path.read_text()) for path in files]
+
+
 def _tags_lookups(tree: ast.AST) -> tuple[set[str], int]:
     """The keys a module looks up in ``TAGS`` by a literal, and how many lookups
     it makes by any other expression."""
@@ -190,33 +200,41 @@ def test_every_tag_group_a_builder_declares_is_known(name):
 
 @pytest.mark.parametrize("name", list(values.SUMMARIES))
 def test_a_builder_uses_every_tag_group_it_declares_and_no_other(name):
-    tree = ast.parse((BUILDERS / f"{name}.py").read_text())
-    keys, other = _tags_lookups(tree)
-    assert other == 0
-    assert keys == set(_builder(name).TAGS)
+    lookups = [_tags_lookups(tree) for tree in _builder_trees(name)]
+    assert all(other == 0 for _, other in lookups)
+    assert set().union(*(keys for keys, _ in lookups)) == set(_builder(name).TAGS)
 
 
 @pytest.mark.parametrize("name", list(values.SUMMARIES))
 def test_a_builder_declares_its_tags_only_in_its_table(name):
     """Every ``Tags`` and every question id in a builder is in its ``TAGS`` table,
-    so a value's tags are declared once, as data."""
-    tree = ast.parse((BUILDERS / f"{name}.py").read_text())
-    table = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        and isinstance(node.targets[0], ast.Name)
-        and node.targets[0].id == "TAGS"
-    )
+    so a value's tags are declared once, as data, in one file of the builder."""
+
+    def table(tree: ast.Module) -> ast.Assign | None:
+        return next(
+            (
+                node
+                for node in tree.body
+                if isinstance(node, ast.Assign)
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id == "TAGS"
+            ),
+            None,
+        )
+
+    trees = _builder_trees(name)
+    tables = [table(tree) for tree in trees]
+    assert sum(t is not None for t in tables) == 1
     stray = [
         (node.lineno, ast.unparse(node))
+        for tree, found in zip(trees, tables, strict=True)
         for node in ast.walk(tree)
         if (
             (isinstance(node, ast.Constant) and isinstance(node.value, str))
             and _ID.fullmatch(node.value)
             or (isinstance(node, ast.Call) and ast.unparse(node.func) == "Tags")
         )
-        and not table.lineno <= node.lineno <= table.end_lineno
+        and not (found and found.lineno <= node.lineno <= found.end_lineno)
     ]
     assert not stray
 
@@ -254,8 +272,7 @@ def _factory_calls(tree: ast.Module) -> list[tuple[int, str, set[str]]]:
 def test_a_value_factory_names_the_function_its_values_are_made_in(name):
     """A value's ``function`` is where a reader looks for its computation, so each
     factory names the function it is made in, or the one it is handed to."""
-    tree = ast.parse((BUILDERS / f"{name}.py").read_text())
-    calls = _factory_calls(tree)
+    calls = [c for tree in _builder_trees(name) for c in _factory_calls(tree)]
     assert calls
     wrong = [(line, named) for line, named, allowed in calls if named not in allowed]
     assert not wrong
@@ -289,10 +306,10 @@ def test_a_factory_records_the_function_and_fills_in_what_is_shared():
 
 def test_the_content_values_find_their_tags_by_key_word():
     assert (
-        behavior._content_tags("swr_armreward_total")
+        content._content_tags("swr_armreward_total")
         == behavior.TAGS["content_reward_value"]
     )
-    assert behavior._content_tags("no_such_word") == behavior.TAGS["anchoring"]
+    assert content._content_tags("no_such_word") == behavior.TAGS["anchoring"]
 
 
 def test_the_remote_groups_spike_evidence_also_answers_question_2c_7():

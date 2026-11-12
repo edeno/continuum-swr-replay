@@ -1,10 +1,13 @@
-"""The behavior summary's fit values hold the statistic their key names, on hand-made fits.
+"""The behavior summary's rate values hold the statistic their key names, on
+hand-made fits and audits.
 
 Each population, rung and term is given its own number, so a value read from
 another population, rung or term, or the lowest read as the highest, fails.
 """
 
 from __future__ import annotations
+
+from dataclasses import fields, replace
 
 import numpy as np
 import pandas as pd
@@ -17,12 +20,13 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
     REWARD_HISTORY_N_LAGS,
 )
 from continuum_swr_replay.analysis.behavior.per_bin_design import reward_kernel_weights
-from continuum_swr_replay.reported import behavior
+from continuum_swr_replay.reported.behavior import rate
+from continuum_swr_replay.reported.behavior.inputs import BehaviorInputs
+from continuum_swr_replay.reported.behavior.rate import cohort_audit_values
+from tests.support._behavior_fits import ANIMALS, values_by_key
 
 NAN = np.nan
-ANIMALS = ("a", "a", "b", "c", "d", "e")
-"""Six sessions of five animals: the median over sessions is not the median
-over the animals' own medians."""
+
 
 POPULATIONS = {
     "swr": {
@@ -187,16 +191,12 @@ def _all_stops_fits() -> pd.DataFrame:
     return fits
 
 
-def _values(values: list) -> dict[str, float]:
-    return {value.key: value.value for value in values}
-
-
 # --- the per-bin rate ladder ----------------------------------------------------------
 
 
 def test_per_bin_values_read_each_population_s_own_statistic():
-    values = _values(
-        behavior.per_bin_values(_per_bin_fits(), _all_stops_fits(), "source")
+    values = values_by_key(
+        rate.per_bin_values(_per_bin_fits(), _all_stops_fits(), "source")
     )
     assert values["rate_sessions"] == 6
     assert values["rate_stops"] == 60
@@ -234,8 +234,8 @@ def test_per_bin_values_read_each_population_s_own_statistic():
 
 
 def test_per_bin_values_read_each_clock_s_time_course():
-    values = _values(
-        behavior.per_bin_values(_per_bin_fits(), _all_stops_fits(), "source")
+    values = values_by_key(
+        rate.per_bin_values(_per_bin_fits(), _all_stops_fits(), "source")
     )
     assert values["rate_time_peak_s_non_local"] == pytest.approx(2.0)
     assert values["rate_arrival_peak_s_non_local"] == pytest.approx(3.0)
@@ -262,8 +262,8 @@ def test_per_bin_values_read_each_clock_s_time_course():
 
 
 def test_per_bin_values_read_the_paired_kernel_and_the_all_stops_fit():
-    values = _values(
-        behavior.per_bin_values(_per_bin_fits(), _all_stops_fits(), "source")
+    values = values_by_key(
+        rate.per_bin_values(_per_bin_fits(), _all_stops_fits(), "source")
     )
     # SWR-coupled (3) minus non-SWR (0.5) lag-1 kernel: positive in every session
     assert values["rate_paired_sessions"] == 6
@@ -285,8 +285,8 @@ def test_per_bin_detail_values_read_each_population_rung_and_term():
     in_transit.attrs["arrival_clock_cohort"] = _arrival_cohort(
         {"swr": 20, "non_local": 30, "non_local_swr": 40, "non_local_no_swr": 50}
     )
-    values = _values(
-        behavior.per_bin_detail_values(
+    values = values_by_key(
+        rate.per_bin_detail_values(
             _per_bin_fits(), _all_stops_fits(), in_transit, "source"
         )
     )
@@ -375,7 +375,7 @@ def _per_stop_fits() -> pd.DataFrame:
 
 
 def test_per_stop_values_are_the_child_minus_the_parent_on_the_same_stops():
-    values = _values(behavior.per_stop_values(_per_stop_fits(), "source"))
+    values = values_by_key(rate.per_stop_values(_per_stop_fits(), "source"))
     # non_local: steps -1 to -7; session median -4; animals a -2, then -4 to -7
     assert values["per_stop_sessions_non_local"] == 7
     assert values["per_stop_delta_aic_session_non_local"] == -4.0
@@ -421,7 +421,7 @@ def test_rate_contrast_separation_values_count_each_cohort_rung_and_term():
             + [term],
         }
     )
-    values = _values(behavior.rate_contrast_separation_values(fits, "source"))
+    values = values_by_key(rate.rate_contrast_separation_values(fits, "source"))
     # contrast fits flagged separated: primary 1 of S1 and 2 of S2, of 7
     assert values["rate_contrast_separated_fraction_primary"] == pytest.approx(3 / 7)
     assert values["rate_contrast_separated_fraction_post_outcome"] == 0.2
@@ -450,7 +450,7 @@ def test_rate_contrast_audit_values_name_the_contrast_term_that_loses_most():
             "n_dropped": [0, 12, 5, 50],
         }
     )
-    values = {v.key: v for v in behavior.rate_contrast_audit_values(audited, "source")}
+    values = {v.key: v for v in rate.rate_contrast_audit_values(audited, "source")}
     assert values["rate_contrast_audited_rows"].value == 4
     assert values["rate_contrast_terms_losing_sessions"].value == 2
     assert values["rate_contrast_most_dropped"].value == 12
@@ -458,198 +458,59 @@ def test_rate_contrast_audit_values_name_the_contrast_term_that_loses_most():
     assert values["rate_contrast_most_dropped_of"].value == 102
 
 
-# --- single coefficients: leaf ladder, choice, ripple power ---------------------------
-
-
-def _coefficient_fits(term: str, coefficients, se: float) -> pd.DataFrame:
-    """One fit per coefficient of ``term``, in the six sessions of five animals."""
-    return pd.DataFrame(
-        {
-            "animal": list(ANIMALS),
-            "session_date": list(range(len(ANIMALS))),
-            "epoch": "02_r1",
-            f"coef_{term}": coefficients,
-            f"sd_{term}": 0.1,
-            f"bse_{term}": se,
-            "separated_terms": "",
-        }
+def test_cohort_audit_values_read_the_non_local_rows_of_each_audit(tmp_path):
+    columns = [
+        "population",
+        "model",
+        "n_in",
+        "n_drop_own_predictor_missing",
+        "n_drop_common_cohort_other",
+        "n_modeled",
+        "n_excluded_session",
+    ]
+    per_bin = pd.DataFrame(
+        [
+            ("swr", "M0_const", 1, 2, 3, 4, 5),
+            ("non_local", "M0_const", 900, 11, 12, 800, 13),
+            ("non_local", "M5_time", 900, 21, 22, 700, 23),
+        ],
+        columns=columns,
     )
-
-
-def _rung_fit(aic, frame: pd.DataFrame | None = None) -> pd.DataFrame:
-    """One rung's fit statistics in the six sessions, beside ``frame``'s columns."""
-    fit = frame if frame is not None else _coefficient_fits("unused", [0.0] * 6, 0.1)
-    return fit.assign(llf=-40.0, aic=aic, bic=aic, n_params=3, n_events=50)
-
-
-def test_leaf_values_read_each_rung_s_own_term_and_step(tmp_path):
-    rising = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]  # median 0.35
-    # Each step's per-session AIC(child) - AIC(parent), sessions in ANIMALS order
-    # (a, a, b, c, d, e):
-    # M4 -> Mu  [-10, -6, -1, -3, 4, -5]: median -4, four below -2; animal
-    #           medians -8, -1, -3, 4, -5, four negative. The child is better.
-    # M4 -> Mv  [3, 1, 5, -4, 2, 6]: median 2.5, one below -2; animal medians
-    #           2, 5, -4, 2, 6, one negative. The parent is better.
-    # Mu -> Mvu [-1, 0.5, -2.5, 1.5, -0.5, 3]: median 0, one below -2; animal
-    #           medians -0.25, -2.5, 1.5, -0.5, 3, three negative.
-    m4 = np.full(6, 100.0)
-    mu = m4 + [-10, -6, -1, -3, 4, -5]
-    mv = m4 + [3, 1, 5, -4, 2, 6]
-    mvu = mu + [-1, 0.5, -2.5, 1.5, -0.5, 3]
-    _rung_fit(m4).to_pickle(tmp_path / "M4.pkl")
-    _rung_fit(
-        mu,
-        _coefficient_fits(
-            "reward_belief_variance_candidate_arm_preoutcome_z", rising, 0.05
-        ),
-    ).to_pickle(tmp_path / "Mu.pkl")
-    _rung_fit(
-        mv,
-        _coefficient_fits(
-            "reward_belief_mean_candidate_arm_preoutcome",
-            [-2 * c for c in rising],
-            0.07,
-        ),
-    ).to_pickle(tmp_path / "Mv.pkl")
-    _rung_fit(mvu).to_pickle(tmp_path / "Mvu.pkl")
-    values = _values(behavior.leaf_values(tmp_path, "source"))
-    assert values["leaf_uncertainty"] == pytest.approx(0.35)
-    assert values["leaf_value"] == pytest.approx(-0.7)
-    assert values["leaf_uncertainty_sessions"] == 6
-    assert values["leaf_uncertainty_animals_positive"] == 5
-    assert values["leaf_value_animals_positive"] == 0
-    assert values["leaf_uncertainty_se"] == pytest.approx(0.05)
-    assert values["leaf_value_se"] == pytest.approx(0.07)
-    assert values["leaf_step_uncertainty"] == -4.0
-    assert values["leaf_step_uncertainty_clear"] == 4
-    assert values["leaf_step_uncertainty_animals"] == 4
-    assert values["leaf_step_value"] == 2.5
-    assert values["leaf_step_value_clear"] == 1
-    assert values["leaf_step_value_sessions"] == 6
-    assert values["leaf_step_value_animals"] == 1
-    assert values["leaf_step_both"] == 0.0
-    assert values["leaf_step_both_clear"] == 1
-    assert values["leaf_step_both_animals"] == 3
-
-
-def test_leaf_steps_ignore_a_stored_comparison(tmp_path):
-    """A bundle's model_comparison.pkl written in the old sign (parent minus
-    child) is not read: the step comes from the rungs' own AICs."""
-    m4 = np.full(6, 100.0)
-    mu = m4 - 10.0
-    for name, aic in (("M4", m4), ("Mvu", mu)):
-        _rung_fit(aic).to_pickle(tmp_path / f"{name}.pkl")
-    for name, aic, term in (
-        ("Mu", mu, "reward_belief_variance_candidate_arm_preoutcome_z"),
-        ("Mv", m4, "reward_belief_mean_candidate_arm_preoutcome"),
-    ):
-        _rung_fit(aic, _coefficient_fits(term, [0.1] * 6, 0.05)).to_pickle(
-            tmp_path / f"{name}.pkl"
-        )
-    pd.DataFrame(
-        {"parent": ["M4"], "child": ["Mu"], "n_animals": 5, "delta_aic_median": 10.0}
-    ).to_pickle(tmp_path / "model_comparison.pkl")
-    values = _values(behavior.leaf_values(tmp_path, "source"))
-    assert values["leaf_step_uncertainty"] == -10.0
-
-
-def test_choice_values_read_each_block_s_own_term():
-    non_swr = [0.1, 0.2, 0.3, 0.4, 0.5, -0.6]  # median 0.25, five positive
-    swr = [-0.1, -0.2, -0.3, -0.4, 0.5, 0.6]  # median -0.15, two positive
-    split = _coefficient_fits("replay_fraction_non_swr", non_swr, 0.1).merge(
-        _coefficient_fits("replay_fraction_swr", swr, 0.1)
+    per_stop = pd.DataFrame(
+        [
+            ("non_local", "R1", 500, 31, 32, 300, 33),
+            ("non_local", "R0", 500, 41, 42, 400, 43),
+            ("swr", "R0", 6, 7, 8, 9, 10),
+        ],
+        columns=columns,
     )
-    fits = {
-        "choice_swr_split": {"C_full_swr_split": split},
-        "choice": {
-            "C_full": _coefficient_fits("replay_fraction", [0.3] * 6, 0.1),
-            "C_replay_only": _coefficient_fits("replay_fraction", [-0.9] * 6, 0.1),
-        },
+    inputs = BehaviorInputs(
+        **{field.name: tmp_path / field.name for field in fields(BehaviorInputs)}
+    )
+    inputs = replace(
+        inputs,
+        per_bin_audit=tmp_path / "per_bin_audit.csv",
+        per_stop_audit=tmp_path / "per_stop_audit.csv",
+    )
+    per_bin.to_csv(inputs.per_bin_audit, index=False)
+    per_stop.to_csv(inputs.per_stop_audit, index=False)
+
+    values = {v.key: v for v in cohort_audit_values(inputs)}
+    read = {key: value.value for key, value in values.items()}
+    assert read == {
+        "rate_audit_stops_in": 900,
+        "rate_audit_stops_own_drop": 11,
+        "rate_audit_stops_common_drop": 12,
+        "rate_audit_stops_modeled": 800,
+        "rate_audit_stops_modeled_session_excluded": 13,
+        # what entered and what was dropped are read from the R0 row
+        "per_stop_audit_stops_in": 500,
+        "per_stop_audit_stops_own_drop": 41,
+        "per_stop_audit_stops_common_drop": 42,
+        "per_stop_audit_stops_modeled": 400,
+        "per_stop_audit_stops_modeled_session_excluded": 43,
+        "per_stop_audit_stops_full": 300,
+        "per_stop_audit_stops_full_session_excluded": 33,
     }
-    values = _values(behavior.choice_values(fits, "source"))
-    assert values["choice_non_swr"] == pytest.approx(0.25)
-    assert values["choice_swr"] == pytest.approx(-0.15)
-    assert values["choice_full"] == pytest.approx(0.3)
-    assert values["choice_raw"] == pytest.approx(-0.9)
-    assert values["choice_non_swr_sessions"] == 6
-    assert values["choice_non_swr_positive_sessions"] == 5
-    assert values["choice_non_swr_negative_sessions"] == 1
-    assert values["choice_swr_positive_sessions"] == 2
-    assert values["choice_swr_negative_sessions"] == 4
-    assert values["choice_full_animals_positive"] == 5
-    assert values["choice_raw_animals_positive"] == 0
-    # |coefficient| / 0.1 is 1 to 6: all but the first are above 1.96
-    assert values["choice_non_swr_significant_fraction"] == pytest.approx(5 / 6)
-    # six sessions of one sign: two-sided exact p = 2 / 2 ** 6
-    assert values["choice_full_p"] == pytest.approx(0.03125)
-
-
-def test_choice_values_read_through_a_refusing_gate_are_pending():
-    # Twelve sessions. The SWR term is separated in three of them, a quarter,
-    # which is more than the per-term gate lets be left out: the audited
-    # aggregates would publish no row for it. Its seven values are kept, over
-    # the nine sessions left, and marked pending; the other terms' are not.
-    swr, non_swr = "replay_fraction_swr", "replay_fraction_non_swr"
-    split = pd.DataFrame(
-        {
-            "animal": list(ANIMALS) * 2,
-            "session_date": list(range(12)),
-            "epoch": "02_r1",
-            f"coef_{non_swr}": 0.2,
-            f"sd_{non_swr}": 0.1,
-            f"bse_{non_swr}": 0.1,
-            f"coef_{swr}": -0.3,
-            f"sd_{swr}": 0.1,
-            f"bse_{swr}": 0.1,
-            "separated_terms": [swr, swr, "", "", "", "", swr, "", "", "", "", ""],
-        }
-    )
-    fits = {
-        "choice_swr_split": {"C_full_swr_split": split},
-        "choice": {
-            "C_full": _coefficient_fits("replay_fraction", [0.3] * 6, 0.1),
-            "C_replay_only": _coefficient_fits("replay_fraction", [-0.9] * 6, 0.1),
-        },
-    }
-
-    values = {value.key: value for value in behavior.choice_values(fits, "source")}
-
-    pending = {key for key, value in values.items() if value.pending is not None}
-    assert pending == {
-        "choice_swr",
-        "choice_swr_p",
-        "choice_swr_sessions",
-        "choice_swr_positive_sessions",
-        "choice_swr_negative_sessions",
-        "choice_swr_animals_positive",
-        "choice_swr_significant_fraction",
-    }
-    assert values["choice_swr_sessions"].value == 9
-    assert values["choice_non_swr_sessions"].value == 12
-    note = values["choice_swr"].pending
-    assert "the per-term session gate refuses replay_fraction_swr" in note
-    assert "more than 20 % of the sessions" in note
-
-
-def test_power_values_read_each_covariate_s_own_column():
-    rising = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
-    coefs = pd.DataFrame(
-        {
-            "animal": [*ANIMALS, "e"],
-            "session_date": list(range(7)),
-            "epoch": "02_r1",
-            "known_reward_outcome_lag_1": rising,
-            "rpe_postoutcome": [-c for c in rising],
-            # one session has no coefficient for this covariate
-            "patch_switch_fraction_last5_completed_trips": [2.0] * 6 + [NAN],
-        }
-    )
-    values = _values(behavior.power_values(coefs, "source"))
-    assert values["power_sessions"] == 7
-    assert values["power_reward"] == pytest.approx(0.4)
-    assert values["power_rpe"] == pytest.approx(-0.4)
-    assert values["power_exploration"] == 2.0
-    assert values["power_reward_animals_positive"] == 5
-    assert values["power_rpe_animals_positive"] == 0
-    assert values["power_reward_p"] == pytest.approx(2 / 2**7)
-    assert values["power_exploration_p"] == pytest.approx(2 / 2**6)
+    assert "per_bin_audit.csv" in values["rate_audit_stops_in"].source
+    assert "per_stop_audit.csv" in values["per_stop_audit_stops_in"].source

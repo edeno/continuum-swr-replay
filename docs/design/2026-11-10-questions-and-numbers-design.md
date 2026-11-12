@@ -665,7 +665,7 @@ confirms that every marker key arrives somewhere.
 The prose at lines 1–56 goes to `docs/rate_models.md`, and section 5 (lines
 217–236, no values) goes to `TODO.md` if it is still pending. Its inbound links
 include `scripts/behavior/rate/plot_per_bin_rate_summary.py`,
-`src/continuum_swr_replay/reported/behavior.py` (then named part3.py) and
+`src/continuum_swr_replay/reported/behavior/` (then the module part3.py, split by subject on 2026-11-12) and
 `tests/unit/test_summarize_per_bin_rate_models.py` (the test was removed later,
 with `summarize_per_bin_rate_models.py`, which it tested). These are code, so each is
 checked before the file is removed.
@@ -700,7 +700,7 @@ and `tests/reported/test_manuscript_macros.py` are updated.
   `scripts/exploratory/_verify_content_models.py`;
 - `src/continuum_swr_replay/analysis/behavior/model_specs.py`,
   `src/continuum_swr_replay/reported/__init__.py`, `src/continuum_swr_replay/reported/values.py`;
-- `src/continuum_swr_replay/reported/behavior.py` (then named part3.py). Its `docs: replay_rate_content_swr_synthesis`
+- `src/continuum_swr_replay/reported/behavior/` (then the module part3.py, split by subject on 2026-11-12). Its `docs: replay_rate_content_swr_synthesis`
   tags (`:1854`, `:2699`) are replaced per decision 4;
 - the design documents under `docs/design/`.
 

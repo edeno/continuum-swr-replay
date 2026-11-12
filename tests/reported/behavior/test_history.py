@@ -1,18 +1,14 @@
-"""The behavior summary's duration-aware history and horse-race values, on synthetic inputs."""
+"""The behavior summary's duration-aware history values, on synthetic inputs."""
 
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.rate.history_kernel_statistics import (
     HISTORY_MAX_SE,
 )
-from continuum_swr_replay.reported.behavior import (
-    duration_aware_history_values,
-    horserace_values,
-)
+from continuum_swr_replay.reported.behavior.history import duration_aware_history_values
 
 ANIMALS = ("a", "b", "c", "d", "e")
 # Per population: the end-locked first-lag rate ratio (as a multiple of
@@ -242,30 +238,3 @@ def test_history_values_drop_an_unconverged_end_locked_fit_loudly():
     pooled["results"][0]["duration_aware"]["Mself_dur"]["converged"] = False
     with pytest.raises(ValueError, match="did not converge"):
         duration_aware_history_values(_ridge(), pooled, "x")
-
-
-def test_horserace_values_name_each_population_and_predictor():
-    predictors = {
-        "reward_belief_variance_candidate_arm_preoutcome_z": 0.03,
-        "reward_belief_mean_candidate_arm_preoutcome_z": -0.001,
-        "distance_to_candidate_arm_cm_z": -0.01,
-        "visit_recency_trials_z": 0.002,
-    }
-    summary = pd.DataFrame(
-        [
-            {
-                "population": pop,
-                "predictor": p,
-                "median": m,
-                "n_animals_consistent": 4,
-                "median_cond_number": 3.0 + i,
-            }
-            for i, pop in enumerate(("all", "SWR", "non_SWR"))
-            for p, m in predictors.items()
-        ]
-    )
-    values = {v.key: v for v in horserace_values(summary, "x")}
-    assert values["horserace_uncertainty_swr"].value == pytest.approx(0.03)
-    assert values["horserace_value_non_swr_animals"].value == 4
-    assert values["horserace_condition_number_non_swr"].value == pytest.approx(5.0)
-    assert len(values) == 3 * (4 * 2 + 1)
