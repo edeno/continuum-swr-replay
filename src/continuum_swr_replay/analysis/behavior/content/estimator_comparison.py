@@ -28,6 +28,7 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from ...shared_statistics import session_median_statistics
 from .._fit_diagnostics import SEPARATION_COEF_ABS
 from ..coefficient_statistics import animal_median_bootstrap
+from ..fit_comparability import COMPARABILITY_COLUMNS, why_not_comparable
 from ..fitting import CONDITIONAL_POISSON_COUNT, CONDITIONAL_POISSON_FRACTION
 from .dirichlet_multinomial import ESTIMATOR as DIRICHLET_MULTINOMIAL
 
@@ -182,10 +183,26 @@ def attach_delta_aic(coefficients: pd.DataFrame) -> pd.DataFrame:
     """Add ``delta_aic_vs_parent`` per (session, rung, estimator).
 
     It is the rung's ``aic_equalized`` minus its parent's, child minus parent:
-    negative means the rung is better. The difference is only formed where the rung and its parent were fit on the
-    same number of events in that session and estimator; an AIC difference
-    across different rows is not a model comparison, so it is left NaN and
-    counted (``n_delta_aic_row_mismatch``) rather than reported.
+    negative means the rung is better. The difference is only formed where the
+    rung's and its parent's fits of that session and estimator can be compared
+    (:func:`~continuum_swr_replay.analysis.behavior.fit_comparability.why_not_comparable`,
+    on the :data:`~continuum_swr_replay.analysis.behavior.fit_comparability.COMPARABILITY_COLUMNS`
+    the rows carry: ``n_events`` here). An AIC difference across different rows
+    is not a model comparison, so it is left NaN and flagged
+    (``delta_aic_row_mismatch``) rather than reported.
+
+    Parameters
+    ----------
+    coefficients : pd.DataFrame, shape (n_rows, n_columns)
+        One row per (session, rung, term, estimator), with ``parent`` and
+        ``aic_equalized``.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``coefficients`` with ``delta_aic_vs_parent`` and
+        ``delta_aic_row_mismatch`` (True where the parent was fit and the two
+        fits cannot be compared).
     """
     coefficients = coefficients.copy()
     coefficients["delta_aic_vs_parent"] = np.nan
@@ -193,26 +210,31 @@ def attach_delta_aic(coefficients: pd.DataFrame) -> pd.DataFrame:
     if coefficients.empty:
         return coefficients
 
+    carried = [c for c in COMPARABILITY_COLUMNS if c in coefficients]
     fit_level = coefficients.drop_duplicates([*SC, "model", "estimator"])[
-        [*SC, "model", "estimator", "aic_equalized", "n_events"]
+        [*SC, "model", "estimator", "aic_equalized", *carried]
     ]
     parent_level = fit_level.rename(
         columns={
             "model": "parent",
-            "aic_equalized": "parent_aic_equalized",
-            "n_events": "parent_n_events",
+            "aic_equalized": "aic_equalized_parent",
+            **{column: f"{column}_parent" for column in carried},
         }
     )
     merged = coefficients.merge(
         parent_level, on=[*SC, "parent", "estimator"], how="left"
     )
-    matched = merged["parent_n_events"].eq(merged["n_events"])
-    merged.loc[matched, "delta_aic_vs_parent"] = (
-        merged.loc[matched, "aic_equalized"]
-        - merged.loc[matched, "parent_aic_equalized"]
+    comparable = ~why_not_comparable(merged, ("", "_parent")).any(axis=1)
+    merged.loc[comparable, "delta_aic_vs_parent"] = (
+        merged.loc[comparable, "aic_equalized"]
+        - merged.loc[comparable, "aic_equalized_parent"]
     )
-    merged["delta_aic_row_mismatch"] = merged["parent_aic_equalized"].notna() & ~matched
-    return merged.drop(columns=["parent_aic_equalized", "parent_n_events"])
+    merged["delta_aic_row_mismatch"] = (
+        merged["aic_equalized_parent"].notna() & ~comparable
+    )
+    return merged.drop(
+        columns=["aic_equalized_parent", *(f"{column}_parent" for column in carried)]
+    )
 
 
 def unidentified_rows(coefficients: pd.DataFrame) -> pd.Series:
