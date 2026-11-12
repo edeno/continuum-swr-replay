@@ -235,3 +235,30 @@ def test_mark_correlations_are_animal_balanced(tmp_path):
     assert table["statistic"].tolist() == ["mark_correlation"]
     assert table["value"].iloc[0] == pytest.approx(0.6)
     assert table["n_sessions"].iloc[0] == 3
+
+
+def test_complete_bundle_records_keep_only_complete_bundles_in_name_order(tmp_path):
+    """A sidecar with another status, or a non-sidecar file, is not a bundle; a
+    record with an ``extra`` block is read from it, one without from itself."""
+    sidecars = {
+        "c_marked_family.provenance.json": {
+            "extra": {"bundle_status": "complete", "model_name": "c"}
+        },
+        "a_marked_family.provenance.json": {
+            "bundle_status": "complete",
+            "model_name": "a",
+        },
+        "b_marked_family.provenance.json": {"extra": {"bundle_status": "no_units"}},
+        "d_marked_family.provenance.json": {"bundle_status": "ineligible"},
+        "e_other.provenance.json": {"bundle_status": "complete"},
+    }
+    for name, record in sidecars.items():
+        (tmp_path / name).write_text(json.dumps(record))
+
+    records = stats.complete_bundle_records(tmp_path)
+
+    assert [path.name for path, _ in records] == [
+        "a_marked_family.provenance.json",
+        "c_marked_family.provenance.json",
+    ]
+    assert [extra["model_name"] for _, extra in records] == ["a", "c"]

@@ -58,7 +58,6 @@ The follow-up corpus (contract 3, ``well_unknown`` baseline; writes
 from __future__ import annotations
 
 import argparse
-import json
 from collections import defaultdict
 from pathlib import Path
 
@@ -73,6 +72,7 @@ from continuum_swr_replay.analysis.pfc.marked_family_statistics import (
     MAX_P_THRESHOLD,
     animal_balanced_curve,
     animal_balanced_fraction_positive,
+    complete_bundle_records,
     mark_correlations,
     null_band_summary,
     population_curve_summary,
@@ -156,11 +156,7 @@ def load_bundles(
     contracts: set = set()
     event_sets: set = set()
     model_sets: set = set()
-    for sidecar in sorted(bundle_dir.glob("*_marked_family.provenance.json")):
-        record = json.load(open(sidecar))
-        extra = record.get("extra", record)
-        if extra.get("bundle_status") != "complete":
-            continue
+    for sidecar, extra in complete_bundle_records(bundle_dir):
         contracts.add(extra.get("bundle_contract_version"))
         event_sets.add(extra.get("event_set", "canonical"))
         model = extra["model_name"]

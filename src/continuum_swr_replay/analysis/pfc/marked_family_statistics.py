@@ -16,6 +16,8 @@ and writes the summary the mpfc summary builder reads.
   shuffled-mark refits.
 - :func:`mark_correlations`: the within-session correlation of every pair of
   marks, from the bundles' sidecars.
+- :func:`complete_bundle_records`: the complete bundles of a directory, the
+  only ones :func:`mark_correlations` and the summary script read.
 """
 
 from __future__ import annotations
@@ -38,11 +40,39 @@ PRE_ONSET_MAX_S = -0.1
 POST_ONSET_WINDOW_S = (0.0, 0.15)
 
 
+def complete_bundle_records(bundle_dir: Path) -> list[tuple[Path, dict]]:
+    """The sidecar of every complete bundle in a directory, in name order.
+
+    A bundle is complete when its ``*_marked_family.provenance.json`` sidecar
+    records ``bundle_status == "complete"``; a session the runner found
+    ineligible or without units leaves a sidecar with another status and no
+    bundle.
+
+    Parameters
+    ----------
+    bundle_dir : Path
+        Directory holding ``*_marked_family.pkl`` bundles and sidecars.
+
+    Returns
+    -------
+    list of (Path, dict)
+        Each complete bundle's sidecar path and the record's ``extra`` (the
+        record itself when it has none), sorted by sidecar path.
+    """
+    records = []
+    for sidecar in sorted(bundle_dir.glob("*_marked_family.provenance.json")):
+        record = json.load(open(sidecar))
+        extra = record.get("extra", record)
+        if extra.get("bundle_status") == "complete":
+            records.append((sidecar, extra))
+    return records
+
+
 def mark_correlations(bundle_dir: Path) -> pd.DataFrame:
     """Correlation of every pair of marks in each model and class.
 
-    Read from each complete bundle's sidecar
-    (``marked_family_diagnostics.event_mark_geometry_by_class``: the
+    Read from each complete bundle's sidecar (:func:`complete_bundle_records`;
+    ``marked_family_diagnostics.event_mark_geometry_by_class``: the
     within-session correlation of the standardized event marks), then
     averaged unit -> session -> animal like every other statistic here: the
     mean over animals of each animal's mean over sessions. A slope on a mark
@@ -61,11 +91,7 @@ def mark_correlations(bundle_dir: Path) -> pd.DataFrame:
         ``statistic`` (``"mark_correlation"``), ``value``, ``n_sessions``.
     """
     per_session: dict = defaultdict(lambda: defaultdict(list))
-    for sidecar in sorted(bundle_dir.glob("*_marked_family.provenance.json")):
-        record = json.load(open(sidecar))
-        extra = record.get("extra", record)
-        if extra.get("bundle_status") != "complete":
-            continue
+    for _, extra in complete_bundle_records(bundle_dir):
         animal, _ = parse_nwb_filename(extra["nwb_file_name"])
         geometry = extra.get("marked_family_diagnostics", {}).get(
             "event_mark_geometry_by_class", {}
