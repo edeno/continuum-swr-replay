@@ -185,15 +185,15 @@ def test_called_response_timing_intervals_come_from_the_nested_bootstrap(
     }
     enhanced = statistics.loc["enhanced"]
     for name, values in expected.items():
-        low, high = np.percentile(values, [2.5, 97.5])
-        assert enhanced[f"{name}_ci_low"] == pytest.approx(low), name
-        assert enhanced[f"{name}_ci_high"] == pytest.approx(high), name
-        assert low <= enhanced[name] <= high, name
-    # the decreases are one unit of one day: every resample is the same curve
+        # two animals (a, b): the value +/- t(0.975, 1) sqrt(2) SD(replicates)
+        half = 12.7062047362 * np.sqrt(2) * np.std(values, ddof=1)
+        assert enhanced[f"{name}_ci_low"] == pytest.approx(enhanced[name] - half), name
+        assert enhanced[f"{name}_ci_high"] == pytest.approx(enhanced[name] + half), name
+    # the decreases are one unit of one animal: no t quantile, no interval
     suppressed = statistics.loc["suppressed"]
     for name in expected:
-        assert suppressed[f"{name}_ci_low"] == pytest.approx(suppressed[name]), name
-        assert suppressed[f"{name}_ci_high"] == pytest.approx(suppressed[name]), name
+        assert np.isnan(suppressed[f"{name}_ci_low"]), name
+        assert np.isnan(suppressed[f"{name}_ci_high"]), name
 
 
 def test_called_response_timing_counts_animals_whose_own_curve_starts_early(statistics):

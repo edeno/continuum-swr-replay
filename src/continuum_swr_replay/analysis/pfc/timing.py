@@ -21,10 +21,12 @@ measures it on simulated responses of known onset, read by
 
 The population curve is the mean over units of each curve multiplied by the
 sign of its own peak (so a suppression counts as a response of the same
-size), with a percentile interval from the nested bootstrap
+size), with a 95 % interval from the nested bootstrap
 (:func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_draw`:
 the animals, then each drawn animal's groups of units, its sessions or its
-recording days, then each drawn group's units). An animal's own curve is the
+recording days, then each drawn group's units): the statistic plus or minus a
+small-sample t correction over the animals times the draws' standard deviation
+(:func:`~continuum_swr_replay.analysis.shared_statistics.bootstrap_interval`). An animal's own curve is the
 mean over its groups of each group's sign-aligned mean curve.
 
 The timing statistics of the units called for an event class
@@ -44,6 +46,7 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_balanced_curve,
+    bootstrap_interval,
     nested_bootstrap_draw,
     nested_codes,
 )
@@ -266,7 +269,10 @@ class PopulationTiming(NamedTuple):
         Its peak lag (the lag of its largest absolute value) and half-maximum
         onset, in seconds.
     peak_lag_interval, onset_lag_interval : tuple of float
-        2.5th and 97.5th percentiles over the nested resamples, in seconds.
+        95 % intervals from the nested resamples
+        (:func:`~continuum_swr_replay.analysis.shared_statistics.bootstrap_interval`
+        over the animals), in seconds; NaN when the curve has no such lag or
+        there are fewer than two animals.
     steepest_lag : float
         Its steepest approach to the peak (:func:`steepest_approach_lag`), s.
     steepest_lag_interval : tuple of float
@@ -277,8 +283,8 @@ class PopulationTiming(NamedTuple):
         the size is negative only if the mean curve's largest absolute value
         is on the other side of zero from the units' own peaks.
     size_interval : tuple of float
-    n_units, n_groups : int
-        Units and groups the curve averages.
+    n_units, n_groups, n_animals : int
+        Units, groups and animals the curve averages.
     """
 
     curve: NDArray
@@ -292,6 +298,7 @@ class PopulationTiming(NamedTuple):
     size_interval: tuple[float, float]
     n_units: int
     n_groups: int
+    n_animals: int
 
 
 def population_timing(
@@ -356,6 +363,7 @@ def population_timing(
             nan_pair,
             0,
             0,
+            0,
         )
     return _mean_curve_timing(
         *resampled,
@@ -374,10 +382,10 @@ def _resampled_mean_curves(
     *,
     n_boot: int,
     seed: int,
-) -> tuple[NDArray, NDArray, int] | None:
+) -> tuple[NDArray, NDArray, int, int] | None:
     """The sign-aligned mean curve, shape (n_lags,), its ``n_boot`` nested
-    resamples (animals, groups, units), shape (n_boot, n_lags), and the number of
-    groups; None when there is no unit."""
+    resamples (animals, groups, units), shape (n_boot, n_lags), and the numbers of
+    groups and of animals; None when there is no unit."""
     aligned = curves * np.sign(np.asarray(peak, dtype=float))[None, :]
     if aligned.shape[1] == 0:
         return None
@@ -396,13 +404,14 @@ def _resampled_mean_curves(
         ]
     ).astype(float)  # (n_boot, n_units)
     boot_curves = (counts @ aligned.T) / counts.sum(axis=1)[:, None]
-    return curve, boot_curves, n_groups
+    return curve, boot_curves, n_groups, int(animal_codes.max()) + 1
 
 
 def _mean_curve_timing(
     curve: NDArray,
     boot_curves: NDArray,
     n_groups: int,
+    n_animals: int,
     lag_time: NDArray,
     *,
     n_units: int,
@@ -419,22 +428,27 @@ def _mean_curve_timing(
     observed_size = response_size(curve, lag_time, baseline=baseline)
     boot_size = response_size(boot_curves.T, lag_time, baseline=baseline)
 
-    def interval(values: NDArray) -> tuple[float, float]:
-        low, high = np.nanpercentile(values, [2.5, 97.5])
-        return float(low), float(high)
+    def interval(estimate: float, draws: NDArray) -> tuple[float, float]:
+        low, high, _ = bootstrap_interval(estimate, draws, n_animals)
+        return low, high
 
+    peak_lag = float(observed.peak_lag[0])
+    onset_lag = float(observed.onset_lag[0])
+    steepest_lag = float(observed_steepest[0])
+    size = float(observed_size[0])
     return PopulationTiming(
         curve=curve,
-        peak_lag=float(observed.peak_lag[0]),
-        onset_lag=float(observed.onset_lag[0]),
-        peak_lag_interval=interval(boot.peak_lag),
-        onset_lag_interval=interval(boot.onset_lag),
-        steepest_lag=float(observed_steepest[0]),
-        steepest_lag_interval=interval(boot_steepest),
-        size=float(observed_size[0]),
-        size_interval=interval(boot_size),
+        peak_lag=peak_lag,
+        onset_lag=onset_lag,
+        peak_lag_interval=interval(peak_lag, boot.peak_lag),
+        onset_lag_interval=interval(onset_lag, boot.onset_lag),
+        steepest_lag=steepest_lag,
+        steepest_lag_interval=interval(steepest_lag, boot_steepest),
+        size=size,
+        size_interval=interval(size, boot_size),
         n_units=n_units,
         n_groups=n_groups,
+        n_animals=n_animals,
     )
 
 
@@ -528,8 +542,9 @@ def population_rise_timing(
         - ``rise_size``: its value at the peak less its value at the first
           lag, on the log-rate scale.
         - ``rise_onset_ms_ci_low``, ``rise_onset_ms_ci_high``,
-          ``rise_size_ci_low``, ``rise_size_ci_high``: the 2.5th and 97.5th
-          percentiles of the rise onset and the rise size over the resamples.
+          ``rise_size_ci_low``, ``rise_size_ci_high``: the 95 % intervals of
+          the rise onset and the rise size from the resamples, a small-sample
+          t correction over the animals (NaN with one animal).
 
         One unit is enough: the mean curve is then that unit's own. With no
         unit, every statistic is NaN.
@@ -708,8 +723,9 @@ def called_response_timing(
           is not at the first lag (a peak there has no approach).
 
         For the sign-aligned mean curve (each with ``_ci_low`` and
-        ``_ci_high``, the 2.5th and 97.5th percentiles over the replicates,
-        except the two ``fraction`` statistics and ``size_vs_control``):
+        ``_ci_high``, its 95 % interval from the replicates with a
+        small-sample t correction over the animals, except the two
+        ``fraction`` statistics and ``size_vs_control``):
 
         - ``population_peak_ms``, ``population_onset_ms``,
           ``population_rise_onset_ms``, ``population_steepest_ms``: its peak

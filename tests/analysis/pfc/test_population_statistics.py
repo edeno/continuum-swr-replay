@@ -832,23 +832,24 @@ def test_swr_without_replay_timing_statistics_of_the_called_units_mean_curve():
     assert enhanced["rise_onset_ms"] == pytest.approx(20)
     # the top less the value at -200 ms, not the top itself (1.2)
     assert enhanced["rise_size"] == pytest.approx(1.0)
-    # The replicates resample the animals, their days and the days' units: a
-    # mean of these lines is half way up between the earliest line's crossing
-    # (unit 8 alone, 10 ms) and the latest's (unit 0 alone, 50 ms).
-    assert 10 <= enhanced["rise_onset_ms_ci_low"] <= 20
-    assert 20 <= enhanced["rise_onset_ms_ci_high"] <= 50
+    # The replicates resample the animals (chimi and wilbur), their days and
+    # the days' units: a mean of these lines is half way up between the
+    # earliest line's crossing (unit 8 alone, 10 ms) and the latest's (unit 0
+    # alone, 50 ms). With two animals the interval about 20 ms is wide; every
+    # replicate's rise size is 1.0, so its interval has no width.
+    low, high = enhanced["rise_onset_ms_ci_low"], enhanced["rise_onset_ms_ci_high"]
+    assert (low + high) / 2 == pytest.approx(20)
+    assert low < 10 and high > 50
     assert enhanced["rise_size_ci_low"] == pytest.approx(1.0)
     assert enhanced["rise_size_ci_high"] == pytest.approx(1.0)
     # Sessions with enough events, increases: units 5 and 8, of one day of one
     # animal. Their mean is half way up from 14 ms ((14/58 + 14/18) / 2 = 0.510,
-    # at 12 ms 0.437); the units are resampled within the day, and a replicate
-    # of unit 8 alone crosses at 10 ms, of unit 5 alone at 30 ms (resampling
-    # the days alone would give 14 ms every time).
+    # at 12 ms 0.437); one animal gives no interval.
     enough = result.loc[("min_events", "enhanced")]
     assert enough["peak_ms"] == pytest.approx(58)
     assert enough["rise_onset_ms"] == pytest.approx(14)
-    assert enough["rise_onset_ms_ci_low"] == pytest.approx(10)
-    assert enough["rise_onset_ms_ci_high"] == pytest.approx(30)
+    assert np.isnan(enough["rise_onset_ms_ci_low"])
+    assert np.isnan(enough["rise_onset_ms_ci_high"])
     for subset in ("all", "min_events"):
         suppressed = result.loc[(subset, "suppressed")]
         assert suppressed["peak_ms"] == pytest.approx(58)

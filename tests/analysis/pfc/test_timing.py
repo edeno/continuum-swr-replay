@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from continuum_swr_replay.analysis.pfc.timing import (
+    _resampled_mean_curves,
     peak_and_onset,
     population_timing,
     response_size,
@@ -11,6 +12,7 @@ from continuum_swr_replay.analysis.pfc.timing import (
     steepest_approach_lag,
     timing_rule_calibration,
 )
+from continuum_swr_replay.analysis.shared_statistics import bootstrap_interval
 
 # The report window: +/-200 ms at 500 Hz.
 LAG_TIME = np.arange(-100, 101) / 500.0
@@ -99,6 +101,17 @@ def test_population_timing_bootstrap_is_seeded_and_brackets_the_estimate():
     low, high = first.onset_lag_interval
     assert low <= first.onset_lag <= high
     assert first.onset_lag < first.peak_lag
+    # Each interval is the corrected t interval over the three animals of the
+    # same resamples, about the statistic on the data.
+    _, boot, _, n_animals = _resampled_mean_curves(
+        curves, peaks, groups, animals, n_boot=200, seed=3
+    )
+    assert n_animals == 3 and first.n_animals == 3
+    draws = peak_and_onset(boot.T, LAG_TIME).peak_lag
+    expected = bootstrap_interval(first.peak_lag, draws, 3)
+    assert first.peak_lag_interval == pytest.approx((expected.low, expected.high))
+    half = 4.30265273 * np.sqrt(3 / 2) * np.std(draws, ddof=1)
+    assert first.peak_lag_interval[1] == pytest.approx(first.peak_lag + half)
 
 
 def test_population_timing_with_no_units_is_nan():
@@ -138,24 +151,33 @@ def test_population_timing_weights_units_not_sessions():
 
     assert result.peak_lag == pytest.approx(0.020)
     assert result.n_groups == 2
-    # Resamples drawing only animal y (session b) peak at +100 ms.
-    assert result.peak_lag_interval[1] == pytest.approx(0.100)
+    # The interval is about the unit-weighted peak, and wide enough to hold
+    # the resamples drawing only animal y (session b), which peak at +100 ms.
+    low, high = result.peak_lag_interval
+    assert (low + high) / 2 == pytest.approx(0.020)
+    assert high > 0.100
 
 
 def test_population_timing_resamples_the_units_within_a_session():
-    # One animal with one session: resampling the sessions alone would give
-    # every replicate the same curve. The units differ (+10 to +50 ms), so
-    # resampling them inside the session spreads the peak lag.
-    curves = np.column_stack(
-        [_bump(center, 0.005, 1.0) for center in (0.010, 0.020, 0.030, 0.040, 0.050)]
-    )
+    # Two animals of one session each, holding the same five units: resampling
+    # the animals and sessions alone would give every replicate the same curve.
+    # The units differ (+10 to +50 ms), so resampling them inside the session
+    # spreads the peak lag.
+    one = [_bump(center, 0.005, 1.0) for center in (0.010, 0.020, 0.030, 0.040, 0.050)]
+    curves = np.column_stack(one + one)
     peaks = peak_and_onset(curves, LAG_TIME).peak
+    animals = np.repeat([0, 1], 5)
     result = population_timing(
-        curves, peaks, np.zeros(5), np.zeros(5), LAG_TIME, n_boot=200, seed=0
+        curves, peaks, animals, animals, LAG_TIME, n_boot=200, seed=0
     )
 
     low, high = result.peak_lag_interval
     assert low < result.peak_lag < high
+    # one animal: no t quantile, no interval
+    alone = population_timing(
+        curves[:, :5], peaks[:5], np.zeros(5), np.zeros(5), LAG_TIME, n_boot=20
+    )
+    assert np.isnan(alone.peak_lag_interval).all()
 
 
 def test_reference_window_baseline_and_size():

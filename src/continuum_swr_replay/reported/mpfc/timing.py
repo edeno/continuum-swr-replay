@@ -100,8 +100,9 @@ def timing_values(
             stats[f"{statistic}_ci_low"],
             "quantity",
             "int",
-            f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} "
-            f"{TIMING_RESAMPLES} (seed {TIMING_BOOTSTRAP_SEED})",
+            f"lower bound of its 95 % interval from {TIMING_BOOTSTRAP_DRAWS:,} "
+            f"{TIMING_RESAMPLES} (seed {TIMING_BOOTSTRAP_SEED}), with a "
+            "small-sample t correction over the animals",
             "ms",
         )
         add(
@@ -109,7 +110,7 @@ def timing_values(
             stats[f"{statistic}_ci_high"],
             "quantity",
             "int",
-            "97.5th percentile of that over the same resamples",
+            "upper bound of that interval",
             "ms",
         )
 
@@ -269,8 +270,9 @@ def timing_values(
                         stats[f"population_{rule}_ci_{bound}"],
                         "quantity",
                         "dec2",
-                        f"{'2.5th' if bound == 'low' else '97.5th'} percentile of that "
-                        f"over {TIMING_BOOTSTRAP_DRAWS:,} {TIMING_RESAMPLES}",
+                        f"{'lower' if bound == 'low' else 'upper'} bound of its 95 % "
+                        f"interval from {TIMING_BOOTSTRAP_DRAWS:,} {TIMING_RESAMPLES}, "
+                        "with a small-sample t correction over the animals",
                         "log rate",
                     )
             add(
