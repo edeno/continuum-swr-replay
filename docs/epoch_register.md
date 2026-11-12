@@ -13,15 +13,10 @@ docstring.
 The register has one row per `(nwb_file_name, epoch)`: its `status`, its `reason`
 (empty for an analysed epoch) and its `evidence`. An `epoch` of `*` covers every
 epoch of a session none of whose run epochs is known (no NWB file, or no run epoch
-in it). It was generated once, on 2026-10-05, from the exclusion audit and the
-populate plan, both local to the analysis machine:
-
-- the audit: `.claude/research/refresh_exclusions/exclusions_report.md` and
-  `exclusions_table.csv`, with 557 rows: 553 run epochs and 4 sessions with none;
-- the populate plan: `.claude/research/refresh_populate/populate_report.md` and
-  `populate_matrix.csv`.
-
-It is hand-maintained from then on.
+in it). It was generated once, on 2026-10-05, from the exclusion audit (557 rows:
+553 run epochs and 4 sessions with none) and the populate plan. Their working files
+were scratch analyses and are not in the repository; each register row's `evidence`
+carries what they found for that epoch. It is hand-maintained from then on.
 
 **This doc is partly generated.** The rule, the reason codes, the counts and the
 table of excluded and pending epochs sit between `<!-- BEGIN GENERATED -->` and
@@ -271,14 +266,33 @@ recorded.
 
 ## Excluded and pending epochs
 
-The source for the evidence is the exclusion audit and the populate plan.
-`populate_plan.py` and `populate_report.md` are in
-`.claude/research/refresh_populate/`. A `SUSTAINED_NOISE` entry's evidence comes from
-the artifact run (its S cores, with block bounds in seconds after the epoch's first
-sample) and from `.claude/research/refresh_r11/` (`s_epoch_tetrodes.csv`, and the
-step-5 test in `s_epoch/s_epochs.csv` and `r11a_report.md` §5). One row per session
-and evidence, its epochs comma-separated, `*` for a session-wide entry. A literal `|`
-inside a cell is written `\|`.
+The source for the evidence is the exclusion audit and the populate plan, and for a
+`SUSTAINED_NOISE` entry the artifact run (its S cores, with block bounds in seconds
+after the epoch's first sample) and the re-decode preflight's S-epoch test (R11a,
+2026-10-10). Two names in the evidence need a definition:
+
+- **"populate_report.md B1-B3"** (wilbur20210401): the populate plan's three
+  blockers. B1, the session is half-ingested: Spyglass holds its `Nwbfile` row and
+  nothing below it, the tracked copy file is missing, and re-inserting it would delete
+  a row in another member's schema and purge unused external files lab-wide. B2, its
+  trial intervals come only from another lab member's schema, which this project
+  cannot write. B3, the reward-model fit has no q-values for that day, and adding its
+  8 epochs would take wilbur's stop coverage below the 90 % that `build_qvals_table`
+  requires.
+- **"R11a step 5"** (each `SUSTAINED_NOISE` epoch): does dropping the S block's
+  evidence tetrodes change the decode outside the block? Each epoch was decoded with
+  all tetrodes and with the evidence tetrodes dropped, with the same fitted
+  transitions and encoding. Per bin, diff = P(non-local) with all tetrodes minus
+  without them, averaged 1–3 s outside each block (masked bins left out); the
+  baseline is the mean diff over 2-s control windows at least 30 s from every block,
+  weighted by the S windows' immobile share. The excess is diff minus baseline, with a
+  bootstrap 95 % CI (2,000 resamples, seed 0). FAIL means the CI lies wholly above 0.
+  The evidence tetrodes are the channels whose own window ratio reaches the S core
+  threshold for 2 windows inside the block, mapped to electrode groups. A dated
+  measurement, not computed by a summary.
+
+One row per session and evidence, its epochs comma-separated, `*` for a session-wide
+entry. A literal `|` inside a cell is written `\|`.
 
 <!-- BEGIN GENERATED: entries -->
 | session | epochs | status | reason | evidence |

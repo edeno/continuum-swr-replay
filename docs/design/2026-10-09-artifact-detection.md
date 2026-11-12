@@ -18,14 +18,21 @@ consensus over rule R-T's tetrodes, with the mask out of its normalization
 (`data_loaders/lfp.with_ripple_power`). **Not yet applied:** `swr_source.ARTIFACT_INTERVALS_RUN_ID` stays
 None until runbook R9 runs the detector on all epochs and sets it.
 
-**Sources** (all under `.claude/research/refresh_artifact_detector/`):
+**Where the numbers come from.** Unless a number names a later run, it is a dated
+measurement of 2026-10-05 to 2026-10-09 on the 218 epochs then analysed, made by the
+studies below; no summary in `paper/reported/` computes it. The studies' working files
+were scratch analyses and are not in the repository: this note is their record, and it
+names them by these labels.
 
-- `detector_report.md` (the "report"): the prototype and its validation;
-- `literature_review.md`;
-- `followup/`: studies C1 (events at the ports, the tetrode rule), C2
-  (`justification_report.md`: the threshold rule and the precedents read from source) and C3
-  (`followup_c3_report.md`: how far a masked gap changes the decoders);
-- `task16_check/`: the repo detector's checks against the prototype and against C2.
+- **The report:** the prototype detector and its validation (its section numbers are
+  written "report §").
+- **The literature review** of artifact rules in the field.
+- **C1:** the events at the ports, and the tetrode rule (see
+  [2026-10-09-swr-tetrode-selection.md](2026-10-09-swr-tetrode-selection.md)).
+- **C2:** the threshold rule, its held-out and ± 25 % checks, and the precedents read
+  from source ("C2 §").
+- **C3:** how far a masked gap changes the decoders.
+- **The Task 16 check:** the repository detector against the prototype and against C2.
 
 ## Names: what the validation sets are, and are not
 
@@ -177,7 +184,7 @@ core. The 1 ms is a definition, not a margin, so rule P does not apply. SpikeInt
 default refractory period is also 1 ms (`compute_refrac_period_violations`,
 `get_potential_auto_merge`), and its `remove_duplicated_spikes` treats one unit's spikes within
 0.3 ms as one spike detected twice. The prototype also let twins support each other (it left
-out only the spike itself, `artdet_spikes.py`); it caught this line because its reference was the
+out only the spike itself); it caught this line because its reference was the
 decoder's encoding marks, which did not hold the twins. The search is exact: the k nearest
 reference marks, with k = 1 + the most reference marks inside any spike's own event (4–10 on the
 acceptance epochs). On the 23 acceptance epochs (Task 16's 22 and chimi20200227_02_r1) the new core is the only change:
@@ -192,7 +199,7 @@ before: 0.2–1.0 s more per epoch, 26 s more on j1620210709_10_r5 (3.1 M spikes
 The value is measured where the rule could mask the event: the event widened by its padding.
 
 - **Why 1.5.** One animal's calibration maximum, divided by the other four animals' maximum,
-  reaches 1.27–1.59 (`c2_loao_ratio.csv`; T-ca1 1.59 and T-ref 1.27, both chimi). A cut placed
+  reaches 1.27–1.59 (C2; T-ca1 1.59 and T-ref 1.27, both chimi). A cut placed
   on four animals with less margin failed on the fifth: placed without chimi, T-ref 13.8 and K
   15.7 masked 2 model-reviewed SWRs and 2 giant-day events on chimi (C2 §3.1).
 - **Zero maximum.** If SWRs never reach the statistic, it is placed below the smallest labelled
@@ -209,13 +216,13 @@ In the code each rule-P threshold is the margin times a named calibration maximu
 | `T_REF` | `T_REF_CALIBRATION_MAX` 11.7156 (a giant-day event; reference set 9.2, model-reviewed 7.2) | **17.5734** | 15 (1.28×) |
 | `T_CA1_K` | `T_CA1_K_CALIBRATION_MAX` 16.6824 (chimi's giant day and a model-reviewed SWR) | **25.0236** | 20 (1.20×) |
 
-The maxima are `followup/c2_rule_check.csv`'s rule values divided by 1.5.
+The maxima are C2's rule values divided by 1.5.
 
 ### Justification table, at the shipped values
 
 Adapted from C2 §1. "Sensitivity" is each constant at ± 25 % of its shipped value, one at a
-time, scored by C2's rebuilt detector with the one mask on all 218 epochs
-(`task16_check/round2/c2_sensitivity_shipped.csv`). At the shipped values that detector
+time, scored by C2's rebuilt detector with the one mask on all 218 epochs (the Task 16
+check's second round). At the shipped values that detector
 masks 414.4 s, and of the calibration set it masks 0 of 9,208 reference-set SWRs, 0 of 3,938
 giant-day events and 1 of 55 model-reviewed SWRs (the S-padding case, below).
 
@@ -243,8 +250,8 @@ reviewing every spike-only core.
 
 | Core | Padding (each side) | The measurement behind it |
 |---|---|---|
-| S block | **1.0 s** | Noise spikes on the affected tetrodes leak up to 1 s past some block edges: within 0.5 s outside a block, a median of 1.0–1.3× baseline but 3–6× at the 75th percentile and up to 165× (`validation/S_edge_spike_rates.csv`) |
-| T with an LFP signature (`ref` or `ca1`) | **0.3 s** | The stored ripple FIR has 535 taps (half-length 0.267 s). The consensus ringing ≥ 2 robust z around 425 cores has its 99th percentile at 316 ms; 0.3 s covers 96.8–100 % of held-out cores (`c2_padding_heldout.csv`). The burst of OOD spikes after a step reaches +269 ms (report §2.3) |
+| S block | **1.0 s** | Noise spikes on the affected tetrodes leak up to 1 s past some block edges: within 0.5 s outside a block, a median of 1.0–1.3× baseline but 3–6× at the 75th percentile and up to 165× (the report's validation) |
+| T with an LFP signature (`ref` or `ca1`) | **0.3 s** | The stored ripple FIR has 535 taps (half-length 0.267 s). The consensus ringing ≥ 2 robust z around 425 cores has its 99th percentile at 316 ms; 0.3 s covers 96.8–100 % of held-out cores (C2). The burst of OOD spikes after a step reaches +269 ms (report §2.3) |
 | Spike-only T | **0.1 s** | 98.8 % of OOD marks after a line lie within 100 ms (99th percentile 53 ms; C2 §1) |
 
 - **Interval rules.** Intervals are closed, merged when they overlap or touch, and clipped to the
@@ -353,7 +360,7 @@ with S padded 0 s):
 | Kay normalization | SD / robust SD of the 14 low-count epochs from 1.54–10.5 to 1.03–1.29 |
 
 **C2's rebuilt detector at the shipped constants with the one mask**, all 218 epochs
-(`task16_check/round2/c2_prediction_scores.csv`):
+(the Task 16 check's second round):
 
 | Set | Result |
 |---|---|
@@ -365,10 +372,10 @@ with S padded 0 s):
 | Spike-only lines | 3 of 3 |
 | S reference windows | 153 of 153 |
 
-**Task 16's repo detector** (`task16_check/`, run `ea2047d55e81` at commit `ea2047d`, from a
+**Task 16's repo detector** (the Task 16 check, run `ea2047d55e81` at commit `ea2047d`, from a
 clean tree). It covered 22 epochs: the 5 pilots, the 14 other epochs with the most masked time
 in the prototype's output, and the 3 epochs that hold the spike-only lines. It was compared with
-C2's rebuilt detector at the same constants and the one mask (`task16_check/round2/`):
+C2's rebuilt detector at the same constants and the one mask:
 
 - **Masked time:** 301.06 s against 300.66 s. 20 epochs agree to 0.0002 s, and every C2
   interval overlaps a repo interval.
@@ -377,8 +384,7 @@ C2's rebuilt detector at the same constants and the one mask (`task16_check/roun
   - chimi20200225_04_r2 at 699.0 s, a small step (accepted in fix round 1);
   - chimi20200225_06_r3 at 347.8 s, a large step on several CA1 channels. Rule P's
     `T_CA1_K` no longer flags its CA1 part. Its spike line (0.68 of tetrodes, 40 % OOD) is
-    still flagged under the repo reference, but not under the prototype's
-    (`round2/new_core_chimi20200225_06_r3_HPC_347.805.png`).
+    still flagged under the repo reference, but not under the prototype's.
 - **Verdicts identical to C2's** on these epochs:
   - reference SWR set: 0 of 902 masked (3 of the 905 as labelled: the known label errors, all
     model-reviewed steps);
@@ -388,8 +394,7 @@ C2's rebuilt detector at the same constants and the one mask (`task16_check/roun
   - S events: 3 of 3;
   - S reference windows: 143 of 143.
 - **The SWR runner:** on the 7 epochs with an S block, padding S by 1 s instead of 0 s changes
-  Kay's count from 1,017 to 1,018 (−1 to +1 per epoch), against 250 without a mask
-  (`round2/kay_s_padding_effect.csv`).
+  Kay's count from 1,017 to 1,018 (−1 to +1 per epoch), against 250 without a mask.
 - **Cost:** 61–96 s per epoch on CPU, almost all of it loading. The worker peak RSS is
   1.9–4.0 GiB; the largest is j1620210706_02_r1, with 2.5 M samples.
 - **Determinism:** rerunning 17 of the epochs gave byte-identical cores files.

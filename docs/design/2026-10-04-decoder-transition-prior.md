@@ -123,10 +123,9 @@ The flag comes back when both are fixed.
 
 Pilot epochs (HPC): peanut20201202_10_r5, j1620210707_06_r3, chimi20200225_02_r1,
 wilbur20210329_12_r6 and senor20201101_06_r3. Every setting decoded the same inputs; only
-the discrete transitions differed. The details are in
-`.claude/research/refresh_validation/`: `variants_report.md`, `variants_tables.md`,
-`variants_simulation.md` and `state_evidence/` (`report_tables.md`, `bout_stats.csv`); and
-in `.claude/research/refresh_ablation/ablation_report.md` ("Ablation 5", "Ablation 6").
+the discrete transitions differed. Every number in this section is a dated measurement of
+2026-10-04 on these five epochs, not computed by a summary; the validation's working files
+were scratch analyses and are not in the repository.
 
 - **Events.** 245 / 236 / 264 / 195 / 223 = **1,163**. For comparison, April's discrete
   settings on the same inputs give 1,021, and today's library defaults give 1,349.
@@ -152,9 +151,8 @@ in `.claude/research/refresh_ablation/ablation_report.md` ("Ablation 5", "Ablati
   (P10-B, P30-B and P100-B on the five epochs). The final E-step, stored after the last
   M-step, fell slightly in three of them: P30-B senor −126, P10-B j16 −28 and P10-B wilbur
   −104 nats, on totals of 5 to 11 million.
-- **No takeover.** This was checked for P10-B, P30-B and P100-B with
-  `.claude/research/refresh_validation/nonlocal_takeover.py`. Values below are in that order,
-  with April's settings for comparison.
+- **No takeover.** This was checked for P10-B, P30-B and P100-B. Values below are in that
+  order, with April's settings for comparison.
   - **Immobile bouts ≥ 1 s:** 612 per setting. Of these, 8 / 8 / 8 are ≥ 50 % confidently
     non-local (P(non-local) > 0.8), and 3 / 3 / 3 are ≥ 90 %. April's settings: 13 and 5.
   - **Running bouts ≥ 1 s:** 1,002. Of these, 8 / 8 / 8 are ≥ 50 % non-local, and one in
@@ -168,8 +166,7 @@ in `.claude/research/refresh_ablation/ablation_report.md` ("Ablation 5", "Ablati
   - The silence probe gives 31 false calls. For comparison: P30 gives 55; W1-L 27; today's
     defaults 21; April's settings 1.
 - **Sensitivity to prior strength.** P30-B's prior was also decoded at 10 and 100 visits
-  (P10-B, P100-B; `variants_tables.md`, "Side-by-side, prior family", and
-  `ablation_report.md`, "Ablation 6"). Values are P10-B / P30-B / P100-B.
+  (P10-B, P100-B). Values are P10-B / P30-B / P100-B.
   - **Events:** 1,163 / 1,163 / 1,158. Per epoch (peanut, j16, chimi, wilbur, senor):
     243, 237, 265, 193, 225; 245, 236, 264, 195, 223; and 241, 239, 260, 197, 221.
   - **Against April's settings** (shared / setting-only / April-only): 1,012 / 151 / 59;
@@ -210,9 +207,6 @@ in `.claude/research/refresh_ablation/ablation_report.md` ("Ablation 5", "Ablati
 - **Five epochs.** Pooled event-level rates treat events as independent.
 
 ## Sources
-
-Full verbatim quotes, and the library's history of its defaults:
-`.claude/research/refresh_validation/transition_parameter_sources.md`.
 
 - Buzsáki G (2015). Hippocampal sharp wave-ripple: a cognitive biomarker for episodic memory
   and planning. *Hippocampus* 25:1073–1188. doi:10.1002/hipo.22488

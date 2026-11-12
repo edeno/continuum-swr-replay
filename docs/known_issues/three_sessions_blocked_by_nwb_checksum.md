@@ -1,8 +1,7 @@
 # Three sessions blocked by an upstream NWB checksum failure
 
 **Status:** resolved on 2026-08-19. The three epochs are in the cohort and in every table.
-Found resolved by the exclusion audit of 2026-10-05
-(`.claude/research/refresh_exclusions/exclusions_report.md`, section 3.8). The
+Found resolved by the exclusion audit of 2026-10-05. The
 cohort is the epoch register's ([../epoch_register.md](../epoch_register.md)),
 where these three epochs are `analysed`.
 

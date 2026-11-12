@@ -79,9 +79,8 @@ The cohort is the epoch register's ([../epoch_register.md](../epoch_register.md)
 ## Effect on the results
 
 The size and the cause of each change are in the
-[audit report](../../.claude/docs/reviews/2026-10-12-full-pipeline-refresh.md), section 3, which copies the
-attribution in `.claude/research/refresh_attribution/r8a_report.md` (section 0; local, not
-tracked). In short:
+[audit report](../../.claude/docs/reviews/2026-10-12-full-pipeline-refresh.md), section 3. In
+short:
 
 - The code changed no fitted result. With the same decodes and SWR labels, current code rebuilds
   the golden tables and rate fits exactly. It changed two descriptives: the content-quadrant
@@ -95,8 +94,7 @@ tracked). In short:
   (report, section 3, caveat 1).
 
 Event ids are not stable across decodes. An old-to-new comparison must match events on
-(epoch, `event_start_s`, `event_end_s`), not on `event_id`
-(`.claude/research/refresh_r13/r13a_report.md`, section 4.5; local).
+(epoch, `event_start_s`, `event_end_s`), not on `event_id`.
 
 ## What is stale until rerun
 
@@ -132,5 +130,4 @@ golden baseline.
 
 33 at-well stops in `chimi20200218_06_r3` disagree on reward between `qvals_table` and the stop
 table. They did so before the refresh too, in the old and the new tables alike (report, section 5,
-item 42; `.claude/research/refresh_r13/r13a_report.md`, concern 5; local). The report gives no
-cause.
+item 42). The report gives no cause.

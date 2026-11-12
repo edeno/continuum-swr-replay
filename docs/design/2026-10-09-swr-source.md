@@ -28,14 +28,14 @@ tables, the Widloski-detector table's SWR columns, and the PFC path's SWR interv
   255 epochs `ok` (the register's 242 analysed and its 13 `SUSTAINED_NOISE`), with the
   artifact mask of run `fbbff144a123` and rule R-T for all four detectors. It replaced R3's
   run `50a98592acee` (no mask, no R-T; j1620210710 `02_r1` and `04_r2` had failed there on a lab-database
-  inconsistency, and both are `ok` now). Gate report:
-  `.claude/research/refresh_artifact_detector/r10_gate/r10_gate_report.md`.
+  inconsistency, and both are `ok` now).
   `SWR_INVENTORY_RUN_ID` is the one value to change for another run.
 
 ## Why: the 2.0 inventory against the stored events
 
-Source: `.claude/research/refresh_r1/kay_version_ratio.csv`. It compares 216 epochs, using
-the version check's strict positive-duration overlap.
+A dated measurement of 2026-10-05 by the ripple_detection version check, not computed by
+a summary. It compares 216 epochs, using the version check's strict positive-duration
+overlap.
 
 | | stored (1.7, Spyglass) | direct (2.0) |
 |---|---|---|
@@ -60,7 +60,7 @@ What the comparison shows:
 - **The two agree closely in bulk.**
 - **The stored events' inputs are unknown.** On today's Spyglass inputs, ripple_detection
   1.5.1, 1.7.0, 1.7.1 and 2.0 give identical counts in the outlier epochs. So the stored
-  events came from other, older inputs (`.claude/research/refresh_artifacts/`).
+  events came from other, older inputs.
 - **Artifacts contaminate the stored events.** 654 of 38,824 stored events (1.7 %) lie
   inside artifacts.
 - **Artifacts explain the low epochs.** In those 14 epochs (senor, chimi) artifacts
@@ -257,4 +257,5 @@ What the pilot shows:
 - **Coverage is complete.** The stored band covers at least 99.97 % of each decode grid,
   and no non-local event touches an unobserved bin.
 
-Script and output: `task15_pilot.py` and `task15_pilot.csv` in the session scratchpad.
+A dated measurement, not computed by a summary; its script and output were scratch and are
+not in the repository.

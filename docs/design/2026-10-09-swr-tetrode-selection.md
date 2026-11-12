@@ -10,13 +10,16 @@ the rule; the next SWR runner run applies it. The reference veto R-rip was studi
 used. Companion note: [2026-10-09-artifact-detection.md](2026-10-09-artifact-detection.md) (the
 artifact mask).
 
-**Sources** (all under `.claude/research/refresh_artifact_detector/followup/`):
+**Where the numbers come from.** Unless a number names a later run, it is a dated
+measurement of 2026-10-09 or earlier, made by the studies below; no summary in
+`paper/reported/` computes it. The studies' working files were scratch analyses and are
+not in the repository: this note is their record, and it names them by these labels.
 
-- `followup_report.md` (C1): events at the ports, and the proxies we have for licking;
-- `followup_c1b_report.md` (C1b): the field's noise-channel veto and R-rip, and the j16 residual;
-- `followup_c1c_report.md` (C1c): the j16 tetrodes, and rule R-T with its effect;
-- `c1c_rule.json`: R-T as written before any effect was measured;
-- `justification_report.md` (C2): R-T held out, its sensitivity, and the field precedents.
+- **C1:** the events at the ports, and the proxies we have for licking;
+- **C1b:** the field's noise-channel veto and R-rip, and the j16 residual;
+- **C1c:** the j16 tetrodes, and rule R-T with its effect (R-T was written down before any
+  effect was measured);
+- **C2:** R-T held out, its sensitivity, and the field precedents.
 
 ## Names
 
@@ -24,7 +27,7 @@ Neither validation set is ground truth.
 
 - **The reference SWR set** is rule-defined: 9,208 events that meet Kay ∩ Karlsson, a Kay
   duration of 30–200 ms, speed < 4 cm/s over ± 250 ms, a sharp wave, and MUA ≥ 2× the epoch
-  mean. The research files call it "TS".
+  mean.
 - **Model-reviewed labels** come from one AI reviewer, with no human and no second rater
   (55 SWRs in the pooled review; 36 events in C1c's blind spot-check).
 - **"Lacks SWR features"** (C1's label for a detected event): no sharp wave, MUA < 2×, and either
@@ -35,7 +38,7 @@ Neither validation set is ground truth.
 
 We have no EMG and no lick sensor; a beam break says only that the nose is in the port. So C1
 tested the **detected events**, not the licking. Kay events (ripple_detection 2.0, all 218
-epochs, outside the prototype artifact mask), by period (`c1_event_features_by_period.csv`):
+epochs, outside the prototype artifact mask), by period:
 
 | Period | Kay events | MUA ratio (median) | Sharp wave \|dev\| (median) | Ripple on ≥ 3 z channels (median share) | Lacks SWR features |
 |---|---|---|---|---|---|
@@ -44,7 +47,7 @@ epochs, outside the prototype artifact mask), by period (`c1_event_features_by_p
 | Immobile, away from the ports | 616 | 3.32 | 1.14 | 0.82 | 8.8 % |
 | Other | 4,398 | 2.55 | 1.09 | 0.77 | 16.1 % |
 
-By animal (`c1_flag_by_animal_period.csv`):
+By animal:
 
 | Animal | Rewarded port | Unrewarded port | Away |
 |---|---|---|---|
@@ -67,7 +70,7 @@ By animal (`c1_flag_by_animal_period.csv`):
 
 ## The j16 finding: three tetrodes that do not ripple with CA1
 
-C1c (`followup_c1c_report.md`):
+C1c found:
 
 - Electrode groups **0, 10 and 22** are among the three loudest tetrodes in 95 %, 88 % and 92 %
   of j16's featureless Kay events, on all 8 days (chance is 3/22 = 14 %).
@@ -83,7 +86,7 @@ C1c (`followup_c1c_report.md`):
 
 ## Rule R-T
 
-Written to `c1c_rule.json` before any recomputed consensus or event count was looked at. It
+Written down before any recomputed consensus or event count was looked at. It
 reads only the stored ripple band, head speed and the artifact mask: no spikes, MUA, sharp wave
 or event label. Per epoch, for each CA1 band tetrode `c` (the stored band holds one channel per
 tetrode in all 218 epochs: 22, or 13 for wilbur):
@@ -101,8 +104,8 @@ tetrode in all 218 epochs: 22, or 13 for wilbur):
 | Constant | Value | Evidence |
 |---|---|---|
 | Cut | 1.0 robust z | A mechanism constant: a rise of less than one robust SD while the rest of CA1 ripples. j16 groups 0, 10, 22 score −0.12 to 0.81 in all 58 epochs; every other j16 tetrode ≥ 1.78 |
-| LOO threshold | 5 z | "The others ripple" must mean strong ripples. 3.75 drops 61 rippling tetrode-epochs; 5 drops 2 weakly rippling ones; 6.25 drops none (C2 §3.3) |
-| σ | 4 ms | Kay's own smoothing. 3 ms drops 1 weakly rippling tetrode-epoch, 5 ms drops 4 (C2 §3.3) |
+| LOO threshold | 5 z | "The others ripple" must mean strong ripples. 3.75 drops 61 rippling tetrode-epochs; 5 drops 2 weakly rippling ones; 6.25 drops none (C2) |
+| σ | 4 ms | Kay's own smoothing. 3 ms drops 1 weakly rippling tetrode-epoch, 5 ms drops 4 (C2) |
 
 **Fail closed.** The epoch fails, with its reason and every tetrode's coupling in the
 manifest, when:
@@ -141,7 +144,7 @@ In C1c no epoch of the 218 came near the first two: at most 4 of 22 tetrodes dro
 
 ## Effect (C1c, all 218 epochs)
 
-Which tetrodes it drops (`c1c_rule_drops.csv`):
+Which tetrodes it drops:
 
 | Animal | Epochs with a drop | Tetrodes dropped |
 |---|---|---|
@@ -151,7 +154,7 @@ Which tetrodes it drops (`c1c_rule_drops.csv`):
 | wilbur | 5 / 44 | group 2, Apr 2–3 |
 | peanut | 0 / 13 | none |
 
-Before and after, Kay with the inventory's settings (`c1c_rule_effect.csv`). These numbers are
+Before and after, Kay with the inventory's settings. These numbers are
 C1c's: the prototype mask, R-rip applied, and Kay's default normalization.
 
 | Animal | Kay events | Lacks SWR features | Reference-set SWRs detected (of n) | Model-reviewed SWRs detected | Rewarded port: lacking | Unrewarded port: lacking |
@@ -169,7 +172,7 @@ C1c's: the prototype mask, R-rip applied, and Kay's default normalization.
 - 28 reference-set SWRs are lost and 505 gained, over all animals.
 
 **Blind spot-check** of the j16 change (36 events, labels given before unblinding, by the model
-reviewer; `c1c_blind_labels.csv`):
+reviewer):
 
 | Stratum | SWR | Unclear | No event (background crossing) |
 |---|---|---|---|
@@ -178,7 +181,7 @@ reviewer; `c1c_blind_labels.csv`):
 | Kept events (random 6) | 6 | 0 | 0 |
 | Reference-set SWRs lost (random 6 of 25) | 3 | 2 | 1 |
 
-**Held out and alternatives** (C2, `justification_report.md` §2.2, §3.3):
+**Held out and alternatives** (C2):
 
 - With j16 held out, cut 1.0 drops 174 of 174 culprit tetrode-epochs and 0 of 1,045 rippling
   j16 tetrode-epochs. With each other animal held out it drops one weakly rippling tetrode-epoch
@@ -198,10 +201,9 @@ reviewer; `c1c_blind_labels.csv`):
 ## Acceptance against C1c (Task 17b)
 
 The runner, with a scratch artifact run at the implementing commit, on 13 epochs: the 5 pilots,
-j16 on four more days, chimi Feb 27 and Feb 28 (one epoch each) and two senor S epochs
-(`.claude/research/refresh_artifact_detector/task17b_check/`).
+j16 on four more days, chimi Feb 27 and Feb 28 (one epoch each) and two senor S epochs.
 
-- **Dropped groups** equal `c1c_rule_drops.csv` in all 13: j16 0, 10 and 22 on 5 days; chimi 17
+- **Dropped groups** equal C1c's in all 13: j16 0, 10 and 22 on 5 days; chimi 17
   on Feb 27 and 28; senor 0 (20201101_14_r7) and 1 (20201107_12_r6); none elsewhere (wilbur's
   13 tetrodes included).
 - **Coupling.** With C1c's (prototype) mask as the reference exclusion, every tetrode's coupling
@@ -257,10 +259,10 @@ reviewed blind were not SWRs.
   ± 250 ms: it holds 4 reference-set SWRs in the first second of visits and 560 in the first 2 s.
   In the first second, 85 % of Kay events exceed 4 cm/s within ± 250 ms.
 - **After R-T,** the featureless share at the ports is **1.0 %** on rewarded visits and **4.8 %**
-  on unrewarded visits over all animals (`c1c_rule_effect_by_period.csv`; j16 0.8 % and 3.7 %).
+  on unrewarded visits over all animals (j16 0.8 % and 3.7 %).
 - A padded speed rule (every sample < 4 cm/s over the event ± 0.25 s) would keep 81 % of Kay
   events and only 37–79 % at unrewarded ports, and lowers j16's featureless share only from
-  43 % to 33 % (`c1c_speed_padded.csv`).
+  43 % to 33 %.
 - **No visit-onset or padded-speed rule is added.** The canonical whole-event immobility rule
   (every sample < 4 cm/s, `analysis/events/immobility.py`) is unchanged.
 

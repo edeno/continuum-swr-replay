@@ -4,8 +4,7 @@
 never in the cohort. Its 5 run epochs (02_r1, 04_r2, 06_r3, 08_r4, 10_r5) are
 `excluded` / `DEPLETION_TASK` in the epoch register
 ([../epoch_register.md](../epoch_register.md)). Corrected on 2026-10-05 by the
-exclusion audit (`.claude/research/refresh_exclusions/exclusions_report.md`,
-section 3.4). The earlier version of this note, written 2026-07-10, named the wrong
+exclusion audit. The earlier version of this note, written 2026-07-10, named the wrong
 mechanism.
 
 ## Why it is not analysed

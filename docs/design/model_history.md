@@ -500,8 +500,8 @@ effect of the leaf-arm feature: `CS1nt`'s `swr_x_is_current_arm` was −0.41
 (0/5 animals positive) and `CS1`'s −0.07 (1/5), against a paired within-session
 split difference (`C2_base` SWR − non-SWR `is_current_arm`) of about +0.09
 (3/5). With SWR-specific baselines the pooled terms read +0.03 (3/5) and +0.19
-(3/5) and match the split difference animal by animal (exploratory refit,
-`.claude/research/claim19a/swr_current_armfe.py`). The trunk shift itself is
+(3/5) and match the split difference animal by animal (an exploratory refit of
+2026-10-30; dated, not computed by a summary). The trunk shift itself is
 reported directly (Part 3 `trunk_share_*`). The patch ladder has no patch fixed
 effects (its base is current/previous patch, recency and never-visited), so it
 has no shared baselines to split and is unchanged.
