@@ -219,9 +219,12 @@ layers below it, never from a layer above:
    analysis does not depend on the reporting. Nothing in `src/` imports `scripts/`.
 
 There are no package cycles. `tests/repository/test_import_layering.py` enforces all of
-this except the rules for `reported/`, which hold today but are not tested (it also keeps `data_loaders/` from importing `analysis/`, `hippocampus/` from
-importing `behavior/`, and the covariate builders from importing `model_specs.py`). It
-has no allowlist: any violation fails.
+this except three rules that hold today but are not tested: those for `reported/`,
+that `analysis/constants.py` imports only the foundation, and that
+`analysis/shared_statistics.py` imports nothing from the package. It also keeps
+`data_loaders/` from importing `analysis/`, `hippocampus/` from importing `behavior/`,
+and the covariate builders from importing `model_specs.py`, and has no allowlist: any
+violation fails.
 
 Inside `analysis/behavior/` the subpackages import in one direction: `covariates/`,
 then `choice/`, then `tables/`, then `rate/` and `content/`, which do not import
