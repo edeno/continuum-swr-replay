@@ -22,13 +22,16 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.analysis.events.analysed_time import analysed_bins
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
-    event_strict_overlap_mask,
+    nonlocal_event_bins_by_swr,
 )
 from continuum_swr_replay.analysis.hippocampus import (
     compute_calibration_curve,
     compute_local_decoding_error,
     get_event_durations_ms,
     get_event_start_end_times,
+)
+from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
+    normalized_replay_position_by_swr,
 )
 from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
     calibration_curve_statistics,
@@ -38,7 +41,6 @@ from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
 from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
     compute_triggered_average_curves,
 )
-from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
 from continuum_swr_replay.visualization.figure_utilities import (
     PANEL_SINGLE,
     get_figure_size,
@@ -421,22 +423,6 @@ def plot_event_ripple_by_swr(
         plt.tight_layout()
 
 
-def _nonlocal_swr_event_bin_masks(
-    data_over_time: pd.DataFrame,
-) -> tuple[pd.Series, pd.Series]:
-    """Return whole-event SWR/non-SWR masks for Non-Local event bins.
-
-    The frame is read through the SWR source (``load_data_over_time``), whose
-    labels hold only eligible events: every one immobile as a whole, and every
-    Non-Local one above the probability threshold.
-    """
-    active = data_over_time["non_local_event"] > 0
-    is_swr_event = event_strict_overlap_mask(
-        data_over_time, "non_local_event", "SWR_event"
-    )
-    return active & is_swr_event, active & ~is_swr_event
-
-
 def plot_replay_speed_by_swr(
     data_over_time: pd.DataFrame,
     output_dir: Path | None = None,
@@ -464,7 +450,7 @@ def plot_replay_speed_by_swr(
 
     bins = np.arange(0, 3000, 100)
 
-    swr_mask, no_swr_mask = _nonlocal_swr_event_bin_masks(data_over_time)
+    swr_mask, no_swr_mask = nonlocal_event_bins_by_swr(data_over_time)
     ax.hist(
         data_over_time.loc[swr_mask, "map_speed"],
         bins=bins,
@@ -599,16 +585,9 @@ def plot_replay_position_by_swr(
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
-    # About one histogram bin per 2 cm (the 1D place-bin size) of the median
-    # session's track length; the positions are then normalized to [0, 1].
-    unique_positions = data_over_time["max_linear_position"].unique()
-    median_track_length_cm = np.nanmedian(unique_positions[~np.isnan(unique_positions)])
-    n_position_bins = int(median_track_length_cm / PLACE_BIN_SIZE_1D)
-
-    swr_mask, no_swr_mask = _nonlocal_swr_event_bin_masks(data_over_time)
+    positions, n_position_bins = normalized_replay_position_by_swr(data_over_time)
     ax.hist(
-        data_over_time.loc[swr_mask, "map_estimate"]
-        / data_over_time.loc[swr_mask, "max_linear_position"],
+        positions["swr"],
         bins=n_position_bins,
         density=True,
         alpha=0.7,
@@ -617,8 +596,7 @@ def plot_replay_position_by_swr(
     )
 
     ax.hist(
-        data_over_time.loc[no_swr_mask, "map_estimate"]
-        / data_over_time.loc[no_swr_mask, "max_linear_position"],
+        positions["non_swr"],
         bins=n_position_bins,
         density=True,
         alpha=0.7,

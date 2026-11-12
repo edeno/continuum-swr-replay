@@ -17,6 +17,9 @@ get_conditional_non_local_posterior
     spatial representation during replay.
 load_conditional_posterior
     The same, read from a decode's ``results.nc`` (``decoding.results.open_results``).
+normalized_replay_position_by_swr
+    The decoded position of non-local event bins as a fraction of the track, split
+    by SWR overlap.
 get_map_speed
     Compute the speed of the decoded position over time using the maximum a posteriori
     (MAP) estimate. Useful for distinguishing stationary replay from trajectory sweeps.
@@ -80,10 +83,13 @@ from non_local_detector.model_checking.highest_posterior_density import (
 from ripple_detection.core import gaussian_smooth
 
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    nonlocal_event_bins_by_swr,
+)
 
 from ...data_types import SessionData
 from ...decoding.results import open_results
-from ...parameters import SAMPLING_FREQUENCY
+from ...parameters import PLACE_BIN_SIZE_1D, SAMPLING_FREQUENCY
 
 
 def get_conditional_non_local_posterior(results: xr.Dataset) -> xr.DataArray:
@@ -404,6 +410,47 @@ def track_distance_cm(
     for k in np.flatnonzero(a_ok & b_ok):
         out[k] = float(distance_between_nodes[a[k]][b[k]])
     return out
+
+
+def normalized_replay_position_by_swr(
+    data_over_time: pd.DataFrame,
+) -> tuple[dict[str, pd.Series], int]:
+    """The decoded position of non-local event bins as a fraction of the track.
+
+    Each bin's ``map_estimate`` is divided by its session's
+    ``max_linear_position``, so sessions with different track lengths share
+    one [0, 1] axis. The bins are split by whether their event overlaps an SWR
+    (:func:`~continuum_swr_replay.analysis.events.nonlocal_detection.nonlocal_event_bins_by_swr`).
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        A frame read through the SWR source, with ``map_estimate``,
+        ``max_linear_position``, ``non_local_event``, ``SWR_event`` and the
+        session columns.
+
+    Returns
+    -------
+    positions : dict
+        ``swr`` and ``non_swr``: the normalized position of each bin of the
+        SWR-overlapping events and of the other events.
+    n_bins : int
+        The histogram bins that make one bin about one 1-D place bin
+        (``PLACE_BIN_SIZE_1D``, cm) of the median session's track: the median
+        over the frame's distinct ``max_linear_position`` values divided by
+        the place-bin size, rounded down.
+    """
+    unique_positions = data_over_time["max_linear_position"].unique()
+    median_track_length_cm = np.nanmedian(unique_positions[~np.isnan(unique_positions)])
+    n_bins = int(median_track_length_cm / PLACE_BIN_SIZE_1D)
+
+    swr_mask, non_swr_mask = nonlocal_event_bins_by_swr(data_over_time)
+    positions = {
+        word: data_over_time.loc[mask, "map_estimate"]
+        / data_over_time.loc[mask, "max_linear_position"]
+        for word, mask in (("swr", swr_mask), ("non_swr", non_swr_mask))
+    }
+    return positions, n_bins
 
 
 def get_map_speed(

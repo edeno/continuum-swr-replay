@@ -309,6 +309,35 @@ def event_strict_overlap_mask(
     return pd.Series(mask, index=data_over_time.index)
 
 
+def nonlocal_event_bins_by_swr(
+    data_over_time: pd.DataFrame,
+) -> tuple[pd.Series, pd.Series]:
+    """The bins of non-local events, split by whether the event overlaps an SWR.
+
+    The split is event-level (:func:`event_strict_overlap_mask`): every bin of
+    an event with a positive-duration SWR overlap is in the SWR set, every bin
+    of another event in the non-SWR set.
+
+    Parameters
+    ----------
+    data_over_time : pd.DataFrame
+        A frame read through the SWR source (``load_data_over_time``), whose
+        ``non_local_event`` labels hold only eligible events (each immobile as
+        a whole and above the probability threshold), with ``SWR_event`` and
+        the session columns.
+
+    Returns
+    -------
+    swr, non_swr : pd.Series of bool, shape (n_bins,)
+        The bins of SWR-overlapping events, and of the other events.
+    """
+    active = data_over_time["non_local_event"] > 0
+    is_swr_event = event_strict_overlap_mask(
+        data_over_time, "non_local_event", "SWR_event"
+    )
+    return active & is_swr_event, active & ~is_swr_event
+
+
 def get_overlap_times(
     non_local_times: pd.DataFrame,
     ripple_times: pd.DataFrame,
