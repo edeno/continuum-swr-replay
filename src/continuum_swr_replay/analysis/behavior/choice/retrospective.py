@@ -43,6 +43,8 @@ production code share the same source of truth.
 
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import dataclass
 
 import numpy as np
@@ -54,6 +56,7 @@ from continuum_swr_replay.data_loaders.constants import (
     WELL_PATCH_MAPPING,
 )
 from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
     present_session_columns,
 )
 
@@ -72,9 +75,15 @@ __all__ = [
     "ends_at_next",
     "ends_at_next_patch",
     "ends_at_prev",
+    "family_unit_counts",
     "freeze_retrospective_cohort",
+    "retrospective_alignment_by_session",
     "retrospective_alignment_with_shuffle",
+    "retrospective_status",
+    "select_event_subset",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 # Patch (1/2/3) → trunk arm id. Each patch junction connects to the
@@ -85,6 +94,10 @@ _PATCH_TO_TRUNK_ARM: dict[int, int] = {1: 6, 2: 7, 3: 8}
 
 # Wells are arms 0–5 (degree-1 leaves of the track graph).
 _VALID_WELL_ARMS = frozenset(WELL_PATCH_MAPPING.keys())
+
+#: Movable visit contexts a metric family needs before its null can move a
+#: label; below it the family's statistics are NaN.
+MIN_MOVABLE_VISIT_CONTEXTS = 2
 
 
 def _visit_context_ids(event_table: pd.DataFrame) -> pd.Series:
@@ -1277,7 +1290,7 @@ def retrospective_alignment_with_shuffle(
             out.update(frozen.audit)
             out["n_events"] = n_events
 
-        if frozen.audit["n_shuffle_units"] < 2:
+        if frozen.audit["n_shuffle_units"] < MIN_MOVABLE_VISIT_CONTEXTS:
             for metric in selected_metrics:
                 out[f"n_events_{metric}"] = 0
                 out[f"real_mean_{metric}"] = float("nan")
@@ -1349,3 +1362,192 @@ def retrospective_alignment_with_shuffle(
                 out[f"shuffled_std_{metric}"] = float("nan")
                 out[f"real_minus_shuffled_{metric}"] = float("nan")
     return out
+
+
+def family_unit_counts(
+    result: dict[str, float | int | bool | str],
+) -> dict[str, int]:
+    """Movable visit-context counts for each calibrated metric family.
+
+    Only families the run actually requested appear in ``result`` (a
+    :func:`retrospective_alignment_with_shuffle` output), so read whichever
+    suffixed keys are present rather than assuming all three.
+    """
+    suffix = "_family"
+    prefix = "n_shuffle_units_"
+    counts: dict[str, int] = {}
+    for key, value in result.items():
+        if not (key.startswith(prefix) and key.endswith(suffix)):
+            continue
+        family = key[len(prefix) : -len(suffix)]
+        # The retained count is ``n_shuffle_units_<family>_family``. Sibling
+        # keys qualify the same suffix -- ``..._input_<family>_family``,
+        # ``..._excluded_singleton_<family>_family`` -- and their zeros would
+        # read as a non-movable family. A family name is a single token.
+        if "_" in family:
+            continue
+        counts[family] = int(value)
+    return counts
+
+
+def retrospective_status(
+    result: dict[str, float | int | bool | str],
+) -> str:
+    """Explicit persisted status for a session's retrospective analysis.
+
+    A family needs :data:`MIN_MOVABLE_VISIT_CONTEXTS` movable visit contexts
+    before its null can move a label, and the families are calibrated
+    independently, so a session can estimate some metrics and not others.
+    Distinguish that from the case where nothing is estimable: ``ok`` means
+    every requested family is movable, ``partial_movable_families`` that at
+    least one is not, and ``no_movable_family`` that none are.
+    """
+    counts = family_unit_counts(result)
+    if not counts:
+        return "no_movable_family"
+    movable = [count >= MIN_MOVABLE_VISIT_CONTEXTS for count in counts.values()]
+    if all(movable):
+        return "ok"
+    return "partial_movable_families" if any(movable) else "no_movable_family"
+
+
+#: The event subsets the alignment may be read on, by ``is_swr``.
+EVENT_SUBSETS = ("all", "swr_only", "non_swr_only")
+
+
+def select_event_subset(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
+    event_sequence_table: pd.DataFrame,
+    subset: str,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Keep the SWR or the non-SWR events of the three event tables.
+
+    ``swr_only`` keeps ``is_swr`` events, ``non_swr_only`` the others, ``all``
+    every event. The event and event-arm tables are filtered on their own
+    ``is_swr``; the sequence table keeps the rows of the kept events (an inner
+    join on the session keys and ``event_id``).
+
+    Raises
+    ------
+    ValueError
+        If ``subset`` is not one of :data:`EVENT_SUBSETS`.
+    """
+    if subset not in EVENT_SUBSETS:
+        raise ValueError(f"subset must be one of {EVENT_SUBSETS}, not {subset!r}")
+    if subset == "all":
+        return event_table, event_arm_table, event_sequence_table
+    want_swr = subset == "swr_only"
+    keep = event_table["is_swr"].astype(bool) == want_swr
+    event_table = event_table[keep].copy()
+    event_arm_table = event_arm_table[
+        event_arm_table["is_swr"].astype(bool) == want_swr
+    ].copy()
+    event_sequence_table = event_sequence_table.merge(
+        event_table[[*SESSION_COLUMNS, "event_id"]],
+        on=[*SESSION_COLUMNS, "event_id"],
+        how="inner",
+    )
+    return event_table, event_arm_table, event_sequence_table
+
+
+def retrospective_alignment_by_session(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
+    event_sequence_table: pd.DataFrame,
+    *,
+    n_shuffles: int,
+    seed: int,
+    subset: str,
+    stop_cohort: str,
+    max_sessions: int | None = None,
+) -> pd.DataFrame:
+    """:func:`retrospective_alignment_with_shuffle` on every session, in order.
+
+    The sessions are taken in sorted key order (the first ``max_sessions``
+    only, when given). Each draws its shuffles from its own generator, seeded
+    by one draw of ``numpy.random.default_rng(seed)`` in that order, so a
+    session's result does not depend on which sessions ran before it beyond
+    its position. Every session is kept, with its :func:`retrospective_status`;
+    a family without :data:`MIN_MOVABLE_VISIT_CONTEXTS` movable visit contexts
+    reports NaN metrics. A session that violates the location/observability
+    contract raises, so a partial cohort is never returned.
+
+    Parameters
+    ----------
+    event_table, event_arm_table, event_sequence_table : pd.DataFrame
+        The three event tables of the analysed cohort, all sessions.
+    n_shuffles : int
+        Circular-shift draws per session.
+    seed : int
+        Master seed.
+    subset, stop_cohort : str
+        Labels written on every row.
+    max_sessions : int, optional
+        Analyse only the first sessions.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per session: the alignment result, the session keys,
+        ``subset``, ``stop_cohort``, ``retrospective_status`` and
+        ``elapsed_s``.
+    """
+    rng = np.random.default_rng(seed)
+    rows = []
+    sessions = sorted(event_table.groupby(list(SESSION_COLUMNS)).groups.keys())
+    if max_sessions is not None:
+        sessions = sessions[:max_sessions]
+        logger.info("Smoke run: first %d session(s) only", len(sessions))
+    # Each table split by session once; a session a table lacks gets its empty
+    # frame (same columns and dtypes).
+    tables = (event_table, event_arm_table, event_sequence_table)
+    by_session = [
+        dict(tuple(table.groupby(list(SESSION_COLUMNS), sort=False)))
+        for table in tables
+    ]
+    for i, sess_key in enumerate(sessions):
+        animal, session_date, epoch = sess_key
+        ev_s, ea_s, es_s = (
+            groups.get(sess_key, table.iloc[:0])
+            for groups, table in zip(by_session, tables, strict=True)
+        )
+        t0 = time.time()
+        # Fail the batch before publication when any session violates the
+        # location/observability contract.  Continuing here would turn a
+        # scientific integrity error into an unreported session exclusion and
+        # then persist a plausible-looking partial cohort.
+        result = retrospective_alignment_with_shuffle(
+            ev_s,
+            ea_s,
+            es_s,
+            n_shuffles=n_shuffles,
+            rng=np.random.default_rng(rng.integers(0, 2**32)),
+        )
+        status = retrospective_status(result)
+        if status != "ok":
+            logger.info(
+                "Retaining %s/%s/%s with status=%s; families without two "
+                "movable visit contexts report NaN metrics (%s)",
+                animal,
+                session_date,
+                epoch,
+                status,
+                family_unit_counts(result),
+            )
+
+        result.update(
+            {
+                "animal": animal,
+                "session_date": session_date,
+                "epoch": epoch,
+                "subset": subset,
+                "stop_cohort": stop_cohort,
+                "retrospective_status": status,
+                "elapsed_s": time.time() - t0,
+            }
+        )
+        rows.append(result)
+        if (i + 1) % 25 == 0 or i + 1 == len(sessions):
+            logger.info("  done %d/%d", i + 1, len(sessions))
+    return pd.DataFrame(rows)

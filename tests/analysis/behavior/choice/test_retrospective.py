@@ -39,18 +39,18 @@ from continuum_swr_replay.analysis.behavior.choice.retrospective import (
     ends_at_next,
     ends_at_next_patch,
     ends_at_prev,
+    family_unit_counts,
     freeze_retrospective_cohort,
+    retrospective_alignment_by_session,
     retrospective_alignment_with_shuffle,
+    retrospective_status,
+    select_event_subset,
 )
 from continuum_swr_replay.analysis.behavior.choice.shuffles import (
     next_arm_circular_shift,
 )
 from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
-from scripts.behavior.choice.run_retrospective_alignment import (
-    _family_unit_counts,
-    _retrospective_status,
-)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # arm_path_well_to_well
@@ -762,7 +762,7 @@ class TestRetrospectiveAlignmentWithShuffle:
         assert result["n_events_patch_family"] == 0
         assert result["n_events_path_family"] == 0
         assert result["n_shuffle_units_excluded_singleton_arm_family"] == 1
-        assert _retrospective_status(result) == "no_movable_family"
+        assert retrospective_status(result) == "no_movable_family"
 
     def test_missing_at_well_is_excluded_like_an_explicit_false(self):
         """``pd.NA`` must not survive the cohort filter.
@@ -1172,7 +1172,7 @@ class TestRetrospectiveAlignmentWithShuffle:
         assert result["n_shuffle_units_excluded_deterministic_path_family"] == 2
         assert result["cohort_policy"] == "metric_family_specific"
         assert result["path_null_effectively_cross_patch"] is True
-        assert _retrospective_status(result) == "ok"
+        assert retrospective_status(result) == "ok"
 
     def test_family_unit_counts_ignore_qualified_sibling_keys(self):
         """Only the retained-count key names a family.
@@ -1190,24 +1190,24 @@ class TestRetrospectiveAlignmentWithShuffle:
             "n_shuffle_units_excluded_singleton_path_family": 0,
         }
 
-        assert _family_unit_counts(result) == {"arm": 4, "path": 2}
-        assert _retrospective_status(result) == "ok"
+        assert family_unit_counts(result) == {"arm": 4, "path": 2}
+        assert retrospective_status(result) == "ok"
 
     def test_status_separates_partial_from_no_movable_family(self):
         """A session can estimate one family and not another."""
         assert (
-            _retrospective_status(
+            retrospective_status(
                 {"n_shuffle_units_arm_family": 4, "n_shuffle_units_path_family": 1}
             )
             == "partial_movable_families"
         )
         assert (
-            _retrospective_status(
+            retrospective_status(
                 {"n_shuffle_units_arm_family": 1, "n_shuffle_units_path_family": 0}
             )
             == "no_movable_family"
         )
-        assert _retrospective_status({}) == "no_movable_family"
+        assert retrospective_status({}) == "no_movable_family"
 
     def test_patch_family_exchanges_visits_across_arms_in_same_patch(self):
         """Patch calibration conditions on current patch, not current arm."""
@@ -1483,3 +1483,71 @@ def test_the_shuffle_null_needs_the_callers_generator():
     empty = pd.DataFrame()
     with pytest.raises(TypeError, match="rng"):
         retrospective_alignment_with_shuffle(empty, empty, empty, n_shuffles=1)
+
+
+def _tables_of(epoch: str, event_ids: list[int], is_swr: list[bool]):
+    ev = _make_event_table(
+        [
+            {
+                "event_id": event_id,
+                "occupancy_well_arm": 0,
+                "next_arm": 1,
+                "next_patch": 1,
+                "is_swr": swr,
+            }
+            for event_id, swr in zip(event_ids, is_swr, strict=True)
+        ]
+    ).assign(epoch=epoch)
+    ea = _make_event_arm_table(
+        {event_id: [0.5, 0.5, 0, 0, 0, 0, 0, 0, 0] for event_id in event_ids}
+    ).assign(epoch=epoch)
+    ea["is_swr"] = ea["event_id"].map(dict(zip(event_ids, is_swr, strict=True)))
+    es = _make_event_sequence_table(
+        {event_id: [0, 1] for event_id in event_ids}
+    ).assign(epoch=epoch)
+    return ev, ea, es
+
+
+def test_an_event_subset_keeps_the_same_events_in_all_three_tables():
+    ev, ea, es = _tables_of("01_r1", [1, 2, 3], [True, False, True])
+
+    swr = select_event_subset(ev, ea, es, "swr_only")
+    non_swr = select_event_subset(ev, ea, es, "non_swr_only")
+    everything = select_event_subset(ev, ea, es, "all")
+
+    assert [set(t["event_id"]) for t in swr] == [{1, 3}] * 3
+    assert [set(t["event_id"]) for t in non_swr] == [{2}] * 3
+    assert all(a is b for a, b in zip(everything, (ev, ea, es), strict=True))
+    with pytest.raises(ValueError, match="subset must be one of"):
+        select_event_subset(ev, ea, es, "mua_only")
+
+
+def test_the_sessions_are_run_in_order_each_with_its_own_seeded_draw():
+    first = _tables_of("01_r1", [1, 2], [True, False])
+    second = _tables_of("02_r1", [3, 4], [True, True])
+    ev, ea, es = (
+        pd.concat([a, b], ignore_index=True) for a, b in zip(first, second, strict=True)
+    )
+
+    def run(**kwargs):
+        return retrospective_alignment_by_session(
+            ev,
+            ea,
+            es,
+            n_shuffles=2,
+            seed=7,
+            subset="all",
+            stop_cohort="at_well",
+            **kwargs,
+        ).drop(columns="elapsed_s")
+
+    out = run()
+    assert list(out["epoch"]) == ["01_r1", "02_r1"]
+    assert set(out["subset"]) == {"all"}
+    assert set(out["stop_cohort"]) == {"at_well"}
+    # Each session's events share one stop at one well: one visit context, so
+    # no family can move a label.
+    assert set(out["retrospective_status"]) == {"no_movable_family"}
+    pd.testing.assert_frame_equal(out, run())
+    # The first session's draw does not depend on the sessions after it.
+    pd.testing.assert_frame_equal(run(max_sessions=1), out.iloc[:1])

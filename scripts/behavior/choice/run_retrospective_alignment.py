@@ -34,16 +34,15 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-import time
 from collections.abc import Sequence
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior import (
-    at_well_event_cohort,
-    retrospective_alignment_with_shuffle,
+from continuum_swr_replay.analysis.behavior import at_well_event_cohort
+from continuum_swr_replay.analysis.behavior.choice.retrospective import (
+    retrospective_alignment_by_session,
+    select_event_subset,
 )
 from continuum_swr_replay.analysis.behavior.fit_provenance import (
     record_inputs,
@@ -83,52 +82,6 @@ def fit_input_paths() -> dict[str, Path]:
 #: The flag exists to make the cohort readable from the command line and the
 #: sidecar, not to offer a choice.
 STOP_COHORTS = ("at_well",)
-
-
-def _family_unit_counts(
-    result: dict[str, float | int | bool | str],
-) -> dict[str, int]:
-    """Movable visit-context counts for each calibrated metric family.
-
-    Only families the run actually requested appear in ``result``, so read
-    whichever suffixed keys are present rather than assuming all three.
-    """
-    suffix = "_family"
-    prefix = "n_shuffle_units_"
-    counts: dict[str, int] = {}
-    for key, value in result.items():
-        if not (key.startswith(prefix) and key.endswith(suffix)):
-            continue
-        family = key[len(prefix) : -len(suffix)]
-        # The retained count is ``n_shuffle_units_<family>_family``. Sibling
-        # keys qualify the same suffix -- ``..._input_<family>_family``,
-        # ``..._excluded_singleton_<family>_family`` -- and their zeros would
-        # read as a non-movable family. A family name is a single token.
-        if "_" in family:
-            continue
-        counts[family] = int(value)
-    return counts
-
-
-def _retrospective_status(
-    result: dict[str, float | int | bool | str],
-) -> str:
-    """Explicit persisted status for a session's retrospective analysis.
-
-    A family needs two movable visit contexts before its null can move a
-    label, and the families are calibrated independently, so a session can
-    estimate some metrics and not others. Distinguish that from the case
-    where nothing is estimable: ``ok`` means every requested family is
-    movable, ``partial_movable_families`` that at least one is not, and
-    ``no_movable_family`` that none are.
-    """
-    counts = _family_unit_counts(result)
-    if not counts:
-        return "no_movable_family"
-    movable = [count >= 2 for count in counts.values()]
-    if all(movable):
-        return "ok"
-    return "partial_movable_families" if any(movable) else "no_movable_family"
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -233,91 +186,26 @@ def main(argv: Sequence[str] | None = None) -> None:
         n_before_location,
     )
 
-    if args.swr_only:
-        keep = event_table["is_swr"].astype(bool)
-        event_table = event_table[keep].copy()
-        event_arm_table = event_arm_table[event_arm_table["is_swr"].astype(bool)].copy()
-        event_sequence_table = event_sequence_table.merge(
-            event_table[[*SESSION_COLUMNS, "event_id"]],
-            on=[*SESSION_COLUMNS, "event_id"],
-            how="inner",
-        )
+    event_table, event_arm_table, event_sequence_table = select_event_subset(
+        event_table, event_arm_table, event_sequence_table, label
+    )
+    if label == "swr_only":
         logging.info("Filtered to SWR events: %d", len(event_table))
-    elif args.non_swr_only:
-        keep = ~event_table["is_swr"].astype(bool)
-        event_table = event_table[keep].copy()
-        event_arm_table = event_arm_table[
-            ~event_arm_table["is_swr"].astype(bool)
-        ].copy()
-        event_sequence_table = event_sequence_table.merge(
-            event_table[[*SESSION_COLUMNS, "event_id"]],
-            on=[*SESSION_COLUMNS, "event_id"],
-            how="inner",
-        )
+    elif label == "non_swr_only":
         logging.info("Filtered to non-SWR events: %d", len(event_table))
 
-    rng = np.random.default_rng(args.seed)
-    rows = []
-    n_no_movable = 0
-    sessions = sorted(event_table.groupby(list(SESSION_COLUMNS)).groups.keys())
-    if args.max_sessions is not None:
-        sessions = sessions[: args.max_sessions]
-        logging.info("Smoke run: first %d session(s) only", len(sessions))
-    # Each table split by session once; a session a table lacks gets its empty
-    # frame (same columns and dtypes).
-    tables = (event_table, event_arm_table, event_sequence_table)
-    by_session = [
-        dict(tuple(table.groupby(list(SESSION_COLUMNS), sort=False)))
-        for table in tables
-    ]
-    for i, sess_key in enumerate(sessions):
-        animal, session_date, epoch = sess_key
-        ev_s, ea_s, es_s = (
-            groups.get(sess_key, table.iloc[:0])
-            for groups, table in zip(by_session, tables, strict=True)
-        )
-        t0 = time.time()
-        # Fail the batch before publication when any session violates the
-        # location/observability contract.  Continuing here would turn a
-        # scientific integrity error into an unreported session exclusion and
-        # then persist a plausible-looking partial cohort.
-        result = retrospective_alignment_with_shuffle(
-            ev_s,
-            ea_s,
-            es_s,
-            n_shuffles=args.n_shuffles,
-            rng=np.random.default_rng(rng.integers(0, 2**32)),
-        )
-        family_unit_counts = _family_unit_counts(result)
-        retrospective_status = _retrospective_status(result)
-        if retrospective_status != "ok":
-            logging.info(
-                "Retaining %s/%s/%s with status=%s; families without two "
-                "movable visit contexts report NaN metrics (%s)",
-                animal,
-                session_date,
-                epoch,
-                retrospective_status,
-                family_unit_counts,
-            )
-            n_no_movable += 1
-
-        result.update(
-            {
-                "animal": animal,
-                "session_date": session_date,
-                "epoch": epoch,
-                "subset": label,
-                "stop_cohort": args.stop_cohort,
-                "retrospective_status": retrospective_status,
-                "elapsed_s": time.time() - t0,
-            }
-        )
-        rows.append(result)
-        if (i + 1) % 25 == 0 or i + 1 == len(sessions):
-            logging.info("  done %d/%d", i + 1, len(sessions))
-
-    out = pd.DataFrame(rows)
+    out = retrospective_alignment_by_session(
+        event_table,
+        event_arm_table,
+        event_sequence_table,
+        n_shuffles=args.n_shuffles,
+        seed=args.seed,
+        subset=label,
+        stop_cohort=args.stop_cohort,
+        max_sessions=args.max_sessions,
+    )
+    n_sessions = len(out)
+    n_no_movable = int(out["retrospective_status"].ne("ok").sum()) if n_sessions else 0
     out.to_pickle(output_path)
     sidecar = write_fit_provenance(
         output_path,
@@ -337,7 +225,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             "subset": label,
             "n_shuffles": args.n_shuffles,
             "seed": args.seed,
-            "n_sessions_analysed": len(sessions),
+            "n_sessions_analysed": n_sessions,
             "is_partial_run": args.max_sessions is not None,
         },
     )
@@ -346,7 +234,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     logging.info(
         "Persisted %d/%d sessions with at least one non-movable metric family",
         n_no_movable,
-        len(sessions),
+        n_sessions,
     )
 
     # Summary across sessions for quick stdout interpretation.
