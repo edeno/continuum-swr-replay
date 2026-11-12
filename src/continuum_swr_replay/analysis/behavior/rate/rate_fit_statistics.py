@@ -30,6 +30,7 @@ import numpy as np
 import pandas as pd
 from patsy import dmatrix
 
+from continuum_swr_replay.analysis.behavior._fit_diagnostics import fit_flag_counts
 from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
     paired_coefficient_statistics,
     require_one_fit_per_session,
@@ -318,7 +319,8 @@ def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
         - ``n_sessions``: those sessions.
         - ``n_dropped``: fitted sessions the gate left out.
         - ``n_nonconverged``: kept sessions whose fit did not converge; a
-          missing ``converged`` flag counts as not converged.
+          missing ``converged`` flag counts as not converged
+          (:func:`~continuum_swr_replay.analysis.behavior._fit_diagnostics.fit_flag_counts`).
         - ``rate_ratio_lag_<k>``, for each lag ``k`` from 1: the median over
           sessions of the session's kernel at that lag, as a rate ratio.
         - ``late_rate_ratio_min``, ``late_rate_ratio_max``: the lowest and
@@ -332,6 +334,11 @@ def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
         - ``n_animals``: the animals with a kept session.
         - ``n_animals_lag_one_positive``: animals whose median lag-1 kernel is
           above a rate ratio of 1.
+
+    Raises
+    ------
+    KeyError
+        If ``fits`` has no ``converged`` column.
     """
     gated, kernels = _gated_reward_kernels(fits)
     lag_one = pd.Series(kernels[:, 0], index=gated.index)
@@ -342,7 +349,11 @@ def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
     return {
         "n_sessions": len(gated),
         "n_dropped": n_fitted - len(gated),
-        "n_nonconverged": int((~gated["converged"].eq(True)).sum()),
+        # Selecting the column first raises when the fits lack it, so the
+        # count cannot read 0 for fits that never recorded the flag.
+        "n_nonconverged": fit_flag_counts(gated[["converged"]])[
+            "n_sessions_flagged_nonconverged"
+        ],
         **{
             f"rate_ratio_lag_{lag}": float(rate_ratio)
             for lag, rate_ratio in enumerate(rate_ratios, start=1)

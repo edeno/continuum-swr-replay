@@ -251,6 +251,12 @@ def test_a_missing_convergence_flag_counts_as_not_converged():
     assert stats.reward_kernel_statistics(fits)["n_nonconverged"] == 2
 
 
+def test_fits_without_a_convergence_column_are_refused_not_counted_converged():
+    fits = _fits(_first_bump([0.5, 1.0, -0.2, 0.3, 0.4, 0.6]))
+    with pytest.raises(KeyError, match="converged"):
+        stats.reward_kernel_statistics(fits.drop(columns="converged"))
+
+
 def test_animals_with_a_negative_median_lag_one_kernel_are_not_counted_positive():
     fits = _fits(
         _first_bump([0.5, 1.0, -0.2, -0.3, 0.4]), animals=["a", "a", "b", "b", "c"]
