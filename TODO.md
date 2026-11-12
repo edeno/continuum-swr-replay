@@ -60,8 +60,7 @@ Work that is deferred on purpose. Each item says when it should be done.
     own SEM over animals and its own null band, without the draw-count truncation
     `null_band_summary` applies); `scripts/figures/generate_figure04.py`
     (`plot_population_average`: a pooled unit mean and SEM, not the summary's
-    animal-balanced mean); `scripts/pfc/measure_pfc_null_geometry.py`
-    (`excluded_section`, `overlap_section`).
+    animal-balanced mean).
   - behavior: `scripts/behavior/coupling/fit_swr_power_model.py` (percentiles, mean
     and SD of ripple power by class, the duration correlation it prints);
     `scripts/behavior/content/fit_replay_content_models.py` and

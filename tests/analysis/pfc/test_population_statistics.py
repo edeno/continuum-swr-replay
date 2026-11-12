@@ -283,6 +283,51 @@ def test_unmatchable_event_statistics_pool_classes_and_find_the_worst_session():
     assert (result["worst_excluded"], result["worst_total"]) == (3, 4)
 
 
+def test_unmatchable_events_by_class_sum_sessions_and_skip_empty_ones():
+    windows = _windows(
+        [
+            ("s1", "SWR", 10, 1),
+            ("s1", "replay", 0, 0),
+            ("s2", "SWR", 30, 3),
+            ("s2", "replay", 20, 10),
+            ("s3", "replay", 4, 3),
+            ("s3", "control", 0, 0),
+        ]
+    )
+    result = stats.unmatchable_events_by_class(windows).set_index("event_class")
+    assert list(result.index) == ["SWR", "control", "replay"]
+    # replay: three sessions (s1 has no event of it), 13 of 24 events; its
+    # largest session share is s3's 3 of 4, not s2's 10 of 20
+    replay = result.loc["replay"]
+    assert replay["n_sessions"] == 3
+    assert (replay["n_events_total"], replay["n_events_excluded"]) == (24, 13)
+    assert replay["max_session_frac_excluded"] == pytest.approx(0.75)
+    assert replay["frac_excluded"] == pytest.approx(13 / 24)
+    assert result.loc["SWR", "frac_excluded"] == pytest.approx(0.1)
+    # a class with no event in any session has no share
+    assert np.isnan(result.loc["control", "max_session_frac_excluded"])
+    assert np.isnan(result.loc["control", "frac_excluded"])
+
+
+def test_engagement_null_overlap_statistics_name_the_worst_median_session():
+    overlap = pd.DataFrame(
+        {
+            "session": ["s1", "s2", "s3", "s4"],
+            "median_overlap_fraction": [0.1, 0.4, 0.2, np.nan],
+            "max_overlap_fraction": [0.5, 0.45, 0.9, np.nan],
+        }
+    )
+    assert stats.engagement_null_overlap_statistics(overlap) == {
+        "n_sessions": 3,
+        "median_over_sessions": pytest.approx(0.2),
+        "min_over_sessions": 0.1,
+        "max_over_sessions": 0.4,
+        # the largest median, not the largest single draw (s3)
+        "worst_session": "s2",
+        "max_single_draw_overlap": 0.9,
+    }
+
+
 def test_unmatchable_event_statistics_refuse_a_table_without_events():
     with pytest.raises(ValueError, match="no session holds an event of any class"):
         stats.unmatchable_event_statistics(_windows([("s1", "SWR", 0, 0)]))

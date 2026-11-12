@@ -351,8 +351,8 @@ def spacing_section(
 def overlap_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
     """Per-session overlap of the engagement null's draws with the control.
 
-    The median and range over sessions are
-    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.session_value_statistics`.
+    The statistics over sessions are
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.engagement_null_overlap_statistics`'s.
     """
     rows = []
     for bundle in bundle_paths(data_dir):
@@ -366,19 +366,8 @@ def overlap_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
             }
         )
     table = pd.DataFrame(rows)
-    median = table["median_overlap_fraction"]
-    over_sessions = population_statistics.session_value_statistics(median)
     summary = pd.DataFrame(
-        [
-            {
-                "n_sessions": int(median.notna().sum()),
-                "median_over_sessions": float(over_sessions["median"]),
-                "min_over_sessions": float(over_sessions["min"]),
-                "max_over_sessions": float(over_sessions["max"]),
-                "worst_session": str(table.loc[median.idxmax(), "session"]),
-                "max_single_draw_overlap": float(table["max_overlap_fraction"].max()),
-            }
-        ]
+        [population_statistics.engagement_null_overlap_statistics(table)]
     )
     text = (
         "## How much of the engagement null is a copy of its baseline\n\n"
@@ -455,52 +444,26 @@ def non_positive_section(
 def excluded_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
     """Per-session, per-class counts of events no legal control could match.
 
-    The worst session and class are
+    The counts per class are
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.unmatchable_events_by_class`'s,
+    the worst session and class
     :func:`~continuum_swr_replay.analysis.pfc.population_statistics.unmatchable_event_statistics`'s.
     """
     rows = []
     for bundle in bundle_paths(data_dir):
         record = read_sidecar(bundle)
         for class_name, window in (record.get("null_windows") or {}).items():
-            total = int(window["n_events_total"])
             rows.append(
                 {
                     "session": session_of(bundle),
                     "event_class": class_name,
-                    "n_events_total": total,
-                    "n_events_tested": int(window["n_events_tested"]),
-                    "n_events_excluded_unmatchable": int(
-                        window["n_events_excluded_unmatchable"]
-                    ),
-                    "frac_excluded": (
-                        float(window["n_events_excluded_unmatchable"] / total)
-                        if total
-                        else np.nan
-                    ),
+                    "total": int(window["n_events_total"]),
+                    "excluded": int(window["n_events_excluded_unmatchable"]),
                 }
             )
     table = pd.DataFrame(rows)
-    corpus = (
-        table.groupby("event_class", as_index=False)
-        .agg(
-            n_sessions=("session", "size"),
-            n_events_total=("n_events_total", "sum"),
-            n_events_excluded=("n_events_excluded_unmatchable", "sum"),
-            max_session_frac_excluded=("frac_excluded", "max"),
-        )
-        .assign(
-            frac_excluded=lambda frame: frame["n_events_excluded"]
-            / frame["n_events_total"]
-        )
-    )
-    worst = population_statistics.unmatchable_event_statistics(
-        table.rename(
-            columns={
-                "n_events_total": "total",
-                "n_events_excluded_unmatchable": "excluded",
-            }
-        )
-    )
+    corpus = population_statistics.unmatchable_events_by_class(table)
+    worst = population_statistics.unmatchable_event_statistics(table)
     text = (
         "## Events the matched test could not use\n\n"
         "An event with no legal non-event window inside its own fitted bout "

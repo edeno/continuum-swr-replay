@@ -537,6 +537,76 @@ def unmatchable_event_statistics(windows: pd.DataFrame) -> dict[str, object]:
     }
 
 
+def unmatchable_events_by_class(windows: pd.DataFrame) -> pd.DataFrame:
+    """Per event class, the events with no legal within-bout control.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame, shape (n_sessions * n_classes, 4)
+        One row per session and event class, as for
+        :func:`unmatchable_event_statistics`: ``session``, ``event_class``,
+        ``total`` and ``excluded``.
+
+    Returns
+    -------
+    by_class : pd.DataFrame, shape (n_classes, 6)
+        One row per event class, in sorted order: ``event_class``,
+        ``n_sessions`` (rows of the class, a session with no event of it
+        included), ``n_events_total`` and ``n_events_excluded`` (summed over
+        sessions), ``max_session_frac_excluded`` (the largest excluded share
+        of a session, over the sessions with an event of the class) and
+        ``frac_excluded`` (excluded over total events).
+    """
+    share = (windows["excluded"] / windows["total"]).where(windows["total"] > 0)
+    return (
+        windows.assign(share=share)
+        .groupby("event_class", as_index=False)
+        .agg(
+            n_sessions=("session", "size"),
+            n_events_total=("total", "sum"),
+            n_events_excluded=("excluded", "sum"),
+            max_session_frac_excluded=("share", "max"),
+        )
+        .assign(
+            frac_excluded=lambda frame: frame["n_events_excluded"]
+            / frame["n_events_total"]
+        )
+    )
+
+
+def engagement_null_overlap_statistics(overlap: pd.DataFrame) -> dict[str, object]:
+    """How much of the engagement null's windows land on the shipped control.
+
+    Parameters
+    ----------
+    overlap : pd.DataFrame, shape (n_sessions, 3)
+        One row per session: ``session``, and over that session's engagement
+        null draws the median (``median_overlap_fraction``) and the largest
+        (``max_overlap_fraction``) share of a draw's windows that land on the
+        shipped matched control (NaN when the session records none).
+
+    Returns
+    -------
+    statistics : dict
+        - ``n_sessions``: sessions with a median share.
+        - ``median_over_sessions``, ``min_over_sessions``,
+          ``max_over_sessions``: of the session medians
+          (:func:`session_value_statistics`).
+        - ``worst_session``: the session with the largest median share.
+        - ``max_single_draw_overlap``: the largest share of any one draw.
+    """
+    median = overlap["median_overlap_fraction"]
+    over_sessions = session_value_statistics(median)
+    return {
+        "n_sessions": int(median.notna().sum()),
+        "median_over_sessions": float(over_sessions["median"]),
+        "min_over_sessions": float(over_sessions["min"]),
+        "max_over_sessions": float(over_sessions["max"]),
+        "worst_session": str(overlap.loc[median.idxmax(), "session"]),
+        "max_single_draw_overlap": float(overlap["max_overlap_fraction"].max()),
+    }
+
+
 # --- SWR-coupled against non-SWR replay ---------------------------------------------
 
 
