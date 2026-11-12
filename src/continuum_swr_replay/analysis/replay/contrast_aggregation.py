@@ -574,6 +574,56 @@ def pct_significant_sessions(
     return float((pvals < 0.05).mean())
 
 
+def gated_term_statistics(
+    fits: pd.DataFrame, term: str
+) -> tuple[TermSessionGate, dict[str, float | str]]:
+    """One term's coefficient summarized over the sessions the per-term gate keeps.
+
+    The statistics are computed whatever the gate's refusal; the caller reads
+    :attr:`TermSessionGate.refusal` and decides whether to publish them.
+
+    Parameters
+    ----------
+    fits : pandas.DataFrame, shape (n_sessions, n_columns)
+        Per-session fits of one rung and population, with ``animal``,
+        ``coef_<term>`` and the columns :func:`gate_term_sessions` reads
+        (optionally ``bse_<term>``, ``bse_cluster_<term>``, ``pval_<term>``).
+    term : str
+        The term.
+
+    Returns
+    -------
+    gate : TermSessionGate
+        Which sessions are kept, and how many were left out and why.
+    statistics : dict
+        Over the kept sessions: the names of
+        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`,
+        and
+
+        - ``signed_rank_p``: the Wilcoxon signed-rank p of the coefficients
+          against zero
+          (:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`).
+        - ``session_se_median``: the median of :func:`session_se`; NaN when the
+          fits carry no standard error.
+        - ``se_source``: which standard error that is (:func:`session_se`).
+        - ``significant_fraction``: :func:`pct_significant_sessions`, read on
+          that same standard error.
+    """
+    gate = gate_term_sessions(fits, term)
+    kept = fits[gate.kept]
+    coef = kept[f"coef_{term}"]
+    se, se_source = session_se(kept, term)
+    return gate, {
+        **session_median_statistics(coef, kept["animal"]),
+        "signed_rank_p": signed_rank_p(coef),
+        "session_se_median": np.nan if se is None else float(se.median()),
+        "se_source": se_source,
+        "significant_fraction": pct_significant_sessions(
+            coef, se, kept.get(f"pval_{term}")
+        ),
+    }
+
+
 def aggregate_contrast(
     res: pd.DataFrame,
     specs: list[tuple[str, str, str]],
@@ -588,7 +638,8 @@ def aggregate_contrast(
         Per-session fits: columns ``model``, ``population``, ``animal`` and
         ``coef_<term>`` (optionally ``bse_<term>``, ``pval_<term>``,
         ``sd_<term>``). Which sessions a term keeps, and whether its row is
-        emitted at all, is :func:`gate_term_sessions`.
+        emitted at all, is :func:`gate_term_sessions`; the row's summary of
+        the kept sessions is :func:`gated_term_statistics`.
     specs : list of (model, population, term)
         One aggregated row per spec (in order).
     level : str
@@ -599,14 +650,13 @@ def aggregate_contrast(
     sd = sd or {}
     rows = []
     for model, pop, term in specs:
-        ccol, pcol = f"coef_{term}", f"pval_{term}"
         s_all = res[(res.model == model) & (res.population == pop)]
-        if ccol not in s_all.columns:
+        if f"coef_{term}" not in s_all.columns:
             continue
         # Resolved only for a term the fits carry: a spec with no coefficient
         # column emits no row, so it needs no unit.
         factor, unit = std_factor(term, sd)
-        gate = gate_term_sessions(s_all, term)
+        gate, summary = gated_term_statistics(s_all, term)
         if gate.refusal == "too_few_sessions":
             continue
         if gate.refusal == "unidentified_share":
@@ -626,13 +676,7 @@ def aggregate_contrast(
                 gate.n_unidentified,
             )
             continue
-        s = s_all[gate.kept]
-        coef = s[ccol]
-        se_per_session, se_source = session_se(s, term)
-        session_se_median = (
-            np.nan if se_per_session is None else float(se_per_session.median())
-        )
-        summary = session_median_statistics(coef, s["animal"])
+        session_se_median = summary["session_se_median"]
         # Session-level fit-diagnostics counts (informational; NOT drops). These stay
         # FIT-level -- they answer "how many fits had any unidentified term", which is
         # a different question from the per-term drop above. Counted over ALL modeled
@@ -664,17 +708,15 @@ def aggregate_contrast(
                 "n_animals_pos": summary["n_animals_positive"],
                 "coef_session_median": summary["median"],
                 "typical_session_se": session_se_median,
-                "se_source": se_source,
+                "se_source": summary["se_source"],
                 "std_unit": unit,
                 "std_factor": factor,
                 "std_coef_animal_median": summary["animal_median"] * factor,
                 "std_coef_session_median": summary["median"] * factor,
                 "std_typical_session_se": session_se_median * factor,
                 "pct_positive_session": summary["positive_fraction"],
-                "pct_sig_session": pct_significant_sessions(
-                    coef, se_per_session, s[pcol] if pcol in s else None
-                ),
-                "session_signrank_p": signed_rank_p(coef),
+                "pct_sig_session": summary["significant_fraction"],
+                "session_signrank_p": summary["signed_rank_p"],
             }
         )
     df = pd.DataFrame(rows)

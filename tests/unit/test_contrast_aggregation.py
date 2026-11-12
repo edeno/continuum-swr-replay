@@ -771,6 +771,47 @@ def test_the_gate_refuses_exactly_what_the_audited_table_omits(
         assert audited.loc[0, "n_sessions"] == gate.n_kept
 
 
+def _summary_fits() -> pd.DataFrame:
+    """Six kept sessions of animals a (3), b (2), c (1); one separated, one
+    runaway (|40| * sd 1 >= 10) and one the fit records as uninformed."""
+    return pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "b", "b", "c", "c", "a", "b"],
+            "coef_x": [0.4, 0.2, 0.9, 0.1, 0.3, 0.5, 5.0, 40.0, float("nan")],
+            "sd_x": [0.1] * 7 + [1.0, 0.1],
+            "bse_x": [0.1, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, float("nan")],
+            # The fourth session's sandwich is not finite: its model SE is used.
+            "bse_cluster_x": [0.1, 0.1, 0.3, float("nan"), 0.1, 0.1, 0.1, 0.1]
+            + [float("nan")],
+            "separated_terms": [""] * 6 + ["x", "", ""],
+            "unidentified_terms": [""] * 8 + ["x:no_within_event_variation"],
+        }
+    )
+
+
+def test_the_gated_summary_is_of_the_kept_sessions_only() -> None:
+    gate, summary = contrast_aggregation.gated_term_statistics(_summary_fits(), "x")
+
+    assert (gate.n_kept, gate.n_dropped, gate.n_unidentified) == (6, 2, 1)
+    # Three of nine fitted sessions left out: the gate refuses, the summary is
+    # still computed.
+    assert gate.refusal == "unidentified_share"
+    # kept 0.1 0.2 0.3 0.4 0.5 0.9: median 0.35 (the mean is 0.4)
+    assert summary["n_sessions"] == 6
+    assert summary["median"] == pytest.approx(0.35)
+    # animals a 0.4, b 0.2, c 0.5 -> 0.4
+    assert summary["n_animals"] == 3
+    assert summary["animal_median"] == pytest.approx(0.4)
+    assert summary["n_positive"] == 6 and summary["n_animals_positive"] == 3
+    # Six positive differences: the exact two-sided p is 2 / 2**6.
+    assert summary["signed_rank_p"] == pytest.approx(0.03125)
+    # SEs 0.1 0.1 0.3 0.2 0.1 0.1 (five clustered): median 0.1
+    assert summary["session_se_median"] == pytest.approx(0.1)
+    assert summary["se_source"] == "cluster"
+    # z = 4, 2, 3, 0.5, 3, 5: five above 1.96
+    assert summary["significant_fraction"] == pytest.approx(5 / 6)
+
+
 def _assembly_tables(duplicated: str) -> dict[str, pd.DataFrame]:
     ev = pd.DataFrame({"event_id": [1, 2], "stop_id": [10, 11]})
     stop = pd.DataFrame(

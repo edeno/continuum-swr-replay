@@ -29,9 +29,8 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     gate_term_sessions,
-    pct_significant_sessions,
+    gated_term_statistics,
     separated_for_term,
-    session_se,
     unidentified_for_term,
 )
 from continuum_swr_replay.analysis.statistics import (
@@ -162,9 +161,16 @@ def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
     statistics = session_median_statistics(values, known["animal"])
     return {
         **statistics,
+        **_exp_medians(statistics),
+        "signed_rank_p": signed_rank_p(values),
+    }
+
+
+def _exp_medians(statistics: Mapping[str, float]) -> dict[str, float]:
+    """``exp`` of the median over sessions and of the median over animals."""
+    return {
         "exp_median": float(np.exp(statistics["median"])),
         "exp_animal_median": float(np.exp(statistics["animal_median"])),
-        "signed_rank_p": signed_rank_p(values),
     }
 
 
@@ -327,26 +333,32 @@ def gated_coefficient_statistics(fits: pd.DataFrame, term: str) -> dict[str, flo
         - ``session_se_median``: the median over sessions of the session's
           standard error of the coefficient (event-clustered where the fit
           wrote one); NaN when the fits carry no standard error.
+        - ``se_source``: ``"cluster"`` when more than half of the kept
+          sessions' standard errors are event-clustered, else ``"model"``.
         - ``significant_fraction``: of the kept sessions with a usable standard
           error (a finite ratio of coefficient to standard error), the share
           whose coefficient differs from zero at 0.05, two-sided, on that
           standard error. When no kept session has one, the share of all kept
           sessions whose own p-value (``pval_<term>``) is below 0.05; NaN when
           the fits carry neither.
+
+        The summary of the kept sessions is
+        :func:`~continuum_swr_replay.analysis.replay.contrast_aggregation.gated_term_statistics`,
+        the one the audited aggregates' rows are made of.
+
+    Raises
+    ------
+    ValueError
+        If two rows of ``fits`` are of the same session.
     """
-    gate = gate_term_sessions(fits, term)
-    kept = fits[gate.kept]
-    column = f"coef_{term}"
-    se, _ = session_se(kept, term)
+    require_one_fit_per_session(fits)
+    gate, statistics = gated_term_statistics(fits, term)
     return {
-        **coefficient_statistics(kept, column),
+        **statistics,
+        **_exp_medians(statistics),
         "n_dropped": gate.n_dropped,
         "n_unidentified": gate.n_unidentified,
         "gate_refuses": gate.refusal is not None,
-        "session_se_median": float(se.median()) if se is not None else float("nan"),
-        "significant_fraction": float(
-            pct_significant_sessions(kept[column], se, kept.get(f"pval_{term}"))
-        ),
     }
 
 
