@@ -124,6 +124,22 @@ def _require_same(
     )
 
 
+def compared_events(inventory: pd.DataFrame) -> pd.DataFrame:
+    """The inventory's compared events: those immobile as a whole
+    (``whole_event_speed_eligible``), indexed from 0.
+
+    Parameters
+    ----------
+    inventory : pd.DataFrame, shape (n_events, n_columns)
+        An epoch's stored ``inventory`` table.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_compared, n_columns)
+    """
+    return inventory[inventory.whole_event_speed_eligible].reset_index(drop=True)
+
+
 def rebuild_matches(
     tables: Mapping[str, pd.DataFrame],
     still: Mapping[tuple, NDArray],
@@ -135,8 +151,7 @@ def rebuild_matches(
 
     The coverage is ``stored_coverage`` of the stored observations and
     set-aside events; the memberships are ``event_matches`` over the stored
-    compared events (the ``inventory`` rows with
-    ``whole_event_speed_eligible``) and pairs. Both are checked: the
+    compared events (:func:`compared_events`) and pairs. Both are checked: the
     ``flag_pairs``, ``directional_agreement`` and ``membership_against`` they
     give must equal the stored ``pairs``, ``directional`` and ``cells`` tables
     exactly, rows in any order.
@@ -172,8 +187,7 @@ def rebuild_matches(
 
     """
     coverage = stored_coverage(tables["observations"], tables["set_aside"], still)
-    inventory = tables["inventory"]
-    compared = inventory[inventory.whole_event_speed_eligible].reset_index(drop=True)
+    compared = compared_events(tables["inventory"])
     pairs = tables["pairs"][list(PAIR_DTYPES)]
     matches = event_matches(compared, pairs, coverage, detectors=detectors)
     # each pair's within-exposure flags, so the memberships are checked event

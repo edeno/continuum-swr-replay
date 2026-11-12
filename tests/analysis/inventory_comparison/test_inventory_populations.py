@@ -32,6 +32,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
 from continuum_swr_replay.analysis.inventory_comparison.populations import (
     POPULATION_DTYPES,
     _require_same,
+    compared_events,
     population_rows,
     rebuild_matches,
 )
@@ -330,3 +331,16 @@ class TestPopulationRows:
                 tables["cells"],
                 directional[directional.target_detector != "c"],
             )
+
+
+def test_the_compared_events_are_the_whole_event_immobile_ones_indexed_from_zero():
+    inventory = pd.DataFrame(
+        {
+            "event_key": ["a", "b", "c", "d"],
+            "whole_event_speed_eligible": [False, True, False, True],
+        },
+        index=[10, 11, 12, 13],
+    )
+    compared = compared_events(inventory)
+    assert compared.event_key.tolist() == ["b", "d"]
+    assert compared.index.tolist() == [0, 1]

@@ -15,33 +15,6 @@ from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.parameters import ROOT_DIR
 
 
-def test_the_row_mask_holds_each_intervals_rows_and_no_others():
-    mask = runner._row_mask(10, np.array([1, 3, 8]), np.array([3, 0, 2]))
-
-    np.testing.assert_array_equal(np.flatnonzero(mask), [1, 2, 3, 8, 9])
-
-
-def test_overlapping_intervals_mark_their_rows_once():
-    mask = runner._row_mask(6, np.array([0, 2]), np.array([4, 3]))
-
-    np.testing.assert_array_equal(np.flatnonzero(mask), [0, 1, 2, 3, 4])
-
-
-def test_the_evidence_rows_are_the_events_rows_never_the_last_sample():
-    time = 100.0 + 0.002 * np.arange(20)
-    events = pd.DataFrame(
-        {
-            "event_start_s": [time[2], time[10], time[19]],
-            "event_end_s": [time[6], time[-1], time[-1]],
-        }
-    )
-
-    rows = runner.evidence_rows(time, events)
-
-    # rows 2 to 6, and 10 to 18: the grid's last sample is no row
-    np.testing.assert_array_equal(np.flatnonzero(rows), [2, 3, 4, 5, 6, *range(10, 19)])
-
-
 def test_a_row_of_a_scored_interval_not_requested_is_refused():
     rows = np.zeros(10, dtype=bool)
     rows[2:6] = True

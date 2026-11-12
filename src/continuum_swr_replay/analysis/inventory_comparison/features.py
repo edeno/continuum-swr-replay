@@ -310,6 +310,48 @@ def _grid_rows(
     return first, n_rows
 
 
+def grid_row_mask(n_time: int, first: NDArray, n_rows: NDArray) -> NDArray[np.bool_]:
+    """The rows of every interval, as one mask over the grid.
+
+    Parameters
+    ----------
+    n_time : int
+        The grid's samples.
+    first, n_rows : NDArray of int, shape (n_intervals,)
+        Each interval's first row and its number of rows (:func:`_grid_rows`).
+
+    Returns
+    -------
+    NDArray of bool, shape (n_time,)
+        True on every row of any interval.
+    """
+    edges = np.zeros(n_time + 1, dtype=np.int64)
+    np.add.at(edges, first, 1)
+    np.add.at(edges, first + n_rows, -1)
+    mask: NDArray[np.bool_] = np.cumsum(edges[:-1]) > 0
+    return mask
+
+
+def evidence_rows(time: NDArray, events: pd.DataFrame) -> NDArray[np.bool_]:
+    """The rows whose evidence is computed: every row of the compared events.
+
+    Parameters
+    ----------
+    time : NDArray, shape (n_time,)
+        The decode grid.
+    events : pd.DataFrame
+        ``event_start_s`` and ``event_end_s`` of the compared events.
+
+    Returns
+    -------
+    rows : NDArray of bool, shape (n_time,)
+        Never the grid's last sample, which is no row (``features``' row
+        rule).
+    """
+    first, n_rows = _grid_rows(time, events)
+    return grid_row_mask(time.size, first, n_rows)
+
+
 def _over_rows(
     ufunc: np.ufunc, values: NDArray, first: NDArray, n_rows: NDArray
 ) -> NDArray:

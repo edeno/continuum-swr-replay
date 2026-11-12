@@ -151,8 +151,9 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (  # noq
     DURATION_STRATUM_LABELS,
     PosteriorTraces,
     RowTraces,
-    _grid_rows,
     duration_stratum,
+    evidence_rows,
+    grid_row_mask,
     interval_features,
     ms_features,
     neighbour_gaps,
@@ -163,6 +164,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa
     MATCH_DTYPES,
 )
 from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
+    compared_events,
     population_rows,
     rebuild_matches,
 )
@@ -253,35 +255,6 @@ class _EpochRefused(Exception):
     """The epoch's inputs are not the comparison's; the message says why."""
 
 
-def _row_mask(n_time: int, first: NDArray, n_rows: NDArray) -> NDArray[np.bool_]:
-    """The rows of every interval, as one mask over the grid."""
-    edges = np.zeros(n_time + 1, dtype=np.int64)
-    np.add.at(edges, first, 1)
-    np.add.at(edges, first + n_rows, -1)
-    mask: NDArray[np.bool_] = np.cumsum(edges[:-1]) > 0
-    return mask
-
-
-def evidence_rows(time: NDArray, events: pd.DataFrame) -> NDArray[np.bool_]:
-    """The rows whose evidence is computed: every row of the compared events.
-
-    Parameters
-    ----------
-    time : NDArray, shape (n_time,)
-        The decode grid.
-    events : pd.DataFrame
-        ``event_start_s`` and ``event_end_s`` of the compared events.
-
-    Returns
-    -------
-    rows : NDArray of bool, shape (n_time,)
-        Never the grid's last sample, which is no row (``features``' row
-        rule).
-    """
-    first, n_rows = _grid_rows(time, events)
-    return _row_mask(time.size, first, n_rows)
-
-
 def _require_requested(rows: NDArray[np.bool_], intervals: pd.DataFrame) -> None:
     """Raise unless every row of every interval had its evidence computed.
 
@@ -290,7 +263,7 @@ def _require_requested(rows: NDArray[np.bool_], intervals: pd.DataFrame) -> None
     """
     starts = intervals["first_row"].to_numpy(dtype=np.int64)
     counts = intervals["n_rows"].to_numpy(dtype=np.int64)
-    scored = _row_mask(rows.size, starts, counts)
+    scored = grid_row_mask(rows.size, starts, counts)
     if (scored & ~rows).any():
         raise RuntimeError(
             f"{int((scored & ~rows).sum())} rows of scored intervals were not among "
@@ -443,7 +416,7 @@ def epoch_tables(
         stored, still, detectors=inventory_run.DETECTORS, cells=inventory_run.CELLS
     )
     inventory = stored["inventory"]
-    compared = inventory[inventory.whole_event_speed_eligible].reset_index(drop=True)
+    compared = compared_events(inventory)
     populations = population_rows(
         compared, matches, stored["cells"], stored["directional"]
     )
