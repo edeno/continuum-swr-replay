@@ -35,7 +35,6 @@ from continuum_swr_replay.analysis.events.analysed_time import (
 from continuum_swr_replay.analysis.events.artifact_intervals import (
     cores_path,
     read_manifest,
-    write_manifest,
 )
 from continuum_swr_replay.analysis.events.eligibility import (
     DropReason,
@@ -54,7 +53,7 @@ from continuum_swr_replay.analysis.events.swr_source import (
     swr_events,
 )
 from continuum_swr_replay.paths import artifact_intervals_root, swr_inventory_root
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file, write_json
 from tests.support._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     RUN_ID,
@@ -386,7 +385,7 @@ class TestTheArtifactIntervals:
         pd.DataFrame({"start_time": [1.0], "end_time": [2.0]}).to_parquet(path)
         manifest = read_manifest(directory)
         manifest["epochs"][EPOCH]["outputs"]["cores"]["sha256"] = sha256_file(path)
-        write_manifest(directory, manifest)
+        write_json(directory / "manifest.json", manifest, indent=2)
 
         with pytest.raises(SwrSourceError, match="core_start"):
             swr_events(EPOCH, speed=pd.Series(_speed(), index=TIME))

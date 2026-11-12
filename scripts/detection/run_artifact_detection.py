@@ -38,8 +38,9 @@ seconds, input hashes, and the file's path and sha256. Only this process
 writes it, atomically, after each epoch. A rerun under the same run id skips
 the epochs already ``ok`` unless ``--overwrite`` is given, and refuses
 settings other than the manifest's. A run holds an exclusive lock on its
-folder's ``.lock``. The run id is the code commit's first 12 characters unless
-``--run-id`` is given.
+folder's ``.lock``. The run id is the code commit's first 12 characters (with
+``-dirty`` when tracked files have uncommitted changes) unless ``--run-id`` is
+given.
 
 The epochs are the epoch register's analysed ones and the ones it excludes for
 an S block (``SUSTAINED_NOISE``, re-tested by every run); with
@@ -59,7 +60,6 @@ Usage:
 
 import argparse
 import functools
-import json
 import resource
 import sys
 import time as clock
@@ -78,7 +78,6 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.events.artifact_intervals import (
     cores_path,
     write_cores,
-    write_manifest,
 )
 from continuum_swr_replay.analysis.events.artifact_masks import (
     PADDING_S,
@@ -104,6 +103,7 @@ from continuum_swr_replay.intervals import (
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import artifact_intervals_root
 from continuum_swr_replay.runs.batch import (
+    RunManifest,
     raise_open_file_limit,
     run_epoch_task,
     run_epochs,
@@ -112,6 +112,7 @@ from continuum_swr_replay.runs.batch import (
 from continuum_swr_replay.runs.cli import filter_epoch_info, parse_run_id
 from continuum_swr_replay.runs.io import array_sha256, json_ready
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
+from continuum_swr_replay.runs.provenance import run_id as run_id_of
 
 PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/2026-10-09-artifact-detection.md"
@@ -427,7 +428,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--run-id",
         type=parse_run_id,
         help="The run's folder under --output-root: letters, digits, '.', '_' "
-        "and '-'. Defaults to the first 12 characters of git rev-parse HEAD.",
+        "and '-'. Defaults to the first 12 characters of git rev-parse HEAD, "
+        "with -dirty when tracked files have uncommitted changes.",
     )
     # Where the run folders go: where the SWR source reads them.
     parser.add_argument("--output-root", type=Path, default=artifact_intervals_root())
@@ -441,12 +443,7 @@ def main(argv: list[str] | None = None) -> None:
     old_soft, new_soft = raise_open_file_limit()
     print(f"open-file soft limit {old_soft} -> {new_soft}", flush=True)
     provenance = provenance_record(ROOT_DIR)
-    run_id = provenance["commit"][:12] if args.run_id is None else args.run_id
-    if provenance["dirty"]:
-        print(
-            f"warning: uncommitted changes; run {run_id} cannot be tied to a commit",
-            flush=True,
-        )
+    run_id = run_id_of(provenance, args.run_id)
     output_dir = args.output_root / run_id
     with run_lock(output_dir):
         run(args, output_dir)
@@ -462,39 +459,24 @@ def run(args: argparse.Namespace, output_dir: Path) -> None:
         sys.exit("No epochs match --animal, --date and --epoch.")
 
     manifest_path = output_dir / "manifest.json"
-    records: dict[str, dict] = {}
-    if manifest_path.exists():
-        previous = json.loads(manifest_path.read_text())
-        if previous["settings"] != settings:
-            sys.exit(
-                f"{manifest_path} was written with other settings; a run must "
-                "not mix them. Start a new --run-id."
-            )
-        records = previous["epochs"]
-
-    def write() -> None:
-        write_manifest(
-            output_dir,
-            {
-                "produced_by": PRODUCED_BY,
-                "run_id": run_id,
-                "design_spec": DESIGN_SPEC,
-                "settings": settings,
-                "epochs": records,
-            },
-        )
-
-    to_run = []
-    for nwb_file_name, epoch_name in epochs:
-        identifier = swr_epoch_id(nwb_file_name, epoch_name)
-        if records.get(identifier, {}).get("status") == "ok" and not args.overwrite:
-            print(f"{identifier}: already written", flush=True)
-        else:
-            # the record goes first, so a run stopped part way cannot leave a
-            # new file under an old record
-            records.pop(identifier, None)
-            to_run.append((nwb_file_name, epoch_name))
-    write()
+    manifest = RunManifest.resume(
+        manifest_path,
+        {
+            "produced_by": PRODUCED_BY,
+            "run_id": run_id,
+            "design_spec": DESIGN_SPEC,
+            "settings": settings,
+        },
+    )
+    by_identifier = {
+        swr_epoch_id(nwb_file_name, epoch_name): (nwb_file_name, epoch_name)
+        for nwb_file_name, epoch_name in epochs
+    }
+    to_run = [
+        by_identifier[identifier]
+        for identifier in manifest.to_redo(by_identifier, args.overwrite)
+    ]
+    manifest.write()
     print(
         f"{len(to_run)} epochs to run on {args.n_workers} worker processes, each "
         f"logging to {Path.cwd() / 'logs' / '<epoch_id>_artifacts.log'}",
@@ -520,11 +502,11 @@ def run(args: argparse.Namespace, output_dir: Path) -> None:
         run_epochs(tasks, _run_epoch_logged, cluster_factory, key_prefix="artifacts"),
         start=1,
     ):
-        records[identifier] = record
+        manifest.records[identifier] = record
         print(f"[{number}/{len(to_run)}] {identifier}: {summary(record)}", flush=True)
         if record["status"] == "failed":
             failed.append(identifier)
-        write()
+        manifest.write()
     print(f"manifest -> {manifest_path}", flush=True)
     if failed:
         sys.exit(

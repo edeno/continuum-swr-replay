@@ -7,8 +7,6 @@ Offline: everything is written under ``tmp_path``.
 
 from __future__ import annotations
 
-import json
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -23,10 +21,9 @@ from continuum_swr_replay.analysis.events.artifact_intervals import (
     read_epoch_cores,
     read_manifest,
     write_cores,
-    write_manifest,
 )
 from continuum_swr_replay.analysis.events.artifact_masks import artifact_intervals
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file, write_json
 from continuum_swr_replay.tables.io import read_attrs
 
 EPOCH = "chimi20200225_02_r1_HPC"
@@ -66,7 +63,7 @@ def _run(tmp_path, cores: pd.DataFrame | None = None, **record) -> tuple:
             }
         },
     }
-    write_manifest(directory, manifest)
+    write_json(directory / "manifest.json", manifest, indent=2)
     return directory, manifest
 
 
@@ -110,15 +107,6 @@ class TestTheCoresFile:
 
 
 class TestTheManifest:
-    def test_it_is_strict_json_written_whole(self, tmp_path):
-        write_manifest(tmp_path, {"run_id": tmp_path.name, "epochs": {}})
-
-        text = (tmp_path / "manifest.json").read_text()
-        assert json.loads(text) == {"run_id": tmp_path.name, "epochs": {}}
-        assert not list(tmp_path.glob(".*tmp"))
-        with pytest.raises(ValueError):
-            write_manifest(tmp_path, {"run_id": tmp_path.name, "x": float("nan")})
-
     def test_a_folder_holding_another_runs_manifest_is_refused(self, tmp_path):
         directory, _ = _run(tmp_path)
         moved = directory.rename(directory.parent / "other")
@@ -154,7 +142,7 @@ class TestReadingAnEpoch:
     def test_a_failed_epoch_is_refused(self, tmp_path):
         directory, manifest = _run(tmp_path)
         manifest["epochs"][EPOCH] = {"status": "failed", "error": "boom"}
-        write_manifest(directory, manifest)
+        write_json(directory / "manifest.json", manifest, indent=2)
 
         with pytest.raises(ArtifactRunError, match="failed.*boom"):
             read_epoch_cores(directory, EPOCH)

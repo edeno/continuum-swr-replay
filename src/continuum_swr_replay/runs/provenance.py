@@ -1,10 +1,11 @@
 """What code a run ran: the git checkout and the environment it ran from.
 
 Every runner that records its commit reads it through :func:`git`, which runs
-``git --no-optional-locks``: by default ``git status`` and ``git describe
---dirty`` refresh the index and write it back under a lock, and the runners
-record their commit in a checkout that other work commits in. A decoder or a
-detection runner records the fuller :func:`provenance_record`.
+``git --no-optional-locks``: by default ``git status`` refreshes the index and
+writes it back under a lock, and the runners record their commit in a checkout
+that other work commits in. A decoder or a detection runner records the fuller
+:func:`provenance_record`. A run's folder, a measurement's manifest and a
+summary name a commit by :func:`commit_label`.
 """
 
 from __future__ import annotations
@@ -13,18 +14,21 @@ import importlib.metadata
 import json
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from continuum_swr_replay.runs.io import sha256_file
 
 __all__ = [
+    "commit_label",
     "described_commit",
     "git",
     "git_commit",
     "git_dirty",
     "produced_by",
     "provenance_record",
+    "run_id",
 ]
 
 
@@ -92,16 +96,58 @@ def git_dirty(repo: Path) -> bool:
     return bool(git(repo, "status", "--porcelain", "--untracked-files=no"))
 
 
+def commit_label(commit: str, dirty: bool) -> str:
+    """A commit as a run or a summary names it: its first 12 characters, with
+    ``-dirty`` when the checkout had uncommitted changes to tracked files.
+
+    Parameters
+    ----------
+    commit : str
+        The full commit (``git rev-parse HEAD``, :func:`git_commit`).
+    dirty : bool
+        Whether a tracked file differed from the commit (:func:`git_dirty`).
+    """
+    return commit[:12] + ("-dirty" if dirty else "")
+
+
+def run_id(provenance: Mapping[str, Any], requested: str | None) -> str:
+    """A run's id, which names its folder: `requested`, or by default the
+    commit's :func:`commit_label`.
+
+    A checkout with uncommitted changes is warned of, since the run cannot be
+    tied to a commit.
+
+    Parameters
+    ----------
+    provenance : Mapping
+        :func:`provenance_record`'s ``commit`` and ``dirty``.
+    requested : str or None
+        The ``--run-id`` given, if any.
+    """
+    identifier = (
+        commit_label(provenance["commit"], provenance["dirty"])
+        if requested is None
+        else requested
+    )
+    if provenance["dirty"]:
+        print(
+            f"warning: uncommitted changes; run {identifier} cannot be tied to a "
+            "commit",
+            flush=True,
+        )
+    return identifier
+
+
 def described_commit() -> str:
     """The commit this ran from, so a saved table can be tied back to the code.
 
-    ``git describe --always --dirty --abbrev=12`` in the working directory, as
-    the memoryless simulation sweeps record it. A checkout with uncommitted
-    changes is named with ``-dirty`` and warned of on stderr; when git cannot
-    say, ``"unknown"``, with a warning.
+    The working directory's :func:`commit_label`. A checkout with uncommitted
+    changes is warned of on stderr; when git cannot say, ``"unknown"``, with a
+    warning.
     """
+    repo = Path.cwd()
     try:
-        commit = git(Path.cwd(), "describe", "--always", "--dirty", "--abbrev=12")
+        commit = commit_label(git_commit(repo), git_dirty(repo))
     except (OSError, subprocess.CalledProcessError) as error:
         print(
             f"warning: git commit unknown ({error}); recording 'unknown'",

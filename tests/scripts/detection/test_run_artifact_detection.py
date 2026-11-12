@@ -30,7 +30,7 @@ from continuum_swr_replay.analysis.events.artifact_masks import (
 )
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.runs import batch
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file, write_json
 from continuum_swr_replay.tables.io import read_attrs
 from tests.support._artifact_synthetic import FS, NOISE, SyntheticEpoch
 
@@ -245,8 +245,10 @@ def test_the_source_reads_a_run_the_runner_wrote(processed_data_root, monkeypatc
     output_dir = runner.build_parser().parse_args([]).output_root / "run0001"
     output_dir.mkdir(parents=True)
     record = _run_epoch(output_dir, epoch)
-    runner.write_manifest(
-        output_dir, {"run_id": "run0001", "epochs": {EPOCH_ID: record}}
+    write_json(
+        output_dir / "manifest.json",
+        {"run_id": "run0001", "epochs": {EPOCH_ID: record}},
+        indent=2,
     )
     monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run0001")
 

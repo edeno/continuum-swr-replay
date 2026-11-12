@@ -78,7 +78,6 @@ Usage:
 """
 
 import argparse
-import json
 import resource
 import sys
 import time as clock
@@ -130,16 +129,16 @@ from continuum_swr_replay.paths import (
     inventory_comparison_root,
     memoryless_root,
 )
-from continuum_swr_replay.runs.batch import run_lock
+from continuum_swr_replay.runs.batch import RunManifest, run_lock
 from continuum_swr_replay.runs.cli import parse_run_id, select_analysed_epochs
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.io import (
     json_ready,
     replace_outputs,
     sha256_file,
-    write_json,
 )
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
+from continuum_swr_replay.runs.provenance import run_id as run_id_of
 
 PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
@@ -362,7 +361,8 @@ def main(argv: list[str] | None = None) -> None:
         "--run-id",
         type=parse_run_id,
         help="The run's folder: letters, digits, '.', '_' and '-'. Defaults to the "
-        "first 12 characters of git rev-parse HEAD.",
+        "first 12 characters of git rev-parse HEAD, with -dirty when tracked "
+        "files have uncommitted changes.",
     )
     args = parser.parse_args(argv)
     if args.epoch_id is not None and any(
@@ -371,12 +371,7 @@ def main(argv: list[str] | None = None) -> None:
         parser.error("--epoch-id names one epoch; drop --animal, --date and --epoch.")
 
     provenance = provenance_record(ROOT_DIR)
-    run_id = provenance["commit"][:12] if args.run_id is None else args.run_id
-    if provenance["dirty"]:
-        print(
-            f"warning: uncommitted changes; run {run_id} cannot be tied to a commit",
-            flush=True,
-        )
+    run_id = run_id_of(provenance, args.run_id)
     output_dir = inventory_comparison_root() / run_id
     with run_lock(output_dir):
         run(args, provenance, output_dir)
@@ -399,39 +394,17 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         sys.exit("No analysed epochs match --animal, --date and --epoch.")
 
     manifest_path = output_dir / "manifest.json"
-    records: dict[str, dict] = {}
-    if manifest_path.exists():
-        previous = json.loads(manifest_path.read_text())
-        if previous["settings"] != settings:
-            sys.exit(
-                f"{manifest_path} was written with other settings; a run must "
-                "not mix them. Start a new --run-id."
-            )
-        records = previous["epochs"]
-
-    def write_manifest() -> None:
-        write_json(
-            manifest_path,
-            {
-                "produced_by": PRODUCED_BY,
-                "run_id": output_dir.name,
-                "design_spec": DESIGN_SPEC,
-                "settings": settings,
-                "epochs": records,
-            },
-            indent=2,
-        )
-
-    to_run = []
-    for identifier in epochs:
-        if records.get(identifier, {}).get("status") == "ok" and not args.overwrite:
-            print(f"{identifier}: already written", flush=True)
-        else:
-            # the record goes first, so a run stopped part way cannot leave new
-            # files under an old record
-            records.pop(identifier, None)
-            to_run.append(identifier)
-    write_manifest()
+    manifest = RunManifest.resume(
+        manifest_path,
+        {
+            "produced_by": PRODUCED_BY,
+            "run_id": output_dir.name,
+            "design_spec": DESIGN_SPEC,
+            "settings": settings,
+        },
+    )
+    to_run = manifest.to_redo(epochs, args.overwrite)
+    manifest.write()
     print(f"{len(to_run)} epochs to run, one at a time", flush=True)
 
     failed = []
@@ -443,11 +416,11 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
             memoryless_dir=memoryless_dir,
             provenance=provenance,
         )
-        records[identifier] = record
+        manifest.records[identifier] = record
         print(f"[{number}/{len(to_run)}] {identifier}: {summary(record)}", flush=True)
         if record["status"] != "ok":
             failed.append(identifier)
-        write_manifest()
+        manifest.write()
     print(f"manifest -> {manifest_path}", flush=True)
     if failed:
         sys.exit(

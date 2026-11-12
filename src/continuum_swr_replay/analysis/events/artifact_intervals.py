@@ -18,7 +18,6 @@ file still has.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,13 +29,13 @@ import pandas as pd
 from continuum_swr_replay.analysis.events.artifact_masks import (
     artifact_intervals as padded_cores,
 )
-from continuum_swr_replay.runs.io import sha256_file, write_json
+from continuum_swr_replay.runs import io as runs_io
+from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import write_table
 
 __all__ = [
     "CORES_SUFFIX",
     "CORE_COLUMNS",
-    "MANIFEST_NAME",
     "ArtifactRunError",
     "EpochCores",
     "cores_path",
@@ -47,11 +46,9 @@ __all__ = [
     "read_manifest",
     "validate_cores",
     "write_cores",
-    "write_manifest",
 ]
 
 CORES_SUFFIX = "_artifact_intervals.parquet"
-MANIFEST_NAME = "manifest.json"
 
 CORE_COLUMNS: Mapping[str, str] = {
     "kind": "object",
@@ -187,35 +184,19 @@ def write_cores(cores: pd.DataFrame, path: Path, *, stamp: Mapping[str, Any]) ->
     return sha256_file(written)
 
 
-def write_manifest(run_dir: Path, manifest: Mapping[str, Any]) -> None:
-    """Write ``run_dir / manifest.json`` as strict JSON, atomically.
-
-    Raises
-    ------
-    ValueError
-        If the content holds NaN or infinity (strict JSON has neither).
-    """
-    write_json(Path(run_dir) / MANIFEST_NAME, manifest, indent=2)
-
-
 def read_manifest(run_dir: Path) -> dict[str, Any]:
-    """The run folder's manifest, checked to name the folder.
+    """The run folder's manifest, checked to name the folder
+    (``runs.io.read_manifest``).
 
     Raises
     ------
     ArtifactRunError
-        If there is no manifest, or it is another run's.
+        If there is no readable manifest, or it is another run's.
     """
-    path = Path(run_dir) / MANIFEST_NAME
-    if not path.exists():
-        raise ArtifactRunError(f"no artifact run manifest at {path}")
-    manifest: dict[str, Any] = json.loads(path.read_text())
-    if manifest.get("run_id") != Path(run_dir).name:
-        raise ArtifactRunError(
-            f"{path} is run {manifest.get('run_id')!r}, not the folder's "
-            f"{Path(run_dir).name!r}"
-        )
-    return manifest
+    try:
+        return runs_io.read_manifest(Path(run_dir), names_folder=True)
+    except ValueError as error:
+        raise ArtifactRunError(f"artifact run: {error}") from error
 
 
 def read_epoch_cores(run_dir: Path, epoch_id: str) -> EpochCores:

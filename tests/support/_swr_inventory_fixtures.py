@@ -27,7 +27,6 @@ from continuum_swr_replay.analysis.events.artifact_intervals import (
     cores_path,
     make_cores,
     write_cores,
-    write_manifest,
 )
 from continuum_swr_replay.paths import (
     PROCESSED_DATA_DIR_ENV,
@@ -35,7 +34,7 @@ from continuum_swr_replay.paths import (
     processed_data_dir,
     swr_inventory_root,
 )
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file, write_json
 
 RUN_ID = "testrun0001"
 ARTIFACT_RUN_ID = "testartifacts01"
@@ -189,7 +188,11 @@ def write_artifact_run(
             "span_s": [float(span[0]), float(span[1])],
             "outputs": {"cores": {"path": str(path), "sha256": sha}},
         }
-    write_manifest(directory, {"run_id": run_id, "epochs": records})
+    write_json(
+        directory / "manifest.json",
+        {"run_id": run_id, "epochs": records},
+        indent=2,
+    )
     return directory
 
 

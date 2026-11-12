@@ -6,7 +6,9 @@ Two drivers share the pieces here:
   epoch, on a GPU cluster or, with ``--allow_cpu``, a CPU one);
 - :func:`run_epochs`, the detection and QA runners' loop (one submitted task
   per epoch, each record yielded as it finishes, so the caller alone writes
-  the run's manifest).
+  the run's manifest), which keeps it through :class:`RunManifest`: resumed
+  from an earlier run in the same folder only under the same settings, the
+  records of epochs to redo dropped first, and rewritten after each epoch.
 
 A task logs to its own file (:func:`setup_logger`, :func:`run_epoch_logged`)
 and closes the NWB files Spyglass opened for it (:func:`release_nwb_files`).
@@ -28,16 +30,19 @@ import resource
 import sys
 import traceback
 from argparse import Namespace
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.cli import filter_epoch_info
+from continuum_swr_replay.runs.io import write_json
 
 __all__ = [
+    "RunManifest",
     "cuda_cluster_class",
     "lost_epoch_record",
     "raise_open_file_limit",
@@ -514,6 +519,84 @@ def run_epoch_task(
         describe=describe,
         log_provenance=log_provenance,
     )
+
+
+@dataclass
+class RunManifest:
+    """A run's ``manifest.json`` as its runner keeps it: the run's header and
+    one record per epoch, rewritten whole after each change.
+
+    A runner resumes it (:meth:`resume`), drops the records of the epochs it
+    will redo (:meth:`to_redo`), writes it, and writes it again after each
+    epoch's record arrives (:meth:`write`).
+
+    Attributes
+    ----------
+    path : Path
+        The run folder's ``manifest.json``.
+    header : dict
+        The run's fields, written before ``epochs`` in their order, such as
+        ``produced_by``, ``run_id``, ``design_spec`` and ``settings``.
+    records : dict
+        Each epoch's record, by epoch id.
+    """
+
+    path: Path
+    header: dict[str, Any]
+    records: dict[str, dict] = field(default_factory=dict)
+
+    @classmethod
+    def resume(
+        cls,
+        path: Path,
+        header: Mapping[str, Any],
+        *,
+        hint: str = "Start a new --run-id.",
+    ) -> RunManifest:
+        """The run's manifest, holding the records of an earlier run in its
+        folder; exit if that run was made with other settings.
+
+        Parameters
+        ----------
+        path : Path
+            The run folder's ``manifest.json``; none yet starts a new run.
+        header : Mapping
+            The run's fields; its ``settings`` must equal the earlier run's.
+        hint : str, optional
+            The refusal's last sentence: what to do instead.
+        """
+        manifest = cls(path, dict(header))
+        if path.exists():
+            previous = json.loads(path.read_text())
+            if previous.get("settings") != header["settings"]:
+                sys.exit(
+                    f"{path} was written with other settings; a run must not mix "
+                    f"them. {hint}"
+                )
+            manifest.records = previous["epochs"]
+        return manifest
+
+    def to_redo(self, identifiers: Iterable[str], overwrite: bool) -> list[str]:
+        """The epochs to run, in their order; the others are already written.
+
+        An epoch is kept when its record is ``ok`` and `overwrite` is False
+        (printed as already written). The record of an epoch to run is dropped
+        here, before it runs, so a run stopped part way cannot leave new files
+        under an old record.
+        """
+        to_run = []
+        for identifier in identifiers:
+            done = self.records.get(identifier, {}).get("status") == "ok"
+            if done and not overwrite:
+                print(f"{identifier}: already written", flush=True)
+            else:
+                self.records.pop(identifier, None)
+                to_run.append(identifier)
+        return to_run
+
+    def write(self) -> None:
+        """Write the header, then ``epochs``, as strict JSON, atomically."""
+        write_json(self.path, {**self.header, "epochs": self.records}, indent=2)
 
 
 @contextmanager

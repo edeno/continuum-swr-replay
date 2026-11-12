@@ -8,6 +8,7 @@ SWR runner's tests.
 from __future__ import annotations
 
 import functools
+import json
 
 import dask
 import pytest
@@ -142,3 +143,66 @@ def test_an_epoch_task_that_raises_still_closes_the_nwb_files(tmp_path, monkeypa
             log_provenance=True,
         )
     assert closed == [1]
+
+
+_HEADER = {"produced_by": "scripts/x.py", "run_id": "run0001", "settings": {"a": 1}}
+
+
+def test_a_run_manifest_writes_its_header_then_its_epochs(tmp_path):
+    """In the header's order, as strict JSON; a new run has no records."""
+    path = tmp_path / "manifest.json"
+    manifest = batch.RunManifest.resume(path, _HEADER)
+    assert manifest.records == {}
+    manifest.records["e1"] = {"status": "ok"}
+
+    manifest.write()
+
+    assert path.read_text() == json.dumps(
+        {**_HEADER, "epochs": {"e1": {"status": "ok"}}}, indent=2
+    )
+    manifest.records["e2"] = {"status": "ok", "x": float("nan")}
+    with pytest.raises(ValueError):
+        manifest.write()
+
+
+def test_a_resumed_run_keeps_ok_epochs_and_drops_the_records_it_redoes(
+    tmp_path, capsys
+):
+    """An ``ok`` epoch is kept unless overwriting; a failed, partial or new one
+    is run, and its old record goes before it runs."""
+    path = tmp_path / "manifest.json"
+    first = batch.RunManifest.resume(path, _HEADER)
+    first.records.update(
+        {
+            "e1": {"status": "ok"},
+            "e2": {"status": "failed"},
+            "e3": {"status": "partial"},
+        }
+    )
+    first.write()
+
+    resumed = batch.RunManifest.resume(path, _HEADER)
+    to_run = resumed.to_redo(["e3", "e1", "e4", "e2"], overwrite=False)
+
+    assert to_run == ["e3", "e4", "e2"]
+    assert resumed.records == {"e1": {"status": "ok"}}
+    assert capsys.readouterr().out == "e1: already written\n"
+    again = batch.RunManifest.resume(path, _HEADER)
+    assert again.to_redo(["e1", "e2"], overwrite=True) == ["e1", "e2"]
+    assert again.records == {"e3": {"status": "partial"}}
+
+
+def test_a_run_made_with_other_settings_is_refused(tmp_path):
+    """Two settings must not mix in one run folder; a manifest with no
+    settings at all is another run's too."""
+    path = tmp_path / "manifest.json"
+    batch.RunManifest.resume(path, _HEADER).write()
+    other = {**_HEADER, "settings": {"a": 2}}
+
+    with pytest.raises(SystemExit, match="other settings.*Start a new --run-id"):
+        batch.RunManifest.resume(path, other)
+    with pytest.raises(SystemExit, match="other settings.*Rerun elsewhere"):
+        batch.RunManifest.resume(path, other, hint="Rerun elsewhere.")
+    path.write_text(json.dumps({"epochs": {}}))
+    with pytest.raises(SystemExit, match="other settings"):
+        batch.RunManifest.resume(path, _HEADER)

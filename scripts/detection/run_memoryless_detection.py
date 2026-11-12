@@ -111,7 +111,6 @@ Usage:
 import argparse
 import contextlib
 import functools
-import json
 import logging
 import os
 import sys
@@ -192,6 +191,7 @@ from continuum_swr_replay.intervals import (
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import memoryless_root, processed_data_dir
 from continuum_swr_replay.runs.batch import (
+    RunManifest,
     cuda_cluster_class,
     raise_open_file_limit,
     release_nwb_files,
@@ -200,8 +200,12 @@ from continuum_swr_replay.runs.batch import (
 from continuum_swr_replay.runs.batch import run_epochs as batch_run_epochs
 from continuum_swr_replay.runs.cli import parse_run_id
 from continuum_swr_replay.runs.device import xla_flags
-from continuum_swr_replay.runs.io import sha256_file
-from continuum_swr_replay.runs.provenance import produced_by, provenance_record
+from continuum_swr_replay.runs.io import sha256_file, write_json
+from continuum_swr_replay.runs.provenance import (
+    commit_label,
+    produced_by,
+    provenance_record,
+)
 from continuum_swr_replay.runs.threads import BLAS_THREAD_VARIABLES
 from continuum_swr_replay.tables.io import write_atomically, write_table
 
@@ -633,11 +637,9 @@ def run_settings(
 
 
 def write_manifest(path: Path, manifest: dict) -> None:
-    """Write through a temporary file, so a stopped run never leaves half a manifest."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_atomically(
-        path, lambda temporary: temporary.write_text(json.dumps(manifest, indent=2))
-    )
+    """Write the manifest as strict JSON through a temporary file, so a stopped
+    run never leaves half a manifest (``runs.io.write_json``)."""
+    write_json(path, manifest, indent=2)
 
 
 def _counts(record: dict) -> str:
@@ -912,7 +914,7 @@ def main(argv: list[str] | None = None) -> None:
         )
     commit = git_hash()
     run_id = args.run_id or (
-        f"{commit[:12]}{'-dirty' if commit.endswith('-dirty') else ''}"
+        f"{commit_label(commit.removesuffix('-dirty'), commit.endswith('-dirty'))}"
         f"-seed{args.run_seed}{'' if shuffle else '-noshuffle'}"
         f"{'-singles' if args.keep_single_window_runs else ''}"
     )
@@ -960,15 +962,17 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     manifest_path = output_dir / "manifest.json"
-    epochs: dict[str, dict] = {}
-    if manifest_path.exists():
-        previous = json.loads(manifest_path.read_text())
-        if previous.get("settings") != settings:
-            sys.exit(
-                f"{manifest_path} was written with other settings, code or "
-                "library versions; a run must not mix them. Start a new --run-id."
-            )
-        epochs = previous["epochs"]
+    header = {
+        "produced_by": provenance["produced_by"],
+        "run_id": run_id,
+        "design_spec": DESIGN_SPEC,
+        "settings": settings,
+    }
+    epochs = RunManifest.resume(
+        manifest_path,
+        header,
+        hint="The settings hold the code and library versions. Start a new --run-id.",
+    ).records
     for epoch_id, why in skipped.items():
         # an epoch already written under this run stays written; a skip only
         # says why it was not run this time
@@ -976,13 +980,7 @@ def main(argv: list[str] | None = None) -> None:
             epochs[epoch_id] = {"status": "skipped", "reason": why}
 
     def manifest() -> dict:
-        return {
-            "produced_by": provenance["produced_by"],
-            "run_id": run_id,
-            "design_spec": DESIGN_SPEC,
-            "settings": settings,
-            "epochs": epochs,
-        }
+        return {**header, "epochs": epochs}
 
     run_one_kwargs = {
         "root": args.root,

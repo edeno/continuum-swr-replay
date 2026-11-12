@@ -59,7 +59,6 @@ Usage:
 
 import argparse
 import functools
-import json
 import resource
 import sys
 import time as clock
@@ -112,6 +111,7 @@ from continuum_swr_replay.intervals import (
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import carey_root
 from continuum_swr_replay.runs.batch import (
+    RunManifest,
     raise_open_file_limit,
     run_epoch_task,
     run_epochs,
@@ -122,9 +122,9 @@ from continuum_swr_replay.runs.io import (
     array_sha256,
     json_ready,
     replace_outputs,
-    write_json,
 )
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
+from continuum_swr_replay.runs.provenance import run_id as run_id_of
 
 PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
@@ -478,7 +478,8 @@ def main(argv: list[str] | None = None) -> None:
         "--run-id",
         type=parse_run_id,
         help="The run's folder under --output-root: letters, digits, '.', '_' "
-        "and '-'. Defaults to the first 12 characters of git rev-parse HEAD.",
+        "and '-'. Defaults to the first 12 characters of git rev-parse HEAD, "
+        "with -dirty when tracked files have uncommitted changes.",
     )
     parser.add_argument("--output-root", type=Path, default=carey_root())
     args = parser.parse_args(argv)
@@ -487,12 +488,7 @@ def main(argv: list[str] | None = None) -> None:
     old_soft, new_soft = raise_open_file_limit()
     print(f"open-file soft limit {old_soft} -> {new_soft}", flush=True)
     provenance = provenance_record(ROOT_DIR)
-    run_id = provenance["commit"][:12] if args.run_id is None else args.run_id
-    if provenance["dirty"]:
-        print(
-            f"warning: uncommitted changes; run {run_id} cannot be tied to a commit",
-            flush=True,
-        )
+    run_id = run_id_of(provenance, args.run_id)
     output_dir = args.output_root / run_id
     with run_lock(output_dir):
         run(args, provenance, output_dir)
@@ -511,40 +507,24 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         sys.exit("No epochs match --animal, --date and --epoch.")
 
     manifest_path = output_dir / "manifest.json"
-    records: dict[str, dict] = {}
-    if manifest_path.exists():
-        previous = json.loads(manifest_path.read_text())
-        if previous["settings"] != settings:
-            sys.exit(
-                f"{manifest_path} was written with other settings; a run must "
-                "not mix them. Start a new --run-id."
-            )
-        records = previous["epochs"]
-
-    def write_manifest() -> None:
-        write_json(
-            manifest_path,
-            {
-                "produced_by": PRODUCED_BY,
-                "run_id": run_id,
-                "design_spec": DESIGN_SPEC,
-                "settings": settings,
-                "epochs": records,
-            },
-            indent=2,
-        )
-
-    to_run = []
-    for nwb_file_name, epoch_name in epochs:
-        identifier = swr_source.swr_epoch_id(nwb_file_name, epoch_name)
-        if records.get(identifier, {}).get("status") == "ok" and not args.overwrite:
-            print(f"{identifier}: already written", flush=True)
-        else:
-            # the record goes first, so a run stopped part way cannot leave new
-            # files under an old record
-            records.pop(identifier, None)
-            to_run.append((nwb_file_name, epoch_name))
-    write_manifest()
+    manifest = RunManifest.resume(
+        manifest_path,
+        {
+            "produced_by": PRODUCED_BY,
+            "run_id": run_id,
+            "design_spec": DESIGN_SPEC,
+            "settings": settings,
+        },
+    )
+    by_identifier = {
+        swr_source.swr_epoch_id(nwb_file_name, epoch_name): (nwb_file_name, epoch_name)
+        for nwb_file_name, epoch_name in epochs
+    }
+    to_run = [
+        by_identifier[identifier]
+        for identifier in manifest.to_redo(by_identifier, args.overwrite)
+    ]
+    manifest.write()
     print(
         f"{len(to_run)} epochs to run on {args.n_workers} worker processes, each "
         f"logging to {Path.cwd() / 'logs' / '<epoch_id>_carey.log'}",
@@ -575,11 +555,11 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         run_epochs(tasks, _run_epoch_logged, cluster_factory, key_prefix="carey"),
         start=1,
     ):
-        records[identifier] = record
+        manifest.records[identifier] = record
         print(f"[{number}/{len(to_run)}] {identifier}: {summary(record)}", flush=True)
         if record["status"] == "failed":
             failed.append(identifier)
-        write_manifest()
+        manifest.write()
     print(f"manifest -> {manifest_path}", flush=True)
     if failed:
         sys.exit(

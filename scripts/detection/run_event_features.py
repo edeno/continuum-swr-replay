@@ -40,7 +40,8 @@ stored) and every rejection stage ``unknown``.
 
 Each epoch writes, under
 ``Processed-Data/replay_detection_comparison/event_features/<run_id>/`` (the
-run id is the first 12 characters of the commit), one set of
+run id is the first 12 characters of the commit, with ``-dirty`` when tracked
+files have uncommitted changes), one set of
 ``{epoch_id}_<table>.parquet``, one per table of ``feature_run.TABLE_DTYPES``:
 ``features`` (``feature_run.FEATURE_DTYPES``), ``pair_membership`` (the rebuilt
 ``event_matches``) and ``rejection``. Every table is made before any is
@@ -82,7 +83,6 @@ pin_blas_threads()
 import argparse  # noqa: E402
 import functools  # noqa: E402
 import inspect  # noqa: E402
-import json  # noqa: E402
 import logging  # noqa: E402
 import resource  # noqa: E402
 import sys  # noqa: E402
@@ -196,6 +196,7 @@ from continuum_swr_replay.paths import (  # noqa: E402
     table_path,
 )
 from continuum_swr_replay.runs.batch import (  # noqa: E402
+    RunManifest,
     raise_open_file_limit,
     run_epoch_logged,
     run_epochs,
@@ -213,11 +214,13 @@ from continuum_swr_replay.runs.io import (  # noqa: E402
     read_manifest,
     replace_outputs,
     sha256_file,
-    write_json,
 )
 from continuum_swr_replay.runs.provenance import (  # noqa: E402
     produced_by,
     provenance_record,
+)
+from continuum_swr_replay.runs.provenance import (  # noqa: E402
+    run_id as run_id_of,
 )
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
@@ -784,12 +787,7 @@ def main(argv: list[str] | None = None) -> None:
     # before the cluster starts: its worker processes inherit this limit
     raise_open_file_limit()
     provenance = provenance_record(ROOT_DIR)
-    run_id = provenance["commit"][:12]
-    if provenance["dirty"]:
-        print(
-            f"warning: uncommitted changes; run {run_id} cannot be tied to a commit",
-            flush=True,
-        )
+    run_id = run_id_of(provenance, None)
     output_dir = event_features_root() / run_id
     with run_lock(output_dir):
         run(args, provenance, output_dir)
@@ -829,40 +827,21 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         sys.exit("No analysed epochs match --animal, --date and --epoch.")
 
     manifest_path = output_dir / "manifest.json"
-    records: dict[str, dict] = {}
-    if manifest_path.exists():
-        previous = json.loads(manifest_path.read_text())
-        if previous["settings"] != settings:
-            sys.exit(
-                f"{manifest_path} was written with other settings; a run must "
-                "not mix them. Commit, and run under the new commit."
-            )
-        records = previous["epochs"]
-
-    def write_manifest() -> None:
-        write_json(
-            manifest_path,
-            {
-                "produced_by": PRODUCED_BY,
-                "run_id": output_dir.name,
-                "design_spec": DESIGN_SPEC,
-                "settings": settings,
-                "epochs": records,
-            },
-            indent=2,
-        )
-
-    to_run = []
-    for identifier in epochs:
-        if records.get(identifier, {}).get("status") == "ok" and not args.overwrite:
-            print(f"{identifier}: already written", flush=True)
-        else:
-            # the record goes first, so a run stopped part way cannot leave new
-            # files under an old record
-            records.pop(identifier, None)
-            key = parse_epoch_identifier(identifier)
-            to_run.append((key.nwb_file_name, key.epoch_name))
-    write_manifest()
+    manifest = RunManifest.resume(
+        manifest_path,
+        {
+            "produced_by": PRODUCED_BY,
+            "run_id": output_dir.name,
+            "design_spec": DESIGN_SPEC,
+            "settings": settings,
+        },
+        hint="Commit, and run under the new commit.",
+    )
+    to_run = [
+        (key.nwb_file_name, key.epoch_name)
+        for key in map(parse_epoch_identifier, manifest.to_redo(epochs, args.overwrite))
+    ]
+    manifest.write()
     print(
         f"{len(to_run)} epochs to run on {args.n_workers} worker processes, each "
         f"logging to {Path.cwd() / 'logs' / '<epoch_id>_event_features.log'}",
@@ -901,11 +880,11 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         ),
         start=1,
     ):
-        records[identifier] = record
+        manifest.records[identifier] = record
         print(f"[{number}/{len(to_run)}] {identifier}: {summary(record)}", flush=True)
         if record["status"] != "ok":
             failed.append(identifier)
-        write_manifest()
+        manifest.write()
     print(f"manifest -> {manifest_path}", flush=True)
     if failed:
         sys.exit(

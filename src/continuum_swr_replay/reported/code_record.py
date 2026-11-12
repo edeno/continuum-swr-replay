@@ -37,6 +37,7 @@ from types import ModuleType
 from typing import TypedDict
 
 from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.provenance import commit_label as runs_commit_label
 from continuum_swr_replay.runs.provenance import git, git_commit
 
 PACKAGE = "continuum_swr_replay"
@@ -250,7 +251,7 @@ def commit_label(record: CodeRecord) -> str:
     ``head``, with ``-dirty`` when a file the build used was uncommitted. Other
     uncommitted files in the checkout (a summary just written, a draft) do not
     make it dirty."""
-    return record["head"][:12] + ("-dirty" if record["uncommitted"] else "")
+    return runs_commit_label(record["head"], bool(record["uncommitted"]))
 
 
 def code_changes(record: CodeRecord, repo: Path) -> list[str]:
