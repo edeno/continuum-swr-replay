@@ -23,6 +23,9 @@ number prints a true minus (U+2212; ``\ensuremath{-}`` in LaTeX), and a value
 that rounds to zero prints without a sign. Rounding is a communication choice, not a
 statement of uncertainty: where variability matters to a claim, it is a value
 of its own (an interval's bounds, a count of animals).
+
+A duration measured in seconds and reported in milliseconds is converted by
+:func:`milliseconds` (:data:`MS_PER_S`), here and nowhere else in the builders.
 """
 
 from __future__ import annotations
@@ -31,6 +34,14 @@ import math
 from decimal import ROUND_HALF_UP, Decimal
 
 from continuum_swr_replay.reported.values import Value
+
+MS_PER_S = 1000
+"""Milliseconds in a second."""
+
+
+def milliseconds(seconds: float) -> float:
+    """``seconds`` in milliseconds, for a value or a description given in ms."""
+    return MS_PER_S * seconds
 
 
 def _round(x: float | Decimal, places: int) -> Decimal:

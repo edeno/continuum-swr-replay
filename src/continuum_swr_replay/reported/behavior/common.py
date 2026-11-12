@@ -12,6 +12,7 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     MIN_SESSIONS_PER_TERM,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.values import (
     Tags,
 )
@@ -49,7 +50,7 @@ def _gate_note(statistics: Mapping[str, Any], term: str) -> str | None:
     return (
         f"the per-term session gate refuses {term}: it keeps fewer than "
         f"{MIN_SESSIONS_PER_TERM} sessions, or leaves out more than "
-        f"{100 * MAX_UNIDENTIFIED_SHARE:.0f} % of the sessions with a fit"
+        f"{format_number(MAX_UNIDENTIFIED_SHARE, 'pct')} of the sessions with a fit"
     )
 
 

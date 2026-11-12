@@ -8,7 +8,11 @@ from __future__ import annotations
 
 import pytest
 
-from continuum_swr_replay.reported.formatting import formatted
+from continuum_swr_replay.reported.formatting import (
+    format_number,
+    formatted,
+    milliseconds,
+)
 from continuum_swr_replay.reported.values import Value
 
 MINUS = "−"
@@ -119,3 +123,11 @@ def test_a_marker_s_style_replaces_the_value_s_own():
 def test_a_style_that_does_not_suit_the_value_is_refused(x, kind, style, error):
     with pytest.raises(ValueError, match=error):
         formatted(_value(x, kind), style)
+
+
+def test_milliseconds_converts_seconds_for_a_value_given_in_ms():
+    """0.015 s is 15 ms; a 0.04 s replay prints 40 ms; a negative offset keeps its sign."""
+    assert milliseconds(0.015) == pytest.approx(15.0)
+    assert format_number(milliseconds(0.015), "int") == "15"
+    assert format_number(milliseconds(0.04), "int") == "40"
+    assert milliseconds(-0.0125) == pytest.approx(-12.5)

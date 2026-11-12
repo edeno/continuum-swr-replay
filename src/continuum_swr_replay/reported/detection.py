@@ -47,6 +47,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table i
     outside_window_call_statistics,
 )
 from continuum_swr_replay.paths import ROOT_DIR, memoryless_root, processed_data_dir
+from continuum_swr_replay.reported.formatting import format_number, milliseconds
 from continuum_swr_replay.reported.values import (
     Summary,
     Tags,
@@ -456,7 +457,9 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
             f"the timing errors are not of the same durations: {jump_durations} and "
             f"{durations} s"
         )
-    shortest_ms, longest_ms = (f"{1000 * duration:.0f}" for duration in durations)
+    shortest_ms, longest_ms = (
+        format_number(milliseconds(duration), "int") for duration in durations
+    )
     shortest = f"shortest ({shortest_ms} ms)"
     longest = f"longest ({longest_ms} ms)"
     over_durations = f"over true durations ({shortest_ms} to {longest_ms} ms)"

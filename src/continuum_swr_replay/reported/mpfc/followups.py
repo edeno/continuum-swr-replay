@@ -21,6 +21,7 @@ from continuum_swr_replay.analysis.pfc.marked_family_statistics import (
 from continuum_swr_replay.paths import (
     ROOT_DIR,
 )
+from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.mpfc.common import (
     TAGS,
     _finite_adder,
@@ -249,9 +250,11 @@ def marked_family_values(
                     f"share of units whose held-out deviance improves when the mark's "
                     f"kernel is in the model, {what} (per session, mean over sessions "
                     "within animal, mean over animals; over "
-                    f"{row['n_usable']:.0f} usable of {row['n_units']:.0f} unit fits, "
-                    f"{row['n_excluded_blowup']:.0f} left out as blow-ups, in "
-                    f"{row['n_sessions']:.0f} sessions of {row['n_animals']:.0f} "
+                    f"{format_number(row['n_usable'], 'int')} usable of "
+                    f"{format_number(row['n_units'], 'int')} unit fits, "
+                    f"{format_number(row['n_excluded_blowup'], 'int')} left out as "
+                    f"blow-ups, in {format_number(row['n_sessions'], 'int')} sessions "
+                    f"of {format_number(row['n_animals'], 'int')} "
                     "animals). No chance reference was computed, so the share expected "
                     "by chance is unknown: this is not a test",
                 )
@@ -357,7 +360,8 @@ def stop_context_values(
         if unit_set == "called" and sign == "increase":
             if row["n_loao_estimated"] != row["n_animals"]:
                 raise ValueError(
-                    f"{stem}: {row['n_loao_estimated']:.0f} of {row['n_animals']:.0f} "
+                    f"{stem}: {format_number(row['n_loao_estimated'], 'int')} of "
+                    f"{format_number(row['n_animals'], 'int')} "
                     "leave-one-animal-out fits have an estimate"
                 )
             add(

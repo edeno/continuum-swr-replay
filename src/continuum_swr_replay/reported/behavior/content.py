@@ -34,6 +34,7 @@ from continuum_swr_replay.reported.behavior.common import (
     _require,
     _require_every_animal,
 )
+from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.values import (
     Tags,
     Value,
@@ -593,7 +594,8 @@ def _estimator_interval(boot: pd.DataFrame) -> str:
     )
     return (
         "95 % interval (nested bootstrap, animals then their sessions; small-sample "
-        f"t correction over the {boot['n_animals'].iloc[0]:.0f} animals)"
+        f"t correction over the {format_number(boot['n_animals'].iloc[0], 'int')} "
+        "animals)"
     )
 
 

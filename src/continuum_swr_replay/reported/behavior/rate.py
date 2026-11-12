@@ -45,6 +45,7 @@ from continuum_swr_replay.reported.behavior.common import (
     _require_every_animal,
 )
 from continuum_swr_replay.reported.behavior.inputs import BehaviorInputs
+from continuum_swr_replay.reported.formatting import format_number, milliseconds
 from continuum_swr_replay.reported.values import (
     Value,
     pend,
@@ -61,6 +62,8 @@ RATE_POPULATIONS = {
 }
 FULL_RATE_RUNG = "M7r_time_histcos_rew"
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
+#: The per-bin model's bin width, in ms, as the descriptions write it.
+_BIN_MS = format_number(milliseconds(BIN_S), "int")
 #: What every value read off one reward basis coefficient says about itself.
 BASIS_COEFFICIENT_NOTE = (
     "a basis coefficient, not the effect of a reward at any lag: the three "
@@ -115,7 +118,7 @@ def per_bin_values(
             cohort["n_bins_non_local"],
             "count",
             "count",
-            f"{1000 * BIN_S:g} ms bins at risk in the frozen common cohort, non-local "
+            f"{_BIN_MS} ms bins at risk in the frozen common cohort, non-local "
             "populations (the bins inside a non-local event are not at risk)",
         ),
         make(
@@ -123,7 +126,7 @@ def per_bin_values(
             cohort["n_bins_swr"],
             "count",
             "count",
-            f"{1000 * BIN_S:g} ms bins at risk in the frozen common cohort, detected "
+            f"{_BIN_MS} ms bins at risk in the frozen common cohort, detected "
             "SWR (the bins inside a Kay SWR are not at risk)",
         ),
     ]
@@ -705,7 +708,7 @@ def per_bin_detail_values(
                 baseline["events_per_bin"],
                 "quantity",
                 "sig2",
-                f"{label}: median M0_const rate times the {1000 * BIN_S:g} ms bin, the "
+                f"{label}: median M0_const rate times the {_BIN_MS} ms bin, the "
                 "mean per-bin count",
                 "events/bin",
             ),

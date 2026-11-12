@@ -80,6 +80,11 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.reported.detection import STATE_EVIDENCE_RUN
+from continuum_swr_replay.reported.formatting import (
+    MS_PER_S,
+    format_number,
+    milliseconds,
+)
 from continuum_swr_replay.reported.values import (
     Summary,
     Tags,
@@ -309,8 +314,8 @@ def calibration_values(calibration: pd.DataFrame, source: str) -> list[Value]:
             "sig2",
             f"median over sessions of each session's median decoding error at time "
             f"bins whose Local probability is in the 0.1-wide bin centred on "
-            f"{center:.2f} (bin {index} of {len(CALIBRATION_BINS)}), outside excluded "
-            "time, sessions pooled",
+            f"{format_number(center, 'dec2')} (bin {index} of "
+            f"{len(CALIBRATION_BINS)}), outside excluded time, sessions pooled",
             "cm",
         )
         for index, (word, (center, median)) in enumerate(
@@ -462,7 +467,7 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "start_offset_median_ms",
-            1000 * stats["start_offset_median_s"],
+            milliseconds(stats["start_offset_median_s"]),
             "quantity",
             "int",
             "median of event start minus matched SWR start",
@@ -470,7 +475,7 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "end_offset_median_ms",
-            1000 * stats["end_offset_median_s"],
+            milliseconds(stats["end_offset_median_s"]),
             "quantity",
             "int",
             "median of event end minus matched SWR end",
@@ -1320,7 +1325,7 @@ _PROPERTIES = (
     (
         "duration",
         "event_duration_s",
-        1000.0,
+        MS_PER_S,
         "ms",
         "int",
         "lower",
@@ -1526,12 +1531,13 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
         name = _PROPERTY_NAMES[word]
         interval = (
             "95 % interval (nested bootstrap, small-sample t correction over the "
-            f"{row.n_animals:.0f} animals)"
+            f"{format_number(row.n_animals, 'int')} animals)"
         )
         skipped = (
-            f"; {row.matched_replicates_skipping_strata:.0f} of "
-            f"{row.n_replicates:.0f} replicates left out a stratum that drew no "
-            f"event of a class, {row.matched_difference_nan_replicates:.0f} had no "
+            f"; {format_number(row.matched_replicates_skipping_strata, 'int')} of "
+            f"{format_number(row.n_replicates, 'int')} replicates left out a stratum "
+            "that drew no event of a class, "
+            f"{format_number(row.matched_difference_nan_replicates, 'int')} had no "
             "estimate"
         )
         values += [
