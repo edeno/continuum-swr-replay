@@ -4,8 +4,9 @@
 Reads the persisted per-session coefficients in
 ``models_per_bin_rate/all_models.pkl`` (produced by
 ``fit_per_bin_rate_models.py``) and renders the two headline figures -- no
-re-fitting happens here. Within-animal / across-session summaries (medians,
-IQR, paired Wilcoxon) are computed at read time.
+re-fitting happens here. The summaries drawn (medians, IQR, per-animal medians,
+the paired signed-rank test) are ``rate_fit_statistics``' and
+``coefficient_statistics``', over the sessions the summary reads them over.
 
 Both figures read the full model ``M7r_time_histcos_rew`` (time spline +
 raised-cosine self-history + reward kernel), so every effect is shown
@@ -18,7 +19,8 @@ controlled for the within-stop time course and the same-event clustering:
   them; ``rate_fit_statistics.reward_kernel_by_lag``), and the dissociation between SWR-coupled and non-SWR
   non-local events on the first reward-history basis coefficient
   (``reward_history_rcos_0``, a recent-reward fraction weighted toward the
-  newest outcomes: about 0.33 / 0.26 / 0.17 / 0.11 on lags 1-4).
+  newest outcomes: about 0.33 / 0.26 / 0.17 / 0.11 on lags 1-4), over the
+  sessions the per-term gate keeps.
 * ``selfhistory_autocorr.png`` -- the within-stop self-history rate ratio
   over lags 1..10 after the previous event's END (the at-risk design counts
   history from event ends), reconstructed from the four raised-cosine basis

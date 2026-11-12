@@ -3,9 +3,11 @@
 Each function takes per-session fits of the per-bin conditional-intensity
 ladder (``MODEL_PER_BIN_RATE``; one row per session, rung and population, as
 ``scripts/rate/fit_per_bin_rate_models.py`` writes them) and returns named
-numbers: the frozen cohort, the baseline rate, the reconstructed reward kernel,
-each rung's fit quality, and the fitted time course on the stop and arrival
-clocks.
+numbers: the frozen cohort, the baseline rate, one coefficient of two
+populations within session, the reconstructed reward and self-history kernels
+(summarized and lag by lag), each rung's fit quality, and the fitted time
+course on the stop and arrival clocks. The rate figures draw these functions'
+numbers, so a figure shows what the summary reports.
 
 The reward effect is the kernel reconstructed per session from the three
 reward-basis coefficients, read over the sessions whose three reward terms all

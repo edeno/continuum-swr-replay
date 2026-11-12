@@ -196,7 +196,13 @@ offset. Its limitation is exactly that offset — see below.
   (`--workers N` fans sessions over processes) →
   `Processed-Data/replay_content/models_per_bin_rate/all_models.pkl`. Plot with
   `scripts/rate/plot_per_bin_rate_models.py`
-  (→ `reward_kernel_basis.png`, `selfhistory_autocorr.png`); the
+  (→ `reward_kernel_basis.png`, `selfhistory_autocorr.png`) and
+  `scripts/rate/plot_per_bin_rate_summary.py` (→ `per_bin_rate_ladder_summary.png`).
+  Both draw the summary's statistics over the summary's sessions: the reward
+  kernel and the single basis coefficients over the sessions the per-term gate
+  keeps, the fitted time course of `M5_time` between its interior knots
+  (`rate_fit_statistics.fitted_time_course`), AIC steps differenced within
+  session, and the time courses' support over the well-anchored stops. The
   descriptive PSTH `scripts/exploratory/_timeresolved_psth.py`
   (→ `rate_timecourse_vs_pump.png`) reads the onset/dense tables directly.
 
@@ -497,7 +503,8 @@ Wiener 2003 censoring correction for short/variable-length stops) — the
 rescaling math is not re-implemented here. The per-fit scalars
 (`ks_statistic`, `ks_within_band`, `max_isi_autocorr`, `dispersion`,
 `mean_predicted`, `max_predicted`) are persisted for every fit in
-`all_models.pkl`; `scripts/rate/plot_model_checking.py` reads them for the
+`all_models.pkl`; `scripts/rate/plot_model_checking.py` summarizes them per rung
+with `rate_fit_statistics.ladder_fit_statistics` for the
 up-the-ladder story (`model_checking_ladder.png`) and re-fits a couple of
 example sessions inline for the KS / Q-Q / ISI-autocorrelation / cumulative-
 residual quartet (`model_checking_example_{rich,sparse}.png`).

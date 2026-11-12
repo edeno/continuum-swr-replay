@@ -10,6 +10,12 @@ reconstructed reward kernel and the self-history kernel (M7), the
 model-comparison ladder (ΔAIC + CV bits/event), and the slow reward-history
 component by population (M7).
 
+Every panel draws the statistic the behavior summary reports, from the function
+that computes it (``rate_fit_statistics``, ``stop_statistics``,
+``coefficient_statistics``), over the same sessions: a reward term over the
+sessions the per-term gate keeps, AIC steps differenced within session, the time
+courses' support over the well-anchored stops.
+
 Usage:
     uv run python scripts/rate/plot_per_bin_rate_summary.py
 """

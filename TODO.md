@@ -54,10 +54,14 @@ Work that is deferred on purpose. Each item says when it should be done.
   `scripts/pfc/` reports take a statistic whole from them or compute their own.
   These still hold their own copy; make each call the function, comparing its
   output before and after on the cluster:
-  - behavior: `scripts/rate/plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`,
-    `plot_model_checking.py` and `fit_per_bin_rate_models.py` (the arrival-window
-    shares), against `analysis/replay/coefficient_statistics.py`,
-    `rate_fit_statistics.py` and `stop_statistics.py`.
+  - detection and events: `scripts/detection/report_inventory_comparison.py` pools the
+    per-animal tables (`_report.pool_sessions`) that
+    `nonlocal_comparison.left_out_statistics` reads; the `summarize` functions of
+    `sweep_memoryless_{detection,controls,heldout}.py` compute the aggregates in the
+    sweep summaries; `measure_event_start_and_rest_theta.py` (`measure_epoch`) computes
+    the per-event measures behind the start-distance and rest-theta values; and
+    `scripts/content/analyze_content_occupancy.py` (`quadrant_fractions`) the
+    per-session shares the events summary reads.
 
   *When:* at each figure's or report's next regeneration.
 
@@ -68,17 +72,6 @@ Work that is deferred on purpose. Each item says when it should be done.
   review of that code (`.claude/docs/reviews/2026-11-11-reported-numbers-review.md`).
   Write each decision in that file.
   *When:* before the Results that cite the value are drafted.
-
-- [ ] **Correctness review of three disagreements found by the cleanup review.**
-  Each may make a reported number, a figure or an audited table disagree with
-  another; none was changed, because settling it changes numbers.
-  - `scripts/rate/plot_per_bin_rate_summary.py` (`_spline_basis`,
-    `_panel_fitted_timecourse`) rebuilds the fitted time course with its own knots
-    and grid and keeps separated sessions, unlike
-    `rate_fit_statistics.fitted_time_course`, so the plotted curve can disagree with
-    the reported peak.
-
-  *When:* before the Results that cite these values or figures are drafted.
 
 - [ ] **Open decisions from the retired figure plan** (`paper/figure_claims_plan.md`,
   removed after `cad31719`; it used an older claim numbering, so "D" is its claim
