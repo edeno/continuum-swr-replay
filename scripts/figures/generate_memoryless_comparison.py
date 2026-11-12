@@ -1125,7 +1125,13 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
 def check_controls_claims(controls: pd.DataFrame) -> None:
     """The caption's claims about the controls, checked against their summary."""
     # refuses a summary in which an output reported an event with no replay
-    sweep_statistics.no_replay_statistics(controls)
+    n_outputs = sweep_statistics.no_replay_statistics(controls)["n_outputs"]
+    if n_outputs != len(OUTPUTS):
+        raise RuntimeError(
+            f"The caption says none of the {len(OUTPUTS)} detector outputs reports "
+            f"an event with no replay; the controls summary holds the event counts "
+            f"of {n_outputs} detector outputs there."
+        )
     for condition in ("jump_120ms", "jump_200ms"):
         if sweep_statistics.controls_value(
             controls,
