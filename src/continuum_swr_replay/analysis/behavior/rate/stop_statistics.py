@@ -153,7 +153,9 @@ def onset_rate_time_course(
         ``t_since_stop_onset`` (seconds); one outside ``[0, window_s)`` is
         left out.
     window_s : float
-        The time since the stop began that the bins span, in seconds.
+        The time since the stop began that the bins span, in seconds: a whole
+        number of bins (up to floating-point rounding, so 4.0 s of 0.1 s bins
+        is forty).
     bin_s : float
         The bin width, in seconds.
     excluded_intervals : pd.DataFrame, optional
@@ -169,12 +171,23 @@ def onset_rate_time_course(
         ``exposure_s``, the seconds of immobility in the bin over all the
         stops; and ``rate``, their ratio in events per second (NaN where no
         stop is immobile).
+
+    Raises
+    ------
+    ValueError
+        If ``window_s`` is not a whole number of bins (the last bin would reach
+        past the window).
     """
+    n_bins = round(window_s / bin_s)
+    if not np.isclose(n_bins * bin_s, window_s):
+        raise ValueError(
+            f"a window of {window_s} s is not a whole number of bins of {bin_s} s"
+        )
     if excluded_intervals is None:
         excluded_intervals = excluded_intervals_by_session(stops)
     t = onsets["t_since_stop_onset"].to_numpy()
     t = t[(t >= 0) & (t < window_s)]
-    edges = np.arange(0, window_s + bin_s, bin_s)
+    edges = np.arange(n_bins + 1) * bin_s
     n_onsets, _ = np.histogram(t, edges)
     keys = ["animal", "session_date", "epoch"]
     exposure = np.zeros(len(edges) - 1)

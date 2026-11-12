@@ -120,6 +120,32 @@ def test_the_onset_rate_clock_is_the_stops_span_less_excluded_time():
     assert np.isnan(longer["rate"].iloc[-1])
 
 
+def test_the_onset_rate_window_must_be_a_whole_number_of_bins():
+    stops = pd.DataFrame(
+        {
+            "animal": ["a"],
+            "session_date": 1,
+            "epoch": "02_r1",
+            "stop_start": [10.0],
+            "stop_end": [15.0],
+        }
+    )
+    excluded = pd.DataFrame(columns=["animal", "session_date", "epoch"])
+    excluded = excluded.assign(start_time=[], end_time=[])
+    onsets = pd.DataFrame({"t_since_stop_onset": [0.05, 3.95]})
+    # 2.25 s is four and a half bins of 0.5 s: a last bin would reach past it.
+    with pytest.raises(ValueError, match="whole number of bins"):
+        stats.onset_rate_time_course(stops, onsets, 2.25, 0.5, excluded)
+    # 4.0 / 0.1 is 40 up to rounding: forty bins, the last ending at 4 s.
+    course = stats.onset_rate_time_course(stops, onsets, 4.0, 0.1, excluded)
+    assert len(course) == 40
+    assert course.index[-1] == pytest.approx(3.95)
+    assert course["n_onsets"].sum() == 2
+    np.testing.assert_allclose(course["exposure_s"], 0.1)
+    # 0.3 / 0.1 is just under 3: three bins, not a fourth past the window.
+    assert len(stats.onset_rate_time_course(stops, onsets, 0.3, 0.1, excluded)) == 3
+
+
 def _boundary_stops() -> pd.DataFrame:
     """Ten stops in two sessions, rows out of time order.
 
