@@ -69,7 +69,6 @@ import logging
 import shutil
 import sys
 import tempfile
-import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import NamedTuple
@@ -113,7 +112,7 @@ from continuum_swr_replay.analysis.behavior.content.model_comparison import (
 from continuum_swr_replay.analysis.behavior.content.session_fits import (
     LOGIT_SKIP_COLUMNS,
     fit_conditional_logit_robustness,
-    fit_model_per_session,
+    fit_content_ladder,
 )
 from continuum_swr_replay.analysis.behavior.content_response import (
     ESTIMATOR_CHOICES,
@@ -137,7 +136,6 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
     rung_predictors,
 )
 from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
-    validate_and_match_fit_results,
     validate_requested_standardization,
 )
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
@@ -189,31 +187,6 @@ logging.basicConfig(
     format="%(asctime)s %(message)s",
     datefmt="%H:%M:%S",
 )
-
-
-def fit_n_categories(hierarchy_kind: str, leaf_only: bool) -> int:
-    """Number of candidate categories the conditional likelihood conditions on.
-
-    The null likelihood, pseudo-R² and cross-validation baselines are all stated
-    against uniform allocation over this many slots, so it must match the rows
-    actually fitted: nine arms, three patches, or the six leaf arms.
-
-    Parameters
-    ----------
-    hierarchy_kind : str
-        One of :data:`HIERARCHY_CHOICES`.
-    leaf_only : bool
-        Whether the trunk-arm rows were dropped from the cohort.
-
-    Returns
-    -------
-    int
-        ``3`` for the patch hierarchy, ``6`` for a leaf-only arm fit, ``9``
-        otherwise.
-    """
-    if hierarchy_kind == "patch":
-        return 3
-    return LEAF_ONLY_N_CATEGORIES if leaf_only else 9
 
 
 def content_fit_inputs(input_dir: Path, table_name: str) -> dict[str, Path]:
@@ -953,83 +926,22 @@ def _load_and_filter_cohort(
 def _fit_content_ladder(
     args: argparse.Namespace, config: _RunConfig, cohort: _ContentCohort
 ) -> tuple[dict[str, pd.DataFrame], dict[str, list[dict]]]:
-    """Fit every requested rung per session and validate the matched ladder.
-
-    Returns the matched per-rung results and, per rung, the sessions the
-    estimator produced no fit for, each with its reason -- an auditable skip
-    rather than a crash of the whole ladder.
-    """
-    hierarchy = config.hierarchy
-    long_df = cohort.long_df
-    valid_model_names = cohort.valid_model_names
-    response_col = cohort.response_col
-    event_col = cohort.event_col
-
-    # Fit every requested rung into memory. Nothing under ``output_dir`` is
-    # created or modified until the whole ladder and its shared cohort pass
-    # integrity checks, so a late empty/failed rung cannot leave mixed results.
-    fit_results: dict[str, pd.DataFrame] = {}
-    estimator_skips: dict[str, list[dict]] = {}
-    for model_name in valid_model_names:
-        spec = hierarchy[model_name]
-        predictors = rung_predictors(spec, args.leaf_only)
-        cv_label = " + CV" if args.cv else ""
-        logging.info(
-            "Fitting %s (%d predictors%s)...", model_name, len(predictors), cv_label
-        )
-        t0 = time.time()
-
-        # Patch hierarchy collapses 9 arms to 3 patches and --leaf-only drops
-        # the 9 arms to 6 leaves; the null / pseudo-R² / CV baselines must use
-        # log(3) or log(6) instead of log(9) for those fits to be on the right
-        # chance footing.
-        n_categories = fit_n_categories(args.hierarchy, args.leaf_only)
-
-        mdf = fit_model_per_session(
-            long_df,
-            model_name,
-            predictors,
-            run_cv=args.cv,
-            response_col=response_col,
-            event_col=event_col,
-            n_categories=n_categories,
-            grain=args.grain,
-            estimator=args.estimator,
-            n_jobs=args.n_jobs,
-            min_events_session_phi=args.min_events_session_phi,
-        )
-        # Read off the frame the fitter returned, before matching reindexes it:
-        # attrs are not a contract pandas carries through every operation.
-        estimator_skips[model_name] = list(mdf.attrs.get("estimator_skips", []))
-
-        elapsed = time.time() - t0
-        logging.info("  %s: %d session fits in %.1fs", model_name, len(mdf), elapsed)
-        # Whether the response these numbers were fit on was rescaled to the
-        # fitted candidate set travels with the numbers: a leaf-only fraction
-        # fit is not on the same response as the nine-arm bundle's.
-        mdf["response_renormalized"] = cohort.response_renormalized
-        fit_results[model_name] = mdf
-
-    model_results = validate_and_match_fit_results(
-        fit_results,
-        requested_model_names=valid_model_names,
-        cohort=long_df,
-        event_col=event_col,
-        require_cv=args.cv,
+    """The run's options and cohort, passed to ``session_fits.fit_content_ladder``."""
+    return fit_content_ladder(
+        cohort.long_df,
+        config.hierarchy,
+        cohort.valid_model_names,
+        hierarchy_kind=args.hierarchy,
+        leaf_only=args.leaf_only,
+        response_col=cohort.response_col,
+        event_col=cohort.event_col,
+        response_renormalized=cohort.response_renormalized,
+        run_cv=args.cv,
+        grain=args.grain,
+        estimator=args.estimator,
+        n_jobs=args.n_jobs,
+        min_events_session_phi=args.min_events_session_phi,
     )
-    shared_session_count = len(next(iter(model_results.values())))
-    if any(len(result) != shared_session_count for result in model_results.values()):
-        raise RuntimeError(
-            "Internal content-ladder session matching failed; no output will be "
-            "published"
-        )
-    logging.info(
-        "Validated complete %d-rung ladder on %d shared sessions",
-        len(model_results),
-        shared_session_count,
-    )
-
-    return model_results, estimator_skips
 
 
 def _audit_compare_and_publish(

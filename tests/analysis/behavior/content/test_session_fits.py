@@ -15,9 +15,11 @@ from continuum_swr_replay.analysis.behavior.content.session_fits import (
     LOGIT_SKIP_COLUMNS,
     MIN_PATCH_EVENTS,
     fit_conditional_logit_robustness,
+    fit_content_ladder,
     fit_contrast_ladder,
     fit_contrast_session,
     fit_model_per_session,
+    fit_n_categories,
     fit_patch_switch,
     patch_models_for_source,
     patch_switch_models_for_source,
@@ -899,3 +901,38 @@ def test_the_switch_block_sees_only_the_switch_events():
     assert MIN_PATCH_EVENTS > 2
     assert record["status"] == "too_few_units"
     assert all(frame.empty for frame in fits.values())
+
+
+def test_leaf_only_fits_six_candidates_not_nine() -> None:
+    assert fit_n_categories("arm", leaf_only=True) == 6
+    assert fit_n_categories("arm", leaf_only=False) == 9
+    assert fit_n_categories("patch", leaf_only=False) == 3
+
+
+def test_leaf_only_ladder_fits_six_categories_on_the_rescaled_response() -> None:
+    """On simulated data: six-category null, and the rows say so."""
+    sim = simulated_session("arm_fraction").rename(columns={"arm_id": "candidate_arm"})
+    long_df, renormalized = leaf_only_cohort(
+        sim, response_col="arm_fraction", response="fraction"
+    )
+    complete = long_df.groupby("event_id")["arm_fraction"].transform(
+        lambda values: values.notna().all()
+    )
+    long_df = long_df[complete].reset_index(drop=True)
+
+    results, _skips = fit_content_ladder(
+        long_df,
+        {"X": ModelSpec("X", ("is_current_arm",), "current-arm bias", None)},
+        ["X"],
+        hierarchy_kind="arm",
+        leaf_only=True,
+        response_col="arm_fraction",
+        event_col="event_id",
+        response_renormalized=renormalized,
+    )
+
+    fitted = results["X"]
+    assert fitted["response_renormalized"].tolist() == [True]
+    n_events = int(fitted["n_events"].iloc[0])
+    # Unit mass per event against a six-category uniform null.
+    assert fitted["llf_null"].iloc[0] == pytest.approx(-n_events * np.log(6))

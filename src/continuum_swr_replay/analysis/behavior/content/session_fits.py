@@ -4,7 +4,9 @@ A content rung is fit per session. Which sessions are fit, by which estimator
 at which grain, and what a session's row carries are decided here once, so a
 runner and any check of its fits produce the same rows:
 
-- :func:`fit_model_per_session` fits one rung of the content ladder;
+- :func:`fit_model_per_session` fits one rung of the content ladder, and
+  :func:`fit_content_ladder` every requested rung, matched to the sessions all
+  of them fit;
 - :func:`fit_conditional_logit_robustness` refits the content ladder's rungs as
   a conditional logit on each event's dominant candidate;
 - :func:`fit_contrast_ladder` fits the is_swr-contrast ladder, per rung and
@@ -17,6 +19,7 @@ runner and any check of its fits produce the same rows:
 from __future__ import annotations
 
 import logging
+import time
 
 import numpy as np
 import pandas as pd
@@ -34,10 +37,12 @@ from ..fitting import (
     fit_null_model_conditional_logit,
 )
 from ..model_specs import (
+    LEAF_ONLY_N_CATEGORIES,
     MODEL_PATCH,
     MODEL_PATCH_MUA,
     MODEL_PATCH_SWITCH,
     MODEL_PATCH_SWR,
+    N_ARM_CATEGORIES,
     rung_predictors,
 )
 from ..tables.table_contracts import CV_RESULT_COLUMNS, validate_and_match_fit_results
@@ -795,6 +800,157 @@ def fit_contrast_ladder(
                 )
             )
     return pd.DataFrame(rows), audits
+
+
+# ── the content ladder ──────────────────────────────────────────────────────
+
+
+def fit_n_categories(hierarchy_kind: str, leaf_only: bool) -> int:
+    """Number of candidate categories the conditional likelihood conditions on.
+
+    The null likelihood, pseudo-R² and cross-validation baselines are all stated
+    against uniform allocation over this many slots, so it must match the rows
+    actually fitted: nine arms, three patches, or the six leaf arms.
+
+    Parameters
+    ----------
+    hierarchy_kind : str
+        ``"arm"`` or ``"patch"``.
+    leaf_only : bool
+        Whether the trunk-arm rows were dropped from the cohort.
+
+    Returns
+    -------
+    int
+        ``3`` for the patch hierarchy, ``6`` for a leaf-only arm fit, ``9``
+        otherwise.
+    """
+    if hierarchy_kind == "patch":
+        return 3
+    return LEAF_ONLY_N_CATEGORIES if leaf_only else N_ARM_CATEGORIES
+
+
+def fit_content_ladder(
+    long_df: pd.DataFrame,
+    hierarchy: dict,
+    model_names,
+    *,
+    hierarchy_kind: str,
+    leaf_only: bool,
+    response_col: str,
+    event_col: str,
+    response_renormalized: bool,
+    run_cv: bool = False,
+    grain: str = "timebin",
+    estimator: str = "conditional_poisson",
+    n_jobs: int = 1,
+    min_events_session_phi: int = DEFAULT_MIN_EVENTS_SESSION_PHI,
+) -> tuple[dict[str, pd.DataFrame], dict[str, list[dict]]]:
+    """Fit every requested rung per session and validate the matched ladder.
+
+    Each rung is :func:`fit_model_per_session` on its predictors under the
+    run's candidate set (:func:`~continuum_swr_replay.analysis.behavior.model_specs.rung_predictors`),
+    against :func:`fit_n_categories` categories. Every row carries
+    ``response_renormalized``: a leaf-only fraction fit is not on the same
+    response as the nine-arm bundle's. The rungs are then restricted to the
+    sessions every one of them fitted
+    (:func:`~continuum_swr_replay.analysis.behavior.tables.table_contracts.validate_and_match_fit_results`).
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        The frozen fitting cohort.
+    hierarchy : dict
+        The ladder (rung name -> ModelSpec).
+    model_names : sequence of str
+        The rungs to fit, in order.
+    hierarchy_kind : {"arm", "patch"}
+        The candidate grain.
+    leaf_only : bool
+        Whether the cohort holds the six leaf arms only.
+    response_col, event_col : str
+        The response and the event identifier.
+    response_renormalized : bool
+        Whether the response was rescaled to the fitted candidate set.
+    run_cv, grain, estimator, n_jobs, min_events_session_phi
+        Passed to :func:`fit_model_per_session`.
+
+    Returns
+    -------
+    (model_results, estimator_skips)
+        The matched per-rung frames, and per rung the sessions the estimator
+        produced no fit for, each with its reason.
+
+    Raises
+    ------
+    RuntimeError
+        If the matched rungs do not share one session count.
+    """
+    # Fit every requested rung into memory. Nothing is written until the whole
+    # ladder and its shared cohort pass integrity checks, so a late empty/failed
+    # rung cannot leave mixed results.
+    fit_results: dict[str, pd.DataFrame] = {}
+    estimator_skips: dict[str, list[dict]] = {}
+    for model_name in model_names:
+        spec = hierarchy[model_name]
+        predictors = rung_predictors(spec, leaf_only)
+        cv_label = " + CV" if run_cv else ""
+        logger.info(
+            "Fitting %s (%d predictors%s)...", model_name, len(predictors), cv_label
+        )
+        t0 = time.time()
+
+        # Patch hierarchy collapses 9 arms to 3 patches and leaf-only drops
+        # the 9 arms to 6 leaves; the null / pseudo-R² / CV baselines must use
+        # log(3) or log(6) instead of log(9) for those fits to be on the right
+        # chance footing.
+        n_categories = fit_n_categories(hierarchy_kind, leaf_only)
+
+        mdf = fit_model_per_session(
+            long_df,
+            model_name,
+            predictors,
+            run_cv=run_cv,
+            response_col=response_col,
+            event_col=event_col,
+            n_categories=n_categories,
+            grain=grain,
+            estimator=estimator,
+            n_jobs=n_jobs,
+            min_events_session_phi=min_events_session_phi,
+        )
+        # Read off the frame the fitter returned, before matching reindexes it:
+        # attrs are not a contract pandas carries through every operation.
+        estimator_skips[model_name] = list(mdf.attrs.get("estimator_skips", []))
+
+        elapsed = time.time() - t0
+        logger.info("  %s: %d session fits in %.1fs", model_name, len(mdf), elapsed)
+        # Whether the response these numbers were fit on was rescaled to the
+        # fitted candidate set travels with the numbers: a leaf-only fraction
+        # fit is not on the same response as the nine-arm bundle's.
+        mdf["response_renormalized"] = response_renormalized
+        fit_results[model_name] = mdf
+
+    model_results = validate_and_match_fit_results(
+        fit_results,
+        requested_model_names=model_names,
+        cohort=long_df,
+        event_col=event_col,
+        require_cv=run_cv,
+    )
+    shared_session_count = len(next(iter(model_results.values())))
+    if any(len(result) != shared_session_count for result in model_results.values()):
+        raise RuntimeError(
+            "Internal content-ladder session matching failed; no output will be "
+            "published"
+        )
+    logger.info(
+        "Validated complete %d-rung ladder on %d shared sessions",
+        len(model_results),
+        shared_session_count,
+    )
+
+    return model_results, estimator_skips
 
 
 # ── patch hierarchy of one event source ─────────────────────────────────────

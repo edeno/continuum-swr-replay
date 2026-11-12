@@ -41,7 +41,6 @@ from tests.support._content_tables import (
     dm_session,
     fail_logit_for,
     logit_session,
-    simulated_session,
 )
 
 # the runner resolves its directories, and /tmp is itself a symlink on macOS
@@ -390,12 +389,6 @@ def test_leaf_only_run_publishes_to_its_own_bundle() -> None:
     assert "models_hard_count_leaf" in fit_outputs.canonical_output_subdirs()
 
 
-def test_leaf_only_fits_six_candidates_not_nine() -> None:
-    assert mod.fit_n_categories("arm", leaf_only=True) == 6
-    assert mod.fit_n_categories("arm", leaf_only=False) == 9
-    assert mod.fit_n_categories("patch", leaf_only=False) == 3
-
-
 def test_leaf_only_drops_the_trunk_arm_fixed_effects_from_every_rung() -> None:
     """Arms 6 and 7 are identically zero on leaves; the ladder must not carry them."""
     for name, spec in mod.MODEL_HIERARCHY.items():
@@ -606,47 +599,6 @@ def test_renormalized_leaf_bundles_say_so_in_their_provenance(tmp_path) -> None:
 
     record = json.loads((output_dir / "all_models.provenance.json").read_text())
     assert record["response_renormalized"] is True
-
-
-def test_leaf_only_ladder_fits_six_categories_on_the_rescaled_response() -> None:
-    """End to end on simulated data: six-category null, and the rows say so."""
-    sim = simulated_session("arm_fraction").rename(columns={"arm_id": "candidate_arm"})
-    long_df, renormalized = model_specs.leaf_only_cohort(
-        sim, response_col="arm_fraction", response="fraction"
-    )
-    complete = long_df.groupby("event_id")["arm_fraction"].transform(
-        lambda values: values.notna().all()
-    )
-    long_df = long_df[complete].reset_index(drop=True)
-
-    config = mod._RunConfig(
-        hierarchy=_ARM_LADDER,
-        input_dir=CONTENT_IN,
-        output_dir=CONTENT_IN / "models_leaf",
-        table_name="event_arm_table",
-        model_names=["X"],
-    )
-    cohort = mod._ContentCohort(
-        long_df=long_df,
-        long_df_prefilter=sim,
-        valid_model_names=["X"],
-        union_predictors=["is_current_arm"],
-        response_col="arm_fraction",
-        event_col="event_id",
-        n_events_before_complete_case=int(sim["event_id"].nunique()),
-        fit_inputs={},
-        response_renormalized=renormalized,
-    )
-
-    results, _skips = mod._fit_content_ladder(
-        _args(leaf_only=True, cv=False), config, cohort
-    )
-
-    fitted = results["X"]
-    assert fitted["response_renormalized"].tolist() == [True]
-    n_events = int(fitted["n_events"].iloc[0])
-    # Unit mass per event against a six-category uniform null.
-    assert fitted["llf_null"].iloc[0] == pytest.approx(-n_events * np.log(6))
 
 
 # ── Dirichlet-multinomial estimator ──

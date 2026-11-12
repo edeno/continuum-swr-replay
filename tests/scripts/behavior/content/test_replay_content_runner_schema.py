@@ -76,7 +76,7 @@ def test_stale_canonical_table_aborts_before_fit_or_output(tmp_path, monkeypatch
         pytest.fail("schema validation must run before model fitting")
 
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
+    monkeypatch.setattr(session_fits, "fit_model_per_session", _fit_must_not_run)
 
     with pytest.raises(ValueError, match="current-location/novelty schema"):
         runner.main(["--models", "M0"])
@@ -111,7 +111,7 @@ def test_a_table_from_another_swr_source_is_refused(tmp_path, monkeypatch):
         pytest.fail("the source check must run before model fitting")
 
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
+    monkeypatch.setattr(session_fits, "fit_model_per_session", _fit_must_not_run)
 
     with pytest.raises(SwrSourceError, match="another_run"):
         runner.main(["--models", "M0"])
@@ -164,7 +164,7 @@ def test_complete_default_ladder_is_dispatched_without_dropping_rungs(
         )
 
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "fit_model_per_session", _record_fit)
+    monkeypatch.setattr(session_fits, "fit_model_per_session", _record_fit)
     monkeypatch.setattr(
         runner, "run_full_hierarchy_comparison", lambda *args, **kwargs: pd.DataFrame()
     )
@@ -190,7 +190,7 @@ def test_missing_requested_predictor_rejects_the_whole_ladder(tmp_path, monkeypa
         pytest.fail("the complete ladder must validate before fitting")
 
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
+    monkeypatch.setattr(session_fits, "fit_model_per_session", _fit_must_not_run)
 
     with pytest.raises(ValueError, match=r"M6=.*swr_x_is_current_arm"):
         runner.main(["--models", "M5,M6"])
@@ -233,7 +233,7 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
         pytest.fail("standardization validation must run before model fitting")
 
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
+    monkeypatch.setattr(session_fits, "fit_model_per_session", _fit_must_not_run)
 
     with pytest.raises(ValueError, match="stale or invalid"):
         runner.main(["--models", "Mu"])
@@ -277,7 +277,7 @@ def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
         pytest.fail("location contract validation must run before fitting")
 
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
+    monkeypatch.setattr(session_fits, "fit_model_per_session", _fit_must_not_run)
 
     with pytest.raises(ValueError, match="one-hot at wells and NaN off-well"):
         runner.main(["--models", "M0"])
@@ -306,7 +306,9 @@ def test_late_empty_rung_aborts_without_publishing_any_output(tmp_path, monkeypa
         )
 
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "fit_model_per_session", _fit_with_empty_late_rung)
+    monkeypatch.setattr(
+        session_fits, "fit_model_per_session", _fit_with_empty_late_rung
+    )
 
     with pytest.raises(RuntimeError, match="M1.*no session fits"):
         runner.main(["--models", "M0,M1"])
@@ -338,7 +340,7 @@ def test_late_fit_exception_leaves_existing_output_unchanged(tmp_path, monkeypat
         )
 
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "fit_model_per_session", _fit_then_raise)
+    monkeypatch.setattr(session_fits, "fit_model_per_session", _fit_then_raise)
 
     with pytest.raises(RuntimeError, match="late numerical failure"):
         runner.main(["--models", "M0,M1"])
@@ -381,7 +383,7 @@ def test_fit_result_must_report_exact_frozen_cohort_size(tmp_path, monkeypatch):
         )
 
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "fit_model_per_session", _wrong_cohort_size)
+    monkeypatch.setattr(session_fits, "fit_model_per_session", _wrong_cohort_size)
 
     with pytest.raises(RuntimeError, match="expected 2 from the frozen cohort"):
         runner.main(["--models", "M0"])
@@ -416,7 +418,7 @@ def test_published_ladder_uses_intersection_of_successful_sessions(
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
-        runner, "fit_model_per_session", _fit_with_one_late_session_failure
+        session_fits, "fit_model_per_session", _fit_with_one_late_session_failure
     )
     monkeypatch.setattr(
         runner, "run_full_hierarchy_comparison", lambda *args, **kwargs: pd.DataFrame()
@@ -472,7 +474,7 @@ def test_requested_cv_metadata_is_required_at_publication(tmp_path, monkeypatch)
         )
 
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "fit_model_per_session", _primary_without_cv)
+    monkeypatch.setattr(session_fits, "fit_model_per_session", _primary_without_cv)
 
     with pytest.raises(RuntimeError, match="CV result.*missing column"):
         runner.main(["--models", "M0", "--cv"])
@@ -522,7 +524,7 @@ def test_a_logit_rung_with_no_fitted_session_aborts_without_publishing(
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
-        runner,
+        session_fits,
         "fit_model_per_session",
         lambda long_df, model_name, predictors, **kwargs: _one_session_primary_result(
             long_df, model_name
@@ -547,7 +549,7 @@ def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypat
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
-        runner,
+        session_fits,
         "fit_model_per_session",
         lambda long_df, model_name, predictors, **kwargs: _one_session_primary_result(
             long_df, model_name
