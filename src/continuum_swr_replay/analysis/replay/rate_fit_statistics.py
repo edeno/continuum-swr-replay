@@ -13,7 +13,9 @@ pass the per-term gate
 (:func:`~continuum_swr_replay.analysis.replay.contrast_aggregation.gate_term_sessions`);
 a single basis coefficient is not the effect of a reward at any lag. Rates are
 events per at-risk second, kernels are rate ratios, times are in seconds.
-Summaries of one coefficient, and of one rung against another, are in
+Every signed-rank p is
+:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p` (NaN below six
+non-zero differences). Summaries of one coefficient, and of one rung against another, are in
 :mod:`~continuum_swr_replay.analysis.replay.coefficient_statistics`.
 """
 
@@ -24,7 +26,6 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 from patsy import dmatrix
-from scipy.stats import wilcoxon
 
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (
     _paired_difference,
@@ -45,7 +46,10 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     reconstruct_reward_kernels,
     reward_kernel_rate_ratios,
 )
-from continuum_swr_replay.analysis.statistics import session_median_statistics
+from continuum_swr_replay.analysis.statistics import (
+    session_median_statistics,
+    signed_rank_p,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
 
 TIME_COURSE_GRID_POINTS = 401
@@ -152,7 +156,7 @@ def baseline_rate_ratio_statistics(
     return {
         "n_sessions": len(difference),
         "median_ratio": float(np.exp(difference.median())),
-        "signed_rank_p": float(wilcoxon(difference).pvalue),
+        "signed_rank_p": signed_rank_p(difference),
     }
 
 
@@ -263,7 +267,7 @@ def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
         "late_rate_ratio_min": float(late.min()),
         "late_rate_ratio_max": float(late.max()),
         "lag_one_positive_fraction": lag_one_statistics["positive_fraction"],
-        "lag_one_signed_rank_p": float(wilcoxon(lag_one).pvalue),
+        "lag_one_signed_rank_p": signed_rank_p(lag_one),
         "lag_one_animal_rate_ratio": float(np.exp(lag_one_statistics["animal_median"])),
         "n_animals": lag_one_statistics["n_animals"],
         "n_animals_lag_one_positive": lag_one_statistics["n_animals_positive"],
@@ -299,7 +303,7 @@ def paired_lag_one_kernel_statistics(
         "positive_fraction": statistics["positive_fraction"],
         "n_animals": statistics["n_animals"],
         "n_animals_positive": statistics["n_animals_positive"],
-        "signed_rank_p": float(wilcoxon(difference).pvalue),
+        "signed_rank_p": signed_rank_p(difference),
     }
 
 

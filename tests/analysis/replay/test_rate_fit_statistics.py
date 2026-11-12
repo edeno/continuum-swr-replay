@@ -158,8 +158,8 @@ def test_the_baseline_ratio_is_within_session():
     result = stats.baseline_rate_ratio_statistics(a, b)
     assert result["n_sessions"] == 5
     assert result["median_ratio"] == pytest.approx(3.0)
-    # all five differences positive: two-sided exact p = 2 / 2 ** 5
-    assert result["signed_rank_p"] == pytest.approx(0.0625)
+    # five differences are too few for a signed-rank p
+    assert np.isnan(result["signed_rank_p"])
     assert stats.baseline_rate_ratio_statistics(b, a)["median_ratio"] == pytest.approx(
         1 / 3
     )
@@ -239,8 +239,6 @@ def test_animals_with_a_negative_median_lag_one_kernel_are_not_counted_positive(
     )
 
 
-# The last-bump kernels are exactly 0 at lag 1, which the signed-rank test cannot rank.
-@pytest.mark.filterwarnings("ignore:invalid value encountered:RuntimeWarning")
 def test_the_late_kernel_is_read_from_lag_three_on():
     # First bump only, positive: the kernel falls from lag 1 to nothing at lag
     # 10, so from lag 3 on it is highest at lag 3 and lowest (a ratio of 1) at 10.
@@ -312,9 +310,8 @@ def test_the_paired_difference_is_a_minus_b_over_sessions_and_animals():
     assert result["positive_fraction"] == 0.6
     assert result["n_animals"] == 3
     assert result["n_animals_positive"] == 2
-    # The negative ranks sum to 1 + 2 = 3; five of the 32 sign patterns have a
-    # rank sum of at most 3: two-sided p = 2 * 5 / 32.
-    assert result["signed_rank_p"] == pytest.approx(0.3125)
+    # five differences are too few for a signed-rank p
+    assert np.isnan(result["signed_rank_p"])
     reverse = stats.paired_lag_one_kernel_statistics(b, a)
     assert reverse["positive_fraction"] == 0.4
     assert reverse["n_animals_positive"] == 1
