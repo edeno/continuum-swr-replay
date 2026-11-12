@@ -198,7 +198,6 @@ from .plots import (
     plot_graph_as_1D,
     plot_head_direction,
     plot_multiunit_firing,
-    plot_peri_event_probability,
     plot_ripple_consensus_trace_zscore,
     plot_speed,
     plot_spike_times,
@@ -213,7 +212,6 @@ __all__ = [
     "create_multiregion_figurl",
     "create_2D_decoding_plot",
     # Static plots
-    "plot_peri_event_probability",
     "plot_theta_lfp",
     "plot_theta_power_zscore",
     "plot_theta_phase",
