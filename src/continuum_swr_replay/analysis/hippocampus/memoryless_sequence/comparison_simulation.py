@@ -7,7 +7,8 @@ The supplemental memoryless comparison figure
 stationary event, a short path, a short replay and a stray window added
 (their rows of ``event_times`` are :data:`SHORT_PATH_EVENT` and the other
 ``*_EVENT`` constants), decoded window by window under a uniform prior and by
-the switching state-space model fitted on the same non-event data.
+the switching state-space model fitted on the same non-event data. The figure's
+numbers are those of :data:`N_NEURONS` cells decoded under :data:`CONFIG`.
 """
 
 import numpy as np
@@ -51,9 +52,11 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD
 
 __all__ = [
+    "CONFIG",
     "CONTINUOUS_INBOUND_EVENT",
     "CONTINUOUS_OUTBOUND_EVENT",
     "DECODE_BIN_STRIDE",
+    "N_NEURONS",
     "REMOTE_STATIONARY_CM",
     "REMOTE_STATIONARY_EVENT",
     "REMOTE_STATIONARY_S",
@@ -76,6 +79,12 @@ TRACK_HEIGHT_CM = float(TRACK_HEIGHT)
 
 DECODE_BIN_STRIDE = 3
 """Figure 1 strides the 1500 Hz simulation to the project's 500 Hz decode grid."""
+
+N_NEURONS = 25
+"""Cells in the simulation the figure and its recorded numbers are made from."""
+
+CONFIG = MemorylessSequenceConfig(sampling_frequency=500.0)
+"""The sliding-window detector's settings on that 500 Hz grid."""
 
 SHORT_REPLAY = InjectedReplay(
     start_cm=35.0,

@@ -43,6 +43,8 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import sweep
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+    CONFIG,
+    N_NEURONS,
     SHUFFLE_RUN_SEED,
     simulate_and_decode,
 )
@@ -552,7 +554,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # the CPU unless JAX_PLATFORMS names another
     default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--n-neurons", type=int, default=25)
+    parser.add_argument("--n-neurons", type=int, default=N_NEURONS)
     parser.add_argument(
         "--n-seeds", type=int, default=8, help="Sweep seeds; 8 is the whole sweep."
     )
@@ -564,7 +566,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
     args = parser.parse_args(argv)
 
-    config = MemorylessSequenceConfig(sampling_frequency=500.0)
+    config = CONFIG
     decoded = simulate_and_decode(args.n_neurons, config)
     encoding_model = decoded["detector"].encoding_model_[ENCODING_KEY]
     summaries, table = compare_variants(decoded, encoding_model, config, FIGURE_SEED)

@@ -55,8 +55,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     sweep_statistics,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+    CONFIG,
     CONTINUOUS_INBOUND_EVENT,
     CONTINUOUS_OUTBOUND_EVENT,
+    N_NEURONS,
     REMOTE_STATIONARY_EVENT,
     SHORT_PATH,
     SHORT_PATH_EVENT,
@@ -1263,7 +1265,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # the CPU unless JAX_PLATFORMS names another
     default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--n-neurons", type=int, default=25)
+    parser.add_argument("--n-neurons", type=int, default=N_NEURONS)
     parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
     parser.add_argument("--controls-summary", type=Path, default=CONTROLS_SUMMARY_PATH)
     parser.add_argument("--heldout-summary", type=Path, default=HELDOUT_SUMMARY_PATH)
@@ -1275,7 +1277,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
-    config = MemorylessSequenceConfig(sampling_frequency=500.0)
+    config = CONFIG
     summary = read_summary(
         args.summary, "scripts/detection/sweep_memoryless_detection.py"
     )
