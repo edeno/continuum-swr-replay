@@ -21,7 +21,8 @@ and writes the summary the mpfc summary builder reads.
 - :func:`complete_bundle_records`: the complete bundles of a directory, the
   only ones :func:`mark_correlations` and the summary script read.
 - :func:`summary_table`: all of these as the one long table the summary
-  builder reads.
+  builder reads; :func:`wide_statistics` turns it back into one row per
+  model, class and target, refusing a statistic given twice.
 """
 
 from __future__ import annotations
@@ -513,4 +514,37 @@ def summary_table(
             ),
         ],
         ignore_index=True,
+    )
+
+
+def wide_statistics(summary: pd.DataFrame) -> pd.DataFrame:
+    """The statistics of :func:`summary_table` other than the mark correlations,
+    one row per model, class and target.
+
+    Parameters
+    ----------
+    summary : pandas.DataFrame
+        The long table of :func:`summary_table`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Indexed by ``model``, ``event_class`` and ``target`` (sorted), one
+        column per statistic; a statistic missing for every row is left out.
+
+    Raises
+    ------
+    ValueError
+        A model, class, target and statistic has more than one row.
+    """
+    keys = ["model", "event_class", "target", "statistic"]
+    statistics = summary[summary["statistic"] != "mark_correlation"]
+    repeated = statistics[statistics.duplicated(keys, keep=False)]
+    if len(repeated):
+        raise ValueError(
+            "the marked-family summary holds a statistic more than once:\n"
+            f"{repeated[keys].drop_duplicates().to_string(index=False)}"
+        )
+    return statistics.pivot_table(
+        index=keys[:3], columns="statistic", values="value", aggfunc="first"
     )

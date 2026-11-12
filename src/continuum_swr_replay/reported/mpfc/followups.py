@@ -15,6 +15,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.pfc.marked_family_statistics import (
+    wide_statistics,
+)
 from continuum_swr_replay.paths import (
     ROOT_DIR,
 )
@@ -186,9 +189,7 @@ def marked_family_values(
 
     add = _finite_adder(values, make)
 
-    wide = summary[summary["statistic"] != "mark_correlation"].pivot_table(
-        index=["model", "event_class", "target"], columns="statistic", values="value"
-    )
+    wide = wide_statistics(summary)
     for model_word, model in MARKED_MODELS.items():
         for (row_model, event_class, target), row in wide.iterrows():
             if row_model != model or target not in MARKED_TARGETS:

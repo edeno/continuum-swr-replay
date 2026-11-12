@@ -352,6 +352,46 @@ def test_summary_table_is_one_row_per_model_tier_class_target_statistic():
     assert values.loc[("m", "mark_correlation"), "value"] == 0.7
 
 
+def _long(rows):
+    return pd.DataFrame(
+        rows,
+        columns=["model", "tier", "event_class", "target", "statistic", "value"],
+    )
+
+
+def test_wide_statistics_is_one_row_per_model_class_target_without_correlations():
+    long = _long(
+        [
+            ("m", "joint", "pooled", "t", "frac_pos", 0.6),
+            ("m", "joint", "pooled", "t", "peak_value", -0.2),
+            ("m", "joint", "SWR", "t", "frac_pos", 0.1),
+            ("m", "joint", "SWR", "t", "peak_value", np.nan),
+            ("m", "joint", "SWR", "a & b", "mark_correlation", 0.7),
+        ]
+    )
+
+    wide = stats.wide_statistics(long)
+
+    assert list(wide.columns) == ["frac_pos", "peak_value"]
+    assert list(wide.index) == [("m", "SWR", "t"), ("m", "pooled", "t")]
+    assert wide.loc[("m", "pooled", "t"), "frac_pos"] == 0.6
+    assert wide.loc[("m", "pooled", "t"), "peak_value"] == -0.2
+    assert np.isnan(wide.loc[("m", "SWR", "t"), "peak_value"])
+
+
+def test_wide_statistics_refuses_a_statistic_given_twice():
+    """Two rows of one statistic would be averaged into a value neither holds."""
+    long = _long(
+        [
+            ("m", "joint", "pooled", "t", "frac_pos", 0.6),
+            ("m", "joint", "pooled", "t", "frac_pos", 0.2),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="more than once"):
+        stats.wide_statistics(long)
+
+
 def test_summary_table_without_bands_or_correlations():
     keys = {"model": ["m"], "event_class": ["pooled"], "target": ["t"]}
     table = stats.summary_table(
