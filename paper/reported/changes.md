@@ -3597,3 +3597,39 @@ marker, and the computed value now there. Newest last.
 | `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_fraction_high` | +0.30 | +0.39 |
 | `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_dm_low` | −1.2 | −1.1 |
 | `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_dm_high` | +0.30 | +0.34 |
+
+## 2026-11-12
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/design/content_estimator_comparison.md` | `behavior.est_current_count_low` | +0.36 | −0.078 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_current_count_high` | +1.5 | +1.4 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_current_fraction_low` | +0.25 | +0.074 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_current_dm_low` | +0.26 | +0.20 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_current_dm_high` | +1.2 | +1.3 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_current_count_low` | −0.22 | −0.70 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_current_count_high` | +0.71 | +1.1 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_current_fraction_low` | −0.27 | −0.76 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_current_fraction_high` | +0.81 | +1.1 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_current_dm_low` | −0.26 | −0.63 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_current_dm_high` | +0.64 | +1.0 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armreward_count_low` | −0.56 | −0.68 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armreward_count_high` | +0.33 | +0.66 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armreward_fraction_low` | −0.43 | −0.99 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armreward_fraction_high` | +0.62 | +0.64 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armreward_dm_low` | −0.34 | −0.50 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armreward_dm_high` | +0.30 | +0.48 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_armvalue_count_low` | −0.36 | −1.2 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_armvalue_count_high` | +0.93 | +1.2 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_armvalue_fraction_low` | −0.35 | −0.90 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_armvalue_fraction_high` | +0.94 | +1.0 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_armvalue_dm_low` | −0.44 | −1.1 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_armvalue_dm_high` | +0.99 | +1.2 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_count_low` | −0.84 | −0.89 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_count_high` | +0.66 | +1.1 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_fraction_low` | −1.2 | −1.0 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_fraction_high` | +0.39 | +1.2 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_dm_low` | −1.1 | −1.0 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_dm_high` | +0.34 | +0.92 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_breadth_dm_low` | +1.5 | +1.3 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_breadth_dm_high` | +2.1 | +2.2 |

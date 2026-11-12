@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "93ac9014034d",
+ "commit": "c123684d9a61",
  "code": {
-  "head": "93ac9014034d90822e5463d862a4e59a8acef48d",
+  "head": "c123684d9a6153cdc7d148c0ca9dd01ced092a89",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -23,7 +23,7 @@
     "code_sha256": "f61526fd60590ac016a72fa7fc151d66f027c51433337b022efa558c1684c181"
    },
    "src/continuum_swr_replay/analysis/constants.py": {
-    "sha256": "b2c072beab1fd63b91840662d5c679a602ff04ca38b7ff592be9589f2893b9ca",
+    "sha256": "4011ea8a6431cb84fd444504f56a63cb6a464084fa8bf821e86e011053f4a9dc",
     "code_sha256": "017e87339e0c9e3e05841e649c277c6deab7ae4509a0660f2f0720de061caebd"
    },
    "src/continuum_swr_replay/analysis/events/__init__.py": {
@@ -31,8 +31,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/events/analysed_time.py": {
-    "sha256": "a73d52b699fe29fb25fb186eafd7d551707982d26c9a3b9be2b40eee16264e14",
-    "code_sha256": "06142fc489f33df4121c0aff2970afba56b1b3c09ee20397e8973127072361a6"
+    "sha256": "3f958a0691bc312205d5cf3db289923b3f50d6078ad725f0c5ed35a3a45753ed",
+    "code_sha256": "f43cefc1fcb6c35ada94eaac780bed0ce99d2ac09ca636b5df2bf12952041fd6"
    },
    "src/continuum_swr_replay/analysis/events/artifact_intervals.py": {
     "sha256": "a9fb2c62382f4b52e29329017892fd6afd17c25a1330551afa730a860e5292b6",
@@ -63,8 +63,8 @@
     "code_sha256": "b28f2241802c703d90872efad704ea57dbb801032612667db5a8794cac6914f5"
    },
    "src/continuum_swr_replay/analysis/events/nonlocal_detection.py": {
-    "sha256": "68bdd5e35eb1f616bda471846280deb3b0185643e695806dcc5cf26280dda24c",
-    "code_sha256": "5aa528c9a2f3461963007fca3df337b58894d3f525e624116457e87b48bb0466"
+    "sha256": "d834c392b2ad1caf9ef86b2c9c836edaa6c8e6e527c905778cb897bcdc016d00",
+    "code_sha256": "936ac52d7a1dd36c261c001df6bf5641325ab105e4638b39a1cdd4b455628b49"
    },
    "src/continuum_swr_replay/analysis/events/swr_source.py": {
     "sha256": "27dd791cb07d1755f275b2a5c94f4f1f588d997d72728ec6a989382b32cd1e19",
@@ -79,8 +79,8 @@
     "code_sha256": "b176291217c441d363af87c9125922bea7ce9d9aac090708279b800405bd919a"
    },
    "src/continuum_swr_replay/analysis/hippocampus/event_statistics.py": {
-    "sha256": "1ebcb5224373b2d16ec60d571151ad9477c630dff80e113c0249d82a2cf577a5",
-    "code_sha256": "a687bcf6438e81aa5baea073a0bcf2f4936101d3537389a05a526756d6ca3146"
+    "sha256": "d9010d8da7cc95742c21e9ef5b075de3a8707b5aad38eb46aee264db601be406",
+    "code_sha256": "5a22f13a75c673063afbdedc1b4adb92720bffa1c8cce50b8abc0082a4597e74"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/__init__.py": {
     "sha256": "be00f35a8fd3f9b5f8f01cffbb8b160bc1c4dcd8b1b3095c1ebf390cb8eb5146",
@@ -95,8 +95,8 @@
     "code_sha256": "64153bb049ae2104814d1e37794d70cc8e4de5ea15a852e10a1d7bdac9dcc000"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/epoch.py": {
-    "sha256": "f2ef88afe1e8c53ea1668260a554d8d909c815639fbb8e649243f96cf05cfe05",
-    "code_sha256": "fbdf70f0c48b81886691bdfa12d66fdf623d55489c9487078165778f7a8b213d"
+    "sha256": "ccaea4d0a4ffcbcec3c1ead391ced4b4d8257f7ef2cbd22a9e4392d7c4588dbd",
+    "code_sha256": "a7b8e880bed8b2bc76b57e8e7187eaec6afdd90698e1aad708903d9b79b92f37"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/event_table.py": {
     "sha256": "7c0760f44d451e7c41dca3dba02e170140c68e8d65c449063bd729842107d1b3",
@@ -119,15 +119,19 @@
     "code_sha256": "4c5ce7aefdaec2986c15bb844ac865127194b243b527466266a091689a0546ea"
    },
    "src/continuum_swr_replay/analysis/hippocampus/property_contrast.py": {
-    "sha256": "4f5b4bd1353cca1e978a6bc2ede6c152d3e4c1bbf93373f73702d2dd073b70c7",
-    "code_sha256": "e8713e884fb347eab43b6cca9a495c92233ec8e3f5fdd742c14042522aadf3cc"
+    "sha256": "0735915ab4f3237e642181e9053d5c2c21cf712fcf7fe704be7cb52de9f85d0c",
+    "code_sha256": "f41166a9825d9b68988e1293ae88cfb3589285a20a69886670111f2a492ee62e"
+   },
+   "src/continuum_swr_replay/analysis/hippocampus/quality_metrics.py": {
+    "sha256": "37e451ac473c3d3b0aa086e3152e5c7c2842564ae31d5406ae2f0fb760a7ef0c",
+    "code_sha256": "42b2edf24689d5795c22ad1b6148cd4cdf870416b62d3ca5014530c7c11b35b2"
    },
    "src/continuum_swr_replay/analysis/hippocampus/swr_detectors.py": {
     "sha256": "c4cc4566bad69e89f41cfb8b586d2c9e3e0f3691f8cb06fce976b7b3f4d5811d",
     "code_sha256": "e9f0621674950782052037f7e14f41287d41de4ae3bf0b1413c63f211aa74f3f"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/__init__.py": {
-    "sha256": "e68e469abea04db4ff0f35d4d3e2fe01f85fe186fffb89e6b936570f5a78554c",
+    "sha256": "e48de542300d0417f2fb98d15d34c8713efd5261deef06696cfdf7106edf3596",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/adapters.py": {
@@ -147,8 +151,8 @@
     "code_sha256": "9c4b747f3cd155820b8759ef1303822bd2238d2d425b4d8551e160e3593621dc"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/features.py": {
-    "sha256": "15844a1d8800ce7235d0eb0975b16e4e2302a56e980a633cb69ff028e8b5e9e9",
-    "code_sha256": "796dd8b1a36be7204b54c117e4b40b3fba84babf2ce50a2f671d9e1df0f55bc5"
+    "sha256": "20cc52c90059f434078119b1bcc52c1c3599e6c437711b90d8613678fba0b9f0",
+    "code_sha256": "db9b38ed482dbd23e61af576c7d438b8c6fc2b72cb9f21f0b5ee3ee88cfed68a"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/inventory_run.py": {
     "sha256": "e89f0a7e4ef09fd9be612d69965546a15fe62ff05f415023220e54d7fc663c23",
@@ -163,8 +167,8 @@
     "code_sha256": "284adfb44f77efc4d73be65ba8c575fbfa9fc56bc5d23cf4c5ae63bda5844dab"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/pooling.py": {
-    "sha256": "c12cf71f40e7e9257738f17abfc27dfe8a3bc8b0d43a4e08ffc2aad7d7c397c0",
-    "code_sha256": "f4970e5dd69536fd74e76775e9462e42f19ec63bc5d497bd1a63d9db6bbcc6f3"
+    "sha256": "e8fb44471c3ca0b2fafd6b9996499e5a3ff8e0135f980b98e212558130d19a12",
+    "code_sha256": "039102646285ba39a7da8c19ca610fadc205157156a22b6383713083890e8eb3"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/recount.py": {
     "sha256": "fc0aa9792185dedb8c727ddda6ae9c952f03d051dd0cc2cfec980d43f8a5b431",
@@ -179,8 +183,8 @@
     "code_sha256": "d1a3f3d6fccad518c38e97f521088cc7e82969619d48cc99f8e95f455fed5598"
    },
    "src/continuum_swr_replay/analysis/shared_statistics.py": {
-    "sha256": "37602fc9313d70c87ceea3fddeb6965d15542fc653a7739d2c7172705bd35bd8",
-    "code_sha256": "55a34fc5f5bdc43ef6fc495674ebf3556685947520171d09e1a3da9336c8ec0a"
+    "sha256": "20f0c56ada173d49c9f260262933a8aab4ce513612fe638ea301331bb953cdca",
+    "code_sha256": "6ef4f150dc357ffd8f4204afbb0a36e195eac047c8bb48b5ef80214292519824"
    },
    "src/continuum_swr_replay/data_loaders/__init__.py": {
     "sha256": "5cab95c4ae3bdc8ed0ae23bd91ca9bb9d1457b81b46d07f7371364d003198f50",
@@ -199,8 +203,8 @@
     "code_sha256": "cb06d737023792f37b127ea39a85bffff50c44cce96b949da2942142b6846157"
    },
    "src/continuum_swr_replay/data_loaders/spikes.py": {
-    "sha256": "ddaeebc8b774802a821d06225852807e0343f02ce378992d949af07606e48775",
-    "code_sha256": "986bd4f318dd67697d3171887a9c3f6941b1cc7906739187442a4bdfc850ba1b"
+    "sha256": "b31afcb682e50cb2e16db7b3c3a4fd7e73d506f356aeb8b38a04c3f06a7d57ad",
+    "code_sha256": "8f8a7e7061bcbeb36adeb33da34fb7654e832a1b90a23dfebcb5feb37d42e032"
    },
    "src/continuum_swr_replay/data_loaders/utils.py": {
     "sha256": "bf1bfcb41112287744d277c89721ae63a77f6bfaf8fa036d2a42654505eb276c",
@@ -223,8 +227,8 @@
     "code_sha256": "5f3a0b6abae3a4485f627c2dfa93c421910ab8676f9a1897961b0ad612fab885"
    },
    "src/continuum_swr_replay/intervals.py": {
-    "sha256": "f5eb5da08d73a34f49b3a52b125828d395de5801202c8e2beb2aeae6ee45cb45",
-    "code_sha256": "008ae781fc76ac2616d912acbceefd66b9502fd577359f29f09dc07cd23d7176"
+    "sha256": "c44a46126b01ea671b3d106913abd2b1f77fe56770f1fb65203aa94090df9bbc",
+    "code_sha256": "dc09f2d01252e565aa406d4865b32c75e54669e28ac9b7577f7db6bbc22f814c"
    },
    "src/continuum_swr_replay/parameters.py": {
     "sha256": "9749c8994749ad09ad1faaada4ae676c4f0a6353e2ce3628a22b0009d49e519e",
@@ -239,16 +243,16 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "5993c9115a42eb68852f3fe279aae7ab3119391c5f540554c8823779c49bb6a5",
-    "code_sha256": "c7716a28226699b2539fd24eba997b4dc08d181903aee9b116e26434a06bd398"
+    "sha256": "2802477bc3388e8d1a5ed8ff3351fbeaf5f4f70ec8d2056143c387d1e6344804",
+    "code_sha256": "00363c0476cf68588308ca15bc48e078a4d38e8fc0bccb129df2b241ecb97270"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "62998d8594b22fa3b99f0acfe3a3ea797ce73213fc4521c9e90fd950fa5c10b2",
-    "code_sha256": "add3737cc0a74d127440e69cedb6fefd1dddd70a57b4edabd042d3e45394c861"
+    "sha256": "469680a065cf65306e80b31ffacb95cff7847ba656a91c4cb42fbb76171b3c32",
+    "code_sha256": "8342044e9d02eec6d7d13ae04109b0acc650d7cfa504ea2a87fccea1e8d8bfe3"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "ac38ca536c16eb9686c6868837e6144ccec635914f0f54369180778954409625",
-    "code_sha256": "15e0000464a3e8ec2777f1defde055d09e7ca6dbae1f120cac0a60dec7dad166"
+    "sha256": "ce20c399c0f12c2d0f0d0e0d67bc0b63c8ded247c4b31212e1621af9b48d2590",
+    "code_sha256": "71c87b8e9dfcd841b366dd795b935cd3cd47eb16cde2c3755123f14f3297127a"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
@@ -304,11 +308,11 @@
   },
   {
    "path": "Processed-Data/event_property_bootstrap/intervals.csv",
-   "sha256": "d7b8c27a1cca74868b71ba2b87ac4baf302aaeb5c1b45cc7e790354cf492d6fd"
+   "sha256": "4cb5c2db9174519fcac9a17d632255d5cca9a4e5ef003342d4cc340ff2cc5335"
   },
   {
    "path": "Processed-Data/event_property_bootstrap/manifest.json",
-   "sha256": "ef0ddfadea03733f048567516e4fc5a2d59a75d6e416d10c528c9c4394fc634f"
+   "sha256": "e9d8f238865e0f98cca06235e2152e3c590be9efd979bf816511ace6e1fc768f"
   },
   {
    "path": "Processed-Data/brain_state_reference/reference.parquet",
@@ -376,7 +380,7 @@
   },
   {
    "path": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
-   "sha256": "5f2ac0961a93ef25c5fdb89f503729ed3ac16098760d13e36b682dc50b73bc71"
+   "sha256": "20b6f9a8f78b9730548c6b6a65c424f9eaeb26ae56b43485144040b2c9617297"
   },
   {
    "path": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr.provenance.json",
@@ -385,6 +389,18 @@
   {
    "path": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "sha256": "b0fd39ceeee50b3f1332b411528c442e5b0eed82b9027aa8ca549dc949276872"
+  },
+  {
+   "path": "Processed-Data/decoder_quality/sessions.parquet",
+   "sha256": "c6821595f171ffc314c1aaa49d0bfc17e4a59bfe7f4eb004529fe7e178fe1cc5"
+  },
+  {
+   "path": "Processed-Data/decoder_quality/calibration.parquet",
+   "sha256": "db9609ca6b1c048eb3d05a7c1a81ad6f7d1091d042c2c7bba43d22ce39555ffb"
+  },
+  {
+   "path": "Processed-Data/decoder_quality/manifest.json",
+   "sha256": "4587fe6b978c79a2a3578a3a8f740b5a83e3d7a3119384e066e50959c5472862"
   },
   {
    "path": "Processed-Data/ripple_class_structure/distribution.csv",
@@ -482,7 +498,7 @@
    "pending": null
   },
   "arms_difference_high": {
-   "value": 2.0,
+   "value": 3.3245020427632057,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -498,11 +514,11 @@
    "pending": null
   },
   "arms_difference_low": {
-   "value": 1.0,
+   "value": 0.6754979572367943,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of arms the decoded position visits",
+   "description": "lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median number of arms the decoded position visits",
    "questions": [
     "2d.3"
    ],
@@ -530,11 +546,11 @@
    "pending": null
   },
   "arms_matched_difference_high": {
-   "value": 1.2698676996489435,
+   "value": 1.3550759692808738,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "description": "upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals)",
    "questions": [
     "2d.3"
    ],
@@ -546,11 +562,11 @@
    "pending": null
   },
   "arms_matched_difference_low": {
-   "value": 0.8245068814593088,
+   "value": 0.6058358245744284,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
+   "description": "lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "questions": [
     "2d.3"
    ],
@@ -672,6 +688,166 @@
    ],
    "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
+   "pending": null
+  },
+  "calibration_error_bin_eight": {
+   "value": 4.994193495406255,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.75 (bin 8 of 10), outside excluded time, sessions pooled",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "calibration_values",
+   "pending": null
+  },
+  "calibration_error_bin_five": {
+   "value": 6.833637531513142,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.45 (bin 5 of 10), outside excluded time, sessions pooled",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "calibration_values",
+   "pending": null
+  },
+  "calibration_error_bin_four": {
+   "value": 7.20197554292726,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.35 (bin 4 of 10), outside excluded time, sessions pooled",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "calibration_values",
+   "pending": null
+  },
+  "calibration_error_bin_nine": {
+   "value": 4.93249997505852,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.85 (bin 9 of 10), outside excluded time, sessions pooled",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "calibration_values",
+   "pending": null
+  },
+  "calibration_error_bin_one": {
+   "value": 13.706308356734084,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.05 (bin 1 of 10), outside excluded time, sessions pooled",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "calibration_values",
+   "pending": null
+  },
+  "calibration_error_bin_seven": {
+   "value": 5.808237455734448,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.65 (bin 7 of 10), outside excluded time, sessions pooled",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "calibration_values",
+   "pending": null
+  },
+  "calibration_error_bin_six": {
+   "value": 6.191724945610218,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.55 (bin 6 of 10), outside excluded time, sessions pooled",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "calibration_values",
+   "pending": null
+  },
+  "calibration_error_bin_ten": {
+   "value": 2.983956675998255,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.95 (bin 10 of 10), outside excluded time, sessions pooled",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "calibration_values",
+   "pending": null
+  },
+  "calibration_error_bin_three": {
+   "value": 7.479764979385773,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.25 (bin 3 of 10), outside excluded time, sessions pooled",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "calibration_values",
+   "pending": null
+  },
+  "calibration_error_bin_two": {
+   "value": 8.756613928200732,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.15 (bin 2 of 10), outside excluded time, sessions pooled",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "calibration_values",
    "pending": null
   },
   "carey_events": {
@@ -842,6 +1018,38 @@
    "function": "other_detector_values",
    "pending": null
   },
+  "decoding_error_median_cm": {
+   "value": 2.985348135409196,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median over sessions of each session's median Local-state decoding error (the track-graph distance from the decoded to the actual position, over time bins with Local probability above 0.5 outside excluded time), sessions pooled",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "decoding_error_values",
+   "pending": null
+  },
+  "decoding_error_sessions": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "sessions with a Local-state decoding error",
+   "questions": [
+    "2a.1"
+   ],
+   "figures": [
+    "2e"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "decoding_error_values",
+   "pending": null
+  },
   "duration_animals_in_direction": {
    "value": 5,
    "kind": "count",
@@ -857,7 +1065,7 @@
    "pending": null
   },
   "duration_difference_high": {
-   "value": 53.99990081787109,
+   "value": 58.10399801359445,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "ms",
@@ -871,11 +1079,11 @@
    "pending": null
   },
   "duration_difference_low": {
-   "value": 38.00010681152344,
+   "value": 33.89600961580008,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "ms",
-   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median event duration",
+   "description": "lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median event duration",
    "questions": [
     "2d.6"
    ],
@@ -997,7 +1205,7 @@
    "pending": null
   },
   "extent_difference_high": {
-   "value": 57.90744474644557,
+   "value": 64.85858269743765,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -1013,11 +1221,11 @@
    "pending": null
   },
   "extent_difference_low": {
-   "value": 29.21378284532141,
+   "value": 18.40639652906549,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median spatial extent of the decoded content",
+   "description": "lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median spatial extent of the decoded content",
    "questions": [
     "2d.3"
    ],
@@ -1045,11 +1253,11 @@
    "pending": null
   },
   "extent_matched_difference_high": {
-   "value": 44.760822739911575,
+   "value": 52.00482195425528,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "description": "upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals)",
    "questions": [
     "2d.3"
    ],
@@ -1061,11 +1269,11 @@
    "pending": null
   },
   "extent_matched_difference_low": {
-   "value": 23.83648534554771,
+   "value": 17.134191908050543,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
+   "description": "lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "questions": [
     "2d.3"
    ],
@@ -1325,11 +1533,11 @@
    "pending": null
   },
   "heldout_non_swr_per_spike_ci_high": {
-   "value": 0.2429086221203311,
+   "value": 0.2509595244340714,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
-   "description": "upper bound of its 95 % t-interval over animals",
+   "description": "upper bound of that interval",
    "questions": [
     "2c.3"
    ],
@@ -1341,11 +1549,11 @@
    "pending": null
   },
   "heldout_non_swr_per_spike_ci_low": {
-   "value": 0.1608383427290622,
+   "value": 0.1527874404153219,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
-   "description": "lower bound of its 95 % t-interval over animals",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
    "questions": [
     "2c.3"
    ],
@@ -1405,11 +1613,11 @@
    "pending": null
   },
   "heldout_swr_per_spike_ci_high": {
-   "value": 0.7412883605773628,
+   "value": 0.7482813694377988,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
-   "description": "upper bound of its 95 % t-interval over animals",
+   "description": "upper bound of that interval",
    "questions": [
     "2c.3"
    ],
@@ -1421,11 +1629,11 @@
    "pending": null
   },
   "heldout_swr_per_spike_ci_low": {
-   "value": 0.4499811772933648,
+   "value": 0.4429881684329289,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
-   "description": "lower bound of its 95 % t-interval over animals",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
    "questions": [
     "2c.3"
    ],
@@ -1451,7 +1659,7 @@
    "pending": null
   },
   "hpd_difference_high": {
-   "value": 52.72304263477471,
+   "value": 81.56910632958987,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -1465,11 +1673,11 @@
    "pending": null
   },
   "hpd_difference_low": {
-   "value": -5.273391788759729,
+   "value": -10.4318697235274,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median highest-density-region coverage",
+   "description": "lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median highest-density-region coverage",
    "questions": [
     "2d.5"
    ],
@@ -1493,11 +1701,11 @@
    "pending": null
   },
   "hpd_matched_difference_high": {
-   "value": 56.66378995969362,
+   "value": 85.97436288861324,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "description": "upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals)",
    "questions": [
     "2d.5"
    ],
@@ -1507,11 +1715,11 @@
    "pending": null
   },
   "hpd_matched_difference_low": {
-   "value": -1.28299087858383,
+   "value": -9.847013357588525,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
+   "description": "lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "questions": [
     "2d.5"
    ],
@@ -1973,7 +2181,7 @@
    "pending": null
   },
   "max_step_difference_high": {
-   "value": 21.79726445920433,
+   "value": 23.52894180137654,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -1989,11 +2197,11 @@
    "pending": null
   },
   "max_step_difference_low": {
-   "value": 7.833488993673558,
+   "value": 0.0059948885866276,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median largest step of the decoded position",
+   "description": "lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median largest step of the decoded position",
    "questions": [
     "2d.4"
    ],
@@ -2021,11 +2229,11 @@
    "pending": null
   },
   "max_step_matched_difference_high": {
-   "value": 34.14679461143871,
+   "value": 40.64335826717195,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "description": "upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals)",
    "questions": [
     "2d.4"
    ],
@@ -2037,11 +2245,11 @@
    "pending": null
   },
   "max_step_matched_difference_low": {
-   "value": 13.833201479839571,
+   "value": 6.539190459981121,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
+   "description": "lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "questions": [
     "2d.4"
    ],
@@ -2379,7 +2587,7 @@
    "pending": null
   },
   "multimodal_difference_high": {
-   "value": 0.1315913604766633,
+   "value": 0.1889821560087139,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -2393,11 +2601,11 @@
    "pending": null
   },
   "multimodal_difference_low": {
-   "value": 0.0125233243767726,
+   "value": -0.0223154893420472,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median multimodal fraction of the posterior",
+   "description": "lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median multimodal fraction of the posterior",
    "questions": [
     "2d.5"
    ],
@@ -2421,11 +2629,11 @@
    "pending": null
   },
   "multimodal_matched_difference_high": {
-   "value": 0.1183681468594172,
+   "value": 0.1676633916848644,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "description": "upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals)",
    "questions": [
     "2d.5"
    ],
@@ -2435,11 +2643,11 @@
    "pending": null
   },
   "multimodal_matched_difference_low": {
-   "value": 0.0050288679715136,
+   "value": -0.0239861352888575,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
+   "description": "lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "questions": [
     "2d.5"
    ],
@@ -3259,7 +3467,7 @@
    "pending": null
   },
   "pause_difference_high": {
-   "value": -0.0588235294117647,
+   "value": -0.0472019735822844,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -3275,11 +3483,11 @@
    "pending": null
   },
   "pause_difference_low": {
-   "value": -0.0898890449438202,
+   "value": -0.0977255626495995,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median pause fraction",
+   "description": "lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median pause fraction",
    "questions": [
     "2d.4"
    ],
@@ -3307,11 +3515,11 @@
    "pending": null
   },
   "pause_matched_difference_high": {
-   "value": -0.0340058821311469,
+   "value": -0.0118741005961235,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "description": "upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals)",
    "questions": [
     "2d.4"
    ],
@@ -3323,11 +3531,11 @@
    "pending": null
   },
   "pause_matched_difference_low": {
-   "value": -0.0791962528522657,
+   "value": -0.0874478250240186,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
+   "description": "lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "questions": [
     "2d.4"
    ],
@@ -3385,7 +3593,7 @@
    "pending": null
   },
   "peak_difference_high": {
-   "value": 0.0095100561516376,
+   "value": 0.0314217229498237,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -3399,11 +3607,11 @@
    "pending": null
   },
   "peak_difference_low": {
-   "value": -0.1170766410238823,
+   "value": -0.1871832419737737,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median posterior peak (mean over the event)",
+   "description": "lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median posterior peak (mean over the event)",
    "questions": [
     "2d.5"
    ],
@@ -3427,11 +3635,11 @@
    "pending": null
   },
   "peak_matched_difference_high": {
-   "value": -0.0324069123152115,
+   "value": -0.0084196871805459,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "description": "upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals)",
    "questions": [
     "2d.5"
    ],
@@ -3441,11 +3649,11 @@
    "pending": null
   },
   "peak_matched_difference_low": {
-   "value": -0.1271936188070005,
+   "value": -0.1742725312530764,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
+   "description": "lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "questions": [
     "2d.5"
    ],
@@ -3515,7 +3723,7 @@
    "pending": null
   },
   "reversals_difference_high": {
-   "value": 3.0,
+   "value": 4.491660846003976,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -3531,11 +3739,11 @@
    "pending": null
   },
   "reversals_difference_low": {
-   "value": 2.0,
+   "value": 1.508339153996024,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of direction reversals",
+   "description": "lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median number of direction reversals",
    "questions": [
     "2d.4"
    ],
@@ -3563,11 +3771,11 @@
    "pending": null
   },
   "reversals_matched_difference_high": {
-   "value": 2.302368700475361,
+   "value": 2.8527751919521984,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "description": "upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals)",
    "questions": [
     "2d.4"
    ],
@@ -3579,11 +3787,11 @@
    "pending": null
   },
   "reversals_matched_difference_low": {
-   "value": 0.9397167922189464,
+   "value": 0.4973404340801772,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
+   "description": "lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "questions": [
     "2d.4"
    ],
@@ -3989,7 +4197,7 @@
    "pending": null
   },
   "speed_difference_high": {
-   "value": 230.5999917143936,
+   "value": 266.06337585879686,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm/s",
@@ -4005,11 +4213,11 @@
    "pending": null
   },
   "speed_difference_low": {
-   "value": 112.24525279329671,
+   "value": 77.54373064145346,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm/s",
-   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median replay speed (median over the event)",
+   "description": "lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median replay speed (median over the event)",
    "questions": [
     "2d.2"
    ],
@@ -4037,11 +4245,11 @@
    "pending": null
   },
   "speed_matched_difference_high": {
-   "value": 249.50519414864655,
+   "value": 299.1874879552468,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm/s",
-   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "description": "upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals)",
    "questions": [
     "2d.2"
    ],
@@ -4053,11 +4261,11 @@
    "pending": null
   },
   "speed_matched_difference_low": {
-   "value": 107.15692646063094,
+   "value": 61.97815466203076,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm/s",
-   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
+   "description": "lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "questions": [
     "2d.2"
    ],
@@ -4117,7 +4325,7 @@
    "pending": null
   },
   "start_distance_difference_high": {
-   "value": 16.1224583883887,
+   "value": 27.716454261456047,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -4133,11 +4341,11 @@
    "pending": null
   },
   "start_distance_difference_low": {
-   "value": -11.127290151233415,
+   "value": -14.8072373573475,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position)",
+   "description": "lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position)",
    "questions": [
     "2d.1"
    ],
@@ -4165,11 +4373,11 @@
    "pending": null
   },
   "start_distance_matched_difference_high": {
-   "value": 4.059850869845084,
+   "value": 12.77740359083177,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "description": "upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals)",
    "questions": [
     "2d.1"
    ],
@@ -4181,11 +4389,11 @@
    "pending": null
   },
   "start_distance_matched_difference_low": {
-   "value": -28.87617831428696,
+   "value": -39.327710750780994,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
+   "description": "lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "questions": [
     "2d.1"
    ],
@@ -4242,6 +4450,134 @@
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
+   "pending": null
+  },
+  "state_fraction_immobile_continuous": {
+   "value": 0.060076020658016205,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "median over sessions of each session's mean Non-Local_Continuous_prob over its bins slower than 4 cm/s outside excluded time, sessions pooled",
+   "questions": [
+    "2a.6"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "state_fraction_values",
+   "pending": null
+  },
+  "state_fraction_immobile_fragmented": {
+   "value": 0.009040279313921928,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "median over sessions of each session's mean Non-Local_Fragmented_prob over its bins slower than 4 cm/s outside excluded time, sessions pooled",
+   "questions": [
+    "2a.6"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "state_fraction_values",
+   "pending": null
+  },
+  "state_fraction_immobile_local": {
+   "value": 0.7018222212791443,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "median over sessions of each session's mean Local_prob over its bins slower than 4 cm/s outside excluded time, sessions pooled",
+   "questions": [
+    "2a.6"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "state_fraction_values",
+   "pending": null
+  },
+  "state_fraction_immobile_no_spike": {
+   "value": 0.2286837100982666,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "median over sessions of each session's mean No-Spike_prob over its bins slower than 4 cm/s outside excluded time, sessions pooled",
+   "questions": [
+    "2a.6"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "state_fraction_values",
+   "pending": null
+  },
+  "state_fraction_moving_continuous": {
+   "value": 0.19730475544929504,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "median over sessions of each session's mean Non-Local_Continuous_prob over its bins faster than 4 cm/s outside excluded time, sessions pooled",
+   "questions": [
+    "2a.6"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "state_fraction_values",
+   "pending": null
+  },
+  "state_fraction_moving_fragmented": {
+   "value": 0.002371437498368323,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "median over sessions of each session's mean Non-Local_Fragmented_prob over its bins faster than 4 cm/s outside excluded time, sessions pooled",
+   "questions": [
+    "2a.6"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "state_fraction_values",
+   "pending": null
+  },
+  "state_fraction_moving_local": {
+   "value": 0.7818551361560822,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "median over sessions of each session's mean Local_prob over its bins faster than 4 cm/s outside excluded time, sessions pooled",
+   "questions": [
+    "2a.6"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "state_fraction_values",
+   "pending": null
+  },
+  "state_fraction_moving_no_spike": {
+   "value": 0.017432913184165955,
+   "kind": "fraction",
+   "style": "pct1",
+   "unit": "",
+   "description": "median over sessions of each session's mean No-Spike_prob over its bins faster than 4 cm/s outside excluded time, sessions pooled",
+   "questions": [
+    "2a.6"
+   ],
+   "figures": [
+    "decoder_validation"
+   ],
+   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "function": "state_fraction_values",
    "pending": null
   },
   "step_evidence_criterion_animals": {
@@ -4305,6 +4641,22 @@
    "figures": [],
    "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_step_values",
+   "pending": null
+  },
+  "swr_contained_fraction": {
+   "value": 0.2119193921374298,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of immobile non-local events lying inside an SWR, pooled over animals",
+   "questions": [
+    "2b.2"
+   ],
+   "figures": [
+    "2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "event_cohort_values",
    "pending": null
   },
   "swr_content_at_well_fraction": {
@@ -4406,6 +4758,22 @@
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
+   "pending": null
+  },
+  "swr_partial_fraction": {
+   "value": 0.22020482325735052,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of immobile non-local events partly overlapping an SWR, pooled over animals",
+   "questions": [
+    "2b.2"
+   ],
+   "figures": [
+    "2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "event_cohort_values",
    "pending": null
   },
   "swr_remote_animals_above_baseline": {

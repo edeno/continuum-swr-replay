@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "cb5c16baa03a",
+ "commit": "c123684d9a61",
  "code": {
-  "head": "cb5c16baa03a97317b689ab84946f8bfbec6a1cc",
+  "head": "c123684d9a6153cdc7d148c0ca9dd01ced092a89",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -23,7 +23,7 @@
     "code_sha256": "f61526fd60590ac016a72fa7fc151d66f027c51433337b022efa558c1684c181"
    },
    "src/continuum_swr_replay/analysis/constants.py": {
-    "sha256": "b2c072beab1fd63b91840662d5c679a602ff04ca38b7ff592be9589f2893b9ca",
+    "sha256": "4011ea8a6431cb84fd444504f56a63cb6a464084fa8bf821e86e011053f4a9dc",
     "code_sha256": "017e87339e0c9e3e05841e649c277c6deab7ae4509a0660f2f0720de061caebd"
    },
    "src/continuum_swr_replay/analysis/events/__init__.py": {
@@ -43,8 +43,8 @@
     "code_sha256": "b28f2241802c703d90872efad704ea57dbb801032612667db5a8794cac6914f5"
    },
    "src/continuum_swr_replay/analysis/events/nonlocal_detection.py": {
-    "sha256": "68bdd5e35eb1f616bda471846280deb3b0185643e695806dcc5cf26280dda24c",
-    "code_sha256": "5aa528c9a2f3461963007fca3df337b58894d3f525e624116457e87b48bb0466"
+    "sha256": "d834c392b2ad1caf9ef86b2c9c836edaa6c8e6e527c905778cb897bcdc016d00",
+    "code_sha256": "936ac52d7a1dd36c261c001df6bf5641325ab105e4638b39a1cdd4b455628b49"
    },
    "src/continuum_swr_replay/analysis/hippocampus/__init__.py": {
     "sha256": "8e0b5ee16dcc2d9ec74d4fa5cbc2bf7df353ffd4c99fa403eae9e745ce81d8b6",
@@ -63,8 +63,8 @@
     "code_sha256": "64153bb049ae2104814d1e37794d70cc8e4de5ea15a852e10a1d7bdac9dcc000"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/epoch.py": {
-    "sha256": "f2ef88afe1e8c53ea1668260a554d8d909c815639fbb8e649243f96cf05cfe05",
-    "code_sha256": "fbdf70f0c48b81886691bdfa12d66fdf623d55489c9487078165778f7a8b213d"
+    "sha256": "ccaea4d0a4ffcbcec3c1ead391ced4b4d8257f7ef2cbd22a9e4392d7c4588dbd",
+    "code_sha256": "a7b8e880bed8b2bc76b57e8e7187eaec6afdd90698e1aad708903d9b79b92f37"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/event_table.py": {
     "sha256": "7c0760f44d451e7c41dca3dba02e170140c68e8d65c449063bd729842107d1b3",
@@ -111,8 +111,8 @@
     "code_sha256": "5f3a0b6abae3a4485f627c2dfa93c421910ab8676f9a1897961b0ad612fab885"
    },
    "src/continuum_swr_replay/intervals.py": {
-    "sha256": "f5eb5da08d73a34f49b3a52b125828d395de5801202c8e2beb2aeae6ee45cb45",
-    "code_sha256": "008ae781fc76ac2616d912acbceefd66b9502fd577359f29f09dc07cd23d7176"
+    "sha256": "c44a46126b01ea671b3d106913abd2b1f77fe56770f1fb65203aa94090df9bbc",
+    "code_sha256": "dc09f2d01252e565aa406d4865b32c75e54669e28ac9b7577f7db6bbc22f814c"
    },
    "src/continuum_swr_replay/parameters.py": {
     "sha256": "9749c8994749ad09ad1faaada4ae676c4f0a6353e2ce3628a22b0009d49e519e",
@@ -127,12 +127,12 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "5993c9115a42eb68852f3fe279aae7ab3119391c5f540554c8823779c49bb6a5",
-    "code_sha256": "c7716a28226699b2539fd24eba997b4dc08d181903aee9b116e26434a06bd398"
+    "sha256": "2802477bc3388e8d1a5ed8ff3351fbeaf5f4f70ec8d2056143c387d1e6344804",
+    "code_sha256": "00363c0476cf68588308ca15bc48e078a4d38e8fc0bccb129df2b241ecb97270"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "ac38ca536c16eb9686c6868837e6144ccec635914f0f54369180778954409625",
-    "code_sha256": "15e0000464a3e8ec2777f1defde055d09e7ca6dbae1f120cac0a60dec7dad166"
+    "sha256": "ce20c399c0f12c2d0f0d0e0d67bc0b63c8ded247c4b31212e1621af9b48d2590",
+    "code_sha256": "71c87b8e9dfcd841b366dd795b935cd3cd47eb16cde2c3755123f14f3297127a"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
@@ -191,7 +191,7 @@
  "inputs": [
   {
    "path": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv",
-   "sha256": "b986673dc32336208125b037194ebf4a27e03fadcaa99f695b9e6a675461c2ce"
+   "sha256": "9f049948d9c22b2a6907fa7bbec904965518947d7448a7b24806bf2c9ce6098b"
   },
   {
    "path": "Processed-Data/_refresh_20261016/state_evidence/manifest.json",
@@ -782,11 +782,11 @@
    "pending": null
   },
   "heldout_continuous_immobile_ci_high": {
-   "value": 7.943073796271374,
+   "value": 8.087062107268261,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "upper bound of its 95 % t-interval over animals",
+   "description": "upper bound of that interval",
    "questions": [
     "2c.3"
    ],
@@ -796,11 +796,11 @@
    "pending": null
   },
   "heldout_continuous_immobile_ci_low": {
-   "value": 4.247954418351876,
+   "value": 4.10396610735499,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "lower bound of its 95 % t-interval over animals",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
    "questions": [
     "2c.3"
    ],
@@ -866,11 +866,11 @@
    "pending": null
   },
   "heldout_continuous_running_ci_high": {
-   "value": -0.5043086296534636,
+   "value": -0.4666309368514036,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "upper bound of its 95 % t-interval over animals",
+   "description": "upper bound of that interval",
    "questions": [
     "2c.3"
    ],
@@ -880,11 +880,11 @@
    "pending": null
   },
   "heldout_continuous_running_ci_low": {
-   "value": -1.8722314176728352,
+   "value": -1.909909110474895,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "lower bound of its 95 % t-interval over animals",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
    "questions": [
     "2c.3"
    ],
@@ -966,11 +966,11 @@
    "pending": null
   },
   "heldout_fragmented_immobile_mismatched_ci_high": {
-   "value": 0.7932949224004892,
+   "value": 0.8283229652639718,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "upper bound of its 95 % t-interval over animals",
+   "description": "upper bound of that interval",
    "questions": [
     "2c.3"
    ],
@@ -980,11 +980,11 @@
    "pending": null
   },
   "heldout_fragmented_immobile_mismatched_ci_low": {
-   "value": -0.5563469738444028,
+   "value": -0.5913750167078854,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "lower bound of its 95 % t-interval over animals",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
    "questions": [
     "2c.3"
    ],
@@ -1082,11 +1082,11 @@
    "pending": null
   },
   "heldout_local_immobile_ci_high": {
-   "value": 4.403325037649237,
+   "value": 4.435332580420715,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "upper bound of its 95 % t-interval over animals",
+   "description": "upper bound of that interval",
    "questions": [
     "2c.3"
    ],
@@ -1096,11 +1096,11 @@
    "pending": null
   },
   "heldout_local_immobile_ci_low": {
-   "value": 1.177210455146977,
+   "value": 1.1452029123754983,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "lower bound of its 95 % t-interval over animals",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
    "questions": [
     "2c.3"
    ],
@@ -1166,11 +1166,11 @@
    "pending": null
   },
   "heldout_no_spike_immobile_ci_high": {
-   "value": 9.696696599215915,
+   "value": 9.71180070946859,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "upper bound of its 95 % t-interval over animals",
+   "description": "upper bound of that interval",
    "questions": [
     "2c.3"
    ],
@@ -1180,11 +1180,11 @@
    "pending": null
   },
   "heldout_no_spike_immobile_ci_low": {
-   "value": 5.700477350013855,
+   "value": 5.68537323976118,
    "kind": "quantity",
    "style": "sig2",
    "unit": "nats per window",
-   "description": "lower bound of its 95 % t-interval over animals",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
    "questions": [
     "2c.3"
    ],

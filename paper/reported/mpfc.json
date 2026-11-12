@@ -3,9 +3,9 @@
  "summary": "mpfc",
  "title": "how mPFC units respond to the events",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "93ac9014034d",
+ "commit": "c123684d9a61",
  "code": {
-  "head": "93ac9014034d90822e5463d862a4e59a8acef48d",
+  "head": "c123684d9a6153cdc7d148c0ca9dd01ced092a89",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -35,11 +35,11 @@
     "code_sha256": "e91ca3884cbc5ca3151315663601318ed3307f44a304c39cf613a67c5544204c"
    },
    "src/continuum_swr_replay/analysis/behavior/coefficient_statistics.py": {
-    "sha256": "40c8278a04fd9cd206969faf91cf5d5b89a7a3a29d8b733bb987bbd9895476f4",
-    "code_sha256": "8188f6a0845c0566c138fbc758b8035535bbf4413df6796104a33270cff9c3c6"
+    "sha256": "36e193285c565819033c9c3f00c0b41e3fa421fdff2cb8dd2f4e7f5dd1d8dd1d",
+    "code_sha256": "dbb1e0c5a4ad3cb5aae7d00254da09421b99f29efebd4fefda13a1d8698b2b2a"
    },
    "src/continuum_swr_replay/analysis/behavior/cohort_audit.py": {
-    "sha256": "f7367fd1347b2e0e5c5a1599a5ad9d3cad84c0b80a9765b74697d53201484bb4",
+    "sha256": "2e578cffe52b55bcead4d65a76eaca23c5e3d396b36c79d0557991c6d5594a8f",
     "code_sha256": "9983cc5fe3af7db65ee1906b6d66aeaca98a1b1ed6d34b0a55e40ed9a1b36447"
    },
    "src/continuum_swr_replay/analysis/behavior/content_response.py": {
@@ -47,8 +47,8 @@
     "code_sha256": "d97816573cd8a53e780bb898a4e7e9b4d9ed9036a35edab19d1e4fa13e512b51"
    },
    "src/continuum_swr_replay/analysis/behavior/contrast_aggregation.py": {
-    "sha256": "866af3394c8eacca92bf2ef70f9e3128b8fe596b0daf8a033db2c4d110625c54",
-    "code_sha256": "cc2e13fd41bd7c37718238883310569835e2d5edc7c27e56f962b3555f6b4f78"
+    "sha256": "9471c8bca6065f0e8ce0dda1cf14a38434efaac88b02eda7de17aa68f2b88c35",
+    "code_sha256": "1fb1bbdcf3e95db13494b1bd1bba4e390cd298a01b826f029092d42b534989a8"
    },
    "src/continuum_swr_replay/analysis/behavior/covariates/__init__.py": {
     "sha256": "d48cc318bd253e8be59cca3723a0e46de38ec86a62036c383aec722ba49cc61c",
@@ -123,8 +123,8 @@
     "code_sha256": "19df57089d5e0aa5554cd68257c4bce9643d339a2ffb06118c1296914cfef317"
    },
    "src/continuum_swr_replay/analysis/behavior/model_specs.py": {
-    "sha256": "480a142497ee71f5fb794c64e1a7c260b26009f607c9a8c26ee59ce245a3bc7d",
-    "code_sha256": "3709b9ffee0ddb88da41f78b8f2101ebffa4eb5ea6fe470e93c1f83e30ded5c3"
+    "sha256": "9d78f37c61e911b044b0eb1a7c6f384d4dba3f2d8d304a0da6ca04c730f5fa5e",
+    "code_sha256": "f7f0fab4c23d4327cd04fb952ec881fa9870ed2cc4ba85603eeb0d243984b6c6"
    },
    "src/continuum_swr_replay/analysis/behavior/per_bin_design.py": {
     "sha256": "88d1ecada096e4ca46d26b6ff9b1ad5b7b9d03c7603f2a62d8c6b2efe43c62c0",
@@ -135,7 +135,7 @@
     "code_sha256": "d7e69ff9e5807718d122651ff3dceb4df754a77c9a104bc197d8d1c9904336c9"
    },
    "src/continuum_swr_replay/analysis/constants.py": {
-    "sha256": "b2c072beab1fd63b91840662d5c679a602ff04ca38b7ff592be9589f2893b9ca",
+    "sha256": "4011ea8a6431cb84fd444504f56a63cb6a464084fa8bf821e86e011053f4a9dc",
     "code_sha256": "017e87339e0c9e3e05841e649c277c6deab7ae4509a0660f2f0720de061caebd"
    },
    "src/continuum_swr_replay/analysis/events/__init__.py": {
@@ -143,8 +143,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/events/analysed_time.py": {
-    "sha256": "a73d52b699fe29fb25fb186eafd7d551707982d26c9a3b9be2b40eee16264e14",
-    "code_sha256": "06142fc489f33df4121c0aff2970afba56b1b3c09ee20397e8973127072361a6"
+    "sha256": "3f958a0691bc312205d5cf3db289923b3f50d6078ad725f0c5ed35a3a45753ed",
+    "code_sha256": "f43cefc1fcb6c35ada94eaac780bed0ce99d2ac09ca636b5df2bf12952041fd6"
    },
    "src/continuum_swr_replay/analysis/events/artifact_intervals.py": {
     "sha256": "a9fb2c62382f4b52e29329017892fd6afd17c25a1330551afa730a860e5292b6",
@@ -175,8 +175,8 @@
     "code_sha256": "e67897b004c1e389f588c56918a5b2f483977621d069938417960ca3e57b8c50"
    },
    "src/continuum_swr_replay/analysis/pfc/__init__.py": {
-    "sha256": "4b24b48459358f6a7c76fdf0d0ac7891a234048ea8e56fefc8955bcdb664e8f3",
-    "code_sha256": "eeb1796c9a4f4fd64d96188bf6b804c49ff58cdd3c3714eead754e63cfd3e963"
+    "sha256": "28a7847aca524a4ed4c2b34a44cd0265e9e0f28b68f342049d03fbacbf39531b",
+    "code_sha256": "d91a818bbbe49761172973b2a6d61c6ec5e6972629a0195b0b7a0c8830ad5ba1"
    },
    "src/continuum_swr_replay/analysis/pfc/batched_glm.py": {
     "sha256": "5aee85e2b6cc96bd227f60eb094ee1494271c9453ff6602c5848fadd260f6b39",
@@ -207,20 +207,20 @@
     "code_sha256": "5bc750cbf40d7d7c453ddada179139924459ea02b38ce681a01361993b60582a"
    },
    "src/continuum_swr_replay/analysis/pfc/modulation.py": {
-    "sha256": "47f72f91c6297048135562ea81df2f0653ebc3a928cddd80fc30a65947a50015",
-    "code_sha256": "8f15dfee06ee01e81c9934e796c41095b18576f3de083691b1681a81a2e3d14a"
+    "sha256": "cfb33ab19a8e831e83fb1544fab3bfa105f7f5f13d2ab5498115259e660552f5",
+    "code_sha256": "57057ef94fb1c383ca50a906c1bb20998a20eacdcd213d49ad25ce6425b44516"
    },
    "src/continuum_swr_replay/analysis/pfc/population_statistics.py": {
     "sha256": "e65b2f30be01faf392430ff42b3e52119e1da66d664c05b23822768b09ba81e1",
     "code_sha256": "1110e0ac834ce24ea72a5397a7b45e911288a56b86cccf06ba6da4013abcf2ca"
    },
    "src/continuum_swr_replay/analysis/pfc/timing.py": {
-    "sha256": "10276c7bd02c6b1630a643e661474d75ccbabba1d39464f9b11ea2ac13173a82",
-    "code_sha256": "232f9d6f014abb29ee08acee674dba3a9bd82989f99fe2c95e29c5a5d7f3c21a"
+    "sha256": "f8854cc378f9c911d4155bdd736c8f492a734ac48dda0786638da20ef2e982f2",
+    "code_sha256": "7b67adb8bdc8557bb910eb0e07659b7f9335100551c070ff2ab49ecb1c3be0aa"
    },
    "src/continuum_swr_replay/analysis/shared_statistics.py": {
-    "sha256": "37602fc9313d70c87ceea3fddeb6965d15542fc653a7739d2c7172705bd35bd8",
-    "code_sha256": "55a34fc5f5bdc43ef6fc495674ebf3556685947520171d09e1a3da9336c8ec0a"
+    "sha256": "20f0c56ada173d49c9f260262933a8aab4ce513612fe638ea301331bb953cdca",
+    "code_sha256": "6ef4f150dc357ffd8f4204afbb0a36e195eac047c8bb48b5ef80214292519824"
    },
    "src/continuum_swr_replay/data_loaders/__init__.py": {
     "sha256": "5cab95c4ae3bdc8ed0ae23bd91ca9bb9d1457b81b46d07f7371364d003198f50",
@@ -251,8 +251,8 @@
     "code_sha256": "5f3a0b6abae3a4485f627c2dfa93c421910ab8676f9a1897961b0ad612fab885"
    },
    "src/continuum_swr_replay/intervals.py": {
-    "sha256": "f5eb5da08d73a34f49b3a52b125828d395de5801202c8e2beb2aeae6ee45cb45",
-    "code_sha256": "008ae781fc76ac2616d912acbceefd66b9502fd577359f29f09dc07cd23d7176"
+    "sha256": "c44a46126b01ea671b3d106913abd2b1f77fe56770f1fb65203aa94090df9bbc",
+    "code_sha256": "dc09f2d01252e565aa406d4865b32c75e54669e28ac9b7577f7db6bbc22f814c"
    },
    "src/continuum_swr_replay/parameters.py": {
     "sha256": "9749c8994749ad09ad1faaada4ae676c4f0a6353e2ce3628a22b0009d49e519e",
@@ -291,16 +291,16 @@
     "code_sha256": "00c57db7ad79deec94d516ff953652b10627ff601313ee0545c9ad41d664e110"
    },
    "src/continuum_swr_replay/reported/mpfc/swr_without_replay.py": {
-    "sha256": "5f03d47d192fe3801db42b4872f119c29be332b0d87f4234c7a6ce78b0241392",
-    "code_sha256": "eb433f24e02a7d84c3e9a9a4ffa23ecbf4c5b69ed961a7fcf76b1a0d87d223f3"
+    "sha256": "b0eb6dcce15e8df6808fbdafdf916aaeb6b4eebbaeea63feed16383a221cdab3",
+    "code_sha256": "a9df45a80aa067ce0975ec3c697e87edc14ddaeb298a382db85f017a5fdbb6ed"
    },
    "src/continuum_swr_replay/reported/mpfc/timing.py": {
-    "sha256": "88758656c76655da9b53e0dce1277d2f63c22f1495f55fc2d088121e6c32bfaa",
-    "code_sha256": "4eebaf058dd3e19442292f7923e917ea3360e57dbac2d80b0984f161557835e7"
+    "sha256": "6937bc3d0eac5022ddb453038d007891677f1b7ac60411031df4a47d64194c9d",
+    "code_sha256": "933102f093b2baf40e3a5243871d76350bac562c3a005797aed70d2a5df2aa7a"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "ac38ca536c16eb9686c6868837e6144ccec635914f0f54369180778954409625",
-    "code_sha256": "15e0000464a3e8ec2777f1defde055d09e7ca6dbae1f120cac0a60dec7dad166"
+    "sha256": "ce20c399c0f12c2d0f0d0e0d67bc0b63c8ded247c4b31212e1621af9b48d2590",
+    "code_sha256": "71c87b8e9dfcd841b366dd795b935cd3cd47eb16cde2c3755123f14f3297127a"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
@@ -4183,11 +4183,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_high_enhanced_all": {
-   "value": 156.04999999999995,
+   "value": 164.50464434711958,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
+   "description": "upper bound of the 95 % interval from nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (small-sample t correction over the animals) of the rise onset, clipped to the window of lags of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
    "questions": [
     "4.1"
    ],
@@ -4197,11 +4197,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_high_enhanced_min_events": {
-   "value": 66.04999999999995,
+   "value": 124.94949865166112,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
+   "description": "upper bound of the 95 % interval from nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (small-sample t correction over the animals) of the rise onset, clipped to the window of lags of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
    "questions": [
     "4.1"
    ],
@@ -4211,11 +4211,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_high_suppressed_all": {
-   "value": 52.0999999999999,
+   "value": 123.71757310829263,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
+   "description": "upper bound of the 95 % interval from nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (small-sample t correction over the animals) of the rise onset, clipped to the window of lags of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
    "questions": [
     "4.1"
    ],
@@ -4225,11 +4225,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_high_suppressed_min_events": {
-   "value": 68.0,
+   "value": 135.72155867429385,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
+   "description": "upper bound of the 95 % interval from nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (small-sample t correction over the animals) of the rise onset, clipped to the window of lags of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
    "questions": [
     "4.1"
    ],
@@ -4239,11 +4239,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_low_enhanced_all": {
-   "value": -194.0,
+   "value": -200.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
+   "description": "lower bound of the 95 % interval from nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (small-sample t correction over the animals) of the rise onset, clipped to the window of lags of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
    "questions": [
     "4.1"
    ],
@@ -4253,11 +4253,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_low_enhanced_min_events": {
-   "value": -196.0,
+   "value": -200.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
+   "description": "lower bound of the 95 % interval from nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (small-sample t correction over the animals) of the rise onset, clipped to the window of lags of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
    "questions": [
     "4.1"
    ],
@@ -4267,11 +4267,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_low_suppressed_all": {
-   "value": -130.0,
+   "value": -167.7175731082926,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
+   "description": "lower bound of the 95 % interval from nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (small-sample t correction over the animals) of the rise onset, clipped to the window of lags of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
    "questions": [
     "4.1"
    ],
@@ -4281,11 +4281,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_low_suppressed_min_events": {
-   "value": -144.0,
+   "value": -171.72155867429382,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
+   "description": "lower bound of the 95 % interval from nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (small-sample t correction over the animals) of the rise onset, clipped to the window of lags of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
    "questions": [
     "4.1"
    ],
@@ -6307,11 +6307,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_non_swr_replay_enhanced": {
-   "value": -11.950000000000045,
+   "value": 0.33206056287215374,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6321,11 +6321,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_non_swr_replay_suppressed": {
-   "value": -82.0,
+   "value": -100.81171081302536,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6335,11 +6335,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_swr_enhanced": {
-   "value": 20.0,
+   "value": 28.534130097576675,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6349,11 +6349,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_swr_replay_enhanced": {
-   "value": 20.0,
+   "value": 27.766907116013492,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6363,11 +6363,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_swr_replay_suppressed": {
-   "value": -70.0,
+   "value": -78.42300067099555,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6377,11 +6377,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_swr_suppressed": {
-   "value": -34.0,
+   "value": -21.64705916644316,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6391,11 +6391,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_low_non_swr_replay_enhanced": {
-   "value": -60.0,
+   "value": -76.33206056287214,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6409,7 +6409,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6419,11 +6419,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_low_swr_enhanced": {
-   "value": -54.0,
+   "value": -88.53413009757668,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6433,11 +6433,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_low_swr_replay_enhanced": {
-   "value": -46.05,
+   "value": -87.76690711601348,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6451,7 +6451,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6465,7 +6465,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6559,11 +6559,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_high_non_swr_replay_enhanced": {
-   "value": 104.0,
+   "value": 136.21952466070033,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6573,11 +6573,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_high_non_swr_replay_suppressed": {
-   "value": 48.0,
+   "value": 59.427143569206194,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6587,11 +6587,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_high_swr_enhanced": {
-   "value": 120.0,
+   "value": 136.91409195040606,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6601,11 +6601,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_high_swr_replay_enhanced": {
-   "value": 112.0,
+   "value": 121.00936933767723,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6615,11 +6615,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_high_swr_replay_suppressed": {
-   "value": 100.04999999999995,
+   "value": 97.78338917611228,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6629,11 +6629,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_high_swr_suppressed": {
-   "value": 94.0,
+   "value": 104.92925628542027,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6643,11 +6643,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_non_swr_replay_enhanced": {
-   "value": 44.0,
+   "value": 47.78047533929967,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6657,11 +6657,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_non_swr_replay_suppressed": {
-   "value": 14.0,
+   "value": 4.572856430793807,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6671,11 +6671,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_swr_enhanced": {
-   "value": 72.0,
+   "value": 55.08590804959396,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6685,11 +6685,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_swr_replay_enhanced": {
-   "value": 76.0,
+   "value": 62.99063066232277,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6699,11 +6699,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_swr_replay_suppressed": {
-   "value": 33.95000000000001,
+   "value": 10.216610823887724,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6713,11 +6713,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_swr_suppressed": {
-   "value": 44.0,
+   "value": 23.07074371457974,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6979,11 +6979,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_non_swr_replay_enhanced": {
-   "value": 2.0,
+   "value": 6.17251703063066,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -6993,11 +6993,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_non_swr_replay_suppressed": {
-   "value": -10.0,
+   "value": 7.841078991459867,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -7007,11 +7007,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_swr_enhanced": {
-   "value": 32.049999999999955,
+   "value": 42.984540234017096,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -7021,11 +7021,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_swr_replay_enhanced": {
-   "value": 28.0,
+   "value": 35.4073997815147,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -7035,11 +7035,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_swr_replay_suppressed": {
-   "value": -14.0,
+   "value": -4.66730184006809,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -7049,11 +7049,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_swr_suppressed": {
-   "value": -2.0,
+   "value": 5.676692451650412,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -7063,11 +7063,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_non_swr_replay_enhanced": {
-   "value": -52.04999999999999,
+   "value": -78.17251703063066,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -7077,11 +7077,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_non_swr_replay_suppressed": {
-   "value": -86.0,
+   "value": -99.84107899145985,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -7091,11 +7091,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_swr_enhanced": {
-   "value": -36.0,
+   "value": -70.98454023401709,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -7105,11 +7105,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_swr_replay_enhanced": {
-   "value": -38.0,
+   "value": -79.4073997815147,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -7119,11 +7119,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_swr_replay_suppressed": {
-   "value": -48.0,
+   "value": -59.33269815993191,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -7133,11 +7133,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_swr_suppressed": {
-   "value": -34.0,
+   "value": -41.67669245165041,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -7651,11 +7651,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_non_swr_replay_enhanced": {
-   "value": 0.4193288073578174,
+   "value": 0.4985516923784449,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7665,11 +7665,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_non_swr_replay_suppressed": {
-   "value": 0.35899482677603006,
+   "value": 0.3906350512812139,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7679,11 +7679,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_swr_enhanced": {
-   "value": 0.47991302535992897,
+   "value": 0.557378401086553,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7693,11 +7693,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_swr_replay_enhanced": {
-   "value": 0.5825809895307361,
+   "value": 0.6972077004484634,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7707,11 +7707,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_swr_replay_suppressed": {
-   "value": 0.412578142180528,
+   "value": 0.4376188348460173,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7721,11 +7721,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_swr_suppressed": {
-   "value": 0.40671787874816084,
+   "value": 0.45558295230400714,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7735,11 +7735,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_non_swr_replay_enhanced": {
-   "value": 0.2340997806015551,
+   "value": 0.206395791234104,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7749,11 +7749,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_non_swr_replay_suppressed": {
-   "value": 0.23503500199991967,
+   "value": 0.19742538437032633,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7763,11 +7763,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_swr_enhanced": {
-   "value": 0.25151159133439555,
+   "value": 0.21427596439670188,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7777,11 +7777,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_swr_replay_enhanced": {
-   "value": 0.36352904448952067,
+   "value": 0.3333691965014584,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7791,11 +7791,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_swr_replay_suppressed": {
-   "value": 0.296973603262195,
+   "value": 0.2530711347530203,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7805,11 +7805,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_swr_suppressed": {
-   "value": 0.1816750929863565,
+   "value": 0.08243084927916008,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7903,11 +7903,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_non_swr_replay_enhanced": {
-   "value": 0.4171731774268145,
+   "value": 0.47381527215881836,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7917,11 +7917,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_non_swr_replay_suppressed": {
-   "value": 0.6483364853484125,
+   "value": 0.7084440925806326,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7931,11 +7931,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_swr_enhanced": {
-   "value": 0.5331005071810903,
+   "value": 0.6136957154567696,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7945,11 +7945,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_swr_replay_enhanced": {
-   "value": 0.6306289805312761,
+   "value": 0.7538060435675158,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7959,11 +7959,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_swr_replay_suppressed": {
-   "value": 0.6739502985061508,
+   "value": 0.7256507909008575,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7973,11 +7973,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_swr_suppressed": {
-   "value": 0.6165224681706211,
+   "value": 0.66540662402171,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "upper bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -7987,11 +7987,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_non_swr_replay_enhanced": {
-   "value": 0.27731425316861047,
+   "value": 0.2499039606962119,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -8001,11 +8001,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_non_swr_replay_suppressed": {
-   "value": 0.4953593613086709,
+   "value": 0.4554780894283177,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -8015,11 +8015,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_swr_enhanced": {
-   "value": 0.3155476765124131,
+   "value": 0.2846551182954943,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -8029,11 +8029,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_swr_replay_enhanced": {
-   "value": 0.39596658795504214,
+   "value": 0.3699276725272771,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -8043,11 +8043,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_swr_replay_suppressed": {
-   "value": 0.5284591878735655,
+   "value": 0.5024518540203867,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -8057,11 +8057,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_swr_suppressed": {
-   "value": 0.440464129518021,
+   "value": 0.35806777635119363,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units), with a small-sample t correction over the animals",
    "questions": [
     "4.1"
    ],
@@ -8323,11 +8323,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_non_swr_replay_enhanced": {
-   "value": 63.0,
+   "value": 81.43668312598966,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -8337,11 +8337,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_non_swr_replay_suppressed": {
-   "value": 11.0,
+   "value": 51.03702738445532,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -8351,11 +8351,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_swr_enhanced": {
-   "value": 61.0,
+   "value": 86.4656172298588,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -8365,11 +8365,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_swr_replay_enhanced": {
-   "value": 47.049999999999955,
+   "value": 72.52763375931968,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -8379,11 +8379,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_swr_replay_suppressed": {
-   "value": 15.0,
+   "value": 106.1772735711434,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -8393,11 +8393,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_swr_suppressed": {
-   "value": 9.000000000000002,
+   "value": 41.18676869073451,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
+   "description": "upper bound of that interval, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -8407,11 +8407,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_non_swr_replay_enhanced": {
-   "value": -71.00000000000001,
+   "value": -139.43668312598967,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -8421,11 +8421,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_non_swr_replay_suppressed": {
-   "value": -59.04999999999999,
+   "value": -93.03702738445533,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -8435,11 +8435,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_swr_enhanced": {
-   "value": -25.0,
+   "value": -60.4656172298588,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -8449,11 +8449,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_swr_replay_enhanced": {
-   "value": -25.0,
+   "value": -62.52763375931968,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -8463,11 +8463,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_swr_replay_suppressed": {
-   "value": -167.05,
+   "value": -136.1772735711434,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
@@ -8477,11 +8477,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_swr_suppressed": {
-   "value": -27.0,
+   "value": -67.18676869073451,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
+   "description": "lower bound of its 95 % interval from 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0), with a small-sample t correction over the animals, clipped to the window of lags",
    "questions": [
     "4.1"
    ],
