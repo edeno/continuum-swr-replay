@@ -276,8 +276,10 @@ def animal_median_bootstrap(
         - ``n_animals``: the animals with one.
         - ``animal_medians``: each animal's median, a ``pd.Series`` indexed by
           animal in sorted order.
-        - ``animal_median``: the median over animals of those medians
-          (:func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`).
+        - ``animal_median``: the median over animals of those medians (the
+          ``animal_median`` of
+          :func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`);
+          NaN when no animal has a value.
         - ``percentiles``: the resampled statistic's ``percentiles``, a
           ``numpy.ndarray`` of shape ``(len(percentiles),)``; NaN when no
           animal has a value. With one animal every draw is that animal, so
@@ -297,9 +299,7 @@ def animal_median_bootstrap(
         "n_sessions": len(known),
         "n_animals": n_animals,
         "animal_medians": animal_medians,
-        "animal_median": session_median_statistics(known, known_animal)[
-            "animal_median"
-        ],
+        "animal_median": float(animal_medians.median()),
         "percentiles": np.asarray(spread, dtype=float),
     }
 
