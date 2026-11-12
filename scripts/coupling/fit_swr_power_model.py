@@ -47,11 +47,14 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import skew
 
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
+from continuum_swr_replay.analysis.hippocampus.class_or_continuum import (
+    SARLE_CUTOFF,
+    sarle_bimodality,
+)
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (
     coefficient_statistics,
 )
@@ -97,15 +100,6 @@ PREDICTORS = [
 POWER_FIT_COLUMNS = (*PREDICTORS, POWER_COL)
 POST_OUTCOME_GATE_RULE = "event_start_s >= outcome_known_time"
 FIT_SUPPORT_LABEL = "fit_cohort_all_rows"
-
-
-def _bimodality_coef(x: np.ndarray) -> float:
-    """Sarle's bimodality coefficient; > 0.555 suggests bimodal (uniform ref)."""
-    n = len(x)
-    g = skew(x)
-    k = (np.mean((x - x.mean()) ** 4) / x.var() ** 2) - 3.0  # excess kurtosis
-    denom = k + 3.0 * (n - 1) ** 2 / ((n - 2) * (n - 3))
-    return (g**2 + 1) / denom
 
 
 def _assemble() -> pd.DataFrame:
@@ -492,7 +486,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     print(
         "  pctiles 5/25/50/75/95:", np.round(np.percentile(m, [5, 25, 50, 75, 95]), 2)
     )
-    print(f"  Sarle bimodality coef = {_bimodality_coef(m):.3f}  (>0.555 => bimodal)")
+    print(
+        f"  Sarle bimodality coef = {sarle_bimodality(m):.3f}"
+        f"  (>{SARLE_CUTOFF:.3f} => bimodal)"
+    )
     for lab, sub in [("non-SWR events", df[~df.is_swr]), ("SWR events", df[df.is_swr])]:
         s = sub[POWER_COL]
         print(f"  {lab:16s} n={len(s):6d}  mean={s.mean():+.2f}  sd={s.std():.2f}")
