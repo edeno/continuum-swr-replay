@@ -96,6 +96,9 @@ from continuum_swr_replay.analysis.hippocampus.event_statistics import (
     compute_swr_overlap_class_counts,
     overlap_class_statistics,
 )
+from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
+    compute_triggered_average_curves,
+)
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_decode_files,
@@ -113,7 +116,6 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.visualization.figure_panels import (
-    compute_triggered_average_curves,
     plot_decoding_error_distribution,
     plot_event_example_stack,
     plot_event_timing_offsets,

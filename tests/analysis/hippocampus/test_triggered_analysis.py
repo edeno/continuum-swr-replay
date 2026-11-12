@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
+    compute_triggered_average_curves,
     get_signal_windows,
 )
 
@@ -408,3 +409,44 @@ class TestGetSignalWindows:
         time_values = result.coords["time"].values
         assert time_values[0] == pytest.approx(-0.2, abs=1e-6)
         assert time_values[-1] == pytest.approx(0.2, abs=1e-6)
+
+
+def test_triggered_average_curves_are_mean_and_sem_over_events_by_class():
+    """Mean and SEM over events of each class's windows, lag by lag."""
+    # 50 samples at 500 Hz. Events 1, 2 and 3 are one sample each (10, 25, 40);
+    # the signal is 1, 4 and 9 around them, so each window is one constant.
+    time = np.arange(50) / 500.0
+    labels = np.zeros(50, dtype=int)
+    labels[[10, 25, 40]] = [1, 2, 3]
+    signal = np.repeat([1.0, 4.0, 9.0], [18, 15, 17])
+    frame = pd.DataFrame(
+        {
+            "animal": "a",
+            "day": 1,
+            "epoch": "02_r1",
+            "non_local_event": labels,
+            "x": signal,
+        },
+        index=time,
+    )
+    event_types = {
+        "non_local_event_immobile_no_overlap_SWR_event": frame[
+            frame["non_local_event"].isin([1, 3])
+        ],
+        "non_local_event_immobile_overlap_SWR_event": frame[
+            frame["non_local_event"] == 2
+        ],
+    }
+
+    curves = compute_triggered_average_curves(
+        frame, event_types, ["x"], window_sec=0.004
+    )
+
+    curve = curves["x"]
+    np.testing.assert_allclose(curve["time"], [-0.002, 0.0, 0.002])
+    # Events 1 and 3: the mean of 1 and 9 is 5; the SEM, std(ddof=1)/sqrt(2), 4.
+    np.testing.assert_allclose(curve["no_overlap_mean"], [5.0, 5.0, 5.0])
+    np.testing.assert_allclose(curve["no_overlap_sem"], [4.0, 4.0, 4.0])
+    # Event 2 alone: its value, and no SEM from one event.
+    np.testing.assert_allclose(curve["overlap_mean"], [4.0, 4.0, 4.0])
+    assert np.isnan(curve["overlap_sem"]).all()

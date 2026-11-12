@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import sem
 
 from continuum_swr_replay.analysis.constants import (
     BINS_DURATION_MS,
@@ -31,9 +30,11 @@ from continuum_swr_replay.analysis.hippocampus import (
     compute_state_fraction_during_movement,
     get_event_durations_ms,
     get_event_start_end_times,
-    get_signal_windows,
 )
-from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D, SAMPLING_FREQUENCY
+from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
+    compute_triggered_average_curves,
+)
+from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
 from continuum_swr_replay.visualization.figure_utilities import (
     PANEL_SINGLE,
     get_figure_size,
@@ -108,92 +109,6 @@ def plot_event_duration_distribution(
             save_figure(fig, figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
             logging.info(f"Saved: {figure_name}")
         plt.close(fig)
-
-
-def compute_triggered_average_curves(
-    data_over_time: pd.DataFrame,
-    event_types: dict,
-    signals: list[str],
-    time_col: str = "start_time",
-    window_sec: float = 2.0,
-) -> dict:
-    """Reduce ``data_over_time`` to event-triggered mean/SEM curves.
-
-    Splits the work that :func:`plot_triggered_averages` used to do inline
-    into a small, cacheable product: for each signal, the time axis and the
-    across-event mean and SEM for non-SWR (no-overlap) vs SWR-coincident
-    (overlap) immobile non-local events. The returned dict is a few KB,
-    letting callers cache it instead of the multi-GB ``data_over_time``.
-
-    Parameters
-    ----------
-    data_over_time : pd.DataFrame
-        Aggregated per-timebin dataset.
-    event_types : dict
-        Output of :func:`get_event_types`.
-    signals : list of str
-        Signal columns to reduce, in order.
-    time_col : str
-        Alignment column ('start_time' or 'end_time').
-    window_sec : float
-        Half-window around each event, in seconds.
-
-    Returns
-    -------
-    dict
-        ``{signal: {"time", "no_overlap_mean", "no_overlap_sem",
-        "overlap_mean", "overlap_sem"}}`` with numpy-array values.
-
-    """
-    signal_types = list(signals)
-    no_overlap_times = get_event_start_end_times(
-        event_types["non_local_event_immobile_no_overlap_SWR_event"],
-        event_col="non_local_event",
-    )
-    overlap_times = get_event_start_end_times(
-        event_types["non_local_event_immobile_overlap_SWR_event"],
-        event_col="non_local_event",
-    )
-    windows_no = get_signal_windows(
-        data=data_over_time,
-        event_times=no_overlap_times,
-        signal_cols=signal_types,
-        time_col=time_col,
-        window_sec=window_sec,
-        sampling_frequency=SAMPLING_FREQUENCY,
-        event_id_col="non_local_event",
-    )
-    windows_ov = get_signal_windows(
-        data=data_over_time,
-        event_times=overlap_times,
-        signal_cols=signal_types,
-        time_col=time_col,
-        window_sec=window_sec,
-        sampling_frequency=SAMPLING_FREQUENCY,
-        event_id_col="non_local_event",
-    )
-    no_mean_all = windows_no.mean(dim="event")
-    ov_mean_all = windows_ov.mean(dim="event")
-
-    curves: dict = {}
-    for signal_type in signal_types:
-        no_mean = no_mean_all.sel(signal=signal_type)
-        curves[signal_type] = {
-            "time": no_mean["time"].values,
-            "no_overlap_mean": no_mean.values,
-            "no_overlap_sem": sem(
-                windows_no.sel(signal=signal_type).values,
-                axis=0,
-                nan_policy="omit",
-            ),
-            "overlap_mean": ov_mean_all.sel(signal=signal_type).values,
-            "overlap_sem": sem(
-                windows_ov.sel(signal=signal_type).values,
-                axis=0,
-                nan_policy="omit",
-            ),
-        }
-    return curves
 
 
 def plot_triggered_averages(
