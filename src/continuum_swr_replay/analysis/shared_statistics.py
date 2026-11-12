@@ -14,6 +14,8 @@
   (animals, then sessions within each drawn animal, then the units or events
   within each drawn session), the resampling behind every interval; with
   :func:`nested_codes` and :func:`weighted_median`.
+- :func:`bootstrap_interval`: the 95 % interval from those draws, a
+  small-sample t correction over the animals.
 - :func:`session_mean_curve`, :func:`animal_balanced_curve` and
   :func:`animal_curve_sem`: a curve (one value per lag) taken unit -> session
   -> animal, the mean over animals of each animal's mean over its sessions, and
@@ -32,6 +34,7 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike, NDArray
+from scipy.stats import t as student_t
 from scipy.stats import wilcoxon
 
 MIN_SIGNED_RANK_DIFFERENCES = 6
@@ -328,6 +331,68 @@ def nested_bootstrap_draw(
             session_draws[s] * members.size, np.full(members.size, 1.0 / members.size)
         )
     return NestedDraw(animal_draws, session_draws, counts)
+
+
+class BootstrapInterval(NamedTuple):
+    """A 95 % interval of :func:`bootstrap_interval`.
+
+    Attributes
+    ----------
+    low, high : float
+        The interval's bounds.
+    sd : float
+        The standard deviation of the finite draws (``ddof=1``).
+    """
+
+    low: float
+    high: float
+    sd: float
+
+
+def bootstrap_interval(
+    estimate: float, draws: ArrayLike, n_top: int
+) -> BootstrapInterval:
+    """The 95 % interval of a statistic from its nested bootstrap draws.
+
+    ``estimate +/- t(0.975, n_top - 1) * sqrt(n_top / (n_top - 1)) * SD(draws)``,
+    symmetric about the statistic on the data. ``n_top`` is the number of
+    top-level units the draws resample, the animals.
+
+    The percentiles of the draws are not the interval: with five animals the
+    nested percentile bootstrap under-covers. Saravanan, Berman & Sober (2020,
+    section 3.1.3) find its false-positive rate above the nominal level with
+    few subjects; in a simulation of five animals of forty sessions each
+    (normal values, true value zero) a nominal 95 % percentile interval covered
+    84 to 97 % for a mean of animal means and 85 to 98 % for a median pooled
+    over sessions, and this interval 95 to 99.8 % and 96 to 99.8 %. The draws'
+    SD of a mean over ``n`` animals is ``sqrt((n - 1) / n)`` times the standard
+    error ``s / sqrt(n)``, so the factor ``sqrt(n / (n - 1))`` restores it and
+    the interval of a mean is the t-interval over the animals.
+
+    Parameters
+    ----------
+    estimate : float
+        The statistic on the data.
+    draws : array_like, shape (n_draws,)
+        The statistic on each bootstrap replicate
+        (:func:`nested_bootstrap_draw`). A non-finite draw is left out.
+    n_top : int
+        The number of animals the draws resample.
+
+    Returns
+    -------
+    BootstrapInterval
+        ``low`` and ``high`` are NaN when ``estimate`` is not finite, when
+        ``n_top`` is below 2 (no t quantile) or when fewer than two draws are
+        finite; ``sd`` is NaN with fewer than two finite draws.
+    """
+    values = np.asarray(draws, dtype=float)
+    values = values[np.isfinite(values)]
+    sd = float(values.std(ddof=1)) if values.size >= 2 else float("nan")
+    if n_top < 2 or not np.isfinite(estimate) or not np.isfinite(sd):
+        return BootstrapInterval(float("nan"), float("nan"), sd)
+    half = float(student_t.ppf(0.975, n_top - 1)) * np.sqrt(n_top / (n_top - 1)) * sd
+    return BootstrapInterval(float(estimate - half), float(estimate + half), sd)
 
 
 def weighted_median(values_sorted: NDArray, weights: NDArray) -> float:

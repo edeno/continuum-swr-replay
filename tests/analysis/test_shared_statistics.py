@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from itertools import product
+
 import numpy as np
 import pandas as pd
 import pytest
+from scipy.stats import t as student_t
 
 from continuum_swr_replay.analysis import shared_statistics as stats
 
@@ -348,6 +351,55 @@ def test_the_draw_counts_each_level_consistently():
         # each draw of a session draws as many rows as it has
         per_session = np.bincount(session, weights=draw.rows, minlength=3)
         np.testing.assert_array_equal(per_session, draw.sessions * sizes)
+
+
+def test_bootstrap_interval_is_the_estimate_plus_minus_the_corrected_t_half_width():
+    # Draws 1, 2, 3, 4: SD (ddof=1) sqrt(5/3). Five animals: t(0.975, 4) is
+    # 2.7764451, the correction sqrt(5/4). The interval is centred on the
+    # estimate, not on the draws (mean 2.5).
+    interval = stats.bootstrap_interval(10.0, [1.0, 2.0, 3.0, 4.0], 5)
+    half = 2.7764451052 * np.sqrt(5 / 4) * np.sqrt(5 / 3)
+    assert interval.sd == pytest.approx(np.sqrt(5 / 3))
+    assert interval.low == pytest.approx(10.0 - half)
+    assert interval.high == pytest.approx(10.0 + half)
+    # Two animals: t(0.975, 1) is 12.7062047, the correction sqrt(2).
+    two = stats.bootstrap_interval(0.0, [1.0, 2.0, 3.0, 4.0], 2)
+    assert two.high == pytest.approx(12.7062047362 * np.sqrt(2) * np.sqrt(5 / 3))
+
+
+def test_bootstrap_interval_of_a_mean_over_five_animals_is_their_t_interval():
+    # Every one of the 5**5 resamples of five animal values, once each: the
+    # exact bootstrap distribution of their mean. Its SD (ddof=0) is
+    # sqrt(4/5) s/sqrt(5), so the interval is scipy's t-interval up to the
+    # ddof=1 factor sqrt(3125/3124) on the half-width.
+    values = np.array([0.3, -1.2, 2.5, 0.9, 4.0])
+    draws = np.array([values[list(i)].mean() for i in product(range(5), repeat=5)])
+    interval = stats.bootstrap_interval(values.mean(), draws, 5)
+    low, high = student_t.interval(
+        0.95, 4, loc=values.mean(), scale=values.std(ddof=1) / np.sqrt(5)
+    )
+    factor = np.sqrt(3125 / 3124)
+    assert interval.high - values.mean() == pytest.approx(
+        (high - values.mean()) * factor, rel=1e-12
+    )
+    assert values.mean() - interval.low == pytest.approx(
+        (values.mean() - low) * factor, rel=1e-12
+    )
+
+
+def test_bootstrap_interval_leaves_out_non_finite_draws_and_needs_two_animals():
+    with_nan = stats.bootstrap_interval(1.0, [1.0, NAN, 2.0, np.inf, 3.0, 4.0], 5)
+    assert with_nan == stats.bootstrap_interval(1.0, [1.0, 2.0, 3.0, 4.0], 5)
+    one_animal = stats.bootstrap_interval(1.0, [1.0, 2.0], 1)
+    assert np.isnan(one_animal.low) and np.isnan(one_animal.high)
+    assert one_animal.sd == pytest.approx(np.sqrt(0.5))
+    one_draw = stats.bootstrap_interval(1.0, [1.0, NAN], 5)
+    assert np.isnan(one_draw.low) and np.isnan(one_draw.sd)
+    no_estimate = stats.bootstrap_interval(NAN, [1.0, 2.0], 5)
+    assert np.isnan(no_estimate.low) and np.isnan(no_estimate.high)
+    # All draws equal: no width.
+    flat = stats.bootstrap_interval(2.0, [3.0, 3.0, 3.0], 5)
+    assert (flat.low, flat.high, flat.sd) == (2.0, 2.0, 0.0)
 
 
 def test_nested_codes_follow_the_sorted_labels_and_refuse_a_shared_session():
