@@ -82,9 +82,6 @@ from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import
 from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import (  # noqa: E402
     ESTIMATOR as DIRICHLET_MULTINOMIAL,
 )
-from continuum_swr_replay.analysis.behavior.content_response import (  # noqa: E402
-    renormalize_fraction_over_candidates,
-)
 
 # The cohort this comparison runs on is the shipped contrast runner's own at-well
 # cohort, assembled by the same helpers rather than re-derived here, so the two
@@ -110,6 +107,7 @@ from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
     LEAF_ONLY_N_CATEGORIES,
     MODEL_HIERARCHY,
     BASEc_SWR,
+    leaf_only_cohort,
     leaf_only_predictors,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
@@ -361,21 +359,20 @@ def _rung_frame(
 ) -> pd.DataFrame:
     """Restrict and rescale the cohort to what one rung is fit on.
 
-    A leaf-only rung drops the three trunk arms. The fraction response is a
-    share of the event's whole nine-arm mass and the conditional likelihood
-    weights an event by the total it carries, so it is renormalized to unit mass
-    over the six retained leaves; an event with no leaf mass renormalizes to NaN
-    and is then dropped from all three estimators by
-    :func:`_shared_session_rows`. The counts keep their timebin weighting, which
-    is also the ``L_e`` the Dirichlet-multinomial and the multinomial constant
-    are stated on.
+    A leaf-only rung drops the three trunk arms and renormalizes the fraction
+    response to unit mass over the six retained leaves
+    (:func:`~continuum_swr_replay.analysis.behavior.model_specs.leaf_only_cohort`);
+    an event with no leaf mass renormalizes to NaN and is then dropped from all
+    three estimators by :func:`_shared_session_rows`. The counts keep their
+    timebin weighting, which is also the ``L_e`` the Dirichlet-multinomial and
+    the multinomial constant are stated on.
     """
     if not rung.leaf_only:
         return cohort
-    frame = cohort[
-        pd.to_numeric(cohort["candidate_arm"], errors="coerce") < LEAF_ONLY_N_CATEGORIES
-    ]
-    return renormalize_fraction_over_candidates(frame, response_col=fraction_col)
+    frame, _renormalized = leaf_only_cohort(
+        cohort, response_col=fraction_col, response="fraction"
+    )
+    return frame
 
 
 def _shared_session_rows(
