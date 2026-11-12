@@ -66,9 +66,13 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa
     validate_dot_event_contract,
 )
 from continuum_swr_replay.analysis.hippocampus.event_statistics import (  # noqa: E402
+    AT_WELL_CM,
+    FAR_CM,
     OCCUPANCY_PLACES,
     OCCUPANCY_QUADRANTS,
+    arm_occupancy_shares,
     content_occupancy_shares,
+    quadrant_fractions,
 )
 from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS  # noqa: E402
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
@@ -95,8 +99,6 @@ from continuum_swr_replay.tables.io import read_table, table_exists  # noqa: E40
 # the data_over_time file the threshold names (``_80_``)
 THRESHOLD_PERCENT = non_local_threshold_percent(DEFAULT_NON_LOCAL_THRESHOLD)
 IMMOBILITY_CM_PER_S = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-FAR_CM = 20.0  # content track-distance from animal above this = "far/remote"
-AT_WELL_CM = 20.0  # content track-distance to nearest well below this = "at a well"
 MIN_WELLS = 4  # require this many wells localizable in a session
 MIN_IMMOBILE_BINS = 50  # per leaf arm, to estimate the well position
 
@@ -214,27 +216,10 @@ def session_content_distances(
     return d_animal[valid], d_well[valid], is_swr[valid]
 
 
-def quadrant_fractions(d_animal: np.ndarray, d_well: np.ndarray) -> dict[str, float]:
-    """Fraction of content *timebins* in each (far × at-well) quadrant.
-
-    Timebin-weighted (where the decoded content spends its time), not
-    event-weighted; longer events contribute more. Aggregation
-    (:func:`content_occupancy_shares`) keeps this convention (weights
-    per-session fractions by timebin count).
-    """
-    far = d_animal > FAR_CM
-    at_well = d_well < AT_WELL_CM
-    return {
-        "remote_well": float((far & at_well).mean()),
-        "own_well": float((~far & at_well).mean()),
-        "remote_path": float((far & ~at_well).mean()),
-        "near_off": float((~far & ~at_well).mean()),
-    }
-
-
 # --- Arm occupancy (from canonical event tables) ------------------------------
 def arm_occupancy(animal: str | None = None) -> pd.DataFrame | None:
-    """Per-arm posterior-mass occupancy, normalized within SWR group.
+    """Per-arm posterior-mass occupancy, normalized within SWR group
+    (:func:`arm_occupancy_shares`).
 
     Returns a (9-arm x {nonSWR, SWR}) fraction table, or None if the canonical
     ``replay_content/event_arm_table`` is unavailable.
@@ -248,9 +233,7 @@ def arm_occupancy(animal: str | None = None) -> pd.DataFrame | None:
     require_swr_source(ea, what=str(f))
     if animal is not None and "animal" in ea.columns:
         ea = ea[ea["animal"] == animal]
-    ea = ea.assign(group=np.where(ea["is_swr"].astype(bool), "SWR", "nonSWR"))
-    occ = ea.groupby(["group", "candidate_arm"])["arm_posterior_mass"].sum().unstack(0)
-    return occ / occ.sum()
+    return arm_occupancy_shares(ea)
 
 
 # --- Analysis -----------------------------------------------------------------

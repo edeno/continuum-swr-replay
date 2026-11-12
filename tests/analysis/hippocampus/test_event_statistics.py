@@ -475,3 +475,38 @@ def test_content_occupancy_shares_refuse_a_session_with_time_bins_and_no_share()
     occupancy.loc[1, "remote_well"] = 0.1
     shares = stats.content_occupancy_shares(occupancy)
     assert shares.loc["SWR", "remote_well"] == pytest.approx((5 + 3) / 40)
+
+
+def test_quadrant_fractions_share_the_bins_with_strict_thresholds():
+    # A bin at exactly 20 cm from the animal is near, and at exactly 20 cm from
+    # a well is off it.
+    d_animal = np.array([0.0, 10.0, 20.0, 25.0, 30.0])
+    d_well = np.array([0.0, 19.9, 20.0, 5.0, 50.0])
+    fractions = stats.quadrant_fractions(d_animal, d_well)
+    # own well, own well, near off-well, remote well, remote path
+    assert fractions == {
+        "remote_well": 0.2,
+        "own_well": 0.4,
+        "remote_path": 0.2,
+        "near_off": 0.2,
+    }
+    assert tuple(fractions) == stats.OCCUPANCY_QUADRANTS
+
+
+def test_arm_occupancy_shares_normalize_posterior_mass_within_each_group():
+    event_arm = pd.DataFrame(
+        {
+            "is_swr": [1, 1, 0, 0, 0],
+            "candidate_arm": [0, 6, 0, 0, 1],
+            "arm_posterior_mass": [0.5, 1.5, 0.2, 0.6, 0.2],
+        }
+    )
+    shares = stats.arm_occupancy_shares(event_arm)
+    assert shares.loc[0, "SWR"] == pytest.approx(0.25)
+    assert shares.loc[6, "SWR"] == pytest.approx(0.75)
+    # two rows on arm 0 add before the share is taken
+    assert shares.loc[0, "nonSWR"] == pytest.approx(0.8)
+    assert shares.loc[1, "nonSWR"] == pytest.approx(0.2)
+    # an arm a group has no row for is NaN, not zero
+    assert np.isnan(shares.loc[1, "SWR"])
+    assert np.isnan(shares.loc[6, "nonSWR"])

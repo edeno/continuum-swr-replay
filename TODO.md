@@ -64,10 +64,8 @@ Work that is deferred on purpose. Each item says when it should be done.
     per-animal tables (`_report.pool_sessions`) that
     `nonlocal_comparison.left_out_statistics` reads; the `summarize` functions of
     `sweep_memoryless_{detection,controls,heldout}.py` compute the aggregates in the
-    sweep summaries; `measure_event_start_and_rest_theta.py` (`measure_epoch`) computes
-    the per-event measures behind the start-distance and rest-theta values; and
-    `scripts/content/analyze_content_occupancy.py` (`quadrant_fractions`) the
-    per-session shares the events summary reads.
+    sweep summaries; and `measure_event_start_and_rest_theta.py` (`measure_epoch`)
+    computes the per-event measures behind the start-distance and rest-theta values.
 
   *When:* at each figure's or report's next regeneration.
 

@@ -1,7 +1,9 @@
 """Summary statistics of the immobile non-local events.
 
 Each function takes a table an analysis wrote (the canonical event table, a
-reference table, a run's per-event metrics). Most return named numbers: a dict,
+reference table, a run's per-event metrics), except :func:`quadrant_fractions`,
+which takes one session's per-time-bin content distances. Most return named
+numbers: a dict,
 or a table with one row per group. :func:`boundary_offsets` returns one row per
 event (what a histogram draws), :func:`most_steps` a count with the properties
 that attain it, and :func:`n_animals_non_swr_more_at_well` one count. They are
@@ -657,6 +659,68 @@ path, or near the animal off the wells."""
 OCCUPANCY_PLACES = ("remote_well", "own_well", "at_well", "remote_path", "near_off")
 """Where content can sit: the four :data:`OCCUPANCY_QUADRANTS`, and at either
 well (``at_well``)."""
+
+FAR_CM = 20.0
+"""Content farther than this from the animal (track distance, cm) is remote."""
+
+AT_WELL_CM = 20.0
+"""Content nearer than this to the nearest reward well (track distance, cm) is
+at a well."""
+
+
+def quadrant_fractions(d_animal: np.ndarray, d_well: np.ndarray) -> dict[str, float]:
+    """Fraction of content *timebins* in each (far × at-well) quadrant.
+
+    Timebin-weighted (where the decoded content spends its time), not
+    event-weighted; longer events contribute more. Aggregation
+    (:func:`content_occupancy_shares`) keeps this convention (weights
+    per-session fractions by timebin count).
+
+    Parameters
+    ----------
+    d_animal : np.ndarray, shape (n_bins,)
+        Each non-local time bin's track distance (cm) from the decoded content
+        to the animal. Far means above :data:`FAR_CM`.
+    d_well : np.ndarray, shape (n_bins,)
+        The same bins' track distance (cm) from the content to the nearest
+        reward well. At a well means below :data:`AT_WELL_CM`.
+
+    Returns
+    -------
+    dict of str to float
+        The share of the bins in each of :data:`OCCUPANCY_QUADRANTS`.
+    """
+    far = d_animal > FAR_CM
+    at_well = d_well < AT_WELL_CM
+    return {
+        "remote_well": float((far & at_well).mean()),
+        "own_well": float((~far & at_well).mean()),
+        "remote_path": float((far & ~at_well).mean()),
+        "near_off": float((~far & ~at_well).mean()),
+    }
+
+
+def arm_occupancy_shares(event_arm: pd.DataFrame) -> pd.DataFrame:
+    """Per-arm posterior-mass occupancy, normalized within SWR group.
+
+    Parameters
+    ----------
+    event_arm : pd.DataFrame, shape (n_events * n_arms, n_columns)
+        The event-arm table: ``is_swr``, ``candidate_arm`` and
+        ``arm_posterior_mass`` per event and arm.
+
+    Returns
+    -------
+    shares : pd.DataFrame, shape (n_arms, n_groups)
+        Indexed by ``candidate_arm``, one column per group (``"nonSWR"``,
+        ``"SWR"``): the group's posterior mass on the arm over its mass on every
+        arm. NaN for an arm the group has no row for.
+    """
+    ea = event_arm.assign(
+        group=np.where(event_arm["is_swr"].astype(bool), "SWR", "nonSWR")
+    )
+    occ = ea.groupby(["group", "candidate_arm"])["arm_posterior_mass"].sum().unstack(0)
+    return occ / occ.sum()
 
 
 def content_occupancy_shares(occupancy: pd.DataFrame) -> pd.DataFrame:
