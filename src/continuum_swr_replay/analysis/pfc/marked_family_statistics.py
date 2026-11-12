@@ -27,6 +27,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.statistics import session_median_statistics
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
 #: The max-statistic call: outside the reference when the plus-one p is at
@@ -125,7 +126,10 @@ def animal_balanced_fraction_positive(
         One row per (model, event_class, target) with ``n_units``,
         ``n_usable``, ``n_excluded_blowup``, ``n_sessions``, ``n_animals``,
         ``frac_pos`` (median over animals of the within-animal median over
-        sessions), ``frac_pos_min``/``frac_pos_max`` across animals,
+        sessions of each session's share of usable units whose delta is
+        positive: the ``animal_median`` of
+        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`),
+        ``frac_pos_min``/``frac_pos_max`` across animals,
         ``delta_median`` and ``delta_p95`` over usable units.
     """
     table = units.copy()
@@ -140,6 +144,13 @@ def animal_balanced_fraction_positive(
             .groupby(["animal", "session"])["pos"]
             .mean()
         )
+        balanced = session_median_statistics(
+            per_session,
+            pd.Series(
+                per_session.index.get_level_values("animal"), index=per_session.index
+            ),
+        )
+        # The range across animals of the animal medians balanced is the median of.
         per_animal = per_session.groupby(level="animal").median()
         out.append(
             {
@@ -147,9 +158,9 @@ def animal_balanced_fraction_positive(
                 "n_units": int(len(group)),
                 "n_usable": int(len(usable)),
                 "n_excluded_blowup": int(group["blowup"].sum()),
-                "n_sessions": int(per_session.size),
-                "n_animals": int(per_animal.size),
-                "frac_pos": float(per_animal.median()),
+                "n_sessions": int(balanced["n_sessions"]),
+                "n_animals": int(balanced["n_animals"]),
+                "frac_pos": float(balanced["animal_median"]),
                 "frac_pos_min": float(per_animal.min()),
                 "frac_pos_max": float(per_animal.max()),
                 "delta_median": float(usable["usable"].median()),

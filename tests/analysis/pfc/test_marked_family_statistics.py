@@ -32,6 +32,31 @@ def _units() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def test_fraction_positive_is_the_median_of_animal_medians_not_a_mean():
+    """Session shares: a 0, 1/4, 1 (median 1/4, mean 5/12); b 1/2; c 1, 0
+    (a zero delta is not positive). Animal medians 1/4, 1/2, 1/2: their median
+    is 1/2, their mean 5/12, and the median over the six sessions 3/8."""
+    rows = [
+        {"animal": animal, "session": session, "delta": delta}
+        for animal, session, deltas in (
+            ("a", "a1", [-1.0, -1.0]),
+            ("a", "a2", [1.0, -1.0, -1.0, -1.0]),
+            ("a", "a3", [1.0]),
+            ("b", "b1", [1.0, -1.0]),
+            ("c", "c1", [1.0]),
+            ("c", "c2", [-1.0, 0.0]),
+        )
+        for delta in deltas
+    ]
+    units = pd.DataFrame(rows).assign(model="m", event_class="pooled", target="t")
+
+    row = stats.animal_balanced_fraction_positive(units, blowup=1000.0).iloc[0]
+
+    assert (row.n_sessions, row.n_animals) == (6, 3)
+    assert row.frac_pos == pytest.approx(0.5)
+    assert (row.frac_pos_min, row.frac_pos_max) == (0.25, 0.5)
+
+
 def test_fraction_positive_is_animal_balanced_and_excludes_nan_and_blowups():
     out = stats.animal_balanced_fraction_positive(_units(), blowup=1000.0)
     row = out.iloc[0]
