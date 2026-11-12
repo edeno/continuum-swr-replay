@@ -19,6 +19,16 @@ For a detailed description of the behavioral task, training protocol,
 implant, and recording setup, see
 [docs/task_description.md](task_description.md).
 
+### Replay terminology
+
+**Replay includes stationary representations as well as trajectories.** The project
+lead explicitly clarified this on 2026-11-12. Stationary refers to the represented
+location remaining stable, not to the animal's movement. Do not restrict replay
+to moving or sequential representations. Use "trajectory replay" or "sequential
+replay" for a narrower analysis or comparator that requires a trajectory. Validate
+spatial content in stationary events as well as trajectories; absence of movement
+in represented space does not by itself make an event a non-replay control.
+
 ## Development Setup
 
 This project uses **uv** for package management (not pip/conda). Install
