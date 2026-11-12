@@ -80,6 +80,9 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     fit_per_bin_rate_model,
     freeze_per_bin_cohort,
 )
+from continuum_swr_replay.analysis.replay.coefficient_statistics import (  # noqa: E402
+    coefficient_statistics,
+)
 from continuum_swr_replay.analysis.replay.cohort_audit import (  # noqa: E402
     cohort_record,
     stop_own_missing,
@@ -773,10 +776,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     if len(models):
         for cov in FITTED_COVARIATES:
-            col = f"rr_{cov}"
+            col = f"coef_{cov}"
             if col not in models:
                 continue
-            summary = models.groupby("outcome")[col].median().to_dict()
+            summary = {
+                outcome: coefficient_statistics(fits, col)["exp_median"]
+                for outcome, fits in models.groupby("outcome")
+            }
             logger.info("median RR  %-26s %s", cov, summary)
 
 
