@@ -282,7 +282,7 @@ Predictor construction: the timing clocks, the history blocks, the candidate-arm
 
 Model-light estimands for reward-belief uncertainty and replay content.
 
-`assign_within_arm_quantiles`, `build_trial_leaf_table`, `hierarchical_quartile_profile`, `paired_quartile_contrasts`, `summarize_mu_coefficients`, `within_arm_horserace`, `summarize_horserace`
+`assign_within_arm_quantiles`, `build_trial_leaf_table`, `hierarchical_quartile_profile`, `paired_quartile_contrasts`, `summarize_mu_coefficients`, `within_arm_horserace`, `summarize_horserace`, `restrict_to_analysis_cohort`, `analysis_cohort_counts`, `select_example_session`, `quartile_profiles_and_contrasts`
 
 ### `src/continuum_swr_replay/analysis/behavior/content_response.py`
 
@@ -406,7 +406,7 @@ _No module-level public symbols._
 
 Model definitions for replay content analysis.
 
-`ModelSpec`, `default_content_model_names`, `PerBinTerm`, `time_course_spline`, `PerBinRateModelSpec`, `longest_history_window_s`, `leaf_only_predictors`, `rung_predictors`, `restrict_to_leaf_arms`, `leaf_only_cohort`
+`ModelSpec`, `default_content_model_names`, `PerBinTerm`, `time_course_spline`, `PerBinRateModelSpec`, `longest_history_window_s`, `leaf_only_predictors`, `rung_predictors`, `restrict_to_leaf_arms`, `leaf_only_cohort`, `ComparisonRung`, `resolve_comparison_rungs`
 
 ## Fitters
 
@@ -428,7 +428,7 @@ Small shared primitives for the event-table builders.
 
 Does replay content predict the next choice?
 
-`predict_arm_fractions`, `build_residualized_choice_dataset`, `build_choice_dataset`, `fit_choice_model`
+`predict_arm_fractions`, `build_residualized_choice_dataset`, `build_choice_dataset`, `fit_choice_model`, `choice_swr_split_models_for_source`, `fit_choice_blocks`
 
 ### `src/continuum_swr_replay/analysis/behavior/choice/shuffles.py`
 
@@ -516,19 +516,19 @@ Build trial-level reward-belief uncertainty/replay-content results.
 
 Fit three replay-CONTENT estimators on one at-well cohort and compare them.
 
-`RungSpec`, `log_phi_figure_rung`, `resolve_rungs`, `ComparisonResult`, `run_comparison`, `plot_coefficient_agreement`, `plot_log_phi_by_session`, `write_caption`, `main`
+`log_phi_figure_rung`, `plot_coefficient_agreement`, `plot_log_phi_by_session`, `write_caption`, `main`
 
 ### `scripts/behavior/content/compare_event_source_models.py`
 
 Run the replay-content analysis suite on one event source and save fits.
 
-`fit_patch_hierarchy`, `fit_patch_switch`, `fit_per_stop_rate_hierarchy`, `fit_choice_blocks`, `run_switch_aligned`, `main`
+`fit_per_stop_rate_hierarchy`, `run_switch_aligned`, `main`
 
 ### `scripts/behavior/content/fit_replay_content_models.py`
 
 Fit the replay content model hierarchy on pre-computed data.
 
-`fit_n_categories`, `content_fit_inputs`, `print_model_results`, `format_comparison_table`, `run_content_fit`, `main`
+`content_fit_inputs`, `print_model_results`, `format_comparison_table`, `run_content_fit`, `main`
 
 ### `scripts/behavior/content/fit_swr_contrast_content.py`
 
@@ -712,13 +712,13 @@ Across-session and across-animal summaries, contrasts and model comparison over 
 
 Replay content × reward outcome → behavioral change.
 
-`StopSummaryConfig`, `stop_replay_summary`, `fit_is_stay_logistic_per_session`, `fit_is_stay_pooled_gee`, `cross_session_role_summary`, `pooled_gee_role_summary`, `smallest_adjusted_p`, `fit_status_counts`
+`StopSummaryConfig`, `stop_replay_summary`, `fit_is_stay_logistic_per_session`, `fit_is_stay_pooled_gee`, `role_content_column`, `fit_stay_leave_roles`, `cross_session_role_summary`, `pooled_gee_role_summary`, `smallest_adjusted_p`, `fit_status_counts`
 
 ### `src/continuum_swr_replay/analysis/behavior/choice/retrospective.py`
 
 Retrospective alignment of replay content with the next choice.
 
-`at_well_event_cohort`, `arm_path_well_to_well`, `chosen_arm_fraction`, `chosen_arm_fraction_prev`, `ends_at_next`, `ends_at_prev`, `contains_path_to_next`, `contains_path_from_prev`, `chosen_patch_fraction`, `ends_at_next_patch`, `compute_retrospective_metrics`, `freeze_retrospective_cohort`, `retrospective_alignment_with_shuffle`
+`at_well_event_cohort`, `arm_path_well_to_well`, `chosen_arm_fraction`, `chosen_arm_fraction_prev`, `ends_at_next`, `ends_at_prev`, `contains_path_to_next`, `contains_path_from_prev`, `chosen_patch_fraction`, `ends_at_next_patch`, `compute_retrospective_metrics`, `freeze_retrospective_cohort`, `retrospective_alignment_with_shuffle`, `family_unit_counts`, `retrospective_status`, `select_event_subset`, `retrospective_alignment_by_session`
 
 ### `src/continuum_swr_replay/analysis/behavior/choice/switch_analysis.py`
 
@@ -748,7 +748,7 @@ Compare nested models via AIC, BIC, and likelihood ratio tests.
 
 Shared audited aggregation for the is_swr contrast ladders (rate + content).
 
-`load_per_sd_scale`, `load_fit_time_sd_reference`, `std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `gated_term_statistics`, `aggregate_contrast`, `specs_from_ladder`, `contrast_fit_inputs`, `select_outcome_stratum`, `sd_reference`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
+`load_per_sd_scale`, `load_fit_time_sd_reference`, `std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `gated_term_statistics`, `aggregate_contrast`, `specs_from_ladder`, `concentration_specs`, `audited_content_contrast`, `renormalized_rungs`, `contrast_fit_inputs`, `select_outcome_stratum`, `sd_reference`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
 
 ### `src/continuum_swr_replay/analysis/behavior/tables/summaries.py`
 
@@ -1160,6 +1160,12 @@ Across-session summaries of what the per-session fits wrote.
 
 `fit_rows`, `require_one_fit_per_session`, `coefficient_statistics`, `coefficient_family_statistics`, `animal_median_bootstrap`, `gated_coefficient_statistics`, `gated_exp_median_ratio`, `paired_coefficient_statistics`, `gated_coefficient_difference_statistics`, `aic_difference_statistics`, `separated_fraction`, `known_fraction`, `fits_carrying`, `term_separation_statistics`, `rung_separation_range`, `audited_drop_statistics`, `group_range`
 
+### `src/continuum_swr_replay/analysis/behavior/common_cohort.py`
+
+Fit a block of models per session on one frozen complete-case cohort.
+
+`predictor_union`, `block_required_columns`, `hash_unit_ids`, `freeze_session_cohort`, `fit_per_session_common_cohort`, `assert_ladder_timing`
+
 ### `src/continuum_swr_replay/analysis/behavior/content/cohort.py`
 
 The events a content ladder is fit on, and where the others went.
@@ -1176,19 +1182,19 @@ Summary statistics of what the non-local events represent.
 
 How three content estimators agree, fit on one shared event set per session.
 
-`se_ratio_column`, `estimator_rows`, `attach_delta_aic`, `unidentified_rows`, `identified_rows`, `n_unpaired_triples`, `wide_by_estimator`, `summarize_estimators`, `bootstrap_animals`
+`se_ratio_column`, `estimator_rows`, `attach_delta_aic`, `unidentified_rows`, `identified_rows`, `n_unpaired_triples`, `wide_by_estimator`, `summarize_estimators`, `bootstrap_animals`, `n_fits_delta_aic_row_mismatch`, `ComparisonResult`, `shared_session_rows`, `drop_undefined_concentration`, `run_comparison`
 
 ### `src/continuum_swr_replay/analysis/behavior/content/session_fits.py`
 
 Fit the content rungs on every session of a cohort.
 
-`fit_model_per_session`, `fit_conditional_logit_robustness`, `resolve_concentration_cols`, `fit_contrast_session`, `fit_contrast_ladder`
+`fit_model_per_session`, `fit_conditional_logit_robustness`, `resolve_concentration_cols`, `fit_contrast_session`, `fit_contrast_ladder`, `fit_n_categories`, `fit_content_ladder`, `patch_models_for_source`, `patch_switch_models_for_source`, `fit_patch_hierarchy`, `fit_patch_switch`
 
 ### `src/continuum_swr_replay/analysis/behavior/coupling/swr_power.py`
 
 The per-event SWR-power model: an event's ripple power against the behavioral covariates.
 
-`post_outcome_masks`, `balanced_post_outcome_selection`, `gate_events_after_outcome`, `fit_power_model`, `power_distribution_statistics`, `duration_power_correlation`, `power_cohort_records`
+`post_outcome_masks`, `balanced_post_outcome_selection`, `gate_events_after_outcome`, `fit_power_model`, `power_distribution_statistics`, `duration_power_correlation`, `assemble_power_frame`, `power_cohort_records`
 
 ### `src/continuum_swr_replay/analysis/behavior/fit_comparability.py`
 
