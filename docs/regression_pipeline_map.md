@@ -248,7 +248,7 @@ Stable row identities: the ``event_id`` and ``stop_id`` hashes.
 
 The natural key for one recording session: (animal, session_date, epoch).
 
-`session_key_set`, `n_sessions`, `session_key_frame`, `subset_max_per_animal`
+`session_key_set`, `n_sessions`, `session_key_frame`, `subset_max_per_animal`, `present_session_columns`, `require_session_unique_ids`
 
 ## Covariates
 
@@ -706,7 +706,7 @@ Per-model cohort / drop-profile audit records.
 
 Shared audited aggregation for the is_swr contrast ladders (rate + content).
 
-`load_per_sd_scale`, `load_fit_time_sd_reference`, `std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `aggregate_contrast`, `specs_from_ladder`, `contrast_fit_inputs`, `select_outcome_stratum`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
+`load_per_sd_scale`, `load_fit_time_sd_reference`, `std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `gated_term_statistics`, `aggregate_contrast`, `specs_from_ladder`, `contrast_fit_inputs`, `select_outcome_stratum`, `sd_reference`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
 
 ### `src/continuum_swr_replay/analysis/replay/learning.py`
 
@@ -1134,7 +1134,7 @@ Modules under a mapped root that no stage pattern claims. A module landing here 
 
 Across-session summaries of what the per-session fits wrote.
 
-`fit_rows`, `require_one_fit_per_session`, `coefficient_statistics`, `coefficient_family_statistics`, `animal_median_bootstrap`, `gated_coefficient_statistics`, `gated_exp_median_ratio`, `gated_coefficient_difference_statistics`, `aic_difference_statistics`, `separated_fraction`, `known_fraction`, `fits_carrying`, `term_separation_statistics`, `rung_separation_range`, `audited_drop_statistics`, `group_range`
+`fit_rows`, `require_one_fit_per_session`, `coefficient_statistics`, `coefficient_family_statistics`, `animal_median_bootstrap`, `gated_coefficient_statistics`, `gated_exp_median_ratio`, `paired_coefficient_statistics`, `gated_coefficient_difference_statistics`, `aic_difference_statistics`, `separated_fraction`, `known_fraction`, `fits_carrying`, `term_separation_statistics`, `rung_separation_range`, `audited_drop_statistics`, `group_range`
 
 ### `src/continuum_swr_replay/analysis/replay/content_statistics.py`
 
@@ -1152,7 +1152,7 @@ Summary statistics of the event-history kernels of the duration-aware rate fits.
 
 Summary statistics of the per-bin event-rate ladder's fits.
 
-`frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `paired_coefficient_statistics`, `reward_gated_fits`, `reward_kernel_by_lag`, `reward_kernel_animal_medians`, `self_history_kernel_by_lag`, `lag_one_reward_kernels`, `reward_kernel_statistics`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
+`frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `reward_gated_fits`, `reward_kernel_by_lag`, `reward_kernel_animal_medians`, `self_history_kernel_by_lag`, `lag_one_reward_kernels`, `reward_kernel_statistics`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
 
 ### `src/continuum_swr_replay/analysis/replay/stop_statistics.py`
 

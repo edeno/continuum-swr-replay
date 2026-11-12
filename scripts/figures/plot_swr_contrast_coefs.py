@@ -1,7 +1,8 @@
 """Coefficient figures for the is_swr rate + content contrast ladders.
 
-For each effect: every session's coefficient is a faint jittered dot (colored by
-animal); the 5 larger dots are per-animal medians; the black bar is the
+For each effect: the coefficient of every session the per-term gate keeps is a faint
+jittered dot (colored by animal; a term the gate refuses is drawn empty and labelled
+"(not reported)"); the 5 larger dots are per-animal medians; the black bar is the
 across-animal median; the horizontal whisker is its 95% CI (bootstrap over the 5
 per-animal medians -- the animal is the inferential unit, n=5;
 ``coefficient_statistics.animal_median_bootstrap``, 4000 draws). Continuous-predictor
@@ -298,7 +299,7 @@ def rate_figure(R, sd):
         ax,
         R,
         rate_rows,
-        "Rate ladder — is_swr contrast\n(standardized; all sessions + animal 95% CI)",
+        "Rate ladder — is_swr contrast\n(standardized; gated sessions + animal 95% CI)",
         sd,
     )
     ax.legend(
