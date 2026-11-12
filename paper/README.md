@@ -28,7 +28,7 @@ explicitly including stationary representations as well as trajectories.
 | `references.bib` | The bibliography (BibTeX) |
 | `reported_values.tex` | Generated: one LaTeX macro per reported number, read by `main.tex` |
 | `reported/<summary>.json` | The summary files every reported number is read from, named for what they hold: `survey` (the literature numbers the introduction quotes), `detection`, `events`, `behavior`, `mpfc` |
-| `reported/inputs/detection/` | The tracked input files the detection summary reads: the simulation sweep summaries (`detection_{sweep,controls,heldout}_summary.csv`), `reference_check_summary.csv` and the labeled recording's numbers (`memoryless_comparison_recording.json`) |
+| `reported/inputs/detection/` | The tracked input files the detection summary reads: the simulation sweep summaries (`detection_{sweep,controls,heldout}_summary.csv`) and the labeled recording's numbers (`memoryless_comparison_recording.json`). `reference_check_summary.csv`, the memoryless port checked against its reference (`scripts/checks/compare_memoryless_to_reference.py`), is kept beside them; no summary reads it |
 | `reported/questions.md` | Generated: every question of the paper, in its outline, with the values that answer it (macro, value, meaning, source, the builder function that made it) and the values by figure |
 | `figures/<topic>/` | Figures, one folder per figure, written by the figure scripts; only Figure 1's files are kept in the repository |
 | `tables/` | `table_s1_literature_parameters.csv`, the <!--v:survey.papers-->57<!--/v-->-paper survey (Supplementary Data 1, edited by hand), and `table_s1_literature.tex`, Supplementary Table S1 generated from it |
