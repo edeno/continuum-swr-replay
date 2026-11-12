@@ -61,7 +61,7 @@ _SELECT = textwrap.dedent(
 
     import pandas as pd
 
-    from scripts.figures import generate_event_gallery as gallery
+    from continuum_swr_replay.analysis.events import gallery_sample as gallery
 
     rows = [
         {

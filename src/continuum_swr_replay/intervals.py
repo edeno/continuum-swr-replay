@@ -61,6 +61,7 @@ from numpy.typing import NDArray
 __all__ = [
     "contains",
     "contiguous_true_runs",
+    "min_gap_to_intervals",
     "covered_seconds",
     "get_spikecount_per_time_bin",
     "as_frame",
@@ -568,6 +569,37 @@ def contiguous_true_runs(mask: NDArray) -> NDArray:
     padded = np.concatenate([[False], flat, [False]])
     edges = np.flatnonzero(padded[1:] != padded[:-1])
     return edges.reshape(-1, 2).astype(np.int64)
+
+
+def min_gap_to_intervals(
+    starts: np.ndarray,
+    ends: np.ndarray,
+    other_starts: np.ndarray,
+    other_ends: np.ndarray,
+) -> np.ndarray:
+    """Minimum temporal gap from each [starts, ends] interval to any other interval.
+
+    0 where they overlap (or touch), inf when there is no other interval.
+
+    Parameters
+    ----------
+    starts, ends : NDArray, shape (n_intervals,)
+    other_starts, other_ends : NDArray, shape (n_other,)
+
+    Returns
+    -------
+    NDArray, shape (n_intervals,)
+        Seconds from each interval to the nearest other one.
+    """
+    if len(other_starts) == 0:
+        return np.full(len(starts), np.inf)
+    s = starts[:, None]
+    e = ends[:, None]
+    os = other_starts[None, :]
+    oe = other_ends[None, :]
+    # gap = max(0, os - e, s - oe) elementwise; 0 if overlapping
+    gap = np.maximum.reduce([np.zeros_like(s + os), os - e, s - oe])
+    return gap.min(axis=1)
 
 
 def get_spikecount_per_time_bin(spike_times: NDArray, time: NDArray) -> NDArray:

@@ -365,3 +365,21 @@ class TestClosedIntervalsRefuseMalformedBounds:
         np.testing.assert_array_equal(
             normalize(np.array([[np.nan, 1.0], [3.0, 1.0], [4.0, 5.0]])), [[4.0, 5.0]]
         )
+
+
+def test_min_gap_is_zero_on_overlap_or_touch_and_inf_with_no_other_interval():
+    from continuum_swr_replay.intervals import min_gap_to_intervals
+
+    starts = np.array([0.0, 4.0, 10.0, 2.5])
+    ends = np.array([1.0, 5.0, 11.0, 2.75])
+    # others: [2, 3] and [5, 6]. Interval 0 ends 1 s before [2, 3]; interval 1
+    # touches [5, 6] (gap 0); interval 2 starts 4 s after [5, 6] ends; interval
+    # 3 lies inside [2, 3].
+    gaps = min_gap_to_intervals(
+        starts, ends, np.array([2.0, 5.0]), np.array([3.0, 6.0])
+    )
+
+    np.testing.assert_array_equal(gaps, [1.0, 0.0, 4.0, 0.0])
+    assert np.isinf(
+        min_gap_to_intervals(starts, ends, np.array([]), np.array([]))
+    ).all()

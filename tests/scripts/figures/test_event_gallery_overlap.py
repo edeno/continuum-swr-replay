@@ -1,4 +1,4 @@
-"""Regression tests for event-gallery interval selection."""
+"""Regression tests for the event gallery's trial lookups and footer."""
 
 from __future__ import annotations
 
@@ -8,22 +8,9 @@ import pandas as pd
 from scripts.figures.generate_event_gallery import (
     _active_trip_at_time,
     _completed_trials_at,
-    _intervals_overlap_any,
     _outcome_known_trials_at,
     _regression_footer,
 )
-
-
-def test_gallery_overlap_ignores_point_intervals_on_either_side():
-    """Gallery categories use the same positive-duration overlap convention."""
-    starts = np.array([0.0, 1.0, 4.0])
-    ends = np.array([2.0, 1.0, 6.0])
-    other_starts = np.array([1.0, 5.0])
-    other_ends = np.array([1.0, 7.0])
-
-    observed = _intervals_overlap_any(starts, ends, other_starts, other_ends)
-
-    assert observed.tolist() == [False, False, True]
 
 
 def test_gallery_separates_active_trip_from_completed_regression_history():

@@ -43,7 +43,7 @@ parallel unit):
                   ``run_event_gallery.sh`` (tmux).
 
 The sample is the same in every run: each (animal, category) group's seed is
-built from its strings (``_group_seed``), not from ``hash()``. Each rendered
+built from its strings (``gallery_sample.group_seed``), not from ``hash()``. Each rendered
 window shades the epoch's excluded time (``excluded_intervals_of``) in a
 light grey hatched band behind the data, and its column title says so.
 
@@ -64,7 +64,6 @@ from __future__ import annotations
 import argparse
 import logging
 import warnings
-import zlib
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -98,14 +97,9 @@ from continuum_swr_replay.analysis.events.analysed_time import (
     read_dot_with_swr_source,
     swr_intervals,
 )
-from continuum_swr_replay.analysis.events.classified_table import (
-    build_classified_nonlocal_event_table,
-)
-from continuum_swr_replay.analysis.events.immobility import (
-    intervals_from_labels,
-)
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
-    strict_overlap_matrix,
+from continuum_swr_replay.analysis.events.gallery_sample import (
+    event_catalog,
+    select_events,
 )
 from continuum_swr_replay.analysis.events.swr_source import (
     ripple_power_inputs,
@@ -150,11 +144,9 @@ logging.basicConfig(
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")
 
-CATEGORIES = ("swr_contained", "swr_partial", "non_swr", "swr_not_nonlocal")
 DEFAULT_GALLERY_DIR = Path("event_gallery")
 DEFAULT_N_PER_CATEGORY = 50
 WINDOW_SEC = 0.4
-SAMPLE_SEED = 20260617
 EXCLUDED_LABEL = "excluded time"
 
 
@@ -210,217 +202,15 @@ def list_epoch_pkls(data_dir: Path) -> list[Path]:
 
 
 # ---------------------------------------------------------------------------
-# Interval geometry
-# ---------------------------------------------------------------------------
-
-
-def _intervals_overlap_any(
-    starts: np.ndarray,
-    ends: np.ndarray,
-    other_starts: np.ndarray,
-    other_ends: np.ndarray,
-) -> np.ndarray:
-    """Boolean mask: each [starts, ends] interval overlaps any [other_*] interval.
-
-    Strict positive-duration overlap (:func:`strict_overlap_matrix`) over all
-    pairs. Sizes are small per session (hundreds), so the dense broadcast is
-    fine.
-    """
-    return strict_overlap_matrix(starts, ends, other_starts, other_ends).any(axis=1)
-
-
-def _min_gap_to_intervals(
-    starts: np.ndarray,
-    ends: np.ndarray,
-    other_starts: np.ndarray,
-    other_ends: np.ndarray,
-) -> np.ndarray:
-    """Minimum temporal gap from each [starts, ends] interval to any other interval.
-
-    0 where they overlap. Used to find non-SWR events that *barely* miss an
-    SWR (small gap = boundary case near swr_partial).
-    """
-    if len(other_starts) == 0:
-        return np.full(len(starts), np.inf)
-    s = starts[:, None]
-    e = ends[:, None]
-    os = other_starts[None, :]
-    oe = other_ends[None, :]
-    # gap = max(0, os - e, s - oe) elementwise; 0 if overlapping
-    gap = np.maximum.reduce([np.zeros_like(s + os), os - e, s - oe])
-    return gap.min(axis=1)
-
-
-# ---------------------------------------------------------------------------
 # Phase 1: catalog
 # ---------------------------------------------------------------------------
 
 
 def _catalog_one_epoch(pkl_path: Path) -> pd.DataFrame:
-    """Classify + feature one epoch into a per-event catalog frame (cheap).
-
-    Returns one row per immobile non-local event (categories swr_contained /
-    swr_partial / non_swr) plus one row per SWR-only event (swr_not_nonlocal),
-    each carrying the ambiguity feature used for stratified sampling.
-    """
+    """One epoch's gallery catalog (:func:`event_catalog`), from its decode frame."""
     epoch_id = epoch_id_from_pkl(pkl_path)
-    nwb_file_name, epoch_name = parse_epoch_id(epoch_id)
-
-    dot = read_dot_with_swr_source(pkl_path)
-    dot["Non-Local_prob"] = (
-        dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
-    )
-    ct = build_classified_nonlocal_event_table(dot)
-    rows: list[dict] = []
-
-    if len(ct):
-        animal = ct["animal"].iloc[0]
-        day = int(ct["day"].iloc[0])
-        # Immobile only (matches the regression analysis population).
-        ct = ct[ct["whole_event_speed_eligible"]].copy()
-        ev_dur = (ct["event_end"] - ct["event_start"]).to_numpy()
-
-        swr_intervals = intervals_from_labels(dot, "SWR_event")
-        swr_starts = swr_intervals["start_time"].to_numpy()
-        swr_ends = swr_intervals["end_time"].to_numpy()
-
-        # Ambiguity feature per category (see module docstring).
-        #  - swr_partial: fraction of the EVENT inside its matched SWR
-        #    (low -> barely overlapping -> near non_swr; high -> near contained)
-        #  - swr_contained: event/SWR duration ratio (->1 means event nearly
-        #    fills the SWR, i.e. near partial; small means snugly contained)
-        #  - non_swr: temporal gap to nearest SWR (small -> near partial)
-        for i, (_, ev) in enumerate(ct.iterrows()):
-            cls = ev["overlap_class"]
-            common = {
-                "epoch_id": epoch_id,
-                "animal": animal,
-                "day": day,
-                "epoch_name": epoch_name,
-                "category": cls,
-                "event_label": int(ev["non_local_event"]),
-                "event_id": int(ev["event_id"]),
-                "plot_start": float(ev["event_start"]),
-                "plot_end": float(ev["event_end"]),
-                "duration_ms": float(1000 * ev_dur[i]),
-                "peak_nonlocal_prob": float(ev["peak_nonlocal_prob"]),
-            }
-            if cls == "swr_partial":
-                ov_start = max(ev["event_start"], ev["matched_swr_start"])
-                ov_end = min(ev["event_end"], ev["matched_swr_end"])
-                ov = max(0.0, ov_end - ov_start)
-                feat = ov / ev_dur[i] if ev_dur[i] > 0 else 0.0
-            elif cls == "swr_contained":
-                swr_dur = ev["matched_swr_end"] - ev["matched_swr_start"]
-                feat = ev_dur[i] / swr_dur if swr_dur > 0 else 1.0
-            else:  # non_swr
-                feat = float(
-                    _min_gap_to_intervals(
-                        np.array([ev["event_start"]]),
-                        np.array([ev["event_end"]]),
-                        swr_starts,
-                        swr_ends,
-                    )[0]
-                )
-            common["ambiguity"] = float(feat)
-            rows.append(common)
-
-        # swr_not_nonlocal: SWR intervals overlapping no non-local event.
-        nl_intervals = intervals_from_labels(dot, "non_local_event")
-        nl_starts = nl_intervals["start_time"].to_numpy()
-        nl_ends = nl_intervals["end_time"].to_numpy()
-        if len(swr_intervals):
-            overlaps_nl = _intervals_overlap_any(
-                swr_starts, swr_ends, nl_starts, nl_ends
-            )
-            only = swr_intervals.loc[~overlaps_nl]
-            for _, sw in only.iterrows():
-                s, e = float(sw["start_time"]), float(sw["end_time"])
-                win = dot.loc[s:e, "Non-Local_prob"]
-                # ambiguity = peak non-local prob inside the SWR window
-                # (high but no labeled event = borderline "almost an event")
-                peak = float(win.max()) if len(win) else 0.0
-                rows.append(
-                    {
-                        "epoch_id": epoch_id,
-                        "animal": animal,
-                        "day": day,
-                        "epoch_name": epoch_name,
-                        "category": "swr_not_nonlocal",
-                        "event_label": int(sw["SWR_event"]),
-                        "event_id": -1,
-                        "plot_start": s,
-                        "plot_end": e,
-                        "duration_ms": float(1000 * (e - s)),
-                        "peak_nonlocal_prob": peak,
-                        "ambiguity": peak,
-                    }
-                )
-
-    return pd.DataFrame(rows)
-
-
-def _stratified_sample(
-    df: pd.DataFrame, n: int, n_bins: int = 5, seed: int = 0
-) -> pd.DataFrame:
-    """Sample ~n rows spread across quantile bins of ``ambiguity``.
-
-    Quantile-binning then sampling evenly per bin guarantees the sample spans
-    the full ambiguity range — both clear and boundary cases — rather than
-    concentrating on the typical event.
-    """
-    if len(df) <= n:
-        return df
-    rng = np.random.default_rng(seed)
-    ranks = df["ambiguity"].rank(method="first")
-    bins = pd.qcut(ranks, q=min(n_bins, len(df)), labels=False, duplicates="drop")
-    df = df.assign(_bin=bins)
-    n_bin = df["_bin"].nunique()
-    per_bin = max(1, n // n_bin)
-    picks = []
-    for _, g in df.groupby("_bin"):
-        take = min(len(g), per_bin)
-        picks.append(g.iloc[rng.permutation(len(g))[:take]])
-    res = pd.concat(picks)
-    if len(res) < n:  # top up from the remainder
-        extra = df.loc[~df.index.isin(res.index)]
-        k = min(len(extra), n - len(res))
-        if k:
-            res = pd.concat([res, extra.iloc[rng.permutation(len(extra))[:k]]])
-    return res.drop(columns="_bin")
-
-
-def _group_seed(animal: str, category: str) -> int:
-    """The sample seed of one (animal, category) group, the same in every process.
-
-    ``SAMPLE_SEED`` plus a CRC-32 of the two strings. Python's ``hash()`` of a
-    string is salted per process (``PYTHONHASHSEED``), so a seed built from it
-    selected different events in each run.
-    """
-    return SAMPLE_SEED + (zlib.crc32(f"{animal}|{category}".encode()) & 0xFFFF)
-
-
-def select_events(catalog: pd.DataFrame, n_per_category: int) -> pd.DataFrame:
-    """Stratified sample of ~n events per category per animal, deterministic per group.
-
-    Parameters
-    ----------
-    catalog : pd.DataFrame
-        :func:`_catalog_one_epoch` rows, with ``animal``, ``category`` and
-        ``ambiguity``.
-    n_per_category : int
-
-    Returns
-    -------
-    pd.DataFrame
-        The selected rows.
-    """
-    selected = []
-    for (animal, cls), g in catalog.groupby(["animal", "category"]):
-        selected.append(
-            _stratified_sample(g, n_per_category, seed=_group_seed(animal, cls))
-        )
-    return pd.concat(selected, ignore_index=True)
+    _, epoch_name = parse_epoch_id(epoch_id)
+    return event_catalog(read_dot_with_swr_source(pkl_path), epoch_id, epoch_name)
 
 
 def build_catalog(
