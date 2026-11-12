@@ -2047,7 +2047,7 @@ def build_report(
         "plus `analysis/behavior/choice/retrospective.py`, which are the Stage 6 and "
         "Stage 5B paths and are not imported by the unit runner. No estimation "
         "code moved. On matched axes the alignment step is the identity, which "
-        "is what `tests/analysis/pfc/test_alignment.py::"
+        "is what `tests/analysis/hippocampus/test_alignment.py::"
         "test_matched_axes_are_returned_untouched` pins, so the three regimes "
         "differ only in which sessions they accept -- not in what they fit.\n"
     )
