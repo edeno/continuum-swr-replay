@@ -14,6 +14,11 @@ model-choice filter to neurons.  Held-out deviance changes are descriptive
 predictive comparisons.  It uses the shipped hippocampal replay-content
 tables, but does not decode mPFC population activity.
 
+The default output directory, ``pfc_marked_model_family/`` under the
+processed-data root, holds the 71-session corpus of 2026-09-19, fit under bundle
+contract 1. A rerun there removes those bundles as stale, so give a run its own
+``--output-dir``.
+
 Examples
 --------
 Smoke the nine core families for one session::
