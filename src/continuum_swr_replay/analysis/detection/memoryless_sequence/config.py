@@ -4,6 +4,12 @@ The equivalent of the original's ``Analysis_Information.mat``. Most settings
 are retained from Widloski & Foster (2025), the 80 ms window and its 5 ms step
 among them; the speed threshold and the spread threshold are adapted to this
 project's immobility rule and track geometry, as each field's description says.
+The encoding rule is retained too, and lives with the encoding model it builds
+(``encoding.py``): rate maps from running periods (> 10 cm/s) smoothed with an
+8 cm kernel, still outside SWR events and the artifact mask, from clusterless
+marks rather than sorted cells. It is recorded in the run's manifest
+(``settings.encoding``), not here, so that a stored config keeps meaning what it
+meant when it was pickled.
 """
 
 import math

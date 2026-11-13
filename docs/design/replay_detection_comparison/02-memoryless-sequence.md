@@ -29,7 +29,10 @@ recordings, producing inventory 6 of the seven in [overview.md](overview.md).
 The detector is memoryless by construction: each 80 ms window is decoded independently
 under a uniform spatial prior, and sequences are assembled afterwards from continuity
 criteria. That is the substantive contrast with our state-space procedure, which infers
-position and representational state jointly across time. Holding the encoding model fixed
+position and representational state jointly across time. By default the port builds its
+encoding model by the paper's rule, running only (> 10 cm/s) with an 8 cm kernel (V4,
+retained 2026-11-13). Run on the non-local decoder's own encoding model instead
+(`--encoding decoder`), it is the shared-input control: holding the encoding model fixed
 (overview X5) means the two differ in temporal inference and event selection, not in what
 the spikes are taken to mean.
 
@@ -886,7 +889,7 @@ not a reassurance.
 | **V1** | Sorted units, per-cell rate maps | Clusterless KDE encoding model over waveform features × position | HPC in this project is decoded clusterless; there are no sorted units | The encoding model is not a set of place fields. Cell-level inclusion criteria (rate, spatial information, isolation, SNR) have no analogue and are not applied |
 | **V2** | Cell-ID shuffle, p <= 0.05 on spread and jump | Within-tetrode encoding-pair shuffle; the reference's statistics, count and threshold unchanged, its zero-jump rule read from the spikes | Uses existing clusterless arrays without component fitting (D2) | Scrambling individual mark–position pairs can blur tuning; original cell-ID permutation exchanges intact curves. Null distributions and accepted cohorts can differ |
 | **V3** | Tuning curves get `+1e-3` before decoding | Clusterless KDE with its own `EPS` clipping of the ground-process intensity | Different likelihood construction | Low-occupancy bins are regularized differently. Not tunable to match for the clusterless decode. For sorted cells, as in the sweep and the figure, it is matched: the sliding window decodes with the floor (`with_reference_rate_floor`), and the state-space detector reads the fields as fitted. It matters: without it the sweep's significance test passed 69% of replay candidates rather than 88%, and the published-definition rate read 11% rather than 18% ("Against the reference's own arithmetic") |
-| **V4** | Rate maps fit on running periods (> 10 cm/s) | Encoding model fit on the decode's `is_training` mask (`training_type = "no_ripple"`) | Holds encoding fixed between our two procedures | Non-ripple training includes immobility. It differs from the paper, but is shared in the main comparison; any running-only sensitivity must refit both procedures on that same mask |
+| **V4** | Rate maps fit on running periods (> 10 cm/s), smoothed with an 8 cm Gaussian | **Retained (2026-11-13), as the default.** The decode's saved detector refitted per epoch on the decode's own training bins (`hpc_decode_masks`, outside SWR events and the artifact mask) that are also running (head speed > 10 cm/s), with an 8 cm position kernel; spikes and marks unchanged (`memoryless_sequence/encoding.py`). `--encoding decoder` reads the decoder's saved model instead (all speeds, 3.5 cm kernel): the shared-input control | The paper's rate maps are out of sample for every immobile event, SWR or not; the decoder's model trains on immobile non-SWR time (open decision 8). The decoder's model stays selectable so that a difference between the two procedures can still be attributed to inference rather than input | Still not the paper's: the marks are clusterless, not sorted cells (V1); training still leaves out SWR events and the artifact mask, which the paper's running periods do not need to; the library keeps each training run's spikes from one 2 ms bin before it to one after, so a few spikes at the edges of a run enter; and the kernel smooths along the linearized track (V6), not over the paper's open-field 2D. Windows are still gated at 4 cm/s (D3). On `chimi20200212_02_r1_HPC` (5 ms step, no shuffle; 2026-11-13, no summary holds these numbers) the paper's rule trains on 1,138 s of the decoder's 2,702 s and gives 1,533 candidates and 330 replays against the decoder model's 1,650 and 206 |
 
 ### Forced by track geometry
 
@@ -945,6 +948,7 @@ Named for what it does; the citation lives in docstrings, not the module path.
 | module | responsibility | depends on |
 |---|---|---|
 | `config.py` | frozen dataclass of every threshold — the `Analysis_Information.mat` equivalent, one source of truth | — |
+| `encoding.py` | the encoding rule: the paper's running-only refit of the decode's saved detector (10 cm/s, 8 cm kernel; V4), or the decoder's saved model | `detector.pkl`, the decode's training mask (`event_definition.decode_masks`) |
 | `likelihood.py` | prior-excluded `(n_time, n_interior_bins)` log-likelihood on the detector's 5 ms grid, derived from the decode's 2 ms grid | `detector.pkl`; a `results.nc` path was designed (D7) and is not built |
 | `window_statistics.py` | pure functions: window aggregation, normalization, center / spread / jump / dispersion | numpy, bin-distance matrix |
 | `detect.py` | bin filter → sequence assembly → merge → criteria → `CandidateSequences`, retaining rejection diagnostics | the above |
@@ -983,7 +987,11 @@ decoders do: a dask `LocalCUDACluster` with one worker per listed GPU runs one e
 task, and its workers' scratch goes to `--local_scratch_dir`. The main process alone
 writes `manifest.json`, after each epoch finishes, and each epoch logs to
 `logs/{epoch_id}_memoryless.log`. In either mode a failed epoch is recorded and the rest
-run on. A device list is refused when `dask_cuda` is not importable. The full run:
+run on. A device list is refused when `dask_cuda` is not importable. `--encoding` chooses
+the encoding model (V4): `paper` (the default), refitted per epoch in the runner (about a
+minute on a GPU), or `decoder`, the decode's saved model, which adds `-decoderencoding`
+to the default run id. The manifest's settings record the rule, threshold and kernel, and
+each epoch's record its training seconds and encoding spikes. The full run:
 
 ```bash
 uv run python scripts/detection/run_memoryless_detection.py --run-seed 20260922 \
@@ -992,7 +1000,8 @@ uv run python scripts/detection/run_memoryless_detection.py --run-seed 20260922 
 
 ## Data flow, per epoch
 
-1. Load `encoding_model_[("", 0)]` from `{epoch}_detector.pkl`; compute prior-excluded
+1. Load `encoding_model_[("", 0)]` from `{epoch}_detector.pkl`, refitted by the paper's
+   rule unless `--encoding decoder` (V4); compute prior-excluded
    log-likelihood once on the 5 ms grid via `predict_clusterless_kde_log_likelihood(is_local=False)`.
 2. Restrict to interior bins **before** normalizing (V8). `predict_clusterless_kde_log_likelihood`
    already returns only `is_track_interior_` bins, and junction placeholders are
@@ -1330,4 +1339,7 @@ Carried deliberately; each must be checked against real data before results are 
    decoding support from the kernel sums; or the running-only refit spec 03 already
    defers. **Decided 2026-09-22: accepted for now.** Both cohorts carry the asymmetry
    equally; revisit if a non-SWR fraction becomes a headline claim. Reconfirmed
-   2026-09-25: no running-only refit on the pilot.
+   2026-09-25: no running-only refit on the pilot. **Superseded for this detector
+   2026-11-13:** it now uses the paper's running-only encoding by default (V4), so its
+   immobile events, SWR or not, are decoded out of sample; the decoder-model run
+   (`--encoding decoder`) keeps the asymmetry, shared with our cohort.
