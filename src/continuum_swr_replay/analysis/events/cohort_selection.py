@@ -30,7 +30,7 @@ def _as_python_scalar(value: Any) -> Any:
     return value
 
 
-def _sorted_unit_ids(values: Any) -> tuple[Any, ...]:
+def sorted_unit_ids(values: Any) -> tuple[Any, ...]:
     """Return a deterministic tuple of unique, non-missing unit IDs."""
     ids = [_as_python_scalar(value) for value in pd.Series(values).dropna().unique()]
     return tuple(sorted(ids, key=repr))
@@ -122,10 +122,10 @@ def freeze_common_cohort(
         raise ValueError(f"{unit_col} must not contain missing unit identifiers")
 
     cohort = frame.copy()
-    ids_before = _sorted_unit_ids(cohort[unit_col])
+    ids_before = sorted_unit_ids(cohort[unit_col])
 
     has_missing = cohort[required].isna().any(axis=1)
-    missing_ids = _sorted_unit_ids(cohort.loc[has_missing, unit_col])
+    missing_ids = sorted_unit_ids(cohort.loc[has_missing, unit_col])
     if missing_ids:
         cohort = cohort.loc[~cohort[unit_col].isin(missing_ids)].copy()
 
@@ -135,7 +135,7 @@ def freeze_common_cohort(
     if numeric_required:
         numeric_values = cohort[numeric_required].to_numpy(dtype=float)
         has_nonfinite = ~np.isfinite(numeric_values).all(axis=1)
-        nonfinite_ids = _sorted_unit_ids(cohort.loc[has_nonfinite, unit_col])
+        nonfinite_ids = sorted_unit_ids(cohort.loc[has_nonfinite, unit_col])
     else:
         nonfinite_ids = ()
     if nonfinite_ids:
@@ -144,32 +144,32 @@ def freeze_common_cohort(
     nonpositive_offset_ids: tuple[Any, ...] = ()
     if offset_col is not None:
         nonpositive = cohort[offset_col] <= 0
-        nonpositive_offset_ids = _sorted_unit_ids(cohort.loc[nonpositive, unit_col])
+        nonpositive_offset_ids = sorted_unit_ids(cohort.loc[nonpositive, unit_col])
         if nonpositive_offset_ids:
             cohort = cohort.loc[~cohort[unit_col].isin(nonpositive_offset_ids)].copy()
 
     zero_response_ids: tuple[Any, ...] = ()
     if drop_zero_response:
         response_sum = cohort.groupby(unit_col, observed=True)[response_col].sum()
-        zero_response_ids = _sorted_unit_ids(response_sum[response_sum <= 0].index)
+        zero_response_ids = sorted_unit_ids(response_sum[response_sum <= 0].index)
         if zero_response_ids:
             cohort = cohort.loc[~cohort[unit_col].isin(zero_response_ids)].copy()
 
     invalid_choice_ids: tuple[Any, ...] = ()
     if choice_response_col is not None and len(cohort):
         is_binary = cohort[choice_response_col].isin((0, 1))
-        nonbinary_ids = _sorted_unit_ids(cohort.loc[~is_binary, unit_col])
+        nonbinary_ids = sorted_unit_ids(cohort.loc[~is_binary, unit_col])
         binary_rows = cohort.loc[is_binary]
         chosen_per_unit = binary_rows.groupby(unit_col, observed=True)[
             choice_response_col
         ].sum()
-        wrong_sum_ids = _sorted_unit_ids(chosen_per_unit[chosen_per_unit != 1].index)
-        invalid_choice_ids = _sorted_unit_ids((*nonbinary_ids, *wrong_sum_ids))
+        wrong_sum_ids = sorted_unit_ids(chosen_per_unit[chosen_per_unit != 1].index)
+        invalid_choice_ids = sorted_unit_ids((*nonbinary_ids, *wrong_sum_ids))
         if invalid_choice_ids:
             cohort = cohort.loc[~cohort[unit_col].isin(invalid_choice_ids)].copy()
 
     cohort = cohort.reset_index(drop=True)
-    included_ids = _sorted_unit_ids(cohort[unit_col])
+    included_ids = sorted_unit_ids(cohort[unit_col])
     report = {
         "required_columns": tuple(required),
         "n_rows_before": len(frame),

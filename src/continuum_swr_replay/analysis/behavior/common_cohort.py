@@ -20,8 +20,8 @@ from collections.abc import Callable, Mapping
 import pandas as pd
 
 from continuum_swr_replay.analysis.events.cohort_selection import (
-    _sorted_unit_ids,
     freeze_common_cohort,
+    sorted_unit_ids,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -128,7 +128,7 @@ def freeze_session_cohort(
     required_cols = block_required_columns(
         models, unit_col=unit_col, required_base=required_base
     )
-    ids_before = _sorted_unit_ids(group[unit_col])
+    ids_before = sorted_unit_ids(group[unit_col])
 
     provenance = {
         **session,
