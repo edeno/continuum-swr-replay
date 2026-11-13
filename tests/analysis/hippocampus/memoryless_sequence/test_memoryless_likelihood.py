@@ -21,7 +21,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     CLUSTERLESS_LIKELIHOOD_KEYS,
-    ENCODING_KEY,
     EpochLikelihood,
     _drop_the_unreachable_row,
     check_marks_match_encoding,
@@ -36,6 +35,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     aggregate_windows,
 )
+from continuum_swr_replay.decoding.results import ENCODING_KEY
 from tests.support._memoryless_clusterless_epoch import (
     BOUNDARY_SAMPLES,
     N_FEATURES,

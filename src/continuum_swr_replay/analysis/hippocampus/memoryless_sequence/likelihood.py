@@ -30,17 +30,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-import joblib
 import numpy as np
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
+from continuum_swr_replay.decoding.results import ENCODING_KEY, load_saved_detector
 
 __all__ = [
     "CLUSTERLESS_LIKELIHOOD_KEYS",
-    "ENCODING_KEY",
     "REFERENCE_RATE_FLOOR_HZ",
     "SORTED_SPIKES_LIKELIHOOD_KEYS",
     "EpochLikelihood",
@@ -53,9 +52,6 @@ __all__ = [
     "window_midpoints_s",
     "with_reference_rate_floor",
 ]
-
-ENCODING_KEY = ("", 0)
-"""The encoding group a single-environment decode is saved under."""
 
 CLUSTERLESS_LIKELIHOOD_KEYS = (
     "occupancy",
@@ -166,39 +162,17 @@ def load_clusterless_encoding_model(detector_path: str | Path) -> dict:
 
     Raises
     ------
-    FileNotFoundError
-        There is no detector at that path. Nothing is substituted for it.
-    KeyError
-        The detector holds no :data:`ENCODING_KEY` group.
+    FileNotFoundError, KeyError
+        As ``decoding.results.load_saved_detector``.
     ValueError
-        The environment has no place grid, or ``waveform_std`` differs between
-        features, which the per-electrode expansion below could not honor.
+        The environment has no place grid
+        (``decoding.results.load_saved_detector``), or ``waveform_std`` differs
+        between features, which the per-electrode expansion below could not
+        honor.
 
     """
-    detector_path = Path(detector_path)
-    if not detector_path.exists():
-        raise FileNotFoundError(f"No detector at {detector_path}.")
-
-    detector = joblib.load(detector_path)
-    if ENCODING_KEY not in detector.encoding_model_:
-        raise KeyError(
-            f"The detector at {detector_path} has no {ENCODING_KEY!r} encoding "
-            f"group; it has {list(detector.encoding_model_)}."
-        )
+    detector = load_saved_detector(detector_path)
     encoding_model = dict(detector.encoding_model_[ENCODING_KEY])
-
-    # a detector saved by an older library version carries no fitted flag,
-    # though its grid is intact; the track-distance methods refuse to run
-    # without one. Only a grid that is actually there is vouched for.
-    environment = encoding_model["environment"]
-    if (
-        getattr(environment, "place_bin_centers_", None) is None
-        or getattr(environment, "is_track_interior_", None) is None
-    ):
-        raise ValueError(
-            f"The environment in {detector_path} has no fitted place grid."
-        )
-    environment._is_fitted = True
 
     # electrodes can differ in how many waveform features they have, so a
     # per-feature vector cannot be shared between them; the library expands a

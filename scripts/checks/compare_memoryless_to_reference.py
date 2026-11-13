@@ -55,7 +55,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
-    ENCODING_KEY,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
     with_reference_rate_floor,
@@ -78,6 +77,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
     aggregate_windows,
     normalize_windows,
 )
+from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.paths import detection_comparison_dir
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by

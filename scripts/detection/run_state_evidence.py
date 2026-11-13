@@ -132,7 +132,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: E402
     CV_BLOCK_S,
     ENCODING_HELD_OUT,
-    ENCODING_KEY,
     ENCODING_LABELS,
     EVENT_MARGIN_BINS,
     HALVES_SEED,
@@ -174,7 +173,10 @@ from continuum_swr_replay.decoding.files import decode_paths  # noqa: E402
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,
 )
-from continuum_swr_replay.decoding.results import open_results  # noqa: E402
+from continuum_swr_replay.decoding.results import (  # noqa: E402
+    ENCODING_KEY,
+    open_results,
+)
 from continuum_swr_replay.intervals import sample_step  # noqa: E402
 from continuum_swr_replay.parameters import ROOT_DIR  # noqa: E402
 from continuum_swr_replay.paths import processed_data_dir  # noqa: E402

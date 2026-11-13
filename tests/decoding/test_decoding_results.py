@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
 import pytest
@@ -19,7 +20,13 @@ from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     get_conditional_non_local_posterior,
     load_conditional_posterior,
 )
-from continuum_swr_replay.decoding.results import nonlocal_probability, open_results
+from continuum_swr_replay.decoding.results import (
+    ENCODING_KEY,
+    load_saved_detector,
+    nonlocal_probability,
+    open_results,
+)
+from tests.support._memoryless_clusterless_epoch import _StandInDetector
 
 STATES = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
 
@@ -106,3 +113,33 @@ def test_the_non_local_probability_sums_the_two_non_local_states_row_by_row():
         total,
         pd.Series(np.array([0.5, 1.0, np.nan], np.float32), index=frame.index),
     )
+
+
+class _Environment:
+    """The attributes the loader reads of an encoding environment."""
+
+    def __init__(self, centers, interior) -> None:
+        self.place_bin_centers_ = centers
+        self.is_track_interior_ = interior
+
+
+def test_a_saved_detector_comes_back_with_its_grid_marked_fitted(tmp_path):
+    """The flag is restored only for a grid that is there; a missing file, a
+    missing encoding group and a missing grid are each refused."""
+    path = tmp_path / "e_detector.pkl"
+    with pytest.raises(FileNotFoundError, match="No detector"):
+        load_saved_detector(path)
+
+    joblib.dump(_StandInDetector({("other", 7): {}}), path)
+    with pytest.raises(KeyError, match=r"other.*7"):
+        load_saved_detector(path)
+
+    environment = _Environment(np.arange(3.0), np.ones(3, dtype=bool))
+    joblib.dump(_StandInDetector({ENCODING_KEY: {"environment": environment}}), path)
+    loaded = load_saved_detector(path)
+    assert loaded.encoding_model_[ENCODING_KEY]["environment"]._is_fitted is True
+
+    environment.place_bin_centers_ = None
+    joblib.dump(_StandInDetector({ENCODING_KEY: {"environment": environment}}), path)
+    with pytest.raises(ValueError, match="place grid"):
+        load_saved_detector(path)

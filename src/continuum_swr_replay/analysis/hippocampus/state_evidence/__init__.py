@@ -171,7 +171,6 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
     CV_BLOCK_S,
-    ENCODING_KEY,
     EVENT_MARGIN_BINS,
     RUNNING_ENCODING_MIN_SPEED_CM_S,
     UNDERFLOW_OCCUPANCY_FLOOR,
@@ -211,7 +210,6 @@ __all__ = [
     "CALIBRATION_METRICS",
     "CV_BLOCK_S",
     "ENCODING_HELD_OUT",
-    "ENCODING_KEY",
     "ENCODING_LABELS",
     "EVENT_MARGIN_BINS",
     "EPOCH_SUMMARY",

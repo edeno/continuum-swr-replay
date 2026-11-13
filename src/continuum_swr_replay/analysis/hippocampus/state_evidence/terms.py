@@ -10,21 +10,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-import joblib
 import numpy as np
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     CLUSTERLESS_LIKELIHOOD_KEYS,
-    ENCODING_KEY,
 )
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.results import ENCODING_KEY, load_saved_detector
 from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.paths import processed_data_dir
 
 
 def load_detector(epoch_id: str, decode_dir: Path | None = None) -> Any:
-    """The decode's saved detector, its encoding environment marked fitted.
+    """The decode's saved detector, its encoding environment marked fitted
+    (``decoding.results.load_saved_detector``).
 
     Parameters
     ----------
@@ -36,21 +36,12 @@ def load_detector(epoch_id: str, decode_dir: Path | None = None) -> Any:
 
     Raises
     ------
-    KeyError
-        The detector holds no :data:`ENCODING_KEY` encoding model.
+    FileNotFoundError, KeyError, ValueError
+        As ``decoding.results.load_saved_detector``.
     """
     if decode_dir is None:
         decode_dir = processed_data_dir()
-    detector = joblib.load(decode_paths(epoch_id, Path(decode_dir)).detector)
-    if ENCODING_KEY not in detector.encoding_model_:
-        raise KeyError(
-            f"ENCODING_KEY {ENCODING_KEY!r} not in encoding_model_; "
-            f"available: {list(detector.encoding_model_.keys())}"
-        )
-    # The fit flag is not persisted through save/load, but the grid data is
-    # intact; set it so native track-distance methods work.
-    detector.encoding_model_[ENCODING_KEY]["environment"]._is_fitted = True
-    return detector
+    return load_saved_detector(decode_paths(epoch_id, Path(decode_dir)).detector)
 
 
 def encoding_inputs(encoding_model: dict) -> dict:

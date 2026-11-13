@@ -39,12 +39,12 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     CLUSTERLESS_LIKELIHOOD_KEYS,
 )
 from continuum_swr_replay.analysis.hippocampus.state_evidence import (
-    ENCODING_KEY,
     STATES,
     UNDERFLOW_OCCUPANCY_FLOOR,
     interior_bin_mask,
     nearest_interior_bins,
 )
+from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.runs import batch
 from continuum_swr_replay.tables.io import read_table
