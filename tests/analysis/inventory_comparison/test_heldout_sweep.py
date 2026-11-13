@@ -64,3 +64,15 @@ class TestEventTruth:
             heldout_sweep.event_truth(event(5.1, 5.2), None, RECORDED)
             == "recorded_event"
         )
+
+
+def test_the_tiling_folds_split_every_cell_and_the_other_fold_does_not():
+    """A and B's evaluation cells are all the cells between them; C's are half."""
+    folds = heldout_sweep.folds()
+    n_cells = sweep.N_NEURONS
+
+    assert heldout_sweep.FOLDS == ("A", "B", "C")
+    assert heldout_sweep.TILING_FOLDS == ("A", "B")
+    tiled = np.concatenate([folds[f][1] for f in heldout_sweep.TILING_FOLDS])
+    np.testing.assert_array_equal(np.sort(tiled), np.arange(n_cells))
+    assert len(folds["C"][1]) < n_cells

@@ -46,6 +46,14 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
     outside_window_call_statistics,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_controls import (
+    MULTIPART_CONDITIONS,
+)
+from continuum_swr_replay.analysis.inventory_comparison.heldout_sweep import (
+    FOLDS,
+    OUR_EVENT_CLASSES,
+    TILING_FOLDS,
+)
 from continuum_swr_replay.paths import ROOT_DIR, memoryless_root, processed_data_dir
 from continuum_swr_replay.reported.formatting import format_number, milliseconds
 from continuum_swr_replay.reported.values import (
@@ -639,7 +647,6 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
 
 # --- the memoryless comparison: activity that is not one clean replay (l-o) ---
 
-_MULTIPART = ("jump_120ms", "jump_200ms", "chain_continuing", "chain_elsewhere")
 _SLIDING = "sliding_published"
 _OURS = "state_space_canonical"
 
@@ -686,13 +693,13 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
     elsewhere_split = carving(("chain_elsewhere",), "one_per_part", _OURS)
     recovery = {
         detector: sweep_statistics.part_recovery_statistics(
-            controls, _MULTIPART, detector
+            controls, MULTIPART_CONDITIONS, detector
         )
         for detector in (_SLIDING, _OURS)
     }
     if any(
         trials(condition, _SLIDING) != trials(condition, _OURS)
-        for condition in _MULTIPART
+        for condition in MULTIPART_CONDITIONS
     ):
         raise ValueError("the two detectors are scored on different multi-part trials")
 
@@ -907,10 +914,6 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
 
 # --- the memoryless comparison: held-out evidence (p, q) ----------------------
 
-_FOLDS = ("A", "B", "C")
-_TILING_FOLDS = ("A", "B")
-"""The folds whose evaluation cells tile the track."""
-
 
 def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
     """Panels (p, q): content estimated from discovery cells, scored on held-out
@@ -933,19 +936,20 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
             heldout, fold, classes, "continuous_replay"
         )["rate"]
 
-    either = ("ours_only", "shared")
-    ours = over_folds(_TILING_FOLDS, ("ours_only",), "continuous_replay")
-    shared = over_folds(_FOLDS, ("shared",), "continuous_replay")
-    jumping = over_folds(_TILING_FOLDS, either, "non_local")
+    ours = over_folds(TILING_FOLDS, ("ours_only",), "continuous_replay")
+    shared = over_folds(FOLDS, ("shared",), "continuous_replay")
+    jumping = over_folds(TILING_FOLDS, OUR_EVENT_CLASSES, "non_local")
     informative = {
         name: over_folds(
-            _TILING_FOLDS, classes, "continuous_replay", measure="informative_share"
+            TILING_FOLDS, classes, "continuous_replay", measure="informative_share"
         )
         for name, classes in (("ours", ("ours_only",)), ("shared", ("shared",)))
     }
     # refuses a summary in which an informative place-less burst has support
-    placeless = sweep_statistics.placeless_burst_statistics(heldout, _FOLDS)
-    placeless_loose = over_folds(_FOLDS, either, "no_content", suffix="_floor2")
+    placeless = sweep_statistics.placeless_burst_statistics(heldout, FOLDS)
+    placeless_loose = over_folds(
+        FOLDS, OUR_EVENT_CLASSES, "no_content", suffix="_floor2"
+    )
     if shared["rate_spread"] != 0:
         raise ValueError(
             "the caption states one held-out support rate for shared replays; the "

@@ -150,3 +150,21 @@ class TestPartAlone:
         alone = sweep_controls.part_alone_spikes(original, injected, (1.0, 1.15))
 
         np.testing.assert_array_equal(alone[0], [0.5, 1.01, 1.02, 1.2, 1.3, 2.0])
+
+
+def test_multipart_conditions_are_the_trials_with_two_parts():
+    """The jumps and the chains, in the order the trials yield them; no burst."""
+    two_parts = dict.fromkeys(
+        name
+        for name, _, _, _, pieces in sweep_controls.trials(MEANS, 1000.0)
+        if pieces is not None
+        and sum(isinstance(piece, Segment) for piece in pieces) == 2
+    )
+
+    assert sweep_controls.MULTIPART_CONDITIONS == tuple(two_parts)
+    assert sweep_controls.MULTIPART_CONDITIONS == (
+        "jump_120ms",
+        "jump_200ms",
+        "chain_continuing",
+        "chain_elsewhere",
+    )

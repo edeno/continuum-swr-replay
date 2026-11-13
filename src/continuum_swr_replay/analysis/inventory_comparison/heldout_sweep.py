@@ -49,8 +49,11 @@ from continuum_swr_replay.analysis.inventory_comparison.heldout import (
 )
 
 __all__ = [
+    "FOLDS",
     "N_PERMUTATIONS",
+    "OUR_EVENT_CLASSES",
     "PLACEMENT_SEED",
+    "TILING_FOLDS",
     "event_truth",
     "fold_models",
     "folds",
@@ -72,6 +75,19 @@ PLACEMENT_SEED = 2
 def folds() -> dict:
     """The discovery and evaluation cells of each fold, by fold name."""
     return interleaved_folds(sweep.N_NEURONS) | poor_coverage_fold(sweep.N_NEURONS)
+
+
+FOLDS = tuple(folds())
+"""The folds' names, in order: ``("A", "B", "C")``."""
+
+TILING_FOLDS = tuple(interleaved_folds(sweep.N_NEURONS))
+"""The folds whose evaluation cells tile the track (``A``, ``B``); the other
+fold's evaluation cells cover half of it."""
+
+OUR_EVENT_CLASSES = ("ours_only", "shared")
+"""The classes of the events our detector reports
+(:func:`~continuum_swr_replay.analysis.inventory_comparison.heldout.event_classes`):
+alone, or overlapping an event of the sliding window."""
 
 
 def fold_models(discovery: np.ndarray, evaluation: np.ndarray, seed: int = 0):

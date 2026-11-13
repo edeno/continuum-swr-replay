@@ -49,12 +49,14 @@ __all__ = [
     "DETECTORS",
     "FAR_END_CM",
     "JUMP_CM",
+    "MULTIPART_CONDITIONS",
     "N_RECORDINGS",
     "PART_CM",
     "SEGMENT_S",
     "condition_rng",
     "covered_cm",
     "detector_events",
+    "jump_condition",
     "jump_segments",
     "part_alone_spikes",
     "run_detectors",
@@ -91,6 +93,15 @@ CHAIN_STARTS_CM = {"chain_continuing": (30.0, 90.0), "chain_elsewhere": (90.0, 1
 """Where each chain's two parts start; both reach 150 cm at most. Continuing: the
 second picks up where the first ended. Elsewhere: the second starts 140 cm
 from the first's end."""
+
+
+def jump_condition(segment_s: float) -> str:
+    """The name of the mid-event jump condition whose parts last ``segment_s``."""
+    return f"jump_{1000 * segment_s:.0f}ms"
+
+
+MULTIPART_CONDITIONS = (*map(jump_condition, SEGMENT_S), *CHAIN_STARTS_CM)
+"""The conditions whose events have two parts: the jumps and the chains."""
 
 N_RECORDINGS = 8
 """Recordings for the no-replay control. The simulator's seed changes the
@@ -187,7 +198,7 @@ def trials(means: np.ndarray, sampling_frequency: float):
             for jump_cm in JUMP_CM:
                 pieces = jump_segments(segment_s, jump_cm)
                 yield (
-                    f"jump_{1000 * segment_s:.0f}ms",
+                    jump_condition(segment_s),
                     jump_cm,
                     rate_hz,
                     replay(pieces, rate_hz),

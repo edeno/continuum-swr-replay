@@ -92,6 +92,14 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     DEFAULT_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_controls import (
+    MULTIPART_CONDITIONS,
+)
+from continuum_swr_replay.analysis.inventory_comparison.heldout_sweep import (
+    FOLDS,
+    OUR_EVENT_CLASSES,
+    TILING_FOLDS,
+)
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.visualization.figure_utilities import (
@@ -132,14 +140,14 @@ controls, held-out evidence."""
 HELDOUT_GROUPS = (
     ("replay,\nours only", ("ours_only",), "continuous_replay"),
     ("replay,\nshared", ("shared",), "continuous_replay"),
-    ("jumping\nburst", ("ours_only", "shared"), "non_local"),
-    ("place-less\nburst", ("ours_only", "shared"), "no_content"),
+    ("jumping\nburst", OUR_EVENT_CLASSES, "non_local"),
+    ("place-less\nburst", OUR_EVENT_CLASSES, "no_content"),
 )
 """The kinds of event the held-out panels compare: by which detectors found
 them and what they truly are."""
 
-FOLD_HATCH = {"A": None, "B": None, "C": "////"}
-"""Fold C's evaluation cells cover only half the track."""
+FOLD_HATCH = {fold: None if fold in TILING_FOLDS else "////" for fold in FOLDS}
+"""A fold whose evaluation cells cover only half the track is hatched."""
 
 OUTPUTS = (
     ("sliding_accepted", "sliding, before test", 0.4),
@@ -148,14 +156,6 @@ OUTPUTS = (
     ("state_space_continuous", "ours, continuous", 0.4),
 )
 """The four scored outputs of the controls, with their bar opacity."""
-
-MULTIPART_CONDITIONS = (
-    "jump_120ms",
-    "jump_200ms",
-    "chain_continuing",
-    "chain_elsewhere",
-)
-"""The controls conditions whose events have two parts."""
 
 SEGMENTATION_STYLE = (
     ("spanning", "0.2", "one event over all parts"),
