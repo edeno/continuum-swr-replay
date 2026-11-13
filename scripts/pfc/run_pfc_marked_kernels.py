@@ -75,6 +75,7 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     MARKED_EVENT_CLASSES,
     build_marked_model_ladder,
     fit_marked_kernel_ladder,
+    fit_rate_columns,
     prepare_marked_session_context,
 )
 from continuum_swr_replay.analysis.pfc.modulation import (
@@ -602,9 +603,8 @@ def run_analysis(
         statistics["epoch_name"] = epoch_name
         statistics["brain_area"] = brain_area
         statistics["stop_cohort"] = STOP_COHORT
-        statistics["fit_spike_count"] = context.counts.sum(axis=0).astype(int)
-        statistics["fit_firing_rate_hz"] = (
-            context.counts.mean(axis=0) * SAMPLING_FREQUENCY
+        statistics = statistics.assign(
+            **fit_rate_columns(context.counts, SAMPLING_FREQUENCY)
         )
 
         report = in_report_window(context.lag_time)

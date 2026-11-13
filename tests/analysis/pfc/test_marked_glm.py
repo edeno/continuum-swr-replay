@@ -25,6 +25,7 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     build_marked_model_ladder,
     event_basis_block,
     fit_marked_kernel_ladder,
+    fit_rate_columns,
     permuted_mark_blocks,
     standardize_event_marks,
     weighted_event_onset_counts,
@@ -814,6 +815,18 @@ def test_synthetic_mark_kernel_is_recovered_and_improves_heldout_prediction():
         ]
         == 0
     )
+
+
+def test_fit_rate_columns_are_spikes_and_mean_rate_on_the_fitted_bins():
+    """Four fitted bins at 500 Hz: 3 spikes are 375 Hz, none is 0 Hz."""
+    counts = np.array([[0.0, 0.0], [2.0, 0.0], [0.0, 0.0], [1.0, 0.0]])
+
+    columns = fit_rate_columns(counts, 500.0)
+
+    np.testing.assert_array_equal(columns["fit_spike_count"], [3, 0])
+    assert columns["fit_spike_count"].dtype.kind == "i"
+    np.testing.assert_allclose(columns["fit_firing_rate_hz"], [375.0, 0.0])
+    assert list(columns) == ["fit_spike_count", "fit_firing_rate_hz"]
 
 
 def test_ordinary_and_unit_weighted_basis_blocks_are_identical():

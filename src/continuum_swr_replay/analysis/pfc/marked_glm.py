@@ -344,6 +344,29 @@ class MarkedSessionContext:
     baseline_report: dict[str, Any]
 
 
+def fit_rate_columns(counts: NDArray, sampling_frequency: float) -> dict[str, NDArray]:
+    """Each unit's spikes on the fitted bins and its mean rate over them.
+
+    Parameters
+    ----------
+    counts : NDArray, shape (n_fit_bins, n_units)
+        Spike counts on the fitted bins (``MarkedSessionContext.counts``).
+    sampling_frequency : float
+        Bins per second.
+
+    Returns
+    -------
+    dict
+        ``fit_spike_count`` (int, shape ``(n_units,)``) and
+        ``fit_firing_rate_hz`` (the mean count per bin times
+        ``sampling_frequency``), the columns a marked bundle carries.
+    """
+    return {
+        "fit_spike_count": counts.sum(axis=0).astype(int),
+        "fit_firing_rate_hz": counts.mean(axis=0) * sampling_frequency,
+    }
+
+
 def build_baseline_columns(
     fit_mask: pd.Series,
     cohort_stops: pd.DataFrame,
