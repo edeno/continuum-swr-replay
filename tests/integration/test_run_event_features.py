@@ -265,7 +265,9 @@ def write_stop_table(path: Path) -> None:
                 }
             )
         )
-    pd.concat(rows, ignore_index=True).to_parquet(path)
+    write_table(
+        analysed_time.stamp_swr_source(pd.concat(rows, ignore_index=True)), path
+    )
 
 
 @pytest.fixture(scope="module")
