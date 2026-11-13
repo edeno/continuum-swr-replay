@@ -20,7 +20,7 @@ it stops drifting; add new docs to the matching home.
 | review (code/methods output) | `.claude/docs/reviews/` | point-in-time review reports, and the dated audits (before/after refit comparisons, regeneration and parity checks). A decision, validation or limitation a reader needs is copied into `docs/design/` or `docs/known_issues/`, which may link back to the audit as its dated source |
 | exploratory notes + figures | `.claude/research/` | scratch analyses; `*_outputs/` figures. Untracked, so no doc or docstring cites it as evidence: a finding a reader needs is written into `docs/design/` or `docs/known_issues/` as a dated measurement |
 | code map (generated) | `docs/regression_pipeline_map.md` | every pipeline module and the public symbols it defines, by stage |
-| model spec (code) | `src/continuum_swr_replay/analysis/behavior/model_specs.py` | single source of truth for all model ladders |
+| model spec (code) | `src/continuum_swr_replay/analysis/replay_models/model_specs.py` | single source of truth for all model ladders |
 
 Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.claude/`.**
 
@@ -105,9 +105,10 @@ layers below it, never from a layer above:
    signed-rank test, the Benjamini-Hochberg correction, the animal-balanced
    summary over sessions and the nested bootstrap. It imports nothing from the
    package.
-3. **The other `analysis/` packages** (`hippocampus/`, `behavior/`, `pfc/`,
-   `contfrag/`, `inventory_comparison/`). `hippocampus/` never imports `pfc/` or
-   `inventory_comparison/`. No `analysis/` code imports `visualization/`.
+3. **The other `analysis/` packages** (`hippocampus/`, `behavior/`, `event_tables/`,
+   `replay_models/`, `pfc/`, `contfrag/`, `inventory_comparison/`). `hippocampus/`
+   never imports `pfc/`, `inventory_comparison/` or the three data-flow packages
+   below. No `analysis/` code imports `visualization/`.
 4. **`visualization/`** and **`reported/`** (the summary
    builders), side by side, then **`scripts/`** on top. `reported/` imports the
    foundation and `analysis/` (it names and describes the statistics that `analysis/`
@@ -120,15 +121,28 @@ only the foundation and `analysis/`, that `analysis/constants.py` imports only t
 foundation, and that `analysis/shared_statistics.py` imports nothing from the package.
 It does keep `analysis/` and `visualization/` from importing `reported/`. It also keeps
 `data_loaders/` from importing `analysis/`, `hippocampus/` from importing `behavior/`,
-and the covariate builders from importing `model_specs.py`, and has no allowlist: any
-violation fails.
+`event_tables/` or `replay_models/`, and the covariate builders from importing
+`replay_models/model_specs.py`, and has no allowlist: any violation fails.
 
-Inside `analysis/behavior/` the subpackages import in one direction: `covariates/`,
-then `choice/`, then `tables/`, then `rate/`, `content/` and `coupling/`, which do
-not import each other; each may import the modules at the package's top level, which hold
-what several subpackages share (the package docstring lists them); a top-level module
-imports no subpackage, except that `cohort_audit`, `covariate_timing` and
-`contrast_aggregation` import `covariates/`. The layering test checks both.
+The behavior-to-model code is three packages in data-flow order, and each imports
+only those before it:
+
+- **`analysis/behavior/`**: what the animal did and what the behavioral model says.
+  `covariates/` (the behavioral covariates, their catalog and the behavioral-model
+  values), `design_constants.py` (the numbers the covariate builders and the model
+  ladders share), `history_basis.py` and `spatial_mapping.py` (the track lookups).
+  It imports neither `event_tables/` nor `replay_models/`.
+- **`analysis/event_tables/`**: the canonical event, arm, patch, stop and time-bin
+  tables, built by `prepare_data.py` from `event_table.py`, `arm_patch_tables.py`,
+  `stop_table.py` and `timebin_tables.py`, and their contracts. It imports
+  `behavior/`, never `replay_models/`.
+- **`analysis/replay_models/`**: the Part 3 models (`rate/`, `content/`,
+  `coupling/`, `choice/`, which do not import each other) and the machinery they
+  share at its top level (`model_specs.py`, `per_bin_design.py`, the fitters, the
+  cohort, timing and contrast modules), which imports none of those subpackages.
+
+Inside `behavior/`, the top-level modules do not import `covariates/`. The layering
+test checks every rule in this paragraph.
 
 Where each moved, renamed or split module went (2026-10 and 2026-11) is recorded in
 [history/2026-module-moves.md](history/2026-module-moves.md).
@@ -162,15 +176,15 @@ Three tiers:
 
    | dir | producer | holds |
    |---|---|---|
-   | `models_per_bin_rate/` | `scripts/behavior/rate/fit_per_bin_rate_models.py`, `fit_swr_contrast_rate.py`, `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` | the per-bin rate fits: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `cross_history_models.pkl`; plus three exploratory one-offs nothing supported reads (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) |
-   | `models_per_event_swr_power/` | `scripts/behavior/coupling/fit_swr_power_model.py` | the per-event ripple-power model `swr_power_model.pkl`, its `.z_reference_by_session.json` and its two audits |
-   | `models_per_stop_rate/` | `scripts/behavior/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
-   | `models/`, `models_patch/` | `scripts/behavior/content/fit_replay_content_models.py` (arm / patch) | the default content ladders — arm `M0`, `M0a`, `M1`–`M6`; patch `P0`–`P3` — on the at-well events, plus the opt-in value/uncertainty rungs (`Mv`, `Mu`, `Mvu`, `Pv`) when named with `--models` |
+   | `models_per_bin_rate/` | `scripts/replay_models/rate/fit_per_bin_rate_models.py`, `fit_swr_contrast_rate.py`, `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` | the per-bin rate fits: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `cross_history_models.pkl`; plus three exploratory one-offs nothing supported reads (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) |
+   | `models_per_event_swr_power/` | `scripts/replay_models/coupling/fit_swr_power_model.py` | the per-event ripple-power model `swr_power_model.pkl`, its `.z_reference_by_session.json` and its two audits |
+   | `models_per_stop_rate/` | `scripts/replay_models/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
+   | `models/`, `models_patch/` | `scripts/replay_models/content/fit_replay_content_models.py` (arm / patch) | the default content ladders — arm `M0`, `M0a`, `M1`–`M6`; patch `P0`–`P3` — on the at-well events, plus the opt-in value/uncertainty rungs (`Mv`, `Mu`, `Mvu`, `Pv`) when named with `--models` |
    | `models_swr_{T,F}/`, `models_patch_swr_{T,F}/` | same, `--swr-subset T\|F` | content split by SWR (T) / non-SWR (F) |
    | `models_dm/` | same, `--estimator dirichlet_multinomial` | the M0–M6 arm ladder refit as a Dirichlet-multinomial; the matching contrast bundles `swr_contrast_content_{arm,patch,audited}_dm{,_rewarded,_omitted,_len}.pkl` sit in `models_swr_contrast/` beside their conditional twins |
-   | `content_estimator_comparison/` | `scripts/behavior/content/compare_content_estimators.py` | the three-estimator comparison ([design/content_estimator_comparison.md](design/content_estimator_comparison.md)) |
-   | `stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/behavior/choice/run_stay_leave.py` | the per-stop replay summary and the stay/leave models |
-   | `stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/behavior/choice/run_retrospective_alignment.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
+   | `content_estimator_comparison/` | `scripts/replay_models/content/compare_content_estimators.py` | the three-estimator comparison ([design/content_estimator_comparison.md](design/content_estimator_comparison.md)) |
+   | `stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/replay_models/choice/run_stay_leave.py` | the per-stop replay summary and the stay/leave models |
+   | `stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/replay_models/choice/run_retrospective_alignment.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
 
    Every rate, content and PFC fit is on the **well-anchored stop cohort**; a
    `*_allstops` or `*_intransit` suffix marks a sensitivity bundle

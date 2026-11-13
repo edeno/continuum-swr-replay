@@ -3,8 +3,8 @@
 **What this is.** The evidence for two choices of the per-bin rate models (Family B,
 [../rate_models.md](../rate_models.md)): a bin inside an ongoing event of the outcome's
 detector is not at risk, and history is read from past events' ends as well as their
-onsets (`MODEL_CROSS_HISTORY_DURATION_RATE` in `analysis/behavior/model_specs.py`;
-the runner is `scripts/behavior/rate/fit_duration_aware_history_rate.py`). The evidence
+onsets (`MODEL_CROSS_HISTORY_DURATION_RATE` in `analysis/replay_models/model_specs.py`;
+the runner is `scripts/replay_models/rate/fit_duration_aware_history_rate.py`). The evidence
 is a simulation, run 2026-10-26; no real data was read. Its numbers describe the
 simulation and are not reported values. The dated report with every table is
 [2026-10-26-duration-aware-history-simulation.md](../../.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md).
@@ -20,7 +20,7 @@ Are these artefacts of event duration, or real refractoriness, rhythm and coupli
 
 ## How it was checked
 
-`analysis/behavior/rate/duration_history_simulation.py` simulates two streams of
+`analysis/replay_models/rate/duration_history_simulation.py` simulates two streams of
 non-overlapping events (SWR-coupled and non-SWR) with lognormal durations under four
 known truths: (a) no dependence beyond non-overlap; (b) fragmentation, a rise in both
 streams' rate just after any event's end; (c) an onset-locked rhythm in each stream;
@@ -29,7 +29,7 @@ data set is fit by the real design builder and fitter (`aggregate_to_timebins`,
 `freeze_per_bin_cohort`, `fit_per_bin_rate_model`), on the onset-only all-bins design
 and on the at-risk design with onset and end history, pooled and per simulated session.
 The recovery is pinned, seeded, in
-`tests/analysis/behavior/rate/test_duration_history_simulation.py`.
+`tests/analysis/replay_models/rate/test_duration_history_simulation.py`.
 
 ## What it found
 

@@ -49,7 +49,7 @@ panels.
 | Comparator-only and ours-only events, with their spike evidence | `scripts/figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` |
 | Content against reward-belief uncertainty (run `content.fig.uncertainty`) | `scripts/figures/generate_uncertainty_content_figure.py` | `paper/figures/uncertainty_content/` |
 | SWR against non-SWR coefficients, rate and content (run `content.fig.swr_contrast_coefs`) | `scripts/figures/plot_swr_contrast_coefs.py` | `paper/figures/swr_contrast/` |
-| Content models under three estimators (conditional Poisson on counts, on fractions, Dirichlet-multinomial) on one cohort | `scripts/behavior/content/compare_content_estimators.py` | `paper/figures/content_estimators/` |
+| Content models under three estimators (conditional Poisson on counts, on fractions, Dirichlet-multinomial) on one cohort | `scripts/replay_models/content/compare_content_estimators.py` | `paper/figures/content_estimators/` |
 
 The Part 3 figures that read the fits are drawn by `scripts/workflows/run_refits.py`,
 which names each by its run (`rate.fig.*`, `content.fig.*`; `--dry-run` lists

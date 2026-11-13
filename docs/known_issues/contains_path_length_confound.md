@@ -8,7 +8,7 @@
 
 `contains_path_to_next` is all-or-nothing: every arm in
 `arm_path_well_to_well(current_arm, next_arm)` must appear in the event's
-MAP-arm trace ([`retrospective.py`](../../src/continuum_swr_replay/analysis/behavior/choice/retrospective.py),
+MAP-arm trace ([`retrospective.py`](../../src/continuum_swr_replay/analysis/replay_models/choice/retrospective.py),
 `_contains_path`). On the spider track the required set has a different size
 depending on the trip:
 
@@ -66,7 +66,7 @@ in contains rate with identical content.
 
 ## Current exposure
 
-**One consumer, and it ships outputs.** `scripts/behavior/choice/run_retrospective_alignment.py`
+**One consumer, and it ships outputs.** `scripts/replay_models/choice/run_retrospective_alignment.py`
 computes `contains_path_to_next` for every session — it is one of
 `retrospective._DEFAULT_METRICS` — and its results are on disk as
 `replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl`, 218 rows

@@ -41,7 +41,7 @@ one-population null tested against its split.
 - **Spec:** `MODEL_PER_STOP_RATE` (`R0` null, `R1` reward-history
   raised-cosine basis `reward_history_rcos_0..2` + `reward_history_incomplete`)
   in
-  [`model_specs.py`](../src/continuum_swr_replay/analysis/behavior/model_specs.py).
+  [`model_specs.py`](../src/continuum_swr_replay/analysis/replay_models/model_specs.py).
 
 > **Timing definition:** the basis is built from the outcomes physically known
 > at bout start. The newest known outcome names the arrived trip after that
@@ -81,8 +81,8 @@ one-population null tested against its split.
 - **Estimator:** one ordinary Poisson GLM per stop on the event *count*, with a
   `log(immobility_time)` offset — `exp(coef)` is the multiplicative change in
   events per **second of immobility**
-  ([`per_stop_rate_model.py`](../src/continuum_swr_replay/analysis/behavior/rate/per_stop_rate_model.py)).
-- **Runner / output:** `scripts/behavior/rate/fit_per_stop_rate_models.py` →
+  ([`per_stop_rate_model.py`](../src/continuum_swr_replay/analysis/replay_models/rate/per_stop_rate_model.py)).
+- **Runner / output:** `scripts/replay_models/rate/fit_per_stop_rate_models.py` →
   `Processed-Data/replay_content/models_per_stop_rate/all_models.pkl`.
 - **Cite it for:** the Ambrose 2016 / Sosa 2020 reward-rate comparison (same
   Poisson-events-per-second estimator) and the **detected-SWR positive
@@ -108,12 +108,12 @@ offset. Its limitation is exactly that offset — see below.
 - **Spec:** `MODEL_PER_BIN_RATE`, a **point-process GLM
   conditional-intensity ladder** (Truccolo–Eden–Brown 2005) `M0_const … M9r`,
   plus an arrival-anchored sub-ladder (`M0a`/`M5a`/`M7ra`), in
-  [`model_specs.py`](../src/continuum_swr_replay/analysis/behavior/model_specs.py).
+  [`model_specs.py`](../src/continuum_swr_replay/analysis/replay_models/model_specs.py).
 - **Estimator:** one Poisson GLM per session on the **(stop × 15 ms bin)**
   design from `aggregate_to_timebins`, with a `log(exposure)` offset; the
   within-stop time course is modelled explicitly by a `bs(tc, df=4)` spline
   rather than averaged into a per-stop dwell offset
-  ([`per_bin_rate_model.py`](../src/continuum_swr_replay/analysis/behavior/rate/per_bin_rate_model.py)).
+  ([`per_bin_rate_model.py`](../src/continuum_swr_replay/analysis/replay_models/rate/per_bin_rate_model.py)).
 - **At-risk bins (2026-11-03).** Only bins in which an event can start enter
   the fit: a bin inside an ongoing event of the outcome's detector is dropped
   (all Kay SWRs for detected SWR; all non-local events, with or without an
@@ -190,12 +190,12 @@ offset. Its limitation is exactly that offset — see below.
   whose reward terms all pass the per-term separation gate: <!--v:behavior.rate_kernel_sessions_swr-->239<!--/v--> / <!--v:behavior.rate_kernel_sessions_non_local-->240<!--/v--> / <!--v:behavior.rate_kernel_sessions_non_local_swr-->213<!--/v--> / <!--v:behavior.rate_kernel_sessions_non_local_no_swr-->215<!--/v-->
   in the same order.
   Quote the per-rung, per-population `n`, not a flat <!--v:behavior.rate_sessions-->242<!--/v-->.
-- **Runner / output:** `scripts/behavior/rate/fit_per_bin_rate_models.py`
+- **Runner / output:** `scripts/replay_models/rate/fit_per_bin_rate_models.py`
   (`--workers N` fans sessions over processes) →
   `Processed-Data/replay_content/models_per_bin_rate/all_models.pkl`. Plot with
-  `scripts/behavior/rate/plot_per_bin_rate_models.py`
+  `scripts/replay_models/rate/plot_per_bin_rate_models.py`
   (→ `reward_kernel_basis.png`, `selfhistory_autocorr.png`) and
-  `scripts/behavior/rate/plot_per_bin_rate_summary.py` (→ `per_bin_rate_ladder_summary.png`).
+  `scripts/replay_models/rate/plot_per_bin_rate_summary.py` (→ `per_bin_rate_ladder_summary.png`).
   Each panel draws a package function's numbers over the sessions the summary
   reads such numbers over: the reward kernel and the single basis coefficients
   over the sessions the per-term gate keeps; the SWR-coupled against non-SWR
@@ -211,9 +211,9 @@ offset. Its limitation is exactly that offset — see below.
   descriptive PSTH `scripts/exploratory/_timeresolved_psth.py`
   (→ `rate_timecourse_vs_pump.png`) reads the onset/dense tables directly.
 
-  The four rate fitters — `scripts/behavior/rate/fit_per_bin_rate_models.py`,
-  `scripts/behavior/rate/fit_per_stop_rate_models.py`, `scripts/behavior/rate/fit_swr_contrast_rate.py`
-  and `scripts/behavior/rate/fit_uncertainty_rate.py` — plus the audited `is_swr`-contrast
+  The four rate fitters — `scripts/replay_models/rate/fit_per_bin_rate_models.py`,
+  `scripts/replay_models/rate/fit_per_stop_rate_models.py`, `scripts/replay_models/rate/fit_swr_contrast_rate.py`
+  and `scripts/replay_models/rate/fit_uncertainty_rate.py` — plus the audited `is_swr`-contrast
   aggregation each write an `<artifact>.provenance.json`
   sidecar beside the artifact recording the git hash, the estimator, the command line, and
   the SHA-256 / mtime / covariate-schema version of each input table. Readers
@@ -221,7 +221,7 @@ offset. Its limitation is exactly that offset — see below.
   changed since it was written — unless `--allow-stale` is passed, so a plot or
   a summary cannot silently describe a fit of an older table. Re-deriving the
   `is_swr`-contrast aggregate after an aggregation rule changes does not need a
-  refit: `scripts/behavior/rate/fit_swr_contrast_rate.py --aggregate-only` rebuilds the
+  refit: `scripts/replay_models/rate/fit_swr_contrast_rate.py --aggregate-only` rebuilds the
   audited table and its term diagnostics from the persisted per-session fits.
 - **Cite it for:** the **dwell-, time-, reward-history- and clustering-controlled
   dissociation**. In `M7r_time_histcos_rew`, the reconstructed reward kernel at
@@ -419,7 +419,7 @@ those are never shifted and are counted instead. On the canonical stop table <!-
 ## MU — the uncertainty/value model (Family B extension)
 
 `MU_uncertainty` (spec: `model_specs.MODEL_UNCERTAINTY_RATE`; runner:
-`scripts/behavior/rate/fit_uncertainty_rate.py`, output
+`scripts/replay_models/rate/fit_uncertainty_rate.py`, output
 `models_per_bin_rate/uncertainty_rate.pkl`) is an **out-of-ladder** Family-B spec
 that asks whether replay rate tracks the animal's *behavioral-model* value and
 uncertainty beyond the time/reward/history controls. It is the M7r base
@@ -443,7 +443,7 @@ uncertainty beyond the time/reward/history controls. It is the M7r base
   [behavior_model_covariates.md](behavior_model_covariates.md).
 
 Collinearity is controlled, and the exclusions are recorded in the runner
-(`scripts/behavior/rate/fit_uncertainty_rate.py`): the model's chosen-port value is not
+(`scripts/replay_models/rate/fit_uncertainty_rate.py`): the model's chosen-port value is not
 fit, being strongly correlated with ΔV; the nominal-RPE stand-in is not fit either
 (it tracks `rpe_postoutcome`, the behavioural-model RPE the block fits
 instead); `task_reward_probability_patch_mean_gap_best_vs_second` is kept
@@ -503,7 +503,7 @@ Wiener 2003 censoring correction for short/variable-length stops) — the
 rescaling math is not re-implemented here. The per-fit scalars
 (`ks_statistic`, `ks_within_band`, `max_isi_autocorr`, `dispersion`,
 `mean_predicted`, `max_predicted`) are persisted for every fit in
-`all_models.pkl`; `scripts/behavior/rate/plot_model_checking.py` summarizes them per rung
+`all_models.pkl`; `scripts/replay_models/rate/plot_model_checking.py` summarizes them per rung
 with `rate_fit_statistics.ladder_fit_statistics` for the
 up-the-ladder story (`model_checking_ladder.png`) and re-fits a couple of
 example sessions inline for the KS / Q-Q / ISI-autocorrelation / cumulative-
@@ -512,7 +512,7 @@ residual quartet (`model_checking_example_{rich,sparse}.png`).
 Every rate/content/choice fit additionally carries `converged` / `separated`
 status flags, the `|`-joined `separated_terms` naming the unidentified
 coefficients, a `sd_<term>` per coefficient, and an `n_convergence_warnings`
-count (from `analysis.behavior._fit_diagnostics`). Separation is judged **per
+count (from `analysis.replay_models._fit_diagnostics`). Separation is judged **per
 term**: the SE is non-finite or `> 1e3`, or `SE × the SD of its own predictor`
 reaches `1.0` — the SE read on the effect scale, so the threshold is
 `SE >= 1 / SD` — with `|coef| >= 10` standing in for a zero-SD column, which

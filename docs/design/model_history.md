@@ -1,7 +1,7 @@
 # Model design history
 
 The design-decision narrative for the replay-content model ladders, moved here
-from the `analysis/behavior/model_specs.py` module docstring so that module reads
+from the `analysis/replay_models/model_specs.py` module docstring so that module reads
 as the terse `ModelSpec` catalog it is. This is the scientific audit trail —
 including reversed reasoning and retracted numbers — and is preserved verbatim.
 The machine-readable catalog (which predictors each rung carries) lives in

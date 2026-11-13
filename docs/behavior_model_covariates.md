@@ -116,7 +116,7 @@ Checked against `references/Spatial_bandit_manuscript_v3.2_biorxiv_figs.pdf`
   value is **low**. Earlier labels called this "Stay-vs-Switch", which inverts the
   reading; corrected 2026-08-19 in `model_specs.py` and the docs, and the manuscript
   independently confirms the direction. **One stale label remains** in
-  `scripts/behavior/rate/fit_swr_contrast_rate.py:23`.
+  `scripts/replay_models/rate/fit_swr_contrast_rate.py:23`.
 - **Scale.** `reward_belief_mean_port_*` and
   `reward_belief_mean_chosen_arm_preoutcome` are probabilities in [0,1];
   `decision_value_patch_*` is the decision value `β·Q + b` and is **not**

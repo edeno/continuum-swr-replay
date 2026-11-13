@@ -188,8 +188,8 @@ Three properties of that control decide what the comparison can be read as.
   fit yet.
 
 Stage 6
-(`behavior/choice/run_stay_leave.py`) applies `select_stop_cohort` at the stop grain before
-its per-stop summary, and Stage 5B (`behavior/choice/run_retrospective_alignment.py`) takes its
+(`replay_models/choice/run_stay_leave.py`) applies `select_stop_cohort` at the stop grain before
+its per-stop summary, and Stage 5B (`replay_models/choice/run_retrospective_alignment.py`) takes its
 at-well membership from `select_event_cohort` at the event grain (keeping its
 finite-`occupancy_well_arm` conjunct). All three carry `--stop-cohort`; only the
 unit GLM and Stage 6 offer `all_stops`.
@@ -410,7 +410,7 @@ audits of them are kept as the record.
 ## Covariate causal hygiene
 
 Every ladder runner enforces covariate timing at model-build via
-`analysis.behavior.covariate_timing.assert_predictor_timing`; a rung whose
+`analysis.replay_models.covariate_timing.assert_predictor_timing`; a rung whose
 predictor is post-outcome or future-referencing must be **declared
 descriptive**, else the run fails.
 
@@ -435,7 +435,7 @@ descriptive**, else the run fails.
   `is_candidate_arm_never_visited` explicitly identifies novelty. The two enter
   together wherever recency/reward history is modeled.
 - The stay/leave model `is_stay ~ outcome * content`
-  (`scripts/behavior/choice/run_stay_leave.py`) legitimately uses the post-outcome
+  (`scripts/replay_models/choice/run_stay_leave.py`) legitimately uses the post-outcome
   `is_omitted_outcome`: its modeled unit (the stay/leave decision) is
   post-outcome by construction, so the timing gate does not apply.
 
@@ -448,7 +448,7 @@ Covered runners: `fit_replay_content_models.py` (content base ladder, common
 cohort), `fit_swr_contrast_content.py` and `fit_swr_contrast_rate.py` (the
 `is_swr`-contrast ladders), `fit_per_stop_rate_models.py` (Family A) and
 `fit_per_bin_rate_models.py` (Family B). The emitter is
-`analysis.behavior.cohort_audit`. Counts are in the row's `grain` (`event` for
+`analysis.replay_models.cohort_audit`. Counts are in the row's `grain` (`event` for
 content, `stop` for the rate families). Drops are **mutually exclusive**,
 assigned by priority:
 

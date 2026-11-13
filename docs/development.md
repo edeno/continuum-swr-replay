@@ -72,7 +72,9 @@ uv run --frozen mypy src/
 src/continuum_swr_replay/
 ├── data_loaders/          # Data loading from Spyglass/NWB (load_data in bandit_task.py)
 ├── analysis/              # Analysis modules
-│   ├── behavior/          #   the events and the task: covariates/, tables/, rate/, content/, coupling/, choice/, and the shared model ladders, fitters and fit statistics
+│   ├── behavior/          #   what the animal did: covariates/ (behavioral covariates, qvals_table), design constants, track lookups
+│   ├── event_tables/      #   the canonical event, arm, patch, stop and time-bin tables and their contracts
+│   ├── replay_models/     #   the Part 3 models: rate/, content/, coupling/, choice/, and the shared model ladders, fitters and fit statistics
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
 │   ├── events/            #   analysed-time rule, SWR source, event eligibility, classified event table, cohorts
 │   ├── hippocampus/       #   decode masks and aggregation, posterior/quality metrics, event statistics, SWR inventories, artifact detector
@@ -93,7 +95,7 @@ src/continuum_swr_replay/
 └── data_types.py          # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
-├── decoding/  detection/  tables/  behavior/{rate,content,coupling,choice}/  figures/  workflows/  checks/  pfc/  reported/
+├── decoding/  detection/  tables/  behavior/  replay_models/{rate,content,coupling,choice}/  figures/  workflows/  checks/  pfc/  reported/
 └── exploratory/           #   unsupported one-offs (_*.py)
 paper/                     # The manuscript — see paper/README.md
 ├── main.tex  main.pdf     #   LaTeX source and the built PDF (make manuscript)
@@ -119,7 +121,7 @@ tests/                     # pytest suite — see tests/README.md
 > The import layering rules are in [docs/README.md](README.md) ("Code layout"); where moved
 > modules and scripts went is in [docs/history/2026-module-moves.md](history/2026-module-moves.md).
 > **All model ladders (rate, content, is_swr-contrast) are defined in one place —
-> `src/continuum_swr_replay/analysis/behavior/model_specs.py`** (the single source of truth;
+> `src/continuum_swr_replay/analysis/replay_models/model_specs.py`** (the single source of truth;
 > `docs/models_table.md` mirrors it, its rung sets enforced by
 > `tests/repository/test_models_table_mirrors_specs.py` — the formulas themselves are not
 > pinned by that test). Where fitted outputs / figures land is in
@@ -273,7 +275,7 @@ The previously recorded Δ82/Δ250 magnitudes predate the unified speed
 gating and **must be re-derived** before being cited.
 
 The replay-content `build_event_table` in
-`analysis/behavior/tables/tables_event.py` builds on
+`analysis/event_tables/event_table.py` builds on
 top of this. The classified columns are merged in on `event_id`
 (`_merge_classified_event_facts`). Event timing is derived once, by the
 classified pass: its `event_start` / `event_end` / `event_duration` /
@@ -323,8 +325,8 @@ the rate at which events start while none is ongoing; Family A's are events per
 second of stop. See
 [docs/rate_models.md](rate_models.md) for which family to cite for what,
 the M0–M9 ladder, and the point-process model-checking. Runners:
-`scripts/behavior/rate/fit_per_stop_rate_models.py`, `scripts/behavior/rate/fit_per_bin_rate_models.py`;
-plotter: `scripts/behavior/rate/plot_per_bin_rate_models.py`.
+`scripts/replay_models/rate/fit_per_stop_rate_models.py`, `scripts/replay_models/rate/fit_per_bin_rate_models.py`;
+plotter: `scripts/replay_models/rate/plot_per_bin_rate_models.py`.
 
 ### Loading data for a session
 
@@ -465,11 +467,11 @@ Each builder's statistics:
   `scripts/pfc/summarize_pfc_marked_family.py` writes);
 - detection: `analysis/hippocampus/memoryless_sequence/sweep_statistics.py`, `recording_statistics.py`
   and `event_table.py`;
-- behavior: `analysis/behavior/coefficient_statistics.py` (a per-session fit summarized over sessions and
+- behavior: `analysis/replay_models/coefficient_statistics.py` (a per-session fit summarized over sessions and
   animals; the other modules build on it), `rate/rate_fit_statistics.py`, `rate/stop_statistics.py`,
   `content/content_statistics.py`, `content/estimator_comparison.py` (the three content estimators
   compared), `coupling/swr_power.py` (the per-event ripple-power fit and its statistics),
-  `rate/history_kernel_statistics.py`, and the stay/leave summaries in `choice/learning.py`.
+  `rate/history_kernel_statistics.py`, and the stay/leave summaries in `choice/stay_leave.py`.
 
 A builder may count the size of an input it reads (its epochs, its animals) and copy a statistic a file
 already holds. Figure 4 and the `scripts/pfc/` reports call these functions; the scripts and figures that
@@ -501,7 +503,7 @@ still compute a reported statistic themselves are listed in `TODO.md`.
 6. **Track graph**: NetworkX graph of 10 nodes, where nodes 0–5 are wells (6–8 patch junctions, 9 the center) and edges are track segments
 7. **Index/time alignment**: Use `.loc[start:end]` for time-based slicing, not `.iloc`
 8. **Data roots**: every root is read at call time from `$CSR_PROCESSED_DATA_DIR` through `paths`. In tests that variable is the one patch point (the `processed_data_root` fixture); the suite starts with a sentinel root that cannot be read or written
-9. **AIC and BIC differences**: the child rung's minus the parent rung's, within session; negative means the child is better (`analysis/behavior/coefficient_statistics.aic_difference_statistics`, `analysis/behavior/content/model_comparison.compare_nested_models`). Both compare a session only when its two fits can be compared (`analysis/behavior/fit_comparability.why_not_comparable`: the same numbers of events, bins and stops, the same clock and stop cohort, likelihoods on the same constants). Likelihood-ratio statistics and held-out gains keep their own signs
+9. **AIC and BIC differences**: the child rung's minus the parent rung's, within session; negative means the child is better (`analysis/replay_models/coefficient_statistics.aic_difference_statistics`, `analysis/replay_models/content/model_comparison.compare_nested_models`). Both compare a session only when its two fits can be compared (`analysis/replay_models/fit_comparability.why_not_comparable`: the same numbers of events, bins and stops, the same clock and stop cohort, likelihoods on the same constants). Likelihood-ratio statistics and held-out gains keep their own signs
 
 ## Notes on Data Quality
 

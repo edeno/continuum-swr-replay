@@ -356,3 +356,127 @@ of their date.
 - [2026-09-19-pfc-marked-family-summary.md](../../.claude/docs/reviews/2026-09-19-pfc-marked-family-summary.md)
   — the population summary of the 2026-09-19 marked-family corpus
   ([../design/pfc_marked_model_family.md](../design/pfc_marked_model_family.md), "Artifacts").
+
+## Package modules, 2026-11-13
+
+`analysis/behavior/` was split in three, in data-flow order: `analysis/behavior/` keeps
+what the animal did (`covariates/`, `design_constants.py`, `spatial_mapping.py`, and the
+new `history_basis.py`); `analysis/event_tables/` takes the canonical tables (the old
+`tables/` subpackage and `content_response.py`); `analysis/replay_models/` takes the
+Part 3 models (`rate/`, `content/`, `coupling/`, `choice/`) and the fitting machinery
+they share. The stuttering table modules were renamed and `choice/learning.py` became
+`choice/stay_leave.py`. The `analysis.behavior` package no longer re-exports names
+(its PEP 562 table is gone): import each name from the module that defines it. There
+are no compatibility shims. Paths are under `src/continuum_swr_replay/`.
+
+| Old module | New home |
+|---|---|
+| `analysis/behavior/_fit_diagnostics.py` (removed: moved) | `analysis/replay_models/_fit_diagnostics.py` |
+| `analysis/behavior/choice/__init__.py` (removed: moved) | `analysis/replay_models/choice/__init__.py` |
+| `analysis/behavior/choice/choice_prediction.py` (removed: moved) | `analysis/replay_models/choice/choice_prediction.py` |
+| `analysis/behavior/choice/learning.py` (removed: moved) | `analysis/replay_models/choice/stay_leave.py` |
+| `analysis/behavior/choice/retrospective.py` (removed: moved) | `analysis/replay_models/choice/retrospective.py` |
+| `analysis/behavior/choice/shuffles.py` (removed: moved) | `analysis/replay_models/choice/shuffles.py` |
+| `analysis/behavior/choice/switch_analysis.py` (removed: moved) | `analysis/replay_models/choice/switch_analysis.py` |
+| `analysis/behavior/coefficient_statistics.py` (removed: moved) | `analysis/replay_models/coefficient_statistics.py` |
+| `analysis/behavior/cohort_audit.py` (removed: moved) | `analysis/replay_models/cohort_audit.py` |
+| `analysis/behavior/common_cohort.py` (removed: moved) | `analysis/replay_models/common_cohort.py` |
+| `analysis/behavior/content/__init__.py` (removed: moved) | `analysis/replay_models/content/__init__.py` |
+| `analysis/behavior/content/cohort.py` (removed: moved) | `analysis/replay_models/content/cohort.py` |
+| `analysis/behavior/content/content_statistics.py` (removed: moved) | `analysis/replay_models/content/content_statistics.py` |
+| `analysis/behavior/content/dirichlet_multinomial.py` (removed: moved) | `analysis/replay_models/content/dirichlet_multinomial.py` |
+| `analysis/behavior/content/estimator_comparison.py` (removed: moved) | `analysis/replay_models/content/estimator_comparison.py` |
+| `analysis/behavior/content/fit_outputs.py` (removed: moved) | `analysis/replay_models/content/fit_outputs.py` |
+| `analysis/behavior/content/model_checking.py` (removed: moved) | `analysis/replay_models/content/model_checking.py` |
+| `analysis/behavior/content/model_comparison.py` (removed: moved) | `analysis/replay_models/content/model_comparison.py` |
+| `analysis/behavior/content/session_fits.py` (removed: moved) | `analysis/replay_models/content/session_fits.py` |
+| `analysis/behavior/content/simulation.py` (removed: moved) | `analysis/replay_models/content/simulation.py` |
+| `analysis/behavior/content/uncertainty_content.py` (removed: moved) | `analysis/replay_models/content/uncertainty_content.py` |
+| `analysis/behavior/content_response.py` (removed: moved) | `analysis/event_tables/content_response.py` |
+| `analysis/behavior/contrast_aggregation.py` (removed: moved) | `analysis/replay_models/contrast_aggregation.py` |
+| `analysis/behavior/coupling/__init__.py` (removed: moved) | `analysis/replay_models/coupling/__init__.py` |
+| `analysis/behavior/coupling/swr_power.py` (removed: moved) | `analysis/replay_models/coupling/swr_power.py` |
+| `analysis/behavior/covariate_timing.py` (removed: moved) | `analysis/replay_models/covariate_timing.py` |
+| `analysis/behavior/fit_comparability.py` (removed: moved) | `analysis/replay_models/fit_comparability.py` |
+| `analysis/behavior/fitting.py` (removed: moved) | `analysis/replay_models/fitting.py` |
+| `analysis/behavior/model_specs.py` (removed: moved) | `analysis/replay_models/model_specs.py` |
+| `analysis/behavior/per_bin_design.py` (removed: moved) | `analysis/replay_models/per_bin_design.py` |
+| `analysis/behavior/rate/__init__.py` (removed: moved) | `analysis/replay_models/rate/__init__.py` |
+| `analysis/behavior/rate/cross_history.py` (removed: moved) | `analysis/replay_models/rate/cross_history.py` |
+| `analysis/behavior/rate/duration_aware_history.py` (removed: moved) | `analysis/replay_models/rate/duration_aware_history.py` |
+| `analysis/behavior/rate/duration_history_simulation.py` (removed: moved) | `analysis/replay_models/rate/duration_history_simulation.py` |
+| `analysis/behavior/rate/history_kernel_statistics.py` (removed: moved) | `analysis/replay_models/rate/history_kernel_statistics.py` |
+| `analysis/behavior/rate/per_bin_rate_ladder.py` (removed: moved) | `analysis/replay_models/rate/per_bin_rate_ladder.py` |
+| `analysis/behavior/rate/per_bin_rate_model.py` (removed: moved) | `analysis/replay_models/rate/per_bin_rate_model.py` |
+| `analysis/behavior/rate/per_stop_rate_model.py` (removed: moved) | `analysis/replay_models/rate/per_stop_rate_model.py` |
+| `analysis/behavior/rate/post_outcome.py` (removed: moved) | `analysis/replay_models/rate/post_outcome.py` |
+| `analysis/behavior/rate/rate_fit_statistics.py` (removed: moved) | `analysis/replay_models/rate/rate_fit_statistics.py` |
+| `analysis/behavior/rate/ridge_history_cv.py` (removed: moved) | `analysis/replay_models/rate/ridge_history_cv.py` |
+| `analysis/behavior/rate/stop_statistics.py` (removed: moved) | `analysis/replay_models/rate/stop_statistics.py` |
+| `analysis/behavior/rate/swr_contrast_rate.py` (removed: moved) | `analysis/replay_models/rate/swr_contrast_rate.py` |
+| `analysis/behavior/rate/uncertainty_rate.py` (removed: moved) | `analysis/replay_models/rate/uncertainty_rate.py` |
+| `analysis/behavior/tables/__init__.py` (removed: moved) | `analysis/event_tables/__init__.py` |
+| `analysis/behavior/tables/_tables_common.py` (removed: moved) | `analysis/event_tables/_common.py` |
+| `analysis/behavior/tables/bouts.py` (removed: moved) | `analysis/event_tables/bouts.py` |
+| `analysis/behavior/tables/prepare_data.py` (removed: moved) | `analysis/event_tables/prepare_data.py` |
+| `analysis/behavior/tables/summaries.py` (removed: moved) | `analysis/event_tables/summaries.py` |
+| `analysis/behavior/tables/table_contracts.py` (removed: moved) | `analysis/event_tables/table_contracts.py` |
+| `analysis/behavior/tables/tables_arm_patch.py` (removed: moved) | `analysis/event_tables/arm_patch_tables.py` |
+| `analysis/behavior/tables/tables_event.py` (removed: moved) | `analysis/event_tables/event_table.py` |
+| `analysis/behavior/tables/tables_stop.py` (removed: moved) | `analysis/event_tables/stop_table.py` |
+| `analysis/behavior/tables/timebin_tables.py` (removed: moved) | `analysis/event_tables/timebin_tables.py` |
+| `analysis/behavior/tables/trajectory.py` (removed: moved) | `analysis/event_tables/trajectory.py` |
+| `analysis/behavior/tables/uncertainty.py` (removed: moved) | `analysis/event_tables/uncertainty.py` |
+
+`analysis/behavior/_helpers.py` (removed: dissolved) was split by subject; each
+function went to the lowest package that uses it:
+
+| Function | New home |
+|---|---|
+| `single_arm_from_well`, `arms_of_wells`, `arm_to_patch`, `build_well_to_arm_map`, `stay_indicator_from_patches`, `stay_indicator` | `analysis/behavior/spatial_mapping.py` |
+| `align_posterior_to_dot`, `safe_mode`, `first_row_floats`, `strict_mean`, `strict_sum`, `align_count_matrix`, `assert_event_label_alignment`, `assert_single_session_alignment` | `analysis/event_tables/_common.py` |
+| `eq_indicator`, `eq_indicator_or_nan` | `analysis/behavior/covariates/candidate_arm.py` |
+| `add_arm_fixed_effects` | `analysis/replay_models/model_specs.py` |
+
+Two definitions moved down so that no package imports one after it:
+
+- the per-event retrospective metrics (`compute_retrospective_metrics`, the five
+  metrics and their `prev_arm` mirrors, `arm_path_well_to_well`), which the table
+  build merges into the event table, from `analysis/replay_models/choice/retrospective.py`
+  to `analysis/event_tables/retrospective_metrics.py`; the shuffle null stays;
+- `raised_cosine_history_basis` and `reward_basis_from_lags`, which the reward-history
+  covariates read, from `analysis/replay_models/per_bin_design.py` to
+  `analysis/behavior/history_basis.py`.
+
+## Scripts, 2026-11-13
+
+The Part 3 runners moved from `scripts/behavior/` to `scripts/replay_models/`, beside
+`analysis/replay_models/`; `scripts/behavior/` keeps `build_qvals_table.py` and
+`fetch_spatial_bandit_behavior.sh`. The run names of `scripts/workflows/run_refits.py`
+(`rate.per_bin.at_well`, `behavior.retrospective.all`, ...) did not change. Fit sidecars
+written before the move record the old script path in `cli`.
+
+| Old path | New path |
+|---|---|
+| `scripts/behavior/choice/run_retrospective_alignment.py` (removed: moved) | `scripts/replay_models/choice/run_retrospective_alignment.py` |
+| `scripts/behavior/choice/run_stay_leave.py` (removed: moved) | `scripts/replay_models/choice/run_stay_leave.py` |
+| `scripts/behavior/content/analyze_content_occupancy.py` (removed: moved) | `scripts/replay_models/content/analyze_content_occupancy.py` |
+| `scripts/behavior/content/analyze_uncertainty_content.py` (removed: moved) | `scripts/replay_models/content/analyze_uncertainty_content.py` |
+| `scripts/behavior/content/compare_content_estimators.py` (removed: moved) | `scripts/replay_models/content/compare_content_estimators.py` |
+| `scripts/behavior/content/compare_event_source_models.py` (removed: moved) | `scripts/replay_models/content/compare_event_source_models.py` |
+| `scripts/behavior/content/fit_replay_content_models.py` (removed: moved) | `scripts/replay_models/content/fit_replay_content_models.py` |
+| `scripts/behavior/content/fit_swr_contrast_content.py` (removed: moved) | `scripts/replay_models/content/fit_swr_contrast_content.py` |
+| `scripts/behavior/content/generate_replay_content_figures.py` (removed: moved) | `scripts/replay_models/content/generate_replay_content_figures.py` |
+| `scripts/behavior/content/quantify_swr_overlap_geometry.py` (removed: moved) | `scripts/replay_models/content/quantify_swr_overlap_geometry.py` |
+| `scripts/behavior/coupling/fit_swr_power_model.py` (removed: moved) | `scripts/replay_models/coupling/fit_swr_power_model.py` |
+| `scripts/behavior/rate/fit_cross_history_rate.py` (removed: moved) | `scripts/replay_models/rate/fit_cross_history_rate.py` |
+| `scripts/behavior/rate/fit_cross_history_ridge_cv.py` (removed: moved) | `scripts/replay_models/rate/fit_cross_history_ridge_cv.py` |
+| `scripts/behavior/rate/fit_duration_aware_history_rate.py` (removed: moved) | `scripts/replay_models/rate/fit_duration_aware_history_rate.py` |
+| `scripts/behavior/rate/fit_per_bin_rate_models.py` (removed: moved) | `scripts/replay_models/rate/fit_per_bin_rate_models.py` |
+| `scripts/behavior/rate/fit_per_stop_rate_models.py` (removed: moved) | `scripts/replay_models/rate/fit_per_stop_rate_models.py` |
+| `scripts/behavior/rate/fit_swr_contrast_rate.py` (removed: moved) | `scripts/replay_models/rate/fit_swr_contrast_rate.py` |
+| `scripts/behavior/rate/fit_uncertainty_rate.py` (removed: moved) | `scripts/replay_models/rate/fit_uncertainty_rate.py` |
+| `scripts/behavior/rate/plot_model_checking.py` (removed: moved) | `scripts/replay_models/rate/plot_model_checking.py` |
+| `scripts/behavior/rate/plot_per_bin_rate_models.py` (removed: moved) | `scripts/replay_models/rate/plot_per_bin_rate_models.py` |
+| `scripts/behavior/rate/plot_per_bin_rate_summary.py` (removed: moved) | `scripts/replay_models/rate/plot_per_bin_rate_summary.py` |
+| `scripts/behavior/rate/plot_uncertainty_rate.py` (removed: moved) | `scripts/replay_models/rate/plot_uncertainty_rate.py` |

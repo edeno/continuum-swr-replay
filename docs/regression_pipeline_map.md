@@ -28,49 +28,55 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 `peri_switch_index`, `add_experienced_value_columns`, `add_beta_belief_entropy`, `canonicalize_behavior_model_columns`, `assign_stops_to_trials`, `prepare_model_values`, `build_animal`, `stop_mapping_agreement`, `require_complete_mapping`, `standardize_qvals_table`, `write_qvals_outputs`
 
-### `src/continuum_swr_replay/analysis/behavior/tables/_tables_common.py`
+### `src/continuum_swr_replay/analysis/event_tables/_common.py`
 
-Shared prep helpers, the arm standardization column list, and canonical column-order constants for the per-grain table builders.
+Shared parts of the per-grain table builders.
 
-_No module-level public symbols._
+`align_posterior_to_dot`, `safe_mode`, `first_row_floats`, `strict_mean`, `strict_sum`, `align_count_matrix`, `assert_event_label_alignment`, `assert_single_session_alignment`
 
-### `src/continuum_swr_replay/analysis/behavior/tables/bouts.py`
-
-Immobility bouts: where a stop begins and ends, and what falls inside one.
-
-`nearest_well_distance_cm`, `immobility_bout_intervals`, `bout_exposure_s`, `summarize_bout_location`, `bout_start_context`, `time_since_stop`, `assign_bout`
-
-### `src/continuum_swr_replay/analysis/behavior/tables/prepare_data.py`
-
-The per-session replay-table build and the corpus-level steps around it.
-
-`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
-
-### `src/continuum_swr_replay/analysis/behavior/tables/table_contracts.py`
-
-Scientific table contracts beyond the generic covariate schema stamp.
-
-`event_bin_total_column`, `validate_event_arm_table`, `validate_event_patch_table`, `validate_requested_standardization`, `validate_canonical_table_contract`, `validate_and_match_fit_results`
-
-### `src/continuum_swr_replay/analysis/behavior/tables/tables_arm_patch.py`
+### `src/continuum_swr_replay/analysis/event_tables/arm_patch_tables.py`
 
 Canonical arm- and patch-grain builders: one row per (event, arm) / (event, patch).
 
 `build_event_arm_table`, `build_event_patch_table`
 
-### `src/continuum_swr_replay/analysis/behavior/tables/tables_event.py`
+### `src/continuum_swr_replay/analysis/event_tables/bouts.py`
+
+Immobility bouts: where a stop begins and ends, and what falls inside one.
+
+`nearest_well_distance_cm`, `immobility_bout_intervals`, `bout_exposure_s`, `summarize_bout_location`, `bout_start_context`, `time_since_stop`, `assign_bout`
+
+### `src/continuum_swr_replay/analysis/event_tables/event_table.py`
 
 Canonical event-grain builders: one row per non-local event.
 
 `build_event_table`, `build_event_sequence_table`
 
-### `src/continuum_swr_replay/analysis/behavior/tables/tables_stop.py`
+### `src/continuum_swr_replay/analysis/event_tables/prepare_data.py`
+
+The per-session replay-table build and the corpus-level steps around it.
+
+`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
+
+### `src/continuum_swr_replay/analysis/event_tables/retrospective_metrics.py`
+
+Per-event retrospective metrics: does an event's replay content align with the arm the animal visited next (or just left)?
+
+`arm_path_well_to_well`, `chosen_arm_fraction`, `chosen_arm_fraction_prev`, `ends_at_next`, `ends_at_prev`, `contains_path_to_next`, `contains_path_from_prev`, `chosen_patch_fraction`, `ends_at_next_patch`, `compute_retrospective_metrics`
+
+### `src/continuum_swr_replay/analysis/event_tables/stop_table.py`
 
 Canonical stop-grain builder: one row per stopping period.
 
 `build_stop_table`, `add_nonlocal_swr_split`
 
-### `src/continuum_swr_replay/analysis/behavior/tables/timebin_tables.py`
+### `src/continuum_swr_replay/analysis/event_tables/table_contracts.py`
+
+Scientific table contracts beyond the generic covariate schema stamp.
+
+`event_bin_total_column`, `validate_event_arm_table`, `validate_event_patch_table`, `validate_requested_standardization`, `validate_canonical_table_contract`, `validate_and_match_fit_results`
+
+### `src/continuum_swr_replay/analysis/event_tables/timebin_tables.py`
 
 Within-stop time-binned tables (Part B).
 
@@ -80,7 +86,7 @@ Within-stop time-binned tables (Part B).
 
 The analysed-time read point: a decode frame held to the one analysed-time rule.
 
-`stamp_swr_source`, `require_swr_source`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot_with_swr_source`, `analysed_bins`, `immobile_analysed_bins`, `swr_intervals`
+`stamp_swr_source`, `require_swr_source`, `read_swr_table`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot_with_swr_source`, `analysed_bins`, `immobile_analysed_bins`, `swr_intervals`
 
 ### `src/continuum_swr_replay/analysis/events/artifact_intervals.py`
 
@@ -278,29 +284,11 @@ The natural key for one recording session: (animal, session_date, epoch).
 
 Predictor construction: the timing clocks, the history blocks, the candidate-arm block, standardization, and the name registry.
 
-### `src/continuum_swr_replay/analysis/behavior/content/uncertainty_content.py`
-
-Model-light estimands for reward-belief uncertainty and replay content.
-
-`assign_within_arm_quantiles`, `build_trial_leaf_table`, `hierarchical_quartile_profile`, `paired_quartile_contrasts`, `summarize_mu_coefficients`, `within_arm_horserace`, `summarize_horserace`, `restrict_to_analysis_cohort`, `analysis_cohort_counts`, `select_example_session`, `quartile_profiles_and_contrasts`
-
-### `src/continuum_swr_replay/analysis/behavior/content_response.py`
-
-Which per-event response the content ladders are fit on.
-
-`resolve_response_column`, `default_response_for_estimator`, `resolve_response_choice`, `validate_fraction_response`, `renormalize_fraction_over_candidates`
-
-### `src/continuum_swr_replay/analysis/behavior/covariate_timing.py`
-
-Per-covariate pre/post-outcome timing registry + model-build enforcement.
-
-`timing_of`, `assert_predictor_timing`
-
 ### `src/continuum_swr_replay/analysis/behavior/covariates/candidate_arm.py`
 
 Shared derivation of candidate-arm predictors.
 
-`broadcast_candidate_arms`, `attach_candidate_arm_covariates`
+`broadcast_candidate_arms`, `attach_candidate_arm_covariates`, `eq_indicator`, `eq_indicator_or_nan`
 
 ### `src/continuum_swr_replay/analysis/behavior/covariates/clocks.py`
 
@@ -372,13 +360,31 @@ Graph-spatial helpers for per-arm predictors and QC metrics.
 
 Map decoded replay positions to spatial units (arms, patches).
 
-`map_estimate_to_patch`, `map_estimate_to_arm`, `arm_to_well`, `well_to_arm_set`
+`map_estimate_to_patch`, `map_estimate_to_arm`, `arm_to_well`, `well_to_arm_set`, `single_arm_from_well`, `arms_of_wells`, `arm_to_patch`, `build_well_to_arm_map`, `stay_indicator_from_patches`, `stay_indicator`
 
-### `src/continuum_swr_replay/analysis/behavior/tables/uncertainty.py`
+### `src/continuum_swr_replay/analysis/event_tables/content_response.py`
+
+Which per-event response the content ladders are fit on.
+
+`resolve_response_column`, `default_response_for_estimator`, `resolve_response_choice`, `validate_fraction_response`, `renormalize_fraction_over_candidates`
+
+### `src/continuum_swr_replay/analysis/event_tables/uncertainty.py`
 
 Per-event decoder-confidence summaries from the arm-marginal posterior.
 
 `posterior_peak_mean`, `posterior_entropy_mean`, `posterior_hpd_width`, `posterior_hpd_widths`
+
+### `src/continuum_swr_replay/analysis/replay_models/content/uncertainty_content.py`
+
+Model-light estimands for reward-belief uncertainty and replay content.
+
+`assign_within_arm_quantiles`, `build_trial_leaf_table`, `hierarchical_quartile_profile`, `paired_quartile_contrasts`, `summarize_mu_coefficients`, `within_arm_horserace`, `summarize_horserace`, `restrict_to_analysis_cohort`, `analysis_cohort_counts`, `select_example_session`, `quartile_profiles_and_contrasts`
+
+### `src/continuum_swr_replay/analysis/replay_models/covariate_timing.py`
+
+Per-covariate pre/post-outcome timing registry + model-build enforcement.
+
+`timing_of`, `assert_predictor_timing`
 
 ### `src/continuum_swr_replay/tables/covariate_registry.py`
 
@@ -402,89 +408,89 @@ Design constants shared by the covariate builders and the model ladders.
 
 _No module-level public symbols._
 
-### `src/continuum_swr_replay/analysis/behavior/model_specs.py`
+### `src/continuum_swr_replay/analysis/replay_models/model_specs.py`
 
 Model definitions for replay content analysis.
 
-`ModelSpec`, `default_content_model_names`, `PerBinTerm`, `time_course_spline`, `PerBinRateModelSpec`, `longest_history_window_s`, `leaf_only_predictors`, `rung_predictors`, `restrict_to_leaf_arms`, `leaf_only_cohort`, `ComparisonRung`, `resolve_comparison_rungs`
+`ModelSpec`, `default_content_model_names`, `PerBinTerm`, `time_course_spline`, `PerBinRateModelSpec`, `longest_history_window_s`, `leaf_only_predictors`, `rung_predictors`, `restrict_to_leaf_arms`, `leaf_only_cohort`, `ComparisonRung`, `resolve_comparison_rungs`, `add_arm_fixed_effects`
 
 ## Fitters
 
 Estimators and the per-session fit machinery each runner calls.
 
-### `src/continuum_swr_replay/analysis/behavior/_fit_diagnostics.py`
+### `src/continuum_swr_replay/analysis/behavior/history_basis.py`
+
+The raised-cosine history basis and the projection of a lag matrix onto it.
+
+`raised_cosine_history_basis`, `reward_basis_from_lags`
+
+### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 
 Shared fit-diagnostics helpers: convergence, separation, warning capture, flag counts.
 
 `fit_status`, `separated_terms`, `capture_fit_warnings`, `count_fit_quality_warnings`, `flagged_separated`, `fit_flag_counts`, `flagged_nonconverged`, `fold_flag_counts`
 
-### `src/continuum_swr_replay/analysis/behavior/_helpers.py`
-
-Small shared primitives for the event-table builders.
-
-`single_arm_from_well`, `arms_of_wells`, `arm_to_patch`, `stay_indicator_from_patches`, `stay_indicator`, `align_posterior_to_dot`, `safe_mode`, `first_row_floats`, `strict_mean`, `strict_sum`, `eq_indicator`, `eq_indicator_or_nan`, `align_count_matrix`, `assert_event_label_alignment`, `assert_single_session_alignment`, `add_arm_fixed_effects`, `build_well_to_arm_map`
-
-### `src/continuum_swr_replay/analysis/behavior/choice/choice_prediction.py`
+### `src/continuum_swr_replay/analysis/replay_models/choice/choice_prediction.py`
 
 Does replay content predict the next choice?
 
 `predict_arm_fractions`, `build_residualized_choice_dataset`, `build_choice_dataset`, `fit_choice_model`, `choice_swr_split_models_for_source`, `fit_choice_blocks`
 
-### `src/continuum_swr_replay/analysis/behavior/choice/shuffles.py`
+### `src/continuum_swr_replay/analysis/replay_models/choice/shuffles.py`
 
 Null-distribution generators for replay content QC.
 
 `circular_time_shuffle`, `stop_label_shuffle`, `next_arm_circular_shift`
 
-### `src/continuum_swr_replay/analysis/behavior/content/dirichlet_multinomial.py`
+### `src/continuum_swr_replay/analysis/replay_models/content/dirichlet_multinomial.py`
 
 Dirichlet-multinomial fitter for replay content over candidate categories.
 
 `event_loglik`, `multinomial_log_constant`, `fit_dirichlet_multinomial`, `cross_validate_dirichlet_multinomial`, `concentration_cols_for_cohort`, `animal_pooled_log_phi`, `resolve_pooled_log_phi`, `fit_sessions_dirichlet_multinomial`
 
-### `src/continuum_swr_replay/analysis/behavior/content/simulation.py`
+### `src/continuum_swr_replay/analysis/replay_models/content/simulation.py`
 
 Synthetic-data generators for validating the conditional Poisson model.
 
 `sample_arm_design`, `simulate_counts`, `simulate_with_event_covariates`, `simulate_dirichlet_multinomial_counts`, `simulate_autocorrelated_counts`, `SyntheticEnv`, `make_synthetic_env`, `simulate_posterior_bumps`, `simulate_hard_vs_soft_counts`, `make_bandit_track_graph`, `simulate_full_pipeline`
 
-### `src/continuum_swr_replay/analysis/behavior/fitting.py`
+### `src/continuum_swr_replay/analysis/replay_models/fitting.py`
 
 Per-session model fitting for the replay content model hierarchy.
 
 `poisson_estimator_name`, `event_clustered_covariance`, `within_group_full_rank`, `fit_conditional_poisson`, `parse_unidentified_terms`, `conditional_linear_predictor`, `fit_null_model_conditional`, `fit_null_model_conditional_logit`, `fit_conditional_logit`, `conditional_logit_or_reason`
 
-### `src/continuum_swr_replay/analysis/behavior/per_bin_design.py`
+### `src/continuum_swr_replay/analysis/replay_models/per_bin_design.py`
 
 The (stop x bin) point-process design and the bases it is built on.
 
-`attach_is_swr_to_onsets`, `raised_cosine_history_basis`, `reward_basis_from_lags`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `arrival_spanning_stop_ids`, `aggregate_to_timebins`
+`attach_is_swr_to_onsets`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `arrival_spanning_stop_ids`, `aggregate_to_timebins`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/duration_aware_history.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/duration_aware_history.py`
 
 The duration-aware per-bin history design on real events, and its readouts.
 
 `attach_event_ends`, `at_risk_events`, `build_design`, `stack_sessions`, `history_kernels`, `lag_support`, `onset_offset_collinearity`, `fit_pooled_history`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/duration_history_simulation.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/duration_history_simulation.py`
 
 Simulated non-local events with duration, for the per-bin history design.
 
 `HistoryKernel`, `Scenario`, `simulate_interval_streams`, `true_lag_kernel`, `fit_history_direction`, `summarize_direction`, `simulate_pooled_design`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/per_bin_rate_model.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/per_bin_rate_model.py`
 
 Per-bin conditional-intensity Poisson model for replay event onsets (Family B).
 
 `freeze_per_bin_cohort`, `apply_arrival_window`, `require_frozen_per_bin_design`, `fit_per_bin_rate_model`, `fit_per_bin_glm`, `cross_validate_per_bin_rate_model`, `per_bin_rate_gof`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/per_stop_rate_model.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/per_stop_rate_model.py`
 
 Poisson rate model for replay event occurrence.
 
 `fit_per_stop_rate_model`, `cross_validate_per_stop_rate_model`, `incomplete_stops`, `fit_per_stop_rate_hierarchy`, `fit_event_source_rate_hierarchy`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/ridge_history_cv.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/ridge_history_cv.py`
 
 Ridge-penalised, cross-validated self vs self+cross history comparison.
 
@@ -499,126 +505,6 @@ Command-line entry points that fit or plot a ladder.
 Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligned.
 
 `run_build_qvals_table`, `main`
-
-### `scripts/behavior/content/analyze_content_occupancy.py`
-
-Content occupancy of non-local events — where the decoded activity represents.
-
-`find_sessions`, `session_content_distances`, `arm_occupancy`, `analyze`, `group_shares`, `render`, `main`
-
-### `scripts/behavior/content/analyze_uncertainty_content.py`
-
-Build trial-level reward-belief uncertainty/replay-content results.
-
-`mu_inputs`, `build_parser`, `resolve_models_dir`, `main`
-
-### `scripts/behavior/content/compare_content_estimators.py`
-
-Fit three replay-CONTENT estimators on one at-well cohort and compare them.
-
-`log_phi_figure_rung`, `plot_coefficient_agreement`, `plot_log_phi_by_session`, `write_caption`, `main`
-
-### `scripts/behavior/content/compare_event_source_models.py`
-
-Run the replay-content analysis suite on one event source and save fits.
-
-`run_switch_aligned`, `main`
-
-### `scripts/behavior/content/fit_replay_content_models.py`
-
-Fit the replay content model hierarchy on pre-computed data.
-
-`content_fit_inputs`, `print_model_results`, `format_comparison_table`, `run_content_fit`, `main`
-
-### `scripts/behavior/content/fit_swr_contrast_content.py`
-
-Fit the beta-bernoulli replay-CONTENT ladder (arm + patch), is_swr version.
-
-`main`
-
-### `scripts/behavior/content/generate_replay_content_figures.py`
-
-Generate all figures for the replay content analysis.
-
-`bundle_dir`, `all_models_input_paths`, `output_dir`, `build_parser`, `main`
-
-### `scripts/behavior/content/quantify_swr_overlap_geometry.py`
-
-Quantify the non-local/SWR overlap sub-cases on real data.
-
-`quantify_session`, `print_report`, `main`
-
-### `scripts/behavior/coupling/fit_swr_power_model.py`
-
-Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
-
-`build_parser`, `main`
-
-### `scripts/behavior/rate/fit_cross_history_rate.py`
-
-Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
-
-`main`
-
-### `scripts/behavior/rate/fit_cross_history_ridge_cv.py`
-
-Ridge cross-validated comparison of self vs self+cross history, per animal.
-
-`main`
-
-### `scripts/behavior/rate/fit_duration_aware_history_rate.py`
-
-Duration-aware self- and cross-history of the per-bin event rate.
-
-`main`
-
-### `scripts/behavior/rate/fit_per_bin_rate_models.py`
-
-Fit the per-bin conditional-intensity ladder (Family B) and persist it.
-
-`fit_input_paths`, `main`
-
-### `scripts/behavior/rate/fit_per_stop_rate_models.py`
-
-Fit the per-stop replay-rate hierarchy (R0-R1) and persist it.
-
-`fit_input_paths`, `main`
-
-### `scripts/behavior/rate/fit_swr_contrast_rate.py`
-
-Fit the per-bin non-local rate models, `is_swr` version (see docs/models_table.md).
-
-`fit_input_paths`, `main`
-
-### `scripts/behavior/rate/fit_uncertainty_rate.py`
-
-Fit the per-bin replay rate vs behavioral-uncertainty / value, by population.
-
-`fit_input_paths`, `main`
-
-### `scripts/behavior/rate/plot_model_checking.py`
-
-Point-process model checking for the per-bin ladder (Family B).
-
-`all_models_path`, `all_models_input_paths`, `arrival_retention_note`, `plot_gof_ladder`, `isi_autocorrelation_window`, `plot_rescaled_isi_autocorrelation`, `plot_example_quartet`, `build_parser`, `main`
-
-### `scripts/behavior/rate/plot_per_bin_rate_models.py`
-
-Plot the per-bin conditional-intensity ladder (Family B) from its tidy output.
-
-`all_models_path`, `all_models_input_paths`, `plot_reward_kernel`, `plot_selfhistory`, `build_parser`, `main`
-
-### `scripts/behavior/rate/plot_per_bin_rate_summary.py`
-
-Six-panel summary figure for the per-bin rate ladder (Family B).
-
-`all_models_path`, `all_models_input_paths`, `build_parser`, `main`
-
-### `scripts/behavior/rate/plot_uncertainty_rate.py`
-
-Plot replay rate vs uncertainty/value by population from the tidy fit output.
-
-`report`, `plot`, `build_parser`, `main`
 
 ### `scripts/decoding/_decode_runner.py`
 
@@ -720,59 +606,59 @@ Validate candidate covariate bundles and write a release manifest.
 
 Across-session and across-animal summaries, contrasts and model comparison over the per-session fits.
 
-### `src/continuum_swr_replay/analysis/behavior/choice/learning.py`
-
-Replay content × reward outcome → behavioral change.
-
-`StopSummaryConfig`, `stop_replay_summary`, `fit_is_stay_logistic_per_session`, `fit_is_stay_pooled_gee`, `role_content_column`, `fit_stay_leave_roles`, `cross_session_role_summary`, `pooled_gee_role_summary`, `smallest_adjusted_p`, `fit_status_counts`
-
-### `src/continuum_swr_replay/analysis/behavior/choice/retrospective.py`
-
-Retrospective alignment of replay content with the next choice.
-
-`at_well_event_cohort`, `arm_path_well_to_well`, `chosen_arm_fraction`, `chosen_arm_fraction_prev`, `ends_at_next`, `ends_at_prev`, `contains_path_to_next`, `contains_path_from_prev`, `chosen_patch_fraction`, `ends_at_next_patch`, `compute_retrospective_metrics`, `freeze_retrospective_cohort`, `retrospective_alignment_with_shuffle`, `family_unit_counts`, `retrospective_status`, `select_event_subset`, `retrospective_alignment_by_session`
-
-### `src/continuum_swr_replay/analysis/behavior/choice/switch_analysis.py`
-
-Switch-aligned timing analysis for patch-switch prediction.
-
-`build_switch_aligned_table`, `build_control_aligned_table`, `stop_patch_replay`
-
-### `src/continuum_swr_replay/analysis/behavior/cohort_audit.py`
-
-Per-model cohort / drop-profile audit records.
-
-`is_qvals_sourced_column`, `is_qvals_gap_column`, `attach_has_qvals_row`, `qvals_gap_event_ids`, `cohort_record`, `fitted_cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
-
-### `src/continuum_swr_replay/analysis/behavior/content/model_checking.py`
-
-Model checking utilities for the replay content model hierarchy.
-
-`cross_validate_conditional_poisson`, `compute_pearson_residuals`
-
-### `src/continuum_swr_replay/analysis/behavior/content/model_comparison.py`
-
-Compare nested models via AIC, BIC, and likelihood ratio tests.
-
-`fit_metric_statistics`, `compare_nested_models`, `summarize_comparison`, `run_full_hierarchy_comparison`
-
-### `src/continuum_swr_replay/analysis/behavior/contrast_aggregation.py`
-
-Shared audited aggregation for the is_swr contrast ladders (rate + content).
-
-`std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `gated_term_statistics`, `aggregate_contrast`, `specs_from_ladder`, `concentration_specs`, `audited_content_contrast`, `renormalized_rungs`, `contrast_fit_inputs`, `select_outcome_stratum`, `sd_reference`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
-
-### `src/continuum_swr_replay/analysis/behavior/tables/summaries.py`
+### `src/continuum_swr_replay/analysis/event_tables/summaries.py`
 
 Per-event replay summaries from decoder outputs.
 
 `posterior_to_arm_marginal`, `arm_map_from_posterior`, `n_nonlocal_bins`, `nonlocal_weight_sum`, `posterior_mass_total`, `arm_count_hard`, `arm_count_soft`, `arm_posterior_mass`, `arm_fraction_from_event_total`
 
-### `src/continuum_swr_replay/analysis/behavior/tables/trajectory.py`
+### `src/continuum_swr_replay/analysis/event_tables/trajectory.py`
 
 Per-event replay-trajectory rollups, shared by both event-table builders.
 
 `brain_state_means`, `ahead_behind_summary`, `uncertainty_extra`, `trajectory_dynamics`, `compute_trajectory_rollups`
+
+### `src/continuum_swr_replay/analysis/replay_models/choice/retrospective.py`
+
+Retrospective alignment of replay content with the next choice.
+
+`at_well_event_cohort`, `freeze_retrospective_cohort`, `retrospective_alignment_with_shuffle`, `family_unit_counts`, `retrospective_status`, `select_event_subset`, `retrospective_alignment_by_session`
+
+### `src/continuum_swr_replay/analysis/replay_models/choice/stay_leave.py`
+
+Replay content × reward outcome → behavioral change.
+
+`StopSummaryConfig`, `stop_replay_summary`, `fit_is_stay_logistic_per_session`, `fit_is_stay_pooled_gee`, `role_content_column`, `fit_stay_leave_roles`, `cross_session_role_summary`, `pooled_gee_role_summary`, `smallest_adjusted_p`, `fit_status_counts`
+
+### `src/continuum_swr_replay/analysis/replay_models/choice/switch_analysis.py`
+
+Switch-aligned timing analysis for patch-switch prediction.
+
+`build_switch_aligned_table`, `build_control_aligned_table`, `stop_patch_replay`
+
+### `src/continuum_swr_replay/analysis/replay_models/cohort_audit.py`
+
+Per-model cohort / drop-profile audit records.
+
+`is_qvals_sourced_column`, `is_qvals_gap_column`, `attach_has_qvals_row`, `qvals_gap_event_ids`, `cohort_record`, `fitted_cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
+
+### `src/continuum_swr_replay/analysis/replay_models/content/model_checking.py`
+
+Model checking utilities for the replay content model hierarchy.
+
+`cross_validate_conditional_poisson`, `compute_pearson_residuals`
+
+### `src/continuum_swr_replay/analysis/replay_models/content/model_comparison.py`
+
+Compare nested models via AIC, BIC, and likelihood ratio tests.
+
+`fit_metric_statistics`, `compare_nested_models`, `summarize_comparison`, `run_full_hierarchy_comparison`
+
+### `src/continuum_swr_replay/analysis/replay_models/contrast_aggregation.py`
+
+Shared audited aggregation for the is_swr contrast ladders (rate + content).
+
+`std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `gated_term_statistics`, `aggregate_contrast`, `specs_from_ladder`, `concentration_specs`, `audited_content_contrast`, `renormalized_rungs`, `contrast_fit_inputs`, `select_outcome_stratum`, `sd_reference`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
 
 ## Readers and QA
 
@@ -1072,12 +958,6 @@ Rerun the CPU model fits and the figures that read them, in dependency order.
 
 `Run`, `select`, `missing_prerequisites`, `run_env`, `schedule`, `sidecar_times`, `written_artifacts`, `fit_roots`, `check_provenance`, `print_plan`, `main`
 
-### `src/continuum_swr_replay/analysis/behavior/content/fit_outputs.py`
-
-Where content-ladder fits land, and how their numbers are read.
-
-`resolve_contfrag_paths`, `canonical_output_subdir`, `canonical_output_subdirs`, `partial_ladder_subdir`, `belief_chain_output_subdir`, `scale_label`, `frame_estimator`
-
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/evidence.py`
 
 Held-out evidence of every window, by tetrode half (see the package notes).
@@ -1107,6 +987,12 @@ Per-tetrode likelihood terms, and the encodings and decode files they come from.
 Speed regimes and the windows scored: bouts, matched windows, calibration windows.
 
 `keyed_rng`, `regimes`, `analysed_regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `tetrode_halves`, `null_partners`, `window_folds`
+
+### `src/continuum_swr_replay/analysis/replay_models/content/fit_outputs.py`
+
+Where content-ladder fits land, and how their numbers are read.
+
+`resolve_contfrag_paths`, `canonical_output_subdir`, `canonical_output_subdirs`, `partial_ladder_subdir`, `belief_chain_output_subdir`, `scale_label`, `frame_estimator`
 
 ### `src/continuum_swr_replay/decoding/files.py`
 
@@ -1148,109 +1034,229 @@ Centralized schema/version literals for the covariate pipeline.
 
 Modules under a mapped root that no stage pattern claims. A module landing here means `write_pipeline_map.py` needs a stage rule, not that the module is unused.
 
-### `scripts/behavior/choice/run_retrospective_alignment.py`
+### `scripts/replay_models/choice/run_retrospective_alignment.py`
 
 Stage 5B: per-session retrospective replay-content alignment.
 
 `fit_input_paths`, `main`
 
-### `scripts/behavior/choice/run_stay_leave.py`
+### `scripts/replay_models/choice/run_stay_leave.py`
 
 Stage 6: replay content × reward outcome → behavioral change.
 
 `fit_input_paths`, `summary_path`, `fit_path`, `write_summary_provenance`, `log_cross_session_role_summary`, `main`
 
-### `src/continuum_swr_replay/analysis/behavior/coefficient_statistics.py`
+### `scripts/replay_models/content/analyze_content_occupancy.py`
+
+Content occupancy of non-local events — where the decoded activity represents.
+
+`find_sessions`, `session_content_distances`, `arm_occupancy`, `analyze`, `group_shares`, `render`, `main`
+
+### `scripts/replay_models/content/analyze_uncertainty_content.py`
+
+Build trial-level reward-belief uncertainty/replay-content results.
+
+`mu_inputs`, `build_parser`, `resolve_models_dir`, `main`
+
+### `scripts/replay_models/content/compare_content_estimators.py`
+
+Fit three replay-CONTENT estimators on one at-well cohort and compare them.
+
+`log_phi_figure_rung`, `plot_coefficient_agreement`, `plot_log_phi_by_session`, `write_caption`, `main`
+
+### `scripts/replay_models/content/compare_event_source_models.py`
+
+Run the replay-content analysis suite on one event source and save fits.
+
+`run_switch_aligned`, `main`
+
+### `scripts/replay_models/content/fit_replay_content_models.py`
+
+Fit the replay content model hierarchy on pre-computed data.
+
+`content_fit_inputs`, `print_model_results`, `format_comparison_table`, `run_content_fit`, `main`
+
+### `scripts/replay_models/content/fit_swr_contrast_content.py`
+
+Fit the beta-bernoulli replay-CONTENT ladder (arm + patch), is_swr version.
+
+`main`
+
+### `scripts/replay_models/content/generate_replay_content_figures.py`
+
+Generate all figures for the replay content analysis.
+
+`bundle_dir`, `all_models_input_paths`, `output_dir`, `build_parser`, `main`
+
+### `scripts/replay_models/content/quantify_swr_overlap_geometry.py`
+
+Quantify the non-local/SWR overlap sub-cases on real data.
+
+`quantify_session`, `print_report`, `main`
+
+### `scripts/replay_models/coupling/fit_swr_power_model.py`
+
+Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
+
+`build_parser`, `main`
+
+### `scripts/replay_models/rate/fit_cross_history_rate.py`
+
+Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
+
+`main`
+
+### `scripts/replay_models/rate/fit_cross_history_ridge_cv.py`
+
+Ridge cross-validated comparison of self vs self+cross history, per animal.
+
+`main`
+
+### `scripts/replay_models/rate/fit_duration_aware_history_rate.py`
+
+Duration-aware self- and cross-history of the per-bin event rate.
+
+`main`
+
+### `scripts/replay_models/rate/fit_per_bin_rate_models.py`
+
+Fit the per-bin conditional-intensity ladder (Family B) and persist it.
+
+`fit_input_paths`, `main`
+
+### `scripts/replay_models/rate/fit_per_stop_rate_models.py`
+
+Fit the per-stop replay-rate hierarchy (R0-R1) and persist it.
+
+`fit_input_paths`, `main`
+
+### `scripts/replay_models/rate/fit_swr_contrast_rate.py`
+
+Fit the per-bin non-local rate models, `is_swr` version (see docs/models_table.md).
+
+`fit_input_paths`, `main`
+
+### `scripts/replay_models/rate/fit_uncertainty_rate.py`
+
+Fit the per-bin replay rate vs behavioral-uncertainty / value, by population.
+
+`fit_input_paths`, `main`
+
+### `scripts/replay_models/rate/plot_model_checking.py`
+
+Point-process model checking for the per-bin ladder (Family B).
+
+`all_models_path`, `all_models_input_paths`, `arrival_retention_note`, `plot_gof_ladder`, `isi_autocorrelation_window`, `plot_rescaled_isi_autocorrelation`, `plot_example_quartet`, `build_parser`, `main`
+
+### `scripts/replay_models/rate/plot_per_bin_rate_models.py`
+
+Plot the per-bin conditional-intensity ladder (Family B) from its tidy output.
+
+`all_models_path`, `all_models_input_paths`, `plot_reward_kernel`, `plot_selfhistory`, `build_parser`, `main`
+
+### `scripts/replay_models/rate/plot_per_bin_rate_summary.py`
+
+Six-panel summary figure for the per-bin rate ladder (Family B).
+
+`all_models_path`, `all_models_input_paths`, `build_parser`, `main`
+
+### `scripts/replay_models/rate/plot_uncertainty_rate.py`
+
+Plot replay rate vs uncertainty/value by population from the tidy fit output.
+
+`report`, `plot`, `build_parser`, `main`
+
+### `src/continuum_swr_replay/analysis/replay_models/coefficient_statistics.py`
 
 Across-session summaries of what the per-session fits wrote.
 
 `fit_rows`, `require_one_fit_per_session`, `coefficient_statistics`, `coefficient_family_statistics`, `animal_median_bootstrap`, `gated_coefficient_statistics`, `gated_exp_median_ratio`, `paired_coefficient_statistics`, `gated_coefficient_difference_statistics`, `aic_difference_statistics`, `separated_fraction`, `known_fraction`, `fits_carrying`, `term_separation_statistics`, `rung_separation_range`, `audited_drop_statistics`, `group_range`
 
-### `src/continuum_swr_replay/analysis/behavior/common_cohort.py`
+### `src/continuum_swr_replay/analysis/replay_models/common_cohort.py`
 
 Fit a block of models per session on one frozen complete-case cohort.
 
 `predictor_union`, `block_required_columns`, `block_table_name`, `hash_unit_ids`, `freeze_session_cohort`, `fit_per_session_common_cohort`, `assert_ladder_timing`
 
-### `src/continuum_swr_replay/analysis/behavior/content/cohort.py`
+### `src/continuum_swr_replay/analysis/replay_models/content/cohort.py`
 
 The events a content ladder is fit on, and where the others went.
 
 `prepare_canonical_fit_request`, `CohortSelection`, `select_content_cohort`, `zero_response_event_ids`, `content_cohort_record`, `ContrastFitCohort`, `contrast_fit_cohort`
 
-### `src/continuum_swr_replay/analysis/behavior/content/content_statistics.py`
+### `src/continuum_swr_replay/analysis/replay_models/content/content_statistics.py`
 
 Summary statistics of what the non-local events represent.
 
 `trunk_shares`, `trunk_share_statistics`, `current_patch_trunk_fraction`, `event_length_statistics`, `concentration_contrast_statistics`
 
-### `src/continuum_swr_replay/analysis/behavior/content/estimator_comparison.py`
+### `src/continuum_swr_replay/analysis/replay_models/content/estimator_comparison.py`
 
 How three content estimators agree, fit on one shared event set per session.
 
 `se_ratio_column`, `estimator_rows`, `attach_delta_aic`, `unidentified_rows`, `identified_rows`, `n_unpaired_triples`, `wide_by_estimator`, `summarize_estimators`, `bootstrap_animals`, `n_fits_delta_aic_row_mismatch`, `ComparisonResult`, `shared_session_rows`, `drop_undefined_concentration`, `run_comparison`
 
-### `src/continuum_swr_replay/analysis/behavior/content/session_fits.py`
+### `src/continuum_swr_replay/analysis/replay_models/content/session_fits.py`
 
 Fit the content rungs on every session of a cohort.
 
 `fit_model_per_session`, `fit_conditional_logit_robustness`, `resolve_concentration_cols`, `fit_contrast_session`, `fit_contrast_ladder`, `fit_n_categories`, `fit_content_ladder`, `patch_models_for_source`, `patch_switch_models_for_source`, `fit_patch_hierarchy`, `fit_patch_switch`
 
-### `src/continuum_swr_replay/analysis/behavior/coupling/swr_power.py`
+### `src/continuum_swr_replay/analysis/replay_models/coupling/swr_power.py`
 
 The per-event SWR-power model: an event's ripple power against the behavioral covariates.
 
 `post_outcome_masks`, `balanced_post_outcome_selection`, `gate_events_after_outcome`, `fit_power_model`, `power_distribution_statistics`, `duration_power_correlation`, `assemble_power_frame`, `power_cohort_records`
 
-### `src/continuum_swr_replay/analysis/behavior/fit_comparability.py`
+### `src/continuum_swr_replay/analysis/replay_models/fit_comparability.py`
 
 Which sessions of a rung pair can be compared by an information criterion.
 
 `why_not_comparable`, `pair_rung_fits`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/cross_history.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/cross_history.py`
 
 Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
 
 `fit_direction`, `fit_cross_history`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/history_kernel_statistics.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/history_kernel_statistics.py`
 
 Summary statistics of the event-history kernels of the duration-aware rate fits.
 
 `lag_ms`, `lag_index`, `measurable_kernel`, `kernel_peak`, `self_history_statistics`, `self_history_range_statistics`, `cross_history_statistics`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/per_bin_rate_ladder.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/per_bin_rate_ladder.py`
 
 The per-bin rate ladder (Family B) fit over sessions, and its cohort audit.
 
 `ladder_design`, `fit_ladder_session`, `fit_per_bin_rate_models`, `stop_level_design_columns`, `per_bin_cohort_records`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/post_outcome.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/post_outcome.py`
 
 What a per-bin rate model may see once the trial's outcome is known.
 
 `mask_post_outcome_covariates`, `retained_time_course_support`, `gate_bins_after_outcome`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/rate_fit_statistics.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/rate_fit_statistics.py`
 
 Summary statistics of the per-bin event-rate ladder's fits.
 
 `frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `reward_gated_fits`, `reward_kernel_by_lag`, `reward_kernel_animal_medians`, `self_history_kernel_by_lag`, `reward_kernel_statistics`, `paired_lag_one_reward_kernels`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `model_checking_examples`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/stop_statistics.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/stop_statistics.py`
 
 Summary statistics of the immobility stops and of where event onsets fall in them.
 
 `stop_cohort_counts`, `dwell_statistics`, `still_immobile_fraction`, `onset_rate_time_course`, `outcome_boundary_statistics`, `onset_time_statistics`, `reward_history_incomplete_statistics`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/swr_contrast_rate.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/swr_contrast_rate.py`
 
 The per-bin ``is_swr``-contrast rate ladders, fit over sessions, and their audit.
 
 `primary_union`, `fit_post_outcome_cohort`, `fit_contrast_session`, `fit_contrast_sessions`, `join_contrast_qvals`, `home_cohort`, `contrast_cohort_records`, `covariate_sds`, `max_relative_sd_difference`, `contrast_term_diagnostics`, `cohort_sd_reference`, `aggregate_contrast_fits`
 
-### `src/continuum_swr_replay/analysis/behavior/rate/uncertainty_rate.py`
+### `src/continuum_swr_replay/analysis/replay_models/rate/uncertainty_rate.py`
 
 The per-bin replay rate vs behavioral uncertainty and value, by population.
 

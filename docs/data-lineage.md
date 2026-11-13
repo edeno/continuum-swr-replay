@@ -32,7 +32,7 @@ hand-joined string. Nothing under the root is committed.
 | Decodes, non-local detector | `{epoch_id}_results.nc`, `_detector.pkl`, `_environment.pkl`, `_80_data_over_time.pkl` | `scripts/decoding/run_decoding_bandit.py` |
 | Decodes, ContFrag | `{epoch_id}_contfrag_results.nc`, `_contfrag_detector.pkl`, `_contfrag_environment.pkl`, `_contfrag_data_over_time.pkl`; the SWR or MUA event source is chosen later, by `prepare_contfrag_replay_content_data.py --event-source` | `scripts/decoding/run_decoding_contfrag.py` |
 | Canonical tables | `replay_content/{event,event_arm,event_patch,event_sequence,stop,qvals,event_onset,stop_timebin}_table.parquet`; ContFrag tables under `contfrag_replay_content/` | `scripts/tables/` and `scripts/behavior/` (order in [reproduce.md](reproduce.md#the-full-rebuild)) |
-| Part 3 fits | `replay_content/models*/` and the other result folders under `replay_content/` | `scripts/behavior/rate/`, `scripts/behavior/content/`, `scripts/behavior/`, all run by `scripts/workflows/run_refits.py` |
+| Part 3 fits | `replay_content/models*/` and the other result folders under `replay_content/` | `scripts/replay_models/` (`rate/`, `content/`, `coupling/`, `choice/`), all run by `scripts/workflows/run_refits.py` |
 | Detector comparison | `replay_detection_comparison/{memoryless,carey,inventory,event_features}/<run id>/` | `scripts/detection/` |
 | Part 4 fits (mPFC) | `{epoch_id}_mPFC_modulation.pkl` and its `.npy` arrays | `scripts/pfc/run_pfc_analysis_bandit.py` |
 
