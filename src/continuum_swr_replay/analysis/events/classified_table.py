@@ -56,9 +56,9 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
-    DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
 from continuum_swr_replay.decoding.results import nonlocal_probability
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.event_ids import hash_event_id, validate_event_ids
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
@@ -269,7 +269,7 @@ def build_classified_nonlocal_event_table(
                     "event_start": float(times[0]),
                     "event_end": float(times[-1]),
                     "event_duration": float(
-                        times[-1] - times[0] + 1.0 / DEFAULT_SAMPLING_FREQUENCY_HZ
+                        times[-1] - times[0] + 1.0 / SAMPLING_FREQUENCY
                     ),
                     "event_midpoint_time": float(times[len(times) // 2]),
                     "animal_max_speed_cm_s": float(speed.max()),

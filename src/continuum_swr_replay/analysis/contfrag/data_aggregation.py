@@ -18,7 +18,6 @@ import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
 
-from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.events.analysed_time import read_dot_with_swr_source
 from continuum_swr_replay.analysis.events.epoch_normalizers import (
     run_speed_baseline as epoch_run_speed_baseline,
@@ -35,6 +34,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 from ...data_types import SessionData
 from ..hippocampus.posterior_analysis import get_map_step_distance, get_posterior_stats
@@ -48,7 +48,7 @@ def get_contfrag_data_over_time(
     nwb_file_name: str,
     epoch_name: str,
     brain_area: str = "HPC",
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
 ) -> tuple[pd.DataFrame, xr.DataArray]:
     """Aggregate ContFrag decoding results into time-indexed DataFrame.
 

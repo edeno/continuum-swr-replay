@@ -66,6 +66,7 @@ from continuum_swr_replay.intervals import (
     overlaps_open,
     sample_step,
 )
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 logger = logging.getLogger(__name__)
 
@@ -496,7 +497,7 @@ def prepare_session_stop_context(
     epoch_name: str,
     *,
     brain_area: str = "mPFC",
-    sampling_frequency: float = 500.0,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     bundle_path: str | Path | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Assemble one session's table from the canonical Figure 4 inputs.

@@ -101,13 +101,13 @@ from scipy.ndimage import find_objects, label
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
-    DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (
     analysed_bins,
     immobile_analysed_bins,
 )
 from continuum_swr_replay.decoding.results import nonlocal_probability
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 logger = logging.getLogger(__name__)
@@ -265,7 +265,7 @@ def compute_state_fraction_during_movement(
     data: pd.DataFrame,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     local_prob_threshold: float = 0.5,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     """Fraction of movement time in each decoder state, plus collapse detection.
@@ -369,7 +369,7 @@ def compute_non_local_during_movement(
     data: pd.DataFrame,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     """Rate and duration of non-local events during movement.
@@ -597,7 +597,7 @@ def compute_bout_nonlocal_dominance(
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     min_bout_duration_sec: float = 0.5,
     bout_nonlocal_threshold: float = 0.5,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     """Per-session fraction of running bouts dominated by non-local state.
@@ -1104,7 +1104,7 @@ def compute_local_state_collapse_details(
     data: pd.DataFrame,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     local_prob_threshold: float = 0.5,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     """Detailed characterization of local state collapse episodes.
@@ -1497,7 +1497,7 @@ def compute_session_quality_summary(
     local_prob_threshold: float = 0.5,
     non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     theta_power_threshold: float = 2.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     error_flag_threshold_cm: float = 15.0,
     local_fraction_flag_threshold: float = 0.5,
     swr_overlap_flag_threshold: float = 0.2,

@@ -41,6 +41,7 @@ from continuum_swr_replay.decoding.identifiers import (
     format_epoch_identifier,
     parse_nwb_filename,
 )
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.columns import require_columns
@@ -529,7 +530,7 @@ def prepare_marked_session_context(
     epoch_name: str,
     *,
     brain_area: str = "mPFC",
-    sampling_frequency: float = 500.0,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     cohort_stops: pd.DataFrame,
     event_arm_table_path: str | Path | None = None,
     baseline_terms: str = "well_and_reward_outcome",
@@ -588,7 +589,6 @@ def prepare_marked_session_context(
     # them off the pure marked-design import path used by unit tests.
     from continuum_swr_replay.analysis.constants import (
         DEFAULT_NON_LOCAL_THRESHOLD,
-        DEFAULT_SAMPLING_FREQUENCY_HZ,
     )
     from continuum_swr_replay.analysis.pfc.canonical_events import (
         load_session_event_ripple_power,
@@ -656,9 +656,7 @@ def prepare_marked_session_context(
         start = swrs["start_time"].to_numpy(dtype=float)
         end = swrs["end_time"].to_numpy(dtype=float)
         # Inclusive of one sampled decode bin, as the replay table's duration.
-        swrs[EVENT_DURATION_MARK] = np.log(
-            end - start + 1.0 / DEFAULT_SAMPLING_FREQUENCY_HZ
-        )
+        swrs[EVENT_DURATION_MARK] = np.log(end - start + 1.0 / SAMPLING_FREQUENCY)
         swrs[RIPPLE_POWER_MARK], _ = load_session_event_ripple_power(
             nwb_file_name,
             epoch_name,

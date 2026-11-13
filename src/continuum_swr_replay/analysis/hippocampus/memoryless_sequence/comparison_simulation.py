@@ -84,7 +84,7 @@ N_NEURONS = 25
 """Cells in the simulation the figure and its recorded numbers are made from,
 and in the memoryless sweeps' recording (``sweep.build_recording``)."""
 
-CONFIG = MemorylessSequenceConfig(sampling_frequency=500.0)
+CONFIG = MemorylessSequenceConfig()
 """The sliding-window detector's settings on that 500 Hz grid, in the figure
 and in the sweeps."""
 

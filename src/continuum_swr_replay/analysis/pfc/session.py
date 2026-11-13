@@ -64,6 +64,7 @@ from continuum_swr_replay.intervals import (
     interval_mask,
     sample_step,
 )
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import table_path
 
 # ``load_data`` and the hippocampus helpers below open a Spyglass /
@@ -821,7 +822,7 @@ def run_session(
     nwb_file_name: str,
     epoch_name: str,
     brain_area: str = "mPFC",
-    sampling_frequency: float = 500,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     run_parallel: bool = True,
     stop_cohort: str = "at_well",

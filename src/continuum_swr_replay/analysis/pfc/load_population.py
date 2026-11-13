@@ -22,7 +22,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.pfc import bundle_files
 from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
 from continuum_swr_replay.analysis.pfc.design import symmetric_lags
@@ -39,6 +38,7 @@ from continuum_swr_replay.analysis.pfc.matched_control import (
 from continuum_swr_replay.analysis.pfc.modulation import in_report_window
 from continuum_swr_replay.analysis.shared_statistics import benjamini_hochberg
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.runs.fit_provenance import fit_provenance_path
 
 logger = logging.getLogger(__name__)
@@ -370,8 +370,8 @@ def load_population_data(
 
     """
     fit_lag_time = (
-        symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, DEFAULT_SAMPLING_FREQUENCY_HZ)
-        / DEFAULT_SAMPLING_FREQUENCY_HZ
+        symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, SAMPLING_FREQUENCY)
+        / SAMPLING_FREQUENCY
     )
     lag_time = fit_lag_time[in_report_window(fit_lag_time)]
 

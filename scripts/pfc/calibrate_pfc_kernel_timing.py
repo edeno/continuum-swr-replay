@@ -70,11 +70,11 @@ from continuum_swr_replay.analysis.pfc.timing_calibration import (
     DEFAULT_N_BINS,
     DEFAULT_N_EVENTS,
     REFERENCE_LAGS_S,
-    SAMPLING_FREQUENCY,
     WINDOWS,
     scenario_list,
     simulate_and_fit,
 )
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 
 def parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -146,7 +146,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                     key: (str(value) if isinstance(value, Path) else value)
                     for key, value in vars(args).items()
                 },
-                "sampling_frequency_hz": SAMPLING_FREQUENCY,
+                "sampling_frequency_hz": float(SAMPLING_FREQUENCY),
                 "windows_s": {
                     k: {"fit": f, "read": r} for k, (f, r) in WINDOWS.items()
                 },

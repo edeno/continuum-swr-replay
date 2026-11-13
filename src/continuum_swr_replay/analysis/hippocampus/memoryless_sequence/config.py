@@ -11,8 +11,8 @@ from dataclasses import dataclass, fields
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 __all__ = ["MemorylessSequenceConfig"]
 
@@ -83,7 +83,7 @@ class MemorylessSequenceConfig:
 
     window_duration_s: float = 0.080
     stride_s: float = 0.004
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ
+    sampling_frequency: float = float(SAMPLING_FREQUENCY)
     place_bin_size_cm: float = 2.0
     spread_threshold_cm: float = 10.0
     jump_threshold_cm: float = 20.0

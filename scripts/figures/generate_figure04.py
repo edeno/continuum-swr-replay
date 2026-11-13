@@ -60,7 +60,6 @@ from matplotlib.gridspec import GridSpec
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
-    DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
 from continuum_swr_replay.analysis.events.cohort_selection import stop_cohort_suffix
 from continuum_swr_replay.analysis.pfc import (
@@ -92,6 +91,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (
     peri_event_rate,
 )
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.device import configure_jax_gpu
 from continuum_swr_replay.visualization.figure_utilities import (
@@ -495,7 +495,7 @@ def plot_best_model_selection(df, ax):
 #: reported on +/-200 ms (``in_report_window``): the bundle is fit on the wider
 #: window so the spline's boundary behaviour falls outside the reported one;
 #: the example neuron is fit the same way and its curve trimmed to match.
-FIT_LAGS = symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, DEFAULT_SAMPLING_FREQUENCY_HZ)
+FIT_LAGS = symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, SAMPLING_FREQUENCY)
 
 
 def generate_figure(
@@ -593,7 +593,7 @@ def generate_figure(
         time=time,
         fit_mask=fit_mask,
         fit_lags=lags,
-        sampling_frequency=DEFAULT_SAMPLING_FREQUENCY_HZ,
+        sampling_frequency=SAMPLING_FREQUENCY,
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
         non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
@@ -610,7 +610,7 @@ def generate_figure(
     immobility_design_matrices, spline_basis, lag_time = make_design_matrices(
         event_times,
         data["position_info"],
-        sampling_frequency=DEFAULT_SAMPLING_FREQUENCY_HZ,
+        sampling_frequency=SAMPLING_FREQUENCY,
         lags=lags,
     )
 

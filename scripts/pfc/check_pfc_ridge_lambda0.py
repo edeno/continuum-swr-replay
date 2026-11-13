@@ -42,6 +42,8 @@ import pandas as pd
 from numpy.typing import NDArray
 from patsy import dmatrix
 
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -136,7 +138,7 @@ def audited_designs(
 
 
 def rebuild_session(
-    session: str, sampling_frequency: float = 500.0
+    session: str, sampling_frequency: float = SAMPLING_FREQUENCY
 ) -> dict[str, object]:
     """The fit mask, counts and audited designs of one session.
 

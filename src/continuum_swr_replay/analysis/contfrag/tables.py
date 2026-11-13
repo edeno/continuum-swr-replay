@@ -19,7 +19,6 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
 from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
 from continuum_swr_replay.analysis.events.immobility import (
@@ -28,6 +27,7 @@ from continuum_swr_replay.analysis.events.immobility import (
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
     event_strict_overlap_keys,
 )
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import hash_stop_id
 from continuum_swr_replay.tables.session_keys import one_session
@@ -393,9 +393,7 @@ def build_contfrag_event_table(
             event_col: int(ev_id),
             "event_start_s": float(times[0]),
             "event_end_s": float(times[-1]),
-            "event_duration_s": float(
-                times[-1] - times[0] + 1.0 / DEFAULT_SAMPLING_FREQUENCY_HZ
-            ),
+            "event_duration_s": float(times[-1] - times[0] + 1.0 / SAMPLING_FREQUENCY),
             "is_swr": event_col == "SWR_event"
             or (animal, day, epoch, int(ev_id)) in other_overlap_keys,
             "is_mua": event_col == "MUA_event"

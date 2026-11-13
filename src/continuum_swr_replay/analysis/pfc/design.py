@@ -12,10 +12,10 @@ import pandas as pd
 from numpy.typing import NDArray
 from patsy import dmatrix
 
-from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.pfc.event_sets import SWR_NO_NON_LOCAL
 from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 
 def reindex_by(
@@ -85,7 +85,7 @@ THETA_FORMULA = "1 + np.cos(theta_phase) + np.sin(theta_phase)"
 def build_theta_design(
     theta_phase: pd.Series,
     is_immobile: pd.Series,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
 ) -> tuple[NDArray, NDArray]:
     """The running-bin mask and theta design the theta test is fit on.
 
@@ -273,7 +273,7 @@ def event_onset_counts(times: pd.DataFrame, time: NDArray) -> NDArray:
 def _make_conv_spline_basis(
     times: dict[str, pd.DataFrame],
     position_info: pd.DataFrame,
-    sampling_frequency: float = 500,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     lags: NDArray | None = None,
 ) -> tuple[dict[str, NDArray], NDArray, NDArray]:
     # Every production caller (``run_session`` and Figure 4) passes ``lags``
@@ -302,7 +302,7 @@ def _make_conv_spline_basis(
 def _make_design_matrices(
     times: dict[str, pd.DataFrame],
     position_info: pd.DataFrame,
-    sampling_frequency: float = 500,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     lags: NDArray | None = None,
 ) -> tuple[dict[str, NDArray], NDArray, NDArray]:
     """Build GLM design matrices for all model variants.

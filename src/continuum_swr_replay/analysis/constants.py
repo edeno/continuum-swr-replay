@@ -29,9 +29,6 @@ from continuum_swr_replay.parameters import (
 from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD as DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.parameters import (
-    SAMPLING_FREQUENCY,
-)
 
 # Event detection thresholds: DEFAULT_NON_LOCAL_THRESHOLD and
 # DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC (the whole-event immobility speed
@@ -46,14 +43,6 @@ OUTCOME_TIME_SEMANTICS: str = (
     f"{OMISSION_KNOWN_LATENCY_SEC:.2f} s, destination final poke-out) for omissions"
 )
 """Canonical physical availability rule for a trial's realized outcome."""
-
-# SAMPLING_FREQUENCY is int in parameters.py; cast to float for use in
-# arithmetic that expects float division (e.g., duration / sampling_frequency).
-DEFAULT_SAMPLING_FREQUENCY_HZ: float = float(SAMPLING_FREQUENCY)
-"""Default sampling frequency for neural data (Hz).
-
-Derived from :data:`continuum_swr_replay.parameters.SAMPLING_FREQUENCY`.
-"""
 
 # Histogram bin definitions
 # These are shared across multiple figure generation scripts to ensure consistency

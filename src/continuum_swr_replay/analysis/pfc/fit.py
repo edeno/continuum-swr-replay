@@ -13,8 +13,8 @@ import pandas as pd
 import statsmodels.api as sm
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.pfc.design import build_theta_design
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 #: Fitter backends. ``"statsmodels"`` is the per-unit IRLS the analysis was
 #: built on; ``"jax"`` is the batched IRLS in
@@ -142,7 +142,7 @@ def test_theta_modulation(
     theta_phase: pd.Series,
     is_immobile: pd.Series,
     neuron_spike_count: NDArray,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     *,
     design: tuple[NDArray, NDArray] | None = None,
 ) -> tuple[float, float]:

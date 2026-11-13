@@ -643,7 +643,7 @@ clock; both are NaN for a bout with no completed trial, e.g. a pre-trial stop):
   arrival → outcome window, so their outcome is not yet knowable when they start.
 - `event_duration_s`, `event_start_s`, `event_end_s`, `event_midpoint_s` — the event's
   boundary/mid timestamps and inclusive decoded duration:
-  `event_end_s - event_start_s + 1 / DEFAULT_SAMPLING_FREQUENCY_HZ`. Thus a
+  `event_end_s - event_start_s + 1 / SAMPLING_FREQUENCY`. Thus a
   one-bin event has one-bin duration rather than zero.
 
 **Decode content** (per event-arm; the content-model response family):

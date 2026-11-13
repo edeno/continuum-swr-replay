@@ -10,7 +10,6 @@ import pandas as pd
 import xarray as xr
 from scipy.stats import sem
 
-from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals
 from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_session
 from continuum_swr_replay.analysis.hippocampus.event_analysis import (
@@ -29,7 +28,7 @@ def get_signal_windows(
     signal_cols: list[str],
     time_col: str = "start_time",
     window_sec: float = 2.0,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY_HZ,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
     event_id_col: str | None = None,
 ) -> xr.DataArray:
     """Extract signal windows around event times.

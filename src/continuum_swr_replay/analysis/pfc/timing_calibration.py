@@ -40,12 +40,12 @@ from continuum_swr_replay.analysis.pfc.design import (
 )
 from continuum_swr_replay.analysis.pfc.modulation import in_report_window
 from continuum_swr_replay.analysis.pfc.timing import timing_rule_calibration
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 #: Fitted bins and events of the simulated session (the median canonical
 #: session's fitted bins and per-class event count).
 DEFAULT_N_BINS = 267_000
 DEFAULT_N_EVENTS = 100
-SAMPLING_FREQUENCY = 500.0
 MIN_EVENT_SPACING_S = 0.6
 SHAPES = ("boxcar", "alpha")
 GAINS = (0.7, -0.7, -0.3)

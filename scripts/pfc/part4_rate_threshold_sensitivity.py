@@ -44,7 +44,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.load_population import (
     CALLED_ALPHA,
@@ -54,6 +53,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     significant_fraction,
 )
 from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.mpfc.common import (
     TIMING_BOOTSTRAP_DRAWS,
@@ -249,7 +249,7 @@ def spikes_on_fitted_bins(frame: pd.DataFrame, bundle_dir: Path) -> pd.Series:
         bins[key]
         for key in zip(frame["nwb_file_name"], frame["epoch_name"], strict=True)
     ]
-    return frame["immobility_avg_firing_rate"] * n_bins / DEFAULT_SAMPLING_FREQUENCY_HZ
+    return frame["immobility_avg_firing_rate"] * n_bins / SAMPLING_FREQUENCY
 
 
 def raw_units(bundle_dir: Path) -> pd.DataFrame:
