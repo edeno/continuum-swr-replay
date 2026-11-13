@@ -131,7 +131,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
+from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     get_conditional_non_local_posterior,
 )
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
@@ -611,7 +611,7 @@ def plot_conditional_non_local_posterior(
     """Plot conditional non-local posterior with animal position.
 
     The posterior is the package's
-    (:func:`~continuum_swr_replay.analysis.hippocampus.posterior_analysis.get_conditional_non_local_posterior`)
+    (:func:`~continuum_swr_replay.analysis.decode_quality.posterior_analysis.get_conditional_non_local_posterior`)
     over the window: a time bin with no non-local mass takes the nearest
     earlier bin's. Bins off the track interior are drawn grey.
 

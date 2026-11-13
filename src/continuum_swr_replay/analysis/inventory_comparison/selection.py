@@ -67,12 +67,12 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     CandidateSequences,
     # the detector's own threshold comparison, so a tie is decided as it decides
     _is_above,
 )
-from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import (
+from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     Seed,
     keyed_rng,
 )

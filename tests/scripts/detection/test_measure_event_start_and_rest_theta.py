@@ -1,6 +1,6 @@
 """``measure_event_start_and_rest_theta.measure_epoch``: the frame it reads and the
 columns it adds. The measures are tested in
-``tests/analysis/hippocampus/test_start_and_rest_theta.py``."""
+``tests/analysis/event_properties/test_start_and_rest_theta.py``."""
 
 from __future__ import annotations
 
@@ -14,9 +14,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus import start_and_rest_theta
+from continuum_swr_replay.analysis.event_properties import start_and_rest_theta
 from continuum_swr_replay.decoding.files import decode_paths
-from tests.analysis.hippocampus.test_start_and_rest_theta import EVENTS, frame
+from tests.analysis.event_properties.test_start_and_rest_theta import EVENTS, frame
 
 _SCRIPT = (
     Path(__file__).resolve().parents[3]

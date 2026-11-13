@@ -339,7 +339,7 @@ def build_session_event_sets(
         If a stop cohort is requested without ``cohort_stops``.
     """
     # Deferred import: this helper opens Spyglass / DataJoint at import time.
-    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
         align_results_to_position,
     )
 

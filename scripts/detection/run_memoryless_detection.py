@@ -2,7 +2,7 @@
 """Run the memoryless sequence detector over recorded HPC epochs.
 
 The Widloski & Foster sliding-window detector, ported in
-``continuum_swr_replay.analysis.hippocampus.memoryless_sequence``, run on each
+``continuum_swr_replay.analysis.detection.memoryless_sequence``, run on each
 epoch's saved clusterless decode: the encoding model from
 ``{epoch_id}_detector.pkl``, the decode grid, position and speed from
 ``{epoch_id}_80_data_over_time.pkl``, the SWR labels and where they were
@@ -129,6 +129,40 @@ import pandas as pd
 from distributed.deploy import Cluster
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.detection.detection_inputs import (
+    MARKS_RULE,
+    input_paths,
+    load_marks,
+    marks_cache_dir,
+    marks_cache_path,
+    marks_sha256,
+    memoryless_output_paths,
+)
+from continuum_swr_replay.analysis.detection.memoryless_sequence import (
+    MemorylessSequenceConfig,
+    SequenceIdentity,
+    ShuffleSeed,
+    load_clusterless_encoding_model,
+    run_epoch,
+    window_midpoints_s,
+)
+from continuum_swr_replay.analysis.detection.memoryless_sequence.epoch import (
+    observation_table,
+)
+from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table import (
+    canonical_swr_intervals,
+)
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
+    check_marks_match_encoding,
+)
+from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
+    DEFAULT_N_SHUFFLES,
+    MINIMUM_N_SHUFFLES,
+    SIGNIFICANCE_LEVEL,
+)
+from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
+    windows_holding,
+)
 from continuum_swr_replay.analysis.events.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
@@ -142,40 +176,6 @@ from continuum_swr_replay.analysis.events.swr_source import (
     swr_epoch_id_of_session,
     swr_source_files,
     swr_source_name,
-)
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
-    MARKS_RULE,
-    input_paths,
-    load_marks,
-    marks_cache_dir,
-    marks_cache_path,
-    marks_sha256,
-    memoryless_output_paths,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
-    MemorylessSequenceConfig,
-    SequenceIdentity,
-    ShuffleSeed,
-    load_clusterless_encoding_model,
-    run_epoch,
-    window_midpoints_s,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.epoch import (
-    observation_table,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
-    canonical_swr_intervals,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
-    check_marks_match_encoding,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
-    DEFAULT_N_SHUFFLES,
-    MINIMUM_N_SHUFFLES,
-    SIGNIFICANCE_LEVEL,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
-    windows_holding,
 )
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.decoding.files import (

@@ -2484,7 +2484,7 @@ class TestAlignmentIsIdentityOnMatchedAxes:
     def test_fitted_numbers_are_unchanged_by_the_alignment_step(
         self, position_info, sampling_frequency, spike_count, monkeypatch
     ):
-        import continuum_swr_replay.analysis.hippocampus.data_aggregation as agg
+        import continuum_swr_replay.analysis.decode_quality.data_aggregation as agg
 
         data, results = _synthetic_session(
             position_info, self.EVENT_WINDOWS, self.RIPPLE_WINDOWS

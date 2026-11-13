@@ -34,11 +34,11 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     _drop_the_unreachable_row,
     interior_bin_distances_cm,
 )
-from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
+from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
     interior_bin_mask,
     nearest_interior_bins,
     subnormal_occupancy_bin_mask,

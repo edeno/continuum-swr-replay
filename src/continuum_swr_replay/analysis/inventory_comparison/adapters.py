@@ -39,6 +39,10 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.detection.detection_inputs import (
+    carey_output_paths,
+    memoryless_output_paths,
+)
 from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
@@ -52,10 +56,6 @@ from continuum_swr_replay.analysis.events.eligibility import (
 from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
     intervals_from_labels,
-)
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
-    carey_output_paths,
-    memoryless_output_paths,
 )
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     missing_run_table,

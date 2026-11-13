@@ -3,7 +3,7 @@
 A foundation package: it imports the standard library, numpy, xarray,
 ``non_local_detector`` and the other foundation modules (``parameters``,
 ``data_types``), and nothing from ``analysis``. The HPC decode's masks read the SWR
-source, so they live above it, in ``analysis.hippocampus.decode_masks``.
+source, so they live above it, in ``analysis.detection.decode_masks``.
 
 - ``config``: the encoding-likelihood configs (``DecodingConfig``,
   ``NonLocalDecodingConfig``) and the detector class that decodes each brain
@@ -15,4 +15,6 @@ source, so they live above it, in ``analysis.hippocampus.decode_masks``.
 - ``files``: the one naming rule for a decode's files, and whether a decode's
   files exist.
 - ``results``: the one ``results.nc`` reader.
+- ``result_loading``: a saved decode read back whole: its results, fitted
+  detector and environment (``load_results``).
 """

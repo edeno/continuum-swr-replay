@@ -45,7 +45,7 @@ from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
 
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     DECODE_BIN_STRIDE,
 )
 from continuum_swr_replay.intervals import contiguous_true_runs

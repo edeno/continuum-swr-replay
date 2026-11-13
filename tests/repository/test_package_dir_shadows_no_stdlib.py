@@ -51,7 +51,7 @@ def test_import_ast_succeeds_from_inside_the_package_directory():
 def test_every_package_directory_is_walked():
     dirs = _package_dirs()
     assert PACKAGE_DIR in dirs
-    assert PACKAGE_DIR / "analysis" / "hippocampus" / "state_evidence" in dirs
+    assert PACKAGE_DIR / "analysis" / "event_evidence" / "state_evidence" in dirs
 
 
 def test_no_module_in_any_package_directory_has_a_stdlib_name():

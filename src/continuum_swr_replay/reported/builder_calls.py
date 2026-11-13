@@ -40,7 +40,7 @@ class BuilderCalls:
     analysis : tuple of str
         The ``analysis`` functions it calls, directly or through a helper that
         makes no value, as dotted names without the package
-        (``analysis.hippocampus.event_statistics.event_signal_statistics``),
+        (``analysis.event_properties.event_statistics.event_signal_statistics``),
         sorted.
     through : tuple of str
         The other value-making builder functions it calls, sorted.

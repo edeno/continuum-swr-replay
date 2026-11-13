@@ -25,7 +25,7 @@ spike, and it is kept as the reference the stored path was checked against
 (rows ``s..e`` of the stored likelihood equal the rebuild over ``s..e+1`` to
 float32 rounding).
 
-Per-event metrics, computed by ``analysis.hippocampus.spike_evidence`` (which
+Per-event metrics, computed by ``analysis.event_evidence.spike_evidence`` (which
 also builds the event groups and quiet windows; all bin lookups use native
 track-graph distance):
 
@@ -78,17 +78,10 @@ for _cat in (UserWarning, FutureWarning, DeprecationWarning):
 from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
-    read_dot_with_swr_source,
-)
-from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
-    EventDefinitionError,
-)
-from continuum_swr_replay.analysis.hippocampus import event_statistics  # noqa: E402
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,
 )
-from continuum_swr_replay.analysis.hippocampus.spike_evidence import (  # noqa: E402
+from continuum_swr_replay.analysis.event_evidence.spike_evidence import (  # noqa: E402
     SPIKE_EVIDENCE_METRICS,
     build_session_events,
     event_metrics,
@@ -96,12 +89,21 @@ from continuum_swr_replay.analysis.hippocampus.spike_evidence import (  # noqa: 
     stored_likelihood_columns,
     window_spike_counts,
 )
-from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: E402
+from continuum_swr_replay.analysis.event_evidence.state_evidence import (  # noqa: E402
     UNDERFLOW_OCCUPANCY_FLOOR,
     event_likelihood,
     load_encoding,
     nearest_interior_bins,
     subnormal_occupancy_bin_mask,
+)
+from continuum_swr_replay.analysis.event_properties import (  # noqa: E402
+    event_statistics,
+)
+from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
+    read_dot_with_swr_source,
+)
+from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
+    EventDefinitionError,
 )
 from continuum_swr_replay.analysis.shared_statistics import (  # noqa: E402
     animal_medians,

@@ -1,7 +1,7 @@
 """Measure each epoch's theta, ripple and MUA levels during running and during quiet rest.
 
 The references an event's ``theta_z``, ``ripple_power_z`` and ``mua_rate_z`` are
-read against (``analysis.hippocampus.brain_state_reference``): is a non-local
+read against (``analysis.event_properties.brain_state_reference``): is a non-local
 event at rest a theta-like event, or a quiet-rest one? One row per epoch, for
 the ``ok`` epochs of an event features run, from the same decodes (each
 decode's sha256 must be the one the run recorded), written to
@@ -23,10 +23,10 @@ from typing import Any
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events import analysed_time
-from continuum_swr_replay.analysis.hippocampus.brain_state_reference import (
+from continuum_swr_replay.analysis.event_properties.brain_state_reference import (
     brain_state_reference,
 )
+from continuum_swr_replay.analysis.events import analysed_time
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,

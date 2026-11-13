@@ -33,7 +33,7 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
+from continuum_swr_replay.analysis.decode_quality.hpc_raw_stats import (
     RAW_STAT_COLUMNS,
     TRANSITION_MATRIX_COLUMNS,
     compute_hpc_raw_stats_single,

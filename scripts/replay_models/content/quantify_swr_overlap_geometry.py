@@ -31,6 +31,9 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    validate_results_position_time_alignment,
+)
 from continuum_swr_replay.analysis.events.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
@@ -49,13 +52,10 @@ from continuum_swr_replay.analysis.events.swr_source import (
     artifact_intervals,
     swr_epoch_id,
 )
-from continuum_swr_replay.analysis.hippocampus import load_results
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-    validate_results_position_time_alignment,
-)
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import nwb_stem
+from continuum_swr_replay.decoding.result_loading import load_results
 from continuum_swr_replay.paths import processed_data_dir
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

@@ -48,13 +48,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import sweep
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_controls import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence import sweep
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_controls import (
     N_RECORDINGS,
     run_no_replay,
     run_trials,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_summaries import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_summaries import (
     controls_summary,
 )
 from continuum_swr_replay.paths import detection_comparison_dir

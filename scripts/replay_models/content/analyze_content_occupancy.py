@@ -50,18 +50,13 @@ for _cat in (UserWarning, FutureWarning, DeprecationWarning):
 from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
-    read_dot_with_swr_source,
-    require_swr_source,
-)
-from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
-    EventDefinitionError,
-)
-from continuum_swr_replay.analysis.hippocampus import content_occupancy  # noqa: E402
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,
 )
-from continuum_swr_replay.analysis.hippocampus.event_statistics import (  # noqa: E402
+from continuum_swr_replay.analysis.event_properties import (  # noqa: E402
+    content_occupancy,
+)
+from continuum_swr_replay.analysis.event_properties.event_statistics import (  # noqa: E402
     AT_WELL_CM,
     FAR_CM,
     OCCUPANCY_QUADRANTS,
@@ -69,6 +64,13 @@ from continuum_swr_replay.analysis.hippocampus.event_statistics import (  # noqa
     arm_occupancy_shares,
     content_occupancy_shares,
     quadrant_fractions,
+)
+from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
+    read_dot_with_swr_source,
+    require_swr_source,
+)
+from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
+    EventDefinitionError,
 )
 from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS  # noqa: E402
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402

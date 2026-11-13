@@ -19,7 +19,7 @@ from ...data_loaders.constants import TRACK_SEGMENT_TO_PATCH, TRUNK_ARMS
 from ...parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from ...tables.columns import require_columns
 from ..behavior.covariates.spatial import arm_adjacency, path_continuity
-from ..hippocampus.posterior_analysis import map_estimate_to_map_nodes
+from ..decode_quality.posterior_analysis import map_estimate_to_map_nodes
 from .summaries import _group_by_event
 
 RollupResult = tuple[np.ndarray, dict[str, np.ndarray]]

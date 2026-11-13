@@ -74,6 +74,6 @@ from -0.125 s to +0.125 s relative to the event.
 REMOTE_CM = 100.0
 """How far (cm along the track graph) a place must be from the animal's to be
 remote: the spike-evidence analysis's "remote" event subset
-(``analysis.hippocampus.spike_evidence``) and the event features'
+(``analysis.event_evidence.spike_evidence``) and the event features'
 evidence over remote bins (``inventory_comparison.evidence``,
 ``scripts/detection/run_event_features.py``)."""

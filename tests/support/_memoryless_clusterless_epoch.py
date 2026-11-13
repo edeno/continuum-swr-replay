@@ -17,7 +17,7 @@ from non_local_detector.likelihoods.clusterless_kde import (
     fit_clusterless_kde_encoding_model,
 )
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     ENCODING_KEY,
     interior_bin_distances_cm,
 )

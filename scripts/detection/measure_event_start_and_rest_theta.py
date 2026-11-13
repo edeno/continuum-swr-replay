@@ -6,7 +6,7 @@ the one the event features run recorded) and environment: the start distance
 (track-graph distance from the animal to the event's first decoded position)
 and the share of ``--n-windows`` duration-matched windows of quiet rest whose
 theta is theta-like. The measures are
-``analysis/hippocampus/start_and_rest_theta.py``'s; this script selects the
+``analysis/event_properties/start_and_rest_theta.py``'s; this script selects the
 epochs, reads the frames and writes the tables.
 
 One table per epoch, ``Processed-Data/event_start_rest_theta/<epoch>.parquet``,
@@ -28,12 +28,12 @@ from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_properties.start_and_rest_theta import (
+    start_and_rest_theta,
+)
 from continuum_swr_replay.analysis.events import analysed_time
 from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_session
-from continuum_swr_replay.analysis.hippocampus.start_and_rest_theta import (
-    start_and_rest_theta,
-)
 from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
     EVENT_FEATURES_RUN,
 )

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Detect LFP and spike artifacts in every epoch's CA1 data, on CPU.
 
-The detector (``analysis/hippocampus/artifacts``) masks a period only on an
+The detector (``analysis/detection/artifacts``) masks a period only on an
 artifact signature, never on power alone: S (sustained ripple-band noise on a
 fixed subset of CA1 channels), T-ref (a jump on the reference electrode),
 T-ca1 (a persistent step on several CA1 channels) and T-spk (a synchronous line
@@ -75,6 +75,10 @@ import scipy
 from dask.distributed import LocalCluster
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.detection.artifacts import detect
+from continuum_swr_replay.analysis.detection.artifacts.detect import (
+    detect_artifacts,
+)
 from continuum_swr_replay.analysis.events.artifact_intervals import (
     cores_path,
     write_cores,
@@ -84,10 +88,6 @@ from continuum_swr_replay.analysis.events.artifact_masks import (
     artifact_intervals,
 )
 from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id
-from continuum_swr_replay.analysis.hippocampus.artifacts import detect
-from continuum_swr_replay.analysis.hippocampus.artifacts.detect import (
-    detect_artifacts,
-)
 from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_epochs,
     pending_epochs,

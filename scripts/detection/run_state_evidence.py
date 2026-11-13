@@ -3,7 +3,7 @@
 
 Does each state capture what it claims, judged by spikes that did not choose
 the location? The method, its evidence columns and its caveats are in
-``continuum_swr_replay.analysis.hippocampus.state_evidence``; this runner feeds
+``continuum_swr_replay.analysis.event_evidence.state_evidence``; this runner feeds
 it one epoch at a time and summarizes the pooled result.
 
 Per epoch (a dask CPU worker each):
@@ -121,15 +121,14 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
-from continuum_swr_replay.analysis.events import analysed_time  # noqa: E402
-from continuum_swr_replay.analysis.hippocampus.decode_masks import (  # noqa: E402
+from continuum_swr_replay.analysis.detection.decode_masks import (  # noqa: E402
     hpc_artifact_intervals,
     hpc_decode_masks,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (  # noqa: E402
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (  # noqa: E402
     interior_bin_distances_cm,
 )
-from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: E402
+from continuum_swr_replay.analysis.event_evidence.state_evidence import (  # noqa: E402
     CV_BLOCK_S,
     ENCODING_HELD_OUT,
     ENCODING_LABELS,
@@ -165,6 +164,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     window_evidence,
     window_folds,
 )
+from continuum_swr_replay.analysis.events import analysed_time  # noqa: E402
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
@@ -1413,7 +1413,7 @@ def readme(
         "",
         f"Produced by `{PRODUCED_BY}` at commit {provenance['commit']}"
         f"{' (uncommitted changes)' if provenance['dirty'] else ''}. Method and "
-        "column definitions: `continuum_swr_replay.analysis.hippocampus.state_evidence`.",
+        "column definitions: `continuum_swr_replay.analysis.event_evidence.state_evidence`.",
         "",
         f"Epochs: {discovery['rule']}; {discovery['n_epochs']} listed"
         + (f", {discovery['n_with_all_files']} with all three decode files"

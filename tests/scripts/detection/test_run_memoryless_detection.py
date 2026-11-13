@@ -27,20 +27,20 @@ import pytest
 from dask.distributed import Client, LocalCluster
 
 import scripts.detection.run_memoryless_detection as runner
-from continuum_swr_replay.analysis.events import swr_source
-from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
-from continuum_swr_replay.analysis.hippocampus import detection_inputs
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+from continuum_swr_replay.analysis.detection import detection_inputs
+from continuum_swr_replay.analysis.detection.detection_inputs import (
     input_paths,
     marks_cache_path,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     MEMORYLESS_EVENT_TABLE_DTYPES,
     MemorylessSequenceConfig,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     ENCODING_KEY,
 )
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
 from continuum_swr_replay.data_loaders import spikes
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import ROOT_DIR

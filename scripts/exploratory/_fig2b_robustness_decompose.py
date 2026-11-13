@@ -18,12 +18,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    load_data_over_time,
+)
+from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    compute_swr_overlap_class_counts,
+)
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
-)
-from continuum_swr_replay.analysis.hippocampus import (
-    compute_swr_overlap_class_counts,
-    load_data_over_time,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 

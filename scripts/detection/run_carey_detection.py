@@ -74,28 +74,28 @@ import scipy
 from dask.distributed import LocalCluster
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.events import swr_source
-from continuum_swr_replay.analysis.events.artifact_intervals import (
-    epoch_artifact_intervals,
-)
-from continuum_swr_replay.analysis.events.artifact_masks import (
-    PADDING_S,
-)
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+from continuum_swr_replay.analysis.detection.detection_inputs import (
     MARKS_RULE,
     carey_output_paths,
     decode_marks,
     marks_sha256,
     position_span_samples,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     check_marks_match_encoding,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
+from continuum_swr_replay.analysis.detection.swr_detectors import (
     CAREY_SETTINGS,
     carey_observed_stretches,
     run_carey_detector,
     tetrode_spike_counts,
+)
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.artifact_intervals import (
+    epoch_artifact_intervals,
+)
+from continuum_swr_replay.analysis.events.artifact_masks import (
+    PADDING_S,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (
     epochs_to_run,

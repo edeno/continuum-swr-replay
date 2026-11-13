@@ -20,27 +20,27 @@ import pandas as pd
 import xarray as xr
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.events import (
-    analysed_time,
-    swr_source,
-)
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import decode_marks
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+from continuum_swr_replay.analysis.detection.detection_inputs import decode_marks
+from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     CandidateSequences,
     WindowDecisions,
     sequence_dispersion_cm,
     window_decisions,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     check_marks_match_encoding,
     interior_bin_distances_cm,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     candidate_window_log_likelihood,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     normalize_windows,
     windows_holding,
+)
+from continuum_swr_replay.analysis.events import (
+    analysed_time,
+    swr_source,
 )
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs

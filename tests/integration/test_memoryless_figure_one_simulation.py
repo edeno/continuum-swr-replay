@@ -35,33 +35,33 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
     TRACK_HEIGHT,
 )
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     CONFIG,
     N_NEURONS,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     CandidateSequences,
     detect_candidate_sequences,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     ENCODING_KEY,
     interior_bin_distances_cm,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
     with_reference_rate_floor,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
     ShuffleResult,
     ShuffleSeed,
     shuffle_candidate_sorted,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
     InjectedReplay,
     inject_replay,
     stray_window_spikes,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     aggregate_windows,
     normalize_windows,
 )
@@ -690,7 +690,7 @@ class TestOneWindowFarAway:
         assert decoded.place_bin_centers_cm[center[0]] < 40.0
 
     def test_the_call_rests_on_that_window(self, decoded, sequence):
-        from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
+        from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
             NO_CENTER,
             dispersion_cm,
         )

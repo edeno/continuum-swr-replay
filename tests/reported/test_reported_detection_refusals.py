@@ -9,7 +9,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     sweep_statistics,
 )
 from continuum_swr_replay.paths import ROOT_DIR

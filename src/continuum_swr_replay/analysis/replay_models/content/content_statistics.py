@@ -16,7 +16,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.event_statistics import class_medians
+from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    class_medians,
+)
 from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
     TRUNK_ARMS,

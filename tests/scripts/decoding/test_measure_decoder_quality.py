@@ -1,5 +1,5 @@
 """``measure_decoder_quality.measure_epoch``: the rows it writes for one decode. The
-measures are tested in ``tests/analysis/hippocampus/test_quality_metrics_over_sessions.py``."""
+measures are tested in ``tests/analysis/decode_quality/test_quality_metrics_over_sessions.py``."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pickle
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
+from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     compute_calibration_curve,
     session_decoder_quality,
 )

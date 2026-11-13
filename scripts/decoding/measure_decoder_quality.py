@@ -29,11 +29,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events import analysed_time
-from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
+from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     compute_calibration_curve,
     session_decoder_quality,
 )
+from continuum_swr_replay.analysis.events import analysed_time
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.decoding.files import (
     data_over_time_suffix,

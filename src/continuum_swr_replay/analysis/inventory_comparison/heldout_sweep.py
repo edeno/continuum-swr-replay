@@ -23,21 +23,21 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
     TRACK_HEIGHT,
 )
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     sweep,
     sweep_controls,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     CONFIG,
     N_NEURONS,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     with_reference_rate_floor,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.scoring import (
     score_against_injection,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
     Segment,
     inject_activity,
     piecewise_replay,

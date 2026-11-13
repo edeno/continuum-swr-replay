@@ -51,10 +51,10 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     sweep_statistics,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     CONFIG,
     CONTINUOUS_INBOUND_EVENT,
     CONTINUOUS_OUTBOUND_EVENT,
@@ -68,10 +68,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_si
     STRAY_WINDOW_STILL_S,
     simulate_and_decode,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.recording_statistics import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.recording_statistics import (
     ZOOMED_EVENTS,
     accepted_overlapping,
     best_dispersion_cm,
@@ -88,11 +88,11 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.recording_sta
     stray_window_dispersions,
     verdict,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_controls import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_controls import (
     MULTIPART_CONDITIONS,
 )
 from continuum_swr_replay.analysis.inventory_comparison.heldout_sweep import (

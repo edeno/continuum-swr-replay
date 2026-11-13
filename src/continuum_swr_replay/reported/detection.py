@@ -5,7 +5,7 @@ Every value is read from an output an analysis already wrote; nothing is
 refitted or re-decoded here. This module names and describes the values. A
 statistic an input already holds is copied from it; the statistics of the sweeps'
 summaries, of the labeled recording and of the pilot's events are computed in
-``analysis.hippocampus.memoryless_sequence`` (``sweep_statistics``,
+``analysis.detection.memoryless_sequence`` (``sweep_statistics``,
 ``recording_statistics`` and ``event_table``); here only the size of an input
 (its epochs, its animals) is counted. The inputs (:class:`DetectionInputs`):
 
@@ -40,13 +40,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     sweep_statistics,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table import (
     outside_window_call_statistics,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_controls import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_controls import (
     MULTIPART_CONDITIONS,
 )
 from continuum_swr_replay.analysis.inventory_comparison.heldout_sweep import (

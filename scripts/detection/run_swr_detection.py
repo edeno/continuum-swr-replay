@@ -150,17 +150,10 @@ from dask.distributed import LocalCluster
 from numpy.typing import NDArray
 from ripple_detection import Kay_ripple_detector
 
-from continuum_swr_replay.analysis.events import swr_source
-from continuum_swr_replay.analysis.events.artifact_intervals import (
-    epoch_artifact_intervals,
-)
-from continuum_swr_replay.analysis.events.artifact_masks import (
-    PADDING_S,
-)
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+from continuum_swr_replay.analysis.detection.detection_inputs import (
     position_span_samples,
 )
-from continuum_swr_replay.analysis.hippocampus.ripple_tetrodes import (
+from continuum_swr_replay.analysis.detection.ripple_tetrodes import (
     COUPLING_CUT,
     LOO_SMOOTHING_SIGMA_S,
     LOO_THRESHOLD_Z,
@@ -171,7 +164,7 @@ from continuum_swr_replay.analysis.hippocampus.ripple_tetrodes import (
     check_one_channel_per_tetrode,
     select_ripple_tetrodes,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
+from continuum_swr_replay.analysis.detection.swr_detectors import (
     CHANNEL_SELECTION_BAND_HZ,
     CHANNEL_SELECTION_FILTER_ORDER,
     CHANNEL_SELECTION_RMS_WINDOW_S,
@@ -189,6 +182,13 @@ from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
     run_swr_detectors,
     yu_diagnostics,
     zero_phase_bandpass,
+)
+from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.events.artifact_intervals import (
+    epoch_artifact_intervals,
+)
+from continuum_swr_replay.analysis.events.artifact_masks import (
+    PADDING_S,
 )
 from continuum_swr_replay.analysis.inventory_comparison.kay_version import (
     kay_version_check,

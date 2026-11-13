@@ -418,7 +418,7 @@ class TestTheLoadersIntervalRulesAreTheMasks:
         return cases
 
     def test_event_overlap_is_the_detectors_and_the_sources(self):
-        from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
+        from continuum_swr_replay.analysis.detection.swr_detectors import (
             drop_overlapping_events,
         )
         from continuum_swr_replay.intervals import overlaps_intervals

@@ -1,7 +1,7 @@
 """One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
 Two tests over the immobile non-local events of the canonical event table
-(``analysis.hippocampus.class_or_continuum`` holds the method):
+(``analysis.event_properties.class_or_continuum`` holds the method):
 
 1. **One mode or two.** Per animal and pooled, the distribution of event ripple
    power (the event's peak and mean of the z-scored Kay consensus, and the Kay
@@ -51,16 +51,16 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.constants import REMOTE_CM  # noqa: E402
+from continuum_swr_replay.analysis.event_evidence.spike_evidence import (  # noqa: E402
+    SPIKE_EVIDENCE_METRICS,
+)
+from continuum_swr_replay.analysis.event_properties import (
+    class_or_continuum as cc,  # noqa: E402
+)
 from continuum_swr_replay.analysis.events import analysed_time  # noqa: E402
 from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     swr_epoch_id_of_session,
-)
-from continuum_swr_replay.analysis.hippocampus import (  # noqa: E402
-    class_or_continuum as cc,
-)
-from continuum_swr_replay.analysis.hippocampus.spike_evidence import (  # noqa: E402
-    SPIKE_EVIDENCE_METRICS,
 )
 from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
     inventory_run,

@@ -18,7 +18,7 @@ from types import MappingProxyType
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+from continuum_swr_replay.analysis.detection.detection_inputs import (
     memoryless_output_paths as memoryless_outputs,
 )
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run

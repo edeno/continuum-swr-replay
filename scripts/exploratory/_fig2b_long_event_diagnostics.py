@@ -22,10 +22,12 @@ from pathlib import Path
 
 import numpy as np
 
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    load_data_over_time,
+)
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.hippocampus import load_data_over_time
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 logging.basicConfig(

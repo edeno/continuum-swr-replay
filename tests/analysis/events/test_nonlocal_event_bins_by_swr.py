@@ -5,11 +5,11 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
+    normalized_replay_position_by_swr,
+)
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
     nonlocal_event_bins_by_swr,
-)
-from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
-    normalized_replay_position_by_swr,
 )
 
 

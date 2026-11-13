@@ -1,7 +1,7 @@
 """The artifact mask: the detector's cores, padded from one table.
 
 The detector stores unpadded cores
-(``hippocampus.artifacts.detect.detect_artifacts``). One table,
+(``detection.artifacts.detect.detect_artifacts``). One table,
 :data:`PADDING_S`, pads them, and :func:`artifact_intervals` gives the one mask
 every part of the project uses: the SWR detectors' normalization and event
 drops, MUA detection, the decoders (``is_missing`` and the encoding

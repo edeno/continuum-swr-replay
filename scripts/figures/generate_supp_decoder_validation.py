@@ -45,11 +45,11 @@ from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
-from continuum_swr_replay.analysis.events.analysed_time import immobile_analysed_bins
-from continuum_swr_replay.analysis.hippocampus import (
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
     get_event_types,
     load_data_over_time,
 )
+from continuum_swr_replay.analysis.events.analysed_time import immobile_analysed_bins
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.figure_panels import (
     plot_calibration_curve,

@@ -1195,7 +1195,7 @@ class TestTheNormalizers:
     run-speed baseline is the same percentile of head speed outside the mask."""
 
     def _theta_dot(self) -> pd.DataFrame:
-        from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+        from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
             theta_power_zscore,
         )
 
@@ -1234,7 +1234,7 @@ class TestTheNormalizers:
     ):
         """z is affine in raw power, so re-z-scoring the stored z over the rows
         outside the mask is z-scoring the raw power over those rows."""
-        from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+        from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
             theta_power_zscore,
         )
 

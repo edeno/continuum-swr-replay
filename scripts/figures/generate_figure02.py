@@ -28,7 +28,7 @@ Composite 5-panel figure with the following narrative:
 
 Panels b and d are drawn from the canonical event table
 (``replay_content/event_table.parquet``), the table the events summary cites,
-by the functions the summary uses (``analysis.hippocampus.event_statistics``):
+by the functions the summary uses (``analysis.event_properties.event_statistics``):
 panel b counts its ``overlap_class`` and panel d subtracts ``matched_swr_*``
 from the event bounds. The percents and medians printed on them are those
 functions' numbers, rounded by the summary's rule (``reported.formatting``),
@@ -71,6 +71,22 @@ import pandas as pd
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    get_event_types,
+    load_data_over_time,
+)
+from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
+    compute_local_decoding_error,
+)
+from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    boundary_offset_statistics,
+    boundary_offsets,
+    compute_swr_overlap_class_counts,
+    overlap_class_statistics,
+)
+from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+    compute_triggered_average_curves,
+)
 from continuum_swr_replay.analysis.events.analysed_time import (
     read_swr_table,
     swr_intervals,
@@ -87,21 +103,6 @@ from continuum_swr_replay.analysis.events.swr_source import (
     swr_epoch_id,
     swr_source_name,
 )
-from continuum_swr_replay.analysis.hippocampus import (
-    compute_local_decoding_error,
-    get_event_types,
-    load_data_over_time,
-    load_results,
-)
-from continuum_swr_replay.analysis.hippocampus.event_statistics import (
-    boundary_offset_statistics,
-    boundary_offsets,
-    compute_swr_overlap_class_counts,
-    overlap_class_statistics,
-)
-from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
-    compute_triggered_average_curves,
-)
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_decode_files,
@@ -113,6 +114,7 @@ from continuum_swr_replay.decoding.identifiers import (
     parse_nwb_filename,
     session_name,
 )
+from continuum_swr_replay.decoding.result_loading import load_results
 from continuum_swr_replay.paths import (
     processed_data_dir,
     replay_content_dir,

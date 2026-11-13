@@ -16,7 +16,9 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
-from continuum_swr_replay.analysis.hippocampus import content_occupancy  # noqa: E402
+from continuum_swr_replay.analysis.event_properties import (
+    content_occupancy,  # noqa: E402
+)
 from continuum_swr_replay.visualization import figure_panels  # noqa: E402
 from scripts.figures import generate_event_gallery as gallery  # noqa: E402
 from scripts.figures import generate_supp_decoder_validation as supp  # noqa: E402

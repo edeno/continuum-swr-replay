@@ -9,10 +9,10 @@ import pandas as pd
 import pytest
 
 import scripts.detection.measure_ripple_class_structure as structure
-from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
-from continuum_swr_replay.analysis.hippocampus.spike_evidence import (
+from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
 )
+from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
 from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
     EVENT_FEATURES_RUN,
 )

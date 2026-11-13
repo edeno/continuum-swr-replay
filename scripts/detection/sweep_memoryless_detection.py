@@ -41,16 +41,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     N_NEURONS,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     REFERENCE_RATE_FLOOR_HZ,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import (
     DECODE_MARGIN_S,
     DURATION_S,
     MATCH_TOLERANCE_CM,
@@ -63,11 +63,11 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep import 
     replay_grid,
     usable_intervals,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_replays import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_replays import (
     SAME_PLACE_CM,
     replay_sweep,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_summaries import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_summaries import (
     replay_sweep_summary,
     share,
 )

@@ -2,8 +2,8 @@
 
 Every value is read from an output an analysis already wrote; nothing is
 refitted here. This module names and describes the values. The statistics are
-computed in ``analysis.hippocampus.event_statistics``,
-``analysis.hippocampus.quality_metrics`` and
+computed in ``analysis.event_properties.event_statistics``,
+``analysis.decode_quality.quality_metrics`` and
 ``analysis.inventory_comparison.nonlocal_comparison``; here only the size of an
 input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
 
@@ -38,7 +38,7 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
 - the decoder quality of each analysed epoch (``Processed-Data/decoder_quality``,
   from ``scripts/decoding/measure_decoder_quality.py``): the Local-state
   decoding error, the state fractions moving and immobile, and the calibration
-  curve, summarized by ``analysis.hippocampus.quality_metrics``.
+  curve, summarized by ``analysis.decode_quality.quality_metrics``.
 
 Each derived output above that reads the canonical event table records the
 table's SHA-256 in its manifest; an output made from another table than the
@@ -59,14 +59,15 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
-from continuum_swr_replay.analysis.hippocampus import event_statistics, quality_metrics
-from continuum_swr_replay.analysis.hippocampus.property_contrast import (
-    MAX_NAN_REPLICATE_SHARE,
-)
-from continuum_swr_replay.analysis.hippocampus.spike_evidence import (
+from continuum_swr_replay.analysis.decode_quality import quality_metrics
+from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
 )
+from continuum_swr_replay.analysis.event_properties import event_statistics
+from continuum_swr_replay.analysis.event_properties.property_contrast import (
+    MAX_NAN_REPLICATE_SHARE,
+)
+from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.inventory_comparison import nonlocal_comparison
 from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
     EVENT_FEATURES_RUN,
@@ -1501,7 +1502,7 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
     epoch; 1000 replicates, fixed seed) of the SWR minus non-SWR difference of
     class medians, and of the duration-matched difference: within ten quantile
     strata of the pooled event durations, averaged by stratum size
-    (``analysis.hippocampus.property_contrast``). 95 % intervals: the estimate
+    (``analysis.event_properties.property_contrast``). 95 % intervals: the estimate
     plus or minus a small-sample t correction over the animals times the
     replicates' standard deviation. The class medians' own intervals stay in
     the bootstrap's ``intervals.csv``.

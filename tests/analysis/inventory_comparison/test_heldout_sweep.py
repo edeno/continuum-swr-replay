@@ -3,11 +3,11 @@
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import sweep
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence import sweep
+from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     N_NEURONS,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
     Gap,
     Segment,
     piecewise_replay,

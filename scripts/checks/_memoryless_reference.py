@@ -1,7 +1,7 @@
 """The Widloski & Foster detector as its MATLAB computes it, for a sorted 1-D track.
 
 An independent re-implementation of the reference's arithmetic, kept apart
-from the port in ``continuum_swr_replay.analysis.hippocampus.memoryless_sequence``
+from the port in ``continuum_swr_replay.analysis.detection.memoryless_sequence``
 so the two can be run on the same input and compared step by step. It differs
 from the port exactly where the port adapts the original:
 

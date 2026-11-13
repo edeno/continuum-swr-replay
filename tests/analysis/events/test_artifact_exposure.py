@@ -537,7 +537,7 @@ class TestPeriEventWindows:
     """A triggered window that touches the mask is dropped whole."""
 
     def _windows(self):
-        from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
+        from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
             get_signal_windows,
         )
 

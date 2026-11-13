@@ -31,7 +31,7 @@ Panels c and e draw the values of the events summary (``ripple_*`` and
 (``reported.events.default_inputs``): the canonical event table, the
 brain-state reference and the property bootstrap's ``intervals.csv``. Their
 medians and references are computed by the functions the summary's builder
-calls (``analysis.hippocampus.event_statistics``), and the intervals are the
+calls (``analysis.event_properties.event_statistics``), and the intervals are the
 bootstrap's, as the summary reads them. Panels b, d and f are per-time-bin
 views of the decode frames; no summary value is drawn on them.
 
@@ -56,6 +56,15 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    load_data_over_time,
+    validate_results_position_time_alignment,
+)
+from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    class_medians,
+    event_signal_statistics,
+    reference_medians,
+)
 from continuum_swr_replay.analysis.events.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
@@ -78,20 +87,9 @@ from continuum_swr_replay.analysis.events.swr_source import (
     ripple_power_inputs,
     swr_epoch_id,
 )
-from continuum_swr_replay.analysis.hippocampus import (
-    load_data_over_time,
-    load_results,
-)
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-    validate_results_position_time_alignment,
-)
-from continuum_swr_replay.analysis.hippocampus.event_statistics import (
-    class_medians,
-    event_signal_statistics,
-    reference_medians,
-)
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.result_loading import load_results
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.reported.events import EventsInputs, default_inputs
 from continuum_swr_replay.visualization.figure_panels import (
@@ -274,14 +272,14 @@ def event_panels(
         - ``events``: ``events`` (the histograms).
         - ``ripple_medians``: ``non_swr`` and ``swr``, each class's median event
           ripple power (``ripple_median_*``), by
-          :func:`~continuum_swr_replay.analysis.hippocampus.event_statistics.event_signal_statistics`.
+          :func:`~continuum_swr_replay.analysis.event_properties.event_statistics.event_signal_statistics`.
         - ``ripple_references``: ``running`` and ``rest``, the median over
           epochs of each epoch's level (``ripple_running_reference``,
           ``ripple_rest_reference``), by
-          :func:`~continuum_swr_replay.analysis.hippocampus.event_statistics.reference_medians`.
+          :func:`~continuum_swr_replay.analysis.event_properties.event_statistics.reference_medians`.
         - ``speed_medians``: ``non_swr`` and ``swr``, each class's median event
           replay speed (``speed_median_*``), by
-          :func:`~continuum_swr_replay.analysis.hippocampus.event_statistics.class_medians`.
+          :func:`~continuum_swr_replay.analysis.event_properties.event_statistics.class_medians`.
         - ``speed_contrasts``: the bootstrap's SWR minus non-SWR differences
           and their interval bounds (``speed_difference_*``,
           ``speed_matched_difference*``).

@@ -5,7 +5,7 @@ two added ones, start distance and arms visited), over the immobile non-local
 events of the canonical event table: the median of each class, the SWR minus
 non-SWR difference, and the duration-matched difference (within ten quantile
 strata of the pooled event durations in whole decode samples, averaged by
-stratum size; ``analysis.hippocampus.property_contrast``), each with a 95 %
+stratum size; ``analysis.event_properties.property_contrast``), each with a 95 %
 interval from a nested bootstrap (animals, then epochs within animal, then
 events within epoch; fixed seed): the estimate plus or minus a small-sample t
 correction over the animals times the replicates' standard deviation. Values are on the scale Part 2 reports
@@ -32,12 +32,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
-from continuum_swr_replay.analysis.hippocampus.property_contrast import (
+from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
     bootstrap_contrasts,
     bootstrap_intervals,
 )
+from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.decoding import identifiers
 from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (

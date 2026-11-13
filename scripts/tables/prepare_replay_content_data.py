@@ -70,6 +70,9 @@ except ImportError:  # pragma: no cover - datajoint always present in practice
 
 
 from continuum_swr_replay.analysis.behavior.covariates import load_contingency
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    validate_dot_event_contract,
+)
 from continuum_swr_replay.analysis.event_tables import prepare_data
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     assemble_canonical_tables,
@@ -82,9 +85,6 @@ from continuum_swr_replay.analysis.events.analysed_time import (
     publish_swr_table,
     read_dot_with_swr_source,
     stamp_swr_source,
-)
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-    validate_dot_event_contract,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.paths import (

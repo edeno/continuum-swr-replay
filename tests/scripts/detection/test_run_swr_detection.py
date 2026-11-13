@@ -36,12 +36,12 @@ from ripple_detection import Kay_ripple_detector, filter_ripple_band
 from ripple_detection.simulate import simulate_session, simulate_time
 
 import scripts.detection.run_swr_detection as runner
-from continuum_swr_replay.analysis.events import swr_source
-from continuum_swr_replay.analysis.hippocampus import swr_detectors
-from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
+from continuum_swr_replay.analysis.detection import swr_detectors
+from continuum_swr_replay.analysis.detection.swr_detectors import (
     NoUsableChannelError,
     best_ripple_channel,
 )
+from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.runs import batch
 from continuum_swr_replay.runs.io import sha256_file

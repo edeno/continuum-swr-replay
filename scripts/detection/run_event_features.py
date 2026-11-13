@@ -103,31 +103,31 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_NON_LOCAL_THRESHOLD,
     REMOTE_CM,
 )
-from continuum_swr_replay.analysis.events import (  # noqa: E402
-    analysed_time,
-    swr_source,
-)
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import (  # noqa: E402
+from continuum_swr_replay.analysis.detection.detection_inputs import (  # noqa: E402
     MARKS_RULE,
     decode_marks,
     marks_sha256,
 )
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import (  # noqa: E402
+from continuum_swr_replay.analysis.detection.detection_inputs import (  # noqa: E402
     memoryless_output_paths as memoryless_outputs,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (  # noqa: E402
+from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (  # noqa: E402
     CandidateSequences,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (  # noqa: E402
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (  # noqa: E402
     check_marks_match_encoding,
     interior_bin_distances_cm,
     window_midpoints_s,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (  # noqa: E402
+from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (  # noqa: E402
     windows_holding,
 )
-from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (  # noqa: E402
+from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (  # noqa: E402
     encoding_inputs,
+)
+from continuum_swr_replay.analysis.events import (  # noqa: E402
+    analysed_time,
+    swr_source,
 )
 from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
     inventory_run,

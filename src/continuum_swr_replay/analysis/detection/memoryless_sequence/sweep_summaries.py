@@ -1,0 +1,457 @@
+"""The long-format summaries of the three memoryless sweeps, from their raw tables.
+
+Each sweep of the two replay detectors on simulated data writes its raw table
+under ``Processed-Data/replay_detection_comparison/`` and a summary, one value
+per row, to ``paper/reported/inputs/detection/``: the injected-replay sweep
+(``scripts/detection/sweep_memoryless_detection.py``,
+:func:`replay_sweep_summary`), its controls (``sweep_memoryless_controls.py``,
+:func:`controls_summary`) and the held-out check (``sweep_memoryless_heldout.py``,
+whose summary is ``inventory_comparison.heldout.heldout_summary``, beside the
+held-out rule it summarizes). The scripts add the provenance rows and write the
+files; the statistics the detection summary reports are read from these
+summaries by ``sweep_statistics``.
+
+A rate or share is a mean of booleans, in [0, 1]; durations are in seconds and
+the replay sweep's timing errors in milliseconds.
+"""
+
+import numpy as np
+import pandas as pd
+
+from continuum_swr_replay.analysis.detection.memoryless_sequence.scoring import (
+    SEGMENTATION_LABELS,
+)
+from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
+    SIGNIFICANCE_LEVEL,
+)
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import CONFIG
+
+IN_DOMAIN_PATH_CM = 45.0
+IN_DOMAIN_DURATION_S = 0.12
+"""The smallest swept path and duration the published replay definition can
+accept. Dispersion must exceed 12 cm and a uniform traverse of length L has
+dispersion L / sqrt(12), so a path under about 42 cm cannot qualify however
+well it is decoded; duration must exceed 100 ms. Three quarters of the grid
+lies outside this, by design, to show where each procedure's limit is -- but
+the aggregate over the whole grid is not a rate of anything the published
+method claims to detect."""
+
+
+def share(numerator: float, denominator: float) -> float:
+    """A rate that is undefined, not zero, when nothing was counted."""
+    return float(numerator / denominator) if denominator > 0 else np.nan
+
+
+def melted(frame: pd.DataFrame, id_vars: list[str], summary: str) -> pd.DataFrame:
+    """One block of the long-format summary, its grouping columns kept."""
+    return frame.melt(id_vars=id_vars, var_name="measure", value_name="value").assign(
+        summary=summary
+    )
+
+
+def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
+    """The aggregates quoted from the injected-replay sweep, in one long table.
+
+    Parameters
+    ----------
+    table : pd.DataFrame, shape (n_cells, n_columns)
+        The sweep's raw table, one row per injected replay (cell): its
+        ``path_cm``, ``duration_s`` and ``distance_from_animal_cm``, and each
+        detector's outcome (the ``sliding_*`` and ``state_space_*`` columns
+        ``scripts/detection/sweep_memoryless_detection.py`` writes).
+
+    Returns
+    -------
+    summary : pd.DataFrame, shape (n_values, 7)
+        ``summary`` (the block), ``measure``, the block's grouping columns
+        ``path_cm``, ``duration_s`` and ``distance_bin_cm`` (NaN where the
+        block is not grouped by it), ``value`` and an empty ``note``. The
+        blocks: detection rates by path and duration
+        (``detection_rate_by_path_and_duration``) and by path (``by_path``),
+        the shuffle's pass rates by duration, median duration ratios by
+        duration and by distance from the animal, the rates over every cell
+        (``overall``) and over the cells the published definition can accept
+        (``overall_in_domain``, :data:`IN_DOMAIN_PATH_CM`,
+        :data:`IN_DOMAIN_DURATION_S`), and the start and end errors' quartiles
+        by duration (``timing_by_duration``, ms). The duration, distance and
+        timing blocks read the replays both detectors matched.
+    """
+    # the shuffle never moves a sequence's bounds, so the duration panels read
+    # every accepted sequence that is the injection, before the shuffle
+    found = table[
+        table.sliding_matches_before_shuffle & table.state_space_matches
+    ].copy()
+    found["sliding_duration_ratio"] = found.sliding_duration_s / found.duration_s
+    found["state_space_duration_ratio"] = (
+        found.state_space_duration_s / found.duration_s
+    )
+    missed = table[table.state_space_matches & ~table.sliding_matches]
+
+    parts = []
+
+    by_path_duration = (
+        table.groupby(["path_cm", "duration_s"])[
+            [
+                "sliding_found",
+                "sliding_matches",
+                "sliding_matches_before_shuffle",
+                "sliding_matches_spread_only",
+                "sliding_any_candidate",
+                "state_space_found",
+                "state_space_matches",
+                "state_space_replay_matches",
+            ]
+        ]
+        .mean()
+        .reset_index()
+    )
+    parts.append(
+        melted(
+            by_path_duration,
+            ["path_cm", "duration_s"],
+            "detection_rate_by_path_and_duration",
+        )
+    )
+
+    # the published replay definition applied to the state-space detector's
+    # own events, by path, so the dispersion floor can be read off the file
+    by_path = (
+        # before the shuffle, sliding_matches_before_shuffle is the like-for-like
+        # partner of state_space_replay_matches: both are the duration and
+        # dispersion criteria alone
+        table.groupby("path_cm")[
+            [
+                "sliding_matches",
+                "sliding_matches_before_shuffle",
+                "state_space_replay_matches",
+            ]
+        ]
+        .mean()
+        .join(
+            table[table.state_space_matches]
+            .groupby("path_cm")
+            .state_space_dispersion_cm.median()
+            .rename("state_space_median_dispersion_cm")
+        )
+        .reset_index()
+    )
+    parts.append(melted(by_path, ["path_cm"], "by_path"))
+
+    # each half of the significance test, among the replays reported before
+    # it, by duration: a short replay covers its path in few windows, so its
+    # jumps are large and the jump half is where it fails
+    reported = table[table.sliding_matches_before_shuffle]
+    shuffle_by_duration = (
+        reported.assign(
+            sliding_spread_pass=reported.sliding_p_spread.le(SIGNIFICANCE_LEVEL),
+            sliding_jump_pass=reported.sliding_p_jump.le(SIGNIFICANCE_LEVEL),
+        )
+        .groupby("duration_s")[["sliding_spread_pass", "sliding_jump_pass"]]
+        .mean()
+        .reset_index()
+    )
+    parts.append(
+        melted(shuffle_by_duration, ["duration_s"], "shuffle_pass_rate_by_duration")
+    )
+
+    by_duration = (
+        found.groupby("duration_s")[
+            ["sliding_duration_ratio", "state_space_duration_ratio"]
+        ]
+        .median()
+        .reset_index()
+    )
+    parts.append(
+        melted(by_duration, ["duration_s"], "median_duration_ratio_by_duration")
+    )
+
+    found["distance_bin_cm"] = pd.cut(
+        found.distance_from_animal_cm, [0, 40, 80, 120, 200]
+    ).astype(str)
+    by_distance = (
+        found.groupby("distance_bin_cm", observed=True)[
+            [
+                "sliding_duration_ratio",
+                "sliding_local_fraction",
+                "state_space_duration_ratio",
+            ]
+        ]
+        .median()
+        .reset_index()
+    )
+    parts.append(
+        melted(by_distance, ["distance_bin_cm"], "median_by_distance_from_animal")
+    )
+
+    overall = pd.DataFrame(
+        {
+            "measure": [
+                "n_cells",
+                "sliding_found",
+                "sliding_matches",
+                "sliding_matches_before_shuffle",
+                "sliding_matches_spread_only",
+                "sliding_shuffle_spread_pass_rate",
+                "sliding_shuffle_jump_pass_rate",
+                "missed_failed_shuffle",
+                "sliding_any_candidate",
+                "state_space_found",
+                "state_space_matches",
+                "state_space_replay_matches",
+                "found_by_state_space_only",
+                "found_by_sliding_window_only",
+                "found_by_sliding_window_only_before_shuffle",
+                "sliding_accepted_but_not_the_injection",
+                "sliding_cells_with_several_accepted_overlaps",
+                "state_space_reports_in_several_intervals",
+                "missed_with_candidate_below_dispersion",
+                "missed_with_no_candidate",
+                "missed_median_spread_pass_rate",
+            ],
+            "value": [
+                float(len(table)),
+                float(table.sliding_found.mean()),
+                float(table.sliding_matches.mean()),
+                float(table.sliding_matches_before_shuffle.mean()),
+                float(table.sliding_matches_spread_only.mean()),
+                # each half's pass rate among the injected replays the
+                # detector reported before the shuffle
+                float(
+                    table[table.sliding_matches_before_shuffle]
+                    .sliding_p_spread.le(SIGNIFICANCE_LEVEL)
+                    .mean()
+                ),
+                float(
+                    table[table.sliding_matches_before_shuffle]
+                    .sliding_p_jump.le(SIGNIFICANCE_LEVEL)
+                    .mean()
+                ),
+                float(missed.sliding_matches_before_shuffle.mean()),
+                float(table.sliding_any_candidate.mean()),
+                float(table.state_space_found.mean()),
+                float(table.state_space_matches.mean()),
+                float(table.state_space_replay_matches.mean()),
+                float((table.state_space_matches & ~table.sliding_matches).mean()),
+                float((table.sliding_matches & ~table.state_space_matches).mean()),
+                float(
+                    (
+                        table.sliding_matches_before_shuffle
+                        & ~table.state_space_matches
+                    ).mean()
+                ),
+                share(
+                    (table.sliding_found & ~table.sliding_matches_before_shuffle).sum(),
+                    table.sliding_found.sum(),
+                ),
+                float(table.sliding_n_accepted.gt(1).mean()),
+                share(
+                    table.state_space_n_intervals.gt(1).sum(),
+                    table.state_space_found.sum(),
+                ),
+                float(
+                    (
+                        missed.sliding_n_candidates.gt(0)
+                        & missed.sliding_best_dispersion_cm.lt(
+                            CONFIG.dispersion_threshold_cm
+                        )
+                    ).mean()
+                ),
+                float(missed.sliding_n_candidates.eq(0).mean()),
+                float(missed.sliding_spread_ok.median()),
+            ],
+        }
+    )
+    overall["summary"] = "overall"
+    parts.append(overall)
+
+    in_domain = table[
+        (table.path_cm >= IN_DOMAIN_PATH_CM)
+        & (table.duration_s >= IN_DOMAIN_DURATION_S)
+    ]
+    domain = pd.DataFrame(
+        {
+            "measure": [
+                "n_cells",
+                "sliding_matches",
+                "sliding_matches_before_shuffle",
+                "sliding_matches_spread_only",
+                "state_space_matches",
+                "state_space_replay_matches",
+            ],
+            "value": [
+                float(len(in_domain)),
+                float(in_domain.sliding_matches.mean()),
+                float(in_domain.sliding_matches_before_shuffle.mean()),
+                float(in_domain.sliding_matches_spread_only.mean()),
+                float(in_domain.state_space_matches.mean()),
+                float(in_domain.state_space_replay_matches.mean()),
+            ],
+        }
+    )
+    domain["summary"] = "overall_in_domain"
+    parts.append(domain)
+
+    # where each detector puts an event's start and end against the truth, on
+    # the replays both reported: signed, so absorbed local coding shows as an
+    # early start or a late end rather than only as a longer event
+    timing = []
+    for duration_s, group in found.groupby("duration_s"):
+        row = {"duration_s": duration_s}
+        for detector in ("sliding", "state_space"):
+            for edge in ("start", "end"):
+                error_ms = 1000.0 * group[f"{detector}_{edge}_error_s"]
+                for name, quantile in (("q25", 0.25), ("median", 0.5), ("q75", 0.75)):
+                    row[f"{detector}_{edge}_error_ms_{name}"] = float(
+                        error_ms.quantile(quantile)
+                    )
+        timing.append(row)
+    parts.append(melted(pd.DataFrame(timing), ["duration_s"], "timing_by_duration"))
+
+    # the grouping column is not called "aggregate": that name shadows
+    # DataFrame.aggregate, so frame.aggregate == "x" compares a method and
+    # quietly selects nothing
+    table = pd.concat(parts, ignore_index=True)
+    table["note"] = ""
+    return table[
+        [
+            "summary",
+            "measure",
+            "path_cm",
+            "duration_s",
+            "distance_bin_cm",
+            "value",
+            "note",
+        ]
+    ]
+
+
+def controls_summary(
+    trial_table: pd.DataFrame, no_replay: pd.DataFrame
+) -> pd.DataFrame:
+    """The aggregates of the controls sweep, in one long table.
+
+    Parameters
+    ----------
+    trial_table : pd.DataFrame, shape (n_trial_rows, n_columns)
+        One row per injected trial and scored detector output: ``condition``
+        (a ``*burst`` condition, a jump or a chain), ``level``,
+        ``peak_rate_hz``, ``detector``, ``called``, the canonical output's
+        ``continuous_share`` and ``fragmented_share``, and for multi-part
+        trials ``n_parts``, ``n_recovered``, ``n_recovered_alone`` and
+        ``segmentation``.
+    no_replay : pd.DataFrame, shape (n_stretch_rows, n_columns)
+        One row per immobile stretch and detector output: ``recording``,
+        ``stretch``, ``exposure_s``, ``detector``, ``n_events`` and
+        ``event_time_s``.
+
+    Returns
+    -------
+    summary : pd.DataFrame, shape (n_values, 7)
+        ``summary`` (``no_replay``, ``bursts`` or ``parts``), ``measure``,
+        ``condition``, ``level`` (NaN for a value over every level),
+        ``detector`` (empty for the immobile minutes), ``value`` and an empty
+        ``note``. The no-replay exposure counts each stretch once; a part
+        recovery is the mean over trials of each trial's recovered share, and
+        the paired counts are the trials recovering fewer, or more, parts in
+        context than alone.
+    """
+    rows = []
+
+    def add(summary, measure, condition, level, detector, value):
+        rows.append(
+            {
+                "summary": summary,
+                "measure": measure,
+                "condition": condition,
+                "level": level,
+                "detector": detector,
+                "value": float(value),
+            }
+        )
+
+    exposure_min = (
+        no_replay.groupby(["recording", "stretch"]).exposure_s.first().sum() / 60
+    )
+    add("no_replay", "immobile_minutes", "no_replay", np.nan, "", exposure_min)
+    for detector, group in no_replay.groupby("detector"):
+        add(
+            "no_replay", "n_events", "no_replay", np.nan, detector, group.n_events.sum()
+        )
+        add(
+            "no_replay",
+            "events_per_minute",
+            "no_replay",
+            np.nan,
+            detector,
+            group.n_events.sum() / exposure_min,
+        )
+        add(
+            "no_replay",
+            "time_share",
+            "no_replay",
+            np.nan,
+            detector,
+            group.event_time_s.sum() / (60 * exposure_min),
+        )
+
+    bursts = trial_table[trial_table.condition.str.endswith("burst")]
+    for (condition, level, detector), group in bursts.groupby(
+        ["condition", "level", "detector"]
+    ):
+        add("bursts", "called_rate", condition, level, detector, group.called.mean())
+        if detector == "state_space_canonical":
+            for share in ("continuous_share", "fragmented_share"):
+                add("bursts", share, condition, level, detector, group[share].mean())
+    for (condition, detector), group in bursts.groupby(["condition", "detector"]):
+        add("bursts", "called_rate", condition, np.nan, detector, group.called.mean())
+        for rate_hz, at_rate in group.groupby("peak_rate_hz"):
+            add(
+                "bursts",
+                f"called_rate_at_{rate_hz:g}hz",
+                condition,
+                np.nan,
+                detector,
+                at_rate.called.mean(),
+            )
+
+    multi = trial_table[~trial_table.condition.str.endswith("burst")]
+    for (condition, level, detector), group in multi.groupby(
+        ["condition", "level", "detector"]
+    ):
+        add(
+            "parts",
+            "part_recovery",
+            condition,
+            level,
+            detector,
+            (group.n_recovered / group.n_parts).mean(),
+        )
+        add(
+            "parts",
+            "part_recovery_alone",
+            condition,
+            level,
+            detector,
+            (group.n_recovered_alone / group.n_parts).mean(),
+        )
+        for label in SEGMENTATION_LABELS:
+            add(
+                "parts",
+                f"segmentation_{label}",
+                condition,
+                level,
+                detector,
+                (group.segmentation == label).mean(),
+            )
+    for (condition, detector), group in multi.groupby(["condition", "detector"]):
+        # paired by trial: pooled recovery can rise while some trials lose parts
+        change = group.n_recovered - group.n_recovered_alone
+        add("parts", "n_trials", condition, np.nan, detector, len(group))
+        for measure, count in (
+            ("n_trials_fewer_in_context", (change < 0).sum()),
+            ("n_trials_more_in_context", (change > 0).sum()),
+        ):
+            add("parts", measure, condition, np.nan, detector, count)
+    table = pd.DataFrame(rows)
+    table["note"] = ""
+    return table

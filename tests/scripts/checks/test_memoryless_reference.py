@@ -3,24 +3,24 @@
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     detect_candidate_sequences,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
     with_reference_rate_floor,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     ShuffleSeed,
     cell_identity_permutation,
     sorted_candidate_window_log_likelihood,
     unmoved_center_pairs,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     aggregate_windows,
     normalize_windows,
 )

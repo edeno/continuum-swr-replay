@@ -63,9 +63,8 @@ Markers combine as usual: `-m "real_data and not slow"`.
 
 The package roots (`continuum_swr_replay/__init__.py`,
 `continuum_swr_replay/data_loaders/__init__.py` and the
-`analysis.pfc` and `analysis.hippocampus` `__init__`s) re-export through PEP 562 `__getattr__`
-(the `analysis.behavior`, `analysis.event_tables` and `analysis.replay_models`
-`__init__`s import nothing), and modules with Spyglass
+`analysis.pfc` `__init__`) re-export through PEP 562 `__getattr__`
+(the other `analysis` package `__init__`s import nothing), and modules with Spyglass
 dependencies defer those imports into the functions that need them. The lazy
 contract is pinned by [`tests/repository/test_lazy_imports.py`](repository/test_lazy_imports.py).
 A regression there brings back the import-time DataJoint hang on machines

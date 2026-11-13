@@ -1196,11 +1196,11 @@ def _load_aligned_session(
     """
     # Deferred: opens Spyglass / DataJoint at import time (see the note at
     # the top of this module).
-    from continuum_swr_replay.analysis.hippocampus import load_results
-    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
         align_results_to_position,
     )
     from continuum_swr_replay.data_loaders import load_data
+    from continuum_swr_replay.decoding.result_loading import load_results
 
     logger.info("Loading HPC decoding results...")
     results, _, _ = load_results(

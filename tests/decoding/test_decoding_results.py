@@ -16,7 +16,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
+from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     get_conditional_non_local_posterior,
     load_conditional_posterior,
 )

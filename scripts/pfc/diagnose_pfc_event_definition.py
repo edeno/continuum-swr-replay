@@ -60,15 +60,15 @@ def build_old_event_sets(
     on purpose, so an event that rule drops counts as an old event without a new
     match.
     """
+    from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+        align_results_to_position,
+    )
     from continuum_swr_replay.analysis.events.immobility import (
         build_speed_eligible_event_cohort,
     )
     from continuum_swr_replay.analysis.events.nonlocal_detection import (
         get_confident_times,
         get_overlap_times,
-    )
-    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-        align_results_to_position,
     )
 
     results, position_info, _ = align_results_to_position(
@@ -167,12 +167,12 @@ def build_comparison(
     non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> tuple[pd.DataFrame, dict]:
     """Per-event old-vs-new table and its summary, for one session."""
-    from continuum_swr_replay.analysis.hippocampus import load_results
     from continuum_swr_replay.analysis.pfc.canonical_events import (
         load_session_canonical_events,
         load_session_swr_intervals,
     )
     from continuum_swr_replay.data_loaders import load_data
+    from continuum_swr_replay.decoding.result_loading import load_results
 
     results, _, _ = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC", load_detector=False

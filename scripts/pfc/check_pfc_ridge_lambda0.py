@@ -150,15 +150,14 @@ def rebuild_session(
         DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
         DEFAULT_NON_LOCAL_THRESHOLD,
     )
+    from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+        align_results_to_position,
+    )
     from continuum_swr_replay.analysis.events.analysed_time import (
         excluded_intervals,
         read_artifact_event_drops,
     )
     from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id
-    from continuum_swr_replay.analysis.hippocampus import load_results
-    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-        align_results_to_position,
-    )
     from continuum_swr_replay.analysis.pfc import (
         build_session_event_sets,
         build_session_fit_mask,
@@ -177,6 +176,7 @@ def rebuild_session(
     )
     from continuum_swr_replay.data_loaders import load_data
     from continuum_swr_replay.decoding.identifiers import parse_session_name
+    from continuum_swr_replay.decoding.result_loading import load_results
     from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
     nwb_file_name, epoch = parse_session_name(session)

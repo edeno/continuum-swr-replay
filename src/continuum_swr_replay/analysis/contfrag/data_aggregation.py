@@ -1,6 +1,6 @@
 """Aggregation of ContFrag decoding results over time.
 
-Mirrors ``hippocampus.data_aggregation`` but for the 2-state
+Mirrors ``decode_quality.data_aggregation`` but for the 2-state
 Continuous-Fragmented classifier. Key differences:
 
 - State probability columns: ``Continuous_prob``, ``Fragmented_prob``
@@ -18,6 +18,11 @@ import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
 
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    theta_power_zscore,
+    validate_required_session_data_keys,
+    validate_results_position_time_alignment,
+)
 from continuum_swr_replay.analysis.events.analysed_time import read_dot_with_swr_source
 from continuum_swr_replay.analysis.events.epoch_normalizers import (
     run_speed_baseline as epoch_run_speed_baseline,
@@ -26,18 +31,16 @@ from continuum_swr_replay.analysis.events.immobility import (
     build_speed_eligible_event_cohort,
 )
 from continuum_swr_replay.analysis.events.nonlocal_detection import get_overlap_times
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-    theta_power_zscore,
-    validate_required_session_data_keys,
-    validate_results_position_time_alignment,
-)
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 from ...data_types import SessionData
-from ..hippocampus.posterior_analysis import get_map_step_distance, get_posterior_stats
+from ..decode_quality.posterior_analysis import (
+    get_map_step_distance,
+    get_posterior_stats,
+)
 from .posterior_analysis import get_contfrag_posterior
 
 

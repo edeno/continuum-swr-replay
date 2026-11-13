@@ -47,18 +47,18 @@ import scripts.detection.run_inventory_comparison as comparison
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events import analysed_time, swr_source
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+from continuum_swr_replay.analysis.detection.detection_inputs import (
     input_paths,
     marks_cache_dir,
     marks_cache_path,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     MemorylessSequenceConfig,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     ENCODING_KEY,
 )
+from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.inventory_comparison import (
     feature_run,
     inventory_run,

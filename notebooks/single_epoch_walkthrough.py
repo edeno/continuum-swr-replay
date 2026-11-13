@@ -91,7 +91,7 @@ from matplotlib.lines import Line2D
 
 # --- Data loading + decode outputs ---
 from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
     validate_dot_event_contract,
 )
 from continuum_swr_replay.analysis.replay_models.model_specs import add_arm_fixed_effects
@@ -124,7 +124,7 @@ from continuum_swr_replay.analysis.replay_models.rate.per_stop_rate_model import
     cross_validate_per_stop_rate_model,
     fit_per_stop_rate_model,
 )
-from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
+from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     load_conditional_posterior,
 )
 from continuum_swr_replay.analysis.event_tables.retrospective_metrics import (

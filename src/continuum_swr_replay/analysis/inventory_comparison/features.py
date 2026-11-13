@@ -36,17 +36,17 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
-from continuum_swr_replay.analysis.events.cohort_selection import events_in_stops
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     CandidateSequences,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     NO_CENTER,
     dispersion_cm,
 )
-from continuum_swr_replay.analysis.hippocampus.swr_detectors import (
+from continuum_swr_replay.analysis.detection.swr_detectors import (
     tetrode_spike_counts,
 )
+from continuum_swr_replay.analysis.events.cohort_selection import events_in_stops
 from continuum_swr_replay.analysis.inventory_comparison.recount import (
     FRAGMENT_GAPS_S,
 )

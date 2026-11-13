@@ -345,10 +345,10 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
     names = {r.name for r in runs if r.group == TABLES}
     if not names:
         return []
-    from continuum_swr_replay.analysis.events import swr_source
-    from continuum_swr_replay.analysis.hippocampus.decode_masks import (
+    from continuum_swr_replay.analysis.detection.decode_masks import (
         require_hpc_decode_sources,
     )
+    from continuum_swr_replay.analysis.events import swr_source
     from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
     from continuum_swr_replay.decoding.files import decode_paths
     from continuum_swr_replay.decoding.identifiers import CONTFRAG_SUFFIX

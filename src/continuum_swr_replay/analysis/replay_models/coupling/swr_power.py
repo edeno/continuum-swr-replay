@@ -25,7 +25,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.covariates import add_uncertainty_covariates
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS
-from continuum_swr_replay.analysis.hippocampus.class_or_continuum import (
+from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     sarle_bimodality,
 )
 from continuum_swr_replay.analysis.replay_models.cohort_audit import (

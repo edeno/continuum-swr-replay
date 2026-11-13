@@ -185,7 +185,7 @@ def offline(monkeypatch):
 
 
 def test_the_nonlocal_loader_returns_the_sources_labels(tmp_path, source, register):
-    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
         load_data_over_time,
     )
 
@@ -746,7 +746,7 @@ STORED_RIPPLE_READERS = {
         "prose naming what it replaces"
     ),
     "src/continuum_swr_replay/data_types.py": "load_data's return types",
-    "src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py": (
+    "src/continuum_swr_replay/analysis/decode_quality/data_aggregation.py": (
         "get_data_over_time: the stored labels, which an HPC decode replaces "
         "with the source's (organize_results)"
     ),
@@ -799,7 +799,7 @@ DECODE_FRAME_READERS = {
         "reads it through with_swr_source; artifact_event_drops of the frame as "
         "saved, from the one read its sha256 names"
     ),
-    "src/continuum_swr_replay/analysis/hippocampus/detection_inputs.py": (
+    "src/continuum_swr_replay/analysis/detection/detection_inputs.py": (
         "decode_marks: the grid's first and last time, the span the marks are "
         "loaded over"
     ),
@@ -884,7 +884,7 @@ def test_the_spike_evidence_baseline_lies_outside_excluded_time(source):
     """The null's matched non-event windows are analysed time too: none may
     touch excluded time [101.75, 102.55] (the configured mask widened by
     0.3 s)."""
-    from continuum_swr_replay.analysis.hippocampus import spike_evidence
+    from continuum_swr_replay.analysis.event_evidence import spike_evidence
 
     probability = np.full(TIME.size, 0.5)
     windows = [(100.20, 100.24), (101.72, 101.76), (102.20, 102.24), (103.00, 103.04)]

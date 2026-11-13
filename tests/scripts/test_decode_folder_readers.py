@@ -28,7 +28,7 @@ import scripts.replay_models.content.analyze_content_occupancy as content_occupa
 from continuum_swr_replay.analysis.contfrag.data_aggregation import (
     load_contfrag_data_over_time,
 )
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
     load_data_over_time,
 )
 from continuum_swr_replay.data_loaders import epoch_register

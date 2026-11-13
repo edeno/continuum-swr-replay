@@ -25,6 +25,9 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_table,
     build_contfrag_stop_table,
 )
+from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table import (
+    canonical_swr_intervals,
+)
 from continuum_swr_replay.analysis.event_tables.arm_patch_tables import (
     build_event_arm_table,
 )
@@ -40,9 +43,6 @@ from continuum_swr_replay.analysis.events.immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
     require_canonical_speed_threshold,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
-    canonical_swr_intervals,
 )
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_swr_intervals,

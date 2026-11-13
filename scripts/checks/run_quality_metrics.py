@@ -23,18 +23,18 @@ import numpy as np
 import pandas as pd
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.events.analysed_time import read_dot_with_swr_source
-from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
+from continuum_swr_replay.analysis.decode_quality.hpc_raw_stats import (
     RAW_STAT_COLUMNS,
     TRANSITION_MATRIX_COLUMNS,
     apply_raw_stats_flags,
 )
-from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
+from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     compute_calibration_curve,
     compute_error_by_track_segment,
     compute_non_local_event_context,
     compute_session_quality_summary,
 )
+from continuum_swr_replay.analysis.events.analysed_time import read_dot_with_swr_source
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.decoding.files import (
     DEFAULT_NON_LOCAL_THRESHOLD_PERCENT,

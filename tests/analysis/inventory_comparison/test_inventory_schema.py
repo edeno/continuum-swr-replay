@@ -309,7 +309,7 @@ class TestAdapters:
         from continuum_swr_replay.analysis.events import (
             swr_source,
         )
-        from tests.analysis.hippocampus.memoryless_sequence.test_memoryless_event_table import (
+        from tests.analysis.detection.memoryless_sequence.test_memoryless_event_table import (
             build,
             make_recording,
         )
@@ -330,7 +330,7 @@ class TestAdapters:
         from continuum_swr_replay.analysis.events import (
             swr_source,
         )
-        from tests.analysis.hippocampus.memoryless_sequence.test_memoryless_event_table import (
+        from tests.analysis.detection.memoryless_sequence.test_memoryless_event_table import (
             build,
             make_recording,
         )
@@ -358,7 +358,7 @@ class TestAdapters:
         from continuum_swr_replay.analysis.events import (
             swr_source,
         )
-        from tests.analysis.hippocampus.memoryless_sequence.test_memoryless_event_table import (
+        from tests.analysis.detection.memoryless_sequence.test_memoryless_event_table import (
             build,
             make_recording,
         )
@@ -377,7 +377,7 @@ class TestAdapters:
     def test_the_adapter_reads_what_the_memoryless_builder_writes(self):
         """Fed a real table, so a column rename in the builder fails here and
         not in the runner."""
-        from tests.analysis.hippocampus.memoryless_sequence.test_memoryless_event_table import (
+        from tests.analysis.detection.memoryless_sequence.test_memoryless_event_table import (
             build,
             make_recording,
         )
@@ -395,7 +395,7 @@ class TestAdapters:
     def test_the_published_cohort_of_an_unshuffled_run_is_refused(self):
         """A run made without the shuffle passes nothing, and would read as a
         detector that found no replay."""
-        from tests.analysis.hippocampus.memoryless_sequence.test_memoryless_event_table import (
+        from tests.analysis.detection.memoryless_sequence.test_memoryless_event_table import (
             build,
             make_recording,
         )

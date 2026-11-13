@@ -318,7 +318,7 @@ def test_power_distribution_statistics_by_class():
 
 
 def test_power_distribution_sarle_is_the_hippocampus_coefficient():
-    from continuum_swr_replay.analysis.hippocampus.class_or_continuum import (
+    from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
         sarle_bimodality,
     )
 

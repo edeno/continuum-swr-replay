@@ -18,10 +18,10 @@ def _one_candidate_epoch(monkeypatch, middle_posterior):
     by the given posteriors. The stored decisions are the recomputed ones with
     window 1's center moved to the other bin of the middle posterior's pair, as
     another device's rounding would; the stored dispersion reads that center."""
-    from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
+    from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
         MemorylessSequenceConfig,
     )
-    from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+    from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
         WindowDecisions,
         forward_jumps_cm,
         sequence_dispersion_cm,

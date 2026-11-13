@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.spike_evidence import (
+from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
 )
 from continuum_swr_replay.analysis.inventory_comparison.features import (

@@ -38,7 +38,7 @@ from non_local_detector.environment import Environment
 from continuum_swr_replay.analysis.contfrag.posterior_analysis import (
     get_contfrag_posterior,
 )
-from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
+from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     get_conditional_non_local_posterior,
     get_map_step_distance,
 )

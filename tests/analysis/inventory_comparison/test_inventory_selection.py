@@ -15,10 +15,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     CandidateSequences,
     WindowDecisions,
     assemble_sequences,
@@ -27,7 +27,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     sequence_dispersion_cm,
     sequence_duration_s,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     NO_CENTER,
     forward_jumps_cm,
 )

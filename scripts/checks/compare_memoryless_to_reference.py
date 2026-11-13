@@ -41,25 +41,25 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
     TRACK_HEIGHT,
 )
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import sweep
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence import sweep
+from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     CONFIG,
     N_NEURONS,
     SHUFFLE_RUN_SEED,
     simulate_and_decode,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     detect_candidate_sequences,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
     with_reference_rate_floor,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
     ShuffleSeed,
@@ -67,13 +67,13 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
     shuffle_candidate_sorted,
     sorted_candidate_set_aside_pairs,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
     InjectedReplay,
     inject_replay,
     place_field_means,
     placements,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     aggregate_windows,
     normalize_windows,
 )

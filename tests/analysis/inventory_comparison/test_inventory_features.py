@@ -8,22 +8,22 @@ import xarray as xr
 from non_local_detector.environment import Environment
 from ripple_detection.core import minimum_sample_count
 
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
-    get_confident_times,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     detect_candidate_sequences,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     interior_bin_distances_cm,
     window_midpoints_s,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     dispersion_cm,
     windows_holding,
+)
+from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    get_confident_times,
 )
 from continuum_swr_replay.analysis.inventory_comparison.evidence import animal_bins
 from continuum_swr_replay.analysis.inventory_comparison.features import (

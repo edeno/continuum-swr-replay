@@ -1,7 +1,7 @@
 """Measure slow- and fast-gamma power during each non-local event, and during running and quiet rest.
 
 Is a non-local event at rest accompanied by a rise in slow or fast gamma
-(``analysis.hippocampus.gamma_power``)? Per epoch of the SWR run that
+(``analysis.event_properties.gamma_power``)? Per epoch of the SWR run that
 ``swr_source`` pins:
 
 1. the referenced raw CA1 LFP of the electrodes rule R-T kept
@@ -40,15 +40,15 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events import analysed_time, swr_source
-from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
-from continuum_swr_replay.analysis.hippocampus.gamma_power import (
+from continuum_swr_replay.analysis.event_properties.gamma_power import (
     FILTER_ORDER,
     GAMMA_BANDS,
 )
-from continuum_swr_replay.analysis.hippocampus.gamma_power import (
+from continuum_swr_replay.analysis.event_properties.gamma_power import (
     epoch_gamma as epoch_gamma_measures,
 )
+from continuum_swr_replay.analysis.events import analysed_time, swr_source
+from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.paths import (

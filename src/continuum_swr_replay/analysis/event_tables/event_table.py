@@ -598,7 +598,7 @@ def build_event_table(
     ----------
     dot : pd.DataFrame
         Time-indexed data-over-time frame produced by
-        :func:`continuum_swr_replay.analysis.hippocampus.data_aggregation.get_data_over_time`.
+        :func:`continuum_swr_replay.analysis.decode_quality.data_aggregation.get_data_over_time`.
         Must carry ``animal``, ``day``, ``epoch``, ``non_local_event``,
         ``SWR_event``, ``MUA_event``, ``Non-Local_Continuous_prob``,
         ``Non-Local_Fragmented_prob``, ``map_estimate``, ``head_speed``.

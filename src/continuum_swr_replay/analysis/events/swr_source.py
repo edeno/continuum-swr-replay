@@ -133,7 +133,7 @@ the coverage.
 The run of ``scripts/detection/run_artifact_detection.py`` made on 2026-10-10
 at commit ``fbbff144a123`` over all 255 epochs (the run id is the commit's first
 12 characters), with the detector's constants in
-``analysis/hippocampus/artifacts/detect.py`` at that commit; the run's
+``analysis/detection/artifacts/detect.py`` at that commit; the run's
 ``manifest.json`` records them. To replace it, rerun that script, set this
 constant to the new run's id, then rerun the SWR runner (which reads this
 constant when it starts) and set :data:`SWR_INVENTORY_RUN_ID` to its run, so

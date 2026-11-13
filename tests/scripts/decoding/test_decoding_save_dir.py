@@ -65,13 +65,13 @@ import pytest
 import xarray as xr
 
 from continuum_swr_replay.analysis.contfrag import result_loading as contfrag_loading
+from continuum_swr_replay.analysis.detection import decode_masks
 from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
 )
-from continuum_swr_replay.analysis.hippocampus import decode_masks
-from continuum_swr_replay.analysis.hippocampus import result_loading as hpc_loading
 from continuum_swr_replay.decoding import files as decoding_files
+from continuum_swr_replay.decoding import result_loading as hpc_loading
 from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV, processed_data_dir
 from continuum_swr_replay.runs import batch, cli, provenance
 from continuum_swr_replay.tables.io import write_atomically
@@ -1438,10 +1438,10 @@ def test_each_runner_aggregates_and_reloads_with_its_own_decode_functions(
     from continuum_swr_replay.analysis.contfrag.result_loading import (
         load_contfrag_results,
     )
-    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+    from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
         get_data_over_time,
     )
-    from continuum_swr_replay.analysis.hippocampus.result_loading import (
+    from continuum_swr_replay.decoding.result_loading import (
         load_results,
     )
 

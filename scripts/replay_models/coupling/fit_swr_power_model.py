@@ -48,9 +48,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
+    SARLE_CUTOFF,
+)
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
-from continuum_swr_replay.analysis.hippocampus.class_or_continuum import SARLE_CUTOFF
 from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     coefficient_statistics,
 )

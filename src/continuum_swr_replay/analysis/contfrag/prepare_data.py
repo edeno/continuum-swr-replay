@@ -33,6 +33,9 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_table,
     build_contfrag_stop_table,
 )
+from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    validate_dot_event_contract,
+)
 from continuum_swr_replay.analysis.event_tables import (
     prepare_data as replay_prepare_data,
 )
@@ -44,9 +47,6 @@ from continuum_swr_replay.analysis.event_tables.summaries import (
 )
 from continuum_swr_replay.analysis.events.analysed_time import (
     read_dot_with_swr_source,
-)
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-    validate_dot_event_contract,
 )
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.decoding.results import open_results

@@ -19,29 +19,29 @@ from continuum_swr_replay.analysis.constants import (
     BINS_DURATION_MS,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
+    normalized_replay_position_by_swr,
+)
+from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
+    calibration_curve_statistics,
+    compute_calibration_curve,
+    compute_local_decoding_error,
+    local_decoding_error_statistics,
+    session_state_fractions,
+    state_fraction_statistics,
+)
+from continuum_swr_replay.analysis.event_properties.event_analysis import (
+    get_event_durations_ms,
+    get_event_start_end_times,
+)
+from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
+    compute_triggered_average_curves,
+)
 from continuum_swr_replay.analysis.events.analysed_time import (
     immobile_analysed_bins,
 )
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
     nonlocal_event_bins_by_swr,
-)
-from continuum_swr_replay.analysis.hippocampus import (
-    compute_calibration_curve,
-    compute_local_decoding_error,
-    get_event_durations_ms,
-    get_event_start_end_times,
-)
-from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
-    normalized_replay_position_by_swr,
-)
-from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
-    calibration_curve_statistics,
-    local_decoding_error_statistics,
-    session_state_fractions,
-    state_fraction_statistics,
-)
-from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
-    compute_triggered_average_curves,
 )
 from continuum_swr_replay.visualization.figure_utilities import (
     PANEL_SINGLE,
@@ -737,8 +737,8 @@ def plot_state_fractions_by_movement(
     Shows stacked bars of decoder state fractions for moving and immobile
     periods, demonstrating that the model assigns mostly local during movement.
     The fractions are
-    :func:`~continuum_swr_replay.analysis.hippocampus.quality_metrics.state_fraction_statistics`'s
-    over :func:`~continuum_swr_replay.analysis.hippocampus.quality_metrics.session_state_fractions`:
+    :func:`~continuum_swr_replay.analysis.decode_quality.quality_metrics.state_fraction_statistics`'s
+    over :func:`~continuum_swr_replay.analysis.decode_quality.quality_metrics.session_state_fractions`:
     the median over sessions of each session's mean state probability, as the
     events summary reports them.
 
@@ -1029,7 +1029,7 @@ def plot_event_timing_offsets(
         - Right axis: non-local-end   minus SWR-end   (ms)
 
     The offsets are those of
-    :func:`~continuum_swr_replay.analysis.hippocampus.event_statistics.boundary_offsets`
+    :func:`~continuum_swr_replay.analysis.event_properties.event_statistics.boundary_offsets`
     on the canonical event table: each immobile, SWR-overlapping event's
     ``event_start_s`` / ``event_end_s`` minus its matched SWR's
     ``matched_swr_start`` / ``matched_swr_end`` — one row per event.
@@ -1045,7 +1045,7 @@ def plot_event_timing_offsets(
         ``start_offset_s`` and ``end_offset_s`` (seconds).
     medians : dict
         For each of those columns, its median in seconds
-        (:func:`~continuum_swr_replay.analysis.hippocampus.event_statistics.boundary_offset_statistics`'s
+        (:func:`~continuum_swr_replay.analysis.event_properties.event_statistics.boundary_offset_statistics`'s
         ``start_offset_median_s`` / ``end_offset_median_s``). The dashed line
         is drawn there; it is not computed here.
     median_labels : dict

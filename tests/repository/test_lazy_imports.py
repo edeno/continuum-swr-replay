@@ -111,7 +111,7 @@ _LAZY_IMPORTS: list[str] = [
     # the PFC leaves used to be poisoned by the eager re-export from
     # ``analysis/pfc/__init__.py``.
     "from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson",
-    "from continuum_swr_replay.analysis.hippocampus.event_analysis import get_event_start_end_times",
+    "from continuum_swr_replay.analysis.event_properties.event_analysis import get_event_start_end_times",
     "from continuum_swr_replay.analysis.events.nonlocal_detection import get_confident_times",
     "from continuum_swr_replay.analysis.pfc.load_population import _extract_animal",
     "from continuum_swr_replay.analysis.pfc.session import process_neuron",
@@ -136,9 +136,9 @@ _NO_SCHEDULER_IMPORTS: list[str] = [
     "import continuum_swr_replay.decoding.files",
     "import continuum_swr_replay.decoding.results",
     "import continuum_swr_replay.analysis.pfc.canonical_events",
-    "import continuum_swr_replay.analysis.hippocampus.result_loading",
-    "import continuum_swr_replay.analysis.hippocampus.data_aggregation",
-    "import continuum_swr_replay.analysis.hippocampus.state_evidence.terms",
+    "import continuum_swr_replay.decoding.result_loading",
+    "import continuum_swr_replay.analysis.decode_quality.data_aggregation",
+    "import continuum_swr_replay.analysis.event_evidence.state_evidence.terms",
     "import continuum_swr_replay.analysis.contfrag.data_aggregation",
     "import continuum_swr_replay.analysis.event_tables.prepare_data",
 ]
@@ -158,6 +158,7 @@ _FOUNDATION_MODULES = sorted(
 #: Foundation modules the JAX-free check does not import, and why.
 NOT_JAX_FREE = {
     "decoding.transitions": "imports non_local_detector",
+    "decoding.result_loading": "imports non_local_detector",
 }
 
 # Leaf modules other packages import for a row key, a cohort rule, a column
@@ -203,21 +204,24 @@ def test_leaf_modules_do_not_load_jax():
     )
 
 
-# The hippocampus package root, then each of its direct leaves that needs none
-# of JAX, ``non_local_detector``, statsmodels or dask. While the package
-# ``__init__`` imported its submodules eagerly, every one of them loaded all
-# four, through ``data_aggregation``, ``posterior_analysis`` and
-# ``result_loading``.
+# The package roots that took over the old ``analysis.hippocampus``, then each
+# of its old direct leaves that needs none of JAX, ``non_local_detector``,
+# statsmodels or dask. While the old package ``__init__`` imported its
+# submodules eagerly, every one of them loaded all four, through
+# ``data_aggregation``, ``posterior_analysis`` and ``result_loading``.
 HIPPOCAMPUS_LIGHT: list[str] = [
-    "continuum_swr_replay.analysis.hippocampus",
-    "continuum_swr_replay.analysis.hippocampus.decode_masks",
-    "continuum_swr_replay.analysis.hippocampus.detection_inputs",
-    "continuum_swr_replay.analysis.hippocampus.event_analysis",
-    "continuum_swr_replay.analysis.hippocampus.hpc_raw_stats",
-    "continuum_swr_replay.analysis.hippocampus.quality_metrics",
-    "continuum_swr_replay.analysis.hippocampus.ripple_tetrodes",
-    "continuum_swr_replay.analysis.hippocampus.swr_detectors",
-    "continuum_swr_replay.analysis.hippocampus.triggered_analysis",
+    "continuum_swr_replay.analysis.detection",
+    "continuum_swr_replay.analysis.decode_quality",
+    "continuum_swr_replay.analysis.event_evidence",
+    "continuum_swr_replay.analysis.event_properties",
+    "continuum_swr_replay.analysis.detection.decode_masks",
+    "continuum_swr_replay.analysis.detection.detection_inputs",
+    "continuum_swr_replay.analysis.event_properties.event_analysis",
+    "continuum_swr_replay.analysis.decode_quality.hpc_raw_stats",
+    "continuum_swr_replay.analysis.decode_quality.quality_metrics",
+    "continuum_swr_replay.analysis.detection.ripple_tetrodes",
+    "continuum_swr_replay.analysis.detection.swr_detectors",
+    "continuum_swr_replay.analysis.event_properties.triggered_analysis",
 ]
 
 
@@ -264,10 +268,7 @@ def test_intervals_and_runs_load_no_dask():
 
 @pytest.mark.parametrize(
     "package",
-    [
-        "continuum_swr_replay.analysis.pfc",
-        "continuum_swr_replay.analysis.hippocampus",
-    ],
+    ["continuum_swr_replay.analysis.pfc"],
 )
 def test_every_lazy_export_imports_by_name(package):
     """``from <package> import <name>`` works for every name in ``__all__``,
@@ -288,21 +289,15 @@ def test_an_unknown_name_is_an_attribute_error():
         module.no_such_name  # noqa: B018
 
 
-def test_hippocampus_dir_lists_every_export_before_it_loads():
-    module = importlib.import_module("continuum_swr_replay.analysis.hippocampus")
-    assert set(module.__all__) <= set(dir(module))
-    assert "_LAZY_EXPORTS" in dir(module)
-
-
 def test_a_lazy_export_whose_submodule_fails_raises_import_error(monkeypatch):
     """A submodule that cannot be imported raises ImportError on access; no
     fallback turns it into an AttributeError or a missing name."""
-    package = "continuum_swr_replay.analysis.hippocampus"
+    package = "continuum_swr_replay.analysis.pfc"
     module = importlib.import_module(package)
-    monkeypatch.delitem(module.__dict__, "get_signal_windows", raising=False)
-    monkeypatch.setitem(sys.modules, f"{package}.triggered_analysis", None)
-    with pytest.raises(ImportError, match="triggered_analysis"):
-        module.get_signal_windows  # noqa: B018
+    monkeypatch.delitem(module.__dict__, "build_session_event_sets", raising=False)
+    monkeypatch.setitem(sys.modules, f"{package}.event_sets", None)
+    with pytest.raises(ImportError, match="event_sets"):
+        module.build_session_event_sets  # noqa: B018
 
 
 #: Every package ``__init__`` that re-exports lazily.
@@ -324,7 +319,6 @@ def _unresolved_exports(init: Path, root: Path) -> list[tuple[str, str, str]]:
 def test_the_lazy_inits_are_found():
     assert SRC / "analysis" / "pfc" / "__init__.py" in _LAZY_INITS
     assert SRC / "data_loaders" / "__init__.py" in _LAZY_INITS
-    assert SRC / "analysis" / "hippocampus" / "__init__.py" in _LAZY_INITS
 
 
 @pytest.mark.parametrize("init", _LAZY_INITS, ids=lambda p: str(p.relative_to(SRC)))

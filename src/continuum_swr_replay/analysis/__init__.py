@@ -1,7 +1,7 @@
 """The analyses, one package per subject.
 
 How a non-local event is defined -> ``analysis/events``; how SWRs are detected
--> ``analysis/hippocampus/swr_detectors``; how detectors are compared ->
+-> ``analysis/detection/swr_detectors``; how detectors are compared ->
 ``analysis/inventory_comparison``.
 
 Packages

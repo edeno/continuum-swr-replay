@@ -27,28 +27,28 @@ from non_local_detector.simulate.clusterless_simulation import (
 )
 from non_local_detector.simulate.simulate import simulate_position
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     CandidateSequences,
     detect_candidate_sequences,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.epoch import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.epoch import (
     run_epoch,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table import (
     SequenceIdentity,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     clusterless_epoch_log_likelihood,
     interior_bin_distances_cm,
     window_midpoints_s,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     ShuffleSeed,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
+from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     aggregate_windows,
     normalize_windows,
 )

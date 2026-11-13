@@ -85,6 +85,9 @@ from continuum_swr_replay.analysis.behavior.covariates import (
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
+from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
+    load_conditional_posterior,
+)
 from continuum_swr_replay.analysis.event_tables.arm_patch_tables import (
     build_event_arm_table,
     build_event_patch_table,
@@ -106,10 +109,6 @@ from continuum_swr_replay.analysis.events.swr_source import (
     ripple_power_inputs,
     swr_epoch_id,
 )
-from continuum_swr_replay.analysis.hippocampus import load_results
-from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
-    load_conditional_posterior,
-)
 from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_decode_files,
     analysed_epoch_ids,
@@ -124,6 +123,7 @@ from continuum_swr_replay.decoding.identifiers import (
     parse_session_name,
     session_name,
 )
+from continuum_swr_replay.decoding.result_loading import load_results
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import (
