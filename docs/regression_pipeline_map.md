@@ -26,7 +26,7 @@ Beta-Bernoulli decision-variable covariates — VENDORED from Alison Comrie's `r
 
 Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligned.
 
-`peri_switch_index`, `add_experienced_value_columns`, `add_beta_belief_entropy`, `canonicalize_behavior_model_columns`, `assign_stops_to_trials`, `build_animal`, `write_qvals_outputs`, `run_build_qvals_table`
+`peri_switch_index`, `add_experienced_value_columns`, `add_beta_belief_entropy`, `canonicalize_behavior_model_columns`, `assign_stops_to_trials`, `prepare_model_values`, `build_animal`, `stop_mapping_agreement`, `require_complete_mapping`, `standardize_qvals_table`, `write_qvals_outputs`
 
 ### `src/continuum_swr_replay/analysis/behavior/tables/_tables_common.py`
 
@@ -498,7 +498,7 @@ Command-line entry points that fit or plot a ladder.
 
 Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligned.
 
-`main`
+`run_build_qvals_table`, `main`
 
 ### `scripts/behavior/content/analyze_content_occupancy.py`
 
@@ -754,7 +754,7 @@ Compare nested models via AIC, BIC, and likelihood ratio tests.
 
 Shared audited aggregation for the is_swr contrast ladders (rate + content).
 
-`load_per_sd_scale`, `load_fit_time_sd_reference`, `std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `gated_term_statistics`, `aggregate_contrast`, `specs_from_ladder`, `concentration_specs`, `audited_content_contrast`, `renormalized_rungs`, `contrast_fit_inputs`, `select_outcome_stratum`, `sd_reference`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
+`std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `gated_term_statistics`, `aggregate_contrast`, `specs_from_ladder`, `concentration_specs`, `audited_content_contrast`, `renormalized_rungs`, `contrast_fit_inputs`, `select_outcome_stratum`, `sd_reference`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
 
 ### `src/continuum_swr_replay/analysis/behavior/tables/summaries.py`
 
