@@ -40,13 +40,12 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import ROOT_DIR
-from continuum_swr_replay.paths import processed_data_dir
+from continuum_swr_replay.paths import NL_BOUTS_BY_SWR_STEM, processed_data_dir
 from continuum_swr_replay.runs.io import ok_epochs, read_manifest, write_json
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.io import read_table, write_table
 
 PRODUCED_BY = produced_by(__file__)
-STEM = "nl_bouts_by_swr"
 METRICS = (
     "runcv_nl_anim_mark",
     "runcv_nl_null_mark",
@@ -83,10 +82,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     states = sorted(windows["state"].unique())
     stats = bout_statistics(windows, metrics=dict.fromkeys(states, METRICS))
 
-    write_table(windows, run_dir / f"{STEM}.parquet")
-    stats.to_csv(run_dir / f"{STEM}_stats.csv", index=False)
+    write_table(windows, run_dir / f"{NL_BOUTS_BY_SWR_STEM}.parquet")
+    stats.to_csv(run_dir / f"{NL_BOUTS_BY_SWR_STEM}_stats.csv", index=False)
     write_json(
-        run_dir / f"{STEM}.provenance.json",
+        run_dir / f"{NL_BOUTS_BY_SWR_STEM}.provenance.json",
         {
             "produced_by": PRODUCED_BY,
             "provenance": provenance_record(ROOT_DIR),
@@ -96,7 +95,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         },
         indent=1,
     )
-    print(f"{len(epochs)} epochs, {len(windows)} windows -> {run_dir / STEM}_stats.csv")
+    print(
+        f"{len(epochs)} epochs, {len(windows)} windows -> {run_dir / NL_BOUTS_BY_SWR_STEM}_stats.csv"
+    )
 
 
 if __name__ == "__main__":

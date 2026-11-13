@@ -181,7 +181,10 @@ from continuum_swr_replay.parameters import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     ROOT_DIR,
 )
-from continuum_swr_replay.paths import processed_data_dir  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    STATE_EVIDENCE_DIR,
+    processed_data_dir,
+)
 from continuum_swr_replay.runs.batch import (  # noqa: E402
     raise_open_file_limit,
     run_epoch_logged,
@@ -1509,7 +1512,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=processed_data_dir()
         / f"_refresh_{date.today():%Y%m%d}"
-        / "state_evidence",
+        / STATE_EVIDENCE_DIR,
         help="The only place written to (default: "
         "Processed-Data/_refresh_<today>/state_evidence).",
     )

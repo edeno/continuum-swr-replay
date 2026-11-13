@@ -54,7 +54,12 @@ from continuum_swr_replay.analysis.inventory_comparison.heldout_sweep import (
     OUR_EVENT_CLASSES,
     TILING_FOLDS,
 )
-from continuum_swr_replay.paths import ROOT_DIR, memoryless_root, processed_data_dir
+from continuum_swr_replay.paths import (
+    ROOT_DIR,
+    STATE_EVIDENCE_DIR,
+    memoryless_root,
+    processed_data_dir,
+)
 from continuum_swr_replay.reported.formatting import format_number, milliseconds
 from continuum_swr_replay.reported.values import (
     Summary,
@@ -102,7 +107,9 @@ class DetectionInputs:
 def default_inputs() -> DetectionInputs:
     pilot = memoryless_root() / MEMORYLESS_PILOT_RUN
     return DetectionInputs(
-        state_evidence_dir=processed_data_dir() / STATE_EVIDENCE_RUN / "state_evidence",
+        state_evidence_dir=processed_data_dir()
+        / STATE_EVIDENCE_RUN
+        / STATE_EVIDENCE_DIR,
         sweep_summary=ROOT_DIR / SWEEP_DIR / "detection_sweep_summary.csv",
         controls_summary=ROOT_DIR / SWEEP_DIR / "detection_controls_summary.csv",
         heldout_summary=ROOT_DIR / SWEEP_DIR / "detection_heldout_summary.csv",

@@ -80,8 +80,10 @@ from continuum_swr_replay.paths import (
     EVENT_GAMMA_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_START_REST_THETA_DIR,
+    NL_BOUTS_BY_SWR_STEM,
     RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
+    STATE_EVIDENCE_DIR,
     content_occupancy_dir,
     event_features_root,
     event_spike_evidence_dir,
@@ -181,8 +183,8 @@ def default_inputs() -> EventsInputs:
         spike_evidence_dir=event_spike_evidence_dir(),
         heldout_by_swr=processed_data_dir()
         / STATE_EVIDENCE_RUN
-        / "state_evidence"
-        / "nl_bouts_by_swr_stats.csv",
+        / STATE_EVIDENCE_DIR
+        / f"{NL_BOUTS_BY_SWR_STEM}_stats.csv",
         content_occupancy=content_occupancy_dir() / "content_occupancy_per_session.csv",
         brain_state_reference=processed_data_dir()
         / BRAIN_STATE_REFERENCE_DIR
@@ -1861,7 +1863,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.inputs += [
         file_record(inputs.heldout_by_swr, ROOT_DIR),
         file_record(
-            inputs.heldout_by_swr.with_name("nl_bouts_by_swr.provenance.json"),
+            inputs.heldout_by_swr.with_name(f"{NL_BOUTS_BY_SWR_STEM}.provenance.json"),
             ROOT_DIR,
         ),
     ]
