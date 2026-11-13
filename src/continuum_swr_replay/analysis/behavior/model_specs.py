@@ -50,17 +50,17 @@ from .content_response import renormalize_fraction_over_candidates
 
 # Shared with the covariate builders, which must not import this module: see
 # ``design_constants`` for why the numbers live there and not here. Re-exported
-# below so ``from ...model_specs import BIN_S`` keeps working.
+# below so ``from ...model_specs import RATE_BIN_S`` keeps working.
 from .design_constants import (
     ARM_FE_PREDICTORS,
     ARRIVAL_CLOCK_COLUMN,
     ARRIVAL_SPLINE_KNOTS,
-    BIN_S,
     N_CROSS_LONG_BASIS,
     N_CROSS_LONG_LAGS,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     N_REWARD_LAGS,
+    RATE_BIN_S,
     RECENCY_SPLINE_BOUNDS,
     RECENCY_SPLINE_COLUMNS,
     RECENCY_SPLINE_KNOTS,
@@ -77,7 +77,7 @@ __all__ = [
     "ARM_FE_PREDICTORS",
     "ARRIVAL_CLOCK_COLUMN",
     "ARRIVAL_SPLINE_KNOTS",
-    "BIN_S",
+    "RATE_BIN_S",
     "BELIEF_DEPENDENT_CONTENT_MODELS",
     "CONTENT_ESTIMATOR_COMPARISON_RUNGS",
     "ComparisonRung",
@@ -530,14 +530,14 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
 # fit on the canonical (stop x bin) design from
 # :func:`per_bin_design.aggregate_to_timebins`. Unlike ``MODEL_PER_STOP_RATE`` (one
 # row per stop, ``log(immobility_duration_s)`` dwell offset), every model here is one
-# row per (stop, ``BIN_S``-wide bin) with an equal-exposure ``log(exposure)``
+# row per (stop, ``RATE_BIN_S``-wide bin) with an equal-exposure ``log(exposure)``
 # offset, so the within-stop time course is modelled explicitly by a spline
 # rather than averaged into a per-stop dwell correction.
 #
 # The three blocks (time-since-stop spline, self-history/autoregressive,
 # reward-history basis) toggle independently so each block's contribution is
 # readable with and without the time course, plus the reward x time
-# interaction. ALL models share one bin width ``BIN_S`` so the
+# interaction. ALL models share one bin width ``RATE_BIN_S`` so the
 # ladder is nested and AIC / CV / deviance / GOF are directly comparable (fine
 # bins are required anyway for the self-history term and time-rescaling GOF).
 # The bin width, windows, knots and clock column are in ``design_constants``,
@@ -1440,7 +1440,7 @@ def longest_history_window_s(
     window of its longest-reaching rung: a bin whose window touches the
     artifact mask reads unobserved time (``per_bin_design.aggregate_to_timebins``,
     ``history_window_s``). A rung's window is the longest ``history_lags`` of
-    its terms (:class:`PerBinTerm`) times ``BIN_S``; an is_swr-contrast rung
+    its terms (:class:`PerBinTerm`) times ``RATE_BIN_S``; an is_swr-contrast rung
     (``(formula, columns)``) reaches as far as the block terms its columns come
     from. The reward-history block reads trial outcomes, not neural time, and
     adds none.
@@ -1463,7 +1463,7 @@ def longest_history_window_s(
         else:
             _, columns = rung
             n_lags = max([n_lags, *(_CONTRAST_HISTORY_LAGS.get(c, 0) for c in columns)])
-    return n_lags * BIN_S
+    return n_lags * RATE_BIN_S
 
 
 # Covariates that are only defined once the trial's outcome is known. A stop that

@@ -13,7 +13,7 @@ A lag of a pooled refit's kernel is measurable when it has at least
 kernel is measurable on the first rule alone, whatever its posterior SD
 (:func:`cross_history_statistics`). A lag that is not measurable is left out,
 never read as an effect. Lag index ``j`` is ``j + 1`` bins of
-``BIN_S`` after the past event's anchor (its onset or its end). Lags are
+``RATE_BIN_S`` after the past event's anchor (its onset or its end). Lags are
 reported in ms, kernels as rate ratios.
 """
 
@@ -26,7 +26,7 @@ import pandas as pd
 from scipy.stats import norm
 
 from continuum_swr_replay.analysis.behavior.coefficient_statistics import group_range
-from continuum_swr_replay.analysis.behavior.model_specs import BIN_S
+from continuum_swr_replay.analysis.behavior.model_specs import RATE_BIN_S
 
 HISTORY_MIN_SUPPORT = 3.0
 """A kernel's lag is read when it has at least this many expected onsets ..."""
@@ -49,9 +49,9 @@ def lag_ms(index: int) -> int:
     Returns
     -------
     lag : int
-        The lag in ms: ``index + 1`` bins of ``BIN_S``.
+        The lag in ms: ``index + 1`` bins of ``RATE_BIN_S``.
     """
-    return round((index + 1) * BIN_S * 1e3)
+    return round((index + 1) * RATE_BIN_S * 1e3)
 
 
 def lag_index(ms: float) -> int:
@@ -60,7 +60,7 @@ def lag_index(ms: float) -> int:
     Parameters
     ----------
     ms : float
-        A lag in ms, a whole number of bins of ``BIN_S``.
+        A lag in ms, a whole number of bins of ``RATE_BIN_S``.
 
     Returns
     -------
@@ -72,10 +72,10 @@ def lag_index(ms: float) -> int:
     ValueError
         If ``ms`` is not one bin or a whole number of bins.
     """
-    bins = ms / (BIN_S * 1e3)
+    bins = ms / (RATE_BIN_S * 1e3)
     if round(bins) < 1 or not np.isclose(bins, round(bins)):
         raise ValueError(
-            f"{ms} ms is not a positive whole number of {BIN_S * 1e3:g} ms bins"
+            f"{ms} ms is not a positive whole number of {RATE_BIN_S * 1e3:g} ms bins"
         )
     return round(bins) - 1
 

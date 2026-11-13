@@ -26,11 +26,11 @@ from ..cohort_audit import fitted_cohort_record, stop_own_missing
 from ..covariate_timing import DERIVED_COVARIATE_SOURCES
 from ..model_specs import (
     ARRIVAL_CLOCK_COLUMN,
-    BIN_S,
     MODEL_PER_BIN_RATE,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     PER_BIN_DESIGN,
+    RATE_BIN_S,
     STOP_COVARIATES,
     TMAX,
     longest_history_window_s,
@@ -83,7 +83,7 @@ def ladder_design(
     return aggregate_to_timebins(
         stops_g,
         POPULATIONS[outcome](onsets_g),
-        bin_s=BIN_S,
+        bin_s=RATE_BIN_S,
         tmax=TMAX,
         reward_basis=True,
         self_history_lags=N_HISTORY_LAGS,

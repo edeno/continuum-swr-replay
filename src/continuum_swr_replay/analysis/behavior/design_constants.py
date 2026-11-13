@@ -20,7 +20,7 @@ __all__ = [
     "ARM_FE_PREDICTORS",
     "ARRIVAL_CLOCK_COLUMN",
     "ARRIVAL_SPLINE_KNOTS",
-    "BIN_S",
+    "RATE_BIN_S",
     "N_HISTORY_BASIS",
     "N_HISTORY_LAGS",
     "N_REWARD_LAGS",
@@ -100,10 +100,10 @@ N_REWARD_LAGS = REWARD_HISTORY_N_LAGS
 
 # ── Per-bin conditional-intensity design ──
 #
-# ALL per-bin rate models share one bin width ``BIN_S`` so the ladder is nested
+# ALL per-bin rate models share one bin width ``RATE_BIN_S`` so the ladder is nested
 # and AIC / CV / deviance / GOF are directly comparable (fine bins are required
 # anyway for the self-history term and time-rescaling GOF).
-BIN_S = 0.015  # 15 ms — ladder-wide (refractory <60 ms, bursty ~100 ms)
+RATE_BIN_S = 0.015  # 15 ms — ladder-wide (refractory <60 ms, bursty ~100 ms)
 # Family B models only the first TMAX seconds of each stop. Onsets later in a
 # stop (about a fifth of them) are right-truncated out of the counts, so every
 # Family-B result is conditional on the first 4 s; the long tail is left for a

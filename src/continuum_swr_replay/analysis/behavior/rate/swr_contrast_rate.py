@@ -37,7 +37,6 @@ from ..cohort_audit import fitted_cohort_record, stop_own_missing, term_diagnost
 from ..contrast_aggregation import aggregate_contrast, sd_reference
 from ..covariates import add_uncertainty_covariates
 from ..model_specs import (
-    BIN_S,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     PER_BIN_DESIGN,
@@ -45,6 +44,7 @@ from ..model_specs import (
     POST_OUTCOME_COVARIATES,
     POST_OUTCOME_RATE_RUNGS,
     PRIMARY_COHORT,
+    RATE_BIN_S,
     REWARD_HISTORY_COLUMNS,
     TMAX,
     longest_history_window_s,
@@ -231,7 +231,7 @@ def fit_contrast_session(
         pop: aggregate_to_timebins(
             stops_g,
             POPULATIONS[pop](onsets_g),
-            bin_s=BIN_S,
+            bin_s=RATE_BIN_S,
             tmax=TMAX,
             reward_basis=True,
             self_history_lags=N_HISTORY_LAGS,
@@ -366,10 +366,10 @@ def fit_contrast_sessions(
     ]
     logger.info(
         "Fitting SWR-contrast per-bin models (G0-G8 x %s + S0-S10) over %d sessions "
-        "at BIN_S=%.3f with %d worker(s)...",
+        "at RATE_BIN_S=%.3f with %d worker(s)...",
         list(STRATA),
         len(items),
-        BIN_S,
+        RATE_BIN_S,
         workers,
     )
     rows: list[dict] = []

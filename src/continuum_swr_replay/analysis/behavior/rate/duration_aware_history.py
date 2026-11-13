@@ -40,7 +40,7 @@ from .._fit_diagnostics import (
     capture_fit_warnings,
     count_fit_quality_warnings,
 )
-from ..design_constants import BIN_S, N_HISTORY_BASIS, N_HISTORY_LAGS, TMAX
+from ..design_constants import N_HISTORY_BASIS, N_HISTORY_LAGS, RATE_BIN_S, TMAX
 from ..model_specs import (
     MODEL_CROSS_HISTORY_DURATION_RATE,
     MODEL_CROSS_HISTORY_RATE,
@@ -275,7 +275,7 @@ def build_design(
     design = aggregate_to_timebins(
         stops_g,
         response,
-        bin_s=BIN_S,
+        bin_s=RATE_BIN_S,
         tmax=TMAX,
         reward_basis=True,
         self_history_lags=N_HISTORY_LAGS,

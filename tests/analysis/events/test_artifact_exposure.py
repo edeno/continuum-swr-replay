@@ -27,9 +27,9 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.model_specs import (
-    BIN_S,
     MODEL_PER_BIN_RATE,
     N_HISTORY_LAGS,
+    RATE_BIN_S,
     SWR_CONTRAST_RATE_G_SPECS,
     SWR_CONTRAST_RATE_S_SPECS,
     longest_history_window_s,
@@ -243,11 +243,11 @@ def _mask_by_session() -> pd.DataFrame:
 class TestFamilyBDesign:
     def test_the_longest_history_window_comes_from_the_ladder(self):
         assert longest_history_window_s(MODEL_PER_BIN_RATE.values()) == pytest.approx(
-            N_HISTORY_LAGS * BIN_S
+            N_HISTORY_LAGS * RATE_BIN_S
         )
         assert longest_history_window_s(
             [*SWR_CONTRAST_RATE_G_SPECS.values(), *SWR_CONTRAST_RATE_S_SPECS.values()]
-        ) == pytest.approx(N_HISTORY_LAGS * BIN_S)
+        ) == pytest.approx(N_HISTORY_LAGS * RATE_BIN_S)
 
     def test_bins_are_built_over_the_stops_whole_span(self):
         """The bins' clock is the bout's: Family A's shorter exposure must not

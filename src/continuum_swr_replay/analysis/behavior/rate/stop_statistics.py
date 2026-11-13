@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.model_specs import (
-    BIN_S,
     MODEL_PER_BIN_RATE,
+    RATE_BIN_S,
     TMAX,
     longest_history_window_s,
 )
@@ -225,7 +225,7 @@ def outcome_boundary_statistics(
     crossing stops that span no arrival, and only where it still has a bin
     that starts at or past the boundary.
 
-    The bins counted here are the stop-level design's: bins of ``BIN_S`` within
+    The bins counted here are the stop-level design's: bins of ``RATE_BIN_S`` within
     ``TMAX`` of the stop's start, less those that excluded time and the
     ladder's history window drop. A fitted population's design also drops the
     bins inside one of its ongoing events, which is not done here, so
@@ -265,14 +265,14 @@ def outcome_boundary_statistics(
     bins = aggregate_to_timebins(
         stops,
         pd.DataFrame({"stop_id": [], "t_since_stop_onset": []}),
-        bin_s=BIN_S,
+        bin_s=RATE_BIN_S,
         tmax=TMAX,
         excluded_intervals=excluded_intervals,
         history_window_s=longest_history_window_s(MODEL_PER_BIN_RATE.values()),
     )
     last_bin = stops["stop_id"].map(bins.groupby("stop_id")["binj"].max())
     # a stop with no bin, or with no outcome time, compares False
-    has_bin = last_bin.to_numpy(float) >= np.ceil(delta / BIN_S)
+    has_bin = last_bin.to_numpy(float) >= np.ceil(delta / RATE_BIN_S)
     shifted = crosses & ~spans & has_bin
     return {
         "n_crossing": int(crosses.sum()),

@@ -35,9 +35,9 @@ import numpy as np
 import pandas as pd
 
 from ..design_constants import (
-    BIN_S,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
+    RATE_BIN_S,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
     TMAX,
@@ -370,7 +370,7 @@ def true_lag_kernel(
     source: str,
     anchor: str,
     n_lags: int = N_HISTORY_LAGS,
-    bin_s: float = BIN_S,
+    bin_s: float = RATE_BIN_S,
 ) -> np.ndarray:
     """The scenario's log hazard ratio at each design lag ``1..n_lags``.
 
@@ -439,7 +439,7 @@ def fit_history_direction(
     """Fit one response stream's history rungs, as the cross runner does.
 
     Mirrors ``scripts/behavior/rate/fit_cross_history_rate.py:_fit_direction`` on a
-    simulated session: :func:`aggregate_to_timebins` at ``BIN_S`` / ``TMAX``
+    simulated session: :func:`aggregate_to_timebins` at ``RATE_BIN_S`` / ``TMAX``
     with the reward basis and the raised-cosine self- and cross-history, a
     frozen cohort, and :func:`fit_per_bin_rate_model`.
 
@@ -484,7 +484,7 @@ def fit_history_direction(
     design = aggregate_to_timebins(
         stop_table,
         resp,
-        bin_s=BIN_S,
+        bin_s=RATE_BIN_S,
         tmax=TMAX,
         reward_basis=True,
         self_history_lags=N_HISTORY_LAGS,
@@ -604,7 +604,7 @@ def simulate_pooled_design(
         design = aggregate_to_timebins(
             stop_table,
             events[events["stream"] == response],
-            bin_s=BIN_S,
+            bin_s=RATE_BIN_S,
             tmax=TMAX,
             reward_basis=True,
             self_history_lags=N_HISTORY_LAGS,

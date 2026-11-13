@@ -39,10 +39,10 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.behavior import (  # noqa: E402
-    BIN_S,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     N_REWARD_LAGS,
+    RATE_BIN_S,
     STOP_COVARIATES,
     TMAX,
     PerBinRateModelSpec,
@@ -127,7 +127,7 @@ def _run_session(keys, stops_g, onsets_g) -> list[dict]:
         d = aggregate_to_timebins(
             stops_g,
             POPULATIONS[pop](onsets_g),
-            bin_s=BIN_S,
+            bin_s=RATE_BIN_S,
             tmax=TMAX,
             reward_lags=N_REWARD_LAGS,
             self_history_lags=N_HISTORY_LAGS,

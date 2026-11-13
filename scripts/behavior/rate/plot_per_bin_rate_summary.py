@@ -52,8 +52,8 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (  # noq
     gate_term_sessions,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
-    BIN_S,
     MODEL_PER_BIN_RATE,
+    RATE_BIN_S,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
     TMAX,
@@ -307,7 +307,7 @@ def _panel_selfhistory(ax, df):
     for oc in POPS4:
         kernel = self_history_kernel_by_lag(fit_rows(df, model=FULL, outcome=oc))
         ax.plot(
-            kernel.index * BIN_S * 1000,
+            kernel.index * RATE_BIN_S * 1000,
             kernel["median"],
             marker="o",
             color=STYLE[oc][1],

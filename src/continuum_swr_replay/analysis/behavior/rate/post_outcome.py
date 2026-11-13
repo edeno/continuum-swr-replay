@@ -20,10 +20,11 @@ import pandas as pd
 
 from continuum_swr_replay.tables.columns import require_columns
 
-from ..model_specs import BIN_S, POST_OUTCOME_COVARIATES, PerBinRateModelSpec
+from ..model_specs import POST_OUTCOME_COVARIATES, RATE_BIN_S, PerBinRateModelSpec
 from .per_bin_rate_model import _design_columns
 
-#: The bin gate's rule, recorded on each gated fit.
+#: The bin gate's rule, recorded on each gated fit. Stored fits carry this
+#: string, so it keeps the rate bin's former name, ``BIN_S`` (``RATE_BIN_S``).
 POST_OUTCOME_GATE_RULE = "stop_start + binj * BIN_S >= outcome_known_time"
 
 
@@ -127,7 +128,7 @@ def gate_bins_after_outcome(
     design: pd.DataFrame,
     spec: PerBinRateModelSpec,
     *,
-    bin_s: float = BIN_S,
+    bin_s: float = RATE_BIN_S,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     """Keep fit-complete bins whose left edge is at/after the current outcome.
 

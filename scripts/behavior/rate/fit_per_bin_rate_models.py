@@ -14,7 +14,7 @@ counted from event ends (``PER_BIN_HISTORY_ANCHORS``). Each rung's rate is
 therefore the rate at which events start while none is ongoing, not events per
 second of stop (Family A's quantity).
 
-The WHOLE ladder runs at one bin width (``BIN_S = 0.015``): for each
+The WHOLE ladder runs at one bin width (``RATE_BIN_S = 0.015``): for each
 (session, outcome) the design is built ONCE — carrying the reward-history
 basis and the self-history lags — then frozen to one cohort with
 ``freeze_per_bin_cohort`` over the union of every rung's design columns, and
@@ -89,9 +89,9 @@ import warnings  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 from continuum_swr_replay.analysis.behavior import (  # noqa: E402
-    BIN_S,
     MODEL_PER_BIN_RATE,
     POPULATIONS,
+    RATE_BIN_S,
     attach_is_swr_to_onsets,
 )
 from continuum_swr_replay.analysis.behavior.cohort_audit import (  # noqa: E402
@@ -236,13 +236,13 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     logger.info(
         "Fitting per-bin ladder %s (+CV=%s, +GOF=%s) x %s over %d sessions "
-        "at BIN_S=%.3f with %d worker(s)...",
+        "at RATE_BIN_S=%.3f with %d worker(s)...",
         list(MODEL_PER_BIN_RATE),
         not args.no_cv,
         not args.no_gof,
         list(POPULATIONS),
         stop.groupby(list(SESSION_COLUMNS)).ngroups,
-        BIN_S,
+        RATE_BIN_S,
         args.workers,
     )
     t0 = time.perf_counter()

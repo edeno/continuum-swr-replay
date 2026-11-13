@@ -63,7 +63,7 @@ _LAZY_EXPORTS = {
     "fit_conditional_poisson": "fitting",
     # model_specs.
     "ARRIVAL_CLOCK_COLUMN": "model_specs",
-    "BIN_S": "model_specs",
+    "RATE_BIN_S": "model_specs",
     "MODEL_CHOICE": "model_specs",
     "MODEL_PATCH": "model_specs",
     "MODEL_PATCH_MUA": "model_specs",
@@ -150,7 +150,6 @@ if TYPE_CHECKING:  # pragma: no cover - types only
     from .fitting import fit_conditional_poisson  # noqa: F401
     from .model_specs import (  # noqa: F401
         ARRIVAL_CLOCK_COLUMN,
-        BIN_S,
         MODEL_CHOICE,
         MODEL_PATCH,
         MODEL_PATCH_MUA,
@@ -161,6 +160,7 @@ if TYPE_CHECKING:  # pragma: no cover - types only
         N_HISTORY_BASIS,
         N_HISTORY_LAGS,
         N_REWARD_LAGS,
+        RATE_BIN_S,
         REWARD_HISTORY_COLUMNS,
         REWARD_HISTORY_N_BASIS,
         STOP_COVARIATES,

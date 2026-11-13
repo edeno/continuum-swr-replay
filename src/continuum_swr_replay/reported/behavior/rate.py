@@ -29,8 +29,8 @@ from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
     term_separation_statistics,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import (
-    BIN_S,
     PER_BIN_HISTORY_COLUMNS,
+    RATE_BIN_S,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
     TMAX_ARRIVAL,
@@ -63,7 +63,7 @@ RATE_POPULATIONS = {
 FULL_RATE_RUNG = "M7r_time_histcos_rew"
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 #: The per-bin model's bin width, in ms, as the descriptions write it.
-_BIN_MS = format_number(milliseconds(BIN_S), "int")
+_BIN_MS = format_number(milliseconds(RATE_BIN_S), "int")
 #: What every value read off one reward basis coefficient says about itself.
 BASIS_COEFFICIENT_NOTE = (
     "a basis coefficient, not the effect of a reward at any lag: the three "

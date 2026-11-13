@@ -43,10 +43,10 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     gate_term_sessions,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import (
-    BIN_S,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     PER_BIN_HISTORY_COLUMNS,
+    RATE_BIN_S,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
@@ -137,7 +137,7 @@ def baseline_rate_statistics(null_fits: pd.DataFrame) -> dict[str, float]:
         "median": float(rate.median()),
         "lower_quartile": float(rate.quantile(0.25)),
         "upper_quartile": float(rate.quantile(0.75)),
-        "events_per_bin": float(rate.median() * BIN_S),
+        "events_per_bin": float(rate.median() * RATE_BIN_S),
     }
 
 
@@ -293,7 +293,7 @@ def self_history_kernel_by_lag(fits: pd.DataFrame) -> pd.DataFrame:
     Returns
     -------
     kernel : pd.DataFrame, shape (N_HISTORY_LAGS, 3)
-        Indexed by ``lag`` (bins of ``BIN_S`` after the event ended, from 1):
+        Indexed by ``lag`` (bins of ``RATE_BIN_S`` after the event ended, from 1):
         ``median``, ``lower_quartile`` and ``upper_quartile`` over sessions of
         the session's kernel, as a rate ratio.
     """

@@ -30,7 +30,7 @@ How Family A (this script) and Family B (``fit_per_bin_rate_models.py``) differ
 on the same stop. Family A gives the stop one row: its whole-stop event count
 (the ``stop_table`` columns above), a ``log(immobility_duration_s)`` offset, and
 the reward-history basis evaluated once at bout start, so the whole stop carries
-one history. Family B cuts the same stop into ``BIN_S`` = 15 ms bins over its
+one history. Family B cuts the same stop into ``RATE_BIN_S`` = 15 ms bins over its
 first ``TMAX`` = 4 s only, counts onsets per bin from ``event_onset_table`` with
 a ``log(exposure)`` offset, adds a time-since-stop spline and self-history, and
 in the bins at or past the stop's outcome boundary (``outcome_known_time_s``)

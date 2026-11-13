@@ -61,7 +61,7 @@ RECSPL  := visit_recency_trials_event_leaf_centered_spline_{1,2,3}
 upper_bound=8.0)`); the knots are fixed globally, never per-session quantiles, so
 a fitted curve is reconstructable from the saved coefficients and the spline
 coefficients are comparable across sessions. All per-bin models share one bin
-width (`BIN_S = 15 ms`) so the ladder is nested and AIC / CV / deviance / GOF are
+width (`RATE_BIN_S = 15 ms`) so the ladder is nested and AIC / CV / deviance / GOF are
 directly comparable.
 
 ### Rung-name suffixes

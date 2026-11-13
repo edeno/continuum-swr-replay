@@ -301,7 +301,7 @@ def _simulated_design(n_stops: int = 300) -> pd.DataFrame:
     return aggregate_to_timebins(
         stops,
         events[events["stream"] == "no_swr"],
-        bin_s=model_specs.BIN_S,
+        bin_s=model_specs.RATE_BIN_S,
         tmax=model_specs.TMAX,
         reward_basis=True,
         self_history_lags=model_specs.N_HISTORY_LAGS,

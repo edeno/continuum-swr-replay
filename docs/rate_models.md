@@ -132,7 +132,7 @@ offset. Its limitation is exactly that offset — see below.
   history kernels can show, are in
   [design/duration_aware_history_simulation.md](design/duration_aware_history_simulation.md).
 - **The ladder** toggles three blocks independently, all at one bin width
-  (`BIN_S = 0.015`) so the models are nested and AIC / CV / GOF are comparable:
+  (`RATE_BIN_S = 0.015`) so the models are nested and AIC / CV / GOF are comparable:
 
   | model | adds |
   | --- | --- |

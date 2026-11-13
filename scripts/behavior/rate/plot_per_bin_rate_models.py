@@ -53,7 +53,7 @@ from continuum_swr_replay.analysis.behavior.coefficient_statistics import (  # n
     gated_coefficient_statistics,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
-    BIN_S,
+    RATE_BIN_S,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
 )
@@ -228,7 +228,7 @@ def plot_selfhistory(m7: pd.DataFrame) -> None:
             for column in ("median", "lower_quartile", "upper_quartile")
         )
         ax.errorbar(
-            kernel.index * BIN_S * 1000,
+            kernel.index * RATE_BIN_S * 1000,
             med,
             yerr=[med - lo, hi - med],
             marker="o",

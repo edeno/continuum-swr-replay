@@ -2,7 +2,7 @@
 
 A point-process GLM conditional-intensity ladder (Truccolo-Eden-Brown 2005) on
 the canonical (stop x bin) design from :func:`per_bin_design.aggregate_to_timebins`.
-Each row is one ``BIN_S``-wide time bin within an immobility stop; the response
+Each row is one ``RATE_BIN_S``-wide time bin within an immobility stop; the response
 is the per-bin onset ``count`` and the offset is ``log(exposure)`` (seconds of
 immobility in the bin), so ``exp(intercept)`` is the per-bin onset rate.
 
@@ -18,7 +18,7 @@ confound-free conditional intensity that can be checked as a point process
 
 The ladder (``MODEL_PER_BIN_RATE`` in ``model_specs.py``) toggles three blocks
 (time spline, self-history, reward-history raised-cosine basis) plus the
-reward x time interaction, all at one bin width (``BIN_S``) so the models are
+reward x time interaction, all at one bin width (``RATE_BIN_S``) so the models are
 nested and AIC / CV / deviance / GOF are directly comparable.
 
 Nested comparability also requires one cohort: every rung of a ladder must be

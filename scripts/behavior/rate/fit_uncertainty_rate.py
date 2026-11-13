@@ -61,7 +61,7 @@ from pathlib import Path  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.behavior import (  # noqa: E402
-    BIN_S,
+    RATE_BIN_S,
     add_uncertainty_covariates,
     attach_is_swr_to_onsets,
 )
@@ -285,12 +285,12 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     n_sessions = stop.groupby(list(SESSION_COLUMNS)).ngroups
     logger.info(
-        "Fitting %s over %d sessions x %s populations (BIN_S=%.3f, "
+        "Fitting %s over %d sessions x %s populations (RATE_BIN_S=%.3f, "
         "switch_window=%d)...",
         MU_UNCERTAINTY.name,
         n_sessions,
         list(POPULATIONS_TO_FIT),
-        BIN_S,
+        RATE_BIN_S,
         args.switch_window,
     )
     models = fit_uncertainty_rate(stop, onsets)

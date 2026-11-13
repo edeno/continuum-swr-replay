@@ -14,10 +14,10 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior import (
-    BIN_S,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     POPULATIONS,
+    RATE_BIN_S,
     TMAX,
     aggregate_to_timebins,
 )
@@ -141,7 +141,7 @@ def test_post_outcome_rung_and_its_null_share_the_gated_cohort(two_session_fits)
     design = aggregate_to_timebins(
         stops[stops.session_date == 1],
         POPULATIONS["non_local"](onsets),
-        bin_s=BIN_S,
+        bin_s=RATE_BIN_S,
         tmax=TMAX,
         reward_basis=True,
         self_history_lags=N_HISTORY_LAGS,

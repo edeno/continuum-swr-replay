@@ -21,10 +21,10 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ..fit_comparability import why_not_comparable
 from ..model_specs import (
-    BIN_S,
     MODEL_CROSS_HISTORY_RATE,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
+    RATE_BIN_S,
     TMAX,
     longest_history_window_s,
 )
@@ -62,7 +62,7 @@ def fit_direction(stops_g, onsets_g, resp_pop, cross_pop) -> dict | None:
     resp = POPULATIONS[resp_pop](onsets_g)
     cross = POPULATIONS[cross_pop](onsets_g)
     common = {
-        "bin_s": BIN_S,
+        "bin_s": RATE_BIN_S,
         "tmax": TMAX,
         "reward_basis": True,
         "self_history_lags": N_HISTORY_LAGS,

@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.model_specs import (
-    BIN_S,
     MODEL_UNCERTAINTY_RATE,
+    RATE_BIN_S,
 )
 from continuum_swr_replay.analysis.behavior.rate.per_bin_rate_model import (
     _design_columns,
@@ -76,12 +76,12 @@ def _with_mu_fit_columns(data: dict) -> pd.DataFrame:
     # reports the retained time-course support, so a constant here would
     # make that report vacuous.
     if "tc" not in design and "binj" in design:
-        design["tc"] = (design["binj"].to_numpy(dtype=float) + 0.5) * BIN_S
+        design["tc"] = (design["binj"].to_numpy(dtype=float) + 0.5) * RATE_BIN_S
     for column in _design_columns(MU_UNCERTAINTY):
         if column not in design:
             design[column] = 0.0
     if "exposure" not in design:
-        design["exposure"] = BIN_S
+        design["exposure"] = RATE_BIN_S
     return design
 
 
@@ -91,7 +91,7 @@ def test_post_outcome_bin_gate_uses_physical_left_edge_and_keeps_equality():
             "stop_id": [1, 1, 1, 2, 2, 2],
             "stop_start": [10.0] * 6,
             "binj": [0, 1, 2, 0, 1, 2],
-            "outcome_known_time": [10.0 + BIN_S] * 6,
+            "outcome_known_time": [10.0 + RATE_BIN_S] * 6,
             "trial_reward": [1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
         }
     )
@@ -101,10 +101,10 @@ def test_post_outcome_bin_gate_uses_physical_left_edge_and_keeps_equality():
     assert gated["binj"].tolist() == [1, 2, 1, 2]
     assert gated["response_time"].tolist() == pytest.approx(
         [
-            10.0 + BIN_S,
-            10.0 + 2 * BIN_S,
-            10.0 + BIN_S,
-            10.0 + 2 * BIN_S,
+            10.0 + RATE_BIN_S,
+            10.0 + 2 * RATE_BIN_S,
+            10.0 + RATE_BIN_S,
+            10.0 + 2 * RATE_BIN_S,
         ]
     )
     assert audit == {
@@ -128,10 +128,10 @@ def test_post_outcome_bin_gate_uses_physical_left_edge_and_keeps_equality():
         "outcome_balance_status": "both_outcomes_retained",
         "n_bins_after_outcome_balance_guard": 4,
         # Symmetric here by construction: both classes share a boundary.
-        "min_retained_tc_rewarded": pytest.approx(1.5 * BIN_S),
-        "median_retained_tc_rewarded": pytest.approx(2.0 * BIN_S),
-        "min_retained_tc_omission": pytest.approx(1.5 * BIN_S),
-        "median_retained_tc_omission": pytest.approx(2.0 * BIN_S),
+        "min_retained_tc_rewarded": pytest.approx(1.5 * RATE_BIN_S),
+        "median_retained_tc_rewarded": pytest.approx(2.0 * RATE_BIN_S),
+        "min_retained_tc_omission": pytest.approx(1.5 * RATE_BIN_S),
+        "median_retained_tc_omission": pytest.approx(2.0 * RATE_BIN_S),
         "min_retained_tc_omission_minus_rewarded": pytest.approx(0.0),
     }
 
@@ -150,7 +150,7 @@ def test_gate_audit_exposes_asymmetric_time_course_truncation():
             "stop_start": [10.0] * 8,
             "binj": [0, 1, 2, 3, 0, 1, 2, 3],
             # Rewarded stop 1 clears at once; omission stop 2 only at bin 3.
-            "outcome_known_time": [10.0] * 4 + [10.0 + 3 * BIN_S] * 4,
+            "outcome_known_time": [10.0] * 4 + [10.0 + 3 * RATE_BIN_S] * 4,
             "trial_reward": [1.0] * 4 + [0.0] * 4,
         }
     )
@@ -158,10 +158,10 @@ def test_gate_audit_exposes_asymmetric_time_course_truncation():
     _, audit = gate_bins_after_outcome(design, MU_UNCERTAINTY)
 
     assert audit["outcome_balance_valid"]
-    assert audit["min_retained_tc_rewarded"] == pytest.approx(0.5 * BIN_S)
-    assert audit["min_retained_tc_omission"] == pytest.approx(3.5 * BIN_S)
+    assert audit["min_retained_tc_rewarded"] == pytest.approx(0.5 * RATE_BIN_S)
+    assert audit["min_retained_tc_omission"] == pytest.approx(3.5 * RATE_BIN_S)
     assert audit["min_retained_tc_omission_minus_rewarded"] == pytest.approx(
-        3.0 * BIN_S
+        3.0 * RATE_BIN_S
     )
 
 
