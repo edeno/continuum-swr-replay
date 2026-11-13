@@ -3,9 +3,11 @@
 The detection comparison's example figures
 (``visualization.inventory_examples.draw_example``) draw the memoryless window
 posteriors of the plotted span. They are not stored, so they are re-decoded
-from the decode's marks and encoding model (:func:`recompute_windows`), from one
-epoch's inputs (:func:`load_epoch`), and checked against the windows the
-memoryless run stored: a figure is refused when they disagree beyond a device's
+from the decode's marks and the encoding model the memoryless run read
+(:func:`recompute_windows`), from one epoch's inputs (:func:`load_epoch`): the
+run's manifest names its rule, and the paper's running-only model is refitted
+as the run fitted it (``memoryless_sequence.encoding``). They are checked
+against the windows the memoryless run stored: a figure is refused when they disagree beyond a device's
 rounding (:data:`SPREAD_RTOL`, :data:`CENTER_TIE_RTOL`). Run them on the device
 the memoryless run used (``runs.device.use_memoryless_device``).
 """
@@ -27,8 +29,11 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     sequence_dispersion_cm,
     window_decisions,
 )
+from continuum_swr_replay.analysis.detection.memoryless_sequence.encoding import (
+    epoch_encoding_model,
+    run_encoding,
+)
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    check_marks_match_encoding,
     decoded_windows,
     interior_bin_distances_cm,
 )
@@ -45,11 +50,14 @@ from continuum_swr_replay.analysis.event_definition import (
 )
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.decoding.identifiers import nwb_file_name
+from continuum_swr_replay.decoding.identifiers import (
+    nwb_file_name,
+    parse_epoch_identifier,
+)
 from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.paths import processed_data_dir
-from continuum_swr_replay.runs.io import output_path
+from continuum_swr_replay.runs.io import output_path, read_manifest
 from continuum_swr_replay.tables.io import read_table
 
 __all__ = [
@@ -95,6 +103,7 @@ class EpochInputs:
     spike_times, spike_waveform_features : list of ndarray
         The decode's marks, per tetrode, in the encoding model's order.
     encoding_model : dict
+        The encoding model the memoryless run read.
     bin_distance_cm : ndarray, shape (n_bins, n_bins)
     bin_centers_cm : ndarray, shape (n_bins,)
         The interior bins the memoryless posteriors are over.
@@ -137,16 +146,23 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
     ------
     ValueError
         The decode's marks are not the ones its encoding model was fitted on
-        (``check_marks_match_encoding``), the stored windows are not the
-        decode grid's, or the band does not hold every tetrode the SWR source
-        kept.
+        (``check_marks_match_encoding``), the memoryless run has no readable
+        manifest, the stored windows are not the decode grid's, or the band
+        does not hold every tetrode the SWR source kept.
     """
     dot = pd.read_pickle(inventory_run.decode_path(identifier))
     time = dot.index.to_numpy(dtype=np.float64)
     marks = decode_marks(identifier)
-    encoding_model = marks["encoding_model"]
-    check_marks_match_encoding(
-        encoding_model, marks["spike_times"], marks["spike_waveform_features"]
+    # the run's own encoding model: the decoder's, or the paper's refitted
+    # as the run refitted it (about a minute on a GPU)
+    encoding_model, _ = epoch_encoding_model(
+        run_encoding(read_manifest(memoryless_dir)["settings"]),
+        decode_paths(identifier, processed_data_dir()).detector,
+        dot,
+        marks["spike_times"],
+        marks["spike_waveform_features"],
+        parse_epoch_identifier(identifier),
+        swr_source.artifact_intervals(identifier),
     )
     environment = encoding_model["environment"]
     interior = np.asarray(environment.is_track_interior_).ravel()
