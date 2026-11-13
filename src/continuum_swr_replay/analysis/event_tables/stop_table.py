@@ -9,7 +9,9 @@ import pandas as pd
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
     excluded_intervals_of,
 )
-from continuum_swr_replay.decoding.results import nonlocal_probability
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    nonlocal_probability,
+)
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,

@@ -74,6 +74,7 @@ from continuum_swr_replay.analysis.event_definition.immobility import (
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     get_confident_times,
     get_overlap_times,
+    nonlocal_state_probability,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     artifact_intervals,
@@ -188,9 +189,7 @@ def find_non_swr_example_event(
     time_slice : slice
         Time window centered on the event.
     """
-    non_local_prob = results.acausal_state_probabilities.sel(
-        states="Non-Local Continuous"
-    ) + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
+    non_local_prob = nonlocal_state_probability(results.acausal_state_probabilities)
     position_info = data["position_info"]
     speed = position_info.head_speed.to_numpy()
     position_time = position_info.index

@@ -134,6 +134,9 @@ if TYPE_CHECKING:
 from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     get_conditional_non_local_posterior,
 )
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    nonlocal_state_probability,
+)
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.visualization.palettes import COLORS
 
@@ -477,9 +480,7 @@ def plot_spike_times(
     acausal_state_probabilities = results.sel(
         time=time_slice
     ).acausal_state_probabilities
-    non_local_probabilities = acausal_state_probabilities.sel(
-        states="Non-Local Continuous"
-    ) + acausal_state_probabilities.sel(states="Non-Local Fragmented")
+    non_local_probabilities = nonlocal_state_probability(acausal_state_probabilities)
     is_non_local = (
         non_local_probabilities > DEFAULT_NON_LOCAL_THRESHOLD
     ).values.squeeze()

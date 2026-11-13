@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.event_definition.immobility import (
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     classify_swr_overlap_geometry,
     get_confident_times,
+    nonlocal_state_probability,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     artifact_intervals,
@@ -107,9 +108,8 @@ def quantify_session(
     position_time = data["position_info"].index
     speed = data["position_info"].head_speed.to_numpy()
     validate_results_position_time_alignment(results.time.values, position_time)
-    non_local_prob = (
-        results.acausal_state_probabilities.sel(states="Non-Local Continuous")
-        + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
+    non_local_prob = nonlocal_state_probability(
+        results.acausal_state_probabilities
     ).assign_coords(time=position_time.to_numpy(dtype=float))
 
     detected_nl_events = get_confident_times(

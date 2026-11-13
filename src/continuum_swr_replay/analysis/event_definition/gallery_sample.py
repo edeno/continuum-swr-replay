@@ -23,9 +23,9 @@ from continuum_swr_replay.analysis.event_definition.immobility import (
     intervals_from_labels,
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    nonlocal_probability,
     strict_overlap_matrix,
 )
-from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.intervals import min_gap_to_intervals
 from continuum_swr_replay.tables.session_keys import one_session
 

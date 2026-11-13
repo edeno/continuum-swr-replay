@@ -140,7 +140,7 @@ Canonical whole-event immobility rules for neural event cohorts.
 
 The non-local event rule and the SWR-overlap classification of those events.
 
-`get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `nonlocal_event_bins_by_swr`, `get_overlap_times`, `classify_swr_overlap`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
+`nonlocal_probability`, `nonlocal_state_probability`, `get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `nonlocal_event_bins_by_swr`, `get_overlap_times`, `classify_swr_overlap`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
 
 ### `src/continuum_swr_replay/analysis/event_definition/swr_source.py`
 
@@ -1004,7 +1004,7 @@ The epoch identifier: how a decode is named, built and read back.
 
 The one reader of a decode's ``{epoch_identifier}_results.nc``, and of the clusterless detector it saved beside it (:func:`load_saved_detector`); :func:`load_results` reads an epoch's saved decode back whole: its results, fitted detector and environment.
 
-`nonlocal_probability`, `open_results`, `load_saved_detector`, `load_results`
+`open_results`, `load_saved_detector`, `load_results`
 
 ### `src/continuum_swr_replay/tables/io.py`
 

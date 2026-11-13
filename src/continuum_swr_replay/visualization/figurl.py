@@ -92,6 +92,7 @@ from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     get_confident_times,
+    nonlocal_state_probability,
 )
 from continuum_swr_replay.visualization.palettes import COLORS
 
@@ -265,8 +266,7 @@ def _create_non_local_probability_view(results: xr.Dataset) -> vv.TimeseriesGrap
 
     """
     non_local_times = get_confident_times(
-        results.sel(states="Non-Local Continuous").acausal_state_probabilities
-        + results.sel(states="Non-Local Fragmented").acausal_state_probabilities,
+        nonlocal_state_probability(results.acausal_state_probabilities),
     )
 
     non_local_probability_view = vv.TimeseriesGraph()

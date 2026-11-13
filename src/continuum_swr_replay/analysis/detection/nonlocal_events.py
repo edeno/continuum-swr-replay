@@ -158,11 +158,12 @@ from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     event_strict_overlap_keys,
     get_confident_times,
     get_overlap_times,
+    nonlocal_probability,
+    nonlocal_state_probability,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
-from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD,
     SAMPLING_FREQUENCY,
@@ -612,9 +613,7 @@ def get_data_over_time(
     position_time = data["position_info"].index
     head_speed = data["position_info"].head_speed.to_numpy()
 
-    non_local_prob = results.acausal_state_probabilities.sel(
-        states="Non-Local Continuous"
-    ) + results.acausal_state_probabilities.sel(states="Non-Local Fragmented")
+    non_local_prob = nonlocal_state_probability(results.acausal_state_probabilities)
     non_local_prob = non_local_prob.assign_coords(
         time=position_time.to_numpy(dtype=float)
     )

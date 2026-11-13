@@ -57,6 +57,47 @@ from continuum_swr_replay.tables.columns import require_columns
 INTERVAL_TOLERANCE_SEC = 1e-6
 
 
+def nonlocal_probability(frame: pd.DataFrame) -> pd.Series:
+    """Each row's non-local probability: Non-Local Continuous plus Fragmented.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        Rows of a decode frame, with ``Non-Local_Continuous_prob`` and
+        ``Non-Local_Fragmented_prob``.
+
+    Returns
+    -------
+    pd.Series, shape (n_rows,)
+        On ``frame``'s index, in the columns' dtype; NaN where either is NaN.
+    """
+    return frame["Non-Local_Continuous_prob"] + frame["Non-Local_Fragmented_prob"]
+
+
+def nonlocal_state_probability(
+    acausal_state_probabilities: xr.DataArray,
+) -> xr.DataArray:
+    """A decode's non-local probability: Non-Local Continuous plus Fragmented.
+
+    The same sum as :func:`nonlocal_probability`, on the decoder's own output
+    (``results.acausal_state_probabilities``), before it is written to a frame.
+
+    Parameters
+    ----------
+    acausal_state_probabilities : xr.DataArray, shape (n_time, n_states)
+        With a ``states`` coordinate naming ``Non-Local Continuous`` and
+        ``Non-Local Fragmented``.
+
+    Returns
+    -------
+    xr.DataArray, shape (n_time,)
+        NaN where either state's probability is NaN.
+    """
+    return acausal_state_probabilities.sel(
+        states="Non-Local Continuous"
+    ) + acausal_state_probabilities.sel(states="Non-Local Fragmented")
+
+
 def get_confident_times(
     prob: xr.DataArray,
     speed: np.ndarray | None = None,

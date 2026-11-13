@@ -12,7 +12,8 @@ multi-index, so ``results.acausal_posterior.sel(state="Non-Local Continuous")``
 resolves. Every reader of the file opens it here.
 
 The decode frame (``data_over_time``) carries each state's probability as a
-column; :func:`nonlocal_probability` sums the two non-local states'.
+column; ``analysis.event_definition.nonlocal_event_rule.nonlocal_probability``
+sums the two non-local states'.
 """
 
 from __future__ import annotations
@@ -21,7 +22,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import joblib
-import pandas as pd
 import xarray as xr
 
 from continuum_swr_replay.decoding.files import decode_paths
@@ -39,23 +39,6 @@ if TYPE_CHECKING:
 
 ENCODING_KEY = ("", 0)
 """The encoding group a single-environment decode is saved under."""
-
-
-def nonlocal_probability(frame: pd.DataFrame) -> pd.Series:
-    """Each row's non-local probability: Non-Local Continuous plus Fragmented.
-
-    Parameters
-    ----------
-    frame : pd.DataFrame
-        Rows of a decode frame, with ``Non-Local_Continuous_prob`` and
-        ``Non-Local_Fragmented_prob``.
-
-    Returns
-    -------
-    pd.Series, shape (n_rows,)
-        On ``frame``'s index, in the columns' dtype; NaN where either is NaN.
-    """
-    return frame["Non-Local_Continuous_prob"] + frame["Non-Local_Fragmented_prob"]
 
 
 def open_results(path: str | Path, *, cache: bool = True) -> xr.Dataset:

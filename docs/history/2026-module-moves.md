@@ -504,6 +504,12 @@ kind of stored file does: the memoryless detector's `*_memoryless_candidates.pkl
 `analysis/detection/memoryless_sequence/detect.py:load_candidates`, points the two
 former module names at today's modules for the read, so the stored runs still load.
 
+`nonlocal_probability` moved from `decoding/results.py` to
+`analysis/event_definition/nonlocal_event_rule.py`, beside the new
+`nonlocal_state_probability` (the same sum on the decoder's output), which the
+non-local detector (`analysis/detection/nonlocal_events.py`) and five other callers
+now use in place of an inline sum.
+
 | Old module | New home |
 |---|---|
 | `analysis/events/__init__.py` (removed: moved) | `analysis/event_definition/__init__.py` |

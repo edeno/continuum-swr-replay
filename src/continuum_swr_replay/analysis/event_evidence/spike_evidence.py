@@ -33,11 +33,11 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     event_strict_overlap_mask,
+    nonlocal_probability,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     nearest_interior_bins,
 )
-from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.intervals import contiguous_true_runs
 
 NON_EVENT_THRESHOLD = 0.2

@@ -52,7 +52,9 @@ from continuum_swr_replay.analysis.detector_comparison.schema import STATE_SPACE
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     events_in_stops,
 )
-from continuum_swr_replay.decoding.results import nonlocal_probability
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    nonlocal_probability,
+)
 from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY

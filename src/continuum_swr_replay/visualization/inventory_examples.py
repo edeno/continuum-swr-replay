@@ -28,7 +28,9 @@ from continuum_swr_replay.analysis.detector_comparison.example_windows import (
     recompute_windows,
 )
 from continuum_swr_replay.analysis.detector_comparison.selection import EXAMPLE_SEED
-from continuum_swr_replay.decoding.results import nonlocal_probability
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    nonlocal_probability,
+)
 from continuum_swr_replay.intervals import contiguous_true_runs, sample_step
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,

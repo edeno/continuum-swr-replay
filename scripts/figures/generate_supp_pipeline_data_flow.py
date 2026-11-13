@@ -36,6 +36,9 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
     read_dot_with_swr_source,
     require_swr_source,
 )
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    nonlocal_probability,  # noqa: E402
+)
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_epoch_id_of_session,
 )
@@ -46,7 +49,6 @@ from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
     gate_term_sessions,
 )
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.decoding.results import nonlocal_probability  # noqa: E402
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
