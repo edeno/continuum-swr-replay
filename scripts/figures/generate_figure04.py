@@ -63,16 +63,12 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
 )
 from continuum_swr_replay.analysis.pfc import (
     fit_immobility_models,
-    load_aligned_session,
     make_design_matrices,
     population_statistics,
-    session_events,
-    session_fit_population,
+    prepare_session,
 )
 from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
-from continuum_swr_replay.analysis.pfc.design import symmetric_lags
-from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
 from continuum_swr_replay.analysis.pfc.fit import model_penalties
 from continuum_swr_replay.analysis.pfc.heldout import (
     DEFAULT_CONTROL_DRAWS,
@@ -493,12 +489,6 @@ def plot_best_model_selection(df, ax):
 # Main Figure Assembly
 # ---------------------------------------------------------------------------
 
-#: The lags the models are fit on (+/-250 ms at 500 Hz). The curves are
-#: reported on +/-200 ms (``in_report_window``): the bundle is fit on the wider
-#: window so the spline's boundary behaviour falls outside the reported one;
-#: the example neuron is fit the same way and its curve trimmed to match.
-FIT_LAGS = symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, SAMPLING_FREQUENCY)
-
 
 def generate_figure(
     nwb_file_name="wilbur20210329_.nwb",
@@ -561,9 +551,6 @@ def generate_figure(
     # event sets with the matched non-event control drawn on the session's seed.
     print(f"Loading data for {nwb_file_name}, {epoch_name}...")
     logger = logging.getLogger(f"figure04.{nwb_file_name}.{epoch_name}")
-    results_hpc, data, position_info, _ = load_aligned_session(
-        nwb_file_name, epoch_name, logger
-    )
     cohort_stops = None
     if stop_cohort != "all_stops":
         cohort_stops, cohort_report = load_session_stop_cohort(
@@ -573,33 +560,25 @@ def generate_figure(
             f"Stop cohort {stop_cohort}: "
             f"{cohort_report['n_stops_after']}/{cohort_report['n_stops_before']} stops"
         )
-    time = position_info.index.to_numpy(dtype=float)
-    lags = FIT_LAGS
-    data, _, _, fit_mask, bin_counts = session_fit_population(
-        data,
+    prepared = prepare_session(
         nwb_file_name,
         epoch_name,
-        cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
+        cohort_stops=cohort_stops,
+        sampling_frequency=SAMPLING_FREQUENCY,
+        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
         logger=logger,
     )
+    data = prepared.data
+    time = prepared.time
+    lags = prepared.fit_lags
+    fit_mask = prepared.fit_mask
+    bin_counts = prepared.bin_counts
+    event_times = prepared.event_times
+    event_counts = prepared.event_counts
     print(
         f"Fit bins: {bin_counts['n_bins_fit']}/{bin_counts['n_bins_immobile']} "
         "immobile bins in cohort"
-    )
-    event_times, event_counts, *_ = session_events(
-        data,
-        results_hpc,
-        nwb_file_name,
-        epoch_name,
-        time=time,
-        fit_mask=fit_mask,
-        fit_lags=lags,
-        sampling_frequency=SAMPLING_FREQUENCY,
-        cohort_stops=cohort_stops,
-        stop_cohort=stop_cohort,
-        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
-        logger=logger,
     )
     print(
         f"Events in cohort: {event_counts['n_nonlocal_after']}"

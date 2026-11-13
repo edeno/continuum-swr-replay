@@ -146,90 +146,33 @@ def rebuild_session(
     session-keyed control seed, so the design is the one the reference was fit
     on rather than a fresh cut of the data.
     """
-    from continuum_swr_replay.analysis.detection.nonlocal_events import (
-        align_results_to_position,
-    )
-    from continuum_swr_replay.analysis.event_definition.analysed_time import (
-        excluded_intervals,
-        read_artifact_event_drops,
-    )
-    from continuum_swr_replay.analysis.event_definition.swr_source import swr_epoch_id
-    from continuum_swr_replay.analysis.pfc import (
-        build_session_event_sets,
-        build_session_fit_mask,
-        make_matched_control_times,
-        matched_control_seed,
-    )
-    from continuum_swr_replay.analysis.pfc.canonical_events import (
-        load_session_canonical_events,
-        load_session_swr_intervals,
-        session_data_over_time_path,
-    )
     from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
-    from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
-    from continuum_swr_replay.analysis.pfc.matched_control import (
-        artifact_dropped_events,
-    )
-    from continuum_swr_replay.data_loaders import load_data
+    from continuum_swr_replay.analysis.pfc.session import prepare_session
     from continuum_swr_replay.decoding.identifiers import parse_session_name
-    from continuum_swr_replay.decoding.results import load_results
     from continuum_swr_replay.intervals import get_spikecount_per_time_bin
-    from continuum_swr_replay.parameters import (
-        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        DEFAULT_NON_LOCAL_THRESHOLD,
-    )
 
     nwb_file_name, epoch = parse_session_name(session)
 
     cohort_stops, _ = load_session_stop_cohort(nwb_file_name, epoch, cohort="at_well")
-    results, _, _ = load_results(
-        nwb_file_name, epoch, decoding_brain_area="HPC", load_detector=False
-    )
-    data = load_data(nwb_file_name, epoch)
-    results, position_info, _ = align_results_to_position(
-        results, data["position_info"]
-    )
-    data = {**data, "position_info": position_info}
-
-    _, fit_mask, _ = build_session_fit_mask(
-        position_info,
-        cohort_stops=cohort_stops,
-        stop_cohort="at_well",
-        immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        excluded_intervals=excluded_intervals(swr_epoch_id(nwb_file_name, epoch)),
-        basis_half_window_s=DEFAULT_BASIS_HALF_WINDOW_S,
-    )
-    canonical_events, _ = load_session_canonical_events(nwb_file_name, epoch)
-    swr_intervals, _ = load_session_swr_intervals(
+    # The fit mask, the event sets and the seeded matched control, exactly as
+    # ``run_session`` prepares them; its lags are the archived ``FIT_LAGS``.
+    prepared = prepare_session(
         nwb_file_name,
         epoch,
-        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    )
-    event_times, _ = build_session_event_sets(
-        data,
-        results,
-        canonical_events=canonical_events,
-        swr_intervals=swr_intervals,
-        cohort_stops=cohort_stops,
         stop_cohort="at_well",
-        fit_mask=fit_mask,
-        basis_half_window_s=float(np.abs(FIT_LAGS).max()) / sampling_frequency,
+        cohort_stops=cohort_stops,
+        sampling_frequency=sampling_frequency,
     )
-    event_times["matched_control"] = make_matched_control_times(
-        event_times,
-        fit_mask,
-        np.random.default_rng(matched_control_seed(nwb_file_name, epoch)),
-        avoid=artifact_dropped_events(
-            read_artifact_event_drops(
-                session_data_over_time_path(
-                    nwb_file_name,
-                    epoch,
-                    non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
-                )
-            )
-        ),
-    ).times
+    if not np.array_equal(prepared.fit_lags, FIT_LAGS):
+        raise ValueError(
+            f"the session is prepared over {len(prepared.fit_lags)} lags, the "
+            f"archived fits over {len(FIT_LAGS)}; the rebuild is not the audited "
+            "design"
+        )
+    data = prepared.data
+    event_times = prepared.event_times
+    fit_mask = prepared.fit_mask
+    position_info = prepared.position_info
 
     time = position_info.index.to_numpy(dtype=float)
     spline_basis = audited_basis(FIT_LAGS, sampling_frequency)

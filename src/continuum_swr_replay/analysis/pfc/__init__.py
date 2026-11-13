@@ -21,11 +21,13 @@ run_session
 process_neuron
     One unit's statistics and curves from its fits (prefitted by
     ``run_session``, or fit here).
+prepare_session, PreparedSession
+    ``run_session``'s preparation of a session, as one call: the decode and
+    data trimmed to their shared timestamps, the fit mask with theta phase
+    blanked in excluded time, and the event sets with the matched control.
+    Figure 4 and the PFC check scripts prepare a session with it.
 load_aligned_session, session_fit_population, session_events
-    ``run_session``'s preparation of a session, in order: the decode and data
-    trimmed to their shared timestamps, the fit mask with theta phase blanked
-    in excluded time, and the event sets with the matched control. Figure 4
-    prepares its example session with them.
+    The three steps of ``prepare_session``, in order.
 build_session_fit_mask, build_session_event_sets
     The bins a session is fit on (immobility inside the stop cohort) and the
     event classes its designs are keyed on (``event_sets``).
@@ -87,6 +89,7 @@ from typing import TYPE_CHECKING
 #: Exported name -> (submodule of this package, attribute it is bound to).
 _LAZY_EXPORTS = {
     "MatchedControlDraw": ("matched_control", "MatchedControlDraw"),
+    "PreparedSession": ("session", "PreparedSession"),
     "build_session_event_sets": ("event_sets", "build_session_event_sets"),
     "build_session_fit_mask": ("event_sets", "build_session_fit_mask"),
     "fit_immobility_models": ("fit", "_fit_immobility_models"),
@@ -94,6 +97,7 @@ _LAZY_EXPORTS = {
     "make_design_matrices": ("design", "_make_design_matrices"),
     "make_matched_control_times": ("matched_control", "make_matched_control_times"),
     "matched_control_seed": ("matched_control", "matched_control_seed"),
+    "prepare_session": ("session", "prepare_session"),
     "process_neuron": ("session", "process_neuron"),
     "run_session": ("session", "run_session"),
     "session_events": ("session", "_session_events"),
@@ -128,9 +132,14 @@ if TYPE_CHECKING:  # pragma: no cover - types only
         make_matched_control_times,
         matched_control_seed,
     )
+    from .session import (  # noqa: F401
+        PreparedSession,
+        prepare_session,
+        process_neuron,
+        run_session,
+    )
     from .session import _load_aligned_session as load_aligned_session  # noqa: F401
     from .session import _session_events as session_events  # noqa: F401
     from .session import (  # noqa: F401
         _session_fit_population as session_fit_population,
     )
-    from .session import process_neuron, run_session  # noqa: F401

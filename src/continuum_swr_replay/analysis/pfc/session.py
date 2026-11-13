@@ -8,7 +8,7 @@ and one session (``run_session``).
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, NamedTuple
 
 import dask
 import numpy as np
@@ -982,49 +982,30 @@ def run_session(
         format_epoch_identifier(nwb_file_name, epoch_name, brain_area)
     )
 
-    results, data, position_info, alignment_counts = _load_aligned_session(
-        nwb_file_name, epoch_name, logger
-    )
-
-    position_time = position_info.index
-    time = position_time.to_numpy(dtype=float)
-
-    # Fit with wider lag window (±250ms) so spline boundary artifacts
-    # fall outside the reported window (±200ms). The returned modulation
-    # arrays are trimmed to the reporting window after fitting.
-    fit_lags = symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, sampling_frequency)
-
-    data, excluded, is_immobile, fit_mask, bin_counts = _session_fit_population(
-        data,
+    prepared = prepare_session(
         nwb_file_name,
         epoch_name,
-        cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
-        logger=logger,
-    )
-
-    (
-        event_times,
-        event_counts,
-        event_provenance,
-        artifact_dropped,
-        control_seed,
-        control_draw,
-    ) = _session_events(
-        data,
-        results,
-        nwb_file_name,
-        epoch_name,
-        time=time,
-        fit_mask=fit_mask,
-        fit_lags=fit_lags,
+        cohort_stops=cohort_stops,
         sampling_frequency=sampling_frequency,
-        cohort_stops=cohort_stops,
-        stop_cohort=stop_cohort,
         non_local_threshold=non_local_threshold,
-        logger=logger,
         event_set=event_set,
+        logger=logger,
     )
+    data = prepared.data
+    alignment_counts = prepared.alignment_counts
+    time = prepared.time
+    fit_lags = prepared.fit_lags
+    excluded = prepared.excluded
+    is_immobile = prepared.is_immobile
+    fit_mask = prepared.fit_mask
+    bin_counts = prepared.bin_counts
+    event_times = prepared.event_times
+    event_counts = prepared.event_counts
+    event_provenance = prepared.event_provenance
+    artifact_dropped = prepared.artifact_dropped
+    control_seed = prepared.control_seed
+    control_draw = prepared.control_draw
     n_matched_control = int(len(control_draw.times))
     cohort_info = {
         **bin_counts,
@@ -1144,6 +1125,173 @@ def run_session(
         non_local_no_swr_modulation,
         matched_control_modulation,
         cohort_info,
+    )
+
+
+class PreparedSession(NamedTuple):
+    """A session prepared for its GLMs: the bins they are fit on and the events.
+
+    What :func:`prepare_session` returns, and what :func:`run_session` fits.
+
+    Attributes
+    ----------
+    results : xarray.Dataset
+        HPC decoding results, on the axis shared with ``position_info``.
+    data : dict
+        :func:`~continuum_swr_replay.data_loaders.load_data`'s output, its
+        ``position_info`` the aligned one and its theta phase NaN inside
+        excluded time.
+    position_info : pd.DataFrame
+        The aligned position frame.
+    alignment_counts : dict
+        What the decode/position alignment dropped.
+    time : NDArray, shape (n_time,)
+        The session's time axis (``position_info``'s index), in seconds.
+    fit_lags : NDArray of int, shape (n_lags,)
+        The lags the kernels are fit over, in samples.
+    excluded : pd.DataFrame
+        The session's excluded intervals.
+    is_immobile, fit_mask : pd.Series of bool, shape (n_time,)
+        The running comparison's mask and the immobility models' mask.
+    bin_counts : dict
+        The fit mask's bin counts.
+    event_times : dict of str to pd.DataFrame
+        The event sets, the matched control (``"matched_control"``) included.
+    event_counts : dict
+        The event counts before and after the restriction.
+    event_provenance : dict
+        Paths and hashes of the canonical event inputs.
+    artifact_dropped : pd.DataFrame
+        The events the analysed-time rule dropped.
+    control_seed : int
+        The matched control's seed.
+    control_draw : MatchedControlDraw
+        The matched control's draw.
+    """
+
+    results: Any
+    data: dict[str, Any]
+    position_info: pd.DataFrame
+    alignment_counts: dict[str, Any]
+    time: NDArray
+    fit_lags: NDArray
+    excluded: pd.DataFrame
+    is_immobile: pd.Series
+    fit_mask: pd.Series
+    bin_counts: dict[str, int]
+    event_times: dict[str, pd.DataFrame]
+    event_counts: dict[str, Any]
+    event_provenance: dict[str, Any]
+    artifact_dropped: pd.DataFrame
+    control_seed: int
+    control_draw: MatchedControlDraw
+
+
+def prepare_session(
+    nwb_file_name: str,
+    epoch_name: str,
+    *,
+    stop_cohort: str = "at_well",
+    cohort_stops: pd.DataFrame | None = None,
+    sampling_frequency: float = SAMPLING_FREQUENCY,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
+    event_set: str = "canonical",
+    logger: logging.Logger | None = None,
+) -> PreparedSession:
+    """Prepare one session as :func:`run_session` fits it.
+
+    In order: the decode and data trimmed to their shared timestamps
+    (:func:`_load_aligned_session`), the fit mask and excluded time
+    (:func:`_session_fit_population`), and the canonical event sets with the
+    matched non-event control drawn on the session's seed
+    (:func:`_session_events`). :func:`run_session` fits what this returns, so a
+    caller that needs a session's fit mask, events or control calls this
+    rather than assembling them again.
+
+    Parameters
+    ----------
+    nwb_file_name, epoch_name : str
+        The session.
+    stop_cohort : str
+        ``"at_well"`` (canonical) or ``"all_stops"``; see :func:`run_session`.
+    cohort_stops : pd.DataFrame, optional
+        The session's kept stops; required unless ``stop_cohort`` is
+        ``"all_stops"``.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    non_local_threshold : float
+        The threshold the canonical events were cut at; selects the cached
+        decode frame the SWR labels are read from.
+    event_set : {"canonical", "with_swr_without_replay"}
+        See :func:`run_session`.
+    logger : logging.Logger, optional
+        Defaults to this module's logger.
+
+    Returns
+    -------
+    PreparedSession
+    """
+    logger = logger or logging.getLogger(__name__)
+    results, data, position_info, alignment_counts = _load_aligned_session(
+        nwb_file_name, epoch_name, logger
+    )
+
+    position_time = position_info.index
+    time = position_time.to_numpy(dtype=float)
+
+    # Fit with wider lag window (±250ms) so spline boundary artifacts
+    # fall outside the reported window (±200ms). The returned modulation
+    # arrays are trimmed to the reporting window after fitting.
+    fit_lags = symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, sampling_frequency)
+
+    data, excluded, is_immobile, fit_mask, bin_counts = _session_fit_population(
+        data,
+        nwb_file_name,
+        epoch_name,
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        logger=logger,
+    )
+
+    (
+        event_times,
+        event_counts,
+        event_provenance,
+        artifact_dropped,
+        control_seed,
+        control_draw,
+    ) = _session_events(
+        data,
+        results,
+        nwb_file_name,
+        epoch_name,
+        time=time,
+        fit_mask=fit_mask,
+        fit_lags=fit_lags,
+        sampling_frequency=sampling_frequency,
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        non_local_threshold=non_local_threshold,
+        logger=logger,
+        event_set=event_set,
+    )
+    return PreparedSession(
+        results=results,
+        data=data,
+        position_info=position_info,
+        alignment_counts=alignment_counts,
+        time=time,
+        fit_lags=fit_lags,
+        excluded=excluded,
+        is_immobile=is_immobile,
+        fit_mask=fit_mask,
+        bin_counts=bin_counts,
+        event_times=event_times,
+        event_counts=event_counts,
+        event_provenance=event_provenance,
+        artifact_dropped=artifact_dropped,
+        control_seed=control_seed,
+        control_draw=control_draw,
     )
 
 
