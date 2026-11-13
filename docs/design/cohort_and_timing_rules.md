@@ -17,7 +17,7 @@ The rungs themselves, in R notation, are in
 ## Shared stop cohort
 
 **The rule.** Every rate and content runner selects its population through one
-function, `analysis.events.cohort_selection.select_stop_cohort` (stop grain) or
+function, `analysis.event_definition.cohort_selection.select_stop_cohort` (stop grain) or
 its sibling `select_event_cohort` (event grain), on the canonical
 `occupancy_state` column:
 
@@ -197,7 +197,7 @@ unit GLM and Stage 6 offer `all_stops`.
 **The PFC path aligns the decode to the position frame first.** It is the only
 consumer that reloads `load_data` alongside a saved decode, and decodes written
 before `get_position_info` was trimmed carry more time bins than `load_data` now
-returns for the same epoch. `analysis.hippocampus.data_aggregation.align_results_to_position`
+returns for the same epoch. `analysis.detection.nonlocal_events.align_results_to_position`
 intersects the two axes on exact timestamps and accepts the result only when the
 mismatch is a head/tail trim within budget (600 s on the results axis, 0.1 s on
 the position axis); interleaved mismatches and drift inside the shared run still

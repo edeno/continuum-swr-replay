@@ -8,7 +8,7 @@ import the package (`continuum_swr_replay`) and read and write under the data ro
 
 **Only `_`-prefixed modules are importable by other scripts.** Shared code belongs in
 the package, or in a `_`-prefixed module beside the scripts that share it
-(`decoding/_decode_runner.py`, `detection/_report.py`, `checks/_report.py`, `checks/_memoryless_reference.py`). A script that is not `_`-prefixed is
+(`decoding/_decode_runner.py`, `detector_comparison/_report.py`, `checks/_report.py`, `checks/_memoryless_reference.py`). A script that is not `_`-prefixed is
 never imported by another script or by `src/`; tests may import any script.
 [`tests/repository/test_no_new_script_imports.py`](../tests/repository/test_no_new_script_imports.py)
 enforces this for scripts, and
@@ -32,26 +32,33 @@ them importable.
 - `_decode_runner.py` — not a script: the flow both decode runners share, imported as `scripts.decoding._decode_runner`.
 - `measure_decoder_quality.py` — each analysed epoch's Local-state decoding error, state fractions and calibration curve, which the events summary reads.
 
-## `detection/` — event detectors and the detection comparison
-- `_report.py` — not a script: what the two detection-comparison reports share, imported as `scripts.detector_comparison._report`.
+## `detection/` — the event detectors (Part 1)
 - `run_artifact_detection.py` — the artifact mask of every epoch's CA1 data (`docs/design/2026-10-09-artifact-detection.md`).
 - `run_swr_detection.py` — the four SWR inventories (Kay, Karlsson, Yu, Zugaro) for every epoch, on shared CA1 inputs.
 - `run_carey_detection.py` — Carey's candidate detector, the fifth SWR definition, for every analysed epoch.
 - `run_memoryless_detection.py` — the Widloski & Foster sliding-window detector on each HPC epoch's saved decode.
+- `sweep_memoryless_detection.py` — injected replays scored by both detectors; writes `paper/reported/inputs/detection/detection_sweep_summary.csv`.
+- `sweep_memoryless_controls.py` — the detectors on activity that is not one clean replay; writes `detection_controls_summary.csv` beside it.
+
+## `detector_comparison/` — the inventories compared (Part 1)
+- `_report.py` — not a script: what the two detection-comparison reports share, imported as `scripts.detector_comparison._report`.
 - `run_inventory_comparison.py` — compares the nine event inventories of each analysed epoch on one substrate.
 - `report_inventory_comparison.py` — the counts of one comparison run, per session and per animal, with figures.
 - `run_event_features.py` — the features of every compared event of the nine inventories.
 - `add_state_shares.py` — adds each compared event's decoder-state shares to an event features run.
 - `report_event_features.py` — the features of one event features run, per session and per animal, with figures.
+- `sweep_memoryless_heldout.py` — held-out content of both detectors on simulated data; writes `detection_heldout_summary.csv` beside the sweep summaries.
+
+## `event_evidence/` — are the events real (Part 2)
 - `run_state_evidence.py` — held-out spike evidence for each decoder state on every canonical HPC decode.
+- `split_state_evidence_by_swr.py` — held-out spike evidence of Non-Local bouts, split by SWR coupling.
 - `analyze_event_spike_evidence.py` — the spike-evidence test that non-SWR non-local events favour their decoded location.
 - `run_event_spike_evidence.sh [NJOBS]` — the run of it the events summary reads, one process per epoch (run it in tmux).
-- `split_state_evidence_by_swr.py` — held-out spike evidence of Non-Local bouts, split by SWR coupling.
+
+## `event_properties/` — what the events are like (Part 2)
 - `measure_ripple_class_structure.py` — do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power.
 - `measure_brain_state_reference.py`, `measure_event_gamma.py`, `measure_event_start_and_rest_theta.py` — each epoch's running and rest reference levels, each event's gamma power, start distance and rest theta.
 - `bootstrap_event_properties.py` — bootstrap of the SWR against non-SWR property contrasts.
-- `sweep_memoryless_detection.py` — injected replays scored by both detectors; writes `paper/reported/inputs/detection/detection_sweep_summary.csv`.
-- `sweep_memoryless_controls.py`, `sweep_memoryless_heldout.py` — the detectors on activity that is not one clean replay, and held-out content; write `detection_{controls,heldout}_summary.csv` beside it.
 
 ## `tables/` — the event, stop and time-bin tables
 - `prepare_replay_content_data.py` — build the canonical replay-content tables (event / event-arm / event-patch / event-sequence / stop).

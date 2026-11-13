@@ -58,7 +58,7 @@ A first version of the rule has been tried on simulated data, where the truth is
 Poisson log-likelihood of the evaluation spikes under a discovery content posterior,
 spike and silence terms apart, against the animal's own position and permuted
 evaluation fields, with a coverage floor. It is implemented as
-`inventory_comparison.heldout` and can be applied to recorded tetrodes unchanged. On the
+`detector_comparison.heldout` and can be applied to recorded tetrodes unchanged. On the
 simulation it supports <!--v:detection.heldout_ours_only_support_fold_c-->87<!--/v-->–<!--v:detection.heldout_ours_only_support_max-->97<!--/v-->%
 of the informative true replays only our detector reported and none of
 <!--v:detection.heldout_placeless_informative_events-->19<!--/v--> informative place-less bursts

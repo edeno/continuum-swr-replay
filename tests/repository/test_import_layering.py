@@ -23,16 +23,24 @@ reported as a plain edge rather than as an ``ImportError`` from a cycle:
 - ``foundation_imports_only_foundation``: a foundation module
   (:data:`FOUNDATION`) imports, from within the package, only other
   foundation modules, and nothing from ``scripts``.
-- ``events_imports_only_foundation``: the analysed-time and event substrate
-  (``analysis.event_definition``) imports, from within the package, only foundation
-  modules, ``analysis.constants``, ``analysis.shared_statistics`` and itself, and
-  nothing from ``scripts``.
-- ``hippocampus_imports_no_behavior`` and
-  ``hippocampus_imports_no_pfc_or_inventory_comparison``: the hippocampus
-  package does not reach into ``behavior``, ``event_tables``,
-  ``replay_models``, ``pfc`` or ``inventory_comparison``. Today several of
-  them import hippocampus, so a back edge is also a cycle; these rules hold
-  hippocampus below them even if one stops importing it.
+- ``event_definition_imports_only_foundation``: the rule
+  (``analysis.event_definition``: analysed time, immobility, the non-local
+  event rule, the canonical SWR source) imports, from within the package, only
+  foundation modules, ``analysis.constants``, ``analysis.shared_statistics``
+  and itself, and nothing from ``scripts``.
+- ``event_packages_import_in_order``: the Part 1 and Part 2 packages
+  (:data:`EVENT_RANK`) import in pipeline order: ``event_definition``, then
+  ``decode_quality``, then ``detection``, then ``event_evidence``, then
+  ``event_properties`` and ``detector_comparison``. A package imports only
+  those of a lower rank, so ``decode_quality`` does not import ``detection``
+  and ``event_properties`` and ``detector_comparison`` do not import each
+  other.
+- ``event_packages_import_no_behavior`` and
+  ``event_packages_import_no_pfc_or_contfrag``: the packages of
+  :data:`EVENT_RANK` above ``event_definition`` do not reach into
+  ``behavior``, ``event_tables``, ``replay_models``, ``pfc`` or ``contfrag``.
+  Several of those import them, so a back edge is also a cycle; these rules
+  hold the event packages below them even if one stops importing them.
 - ``data_flow_packages_import_one_way``: ``analysis.behavior``,
   ``analysis.event_tables`` and ``analysis.replay_models`` import in that
   order (:data:`DATA_FLOW_RANK`): ``behavior`` imports neither of the others,
@@ -51,6 +59,13 @@ reported as a plain edge rather than as an ``ImportError`` from a cycle:
 - ``analysis_and_visualization_import_no_reported``: nothing in ``analysis`` or
   ``visualization`` imports ``reported``; the analysis does not depend on the
   reporting.
+- ``reported_imports_only_foundation_and_analysis``: the summary builders
+  (``reported``) import, from within the package, only foundation modules,
+  ``analysis`` and themselves.
+- ``constants_imports_only_foundation``: ``analysis.constants`` imports, from
+  within the package, only foundation modules.
+- ``shared_statistics_imports_nothing_from_the_package``:
+  ``analysis.shared_statistics`` imports no module of the package.
 - ``no_package_cycles``: the package graph is acyclic.
 
 Imports inside functions count: a function-local import is how a cycle is
@@ -73,9 +88,20 @@ from tests.support._imports import (
 )
 
 #: Package nodes, besides the foundation, that ``analysis.event_definition`` may import.
-EVENTS_MAY_IMPORT = frozenset(
+EVENT_DEFINITION_MAY_IMPORT = frozenset(
     {"analysis.event_definition", "analysis.constants", "analysis.shared_statistics"}
 )
+
+#: The Part 1 and Part 2 packages, ranked in pipeline order: one imports only
+#: those of a lower rank.
+EVENT_RANK = {
+    "analysis.event_definition": 0,
+    "analysis.decode_quality": 1,
+    "analysis.detection": 2,
+    "analysis.event_evidence": 3,
+    "analysis.event_properties": 4,
+    "analysis.detector_comparison": 4,
+}
 
 #: The three data-flow packages, ranked: one imports only those of a lower rank.
 DATA_FLOW_RANK = {
@@ -177,23 +203,30 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
             for a, b in edges
             if package_of(a) in FOUNDATION and outside(b, FOUNDATION)
         },
-        "events_imports_only_foundation": {
+        "event_definition_imports_only_foundation": {
             (a, b)
             for a, b in edges
             if package_of(a) == "analysis.event_definition"
-            and outside(b, FOUNDATION | EVENTS_MAY_IMPORT)
+            and outside(b, FOUNDATION | EVENT_DEFINITION_MAY_IMPORT)
         },
-        "hippocampus_imports_no_behavior": {
+        "event_packages_import_in_order": {
             (a, b)
             for a, b in edges
-            if _starts_with(a, "analysis.hippocampus")
-            and _starts_with(b, *DATA_FLOW_RANK)
+            if (pa := package_of(a)) in EVENT_RANK
+            and (pb := package_of(b)) in EVENT_RANK
+            and pa != pb
+            and EVENT_RANK[pb] >= EVENT_RANK[pa]
         },
-        "hippocampus_imports_no_pfc_or_inventory_comparison": {
+        "event_packages_import_no_behavior": {
             (a, b)
             for a, b in edges
-            if _starts_with(a, "analysis.hippocampus")
-            and _starts_with(b, "analysis.pfc", "analysis.detector_comparison")
+            if EVENT_RANK.get(package_of(a), 0) > 0 and _starts_with(b, *DATA_FLOW_RANK)
+        },
+        "event_packages_import_no_pfc_or_contfrag": {
+            (a, b)
+            for a, b in edges
+            if EVENT_RANK.get(package_of(a), 0) > 0
+            and _starts_with(b, "analysis.pfc", "analysis.contfrag")
         },
         "data_flow_packages_import_one_way": {
             (a, b)
@@ -226,6 +259,21 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
             if _starts_with(a, "analysis", "visualization")
             and _starts_with(b, "reported")
         },
+        "reported_imports_only_foundation_and_analysis": {
+            (a, b)
+            for a, b in edges
+            if _starts_with(a, "reported")
+            and outside(b, FOUNDATION)
+            and not _starts_with(b, "analysis", "reported")
+        },
+        "constants_imports_only_foundation": {
+            (a, b)
+            for a, b in edges
+            if a == "analysis.constants" and outside(b, FOUNDATION)
+        },
+        "shared_statistics_imports_nothing_from_the_package": {
+            (a, b) for a, b in edges if a == "analysis.shared_statistics" and b in index
+        },
         "no_package_cycles": _cycle_edges(package_graph(root)),
     }
 
@@ -238,7 +286,12 @@ def test_the_graph_is_not_vacuous() -> None:
     graph = package_graph()
     for node in (
         "analysis.event_definition",
-        "analysis.hippocampus",
+        "analysis.decode_quality",
+        "analysis.detection",
+        "analysis.event_evidence",
+        "analysis.event_properties",
+        "analysis.detector_comparison",
+        "reported",
         "analysis.behavior",
         "analysis.event_tables",
         "analysis.replay_models",
@@ -248,7 +301,11 @@ def test_the_graph_is_not_vacuous() -> None:
         assert node in graph, f"{node} missing from the package graph"
     assert "analysis.behavior.covariates" in module_index(SRC)
     assert "analysis.replay_models.model_specs" in module_index(SRC)
-    assert "analysis.hippocampus" in graph["analysis.event_tables"]
+    assert "analysis.detection" in graph["analysis.event_tables"]
+    assert "analysis.decode_quality" in graph["analysis.detection"]
+    assert "analysis.detection" in graph["analysis.event_evidence"]
+    assert "analysis.event_evidence" in graph["analysis.event_properties"]
+    assert "analysis.event_evidence" in graph["analysis.detector_comparison"]
     assert "analysis.behavior" in graph["analysis.event_tables"]
     assert "analysis.event_tables" in graph["analysis.replay_models"]
     assert set(FOUNDATION) <= set(graph), sorted(set(FOUNDATION) - set(graph))
@@ -343,34 +400,34 @@ def test_a_longer_cycle_is_reported_in_import_order(tmp_path: Path) -> None:
     }
 
 
-def test_events_rule_allows_only_foundation_constants_and_itself(
+def test_event_definition_rule_allows_only_foundation_constants_and_itself(
     tmp_path: Path,
 ) -> None:
     """An ``analysis.event_definition`` module may import the foundation,
     ``analysis.constants`` and its own package; a function-local import of
     an analysis package, or of ``scripts``, is a violation."""
     root = tmp_path / "continuum_swr_replay"
-    for package in ("analysis/event_definition", "analysis/hippocampus"):
+    for package in ("analysis/event_definition", "analysis/detection"):
         (root / package).mkdir(parents=True)
         (root / package / "__init__.py").write_text("")
     (root / "__init__.py").write_text("")
     (root / "analysis" / "__init__.py").write_text("")
     (root / "analysis" / "constants.py").write_text("")
     (root / "intervals.py").write_text("")
-    (root / "analysis" / "hippocampus" / "h.py").write_text("")
-    (root / "analysis" / "events" / "other.py").write_text("")
-    (root / "analysis" / "events" / "e.py").write_text(
+    (root / "analysis" / "detection" / "h.py").write_text("")
+    (root / "analysis" / "event_definition" / "other.py").write_text("")
+    (root / "analysis" / "event_definition" / "e.py").write_text(
         "from continuum_swr_replay import intervals\n"
         "from ..constants import X\n"
         "from .other import Y\n"
         "import numpy\n"
         "def f():\n"
-        "    from ..hippocampus import h\n"
+        "    from ..detection import h\n"
         "    import scripts.qa.tool\n"
     )
 
-    assert rule_violations(root)["events_imports_only_foundation"] == {
-        ("analysis.event_definition.e", "analysis.hippocampus.h"),
+    assert rule_violations(root)["event_definition_imports_only_foundation"] == {
+        ("analysis.event_definition.e", "analysis.detection.h"),
         ("analysis.event_definition.e", "scripts.qa.tool"),
     }
 
@@ -466,4 +523,89 @@ def test_data_flow_and_reporting_rules_see_a_planted_import(tmp_path: Path) -> N
     assert found["analysis_and_visualization_import_no_reported"] == {
         ("analysis.shared", "reported.values"),
         ("visualization.v", "reported.values"),
+    }
+
+
+def test_event_rank_and_leaf_rules_see_a_planted_import(tmp_path: Path) -> None:
+    """Each pipeline-order and leaf rule reports the import it forbids.
+
+    Forbidden: ``decode_quality`` importing ``detection``, ``event_properties``
+    importing ``detector_comparison``, ``detection`` importing ``event_tables``
+    and ``pfc``, ``reported`` importing ``visualization``,
+    ``analysis.constants`` importing ``analysis.shared_statistics``, and
+    ``analysis.shared_statistics`` importing ``intervals``. Allowed, so not
+    reported: ``detection`` importing ``decode_quality``, ``event_properties``
+    importing ``event_evidence``, ``reported`` importing ``analysis``, and
+    ``analysis.constants`` importing ``parameters``.
+    """
+    root = tmp_path / "continuum_swr_replay"
+    analysis = root / "analysis"
+    packages = (
+        "decode_quality",
+        "detection",
+        "event_evidence",
+        "event_properties",
+        "detector_comparison",
+        "event_tables",
+        "pfc",
+    )
+    for package in packages:
+        (analysis / package).mkdir(parents=True)
+        (analysis / package / "__init__.py").write_text("")
+    for package in (root / "reported", root / "visualization"):
+        package.mkdir()
+        (package / "__init__.py").write_text("")
+    for init in (root, analysis):
+        (init / "__init__.py").write_text("")
+    base = "continuum_swr_replay.analysis"
+    (root / "parameters.py").write_text("")
+    (root / "intervals.py").write_text("")
+    (root / "visualization" / "v.py").write_text("")
+    (analysis / "event_tables" / "t.py").write_text("")
+    (analysis / "pfc" / "p.py").write_text("")
+    (analysis / "detector_comparison" / "c.py").write_text("")
+    (analysis / "event_evidence" / "e.py").write_text("")
+    (analysis / "decode_quality" / "q.py").write_text(
+        f"from {base}.detection import d\n"
+    )
+    (analysis / "detection" / "d.py").write_text(
+        f"from {base}.decode_quality import q\n"
+        f"from {base}.event_tables import t\n"
+        "def f():\n    from ..pfc import p\n"
+    )
+    (analysis / "event_properties" / "x.py").write_text(
+        f"from {base}.event_evidence import e\n"
+        f"from {base}.detector_comparison import c\n"
+    )
+    (analysis / "constants.py").write_text(
+        "from continuum_swr_replay import parameters\n"
+        "from continuum_swr_replay.analysis import shared_statistics\n"
+    )
+    (analysis / "shared_statistics.py").write_text(
+        "from continuum_swr_replay import intervals\n"
+    )
+    (root / "reported" / "r.py").write_text(
+        f"from {base}.detection import d\n"
+        "from continuum_swr_replay.visualization import v\n"
+    )
+
+    found = rule_violations(root)
+    assert found["event_packages_import_in_order"] == {
+        ("analysis.decode_quality.q", "analysis.detection.d"),
+        ("analysis.event_properties.x", "analysis.detector_comparison.c"),
+    }
+    assert found["event_packages_import_no_behavior"] == {
+        ("analysis.detection.d", "analysis.event_tables.t"),
+    }
+    assert found["event_packages_import_no_pfc_or_contfrag"] == {
+        ("analysis.detection.d", "analysis.pfc.p"),
+    }
+    assert found["reported_imports_only_foundation_and_analysis"] == {
+        ("reported.r", "visualization.v"),
+    }
+    assert found["constants_imports_only_foundation"] == {
+        ("analysis.constants", "analysis.shared_statistics"),
+    }
+    assert found["shared_statistics_imports_nothing_from_the_package"] == {
+        ("analysis.shared_statistics", "intervals"),
     }

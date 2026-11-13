@@ -28,6 +28,186 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 `peri_switch_index`, `add_experienced_value_columns`, `add_beta_belief_entropy`, `canonicalize_behavior_model_columns`, `assign_stops_to_trials`, `prepare_model_values`, `build_animal`, `stop_mapping_agreement`, `require_complete_mapping`, `standardize_qvals_table`, `write_qvals_outputs`
 
+### `src/continuum_swr_replay/analysis/decode_quality/hpc_raw_stats.py`
+
+Raw-data quality statistics for hippocampal clusterless decoding.
+
+`extract_discrete_transition_matrix`, `compute_hpc_raw_stats_single`, `check_transition_matrix_flags`, `apply_raw_stats_flags`
+
+### `src/continuum_swr_replay/analysis/decode_quality/posterior_analysis.py`
+
+Analysis of decoded posterior distributions.
+
+`get_conditional_non_local_posterior`, `load_conditional_posterior`, `get_map_step_distance`, `step_distance_from_nodes`, `map_estimate_to_map_nodes`, `track_distance_cm`, `normalized_replay_position_by_swr`, `get_map_speed`, `get_posterior_stats`
+
+### `src/continuum_swr_replay/analysis/decode_quality/quality_metrics.py`
+
+Quality metrics for hippocampal decoding analysis.
+
+`compute_local_decoding_error`, `local_decoding_error_statistics`, `compute_state_fraction_during_movement`, `compute_non_local_during_movement`, `compute_behavior_state_breakdown`, `compute_bout_nonlocal_dominance`, `compute_running_error_tail`, `compute_error_by_track_segment`, `compute_no_spike_firing_correspondence`, `compute_non_local_event_context`, `compute_local_state_collapse_details`, `compute_calibration_curve`, `calibration_curve_statistics`, `session_state_fractions`, `state_fraction_statistics`, `session_decoder_quality`, `compute_session_quality_summary`
+
+### `src/continuum_swr_replay/analysis/detection/artifacts/detect.py`
+
+The artifact detector: its constants and its four rules.
+
+`detector_constants`, `s_cores`, `t_ref_events`, `t_ca1_threshold`, `t_ca1_events`, `t_spk_events`, `t_cores`, `spike_ood`, `detect_artifacts`
+
+### `src/continuum_swr_replay/analysis/detection/artifacts/features.py`
+
+The artifact detector's features: S window spectra, J5 and L20 steps, spike lines.
+
+`robust_scale`, `window_valid`, `window_centers`, `window_band_power`, `channel_specificity`, `level_jump`, `level_shift`, `robust_jump`, `reference_jump`, `persistent_step_count`, `nearest_mark_distance`, `spike_lines`
+
+### `src/continuum_swr_replay/analysis/detection/detection_inputs.py`
+
+What the replay detection runners read from a saved HPC decode and from each other.
+
+`position_span_samples`, `marks_cache_dir`, `input_paths`, `marks_cache_path`, `load_marks`, `marks_sha256`, `decode_marks`, `carey_output_paths`, `memoryless_output_paths`
+
+### `src/continuum_swr_replay/analysis/detection/nonlocal_events.py`
+
+The paper's non-local event detector applied to a decode, on one time-indexed frame.
+
+`theta_power_zscore`, `validate_required_session_data_keys`, `validate_results_position_time_alignment`, `align_results_to_position`, `validate_dot_event_contract`, `get_data_over_time`, `load_data_over_time`, `get_event_types`, `compute_swr_nl_event_counts`
+
+### `src/continuum_swr_replay/analysis/detection/ripple_tetrodes.py`
+
+Rule R-T: per epoch, keep the CA1 band tetrodes that ripple with the rest.
+
+`TetrodeSelection`, `TetrodeSelectionError`, `check_one_channel_per_tetrode`, `select_ripple_tetrodes`
+
+### `src/continuum_swr_replay/analysis/event_definition/analysed_time.py`
+
+The analysed-time read point: a decode frame held to the one analysed-time rule.
+
+`stamp_swr_source`, `require_swr_source`, `read_swr_table`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot_with_swr_source`, `analysed_bins`, `immobile_analysed_bins`, `swr_intervals`
+
+### `src/continuum_swr_replay/analysis/event_definition/artifact_intervals.py`
+
+The artifact run folder: one cores file per epoch, and the run's manifest.
+
+`ArtifactRunError`, `EpochCores`, `cores_path`, `empty_cores`, `make_cores`, `validate_cores`, `write_cores`, `read_manifest`, `read_epoch_cores`, `epoch_artifact_intervals`
+
+### `src/continuum_swr_replay/analysis/event_definition/artifact_masks.py`
+
+The artifact mask: the detector's cores, padded from one table.
+
+`core_class`, `artifact_intervals`
+
+### `src/continuum_swr_replay/analysis/event_definition/classified_table.py`
+
+Canonical per-non-local-event classification table.
+
+`match_swr`, `build_classified_nonlocal_event_table`, `assert_drawn_class_matches_ripples`
+
+### `src/continuum_swr_replay/analysis/event_definition/cohort_selection.py`
+
+Shared whole-unit complete-case cohort selection.
+
+`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`
+
+### `src/continuum_swr_replay/analysis/event_definition/decode_masks.py`
+
+The HPC decode's masks, from the paper's SWR source.
+
+`require_hpc_decode_sources`, `require_saved_decode_masks`, `hpc_artifact_intervals`, `hpc_ripple_power_inputs`, `HpcDecodeMasks`, `hpc_decode_masks`
+
+### `src/continuum_swr_replay/analysis/event_definition/eligibility.py`
+
+One analysed-time rule for every event cohort, exposure, bin and window.
+
+`DropReason`, `excluded_time`, `artifact_drop_reasons`, `overlaps_dropped_events`, `event_drop_reasons`, `label_drop_reasons`, `drop_labels`
+
+### `src/continuum_swr_replay/analysis/event_definition/epoch_normalizers.py`
+
+An epoch's run-speed baseline, shared by the decoders and the read path.
+
+`run_speed_baseline`
+
+### `src/continuum_swr_replay/analysis/event_definition/gallery_sample.py`
+
+The event gallery's sample: each event's category and ambiguity, and the draw.
+
+`event_catalog`, `stratified_sample`, `group_seed`, `select_events`
+
+### `src/continuum_swr_replay/analysis/event_definition/immobility.py`
+
+Canonical whole-event immobility rules for neural event cohorts.
+
+`EventDefinitionError`, `require_time_index`, `require_canonical_speed_threshold`, `event_speeds_are_immobile`, `whole_event_immobility_mask`, `filter_event_labels_by_speed`, `validate_whole_event_immobility_contract`, `validate_nonlocal_event_probability_contract`, `filter_event_intervals_by_speed`, `intervals_from_labels`, `build_speed_eligible_event_cohort`
+
+### `src/continuum_swr_replay/analysis/event_definition/nonlocal_event_rule.py`
+
+The non-local event rule and the SWR-overlap classification of those events.
+
+`get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `nonlocal_event_bins_by_swr`, `get_overlap_times`, `classify_swr_overlap`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
+
+### `src/continuum_swr_replay/analysis/event_definition/swr_source.py`
+
+The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
+
+`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `swr_epoch_id`, `swr_inventory_paths`, `inventory_manifest`, `swr_epoch_id_of_session`, `swr_source_files`, `swr_inventory_record`, `ripple_power_inputs`, `read_observed`, `artifact_intervals`, `EpochSource`, `epoch_source`, `read_swr_inventory`, `classify`, `swr_events`
+
+### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
+
+Spike evidence of non-local events: does the prior-excluded spike likelihood favour the decoded location over the animal's?
+
+`build_session_events`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `event_metrics`
+
+### `src/continuum_swr_replay/analysis/event_properties/brain_state_reference.py`
+
+Theta, ripple and MUA levels of running and of quiet rest, the references for an event's.
+
+`regime_masks`, `matched_window_means`, `brain_state_reference`
+
+### `src/continuum_swr_replay/analysis/event_properties/class_or_continuum.py`
+
+One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
+
+`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
+
+### `src/continuum_swr_replay/analysis/event_properties/content_occupancy.py`
+
+Where non-local content sits: each content time bin's track distance to the animal and to the nearest reward well.
+
+`well_positions`, `content_distances`
+
+### `src/continuum_swr_replay/analysis/event_properties/event_analysis.py`
+
+Analysis functions for manipulating and characterizing detected events.
+
+`get_immobile_events`, `get_event_start_end_times`, `get_event_durations_ms`
+
+### `src/continuum_swr_replay/analysis/event_properties/event_statistics.py`
+
+Summary statistics of the immobile non-local events.
+
+`compute_swr_overlap_class_counts`, `overlap_class_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
+
+### `src/continuum_swr_replay/analysis/event_properties/gamma_power.py`
+
+Slow- and fast-gamma power of CA1 on the decode grid: z-scored per epoch, and its change against quiet rest in dB (``power_change_db``).
+
+`band_power`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`, `epoch_gamma`
+
+### `src/continuum_swr_replay/analysis/event_properties/property_contrast.py`
+
+Uncertainty of the SWR against non-SWR property contrasts: a nested bootstrap.
+
+`duration_strata`, `matched_difference`, `bootstrap_contrasts`, `bootstrap_intervals`
+
+### `src/continuum_swr_replay/analysis/event_properties/start_and_rest_theta.py`
+
+Each non-local event's start distance, and the theta of duration-matched quiet rest.
+
+`start_and_rest_theta`
+
+### `src/continuum_swr_replay/analysis/event_properties/triggered_analysis.py`
+
+Event-triggered analysis: signal windows around events, and their averages.
+
+`get_signal_windows`, `compute_triggered_average_curves`
+
 ### `src/continuum_swr_replay/analysis/event_tables/_common.py`
 
 Shared parts of the per-grain table builders.
@@ -81,192 +261,6 @@ Scientific table contracts beyond the generic covariate schema stamp.
 Within-stop time-binned tables (Part B).
 
 `build_event_onset_table`, `build_stop_timebin_table`, `concat_session_timebin_tables`
-
-### `src/continuum_swr_replay/analysis/events/analysed_time.py`
-
-The analysed-time read point: a decode frame held to the one analysed-time rule.
-
-`stamp_swr_source`, `require_swr_source`, `read_swr_table`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot_with_swr_source`, `analysed_bins`, `immobile_analysed_bins`, `swr_intervals`
-
-### `src/continuum_swr_replay/analysis/events/artifact_intervals.py`
-
-The artifact run folder: one cores file per epoch, and the run's manifest.
-
-`ArtifactRunError`, `EpochCores`, `cores_path`, `empty_cores`, `make_cores`, `validate_cores`, `write_cores`, `read_manifest`, `read_epoch_cores`, `epoch_artifact_intervals`
-
-### `src/continuum_swr_replay/analysis/events/artifact_masks.py`
-
-The artifact mask: the detector's cores, padded from one table.
-
-`core_class`, `artifact_intervals`
-
-### `src/continuum_swr_replay/analysis/events/classified_table.py`
-
-Canonical per-non-local-event classification table.
-
-`match_swr`, `build_classified_nonlocal_event_table`, `assert_drawn_class_matches_ripples`
-
-### `src/continuum_swr_replay/analysis/events/cohort_selection.py`
-
-Shared whole-unit complete-case cohort selection.
-
-`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`
-
-### `src/continuum_swr_replay/analysis/events/eligibility.py`
-
-One analysed-time rule for every event cohort, exposure, bin and window.
-
-`DropReason`, `excluded_time`, `artifact_drop_reasons`, `overlaps_dropped_events`, `event_drop_reasons`, `label_drop_reasons`, `drop_labels`
-
-### `src/continuum_swr_replay/analysis/events/epoch_normalizers.py`
-
-An epoch's run-speed baseline, shared by the decoders and the read path.
-
-`run_speed_baseline`
-
-### `src/continuum_swr_replay/analysis/events/gallery_sample.py`
-
-The event gallery's sample: each event's category and ambiguity, and the draw.
-
-`event_catalog`, `stratified_sample`, `group_seed`, `select_events`
-
-### `src/continuum_swr_replay/analysis/events/immobility.py`
-
-Canonical whole-event immobility rules for neural event cohorts.
-
-`EventDefinitionError`, `require_time_index`, `require_canonical_speed_threshold`, `event_speeds_are_immobile`, `whole_event_immobility_mask`, `filter_event_labels_by_speed`, `validate_whole_event_immobility_contract`, `validate_nonlocal_event_probability_contract`, `filter_event_intervals_by_speed`, `intervals_from_labels`, `build_speed_eligible_event_cohort`
-
-### `src/continuum_swr_replay/analysis/events/nonlocal_detection.py`
-
-Non-local event detection and the SWR-overlap classification of those events.
-
-`get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `nonlocal_event_bins_by_swr`, `get_overlap_times`, `classify_swr_overlap`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
-
-### `src/continuum_swr_replay/analysis/events/swr_source.py`
-
-The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
-
-`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `swr_epoch_id`, `swr_inventory_paths`, `inventory_manifest`, `swr_epoch_id_of_session`, `swr_source_files`, `swr_inventory_record`, `ripple_power_inputs`, `read_observed`, `artifact_intervals`, `EpochSource`, `epoch_source`, `read_swr_inventory`, `classify`, `swr_events`
-
-### `src/continuum_swr_replay/analysis/hippocampus/artifacts/detect.py`
-
-The artifact detector: its constants and its four rules.
-
-`detector_constants`, `s_cores`, `t_ref_events`, `t_ca1_threshold`, `t_ca1_events`, `t_spk_events`, `t_cores`, `spike_ood`, `detect_artifacts`
-
-### `src/continuum_swr_replay/analysis/hippocampus/artifacts/features.py`
-
-The artifact detector's features: S window spectra, J5 and L20 steps, spike lines.
-
-`robust_scale`, `window_valid`, `window_centers`, `window_band_power`, `channel_specificity`, `level_jump`, `level_shift`, `robust_jump`, `reference_jump`, `persistent_step_count`, `nearest_mark_distance`, `spike_lines`
-
-### `src/continuum_swr_replay/analysis/hippocampus/brain_state_reference.py`
-
-Theta, ripple and MUA levels of running and of quiet rest, the references for an event's.
-
-`regime_masks`, `matched_window_means`, `brain_state_reference`
-
-### `src/continuum_swr_replay/analysis/hippocampus/class_or_continuum.py`
-
-One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
-
-`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
-
-### `src/continuum_swr_replay/analysis/hippocampus/content_occupancy.py`
-
-Where non-local content sits: each content time bin's track distance to the animal and to the nearest reward well.
-
-`well_positions`, `content_distances`
-
-### `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py`
-
-Aggregation of analysis results over time.
-
-`theta_power_zscore`, `validate_required_session_data_keys`, `validate_results_position_time_alignment`, `align_results_to_position`, `validate_dot_event_contract`, `get_data_over_time`, `load_data_over_time`, `get_event_types`, `compute_swr_nl_event_counts`
-
-### `src/continuum_swr_replay/analysis/hippocampus/decode_masks.py`
-
-The HPC decode's masks, from the paper's SWR source.
-
-`require_hpc_decode_sources`, `require_saved_decode_masks`, `hpc_artifact_intervals`, `hpc_ripple_power_inputs`, `HpcDecodeMasks`, `hpc_decode_masks`
-
-### `src/continuum_swr_replay/analysis/hippocampus/detection_inputs.py`
-
-What the replay detection runners read from a saved HPC decode and from each other.
-
-`position_span_samples`, `marks_cache_dir`, `input_paths`, `marks_cache_path`, `load_marks`, `marks_sha256`, `decode_marks`, `carey_output_paths`, `memoryless_output_paths`
-
-### `src/continuum_swr_replay/analysis/hippocampus/event_analysis.py`
-
-Analysis functions for manipulating and characterizing detected events.
-
-`get_immobile_events`, `get_event_start_end_times`, `get_event_durations_ms`
-
-### `src/continuum_swr_replay/analysis/hippocampus/event_statistics.py`
-
-Summary statistics of the immobile non-local events.
-
-`compute_swr_overlap_class_counts`, `overlap_class_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
-
-### `src/continuum_swr_replay/analysis/hippocampus/gamma_power.py`
-
-Slow- and fast-gamma power of CA1 on the decode grid: z-scored per epoch, and its change against quiet rest in dB (``power_change_db``).
-
-`band_power`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`, `epoch_gamma`
-
-### `src/continuum_swr_replay/analysis/hippocampus/hpc_raw_stats.py`
-
-Raw-data quality statistics for hippocampal clusterless decoding.
-
-`extract_discrete_transition_matrix`, `compute_hpc_raw_stats_single`, `check_transition_matrix_flags`, `apply_raw_stats_flags`
-
-### `src/continuum_swr_replay/analysis/hippocampus/posterior_analysis.py`
-
-Analysis of decoded posterior distributions.
-
-`get_conditional_non_local_posterior`, `load_conditional_posterior`, `get_map_step_distance`, `step_distance_from_nodes`, `map_estimate_to_map_nodes`, `track_distance_cm`, `normalized_replay_position_by_swr`, `get_map_speed`, `get_posterior_stats`
-
-### `src/continuum_swr_replay/analysis/hippocampus/property_contrast.py`
-
-Uncertainty of the SWR against non-SWR property contrasts: a nested bootstrap.
-
-`duration_strata`, `matched_difference`, `bootstrap_contrasts`, `bootstrap_intervals`
-
-### `src/continuum_swr_replay/analysis/hippocampus/quality_metrics.py`
-
-Quality metrics for hippocampal decoding analysis.
-
-`compute_local_decoding_error`, `local_decoding_error_statistics`, `compute_state_fraction_during_movement`, `compute_non_local_during_movement`, `compute_behavior_state_breakdown`, `compute_bout_nonlocal_dominance`, `compute_running_error_tail`, `compute_error_by_track_segment`, `compute_no_spike_firing_correspondence`, `compute_non_local_event_context`, `compute_local_state_collapse_details`, `compute_calibration_curve`, `calibration_curve_statistics`, `session_state_fractions`, `state_fraction_statistics`, `session_decoder_quality`, `compute_session_quality_summary`
-
-### `src/continuum_swr_replay/analysis/hippocampus/result_loading.py`
-
-Loading and managing saved decoding results.
-
-`load_results`
-
-### `src/continuum_swr_replay/analysis/hippocampus/ripple_tetrodes.py`
-
-Rule R-T: per epoch, keep the CA1 band tetrodes that ripple with the rest.
-
-`TetrodeSelection`, `TetrodeSelectionError`, `check_one_channel_per_tetrode`, `select_ripple_tetrodes`
-
-### `src/continuum_swr_replay/analysis/hippocampus/spike_evidence.py`
-
-Spike evidence of non-local events: does the prior-excluded spike likelihood favour the decoded location over the animal's?
-
-`build_session_events`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `event_metrics`
-
-### `src/continuum_swr_replay/analysis/hippocampus/start_and_rest_theta.py`
-
-Each non-local event's start distance, and the theta of duration-matched quiet rest.
-
-`start_and_rest_theta`
-
-### `src/continuum_swr_replay/analysis/hippocampus/triggered_analysis.py`
-
-Event-triggered analysis: signal windows around events, and their averages.
-
-`get_signal_windows`, `compute_triggered_average_curves`
 
 ### `src/continuum_swr_replay/tables/event_ids.py`
 
@@ -772,101 +766,101 @@ Generate the symbol-anchored regression pipeline code map.
 
 `render`, `main`
 
-### `scripts/detection/_report.py`
-
-What the two detection-comparison reports share.
-
-`caption_with_pending`, `read_run`, `with_pending`, `per_session`
-
-### `scripts/detection/add_state_shares.py`
-
-Add each compared event's Local, No-Spike, non-local and uncertain shares to an event features run.
-
-`shares_path`, `epoch_state_shares`, `main`
-
-### `scripts/detection/analyze_event_spike_evidence.py`
-
-Spike-evidence reality analysis for non-SWR non-local events.
-
-`find_sessions`, `load_marks`, `events_with_map_in_left_out_bins`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
-
-### `scripts/detection/bootstrap_event_properties.py`
-
-Bootstrap the SWR against non-SWR property contrasts: class medians, their difference, and the duration-matched difference.
-
-`load_events`, `main`
-
-### `scripts/detection/measure_brain_state_reference.py`
-
-Measure each epoch's theta, ripple and MUA levels during running and during quiet rest.
-
-`main`
-
-### `scripts/detection/measure_event_gamma.py`
-
-Measure slow- and fast-gamma power during each non-local event, and during running and quiet rest.
-
-`out_dir`, `epoch_gamma`, `epochs_to_measure`, `main`
-
-### `scripts/detection/measure_event_start_and_rest_theta.py`
-
-Measure each event's start distance and the theta-like share of duration-matched quiet rest.
-
-`measure_epoch`, `main`
-
-### `scripts/detection/measure_ripple_class_structure.py`
-
-One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
-
-`out_dir`, `measure_epoch`, `epoch_identifier`, `run_measure`, `load_events`, `distribution_simulation`, `plot_distributions`, `step_simulation`, `plot_property`, `spot_check_events`, `plot_spot_checks`, `run_analyze`, `main`
-
-### `scripts/detection/report_event_features.py`
-
-Report one event features run: its features per session and per animal.
-
-`distribution`, `epoch_status`, `context_by_session`, `feature_tables`, `missing_by_session`, `never_missing`, `with_spikes_per_row`, `evidence_coverage_by_session`, `rejection_by_session`, `rejection_by_animal`, `memoryless_cohort_by_session`, `comparator_only_events`, `comparator_only_table`, `stratum_labels`, `report_tables`, `draw_figures`, `write_report`, `main`
-
-### `scripts/detection/report_inventory_comparison.py`
-
-Report one inventory comparison run: its counts per session and per animal.
-
-`epoch_status`, `oriented_pairs`, `match_strength_by_session`, `match_strength_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
-
-### `scripts/detection/run_event_features.py`
-
-Event features of every compared event, one epoch per task.
-
-`memoryless_input_mismatch`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
-
-### `scripts/detection/run_inventory_comparison.py`
-
-Compare the replay-detection inventories, one epoch at a time.
-
-`bounds_mismatch`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
-
-### `scripts/detection/run_state_evidence.py`
-
-Held-out spike evidence for each decoder state, on every canonical HPC decode.
-
-`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `refit_encoding`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
-
-### `scripts/detection/split_state_evidence_by_swr.py`
-
-Held-out spike evidence of Non-Local bouts, split by SWR coupling.
-
-`label_epoch`, `main`
-
 ### `scripts/detection/sweep_memoryless_controls.py`
 
 What each detector does with activity that is not one clean replay.
 
 `main`
 
-### `scripts/detection/sweep_memoryless_heldout.py`
+### `scripts/detector_comparison/_report.py`
+
+What the two detection-comparison reports share.
+
+`caption_with_pending`, `read_run`, `with_pending`, `per_session`
+
+### `scripts/detector_comparison/add_state_shares.py`
+
+Add each compared event's Local, No-Spike, non-local and uncertain shares to an event features run.
+
+`shares_path`, `epoch_state_shares`, `main`
+
+### `scripts/detector_comparison/report_event_features.py`
+
+Report one event features run: its features per session and per animal.
+
+`distribution`, `epoch_status`, `context_by_session`, `feature_tables`, `missing_by_session`, `never_missing`, `with_spikes_per_row`, `evidence_coverage_by_session`, `rejection_by_session`, `rejection_by_animal`, `memoryless_cohort_by_session`, `comparator_only_events`, `comparator_only_table`, `stratum_labels`, `report_tables`, `draw_figures`, `write_report`, `main`
+
+### `scripts/detector_comparison/report_inventory_comparison.py`
+
+Report one inventory comparison run: its counts per session and per animal.
+
+`epoch_status`, `oriented_pairs`, `match_strength_by_session`, `match_strength_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
+
+### `scripts/detector_comparison/run_event_features.py`
+
+Event features of every compared event, one epoch per task.
+
+`memoryless_input_mismatch`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+
+### `scripts/detector_comparison/run_inventory_comparison.py`
+
+Compare the replay-detection inventories, one epoch at a time.
+
+`bounds_mismatch`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+
+### `scripts/detector_comparison/sweep_memoryless_heldout.py`
 
 Does each detector's content reproduce in cells it never saw?
 
 `main`
+
+### `scripts/event_evidence/analyze_event_spike_evidence.py`
+
+Spike-evidence reality analysis for non-SWR non-local events.
+
+`find_sessions`, `load_marks`, `events_with_map_in_left_out_bins`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
+
+### `scripts/event_evidence/run_state_evidence.py`
+
+Held-out spike evidence for each decoder state, on every canonical HPC decode.
+
+`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `refit_encoding`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
+
+### `scripts/event_evidence/split_state_evidence_by_swr.py`
+
+Held-out spike evidence of Non-Local bouts, split by SWR coupling.
+
+`label_epoch`, `main`
+
+### `scripts/event_properties/bootstrap_event_properties.py`
+
+Bootstrap the SWR against non-SWR property contrasts: class medians, their difference, and the duration-matched difference.
+
+`load_events`, `main`
+
+### `scripts/event_properties/measure_brain_state_reference.py`
+
+Measure each epoch's theta, ripple and MUA levels during running and during quiet rest.
+
+`main`
+
+### `scripts/event_properties/measure_event_gamma.py`
+
+Measure slow- and fast-gamma power during each non-local event, and during running and quiet rest.
+
+`out_dir`, `epoch_gamma`, `epochs_to_measure`, `main`
+
+### `scripts/event_properties/measure_event_start_and_rest_theta.py`
+
+Measure each event's start distance and the theta-like share of duration-matched quiet rest.
+
+`measure_epoch`, `main`
+
+### `scripts/event_properties/measure_ripple_class_structure.py`
+
+One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
+
+`out_dir`, `measure_epoch`, `epoch_identifier`, `run_measure`, `load_events`, `distribution_simulation`, `plot_distributions`, `step_simulation`, `plot_property`, `spot_check_events`, `plot_spot_checks`, `run_analyze`, `main`
 
 ### `scripts/pfc/calibrate_pfc_kernel_timing.py`
 
@@ -958,31 +952,31 @@ Rerun the CPU model fits and the figures that read them, in dependency order.
 
 `Run`, `select`, `missing_prerequisites`, `run_env`, `schedule`, `sidecar_times`, `written_artifacts`, `fit_roots`, `check_provenance`, `print_plan`, `main`
 
-### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/evidence.py`
+### `src/continuum_swr_replay/analysis/event_evidence/state_evidence/evidence.py`
 
 Held-out evidence of every window, by tetrode half (see the package notes).
 
 `held_out_evidence`, `window_evidence`
 
-### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/io.py`
+### `src/continuum_swr_replay/analysis/event_evidence/state_evidence/io.py`
 
 Code versions and the decode's stamp, shared by the state-evidence runners.
 
 `code_version`, `saved_decode_masks`
 
-### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/summary.py`
+### `src/continuum_swr_replay/analysis/event_evidence/state_evidence/summary.py`
 
 Summary statistics of the per-window table, over epochs nested in animals.
 
 `sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_mean_intervals`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`
 
-### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/terms.py`
+### `src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py`
 
 Per-tetrode likelihood terms, and the encodings and decode files they come from.
 
 `load_detector`, `encoding_inputs`, `load_encoding`, `encoding_comparison`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `subnormal_occupancy_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `time_folds`, `training_spike_bins`, `running_only_masks`, `spikes_in_bins`
 
-### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/windows.py`
+### `src/continuum_swr_replay/analysis/event_evidence/state_evidence/windows.py`
 
 Speed regimes and the windows scored: bouts, matched windows, calibration windows.
 
@@ -1008,9 +1002,9 @@ The epoch identifier: how a decode is named, built and read back.
 
 ### `src/continuum_swr_replay/decoding/results.py`
 
-The one reader of a decode's ``{epoch_identifier}_results.nc``, and of the clusterless detector it saved beside it (:func:`load_saved_detector`).
+The one reader of a decode's ``{epoch_identifier}_results.nc``, and of the clusterless detector it saved beside it (:func:`load_saved_detector`); :func:`load_results` reads an epoch's saved decode back whole: its results, fitted detector and environment.
 
-`nonlocal_probability`, `open_results`, `load_saved_detector`
+`nonlocal_probability`, `open_results`, `load_saved_detector`, `load_results`
 
 ### `src/continuum_swr_replay/tables/io.py`
 

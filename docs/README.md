@@ -97,52 +97,59 @@ layers below it, never from a layer above:
 
 1. **Foundation**: `columns.py`, `data_loaders/`, `data_types.py`, `decoding/`, `intervals.py`,
    `parameters.py`, `paths.py`, `runs/`, `tables/`. A foundation module imports only
-   other foundation modules.
-2. **`analysis/events/`**, the analysed-time rule and the event substrate. It imports
-   only the foundation, `analysis/constants.py` (which itself imports only the
-   foundation), `analysis/shared_statistics.py` and itself. `analysis/shared_statistics.py` holds
-   the statistics that know nothing of the task, for every `analysis/` package: the
-   signed-rank test, the Benjamini-Hochberg correction, the animal-balanced
-   summary over sessions and the nested bootstrap. It imports nothing from the
-   package.
-3. **The other `analysis/` packages** (`hippocampus/`, `behavior/`, `event_tables/`,
-   `replay_models/`, `pfc/`, `contfrag/`, `inventory_comparison/`). `hippocampus/`
-   never imports `pfc/`, `inventory_comparison/` or the three data-flow packages
-   below. No `analysis/` code imports `visualization/`.
-4. **`visualization/`** and **`reported/`** (the summary
-   builders), side by side, then **`scripts/`** on top. `reported/` imports the
-   foundation and `analysis/` (it names and describes the statistics that `analysis/`
-   computes); nothing in `analysis/` or `visualization/` imports `reported/`, so the
-   analysis does not depend on the reporting. Nothing in `src/` imports `scripts/`.
+   other foundation modules. `analysis/constants.py` imports only the foundation;
+   `analysis/shared_statistics.py` holds the statistics that know nothing of the task
+   (the signed-rank test, the Benjamini-Hochberg correction, the animal-balanced
+   summary over sessions, the nested bootstrap) and imports nothing from the package.
+2. **`analysis/`**: one package per question, in pipeline order. Each imports only
+   the packages before it in the table below (and the foundation, `constants` and
+   `shared_statistics`). `event_definition/` imports no other analysis package. In
+   Part 1 and Part 2 the order is `event_definition` → `decode_quality` → `detection`
+   → `event_evidence` → `event_properties` and `detector_comparison` (the last two
+   do not import each other); none of them imports `behavior/`, `event_tables/`,
+   `replay_models/`, `pfc/` or `contfrag/`. `behavior/` → `event_tables/` →
+   `replay_models/` import in that order. No `analysis/` code imports
+   `visualization/` or `reported/`.
+3. **`visualization/`** and **`reported/`** (the summary builders), side by side, then
+   **`scripts/`** on top. `reported/` imports only the foundation and `analysis/` (it
+   names and describes the statistics that `analysis/` computes). Nothing in `src/`
+   imports `scripts/`.
 
-There are no package cycles. `tests/repository/test_import_layering.py` enforces all of
-this except three rules that hold today but are not tested: that `reported/` imports
-only the foundation and `analysis/`, that `analysis/constants.py` imports only the
-foundation, and that `analysis/shared_statistics.py` imports nothing from the package.
-It does keep `analysis/` and `visualization/` from importing `reported/`. It also keeps
-`data_loaders/` from importing `analysis/`, `hippocampus/` from importing `behavior/`,
-`event_tables/` or `replay_models/`, and the covariate builders from importing
-`replay_models/model_specs.py`, and has no allowlist: any violation fails.
+There are no package cycles. `tests/repository/test_import_layering.py` enforces every
+rule above, and keeps `data_loaders/` from importing `analysis/` and the covariate
+builders from importing `replay_models/model_specs.py`. It has no allowlist: any
+violation fails.
 
-The behavior-to-model code is three packages in data-flow order, and each imports
-only those before it:
+| Stage | Package (`analysis/`) | Owns | Does not own |
+|---|---|---|---|
+| Rule | `event_definition/` | analysed time and excluded time, immobility, the non-local event rule (`nonlocal_event_rule.py`), the canonical SWR source, the decode masks, the classified event table and the cohorts | any detector or statistic |
+| Find | `detection/` | the algorithms that produce inventories: the SWR and Carey detectors, rule R-T, the artifact detector, the memoryless sequence detector, the paper's non-local detector applied to a decode (`nonlocal_events.py`) | which inventory is canonical; comparing inventories |
+| Compare | `detector_comparison/` | the inventories brought onto one schema and compared on the same recordings: overlap, exposure, counts, event features, held-out evidence | running a detector |
+| Check | `decode_quality/` | whether the decode is trustworthy: decoding error, state fractions, calibration, raw-data flags, posterior summaries | reading a saved decode (`decoding/results.py`) |
+| Check | `event_evidence/` | whether the events are real: held-out spike evidence per event and per decoder state | event properties |
+| Describe | `event_properties/` | what the events are like and how SWR and non-SWR events differ: event statistics, the property contrasts, class or continuum, gamma, theta, brain-state references, content occupancy | the behavioral models |
+| Task | `behavior/` | what the animal did and what the behavioral model says: covariates, design constants, track lookups | the tables and the models |
+| Join | `event_tables/` | the canonical event, arm, patch, stop and time-bin tables and their contracts | fitting |
+| Model | `replay_models/` | the Part 3 rate, content, coupling and choice models and the fitting machinery | the tables |
+| Model | `pfc/` | the mPFC and OFC unit analyses (Part 4) | the hippocampal event rule |
+| Side pipeline | `contfrag/` | the Continuous-Fragmented classifier analysis and its tables | the paper's event definition |
 
-- **`analysis/behavior/`**: what the animal did and what the behavioral model says.
-  `covariates/` (the behavioral covariates, their catalog and the behavioral-model
-  values), `design_constants.py` (the numbers the covariate builders and the model
-  ladders share), `history_basis.py` and `spatial_mapping.py` (the track lookups).
-  It imports neither `event_tables/` nor `replay_models/`.
-- **`analysis/event_tables/`**: the canonical event, arm, patch, stop and time-bin
-  tables, built by `prepare_data.py` from `event_table.py`, `arm_patch_tables.py`,
-  `stop_table.py` and `timebin_tables.py`, and their contracts. It imports
-  `behavior/`, never `replay_models/`.
-- **`analysis/replay_models/`**: the Part 3 models (`rate/`, `content/`,
-  `coupling/`, `choice/`, which do not import each other) and the machinery they
-  share at its top level (`model_specs.py`, `per_bin_design.py`, the fitters, the
-  cohort, timing and contrast modules), which imports none of those subpackages.
+| Paper part | Packages | Scripts | Summary |
+|---|---|---|---|
+| Part 1, detection | `detection`, `detector_comparison` | `scripts/detection/`, `scripts/detector_comparison/` | `paper/reported/detection.json` |
+| Part 2, events | `decode_quality`, `event_evidence`, `event_properties` | `scripts/decoding/` (decoder quality), `scripts/event_evidence/`, `scripts/event_properties/` | `paper/reported/events.json` |
+| Part 3, behavior | `behavior`, `event_tables`, `replay_models` | `scripts/behavior/`, `scripts/tables/`, `scripts/replay_models/` | `paper/reported/behavior.json` |
+| Part 4, mPFC | `pfc` | `scripts/pfc/` | `paper/reported/mpfc.json` |
 
-Inside `behavior/`, the top-level modules do not import `covariates/`. The layering
-test checks every rule in this paragraph.
+The summary names follow the paper's parts, not the package names: `reported/events.py`
+builds Part 2's summary from three packages, and `reported/detection.py` Part 1's from
+two.
+
+Inside `behavior/`, the top-level modules do not import `covariates/`; inside
+`replay_models/`, `rate/`, `content/`, `coupling/` and `choice/` do not import each
+other, and the top-level machinery (`model_specs.py`, `per_bin_design.py`, the
+fitters, the cohort, timing and contrast modules) imports none of them. The layering
+test checks these too.
 
 Where each moved, renamed or split module went (2026-10 and 2026-11) is recorded in
 [history/2026-module-moves.md](history/2026-module-moves.md).
@@ -202,8 +209,8 @@ Three tiers:
    | `replay_detection_comparison/swr/<run_id>/` | `swr_inventory_root()` | `scripts/detection/run_swr_detection.py` | the SWR inventories (Kay and the other detectors) |
    | `replay_detection_comparison/memoryless/<run_id>/` | `memoryless_root()` | `scripts/detection/run_memoryless_detection.py` | the memoryless sequence detector's events |
    | `replay_detection_comparison/carey/<run_id>/` | `carey_root()` | `scripts/detection/run_carey_detection.py` | the Carey detector's events |
-   | `replay_detection_comparison/inventory/<run_id>/` | `inventory_comparison_root()` | `scripts/detection/run_inventory_comparison.py` | the detectors' inventories compared |
-   | `replay_detection_comparison/event_features/<run_id>/` | `event_features_root()` | `scripts/detection/run_event_features.py` | per-event features for the comparison |
+   | `replay_detection_comparison/inventory/<run_id>/` | `inventory_comparison_root()` | `scripts/detector_comparison/run_inventory_comparison.py` | the detectors' inventories compared |
+   | `replay_detection_comparison/event_features/<run_id>/` | `event_features_root()` | `scripts/detector_comparison/run_event_features.py` | per-event features for the comparison |
    | `contfrag_replay_content/` | `contfrag_replay_content_dir()` | `scripts/tables/prepare_contfrag_replay_content_data.py` | the replay-content tables built from the Continuous-Fragmented decodes |
    | `{epoch_identifier}_mPFC_modulation.pkl` + five `*_modulation.npy` (root) | | `scripts/pfc/run_pfc_analysis_bandit.py` | the mPFC unit GLMs ([design/pfc_unit_glm_estimator.md](design/pfc_unit_glm_estimator.md), "The bundles") |
    | `pfc_marked_kernels/` | | `scripts/pfc/run_pfc_marked_kernels.py` | the content-marked kernels ([design/pfc_marked_event_kernels.md](design/pfc_marked_event_kernels.md)); no bundle exists yet |

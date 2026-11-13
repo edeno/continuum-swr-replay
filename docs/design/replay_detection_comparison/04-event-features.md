@@ -1,6 +1,6 @@
 # Event differences, selection diagnostics, and threshold robustness
 
-*Design spec. Status: implemented; the smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run ran on all 242 epochs (run `30cf1cc432e9`, all `ok`), and `scripts/detection/add_state_shares.py` added each event's decoder-state shares to it.
+*Design spec. Status: implemented; the smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run ran on all 242 epochs (run `30cf1cc432e9`, all `ok`), and `scripts/detector_comparison/add_state_shares.py` added each event's decoder-state shares to it.
 The initial report (features, spike evidence, selection diagnostics, populations, report
 and examples) is built and reviewed. Baseline windows are dropped from this stage and left for a later design
 (lead, 2026-10-18), matched on spike count; the evidence is reported beside its spike counts. Default-setting diagnostics follow
@@ -77,7 +77,7 @@ include supported comparator-only activity as well as questionable ours-only act
 ### Common spike-evidence diagnostic
 
 Reuse the likelihood backend and spatial mapping in
-`scripts/detection/analyze_event_spike_evidence.py`, applying a common diagnostic to every
+`scripts/event_evidence/analyze_event_spike_evidence.py`, applying a common diagnostic to every
 inventory: mean native-bin log-likelihood difference between the best remote real bin
 and the animal's position. Define remote bins using the same track-distance cutoff
 (`REMOTE_CM`, currently 100 cm) for every interval and record it in the configuration.

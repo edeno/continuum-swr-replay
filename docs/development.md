@@ -76,14 +76,17 @@ src/continuum_swr_replay/
 │   ├── event_tables/      #   the canonical event, arm, patch, stop and time-bin tables and their contracts
 │   ├── replay_models/     #   the Part 3 models: rate/, content/, coupling/, choice/, and the shared model ladders, fitters and fit statistics
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
-│   ├── events/            #   analysed-time rule, SWR source, event eligibility, classified event table, cohorts
-│   ├── hippocampus/       #   decode masks and aggregation, posterior/quality metrics, event statistics, SWR inventories, artifact detector
-│   ├── inventory_comparison/ # event inventories from different detectors compared
+│   ├── event_definition/  #   the rule: analysed time, immobility, the non-local event rule, the SWR source, decode masks, classified event table, cohorts
+│   ├── detection/         #   the detectors: SWR, Carey, artifacts, memoryless sequence, R-T, the non-local detector on a decode
+│   ├── detector_comparison/ # the inventories compared on the same recordings
+│   ├── decode_quality/    #   is the decode trustworthy: decoding error, state fractions, calibration, posterior summaries
+│   ├── event_evidence/    #   are the events real: held-out spike evidence
+│   ├── event_properties/  #   what the events are like; SWR vs non-SWR
 │   ├── pfc/               #   mPFC/OFC unit analysis
 │   ├── constants.py       #   analysis constants and defaults
 │   ├── literature_survey.py #  the replay-study survey's modes, ranges and method shares
 │   └── shared_statistics.py #  statistics that know nothing of the task
-├── decoding/              # decode configs and detector classes, transitions, identifiers and file names, the results.nc reader
+├── decoding/              # decode configs and detector classes, transitions, identifiers and file names, the results.nc reader and load_results
 ├── runs/                  # run infrastructure: provenance, CLI, batch loops, BLAS thread pin (threads), JAX device choice (device)
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, atomic writes, parity
 ├── visualization/         # Plotting utilities; palettes.py holds COLORS, figure_utilities.py the publication-figure helpers
@@ -231,7 +234,7 @@ Spike times are organized as lists of arrays: `spike_times[brain_area][sort_grou
 
 The single source of truth for a non-local event's timing and its
 SWR-overlap classification is
-`analysis/events/classified_table.py:build_classified_nonlocal_event_table`.
+`analysis/event_definition/classified_table.py:build_classified_nonlocal_event_table`.
 It produces one row per non-local event over the *full* event-label
 window: the label's probability contract is **validated, not re-filtered**
 (a violation raises `EventDefinitionError` rather than silently dropping
@@ -240,20 +243,20 @@ timing, per-event speed summaries, peak non-local probability, the 3-way
 `overlap_class` (and 6-way `overlap_subclass`), and the matched SWR.
 
 **One analysed-time rule.** *Excluded time* is the artifact mask
-(`analysis/events/artifact_masks.py`) widened by 0.3 s on each side
-(`analysis/events/analysed_time.py:excluded_intervals`; the rule is in
-`analysis/events/eligibility.py`). Nothing inside it is analysed.
+(`analysis/event_definition/artifact_masks.py`) widened by 0.3 s on each side
+(`analysis/event_definition/analysed_time.py:excluded_intervals`; the rule is in
+`analysis/event_definition/eligibility.py`). Nothing inside it is analysed.
 An event of any kind (non-local, SWR, MUA, ContFrag label, Widloski), an
 exposure second, a time bin with its history window, and a peri-event window
 are used only when they lie wholly outside excluded time. An event must also
 be immobile as a whole: every sampled speed finite and below 4 cm/s
-(`analysis/events/immobility.py`). A kept event that overlaps a dropped SWR or MUA
+(`analysis/event_definition/immobility.py`). A kept event that overlaps a dropped SWR or MUA
 event is dropped too, because its overlap class is unknown.
 
 The rule is applied once, where a decode frame is read
-(`analysis/events/analysed_time.py:with_swr_source`), so every table
+(`analysis/event_definition/analysed_time.py:with_swr_source`), so every table
 inherits it. Each dropped event keeps a reason
-(`analysis/events/analysed_time.py:artifact_event_drops`), and kept events
+(`analysis/event_definition/analysed_time.py:artifact_event_drops`), and kept events
 keep their labels and `event_id`. A stop's `immobility_duration_s` is its
 span less the excluded seconds in it, so it is no longer
 `stop_end - stop_start`.
@@ -460,12 +463,12 @@ Each builder's statistics:
 
 - survey: `analysis/literature_survey.py` (the builder reads the survey's cells into numbers and trigger
   sets; the modes, ranges and shares are computed there);
-- events: `analysis/hippocampus/event_statistics.py`, `analysis/hippocampus/quality_metrics.py` (the
-  decoder's accuracy, state fractions and calibration), `analysis/inventory_comparison/nonlocal_comparison.py`;
+- events: `analysis/event_properties/event_statistics.py`, `analysis/decode_quality/quality_metrics.py` (the
+  decoder's accuracy, state fractions and calibration), `analysis/detector_comparison/nonlocal_comparison.py`;
 - mpfc: `analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`, and
   `analysis/pfc/marked_family_statistics.py` (through the marked-family summary
   `scripts/pfc/summarize_pfc_marked_family.py` writes);
-- detection: `analysis/hippocampus/memoryless_sequence/sweep_statistics.py`, `recording_statistics.py`
+- detection: `analysis/detection/memoryless_sequence/sweep_statistics.py`, `recording_statistics.py`
   and `event_table.py`;
 - behavior: `analysis/replay_models/coefficient_statistics.py` (a per-session fit summarized over sessions and
   animals; the other modules build on it), `rate/rate_fit_statistics.py`, `rate/stop_statistics.py`,
@@ -512,4 +515,4 @@ still compute a reported statistic themselves are listed in `TODO.md`.
 - Position data uses DLC tracking when available, falls back to older tracking methods
 - Some sessions may lack certain interval types or brain areas: the loaders count rows and skip the step when there are none, and an absent area raises `spikes.AreaNotRecordedError`, which `get_spike_data` skips
 - Check for empty spike data before running decoding (`if not data["spike_times"]`)
-- Artifacts: one detector (`analysis/hippocampus/artifacts/`, run `analysis/events/swr_source.py:ARTIFACT_INTERVALS_RUN_ID`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).
+- Artifacts: one detector (`analysis/detection/artifacts/`, run `analysis/event_definition/swr_source.py:ARTIFACT_INTERVALS_RUN_ID`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).

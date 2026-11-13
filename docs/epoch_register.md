@@ -155,7 +155,7 @@ once its decodes exist and its entry is changed to `analysed`.
 
 The decode-folder readers read decode files rather than Spyglass:
 
-- `load_data_over_time` and `load_contfrag_data_over_time` (`analysis/hippocampus/` and
+- `load_data_over_time` and `load_contfrag_data_over_time` (`analysis/detection/nonlocal_events.py` and
   `analysis/contfrag/data_aggregation.py`), used by Figures 2 and 3 and the decoder
   validation supplement;
 - `run_state_evidence.py`;
@@ -165,7 +165,7 @@ The decode-folder readers read decode files rather than Spyglass:
 
 They take `analysed_decode_files(directory, suffix)`, which names the analysed
 epochs' files instead of globbing, so a decode of any other epoch in the folder is
-never read. The two `data_aggregation` loaders also require every analysed epoch's
+never read. The two loaders also require every analysed epoch's
 file. The helper reads only the register, not the database.
 
 `scripts/figures/generate_event_gallery.py` still globs the decode folder. It relies on

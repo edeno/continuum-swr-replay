@@ -56,7 +56,7 @@ Work that is deferred on purpose. Each item says when it should be done.
   audit-only tables are still computed in the scripts.
   These still hold their own copy; make each call the function, comparing its
   output before and after on the cluster:
-  - events: `scripts/detection/analyze_event_spike_evidence.py` (per-epoch and
+  - events: `scripts/event_evidence/analyze_event_spike_evidence.py` (per-epoch and
     per-animal medians written to CSVs nothing reads).
 
   *When:* at each figure's or report's next regeneration.

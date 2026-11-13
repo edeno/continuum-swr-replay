@@ -170,11 +170,11 @@ the error estimates the real-data held-out results will be read with.
   About 580 injected cells plus every no-replay stretch; about a minute at the sweep's
   0.045 s per cell, measured on one seed before the full run. A condition that cannot
   be placed raises; nothing is dropped silently.
-- `analysis/inventory_comparison/heldout.py` (new, src, unit-tested): the fold builder
+- `analysis/detector_comparison/heldout.py` (new, src, unit-tested): the fold builder
   and the evaluation rule as pure functions of event intervals, spike times, a content
   posterior on the decode grid (either estimator) and the evaluation fields, so the real-data pilot applies the same rule
   unchanged.
-- `scripts/detection/sweep_memoryless_heldout.py` (new): the three folds over the injected
+- `scripts/detector_comparison/sweep_memoryless_heldout.py` (new): the three folds over the injected
   replays and the conditions above; raw table to `Processed-Data`, aggregates to
   `paper/reported/inputs/detection/detection_heldout_summary.csv`. About 3 x 5100 cells at the sweep's
   0.045 s per cell, near 12 minutes, measured on one seed of one fold first.

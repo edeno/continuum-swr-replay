@@ -6,10 +6,12 @@ went, for code outside this repository (notebooks, old scripts) and for outputs 
 provenance records an old path. It is not current instruction: the layout today is in
 [../README.md](../README.md) ("Code layout") and [../../scripts/README.md](../../scripts/README.md).
 There are no compatibility shims: an old import path raises `ModuleNotFoundError`.
-The last section lists the dated audits the indexes once cited.
+The section "Dated audits the docs once cited" lists the dated audits the indexes once cited.
 
-An old path is marked "(removed: ...)" so that `tests/repository/test_doc_paths_resolve.py`
-does not look for it; every new path is checked.
+An old path is marked "(removed: ...)". `tests/repository/test_doc_paths_resolve.py`
+skips this file (and the dated design specs, `docs/design/20*-*.md`), so neither the
+old nor the new paths here are checked; they were correct when each section was
+written.
 
 ## Package modules, 2026-11
 
@@ -480,3 +482,135 @@ written before the move record the old script path in `cli`.
 | `scripts/behavior/rate/plot_per_bin_rate_models.py` (removed: moved) | `scripts/replay_models/rate/plot_per_bin_rate_models.py` |
 | `scripts/behavior/rate/plot_per_bin_rate_summary.py` (removed: moved) | `scripts/replay_models/rate/plot_per_bin_rate_summary.py` |
 | `scripts/behavior/rate/plot_uncertainty_rate.py` (removed: moved) | `scripts/replay_models/rate/plot_uncertainty_rate.py` |
+
+## Package modules, 2026-11-13 (second pass)
+
+`analysis/hippocampus/` was dissolved into four packages, one per question, and two
+packages were renamed: `analysis/events/` became `analysis/event_definition/` and
+`analysis/inventory_comparison/` became `analysis/detector_comparison/`. The detectors
+went to `detection/` (`data_aggregation.py`, which applies the paper's non-local event
+rule to a decode, became `detection/nonlocal_events.py`), the decoder checks to
+`decode_quality/`, the spike evidence to `event_evidence/` and the event statistics to
+`event_properties/`; `decode_masks.py` joined `event_definition/`, and
+`events/nonlocal_detection.py` became `event_definition/nonlocal_event_rule.py`.
+`hippocampus/result_loading.py` was merged into the foundation `decoding/results.py`.
+The `analysis.hippocampus` package no longer re-exports names (its PEP 562 table is
+gone): import each name from the module that defines it. There are no compatibility
+shims. Paths are under `src/continuum_swr_replay/`.
+
+Pickles written before the move that hold an instance of a moved class name its old
+module and no longer load: the memoryless detector's `*_memoryless_candidates.pkl`
+(`CandidateSequences`, read by `scripts/detector_comparison/run_event_features.py`)
+until `scripts/detection/run_memoryless_detection.py` is rerun.
+
+| Old module | New home |
+|---|---|
+| `analysis/events/__init__.py` (removed: moved) | `analysis/event_definition/__init__.py` |
+| `analysis/events/analysed_time.py` (removed: moved) | `analysis/event_definition/analysed_time.py` |
+| `analysis/events/artifact_intervals.py` (removed: moved) | `analysis/event_definition/artifact_intervals.py` |
+| `analysis/events/artifact_masks.py` (removed: moved) | `analysis/event_definition/artifact_masks.py` |
+| `analysis/events/classified_table.py` (removed: moved) | `analysis/event_definition/classified_table.py` |
+| `analysis/events/cohort_selection.py` (removed: moved) | `analysis/event_definition/cohort_selection.py` |
+| `analysis/events/eligibility.py` (removed: moved) | `analysis/event_definition/eligibility.py` |
+| `analysis/events/epoch_normalizers.py` (removed: moved) | `analysis/event_definition/epoch_normalizers.py` |
+| `analysis/events/gallery_sample.py` (removed: moved) | `analysis/event_definition/gallery_sample.py` |
+| `analysis/events/immobility.py` (removed: moved) | `analysis/event_definition/immobility.py` |
+| `analysis/events/nonlocal_detection.py` (removed: moved) | `analysis/event_definition/nonlocal_event_rule.py` |
+| `analysis/events/swr_source.py` (removed: moved) | `analysis/event_definition/swr_source.py` |
+| `analysis/hippocampus/__init__.py` (removed) | removed: its re-exports are gone; import from the defining module |
+| `analysis/hippocampus/artifacts/__init__.py` (removed: moved) | `analysis/detection/artifacts/__init__.py` |
+| `analysis/hippocampus/artifacts/detect.py` (removed: moved) | `analysis/detection/artifacts/detect.py` |
+| `analysis/hippocampus/artifacts/features.py` (removed: moved) | `analysis/detection/artifacts/features.py` |
+| `analysis/hippocampus/brain_state_reference.py` (removed: moved) | `analysis/event_properties/brain_state_reference.py` |
+| `analysis/hippocampus/class_or_continuum.py` (removed: moved) | `analysis/event_properties/class_or_continuum.py` |
+| `analysis/hippocampus/content_occupancy.py` (removed: moved) | `analysis/event_properties/content_occupancy.py` |
+| `analysis/hippocampus/data_aggregation.py` (removed: moved) | `analysis/detection/nonlocal_events.py` |
+| `analysis/hippocampus/decode_masks.py` (removed: moved) | `analysis/event_definition/decode_masks.py` |
+| `analysis/hippocampus/detection_inputs.py` (removed: moved) | `analysis/detection/detection_inputs.py` |
+| `analysis/hippocampus/event_analysis.py` (removed: moved) | `analysis/event_properties/event_analysis.py` |
+| `analysis/hippocampus/event_statistics.py` (removed: moved) | `analysis/event_properties/event_statistics.py` |
+| `analysis/hippocampus/gamma_power.py` (removed: moved) | `analysis/event_properties/gamma_power.py` |
+| `analysis/hippocampus/hpc_raw_stats.py` (removed: moved) | `analysis/decode_quality/hpc_raw_stats.py` |
+| `analysis/hippocampus/memoryless_sequence/__init__.py` (removed: moved) | `analysis/detection/memoryless_sequence/__init__.py` |
+| `analysis/hippocampus/memoryless_sequence/comparison_simulation.py` (removed: moved) | `analysis/detection/memoryless_sequence/comparison_simulation.py` |
+| `analysis/hippocampus/memoryless_sequence/config.py` (removed: moved) | `analysis/detection/memoryless_sequence/config.py` |
+| `analysis/hippocampus/memoryless_sequence/detect.py` (removed: moved) | `analysis/detection/memoryless_sequence/detect.py` |
+| `analysis/hippocampus/memoryless_sequence/epoch.py` (removed: moved) | `analysis/detection/memoryless_sequence/epoch.py` |
+| `analysis/hippocampus/memoryless_sequence/event_table.py` (removed: moved) | `analysis/detection/memoryless_sequence/event_table.py` |
+| `analysis/hippocampus/memoryless_sequence/likelihood.py` (removed: moved) | `analysis/detection/memoryless_sequence/likelihood.py` |
+| `analysis/hippocampus/memoryless_sequence/recording_statistics.py` (removed: moved) | `analysis/detection/memoryless_sequence/recording_statistics.py` |
+| `analysis/hippocampus/memoryless_sequence/scoring.py` (removed: moved) | `analysis/detection/memoryless_sequence/scoring.py` |
+| `analysis/hippocampus/memoryless_sequence/shuffle.py` (removed: moved) | `analysis/detection/memoryless_sequence/shuffle.py` |
+| `analysis/hippocampus/memoryless_sequence/simulation.py` (removed: moved) | `analysis/detection/memoryless_sequence/simulation.py` |
+| `analysis/hippocampus/memoryless_sequence/sweep.py` (removed: moved) | `analysis/detection/memoryless_sequence/sweep.py` |
+| `analysis/hippocampus/memoryless_sequence/sweep_controls.py` (removed: moved) | `analysis/detection/memoryless_sequence/sweep_controls.py` |
+| `analysis/hippocampus/memoryless_sequence/sweep_replays.py` (removed: moved) | `analysis/detection/memoryless_sequence/sweep_replays.py` |
+| `analysis/hippocampus/memoryless_sequence/sweep_statistics.py` (removed: moved) | `analysis/detection/memoryless_sequence/sweep_statistics.py` |
+| `analysis/hippocampus/memoryless_sequence/sweep_summaries.py` (removed: moved) | `analysis/detection/memoryless_sequence/sweep_summaries.py` |
+| `analysis/hippocampus/memoryless_sequence/window_statistics.py` (removed: moved) | `analysis/detection/memoryless_sequence/window_statistics.py` |
+| `analysis/hippocampus/posterior_analysis.py` (removed: moved) | `analysis/decode_quality/posterior_analysis.py` |
+| `analysis/hippocampus/property_contrast.py` (removed: moved) | `analysis/event_properties/property_contrast.py` |
+| `analysis/hippocampus/quality_metrics.py` (removed: moved) | `analysis/decode_quality/quality_metrics.py` |
+| `analysis/hippocampus/result_loading.py` (removed: moved) | `decoding/results.py` (`load_results`, `_load_saved_decode`) |
+| `analysis/hippocampus/ripple_tetrodes.py` (removed: moved) | `analysis/detection/ripple_tetrodes.py` |
+| `analysis/hippocampus/spike_evidence.py` (removed: moved) | `analysis/event_evidence/spike_evidence.py` |
+| `analysis/hippocampus/start_and_rest_theta.py` (removed: moved) | `analysis/event_properties/start_and_rest_theta.py` |
+| `analysis/hippocampus/state_evidence/__init__.py` (removed: moved) | `analysis/event_evidence/state_evidence/__init__.py` |
+| `analysis/hippocampus/state_evidence/evidence.py` (removed: moved) | `analysis/event_evidence/state_evidence/evidence.py` |
+| `analysis/hippocampus/state_evidence/io.py` (removed: moved) | `analysis/event_evidence/state_evidence/io.py` |
+| `analysis/hippocampus/state_evidence/summary.py` (removed: moved) | `analysis/event_evidence/state_evidence/summary.py` |
+| `analysis/hippocampus/state_evidence/terms.py` (removed: moved) | `analysis/event_evidence/state_evidence/terms.py` |
+| `analysis/hippocampus/state_evidence/windows.py` (removed: moved) | `analysis/event_evidence/state_evidence/windows.py` |
+| `analysis/hippocampus/swr_detectors.py` (removed: moved) | `analysis/detection/swr_detectors.py` |
+| `analysis/hippocampus/triggered_analysis.py` (removed: moved) | `analysis/event_properties/triggered_analysis.py` |
+| `analysis/inventory_comparison/__init__.py` (removed: moved) | `analysis/detector_comparison/__init__.py` |
+| `analysis/inventory_comparison/adapters.py` (removed: moved) | `analysis/detector_comparison/adapters.py` |
+| `analysis/inventory_comparison/availability.py` (removed: moved) | `analysis/detector_comparison/availability.py` |
+| `analysis/inventory_comparison/cells.py` (removed: moved) | `analysis/detector_comparison/cells.py` |
+| `analysis/inventory_comparison/components.py` (removed: moved) | `analysis/detector_comparison/components.py` |
+| `analysis/inventory_comparison/epoch_comparison.py` (removed: moved) | `analysis/detector_comparison/epoch_comparison.py` |
+| `analysis/inventory_comparison/evidence.py` (removed: moved) | `analysis/detector_comparison/evidence.py` |
+| `analysis/inventory_comparison/example_windows.py` (removed: moved) | `analysis/detector_comparison/example_windows.py` |
+| `analysis/inventory_comparison/feature_run.py` (removed: moved) | `analysis/detector_comparison/feature_run.py` |
+| `analysis/inventory_comparison/features.py` (removed: moved) | `analysis/detector_comparison/features.py` |
+| `analysis/inventory_comparison/heldout.py` (removed: moved) | `analysis/detector_comparison/heldout.py` |
+| `analysis/inventory_comparison/heldout_sweep.py` (removed: moved) | `analysis/detector_comparison/heldout_sweep.py` |
+| `analysis/inventory_comparison/inventory_run.py` (removed: moved) | `analysis/detector_comparison/inventory_run.py` |
+| `analysis/inventory_comparison/kay_version.py` (removed: moved) | `analysis/detector_comparison/kay_version.py` |
+| `analysis/inventory_comparison/nonlocal_comparison.py` (removed: moved) | `analysis/detector_comparison/nonlocal_comparison.py` |
+| `analysis/inventory_comparison/overlap.py` (removed: moved) | `analysis/detector_comparison/overlap.py` |
+| `analysis/inventory_comparison/pooling.py` (removed: moved) | `analysis/detector_comparison/pooling.py` |
+| `analysis/inventory_comparison/populations.py` (removed: moved) | `analysis/detector_comparison/populations.py` |
+| `analysis/inventory_comparison/recount.py` (removed: moved) | `analysis/detector_comparison/recount.py` |
+| `analysis/inventory_comparison/schema.py` (removed: moved) | `analysis/detector_comparison/schema.py` |
+| `analysis/inventory_comparison/selection.py` (removed: moved) | `analysis/detector_comparison/selection.py` |
+| `analysis/inventory_comparison/swr_matrix.py` (removed: moved) | `analysis/detector_comparison/swr_matrix.py` |
+
+## Scripts, 2026-11-13 (second pass)
+
+`scripts/detection/` was split by the package each script drives. It keeps the
+detector runners (`run_artifact_detection.py`, `run_swr_detection.py`,
+`run_carey_detection.py`, `run_memoryless_detection.py`) and the memoryless sweeps
+(`sweep_memoryless_detection.py`, `sweep_memoryless_controls.py`); the rest went to
+`scripts/detector_comparison/`, `scripts/event_evidence/` and
+`scripts/event_properties/`. Outputs written before the move record the old script path
+in `produced_by`.
+
+| Old path | New path |
+|---|---|
+| `scripts/detection/_report.py` (removed: moved) | `scripts/detector_comparison/_report.py` |
+| `scripts/detection/add_state_shares.py` (removed: moved) | `scripts/detector_comparison/add_state_shares.py` |
+| `scripts/detection/analyze_event_spike_evidence.py` (removed: moved) | `scripts/event_evidence/analyze_event_spike_evidence.py` |
+| `scripts/detection/bootstrap_event_properties.py` (removed: moved) | `scripts/event_properties/bootstrap_event_properties.py` |
+| `scripts/detection/measure_brain_state_reference.py` (removed: moved) | `scripts/event_properties/measure_brain_state_reference.py` |
+| `scripts/detection/measure_event_gamma.py` (removed: moved) | `scripts/event_properties/measure_event_gamma.py` |
+| `scripts/detection/measure_event_start_and_rest_theta.py` (removed: moved) | `scripts/event_properties/measure_event_start_and_rest_theta.py` |
+| `scripts/detection/measure_ripple_class_structure.py` (removed: moved) | `scripts/event_properties/measure_ripple_class_structure.py` |
+| `scripts/detection/report_event_features.py` (removed: moved) | `scripts/detector_comparison/report_event_features.py` |
+| `scripts/detection/report_inventory_comparison.py` (removed: moved) | `scripts/detector_comparison/report_inventory_comparison.py` |
+| `scripts/detection/run_event_features.py` (removed: moved) | `scripts/detector_comparison/run_event_features.py` |
+| `scripts/detection/run_event_spike_evidence.sh` (removed: moved) | `scripts/event_evidence/run_event_spike_evidence.sh` |
+| `scripts/detection/run_inventory_comparison.py` (removed: moved) | `scripts/detector_comparison/run_inventory_comparison.py` |
+| `scripts/detection/run_state_evidence.py` (removed: moved) | `scripts/event_evidence/run_state_evidence.py` |
+| `scripts/detection/split_state_evidence_by_swr.py` (removed: moved) | `scripts/event_evidence/split_state_evidence_by_swr.py` |
+| `scripts/detection/sweep_memoryless_heldout.py` (removed: moved) | `scripts/detector_comparison/sweep_memoryless_heldout.py` |

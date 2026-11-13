@@ -5,7 +5,7 @@
 `event_table.py` and `epoch.py` exist and are tested, and
 `scripts/detection/run_memoryless_detection.py` runs them per recorded epoch. The decodes
 are not on the development machine, so the real-data pilot is the next step. The
-comparison between inventories lives in `analysis/inventory_comparison/`
+comparison between inventories lives in `analysis/detector_comparison/`
 ([03](03-inventory-comparison.md)). The sections on what the port does on simulated
 data are results; everything else is a proposed analysis.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
@@ -305,7 +305,7 @@ are not topographic, so the second should matter less on real data than in that
 simulation, but how much position a tetrode's identity carries has to be measured, not
 assumed. Whether the reference's cell-ID shuffle shows the first behaviour on its own
 data is not known. Both are pinned in the tests
-(`tests/analysis/hippocampus/memoryless_sequence/test_memoryless_shuffle.py`,
+(`tests/analysis/detection/memoryless_sequence/test_memoryless_shuffle.py`,
 `tests/integration/test_memoryless_simulated_replay.py`) so a change to either statistic
 has to confront them.
 
@@ -726,11 +726,11 @@ continuous state alone.
 
 ### Held-out evidence on simulated data
 
-`scripts/detection/sweep_memoryless_heldout.py` tries the held-out test of spec 05 where the
+`scripts/detector_comparison/sweep_memoryless_heldout.py` tries the held-out test of spec 05 where the
 truth is known: both detectors run on discovery cells alone, in three folds (two
 interleaved with the roles swapped, one whose evaluation cells cover half the track),
 over every injected replay and controls trial, and every event is scored on the
-evaluation cells by `inventory_comparison.heldout` under both content estimates, ours
+evaluation cells by `detector_comparison.heldout` under both content estimates, ours
 and the sliding window's. Numbers are in `paper/reported/inputs/detection/detection_heldout_summary.csv`; the rule and
 its choices are in [memoryless_simulation_controls.md](memoryless_simulation_controls.md).
 
@@ -933,7 +933,7 @@ calculations. Do not imply that robustness has been established before that stud
 
 ## Architecture
 
-New subpackage `src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/`.
+New subpackage `src/continuum_swr_replay/analysis/detection/memoryless_sequence/`.
 Named for what it does; the citation lives in docstrings, not the module path.
 
 | module | responsibility | depends on |
@@ -1171,7 +1171,7 @@ not additional acceptance criteria.
 ## Failure behavior
 
 No silent fallbacks. Missing `detector.pkl` or a missing `("", 0)` encoding key raises,
-following `scripts/detection/analyze_event_spike_evidence.py`. An epoch with no eligible
+following `scripts/event_evidence/analyze_event_spike_evidence.py`. An epoch with no eligible
 immobility returns an empty frame with correct columns **and explicit dtypes** —
 `build_classified_nonlocal_event_table`'s empty return is all-object, and concatenating
 such frames across epochs silently yields object columns; the memoryless table must not

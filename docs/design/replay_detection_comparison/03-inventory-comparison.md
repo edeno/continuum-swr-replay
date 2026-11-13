@@ -2,12 +2,12 @@
 
 *Design spec. Status: approved; the accounting — schema, availability, overlap, components,
 fragment-merge recount, cells and SWR label matrix — is implemented in
-`src/continuum_swr_replay/analysis/inventory_comparison/` and tested on synthetic
+`src/continuum_swr_replay/analysis/detector_comparison/` and tested on synthetic
 inventories. Also built and tested, on simulated epochs: the per-detector adapters that
 build coverage from recordings (`adapters.py`), Carey's runner
 (`scripts/detection/run_carey_detection.py`), the per-epoch runner
-(`scripts/detection/run_inventory_comparison.py`), the report
-(`scripts/detection/report_inventory_comparison.py`), the sampled examples
+(`scripts/detector_comparison/run_inventory_comparison.py`), the report
+(`scripts/detector_comparison/report_inventory_comparison.py`), the sampled examples
 (`scripts/figures/generate_inventory_examples.py`), and excluded time by reason for every
 comparison. Run: Carey on all 242 analysed epochs (run `fa6537e48bcf`), and the comparison
 on all 242 (run `afeb897d850f`, every epoch `ok`), with its report and examples. The

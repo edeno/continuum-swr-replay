@@ -33,12 +33,12 @@ hand-joined string. Nothing under the root is committed.
 | Decodes, ContFrag | `{epoch_id}_contfrag_results.nc`, `_contfrag_detector.pkl`, `_contfrag_environment.pkl`, `_contfrag_data_over_time.pkl`; the SWR or MUA event source is chosen later, by `prepare_contfrag_replay_content_data.py --event-source` | `scripts/decoding/run_decoding_contfrag.py` |
 | Canonical tables | `replay_content/{event,event_arm,event_patch,event_sequence,stop,qvals,event_onset,stop_timebin}_table.parquet`; ContFrag tables under `contfrag_replay_content/` | `scripts/tables/` and `scripts/behavior/` (order in [reproduce.md](reproduce.md#the-full-rebuild)) |
 | Part 3 fits | `replay_content/models*/` and the other result folders under `replay_content/` | `scripts/replay_models/` (`rate/`, `content/`, `coupling/`, `choice/`), all run by `scripts/workflows/run_refits.py` |
-| Detector comparison | `replay_detection_comparison/{memoryless,carey,inventory,event_features}/<run id>/` | `scripts/detection/` |
+| Detector comparison | `replay_detection_comparison/{memoryless,carey,inventory,event_features}/<run id>/` | `scripts/detection/` (the detectors), `scripts/detector_comparison/` (the comparison and event features) |
 | Part 4 fits (mPFC) | `{epoch_id}_mPFC_modulation.pkl` and its `.npy` arrays | `scripts/pfc/run_pfc_analysis_bandit.py` |
 
 Two settings tie the decodes to the detector runs:
 `ARTIFACT_INTERVALS_RUN_ID` and `SWR_INVENTORY_RUN_ID` in
-`src/continuum_swr_replay/analysis/events/swr_source.py` name the artifact and
+`src/continuum_swr_replay/analysis/event_definition/swr_source.py` name the artifact and
 SWR runs every decode and every analysis reads. A decode refuses to start
 without them. The rule for which time and which events are analysed is
 described in [development.md](development.md#canonical-per-event-classification-table).
