@@ -34,7 +34,12 @@ from tests.support._memoryless_clusterless_epoch import (
     build_sorted_track,
 )
 
-CONFIG = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
+CONFIG = MemorylessSequenceConfig()
+"""The reference's own 5 ms step, on the detector's 200 Hz grid."""
+FOUR_MS = MemorylessSequenceConfig(
+    stride_s=0.004, sampling_frequency=SAMPLING_FREQUENCY
+)
+"""A 4 ms step on the decode's 500 Hz grid, row for row."""
 THRESHOLDS = reference.ReferenceThresholds(
     spread_cm=10.0,
     jump_cm=20.0,
@@ -140,33 +145,32 @@ class TestPortAgreesWithTheReference:
     changes no gate, candidate or verdict.
     """
 
-    @pytest.fixture(scope="class")
-    def both(self, sorted_track):
+    @pytest.fixture(scope="class", params=[CONFIG, FOUR_MS], ids=["5ms", "4ms"])
+    def both(self, sorted_track, request):
+        config = request.param
         result = sorted_spikes_epoch_log_likelihood(
             sorted_track.time,
             sorted_track.linear_position,
             sorted_track.spike_times,
-            with_reference_rate_floor(sorted_track.encoding_model, CONFIG),
-            CONFIG,
+            with_reference_rate_floor(sorted_track.encoding_model, config),
+            config,
         )
         posterior = normalize_windows(
             aggregate_windows(
-                result.log_likelihood, CONFIG.window_n_samples, CONFIG.stride_n_samples
+                result.log_likelihood, config.window_n_samples, config.stride_n_samples
             )
         )
-        midpoint_s = window_midpoints_s(result.time, CONFIG)
+        midpoint_s = window_midpoints_s(result.time, config)
         speed = np.zeros(midpoint_s.size)  # every window eligible
         port = detect_candidate_sequences(
-            posterior, midpoint_s, sorted_track.bin_distance_cm, speed, CONFIG
+            posterior, midpoint_s, sorted_track.bin_distance_cm, speed, config
         )
         rate_hz, _, thresholds = fields_and_thresholds(
-            sorted_track.encoding_model, CONFIG
+            sorted_track.encoding_model, config
         )
-        counts = window_counts(
-            sorted_track.spike_times, sorted_track.time, result.time.size, CONFIG
-        )
+        counts = window_counts(sorted_track.spike_times, sorted_track.time, config)
         reference_posterior = reference.decode_windows(
-            counts, rate_hz, CONFIG.window_duration_s
+            counts, rate_hz, config.window_duration_s
         )
         ref = reference.detect(reference_posterior, midpoint_s, speed, thresholds)
         return posterior, port, reference_posterior, ref
@@ -206,16 +210,9 @@ class TestZeroJumpRuleMatchesTheReference:
         first, last = self.WINDOWS
         floored = with_reference_rate_floor(sorted_track.encoding_model, CONFIG)
         rate_hz, _, _ = fields_and_thresholds(sorted_track.encoding_model, CONFIG)
-        n_rows = sorted_spikes_epoch_log_likelihood(
-            sorted_track.time,
-            sorted_track.linear_position,
-            sorted_track.spike_times,
-            floored,
-            CONFIG,
-        ).time.size
-        counts = window_counts(
-            sorted_track.spike_times, sorted_track.time, n_rows, CONFIG
-        )[first : last + 1]
+        counts = window_counts(sorted_track.spike_times, sorted_track.time, CONFIG)[
+            first : last + 1
+        ]
         seed = ShuffleSeed(run=1, session="zero-jump")
         permutations = [None] + [
             cell_identity_permutation(

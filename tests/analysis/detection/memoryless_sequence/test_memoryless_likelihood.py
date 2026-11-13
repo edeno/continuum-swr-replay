@@ -25,8 +25,12 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood impo
     _drop_the_unreachable_row,
     check_marks_match_encoding,
     clusterless_epoch_log_likelihood,
+    decoded_windows,
+    encoding_bins_per_row,
     interior_bin_distances_cm,
+    likelihood_grid,
     load_clusterless_encoding_model,
+    missing_likelihood_rows,
     sorted_spikes_epoch_log_likelihood,
     validate_time_grid,
     window_midpoints_s,
@@ -34,6 +38,8 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood impo
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     aggregate_windows,
+    normalize_windows,
+    windows_holding,
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from tests.support._memoryless_clusterless_epoch import (
@@ -46,6 +52,11 @@ from tests.support._memoryless_clusterless_epoch import (
     build_simulated_epoch,
     build_sorted_track,
 )
+
+DECODE_GRID = MemorylessSequenceConfig(stride_s=0.004, sampling_frequency=500.0)
+"""The likelihood on the decode's own 500 Hz grid, row for row, at a 4 ms step:
+what the tests below pin the library's arithmetic against. The 200 Hz grid
+the detector uses by default is tested in ``TestDetectorGrid``."""
 
 
 @pytest.fixture(scope="module")
@@ -62,6 +73,7 @@ def decoded(epoch) -> tuple[np.ndarray, np.ndarray]:
         epoch.spike_times,
         epoch.spike_waveform_features,
         load_clusterless_encoding_model(epoch.detector_path),
+        DECODE_GRID,
     )
     return result.time, result.log_likelihood
 
@@ -209,7 +221,7 @@ class TestLoadEncodingModel:
 
 
 class TestValidateTimeGrid:
-    config = MemorylessSequenceConfig()
+    config = DECODE_GRID
 
     def test_a_uniform_grid_at_the_stated_rate_passes(self):
         validate_time_grid(np.arange(100) / 500.0, self.config)
@@ -318,6 +330,7 @@ class TestEpochLogLikelihood:
             epoch.spike_times,
             epoch.spike_waveform_features,
             load_clusterless_encoding_model(epoch.detector_path),
+            DECODE_GRID,
         )
         interior = np.asarray(epoch.environment.is_track_interior_).ravel()
         centers = np.asarray(epoch.environment.place_bin_centers_).ravel()
@@ -352,7 +365,7 @@ class TestEpochLogLikelihood:
 class TestAdditivity:
     """A window sum must equal a direct marked-process sum over its support."""
 
-    config = MemorylessSequenceConfig()
+    config = DECODE_GRID
 
     def direct_for(self, epoch, position_distances, time, window: int) -> np.ndarray:
         """The direct sum over window ``window``, bounded by grid samples."""
@@ -492,6 +505,7 @@ class TestAdditivity:
             spike_times,
             features,
             load_clusterless_encoding_model(epoch.detector_path),
+            self.config,
         )
         windows = aggregate_windows(
             result.log_likelihood,
@@ -521,7 +535,7 @@ class TestAdditivity:
 
 
 class TestWindowMidpoints:
-    config = MemorylessSequenceConfig()
+    config = DECODE_GRID
 
     def test_one_midpoint_per_window(self, decoded):
         time, log_likelihood = decoded
@@ -569,6 +583,189 @@ class TestWindowMidpoints:
         assert midpoints.shape == (0,)
 
 
+class TestDetectorGrid:
+    """The likelihood on its own 200 Hz grid: 5 ms rows, a window of 16."""
+
+    config = MemorylessSequenceConfig()
+
+    @pytest.fixture(scope="class")
+    def on_grid(self, epoch):
+        return clusterless_epoch_log_likelihood(
+            epoch.time,
+            epoch.linear_position,
+            epoch.spike_times,
+            epoch.spike_waveform_features,
+            epoch.encoding_model,
+            self.config,
+        )
+
+    def test_at_the_decode_rate_the_grid_is_the_decode_grid(self, epoch):
+        assert encoding_bins_per_row(DECODE_GRID) == 1.0
+        np.testing.assert_array_equal(
+            likelihood_grid(epoch.time, DECODE_GRID), epoch.time
+        )
+
+    def test_at_the_decode_rate_the_likelihood_is_the_library_s_bit_for_bit(
+        self, epoch
+    ):
+        """The ground-term scaling is exactly 1.0 there and changes no value."""
+        from non_local_detector.likelihoods.clusterless_kde import (
+            predict_clusterless_kde_log_likelihood,
+        )
+
+        library = np.asarray(
+            predict_clusterless_kde_log_likelihood(
+                epoch.time,
+                epoch.time,
+                epoch.linear_position[:, None],
+                epoch.spike_times,
+                epoch.spike_waveform_features,
+                **{k: epoch.encoding_model[k] for k in CLUSTERLESS_LIKELIHOOD_KEYS},
+                is_local=False,
+                block_size=epoch.encoding_model.get("block_size", 100),
+                disable_progress_bar=True,
+            )
+        )[:-1]
+
+        result = clusterless_epoch_log_likelihood(
+            epoch.time,
+            epoch.linear_position,
+            epoch.spike_times,
+            epoch.spike_waveform_features,
+            epoch.encoding_model,
+            DECODE_GRID,
+        )
+
+        assert result.log_likelihood.dtype == library.dtype
+        np.testing.assert_array_equal(result.log_likelihood, library)
+
+    def test_the_grid_steps_5_ms_and_every_second_sample_is_a_decode_sample(
+        self, epoch
+    ):
+        grid = likelihood_grid(epoch.time, self.config)
+
+        assert encoding_bins_per_row(self.config) == 2.5
+        # samples at 0, 2.5, 5, ... decode samples, up to the last decode sample
+        assert grid.size == int((epoch.time.size - 1) / 2.5) + 1
+        np.testing.assert_array_equal(grid[::2], epoch.time[::5][: grid[::2].size])
+        np.testing.assert_allclose(np.diff(grid), 0.005, rtol=1e-9)
+        assert grid[-1] <= epoch.time[-1]
+
+    def test_a_window_is_the_direct_sum_over_its_80_ms(
+        self, epoch, on_grid, position_distances
+    ):
+        """The ground term scaled by 2.5 is 40 decode samples' exposure over 16
+        rows; the spikes are those of the window's own 80 ms."""
+        windows = aggregate_windows(
+            on_grid.log_likelihood,
+            self.config.window_n_samples,
+            self.config.stride_n_samples,
+        )
+        grid = likelihood_grid(epoch.time, self.config)
+
+        # even windows start on a decode sample, odd ones halfway between two
+        for window in (0, 1, 40, 41, len(windows) - 1):
+            direct = direct_window_log_likelihood(
+                epoch,
+                position_distances,
+                grid[window],
+                grid[window + self.config.window_n_samples],
+            )
+            np.testing.assert_allclose(windows[window], direct, rtol=1e-5, atol=1e-4)
+
+    def test_windows_both_grids_hold_agree_only_with_the_scaling(
+        self, epoch, decoded, on_grid
+    ):
+        """80 ms windows starting every 10 ms are on both grids, with the same
+        spikes; their posteriors agree when the ground term is scaled, and do
+        not when it is not."""
+        _, decode_rows = decoded
+        on_decode = aggregate_windows(decode_rows, 40, 5)
+        on_detector = aggregate_windows(on_grid.log_likelihood, 16, 2)
+        n = min(len(on_decode), len(on_detector))
+        unscaled = clusterless_epoch_log_likelihood(
+            epoch.time,
+            epoch.linear_position,
+            epoch.spike_times,
+            epoch.spike_waveform_features,
+            epoch.encoding_model
+            | {
+                "summed_ground_process_intensity": np.asarray(
+                    epoch.encoding_model["summed_ground_process_intensity"]
+                )
+                / encoding_bins_per_row(self.config)
+            },
+            self.config,
+        )
+        without = aggregate_windows(unscaled.log_likelihood, 16, 2)
+
+        np.testing.assert_allclose(on_detector[:n], on_decode[:n], rtol=1e-5, atol=1e-3)
+        np.testing.assert_allclose(
+            normalize_windows(on_detector[:n]),
+            normalize_windows(on_decode[:n]),
+            atol=1e-5,
+        )
+        assert not np.allclose(
+            normalize_windows(without[:n]), normalize_windows(on_decode[:n]), atol=1e-3
+        )
+
+    @pytest.mark.parametrize(("sample", "rows"), [(5, [2]), (7, [2, 3]), (8, [3])])
+    def test_a_row_is_missing_when_it_spans_a_missing_decode_sample(
+        self, epoch, sample, rows
+    ):
+        """Row ``k`` covers decode samples ``[2.5 k, 2.5 (k + 1))``: sample 5
+        starts row 2, sample 7 straddles rows 2 and 3, sample 8 is inside row 3."""
+        is_missing = np.zeros(epoch.time.size, dtype=bool)
+        is_missing[sample] = True
+
+        missing = missing_likelihood_rows(epoch.time, is_missing, self.config)
+
+        assert missing.shape == (likelihood_grid(epoch.time, self.config).size - 1,)
+        np.testing.assert_array_equal(np.flatnonzero(missing), rows)
+
+    def test_at_the_decode_rate_a_missing_row_is_the_missing_sample(self, epoch):
+        is_missing = (epoch.time >= 0.5) & (epoch.time <= 0.6)
+
+        np.testing.assert_array_equal(
+            missing_likelihood_rows(epoch.time, is_missing, DECODE_GRID),
+            is_missing[:-1],
+        )
+        midpoint_s, missing_windows = decoded_windows(
+            epoch.time, is_missing, DECODE_GRID
+        )
+        np.testing.assert_array_equal(
+            midpoint_s, window_midpoints_s(epoch.time[:-1], DECODE_GRID)
+        )
+        np.testing.assert_array_equal(
+            missing_windows,
+            windows_holding(
+                is_missing[:-1],
+                DECODE_GRID.window_n_samples,
+                DECODE_GRID.stride_n_samples,
+            ),
+        )
+
+    def test_the_windows_rebuilt_from_the_decode_grid_are_the_likelihood_s(
+        self, epoch, on_grid
+    ):
+        midpoint_s, missing_windows = decoded_windows(
+            epoch.time, np.zeros(epoch.time.size, dtype=bool), self.config
+        )
+        n_windows = len(
+            aggregate_windows(
+                on_grid.log_likelihood,
+                self.config.window_n_samples,
+                self.config.stride_n_samples,
+            )
+        )
+
+        np.testing.assert_array_equal(
+            midpoint_s, window_midpoints_s(on_grid.time, self.config)
+        )
+        assert midpoint_s.size == missing_windows.size == n_windows
+        assert not missing_windows.any()
+
+
 class TestEpochLikelihoodInvariants:
     def test_times_and_rows_must_agree(self):
         with pytest.raises(ValueError, match="log_likelihood is"):
@@ -601,7 +798,7 @@ class TestEpochLikelihoodInvariants:
 class TestReferenceRateFloor:
     """The reference adds 1e-3 Hz to every rate map before it decodes."""
 
-    config = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
+    config = DECODE_GRID
 
     @pytest.fixture(scope="class")
     def track(self):
@@ -638,6 +835,35 @@ class TestReferenceRateFloor:
             axis=1,
         )[: result.time.size]
         expected = counts @ np.log(fields) - fields.sum(axis=0)
+        np.testing.assert_allclose(
+            result.log_likelihood, expected, rtol=1e-4, atol=1e-3
+        )
+
+    def test_decodes_as_poisson_on_the_detector_grid(self, track):
+        """On 5 ms rows the term for the spikes that did not arrive is 2.5 of
+        the decode's 2 ms bins; the counts are the rows' own."""
+        from non_local_detector.likelihoods.common import get_spikecount_per_time_bin
+
+        config = MemorylessSequenceConfig()
+        floored = with_reference_rate_floor(track.encoding_model, config)
+        result = sorted_spikes_epoch_log_likelihood(
+            track.time, track.linear_position, track.spike_times, floored, config
+        )
+
+        grid = likelihood_grid(track.time, config)
+        interior = np.asarray(track.encoding_model["is_track_interior"]).ravel()
+        fields = (
+            np.asarray(track.encoding_model["place_fields"], dtype=np.float64)[
+                :, interior
+            ]
+            + 1e-3 / SAMPLING_FREQUENCY
+        )
+        counts = np.stack(
+            [get_spikecount_per_time_bin(t, grid) for t in track.spike_times],
+            axis=1,
+        )[:-1]
+        expected = counts @ np.log(fields) - 2.5 * fields.sum(axis=0)
+        np.testing.assert_array_equal(result.time, grid[:-1])
         np.testing.assert_allclose(
             result.log_likelihood, expected, rtol=1e-4, atol=1e-3
         )

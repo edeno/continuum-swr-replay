@@ -17,6 +17,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
+    MemorylessSequenceConfig,
+)
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     clusterless_epoch_log_likelihood,
     interior_bin_distances_cm,
@@ -60,6 +63,10 @@ def encargs(epoch):
     return encoding_inputs(epoch.encoding_model)["encargs"]
 
 
+DECODE_GRID = MemorylessSequenceConfig(stride_s=0.004, sampling_frequency=500.0)
+"""The likelihood row for row on the decode grid, which the evidence reads."""
+
+
 @pytest.fixture(scope="module")
 def whole_grid(epoch, encargs):
     """One library call on the whole grid, its unreachable last row dropped."""
@@ -69,6 +76,7 @@ def whole_grid(epoch, encargs):
         epoch.spike_times,
         epoch.spike_waveform_features,
         encargs,
+        DECODE_GRID,
     ).log_likelihood
 
 
@@ -439,6 +447,7 @@ class TestValidity:
             epoch.spike_times,
             epoch.spike_waveform_features,
             flagged,
+            DECODE_GRID,
         ).log_likelihood
         distance = interior_bin_distances_cm(env)
         far = np.flatnonzero(distance[self.FLAGGED] > REMOTE_CM)[0]

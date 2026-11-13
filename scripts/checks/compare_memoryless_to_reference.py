@@ -55,6 +55,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
+    likelihood_grid,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
     with_reference_rate_floor,
@@ -118,19 +119,28 @@ SWEEP_TOTALS = (
 
 def window_counts(
     spike_times: list[np.ndarray],
-    time: np.ndarray,
-    n_rows: int,
+    decode_time: np.ndarray,
     config: MemorylessSequenceConfig,
 ) -> np.ndarray:
     """Spikes of each cell in each window, binned as the library bins them.
 
-    Spikes are binned on the grid the likelihood was computed on, of which the
-    likelihood keeps the first ``n_rows`` rows.
+    Spikes are binned on the grid the likelihood was computed on, the
+    detector's (``likelihood_grid``) derived from the decode's, of which the
+    likelihood keeps every row but the last.
+
+    Parameters
+    ----------
+    spike_times : list of ndarray
+        One per cell.
+    decode_time : ndarray, shape (n_decode,)
+        The decode grid, the full grid the likelihood was handed.
+    config : MemorylessSequenceConfig
 
     Returns
     -------
     counts : ndarray, shape (n_windows, n_cells)
     """
+    time = likelihood_grid(decode_time, config)
     rows = np.stack(
         [
             get_spikecount_per_time_bin(
@@ -139,7 +149,7 @@ def window_counts(
             for times in spike_times
         ],
         axis=1,
-    ).astype(np.float64)[:n_rows]
+    ).astype(np.float64)[:-1]
     cumulative = np.concatenate([np.zeros((1, rows.shape[1])), np.cumsum(rows, 0)])
     n_windows = (rows.shape[0] - config.window_n_samples) // config.stride_n_samples + 1
     start = config.stride_n_samples * np.arange(n_windows)
@@ -352,10 +362,11 @@ def fields_and_thresholds(
     bin_size_cm = float(np.diff(centers_cm).mean())
     if not np.allclose(np.diff(centers_cm), bin_size_cm):
         raise RuntimeError("The reference's bin units need evenly spaced bins.")
-    # the library's fields are spikes per decode sample; the reference's are Hz
+    # the library's fields are spikes per bin of the decode grid they were
+    # fitted on; the reference's are Hz
     rate_hz = (
         np.asarray(encoding_model["place_fields"], dtype=np.float64)[:, interior]
-        * config.sampling_frequency
+        * config.decode_sampling_frequency
     )
     thresholds = reference.ReferenceThresholds(
         spread_cm=config.spread_threshold_cm,
@@ -379,12 +390,7 @@ def compare_variants(
 ) -> tuple[dict, pd.DataFrame]:
     """``compare`` under each variant of the reference, keyed by variant."""
     rate_hz, centers_cm, thresholds = fields_and_thresholds(encoding_model, config)
-    counts = window_counts(
-        decoded["spike_times"],
-        decoded.get("binning_time", decoded["time"]),
-        decoded["time"].size,
-        config,
-    )
+    counts = window_counts(decoded["spike_times"], decoded["binning_time"], config)
     if counts.shape[0] != decoded["posterior"].shape[0]:
         raise RuntimeError(
             f"{counts.shape[0]} windows of counts for "
@@ -395,7 +401,7 @@ def compare_variants(
         i: sorted_candidate_set_aside_pairs(
             int(decoded["candidates"].runs[i, 0]),
             int(decoded["candidates"].runs[i, 1]),
-            decoded.get("binning_time", decoded["time"]),
+            decoded["binning_time"],
             decoded["spike_times"],
             sliding_model,
             config,
@@ -439,7 +445,7 @@ def decode_sweep_cell(recording: dict, injected: list, window: tuple, key: str) 
         )
     )
     midpoint_s = window_midpoints_s(result.time, config)
-    window_speed = np.interp(midpoint_s, result.time, speed[: result.time.size])
+    window_speed = np.interp(midpoint_s, time, speed)
     candidates = detect_candidate_sequences(
         posterior, midpoint_s, recording["bin_distance_cm"], window_speed, config
     )

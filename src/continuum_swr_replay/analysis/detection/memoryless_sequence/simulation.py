@@ -472,7 +472,7 @@ def stray_window_spikes(
     n_local: int = 5,
     local_interval_s: float = 0.005,
     window_s: float = 0.080,
-    stride_s: float = 0.004,
+    stride_s: float = 0.005,
     clear_margin_s: float = 0.3,
 ) -> tuple[list[NDArray], StrayWindowEvent]:
     """A still event at the animal's place with one window decoded far away.

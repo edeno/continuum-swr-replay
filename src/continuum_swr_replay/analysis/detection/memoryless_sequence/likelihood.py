@@ -1,4 +1,4 @@
-"""Prior-excluded log-likelihood on the native decoding grid.
+"""Prior-excluded log-likelihood on the detector's own time grid.
 
 The detector decodes each window on its own under a uniform spatial prior, so
 what it needs from the encoding model is the spike log-likelihood per time
@@ -18,6 +18,21 @@ What remains is exact: row ``k`` holds the spikes in ``[time[k], time[k + 1])``,
 and the last surviving row also absorbs a spike landing exactly on the epoch's
 final timestamp.
 
+**The detector's grid.** The reference counts spikes in 5 ms bins and steps its
+80 ms window by one of them; the decode's grid is 2 ms, on which 5 ms is 2.5
+rows. So the likelihood is computed on a grid of its own,
+:func:`likelihood_grid`, at ``config.sampling_frequency`` over the decode's
+span, and a window is a whole number of its rows. Every function here that
+takes a ``time`` takes the *decode's* grid and derives the detector's from it,
+so a caller cannot pair the two wrongly. When the two rates agree the
+detector's grid is the decode's, unchanged. The encoding model was fitted on
+the decode's grid, and the library subtracts its ground-process term (the
+spikes that did not arrive) once per row, per *encoding* bin
+(``mean_rates`` are spikes per fitted bin). On a coarser grid that term is
+therefore multiplied by :func:`encoding_bins_per_row`, 2.5 at 5 ms against
+2 ms. The per-spike terms need nothing: a rate rescaled by a constant adds the
+same amount to every place bin, which a window's normalization removes.
+
 **Junction bins.** The library returns only ``is_track_interior_`` columns, and
 the ``edge_id == -1`` placeholders are built from the non-interior bins, so they
 are excluded here by construction. Reading a saved decode's
@@ -36,6 +51,9 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
+from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
+    windows_holding,
+)
 from continuum_swr_replay.decoding.results import ENCODING_KEY, load_saved_detector
 
 __all__ = [
@@ -45,8 +63,12 @@ __all__ = [
     "EpochLikelihood",
     "check_marks_match_encoding",
     "clusterless_epoch_log_likelihood",
+    "decoded_windows",
+    "encoding_bins_per_row",
     "interior_bin_distances_cm",
+    "likelihood_grid",
     "load_clusterless_encoding_model",
+    "missing_likelihood_rows",
     "sorted_spikes_epoch_log_likelihood",
     "validate_time_grid",
     "window_midpoints_s",
@@ -105,6 +127,10 @@ _RATE_TOLERANCE = 1e-4
 The decodes' clocks run 0.4-1.7 ppm fast of 500 Hz. At 1e-4 an 80 ms window is
 off by at most 8 us, 0.004 of a sample, while a grid at another rate is refused.
 """
+
+_WHOLE_SAMPLE_TOLERANCE = 1e-9
+"""How far, in decode samples, a grid position may sit from a whole sample and
+still be that sample."""
 
 
 @dataclass(frozen=True)
@@ -241,6 +267,30 @@ def check_marks_match_encoding(
             )
 
 
+def _check_uniform(time: NDArray, sampling_frequency: float) -> None:
+    """Refuse a grid that is not uniform or not at ``sampling_frequency``.
+
+    Uniformity is judged about the grid's own mean rate, which must itself sit
+    within ``_RATE_TOLERANCE`` of ``sampling_frequency``; a recording clock a
+    few ppm fast passes.
+    """
+    step = (time[-1] - time[0]) / (time.size - 1)
+    offset = (time - time[0]) / step - np.arange(time.size)
+    worst = int(np.argmax(np.abs(offset)))
+    if abs(offset[worst]) > _SAMPLE_TOLERANCE:
+        raise ValueError(
+            f"The decoding grid is not uniform: sample {worst} sits "
+            f"{offset[worst]:.3g} samples from where a uniform grid puts it. "
+            "Windows summed over it would cover unequal spans."
+        )
+    if abs(step * sampling_frequency - 1.0) > _RATE_TOLERANCE:
+        raise ValueError(
+            f"The grid is sampled every {step} s on average, not the "
+            f"{1.0 / sampling_frequency} s of the configured "
+            f"{sampling_frequency} Hz."
+        )
+
+
 def validate_time_grid(time: NDArray, config: MemorylessSequenceConfig) -> None:
     """Check that windows may be summed over this grid at all.
 
@@ -254,6 +304,8 @@ def validate_time_grid(time: NDArray, config: MemorylessSequenceConfig) -> None:
     Parameters
     ----------
     time : ndarray, shape (n_time,)
+        The detector's grid, at ``config.sampling_frequency``
+        (:func:`likelihood_grid`).
     config : MemorylessSequenceConfig
 
     Raises
@@ -270,33 +322,169 @@ def validate_time_grid(time: NDArray, config: MemorylessSequenceConfig) -> None:
             f"{config.window_n_samples} after the final row, which no spike can "
             "reach, is dropped."
         )
-    step = (time[-1] - time[0]) / (time.size - 1)
-    offset = (time - time[0]) / step - np.arange(time.size)
-    worst = int(np.argmax(np.abs(offset)))
-    if abs(offset[worst]) > _SAMPLE_TOLERANCE:
-        raise ValueError(
-            f"The decoding grid is not uniform: sample {worst} sits "
-            f"{offset[worst]:.3g} samples from where a uniform grid puts it. "
-            "Windows summed over it would cover unequal spans."
+    _check_uniform(time, config.sampling_frequency)
+
+
+def encoding_bins_per_row(config: MemorylessSequenceConfig) -> float:
+    """How many of the encoding model's time bins one row of the detector's grid spans.
+
+    The encoding model was fitted on the decode's grid, at
+    ``config.decode_sampling_frequency``, so its ground-process term is per
+    bin of it (2 ms); a row of the detector's grid lasts
+    ``1 / config.sampling_frequency``. 2.5 at 200 Hz, and exactly 1.0 when
+    the two rates agree, where multiplying by it changes no value.
+
+    Parameters
+    ----------
+    config : MemorylessSequenceConfig
+
+    Returns
+    -------
+    bins_per_row : float
+
+    """
+    return config.decode_sampling_frequency / config.sampling_frequency
+
+
+def _grid_positions(n_decode: int, config: MemorylessSequenceConfig) -> NDArray:
+    """Each detector-grid sample's position on the decode grid, in decode samples.
+
+    Shape (n_grid,): ``0, r, 2r, ...`` up to the decode's last sample, with
+    ``r = encoding_bins_per_row(config)``.
+    """
+    step = encoding_bins_per_row(config)
+    positions: NDArray = np.arange(0.0, n_decode - 1 + _WHOLE_SAMPLE_TOLERANCE, step)
+    return positions
+
+
+def likelihood_grid(decode_time: NDArray, config: MemorylessSequenceConfig) -> NDArray:
+    """The detector's time grid over the decode's span.
+
+    Samples every ``encoding_bins_per_row(config)`` decode samples, from the
+    decode's first sample to its last at most, placed by linear interpolation
+    between decode samples, so a sample that falls on a decode sample is that
+    sample exactly (at 200 Hz, every second one). When ``config`` is at the
+    decode's rate the decode grid is returned unchanged.
+
+    Parameters
+    ----------
+    decode_time : ndarray, shape (n_decode,)
+        The decode's uniform grid, at ``config.decode_sampling_frequency``.
+    config : MemorylessSequenceConfig
+
+    Returns
+    -------
+    grid : ndarray, shape (n_grid,)
+        At ``config.sampling_frequency``; ``n_grid == n_decode`` when the two
+        rates agree.
+
+    Raises
+    ------
+    ValueError
+        The decode grid is not uniform at the decode's rate, or the derived
+        grid is too short to hold a window (:func:`validate_time_grid`).
+
+    """
+    decode_time = np.asarray(decode_time, dtype=np.float64)
+    _check_uniform(decode_time, config.decode_sampling_frequency)
+    if config.sampling_frequency == config.decode_sampling_frequency:
+        grid = decode_time
+    else:
+        grid = np.interp(
+            _grid_positions(decode_time.size, config),
+            np.arange(decode_time.size),
+            decode_time,
         )
-    if abs(step * config.sampling_frequency - 1.0) > _RATE_TOLERANCE:
+    validate_time_grid(grid, config)
+    return grid
+
+
+def missing_likelihood_rows(
+    decode_time: NDArray, is_missing: NDArray, config: MemorylessSequenceConfig
+) -> NDArray[np.bool_]:
+    """Which rows of the likelihood span a missing decode sample.
+
+    Row ``k`` of the detector's grid covers ``[grid[k], grid[k + 1])``. It is
+    missing when any decode row it overlaps, ``[time[j], time[j + 1])``, is
+    missing: conservative, so a row is observed only when every spike it
+    holds is. When the two rates agree that is decode row ``k`` itself.
+
+    Parameters
+    ----------
+    decode_time : ndarray, shape (n_decode,)
+    is_missing : ndarray of bool, shape (n_decode,)
+        Decode samples with no observation, as the decoders' ``is_missing``.
+    config : MemorylessSequenceConfig
+
+    Returns
+    -------
+    missing_rows : ndarray of bool, shape (n_grid - 1,)
+        One per row the likelihood keeps (its final row is dropped).
+
+    """
+    decode_time = np.asarray(decode_time, dtype=np.float64)
+    is_missing = np.asarray(is_missing, dtype=bool)
+    if is_missing.shape != decode_time.shape:
         raise ValueError(
-            f"The grid is sampled every {step} s on average, not the "
-            f"{1.0 / config.sampling_frequency} s of the configured "
-            f"{config.sampling_frequency} Hz."
+            f"is_missing {is_missing.shape} must be on the decode grid "
+            f"{decode_time.shape}."
         )
+    # refuses a decode grid the likelihood would refuse
+    likelihood_grid(decode_time, config)
+    positions = _grid_positions(decode_time.size, config)
+    first = np.floor(positions[:-1] + _WHOLE_SAMPLE_TOLERANCE).astype(int)
+    stop = np.ceil(positions[1:] - _WHOLE_SAMPLE_TOLERANCE).astype(int)
+    before = np.concatenate([[0], np.cumsum(is_missing, dtype=np.int64)])
+    missing_rows: NDArray[np.bool_] = (before[stop] - before[first]) > 0
+    return missing_rows
+
+
+def decoded_windows(
+    decode_time: NDArray, is_missing: NDArray, config: MemorylessSequenceConfig
+) -> tuple[NDArray, NDArray[np.bool_]]:
+    """Every window's midpoint, and which windows hold a missing row.
+
+    What :func:`~...epoch.run_epoch` decodes, rebuilt from the decode grid
+    alone, for anything that reads a run's windows back.
+
+    Parameters
+    ----------
+    decode_time : ndarray, shape (n_decode,)
+    is_missing : ndarray of bool, shape (n_decode,)
+    config : MemorylessSequenceConfig
+
+    Returns
+    -------
+    midpoint_s : ndarray, shape (n_windows,)
+    missing_windows : ndarray of bool, shape (n_windows,)
+        The windows left undecoded.
+
+    """
+    rows = likelihood_grid(decode_time, config)[:-1]
+    missing_windows = windows_holding(
+        missing_likelihood_rows(decode_time, is_missing, config),
+        config.window_n_samples,
+        config.stride_n_samples,
+    )
+    return window_midpoints_s(rows, config), missing_windows
 
 
 def _validated_time_and_position(
     time: NDArray, linear_position: NDArray, config: MemorylessSequenceConfig
 ) -> tuple[NDArray, NDArray]:
-    """The checked time grid, and the position as the column the library wants."""
-    time = np.asarray(time, dtype=np.float64)
-    validate_time_grid(time, config)
+    """The detector's grid, and the position on it as the column the library wants.
+
+    Position is interpolated onto the grid only when the grid is not the
+    decode's; the non-local likelihood does not read it.
+    """
+    decode_time = np.asarray(time, dtype=np.float64)
+    grid = likelihood_grid(decode_time, config)
     position = np.asarray(linear_position, dtype=np.float64)
+    if config.sampling_frequency != config.decode_sampling_frequency:
+        position = np.interp(grid, decode_time, position.reshape(decode_time.size))
     if position.ndim == 1:
         position = position[:, None]
-    return time, position
+    return grid, position
 
 
 def clusterless_epoch_log_likelihood(
@@ -307,7 +495,10 @@ def clusterless_epoch_log_likelihood(
     encoding_model: dict,
     config: MemorylessSequenceConfig | None = None,
 ) -> EpochLikelihood:
-    """Decode one epoch on its native grid, with no prior.
+    """Decode one epoch on the detector's grid, with no prior.
+
+    The grid is :func:`likelihood_grid`, and the ground-process term is
+    scaled to its rows (:func:`encoding_bins_per_row`).
 
     Parameters
     ----------
@@ -326,15 +517,19 @@ def clusterless_epoch_log_likelihood(
     Returns
     -------
     likelihood : EpochLikelihood
+        On the detector's grid, ``n_grid - 1`` rows.
 
     """
     from non_local_detector.likelihoods.clusterless_kde import (
         predict_clusterless_kde_log_likelihood,
     )
 
-    time, position = _validated_time_and_position(
-        time, linear_position, config or MemorylessSequenceConfig()
-    )
+    config = config or MemorylessSequenceConfig()
+    time, position = _validated_time_and_position(time, linear_position, config)
+    model = {key: encoding_model[key] for key in CLUSTERLESS_LIKELIHOOD_KEYS}
+    model["summed_ground_process_intensity"] = model[
+        "summed_ground_process_intensity"
+    ] * encoding_bins_per_row(config)
 
     log_likelihood = np.asarray(
         predict_clusterless_kde_log_likelihood(
@@ -343,7 +538,7 @@ def clusterless_epoch_log_likelihood(
             cast(Any, position),
             cast(Any, spike_times),
             cast(Any, spike_waveform_features),
-            **{key: encoding_model[key] for key in CLUSTERLESS_LIKELIHOOD_KEYS},
+            **model,
             is_local=False,
             block_size=encoding_model.get("block_size", 100),
             disable_progress_bar=True,
@@ -356,8 +551,8 @@ def clusterless_epoch_log_likelihood(
 def window_midpoints_s(time: NDArray, config: MemorylessSequenceConfig) -> NDArray:
     """Timestamp of each window: the grid sample half a window into its support.
 
-    A window supporting rows ``[k, k + 40)`` is timestamped at row ``k + 20``,
-    0.040 s after it begins, the time whose speed decides the window's
+    A window supporting rows ``[k, k + W)`` is timestamped at row ``k + W / 2``
+    (``W`` is 16 rows at 200 Hz, 40 at 500 Hz), 0.040 s after it begins, the time whose speed decides the window's
     eligibility and the time that bounds the events assembled from it. It is
     the sample itself, not ``time[k] + 0.040``: on a recording's clock the
     sum misses the sample by up to 2.4e-7 s, and an event bound must sit on
@@ -368,6 +563,8 @@ def window_midpoints_s(time: NDArray, config: MemorylessSequenceConfig) -> NDArr
     Parameters
     ----------
     time : ndarray, shape (n_time,)
+        The likelihood's rows, ``EpochLikelihood.time``: the detector's grid
+        without its final sample.
     config : MemorylessSequenceConfig
 
     Returns
@@ -453,7 +650,8 @@ def with_reference_rate_floor(
     The library clips its fields only at a numerical epsilon, so a spike from a
     cell that is nearly silent somewhere rules that place out almost entirely;
     the reference's :data:`REFERENCE_RATE_FLOOR_HZ` bounds that. The fields are
-    per sample of the decode grid, so the floor is divided by its rate, and the
+    per bin of the grid they were fitted on, the decode's, so the floor is
+    divided by its rate (``config.decode_sampling_frequency``), and the
     term for the spikes that did not arrive, the fields summed over cells, is
     recomputed to match. There is no equivalent for a clusterless model.
 
@@ -462,7 +660,8 @@ def with_reference_rate_floor(
     encoding_model : dict
         Carrying :data:`SORTED_SPIKES_LIKELIHOOD_KEYS`. Not modified.
     config : MemorylessSequenceConfig
-        Its ``sampling_frequency`` is the rate the fields are per sample of.
+        Its ``decode_sampling_frequency`` is the rate the fields are per
+        sample of.
 
     Returns
     -------
@@ -473,7 +672,7 @@ def with_reference_rate_floor(
     """
     fields = (
         np.asarray(encoding_model["place_fields"], dtype=np.float64)
-        + REFERENCE_RATE_FLOOR_HZ / config.sampling_frequency
+        + REFERENCE_RATE_FLOOR_HZ / config.decode_sampling_frequency
     )
     return encoding_model | {
         "place_fields": fields,
@@ -488,13 +687,14 @@ def sorted_spikes_epoch_log_likelihood(
     encoding_model: dict,
     config: MemorylessSequenceConfig | None = None,
 ) -> EpochLikelihood:
-    """Decode one epoch from sorted units, on its native grid, with no prior.
+    """Decode one epoch from sorted units, on the detector's grid, with no prior.
 
     The sorted-spikes likelihood adds each neuron's spike count times the log
-    of its place field, and subtracts a per-sample term for the spikes that did
-    not arrive. Both parts are per row, so the array is additive over time in
-    the same way the clusterless one is, and it assigns spikes to rows with the
-    same convention.
+    of its place field, and subtracts a per-row term for the spikes that did
+    not arrive, scaled here to the detector's rows as the clusterless ground
+    term is (:func:`encoding_bins_per_row`). Both parts are per row, so the
+    array is additive over time in the same way the clusterless one is, and it
+    assigns spikes to rows with the same convention.
 
     Parameters
     ----------
@@ -512,15 +712,19 @@ def sorted_spikes_epoch_log_likelihood(
     Returns
     -------
     likelihood : EpochLikelihood
+        On the detector's grid, ``n_grid - 1`` rows.
 
     """
     from non_local_detector.likelihoods.sorted_spikes_kde import (
         predict_sorted_spikes_kde_log_likelihood,
     )
 
-    time, position = _validated_time_and_position(
-        time, linear_position, config or MemorylessSequenceConfig()
-    )
+    config = config or MemorylessSequenceConfig()
+    time, position = _validated_time_and_position(time, linear_position, config)
+    model = {key: encoding_model[key] for key in SORTED_SPIKES_LIKELIHOOD_KEYS}
+    model["no_spike_part_log_likelihood"] = model[
+        "no_spike_part_log_likelihood"
+    ] * encoding_bins_per_row(config)
 
     log_likelihood = np.asarray(
         predict_sorted_spikes_kde_log_likelihood(
@@ -528,7 +732,7 @@ def sorted_spikes_epoch_log_likelihood(
             cast(Any, time),
             cast(Any, position),
             cast(Any, spike_times),
-            **{key: encoding_model[key] for key in SORTED_SPIKES_LIKELIHOOD_KEYS},
+            **model,
             is_local=False,
             disable_progress_bar=True,
         )

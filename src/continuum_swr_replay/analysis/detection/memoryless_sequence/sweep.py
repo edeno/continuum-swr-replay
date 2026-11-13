@@ -310,6 +310,8 @@ class SlidingWindowRun:
     ``accepted`` and tested against the place-cell identity shuffle; a
     candidate's draws are seeded by the stretch's key and its first window,
     so which other candidates are tested does not change its result.
+    ``time`` is the decoded stretch's samples, on the decode grid; the windows
+    were decoded on the detector's grid derived from it.
     """
 
     time: np.ndarray
@@ -333,7 +335,7 @@ def run_sliding_window(recording, injected, window, cell_key) -> SlidingWindowRu
         )
     )
     midpoint_s = window_midpoints_s(result.time, CONFIG)
-    window_speed = np.interp(midpoint_s, result.time, speed[: result.time.size])
+    window_speed = np.interp(midpoint_s, time, speed)
     candidates = detect_candidate_sequences(
         posterior, midpoint_s, recording["bin_distance_cm"], window_speed, CONFIG
     )
@@ -372,7 +374,7 @@ def run_sliding_window(recording, injected, window, cell_key) -> SlidingWindowRu
         for i in accepted
     }
     return SlidingWindowRun(
-        time=result.time,
+        time=time,
         midpoint_s=midpoint_s,
         posterior=posterior,
         candidates=candidates,

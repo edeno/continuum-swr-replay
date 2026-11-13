@@ -250,7 +250,10 @@ def _speed_samples(
 ) -> NDArray:
     """Every native speed sample from the event's start to its end, inclusive.
 
-    Event bounds are samples of the same grid, so the comparison is exact.
+    Event bounds are window midpoints, samples of the detector's grid. On the
+    decode's own grid they are speed samples and are included; on the 5 ms
+    grid every second bound falls halfway between two speed samples, and the
+    samples inside the event are those between the bounds.
     """
     first = np.searchsorted(time, start_s, side="left")
     last = np.searchsorted(time, end_s, side="right")

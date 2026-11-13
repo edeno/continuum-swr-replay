@@ -886,10 +886,11 @@ def test_the_nearest_event_must_be_a_compared_one():
 
 # --- posterior features: the memoryless windows (ms_) --------------------
 
-CONFIG = MemorylessSequenceConfig()
+CONFIG = MemorylessSequenceConfig(stride_s=0.004, sampling_frequency=500.0)
 MIDPOINT_S = window_midpoints_s(TIME[:-1], CONFIG)
-"""The windows' midpoints on the grid less its last sample, as the run makes
-them: window ``i``'s midpoint is row ``2 i + 20``."""
+"""The windows' midpoints on the grid less its last sample, as a run at a 4 ms
+step on the decode grid makes them: window ``i``'s midpoint is row
+``2 i + 20``. The features read midpoints by time, whatever grid made them."""
 N_WINDOWS = MIDPOINT_S.size
 
 

@@ -85,8 +85,9 @@ N_NEURONS = 25
 and in the memoryless sweeps' recording (``sweep.build_recording``)."""
 
 CONFIG = MemorylessSequenceConfig()
-"""The sliding-window detector's settings on that 500 Hz grid, in the figure
-and in the sweeps."""
+"""The sliding-window detector's settings, in the figure and in the sweeps: the
+published 80 ms window stepped by 5 ms, decoded on a 200 Hz grid derived from
+that 500 Hz decode grid (``likelihood.likelihood_grid``)."""
 
 SHORT_REPLAY = InjectedReplay(
     start_cm=35.0,
@@ -279,7 +280,10 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     result = sorted_spikes_epoch_log_likelihood(
         time, position, spike_times, encoding_model, config
     )
-    position, speed = position[: result.time.size], speed[: result.time.size]
+    # the decode grid's rows, its final sample dropped as the likelihood drops
+    # its own; the state-space detector predicts on these
+    decode_rows = time[:-1]
+    position, speed = position[:-1], speed[:-1]
 
     posterior = normalize_windows(
         aggregate_windows(
@@ -287,7 +291,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         )
     )
     midpoint_s = window_midpoints_s(result.time, config)
-    window_speed = np.interp(midpoint_s, result.time, speed)
+    window_speed = np.interp(midpoint_s, decode_rows, speed)
     bin_distance_cm = interior_bin_distances_cm(environment)
     candidates = detect_candidate_sequences(
         posterior, midpoint_s, bin_distance_cm, window_speed, config
@@ -311,8 +315,9 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
 
     return {
         "detector": detector,
-        "time": result.time,
-        "is_event": is_event[: result.time.size],
+        "time": decode_rows,
+        "binning_time": time,
+        "is_event": is_event[:-1],
         "position": position,
         "speed": speed,
         "spike_times": spike_times,

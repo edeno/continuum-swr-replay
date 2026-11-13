@@ -22,7 +22,9 @@ from tests.support._memoryless_clusterless_epoch import (
     build_tiling_tetrode,
 )
 
-CONFIG = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
+# the decode's own 500 Hz grid at a 4 ms step, on which the synthetic epochs'
+# window indices were chosen
+CONFIG = MemorylessSequenceConfig(stride_s=0.004, sampling_frequency=SAMPLING_FREQUENCY)
 IDENTITY = SequenceIdentity(
     animal="sim",
     day=20200101,

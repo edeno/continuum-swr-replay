@@ -560,7 +560,8 @@ class TestMatchedBaselines:
 #   600-625     exactly 100 ms, kept by assembly and declined as replay.
 # Window 30 is undecoded (it holds a masked row) and window 71 is too fast.
 
-REJECTION_CONFIG = MemorylessSequenceConfig()
+# window counts above are at a 4 ms step: the stages read the config's stride
+REJECTION_CONFIG = MemorylessSequenceConfig(stride_s=0.004, sampling_frequency=500.0)
 N_WINDOWS = 700
 MIDPOINT = 100.0 + REJECTION_CONFIG.stride_s * np.arange(N_WINDOWS)
 TRACK_DISTANCE_CM = 2.0 * np.abs(np.subtract.outer(np.arange(400), np.arange(400)))

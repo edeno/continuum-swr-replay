@@ -29,6 +29,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     check_marks_match_encoding,
+    decoded_windows,
     interior_bin_distances_cm,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
@@ -36,7 +37,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     normalize_windows,
-    windows_holding,
 )
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
 from continuum_swr_replay.analysis.event_definition import (
@@ -153,18 +153,14 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
     candidates = load_candidates(
         memoryless_dir / f"{identifier}_memoryless_candidates.pkl"
     )
-    config = candidates.config
-    n_windows = 1 + (time.size - 1 - config.window_n_samples) // config.stride_n_samples
-    if candidates.midpoint_s.size != n_windows:
-        raise ValueError(
-            f"The stored candidates have {candidates.midpoint_s.size} windows; the "
-            f"decode grid of {identifier} makes {n_windows}."
-        )
     # the runner's is_missing: a bin inside a closed interval of the mask
     is_missing = interval_mask(time, swr_source.artifact_intervals(identifier))
-    missing_windows = windows_holding(
-        is_missing[:-1], config.window_n_samples, config.stride_n_samples
-    )
+    midpoint_s, missing_windows = decoded_windows(time, is_missing, candidates.config)
+    if candidates.midpoint_s.size != midpoint_s.size:
+        raise ValueError(
+            f"The stored candidates have {candidates.midpoint_s.size} windows; the "
+            f"decode grid of {identifier} makes {midpoint_s.size}."
+        )
 
     animal, day, epoch = (str(dot[c].iloc[0]) for c in ("animal", "day", "epoch"))
     band = get_ripple_band_inputs(nwb_file_name(animal, day), epoch)

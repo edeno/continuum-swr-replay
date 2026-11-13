@@ -1,5 +1,7 @@
 """Bin filter, sequence assembly, merge, and replay criteria."""
 
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -44,7 +46,11 @@ def accumulated_track(n_bins: int, bin_size: float = 0.4) -> np.ndarray:
     return np.abs(centers[:, None] - centers[None, :])
 
 
-def window_times(n_windows: int, stride_s: float = 0.004) -> np.ndarray:
+FOUR_MS = MemorylessSequenceConfig(stride_s=0.004, sampling_frequency=500.0)
+"""A 4 ms step on the decode's 500 Hz grid, for the tests that are about it."""
+
+
+def window_times(n_windows: int, stride_s: float = 0.005) -> np.ndarray:
     """Midpoints of consecutive windows."""
     return np.arange(n_windows) * stride_s
 
@@ -362,7 +368,7 @@ class TestAssembleSequences:
         np.testing.assert_array_equal(assembly.pre_merge_runs, [[20, 49]])
 
     def linked_by_one_window(self) -> np.ndarray:
-        """Two 15-window runs 56 ms apart, and one kept window 28 ms from each."""
+        """Two 15-window runs 70 ms apart, and one kept window 35 ms from each."""
         kept = np.zeros(50, dtype=bool)
         kept[0:15] = True
         kept[21] = True
@@ -391,7 +397,7 @@ class TestAssembleSequences:
         kept = np.zeros(40, dtype=bool)
         kept[:26] = True
 
-        assembly = self.assemble(kept)
+        assembly = self.assemble(kept, config=FOUR_MS)
 
         np.testing.assert_array_equal(assembly.runs, [[0, 25]])
 
@@ -399,7 +405,7 @@ class TestAssembleSequences:
         kept = np.zeros(40, dtype=bool)
         kept[:25] = True
 
-        assembly = self.assemble(kept)
+        assembly = self.assemble(kept, config=FOUR_MS)
 
         assert assembly.runs.shape == (0, 2)
 
@@ -454,15 +460,15 @@ class TestSequenceDuration:
 
         duration = sequence_duration_s(np.array([[0, 25], [30, 35]]), time_s)
 
-        np.testing.assert_allclose(duration, [25 * 0.004, 5 * 0.004])
+        np.testing.assert_allclose(duration, [25 * 0.005, 5 * 0.005])
 
     def test_the_window_width_is_not_added(self):
         """Event bounds are midpoints; the decoding support is kept separately."""
         time_s = window_times(30)
 
-        duration = sequence_duration_s(np.array([[0, 25]]), time_s)
+        duration = sequence_duration_s(np.array([[0, 20]]), time_s)
 
-        np.testing.assert_allclose(duration, [0.100])
+        np.testing.assert_allclose(duration, [0.100])  # 20 strides of 5 ms
 
     def test_no_runs_gives_an_empty_float_array(self):
         duration = sequence_duration_s(np.zeros((0, 2), dtype=int), window_times(10))
@@ -526,21 +532,22 @@ class TestReplayMask:
         assert mask.tolist() == [False]
 
     def test_the_thresholds_are_strict(self):
-        """25 strides is exactly 100 ms and fails, as in the reference driver."""
+        """20 strides of 5 ms is exactly 100 ms and fails, as in the reference
+        driver."""
         mask = replay_mask(
-            np.array([[0, 25], [0, 50]]), np.array([20.0, 12.0]), self.config
+            np.array([[0, 20], [0, 50]]), np.array([20.0, 12.0]), self.config
         )
 
         assert mask.tolist() == [False, False]
 
     def test_one_stride_past_the_duration_threshold_is_replay(self):
-        mask = replay_mask(np.array([[3, 29]]), np.array([20.0]), self.config)
+        mask = replay_mask(np.array([[3, 24]]), np.array([20.0]), self.config)
 
         assert mask.tolist() == [True]
 
     def test_a_duration_between_strides_is_rounded_up(self):
         """50 ms is 12.5 strides of 4 ms: 13 strides is strictly longer."""
-        config = MemorylessSequenceConfig(minimum_duration_s=0.050)
+        config = dataclasses.replace(FOUR_MS, minimum_duration_s=0.050)
 
         mask = replay_mask(np.array([[0, 12], [0, 13]]), np.array([20.0, 20.0]), config)
 
@@ -600,11 +607,11 @@ class TestWindowDecisions:
 
     def test_the_ordering_changes_whether_a_candidate_is_accepted(self):
         """The extra window is the one the duration filter turns on."""
-        bins = np.arange(10, 10 + 27)
-        speed = np.zeros(27)
+        bins = np.arange(10, 10 + 22)
+        speed = np.zeros(22)
         speed[-1] = 9.0  # the last window is not immobile
         posterior = self.posterior_at(bins)
-        time_s = window_times(27)
+        time_s = window_times(22)
 
         def runs_for(kept, center):
             return assemble_sequences(
@@ -614,10 +621,11 @@ class TestWindowDecisions:
         decisions = window_decisions(posterior, self.distance, speed, self.config)
         wrong_order = self.jumps_before_speed_gate(posterior, speed)
 
-        # windows 0-24 survive the correct order: index length 24, one short
+        # windows 0-19 survive the correct order: index length 19, one short
+        # of the 20 strides of 5 ms in 100 ms
         assert runs_for(decisions.gates.kept, decisions.center_index).shape == (0, 2)
         np.testing.assert_array_equal(
-            runs_for(wrong_order.kept, decisions.center_index), [[0, 25]]
+            runs_for(wrong_order.kept, decisions.center_index), [[0, 20]]
         )
 
 
@@ -645,25 +653,25 @@ class TestDetectCandidateSequences:
         )
 
         np.testing.assert_array_equal(found.runs, [[0, 39]])
-        np.testing.assert_allclose(found.duration_s, [39 * 0.004])
+        np.testing.assert_allclose(found.duration_s, [39 * 0.005])
         assert found.is_replay.tolist() == [True]
 
     @pytest.mark.parametrize("origin_s", [0.0, 1.58e9])
     def test_a_hundred_millisecond_sequence_fails_whatever_the_clock(self, origin_s):
         """On a recording clock 100 ms of midpoints subtracts to 0.100000143 s."""
-        # every second sample of a 500 Hz grid, from the second window on
-        midpoints = origin_s + np.arange(2, 54, 2) / 500.0
+        # 21 samples of a 200 Hz grid, 20 strides of 5 ms, from the seventh on
+        midpoints = origin_s + np.arange(6, 27) / 200.0
         assert origin_s == 0.0 or midpoints[-1] - midpoints[0] > 0.100
 
         found = detect_candidate_sequences(
-            self.moving_posterior(np.arange(26)),
+            self.moving_posterior(np.arange(21)),
             midpoints,
             self.distance,
-            np.zeros(26),
+            np.zeros(21),
             self.config,
         )
 
-        np.testing.assert_array_equal(found.runs, [[0, 25]])
+        np.testing.assert_array_equal(found.runs, [[0, 20]])
         assert found.dispersion_cm[0] > self.config.dispersion_threshold_cm
         assert found.is_replay.tolist() == [False]
 
@@ -683,19 +691,20 @@ class TestDetectCandidateSequences:
         assert found.is_replay.tolist() == [False]
 
     def test_the_speed_gate_precedes_the_jumps(self):
-        bins = np.arange(27)
-        speed = np.zeros(27)
+        bins = np.arange(22)
+        speed = np.zeros(22)
         speed[-1] = 9.0
 
         found = detect_candidate_sequences(
             self.moving_posterior(bins),
-            window_times(27),
+            window_times(22),
             self.distance,
             speed,
             self.config,
         )
 
-        assert found.decisions.gates.kept.sum() == 25
+        # 20 kept windows, index length 19: one short of 100 ms at 5 ms
+        assert found.decisions.gates.kept.sum() == 20
         assert found.runs.shape == (0, 2)
 
     def test_the_intermediate_stages_are_kept(self):

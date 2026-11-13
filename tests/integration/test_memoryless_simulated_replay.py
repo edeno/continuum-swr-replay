@@ -43,6 +43,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table imp
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     clusterless_epoch_log_likelihood,
     interior_bin_distances_cm,
+    likelihood_grid,
     window_midpoints_s,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
@@ -59,7 +60,7 @@ RUNNING_SPEED_CM_PER_S = 15
 N_ELECTRODES = 5
 EPOCH_S = 1.6
 REPLAY_START_S = 0.4
-CONFIG = MemorylessSequenceConfig(sampling_frequency=float(SAMPLING_FREQUENCY))
+CONFIG = MemorylessSequenceConfig(decode_sampling_frequency=float(SAMPLING_FREQUENCY))
 
 pytestmark = pytest.mark.integration
 
@@ -499,13 +500,12 @@ class TestWholeEpoch:
         each window's gate reads its midpoint and passes, and the whole-event
         rule, which reads every sample, must still catch it. The shuffle
         still runs, as the reference would test it; eligibility is a column."""
-        n_time = round(EPOCH_S * SAMPLING_FREQUENCY)
-        speed = np.zeros(n_time)
-        midpoints = CONFIG.window_n_samples // 2 + CONFIG.stride_n_samples * np.arange(
-            n_time
-        )
+        time = np.arange(round(EPOCH_S * SAMPLING_FREQUENCY)) / SAMPLING_FREQUENCY
+        speed = np.zeros(time.size)
+        # the windows sit on the detector's grid, derived from this decode grid
+        midpoints = window_midpoints_s(likelihood_grid(time, CONFIG)[:-1], CONFIG)
         inside = round(0.5 * SAMPLING_FREQUENCY) + 1  # the replay runs from 0.4 s
-        assert inside not in set(midpoints.tolist())
+        assert time[inside] not in set(midpoints.tolist())
         speed[inside] = 9.0
 
         moved = self.run(simulation, self.SEED, speed=speed)

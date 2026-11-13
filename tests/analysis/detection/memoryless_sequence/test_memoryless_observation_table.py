@@ -9,7 +9,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.epoch import (
     observation_table,
 )
 
-CONFIG = MemorylessSequenceConfig(sampling_frequency=500.0)
+CONFIG = MemorylessSequenceConfig(stride_s=0.004, sampling_frequency=500.0)
 TIME = np.round(np.arange(50) * 0.002, 3)
 """50 samples at 500 Hz. Without the final row, 49 samples hold five 40-sample
 windows two samples apart, timestamped at samples 20, 22, 24, 26 and 28:

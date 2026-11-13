@@ -46,6 +46,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     ENCODING_KEY,
     interior_bin_distances_cm,
+    likelihood_grid,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
     with_reference_rate_floor,
@@ -261,7 +262,10 @@ def decoded() -> Decoded:
     midpoint_s = window_midpoints_s(result.time, CONFIG)
 
     bin_distance_cm = interior_bin_distances_cm(environment)
-    window_speed = np.interp(midpoint_s, result.time, speed[: result.time.size])
+    # the decode grid's rows, its final sample dropped as the likelihood drops
+    # its own; the state-space detector predicts on these
+    decode_rows = time[:-1]
+    window_speed = np.interp(midpoint_s, decode_rows, speed[:-1])
     candidates = detect_candidate_sequences(
         posterior, midpoint_s, bin_distance_cm, window_speed, CONFIG
     )
@@ -283,8 +287,8 @@ def decoded() -> Decoded:
     }
 
     return Decoded(
-        time=result.time,
-        position=position[: result.time.size],
+        time=decode_rows,
+        position=position[:-1],
         event_times=event_times,
         place_bin_centers_cm=result.place_bin_centers_cm,
         midpoint_s=midpoint_s,
@@ -296,7 +300,7 @@ def decoded() -> Decoded:
         bin_distance_cm=bin_distance_cm,
         window_speed=window_speed,
         state_space_intervals=state_space_intervals(
-            detector, result.time, position[: result.time.size], spike_times
+            detector, decode_rows, position[:-1], spike_times
         ),
     )
 
@@ -729,7 +733,8 @@ class TestSortedSpikesLikelihood:
 
         Independent of the library's row assignment: count each neuron's spikes
         in the window's own half-open support, weight the log place field by
-        that count, and charge one silent-part term per sample.
+        that count, and charge one silent-part term per decode sample the
+        window spans: 80 ms of 2 ms samples, 40, however many rows hold them.
         """
         place_fields = np.asarray(decoded.encoding_model["place_fields"])
         interior = np.asarray(decoded.encoding_model["is_track_interior"])
@@ -749,14 +754,20 @@ class TestSortedSpikesLikelihood:
             CONFIG.stride_n_samples,
         )
 
+        # the likelihood's own grid, derived from the decode rows it was handed
+        grid = likelihood_grid(decoded.time, CONFIG)
+        decode_samples = round(
+            CONFIG.window_duration_s * CONFIG.decode_sampling_frequency
+        )
+
         # windows that hold spikes: a silent one compares only the exposure
         # term and would not test the spike assignment at all
         rng = np.random.default_rng(0)
         tested = 0
         for window in rng.permutation(len(windows))[:300]:
             start = window * CONFIG.stride_n_samples
-            start_s = decoded.time[start]
-            end_s = decoded.time[start + CONFIG.window_n_samples]
+            start_s = grid[start]
+            end_s = grid[start + CONFIG.window_n_samples]
             counts = np.array(
                 [
                     ((neuron >= start_s) & (neuron < end_s)).sum()
@@ -768,7 +779,7 @@ class TestSortedSpikesLikelihood:
             tested += 1
             direct = (
                 counts @ np.log(place_fields[:, interior])
-                - CONFIG.window_n_samples * silent_part
+                - decode_samples * silent_part
             )
 
             np.testing.assert_allclose(windows[window], direct, rtol=1e-4, atol=1e-3)

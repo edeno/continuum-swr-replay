@@ -50,7 +50,11 @@ from tests.support._memoryless_clusterless_epoch import (
     build_tiling_tetrode,
 )
 
-CONFIG = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
+# the decode's own 500 Hz grid at a 4 ms step, on which the synthetic epochs'
+# window indices were chosen
+CONFIG = MemorylessSequenceConfig(stride_s=0.004, sampling_frequency=SAMPLING_FREQUENCY)
+DETECTOR_GRID = MemorylessSequenceConfig()
+"""The default: a 5 ms step on the detector's own 200 Hz grid."""
 SEED = ShuffleSeed(run=20260922, session="simulated_epoch")
 
 
@@ -348,7 +352,9 @@ class TestShuffledLikelihood:
 
     WINDOWS = (10, 70)
 
-    def test_the_identity_reproduces_the_epoch_decode(self, epoch):
+    @pytest.mark.parametrize("config", [CONFIG, DETECTOR_GRID], ids=["4ms", "5ms"])
+    def test_the_identity_reproduces_the_epoch_decode(self, epoch, config):
+        """On either grid: same rows, same spikes, same scaled ground term."""
         first, last = self.WINDOWS
         whole = clusterless_epoch_log_likelihood(
             epoch.time,
@@ -356,10 +362,10 @@ class TestShuffledLikelihood:
             epoch.spike_times,
             epoch.spike_waveform_features,
             epoch.encoding_model,
-            CONFIG,
+            config,
         )
         expected = aggregate_windows(
-            whole.log_likelihood, CONFIG.window_n_samples, CONFIG.stride_n_samples
+            whole.log_likelihood, config.window_n_samples, config.stride_n_samples
         )[first : last + 1]
 
         windows = candidate_window_log_likelihood(
@@ -369,7 +375,7 @@ class TestShuffledLikelihood:
             epoch.spike_times,
             epoch.spike_waveform_features,
             epoch.encoding_model,
-            CONFIG,
+            config,
         )
 
         assert windows.shape == expected.shape
@@ -569,7 +575,8 @@ class TestShuffleCandidate:
         assert result.p_jump > 0.05
         assert not result.passes
 
-    def test_the_observed_statistics_are_the_unshuffled_decode(self, tetrode):
+    @pytest.mark.parametrize("config", [CONFIG, DETECTOR_GRID], ids=["4ms", "5ms"])
+    def test_the_observed_statistics_are_the_unshuffled_decode(self, tetrode, config):
         first, last = self.WINDOWS
         windows = candidate_window_log_likelihood(
             first,
@@ -578,10 +585,10 @@ class TestShuffleCandidate:
             tetrode.spike_times,
             tetrode.spike_waveform_features,
             tetrode.encoding_model,
-            CONFIG,
+            config,
         )
         unchanged = unchanged_window_pairs(
-            first, last, tetrode.time, tetrode.spike_times, CONFIG
+            first, last, tetrode.time, tetrode.spike_times, config
         )
         spread, jump = shuffle_statistics(
             normalize_windows(windows), tetrode.bin_distance_cm, unchanged
@@ -595,7 +602,7 @@ class TestShuffleCandidate:
             tetrode.spike_waveform_features,
             tetrode.encoding_model,
             tetrode.bin_distance_cm,
-            CONFIG,
+            config,
             seed=SEED,
             n_shuffles=MINIMUM_N_SHUFFLES,
         )

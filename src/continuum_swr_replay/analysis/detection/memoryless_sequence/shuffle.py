@@ -19,8 +19,10 @@ positions ``X[pi]`` produces the same set of pairs as pairing ``M[pi^-1]`` with
 the small mark array rather than the ``(n_encoding, n_bins)`` position kernel.
 And the per-spike joint mark intensity is the library's own
 ``block_estimate_log_joint_mark_intensity``, with spikes assigned to rows by
-the library's own ``get_spike_time_bin_ind`` on the full epoch grid, so the
-unshuffled re-decode is the epoch decode restricted to the candidate's rows.
+the library's own ``get_spike_time_bin_ind`` on the full epoch grid, the
+detector's (``likelihood.likelihood_grid``), with the ground-process term
+scaled to its rows as the epoch decode scales it, so the unshuffled re-decode
+is the epoch decode restricted to the candidate's rows.
 
 The candidate's windows are re-decoded as they stand, merged gaps included,
 without redetecting anything or reapplying the spread and jump gates. The
@@ -79,7 +81,8 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    validate_time_grid,
+    encoding_bins_per_row,
+    likelihood_grid,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     aggregate_windows,
@@ -518,9 +521,12 @@ def _candidate_rows(
     time: NDArray,
     config: MemorylessSequenceConfig,
 ) -> tuple[NDArray, int, int]:
-    """Validate the grid and return the rows a candidate's windows cover."""
-    time = np.asarray(time, dtype=np.float64)
-    validate_time_grid(time, config)
+    """The detector's grid, and the rows of it a candidate's windows cover.
+
+    ``time`` is the decode's grid; the detector's is derived from it as the
+    epoch decode derives it (``likelihood_grid``).
+    """
+    time = likelihood_grid(time, config)
     # the final sample is a row no spike can reach, and the epoch decode drops it
     n_decodable = (
         1 + (time.size - 1 - config.window_n_samples) // config.stride_n_samples
@@ -615,9 +621,10 @@ def _decode_draws(
     environment = encoding_model["environment"]
     interior = np.asarray(environment.is_track_interior_).ravel()
     bin_centers = np.asarray(environment.place_bin_centers_)[interior]
+    # per row of the detector's grid, as the epoch decode subtracts it
     ground = np.asarray(
         encoding_model["summed_ground_process_intensity"], dtype=np.float64
-    )
+    ) * encoding_bins_per_row(config)
     rows = np.broadcast_to(-ground, (n_draws, row_stop - row_start, ground.size)).copy()
     candidate_rows = []
 
@@ -854,9 +861,10 @@ def _decode_draws_sorted(
         np.add.at(counts[:, cell], rows, 1)
     # the fit clips every field away from zero, so the log is finite
     log_fields = np.log(fields)
+    # per row of the detector's grid, as the epoch decode subtracts it
     absent = np.asarray(
         encoding_model["no_spike_part_log_likelihood"], dtype=np.float64
-    )[interior]
+    )[interior] * encoding_bins_per_row(config)
 
     width, stride = config.window_n_samples, config.stride_n_samples
     cumulative = np.concatenate(

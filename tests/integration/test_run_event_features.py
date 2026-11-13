@@ -231,7 +231,7 @@ def write_memoryless_run(root: Path, decode_root: Path, simulated: dict) -> None
         run_seed=7,
         shuffle=True,
         n_shuffles=N_SHUFFLES,
-        config=MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY),
+        config=MemorylessSequenceConfig(),
         provenance={"git_commit": "test"},
         marks_loader=lambda key, cache, span, sha: (
             simulated["spike_times"],

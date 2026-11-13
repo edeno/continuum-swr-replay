@@ -1,9 +1,9 @@
 """Every threshold the memoryless sequence detector uses, in one place.
 
 The equivalent of the original's ``Analysis_Information.mat``. Most settings
-are retained from Widloski & Foster (2025); the stride, the speed threshold
-and the spread threshold are adapted to this project's sampling grid,
-immobility rule and track geometry, as each field's description says.
+are retained from Widloski & Foster (2025), the 80 ms window and its 5 ms step
+among them; the speed threshold and the spread threshold are adapted to this
+project's immobility rule and track geometry, as each field's description says.
 """
 
 import math
@@ -25,23 +25,34 @@ class MemorylessSequenceConfig:
     """Thresholds for one detection run.
 
     Counts of windows are derived from `stride_s`, never carried over from the
-    original as literal constants. At the reference's 5 ms stride the 100 ms
-    duration filter keeps runs of index length 20, meaning 21 windows; at this
-    project's 4 ms stride the same 100 ms keeps index length 25, meaning 26
-    windows. A ``minimum_duration_s`` that is not a whole number of strides
-    is rounded *up* to the next stride, never down: the reference's 1D branch
-    uses 50 ms, which at a 4 ms stride keeps runs of 13 strides (52 ms), the
-    shortest run that is at least 50 ms.
+    original as literal constants. At the 5 ms stride the 100 ms duration
+    filter keeps runs of index length 20, meaning 21 windows; at a 4 ms stride
+    the same 100 ms keeps index length 25, meaning 26 windows. A
+    ``minimum_duration_s`` that is not a whole number of strides is rounded
+    *up* to the next stride, never down: the reference's 1D branch uses 50 ms,
+    which at a 4 ms stride would keep runs of 13 strides (52 ms), the shortest
+    run that is at least 50 ms.
 
     Attributes
     ----------
     window_duration_s : float
         Decoding window, 0.080 s. Retained from the original.
     stride_s : float
-        Step between window starts, 0.004 s. The original uses 0.005 s, which is
-        2.5 samples on this project's 500 Hz grid.
+        Step between window starts, 0.005 s. Retained: the reference counts
+        spikes in 5 ms bins and slides its window one bin at a time. That is
+        2.5 samples of the decode's 500 Hz grid, so the likelihood is computed
+        on a grid of its own (``sampling_frequency``), on which the window is
+        16 rows and the step one.
     sampling_frequency : float
-        Samples per second of the likelihood's time grid.
+        Samples per second of the likelihood's time grid, 200 Hz: one row per
+        5 ms bin. The grid is derived from the decode's over the same span
+        (``likelihood.likelihood_grid``); at the decode's own rate it is the
+        decode's grid, and at 500 Hz the windows are 40 rows.
+    decode_sampling_frequency : float
+        Samples per second of the decode grid, which the encoding model was
+        fitted on and the likelihood's grid is derived from: this project's
+        500 Hz (:data:`~continuum_swr_replay.parameters.SAMPLING_FREQUENCY`).
+        The encoding model's ground-process term is per bin of it.
     place_bin_size_cm : float
         Spatial bin width, 2.0 cm. Retained. The detector reads its geometry
         from the bin-distance matrix it is handed, so whoever builds the
@@ -82,8 +93,9 @@ class MemorylessSequenceConfig:
     """
 
     window_duration_s: float = 0.080
-    stride_s: float = 0.004
-    sampling_frequency: float = float(SAMPLING_FREQUENCY)
+    stride_s: float = 0.005
+    sampling_frequency: float = 200.0
+    decode_sampling_frequency: float = float(SAMPLING_FREQUENCY)
     place_bin_size_cm: float = 2.0
     spread_threshold_cm: float = 10.0
     jump_threshold_cm: float = 20.0

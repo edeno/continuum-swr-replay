@@ -15,6 +15,8 @@ def test_defaults_are_the_retained_settings():
     config = MemorylessSequenceConfig()
 
     assert config.window_duration_s == 0.080
+    assert config.stride_s == 0.005  # one of the reference's 5 ms bins
+    assert config.sampling_frequency == 200.0  # so the likelihood has 5 ms rows
     assert config.place_bin_size_cm == 2.0
     assert config.jump_threshold_cm == 20.0
     assert config.merge_gap_cm == 20.0
@@ -24,10 +26,9 @@ def test_defaults_are_the_retained_settings():
 
 
 def test_adapted_settings_are_ours_not_theirs():
-    """The settings adapted to this project's grid, immobility rule and track."""
+    """The settings adapted to this project's immobility rule and track."""
     config = MemorylessSequenceConfig()
 
-    assert config.stride_s == 0.004  # 5 ms is 2.5 samples at 500 Hz
     assert config.speed_threshold_cm_per_s == 4.0  # theirs is 5
     assert config.spread_threshold_cm == 10.0  # adapted, not equivalent
 
@@ -42,23 +43,23 @@ def test_the_speed_threshold_is_the_project_s_immobility_rule():
 
 def test_bin_counts_follow_the_stride():
     """A threshold in windows must be derived, never carried over."""
-    config = MemorylessSequenceConfig(sampling_frequency=500.0)
+    config = MemorylessSequenceConfig()
 
-    assert config.window_n_samples == 40
-    assert config.stride_n_samples == 2
+    assert config.window_n_samples == 16  # 0.080 s * 200 Hz
+    assert config.stride_n_samples == 1  # 0.005 s * 200 Hz
     # a surviving run spans at least minimum_duration between first and last
-    # midpoint, so its index length is minimum_duration / stride
-    assert config.minimum_run_index_length == 25
+    # midpoint, so its index length is minimum_duration / stride, 0.100 / 0.005
+    assert config.minimum_run_index_length == 20
 
 
 def test_a_different_stride_moves_the_window_counts():
     """The constant that would silently become a 50 ms threshold."""
-    at_500 = MemorylessSequenceConfig(sampling_frequency=500.0)
-    at_1000 = MemorylessSequenceConfig(sampling_frequency=1000.0)
+    at_200 = MemorylessSequenceConfig(sampling_frequency=200.0)
+    at_400 = MemorylessSequenceConfig(sampling_frequency=400.0)
 
-    assert at_1000.stride_n_samples == 2 * at_500.stride_n_samples
-    assert at_1000.window_n_samples == 2 * at_500.window_n_samples
-    assert at_1000.minimum_run_index_length == at_500.minimum_run_index_length
+    assert at_400.stride_n_samples == 2 * at_200.stride_n_samples
+    assert at_400.window_n_samples == 2 * at_200.window_n_samples
+    assert at_400.minimum_run_index_length == at_200.minimum_run_index_length
 
 
 def test_the_reference_stride_gives_the_reference_counts():
@@ -105,7 +106,8 @@ def test_a_window_that_is_not_a_whole_number_of_samples_raises():
 
 
 def test_the_reference_stride_on_the_project_grid_raises():
-    """5 ms is 2.5 samples at 500 Hz; the reason the stride was adapted."""
+    """5 ms is 2.5 samples at 500 Hz; the reason the likelihood has a grid of
+    its own (``likelihood.likelihood_grid``)."""
     with pytest.raises(ValueError, match="stride_s"):
         MemorylessSequenceConfig(stride_s=0.005, sampling_frequency=500.0)
 
@@ -135,13 +137,13 @@ def test_a_minimum_duration_between_strides_rounds_up_never_down(
 
 def test_a_minimum_duration_shorter_than_one_stride_raises():
     with pytest.raises(ValueError, match="minimum_duration_s"):
-        MemorylessSequenceConfig(minimum_duration_s=0.001, stride_s=0.004)
+        MemorylessSequenceConfig(minimum_duration_s=0.001)
 
 
 def test_a_window_of_an_odd_number_of_samples_is_refused():
     """Its midpoint would fall between two samples, and event bounds are samples."""
     with pytest.raises(ValueError, match="even"):
-        MemorylessSequenceConfig(window_duration_s=0.082)
+        MemorylessSequenceConfig(window_duration_s=0.085)  # 17 rows at 200 Hz
 
 
 def test_single_window_runs_are_dropped_unless_asked_otherwise():

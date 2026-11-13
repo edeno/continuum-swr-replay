@@ -144,7 +144,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     ShuffleSeed,
     load_clusterless_encoding_model,
     run_epoch,
-    window_midpoints_s,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.epoch import (
     observation_table,
@@ -154,14 +153,12 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table imp
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     check_marks_match_encoding,
+    decoded_windows,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
     MINIMUM_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
-)
-from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
-    windows_holding,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
     dropped_for_excluded_time,
@@ -361,7 +358,6 @@ def run_one(
     check_marks_match_encoding(encoding_model, spike_times, spike_waveform_features)
 
     speed = data_over_time["head_speed"].to_numpy(dtype=np.float64)
-    midpoint_s = window_midpoints_s(time[:-1], config)
     # where the source's detector read a gap-free stored band
     swr_epoch = swr_epoch_id_of_session(identity.animal, identity.day, identity.epoch)
     swr_observed = swr_observed_stretches(swr_epoch)
@@ -369,9 +365,7 @@ def run_one(
     # the one artifact mask, on the decode grid, as the decoders' is_missing
     artifact_mask = artifact_intervals(swr_epoch)
     is_missing = interval_mask(time, artifact_mask)
-    missing_windows = windows_holding(
-        is_missing[:-1], config.window_n_samples, config.stride_n_samples
-    )
+    midpoint_s, missing_windows = decoded_windows(time, is_missing, config)
     detection = run_epoch(
         time,
         data_over_time["linear_position"].to_numpy(dtype=np.float64),
@@ -425,7 +419,8 @@ def run_one(
             "start_s": float(time[0]),
             "end_s": float(time[-1]),
             "n_samples": int(time.size),
-            "sampling_frequency": config.sampling_frequency,
+            # the decode grid's; the detector's own is the config's
+            "sampling_frequency": config.decode_sampling_frequency,
         },
         "encoding": {
             "n_electrodes": len(encoding_model["encoding_positions"]),

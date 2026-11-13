@@ -89,7 +89,9 @@ class TestSampleRuns:
         np.testing.assert_array_equal(runs, [[0.0, 0.002], [0.006, 0.008]])
 
 
-WINDOW = MemorylessSequenceConfig().window_n_samples
+DECODE_GRID = MemorylessSequenceConfig(stride_s=0.004, sampling_frequency=FS)
+"""Windows counted in samples of the 500 Hz grid these tests build."""
+WINDOW = DECODE_GRID.window_n_samples
 
 
 class TestWindowSupport:
@@ -127,7 +129,7 @@ class TestWindowSupport:
         observed = sample_runs(
             time, window_supported(time, np.ones(time.size, bool), WINDOW)
         )
-        midpoints = window_midpoints_s(time, MemorylessSequenceConfig())
+        midpoints = window_midpoints_s(time, DECODE_GRID)
 
         assert contains(observed, midpoints, midpoints).all()
         np.testing.assert_array_equal(observed, [[midpoints[0], time[-20]]])

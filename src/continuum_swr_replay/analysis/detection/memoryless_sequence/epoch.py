@@ -6,10 +6,13 @@ left to callers: decode every window under a uniform prior, gate and assemble
 sequences, shuffle every candidate that meets the replay criteria, as the
 reference tests every such candidate, and write one row per candidate.
 
-Bins marked missing (``is_missing``: the artifact mask on the decode grid) are
-unobserved. Their rows of the likelihood never enter a window's sum, every
-window holding one is left undecoded (no posterior, so no normalization and no
-center), and no candidate spans such a window, so the shuffle, which
+The function takes the decode's grid and decodes on the detector's own
+(``likelihood.likelihood_grid``, 5 ms at the default 200 Hz). Bins marked
+missing (``is_missing``: the artifact mask on the decode grid) are unobserved,
+and so is every row of the detector's grid that spans one
+(``likelihood.missing_likelihood_rows``). Those rows never enter a window's
+sum, every window holding one is left undecoded (no posterior, so no
+normalization and no center), and no candidate spans such a window, so the shuffle, which
 re-decodes only a candidate's own windows, never reads them either.
 """
 
@@ -36,6 +39,8 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table imp
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     clusterless_epoch_log_likelihood,
     interior_bin_distances_cm,
+    likelihood_grid,
+    missing_likelihood_rows,
     window_midpoints_s,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
@@ -122,10 +127,11 @@ def run_epoch(
     Parameters
     ----------
     time : ndarray, shape (n_time,)
-        The decode's uniform grid.
+        The decode's uniform grid. The likelihood is computed on the
+        detector's grid derived from it (``likelihood_grid``).
     linear_position : ndarray, shape (n_time,) or (n_time, 1)
     speed_cm_per_s : ndarray, shape (n_time,)
-        The animal's speed on the same grid. Its value at each window midpoint
+        The animal's speed on the decode grid. Its value at each window midpoint
         gates the window; every sample between a sequence's endpoints decides
         whether the sequence is still.
     spike_times, spike_waveform_features : list of ndarray
@@ -142,8 +148,10 @@ def run_epoch(
     config : MemorylessSequenceConfig
     n_shuffles : int, default 100
     is_missing : ndarray of bool, shape (n_time,), optional
-        Bins of the grid with no observation, such as the artifact mask's
-        (closed intervals, as the decoders' ``is_missing``). None marks none.
+        Bins of the decode grid with no observation, such as the artifact
+        mask's (closed intervals, as the decoders' ``is_missing``). A row of
+        the detector's grid spanning one is missing
+        (``missing_likelihood_rows``). None marks none.
     artifact_intervals, dropped_events : DataFrame, optional
         The artifact mask itself and the SWR and MUA events dropped for
         excluded time, for each candidate's ``artifact_drop_reason``
@@ -181,8 +189,11 @@ def run_epoch(
         encoding_model,
         config,
     )
-    # the likelihood drops the grid's final row, which no spike can reach
-    missing_rows = None if is_missing is None else is_missing[: likelihood.time.size]
+    missing_rows = (
+        None
+        if is_missing is None
+        else missing_likelihood_rows(time, is_missing, config)
+    )
     posterior = normalize_windows(
         aggregate_windows(
             likelihood.log_likelihood,
@@ -256,21 +267,22 @@ def observation_table(
 ) -> pd.DataFrame:
     """The stretches this epoch observed, independent of what it detected.
 
-    ``decoded_windows`` are the stretches of window midpoints the grid
-    supports, the final row, which no spike can reach, excluded, less the
+    ``decoded_windows`` are the stretches of window midpoints the detector's
+    grid supports, the final row, which no spike can reach, excluded, less the
     windows holding a missing bin, each from its first to its last midpoint;
     ``swr_labels`` are the stretches where SWR labels were observed.
 
     Parameters
     ----------
     time : ndarray, shape (n_time,)
-        The decode grid.
+        The decode grid; the windows are on the detector's grid derived from
+        it (``likelihood_grid``).
     swr_observed : ndarray, shape (n_stretches, 2)
     config : MemorylessSequenceConfig
     missing_windows : ndarray of bool, shape (n_windows,)
         The windows holding a missing bin, which were not decoded.
     """
-    midpoints = window_midpoints_s(time[:-1], config)
+    midpoints = window_midpoints_s(likelihood_grid(time, config)[:-1], config)
     rows = [
         ("decoded_windows", midpoints[first], midpoints[last])
         for first, last in contiguous_true_runs(

@@ -112,11 +112,8 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (  # noqa: E402
     check_marks_match_encoding,
+    decoded_windows,
     interior_bin_distances_cm,
-    window_midpoints_s,
-)
-from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (  # noqa: E402
-    windows_holding,
 )
 from continuum_swr_replay.analysis.detector_comparison import (  # noqa: E402
     inventory_run,
@@ -302,15 +299,13 @@ def _memoryless_run(
     paths = memoryless_outputs(identifier, memoryless_dir)
     candidates = load_candidates(paths["candidates"])
     config = candidates.config
-    if not np.array_equal(candidates.midpoint_s, window_midpoints_s(time[:-1], config)):
+    # the run's is_missing: a bin inside a closed interval of the mask
+    is_missing = interval_mask(time, swr_source.artifact_intervals(identifier))
+    midpoint_s, undecoded = decoded_windows(time, is_missing, config)
+    if not np.array_equal(candidates.midpoint_s, midpoint_s):
         raise ValueError(
             f"The stored memoryless windows of {identifier} are not the decode grid's."
         )
-    # the run's is_missing: a bin inside a closed interval of the mask
-    is_missing = interval_mask(time, swr_source.artifact_intervals(identifier))
-    undecoded = windows_holding(
-        is_missing[:-1], config.window_n_samples, config.stride_n_samples
-    )
     return candidates, read_table(paths["events"]), undecoded
 
 

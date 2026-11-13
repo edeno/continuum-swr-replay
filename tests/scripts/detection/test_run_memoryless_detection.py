@@ -38,6 +38,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence import (
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     ENCODING_KEY,
+    likelihood_grid,
 )
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.eligibility import (
@@ -73,7 +74,7 @@ needs_cpu_affinity = pytest.mark.skipif(
 EPOCH_ID = "sim20200101_02_r1_HPC"
 N_SHUFFLES = 19
 """The fewest draws at which p <= 0.05 is possible."""
-CONFIG = MemorylessSequenceConfig(sampling_frequency=SAMPLING_FREQUENCY)
+CONFIG = MemorylessSequenceConfig()
 
 DETERMINISTIC = "--xla_gpu_deterministic_ops=true"
 TRITON_OFF = "--xla_gpu_enable_triton_gemm=false"
@@ -521,7 +522,9 @@ class TestRunOne:
         assert swr.start_s == epoch.time[0]
         assert swr.end_s == epoch.time[-1]
         windows = observed[observed.kind == "decoded_windows"].iloc[0]
-        assert windows.start_s == epoch.time[CONFIG.window_n_samples // 2]
+        # the first midpoint, half a window into the detector's grid
+        grid = likelihood_grid(epoch.time, CONFIG)
+        assert windows.start_s == grid[CONFIG.window_n_samples // 2]
 
     def test_the_record_carries_the_grid_the_marks_and_the_encoding(
         self, decode_root, tmp_path
@@ -600,16 +603,30 @@ class TestRunOne:
         candidates = joblib.load(record["outputs"]["candidates"])
         decoded = candidates.decisions.gates.posterior_usable
         stride, width = CONFIG.stride_n_samples, CONFIG.window_n_samples
+        grid = likelihood_grid(epoch.time, CONFIG)
+        missing_rows = np.flatnonzero(missing)
+
+        def spans_a_missing_row(start_s, end_s):
+            """Whether a decode row [t_j, t_j+1) that is missing overlaps."""
+            return bool(
+                (
+                    (epoch.time[missing_rows] < end_s)
+                    & (epoch.time[missing_rows + 1] > start_s)
+                ).any()
+            )
+
         touching = np.array(
             [
-                missing[k * stride : k * stride + width].any()
+                spans_a_missing_row(grid[k * stride], grid[k * stride + width])
                 for k in range(decoded.size)
             ]
         )
         np.testing.assert_array_equal(decoded, ~touching)
         assert len(candidates.runs) >= 2
         for first, last in candidates.runs:
-            assert not missing[first * stride : last * stride + width].any()
+            assert not spans_a_missing_row(
+                grid[first * stride], grid[last * stride + width]
+            )
         table = read_table(record["outputs"]["events"])
         expected_reasons = artifact_drop_reasons(
             table.event_start_s.to_numpy(),
