@@ -44,6 +44,7 @@ __all__ = [
     "ok_table_paths",
     "output_path",
     "read_manifest",
+    "recorded_output",
     "replace_outputs",
     "sha256_file",
     "write_json",
@@ -231,6 +232,39 @@ def read_manifest(run_dir: Path, *, names_folder: bool = False) -> dict:
             f"{run_dir.name!r}"
         )
     return manifest
+
+
+def recorded_output(path: Path, record: Mapping, name: str) -> str:
+    """Check a run's output file against its epoch's manifest record; return its
+    sha256.
+
+    Parameters
+    ----------
+    path : Path
+        The file.
+    record : Mapping
+        The epoch's manifest record, whose ``outputs[name]["sha256"]`` is the
+        file's sha256 when the runner wrote it.
+    name : str
+        The output's name in the record.
+
+    Raises
+    ------
+    ValueError
+        If the file is missing, or its sha256 is not the recorded one (an
+        output recorded without a sha256 is a mismatch).
+    """
+    if not path.exists():
+        raise ValueError(f"{path.name} is missing from {path.parent}")
+    output = (record.get("outputs") or {}).get(name)
+    expected = output.get("sha256") if isinstance(output, Mapping) else None
+    sha = sha256_file(path)
+    if sha != expected:
+        raise ValueError(
+            f"{path.name} has sha256 {sha[:12]}, not the {str(expected)[:12]} the "
+            "manifest recorded"
+        )
+    return sha
 
 
 def ok_epochs(manifest: Mapping) -> list[str]:

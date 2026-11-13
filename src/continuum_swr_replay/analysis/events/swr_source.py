@@ -71,7 +71,7 @@ from continuum_swr_replay.analysis.events.eligibility import (
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.intervals import subtract_intervals
 from continuum_swr_replay.paths import artifact_intervals_root, swr_inventory_root
-from continuum_swr_replay.runs.io import read_manifest, sha256_file
+from continuum_swr_replay.runs.io import read_manifest, recorded_output
 
 __all__ = [
     "ARTIFACT_INTERVALS_RUN_ID",
@@ -350,15 +350,10 @@ def _checked_inventory(
     files = {}
     for name, key in (("events", SWR_DETECTOR), ("observed", "swr_observed")):
         path = inventory[key]
-        if not path.exists():
-            raise SwrSourceError(f"{epoch_id}: {path.name} is missing from {directory}")
-        sha = sha256_file(path)
-        expected = record.get("outputs", {}).get(key, {}).get("sha256")
-        if sha != expected:
-            raise SwrSourceError(
-                f"{epoch_id}: {path.name} has sha256 {sha[:12]}, not the "
-                f"{str(expected)[:12]} the manifest recorded"
-            )
+        try:
+            sha = recorded_output(path, record, key)
+        except ValueError as error:
+            raise SwrSourceError(f"{epoch_id}: {error}") from error
         files[name] = {"path": str(path), "sha256": sha}
     return files, record
 

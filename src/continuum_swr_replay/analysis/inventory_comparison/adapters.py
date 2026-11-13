@@ -78,7 +78,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     validate_inventory,
 )
 from continuum_swr_replay.intervals import intersect, interval_mask
-from continuum_swr_replay.runs.io import read_manifest, sha256_file
+from continuum_swr_replay.runs.io import read_manifest, recorded_output
 from continuum_swr_replay.tables.event_ids import hash_event_id
 from continuum_swr_replay.tables.session_keys import one_session
 
@@ -285,16 +285,14 @@ def _run_files(
     paths = {}
     for name, file_name in files.items():
         path = run_dir / file_name
-        if not path.exists():
-            raise _Unavailable(f"{file_name} is missing")
-        if hashed:
-            output = record.get("outputs", {}).get(name)
-            expected = output.get("sha256") if isinstance(output, Mapping) else None
-            if sha256_file(path) != expected:
-                raise _Unavailable(
-                    f"{file_name} has sha256 other than the manifest's "
-                    f"({str(expected)[:12]})"
-                )
+        if not hashed:
+            if not path.exists():
+                raise _Unavailable(f"{file_name} is missing")
+        else:
+            try:
+                recorded_output(path, record, name)
+            except ValueError as error:
+                raise _Unavailable(str(error)) from error
         paths[name] = path
     return paths, record
 

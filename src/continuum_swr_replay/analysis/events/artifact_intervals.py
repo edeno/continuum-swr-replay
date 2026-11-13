@@ -238,13 +238,10 @@ def read_epoch_cores(run_dir: Path, epoch_id: str) -> EpochCores:
             f"{epoch_id}: no artifact intervals at {path}; an epoch without "
             "artifacts needs an empty file, not a missing one"
         )
-    sha = sha256_file(path)
-    expected = record.get("outputs", {}).get("cores", {}).get("sha256")
-    if sha != expected:
-        raise ArtifactRunError(
-            f"{epoch_id}: {path.name} has sha256 {sha[:12]}, not the "
-            f"{str(expected)[:12]} the manifest recorded"
-        )
+    try:
+        runs_io.recorded_output(path, record, "cores")
+    except ValueError as error:
+        raise ArtifactRunError(f"{epoch_id}: {error}") from error
     span = record.get("span_s")
     if span is None or len(span) != 2:
         raise ArtifactRunError(f"{epoch_id}: the artifact run records no span")

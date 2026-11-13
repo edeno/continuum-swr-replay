@@ -22,6 +22,7 @@ from continuum_swr_replay.runs.io import (
     json_ready,
     ok_table_paths,
     read_manifest,
+    recorded_output,
     sha256_file,
     write_json,
 )
@@ -172,6 +173,25 @@ def test_ok_table_paths_are_the_ok_epochs_tables_sorted_and_may_be_none(tmp_path
     ]
     manifest.write_text(json.dumps({"epochs": {"e3": {"status": "failed"}}}))
     assert ok_table_paths(tmp_path, "features") == []
+
+
+def test_a_recorded_output_must_exist_with_its_recorded_sha256(tmp_path):
+    """A missing file, a changed one and an output recorded without a sha256
+    are each refused; the file's sha256 comes back when it matches."""
+    path = tmp_path / "e1_features.parquet"
+    record = {"outputs": {"features": {"sha256": "0" * 64}}}
+
+    with pytest.raises(ValueError, match="e1_features.parquet is missing"):
+        recorded_output(path, record, "features")
+    path.write_bytes(b"table")
+    sha = sha256_file(path)
+    with pytest.raises(ValueError, match=f"sha256 {sha[:12]}, not the 000000000000"):
+        recorded_output(path, record, "features")
+    for unhashed in ({}, {"outputs": {}}, {"outputs": {"features": "x"}}):
+        with pytest.raises(ValueError, match="not the None"):
+            recorded_output(path, unhashed, "features")
+    record["outputs"]["features"]["sha256"] = sha
+    assert recorded_output(path, record, "features") == sha
 
 
 def test_a_manifest_naming_another_folder_is_refused_only_when_asked(tmp_path):
