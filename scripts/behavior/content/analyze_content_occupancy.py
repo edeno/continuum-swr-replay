@@ -76,6 +76,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
 )
 from continuum_swr_replay.decoding.files import (  # noqa: E402
     decode_paths,
+    epoch_identifier_of,
     non_local_threshold_percent,
 )
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
@@ -118,8 +119,8 @@ def find_sessions(animal: str | None) -> list[str]:
     """
     out = []
     for env in analysed_decode_files(processed_data_dir(), "_environment.pkl"):
-        epoch_id = env.name.removesuffix("_environment.pkl")
-        if animal is not None and not epoch_id.startswith(animal):
+        epoch_id = epoch_identifier_of(env, "_environment.pkl")
+        if animal is not None and parse_epoch_identifier(epoch_id).animal != animal:
             continue
         if decode_paths(
             epoch_id, processed_data_dir(), threshold_percent=THRESHOLD_PERCENT

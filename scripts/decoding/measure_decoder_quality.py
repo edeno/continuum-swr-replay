@@ -35,7 +35,10 @@ from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
     session_decoder_quality,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
-from continuum_swr_replay.decoding.files import data_over_time_suffix
+from continuum_swr_replay.decoding.files import (
+    data_over_time_suffix,
+    epoch_identifier_of,
+)
 from continuum_swr_replay.paths import DECODER_QUALITY_DIR, processed_data_dir
 from continuum_swr_replay.runs.io import sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
@@ -46,7 +49,7 @@ def measure_epoch(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     sha256 = sha256_file(path)
     dot = analysed_time.read_verified_dot_with_swr_source(path, sha256)
     epoch = {
-        "epoch_id": path.name.removesuffix(data_over_time_suffix()),
+        "epoch_id": epoch_identifier_of(path, data_over_time_suffix()),
         "decode_sha256": sha256,
     }
     return (

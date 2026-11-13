@@ -101,6 +101,36 @@ def decode_paths(
     )
 
 
+def epoch_identifier_of(path: Path, suffix: str) -> str:
+    """The epoch identifier a decode file is named for: its name less `suffix`.
+
+    The inverse of :func:`decode_paths` for one of its files, such as
+    ``epoch_identifier_of(path, "_detector.pkl")`` or, for a ``data_over_time``
+    file, ``suffix=data_over_time_suffix()``.
+
+    Parameters
+    ----------
+    path : Path
+        A decode file, such as ``.../chimi20200212_02_r1_HPC_detector.pkl``.
+    suffix : str
+        What follows the identifier in its name, such as ``"_detector.pkl"``.
+
+    Returns
+    -------
+    str
+        Such as ``"chimi20200212_02_r1_HPC"``.
+
+    Raises
+    ------
+    ValueError
+        If the file's name does not end in `suffix` after an identifier.
+    """
+    name = path.name
+    if not name.endswith(suffix) or name == suffix:
+        raise ValueError(f"{name!r} is not a decode file ending in {suffix!r}.")
+    return name.removesuffix(suffix)
+
+
 def results_exist(
     save_folder: Path,
     epoch_identifier: str,

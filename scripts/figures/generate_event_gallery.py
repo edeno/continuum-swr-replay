@@ -114,8 +114,16 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_decode_files,
     analysed_epoch_ids,
 )
-from continuum_swr_replay.decoding.files import data_over_time_suffix, decode_paths
-from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
+from continuum_swr_replay.decoding.files import (
+    data_over_time_suffix,
+    decode_paths,
+    epoch_identifier_of,
+)
+from continuum_swr_replay.decoding.identifiers import (
+    parse_epoch_identifier,
+    parse_session_name,
+    session_name,
+)
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import (
@@ -156,18 +164,13 @@ EXCLUDED_LABEL = "excluded time"
 
 
 def epoch_id_from_pkl(pkl_path: Path) -> str:
-    """``chimi20200213_02_r1_HPC_80_data_over_time.pkl`` -> ``chimi20200213_02_r1``."""
-    return pkl_path.name.removesuffix(f"_HPC{data_over_time_suffix()}")
+    """``chimi20200213_02_r1_HPC_80_data_over_time.pkl`` -> ``chimi20200213_02_r1``.
 
-
-def parse_epoch_id(epoch_id: str) -> tuple[str, str]:
-    """``chimi20200213_02_r1`` -> (``chimi20200213_.nwb``, ``02_r1``).
-
-    The gallery's ids are its ``*_HPC_80_data_over_time.pkl`` stems less the
-    ``_HPC``, which is put back to read them as epoch identifiers.
+    The gallery names an epoch by its session name (``identifiers.session_name``),
+    read back with ``identifiers.parse_session_name``.
     """
-    key = parse_epoch_identifier(f"{epoch_id}_HPC")
-    return key.nwb_file_name, key.epoch_name
+    key = parse_epoch_identifier(epoch_identifier_of(pkl_path, data_over_time_suffix()))
+    return session_name(key.nwb_file_name, key.epoch_name)
 
 
 def list_epoch_pkls(data_dir: Path) -> list[Path]:
@@ -187,7 +190,7 @@ def list_epoch_pkls(data_dir: Path) -> list[Path]:
     pkls = analysed_decode_files(data_dir, suffix)
     if not pkls:
         raise FileNotFoundError(f"No analysed epoch's *{suffix} found in {data_dir}")
-    found = {pkl.name.removesuffix(suffix) for pkl in pkls}
+    found = {epoch_identifier_of(pkl, suffix) for pkl in pkls}
     missing = [epoch_id for epoch_id in analysed_epoch_ids() if epoch_id not in found]
     if missing:
         logging.warning(
@@ -209,7 +212,7 @@ def list_epoch_pkls(data_dir: Path) -> list[Path]:
 def _catalog_one_epoch(pkl_path: Path) -> pd.DataFrame:
     """One epoch's gallery catalog (:func:`event_catalog`), from its decode frame."""
     epoch_id = epoch_id_from_pkl(pkl_path)
-    _, epoch_name = parse_epoch_id(epoch_id)
+    _, epoch_name = parse_session_name(epoch_id)
     return event_catalog(read_dot_with_swr_source(pkl_path), epoch_id, epoch_name)
 
 
@@ -1461,7 +1464,7 @@ def render_epoch(
         logging.info("No selected events for %s — nothing to render.", epoch_id)
         return
 
-    nwb_file_name, epoch_name = parse_epoch_id(epoch_id)
+    nwb_file_name, epoch_name = parse_session_name(epoch_id)
     logging.info("Loading %s %s (%d events)...", nwb_file_name, epoch_name, len(sel))
     # the ripple trace is the source's (the Kay consensus over R-T's tetrodes)
     data = load_data(

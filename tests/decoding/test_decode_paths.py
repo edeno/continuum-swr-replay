@@ -16,6 +16,7 @@ from continuum_swr_replay.decoding.files import (
     DEFAULT_NON_LOCAL_THRESHOLD_PERCENT,
     data_over_time_suffix,
     decode_paths,
+    epoch_identifier_of,
     non_local_threshold_percent,
     results_exist,
 )
@@ -82,3 +83,25 @@ def test_results_exist_reads_the_three_saved_files(tmp_path):
     assert results_exist(tmp_path, epoch_id, overwrite=False)
     assert not results_exist(tmp_path, epoch_id, overwrite=True)
     assert not paths.data_over_time.exists()
+
+
+@pytest.mark.parametrize("threshold_percent", [80, None])
+def test_each_decode_file_reads_back_to_its_identifier(threshold_percent):
+    identifier = "j1620210706_02_r1_HPC_contfrag"
+    paths = decode_paths(identifier, ROOT, threshold_percent=threshold_percent)
+    suffixes = [
+        data_over_time_suffix(threshold_percent),
+        "_results.nc",
+        "_detector.pkl",
+        "_environment.pkl",
+    ]
+    for path, suffix in zip(paths, suffixes, strict=True):
+        assert epoch_identifier_of(path, suffix) == identifier
+
+
+@pytest.mark.parametrize(
+    "name", ["chimi20200212_02_r1_HPC_results.nc", "_detector.pkl"]
+)
+def test_a_file_not_named_identifier_and_suffix_is_refused(name):
+    with pytest.raises(ValueError, match="is not a decode file"):
+        epoch_identifier_of(ROOT / name, "_detector.pkl")
