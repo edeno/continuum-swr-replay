@@ -64,22 +64,7 @@ def swr_without_replay_values(
 
     add = _finite_adder(values, make)
 
-    # A sidecar without a count gives a missing value, which the statistics refuse.
-    sessions = pd.DataFrame(
-        [
-            {
-                name: s.get(name)
-                for name in (
-                    "nwb_file_name",
-                    "epoch_name",
-                    "n_swr_no_non_local",
-                    "n_swr_with_non_local",
-                    "n_swr_no_non_local_unknown",
-                )
-            }
-            for s in sidecars
-        ]
-    )
+    sessions = population_statistics.swr_without_replay_sessions(sidecars)
     events = population_statistics.swr_without_replay_event_statistics(
         sessions, SWR_WITHOUT_REPLAY_MIN_EVENTS
     )

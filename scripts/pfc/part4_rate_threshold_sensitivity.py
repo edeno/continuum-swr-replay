@@ -9,13 +9,12 @@ epoch: nothing is gated at fit time. So the gate can be moved without a refit.
 This script loads the population once with no gate, keeps the units at or above
 each gate
 (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.units_at_or_above_rate`)
-and recomputes Part 4's per-unit values with Part 4's own functions
-(:func:`~continuum_swr_replay.reported.mpfc.population.called_fraction_values`,
-:func:`~continuum_swr_replay.reported.mpfc.population.overlap_and_effect_values`,
-:func:`~continuum_swr_replay.reported.mpfc.swr_without_replay.swr_without_replay_values`). It
-also counts, per gate, the units the loader drops for another reason (no usable
-fit, a non-finite modulation curve), and gives the called fractions per
-firing-rate band, so a low gate can be checked for units with almost no spikes.
+and recomputes Part 4's per-unit statistics with the functions the summary
+calls (:mod:`~continuum_swr_replay.analysis.pfc.population_statistics`), with
+the summary's settings. It also counts, per gate, the units the loader drops
+for another reason (no usable fit, a non-finite modulation curve), and gives the
+called fractions per firing-rate band, so a low gate can be checked for units
+with almost no spikes.
 
 The gate ``none`` keeps every unit with at least one spike on the fitted bins
 (rate > 0); a unit with none has no usable fit and the loader drops it anyway.
@@ -23,7 +22,11 @@ The gate ``none`` keeps every unit with at least one spike on the fitted bins
 Writes, under ``--out-dir``:
 
 - ``part4_rate_threshold_sensitivity.csv``: one row per gate, one column per
-  value (Part 4's key names, plus the ``funnel_*`` counts).
+  value, plus the ``funnel_*`` counts and ``extended_sessions`` (the sessions of
+  the extended event set). A value's name is the statistic's own: the function,
+  the row labels of its result, and the statistic, joined by dots (for example
+  ``called_fractions.non_local_SWR.fraction``, or
+  ``swr_without_replay_unit_statistics.all.called_fraction``).
 - ``part4_rate_threshold_sensitivity_long.csv``: the same values in long form,
   plus the per-band rows (``selection`` = ``band [lo, hi) Hz``).
 
@@ -50,19 +53,21 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
     significant_fraction,
 )
+from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
 from continuum_swr_replay.paths import ROOT_DIR
+from continuum_swr_replay.reported.mpfc.common import (
+    TIMING_BOOTSTRAP_DRAWS,
+    TIMING_BOOTSTRAP_SEED,
+)
 from continuum_swr_replay.reported.mpfc.inputs import (
     STEM,
     default_inputs,
     read_sidecars,
 )
-from continuum_swr_replay.reported.mpfc.population import (
-    called_fraction_values,
-    overlap_and_effect_values,
-)
+from continuum_swr_replay.reported.mpfc.population import BEST_MODELS, EFFECT_CURVES
 from continuum_swr_replay.reported.mpfc.swr_without_replay import (
     SWR_WITHOUT_REPLAY_CURVES,
-    swr_without_replay_values,
+    SWR_WITHOUT_REPLAY_MIN_EVENTS,
 )
 
 #: The gates compared, by label. ``none`` is the smallest positive rate: a
@@ -80,27 +85,143 @@ BANDS = ((0.0, 0.1), (0.1, 0.5), (0.5, 1.0), (1.0, np.inf))
 #: The values shown first in the wide table.
 HEADLINE = (
     "funnel_units_kept",
-    "swr_replay_called_fraction",
-    "non_swr_replay_called_fraction",
-    "swr_no_replay_called_fraction_all",
-    "swr_called_fraction",
-    "nonlocal_called_fraction",
-    "engagement_called_fraction",
-    "overlap_odds_ratio",
-    "overlap_rank_correlation",
-    "split_improves_fraction",
-    "effect_abs_peak_median_swr_replay",
-    "effect_abs_peak_median_non_swr_replay",
-    "effect_abs_peak_median_swr",
-    "effect_abs_peak_median_matched_control",
+    "called_fractions.non_local_SWR.fraction",
+    "called_fractions.non_local_no_SWR.fraction",
+    "swr_without_replay_unit_statistics.all.called_fraction",
+    "called_fractions.SWR.fraction",
+    "called_fractions.non_local.fraction",
+    "called_fractions.engagement.fraction",
+    "replay_class_overlap_statistics.odds_ratio",
+    "replay_class_overlap_statistics.rank_correlation",
+    "replay_split_statistics.improves_fraction",
+    "peak_modulation_statistics.non_local_SWR.abs_peak_median",
+    "peak_modulation_statistics.non_local_no_SWR.abs_peak_median",
+    "peak_modulation_statistics.SWR.abs_peak_median",
+    "peak_modulation_statistics.matched_control.abs_peak_median",
 )
 
 DEFAULT_OUT_DIR = ROOT_DIR / ".claude/research/pfc_response_followups_outputs"
 
 
-def _key_value(key: str, value: float, *args: object, **kwargs: object) -> tuple:
-    """A ``make`` for Part 4's value functions that keeps only key and value."""
-    return key, value
+def _named(statistics: dict | pd.DataFrame, *prefix: str) -> dict[str, float]:
+    """A statistic's result under its own names.
+
+    Parameters
+    ----------
+    statistics : dict or pandas.DataFrame
+        A dict of named numbers, or a table with one row per group (a plain or
+        a multi-level index).
+    *prefix : str
+        Labels put first, the function's name and its arguments.
+
+    Returns
+    -------
+    dict
+        One entry per number: ``prefix``, the row labels and the statistic's
+        name, joined by dots.
+    """
+    if isinstance(statistics, pd.DataFrame):
+        statistics = {
+            (*(row if isinstance(row, tuple) else (row,)), name): value
+            for row, values in statistics.to_dict(orient="index").items()
+            for name, value in values.items()
+        }
+    return {
+        ".".join(
+            str(label)
+            for label in (*prefix, *(key if isinstance(key, tuple) else (key,)))
+        ): value
+        for key, value in statistics.items()
+    }
+
+
+def gate_values(
+    population: pd.DataFrame,
+    extended: pd.DataFrame,
+    extended_curves: dict[str, np.ndarray],
+    lag_time: np.ndarray,
+    sessions: pd.DataFrame,
+) -> dict[str, float]:
+    """Part 4's per-unit statistics over the units of one gate.
+
+    Each is the function the summary calls
+    (:mod:`~continuum_swr_replay.analysis.pfc.population_statistics`), with the
+    summary's settings, named by :func:`_named`.
+
+    Parameters
+    ----------
+    population : pandas.DataFrame
+        The canonical population at the gate.
+    extended : pandas.DataFrame
+        The extended-event-set population at the gate.
+    extended_curves : dict of str to numpy.ndarray, each shape (n_lags, n_units)
+        Its curves.
+    lag_time : numpy.ndarray, shape (n_lags,)
+        Lag of each curve row, in seconds.
+    sessions : pandas.DataFrame
+        The extended event set's sessions
+        (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.swr_without_replay_sessions`).
+
+    Returns
+    -------
+    dict
+        The statistics, by name.
+    """
+    stats = population_statistics
+    settings = {"alpha": CALLED_ALPHA, "min_events": SWR_WITHOUT_REPLAY_MIN_EVENTS}
+    return {
+        **_named(stats.called_fractions(population, CALLED_ALPHA), "called_fractions"),
+        **_named(
+            stats.called_fraction_by_animal(population, "engagement", CALLED_ALPHA),
+            "called_fraction_by_animal",
+            "engagement",
+        ),
+        "bh_called_fraction.engagement": stats.bh_called_fraction(
+            population, "engagement", CALLED_ALPHA
+        ),
+        **_named(
+            stats.best_model_fractions(population, list(BEST_MODELS.values())),
+            "best_model_fractions",
+        ),
+        **_named(
+            stats.replay_class_overlap_statistics(population, CALLED_ALPHA),
+            "replay_class_overlap_statistics",
+        ),
+        **_named(stats.replay_split_statistics(population), "replay_split_statistics"),
+        **_named(
+            stats.peak_modulation_statistics(population, list(EFFECT_CURVES.values())),
+            "peak_modulation_statistics",
+        ),
+        "extended_sessions": len(sessions),
+        **_named(
+            stats.swr_without_replay_event_statistics(
+                sessions, SWR_WITHOUT_REPLAY_MIN_EVENTS
+            ),
+            "swr_without_replay_event_statistics",
+        ),
+        **_named(
+            stats.swr_without_replay_unit_statistics(
+                extended, sessions, three_class_model=THREE_CLASS_MODEL, **settings
+            ),
+            "swr_without_replay_unit_statistics",
+        ),
+        **_named(
+            stats.swr_without_replay_called_by_animal(extended, sessions, **settings),
+            "swr_without_replay_called_by_animal",
+        ),
+        **_named(
+            stats.swr_without_replay_timing_statistics(
+                extended,
+                extended_curves["swr_no_non_local"],
+                lag_time,
+                sessions,
+                n_boot=TIMING_BOOTSTRAP_DRAWS,
+                seed=TIMING_BOOTSTRAP_SEED,
+                **settings,
+            ),
+            "swr_without_replay_timing_statistics",
+        ),
+    }
 
 
 def spikes_on_fitted_bins(frame: pd.DataFrame, bundle_dir: Path) -> pd.Series:
@@ -254,7 +375,9 @@ def main(argv: list[str] | None = None) -> None:
 
     inputs = default_inputs()
     extended_dir = inputs.swr_without_replay_dir
-    extended_sidecars = read_sidecars(extended_dir)
+    sessions = population_statistics.swr_without_replay_sessions(
+        read_sidecars(extended_dir)
+    )
     raw = raw_units(inputs.bundle_dir)
     # Every unit is loaded (no gate), whatever gate the summary itself uses.
     every_unit, _, lag_time = load_population_data(
@@ -276,16 +399,10 @@ def main(argv: list[str] | None = None) -> None:
                 f"gate {label}: {len(population)} canonical units against "
                 f"{len(extended)} extended ones"
             )
-        values = dict(
-            [
-                *called_fraction_values(population, _key_value),
-                *overlap_and_effect_values(population, _key_value),
-                *swr_without_replay_values(
-                    extended, extended_curves, lag_time, extended_sidecars, _key_value
-                ),
-            ]
-        )
-        values = {**funnel(raw, gate, len(population)), **values}
+        values = {
+            **funnel(raw, gate, len(population)),
+            **gate_values(population, extended, extended_curves, lag_time, sessions),
+        }
         wide[label] = values
         long_rows += [
             {"selection": f"gate {label}", "key": k, "value": v}

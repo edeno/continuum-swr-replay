@@ -761,6 +761,33 @@ def test_swr_without_replay_event_statistics_refuse_a_missing_count(column, mess
         stats.swr_without_replay_event_statistics(sessions, MIN_EVENTS)
 
 
+def test_swr_without_replay_sessions_read_the_sidecars_counts():
+    sidecars = [
+        {
+            "nwb_file_name": _S1[0],
+            "epoch_name": _S1[1],
+            "n_swr_no_non_local": 4,
+            "n_swr_with_non_local": 40,
+            "n_swr_no_non_local_unknown": 1,
+            "n_bins_fit": 900,
+        },
+        # a sidecar without its count of SWRs with replay
+        {
+            "nwb_file_name": _S2[0],
+            "epoch_name": _S2[1],
+            "n_swr_no_non_local": 30,
+            "n_swr_no_non_local_unknown": 0,
+        },
+    ]
+    sessions = stats.swr_without_replay_sessions(sidecars)
+    assert list(sessions.columns) == list(SESSIONS.columns)
+    assert sessions.loc[0].tolist() == SESSIONS.loc[0].tolist()
+    assert pd.isna(sessions.loc[1, "n_swr_with_non_local"])
+    # the missing count is refused, not read as zero
+    with pytest.raises(ValueError, match="no count of its SWRs with replay"):
+        stats.swr_without_replay_event_statistics(sessions, MIN_EVENTS)
+
+
 def test_swr_without_replay_called_by_animal():
     result = stats.swr_without_replay_called_by_animal(
         _extended_population(), SESSIONS, alpha=ALPHA, min_events=MIN_EVENTS

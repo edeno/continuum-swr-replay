@@ -24,6 +24,33 @@ _SPEC.loader.exec_module(sensitivity)
 NAN = np.nan
 
 
+def test_named_joins_a_results_labels_into_its_names():
+    assert sensitivity._named({"odds_ratio": 2.0, "n_tested": 7}, "overlap") == {
+        "overlap.odds_ratio": 2.0,
+        "overlap.n_tested": 7,
+    }
+    table = pd.DataFrame(
+        {"n_tested": [3, 4], "fraction": [0.5, 0.25]}, index=["SWR", "non_local"]
+    )
+    assert sensitivity._named(table, "called_fractions") == {
+        "called_fractions.SWR.n_tested": 3,
+        "called_fractions.SWR.fraction": 0.5,
+        "called_fractions.non_local.n_tested": 4,
+        "called_fractions.non_local.fraction": 0.25,
+    }
+    by_group = pd.DataFrame(
+        {"n_units": [1, 2]},
+        index=pd.MultiIndex.from_tuples(
+            [("all", "enhanced"), ("min_events", "suppressed")],
+            names=["subset", "direction"],
+        ),
+    )
+    assert sensitivity._named(by_group, "timing") == {
+        "timing.all.enhanced.n_units": 1,
+        "timing.min_events.suppressed.n_units": 2,
+    }
+
+
 def test_funnel_counts_why_units_leave_at_a_gate():
     raw = pd.DataFrame(
         {

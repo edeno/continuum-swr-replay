@@ -875,6 +875,33 @@ def peak_modulation_statistics(
 # --- SWRs without replay ---------------------------------------------------------------
 
 
+def swr_without_replay_sessions(sidecars: Sequence[Mapping]) -> pd.DataFrame:
+    """The session table of the SWR-without-replay statistics, from the extended
+    event set's sidecars.
+
+    Parameters
+    ----------
+    sidecars : sequence of mapping
+        One sidecar per session of the extended event set.
+
+    Returns
+    -------
+    sessions : pd.DataFrame, shape (n_sessions, 5)
+        ``nwb_file_name``, ``epoch_name``, ``n_swr_no_non_local``,
+        ``n_swr_with_non_local`` and ``n_swr_no_non_local_unknown``
+        (:func:`swr_without_replay_event_statistics`). A sidecar without one of
+        them gives a missing value, which the statistics refuse.
+    """
+    names = (
+        "nwb_file_name",
+        "epoch_name",
+        "n_swr_no_non_local",
+        "n_swr_with_non_local",
+        "n_swr_no_non_local_unknown",
+    )
+    return pd.DataFrame([{name: s.get(name) for name in names} for s in sidecars])
+
+
 def _session_event_counts(sessions: pd.DataFrame) -> pd.Series:
     """Each session's SWRs without replay, indexed by ``(nwb_file_name,
     epoch_name)``.

@@ -51,6 +51,14 @@ BEST_MODELS = {
     "joint": "SWR + non_local_no_SWR",
 }
 
+#: The curves whose peak sizes are reported, by the word their keys use.
+EFFECT_CURVES = {
+    "swr_replay": "non_local_SWR",
+    "non_swr_replay": "non_local_no_SWR",
+    "swr": "SWR",
+    "matched_control": "matched_control",
+}
+
 
 def _uniform(sidecars: list[dict[str, Any]], name: str) -> Any:
     """The one value every sidecar records for ``name``."""
@@ -735,16 +743,10 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
             "larger for SWR-coupled replay than for non-SWR replay",
         ),
     ]
-    effect_curves = (
-        ("swr_replay", "non_local_SWR"),
-        ("non_swr_replay", "non_local_no_SWR"),
-        ("swr", "SWR"),
-        ("matched_control", "matched_control"),
-    )
     effects = population_statistics.peak_modulation_statistics(
-        population, [column for _, column in effect_curves]
+        population, list(EFFECT_CURVES.values())
     )
-    for word, column in effect_curves:
+    for word, column in EFFECT_CURVES.items():
         stats = effects.loc[column]
         label = {
             "swr_replay": "SWR-coupled replay",
