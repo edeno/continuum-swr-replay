@@ -141,11 +141,11 @@ from continuum_swr_replay.runs.cli import (  # noqa: E402
 )
 from continuum_swr_replay.runs.device import configure_jax_gpu  # noqa: E402
 from continuum_swr_replay.runs.fit_provenance import (  # noqa: E402
-    fit_provenance_path,
-    write_fit_provenance,
+    git_hash as loaded_commit,
 )
 from continuum_swr_replay.runs.fit_provenance import (  # noqa: E402
-    git_hash as loaded_commit,
+    matching_sidecar,
+    write_fit_provenance,
 )
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.io import write_atomically  # noqa: E402
@@ -306,41 +306,42 @@ def results_exist(
         ]
     if not all(f.exists() for f in required_files):
         return False
-    sidecar = fit_provenance_path(artifact)
-    if not sidecar.exists():
-        return False
-    record = json.loads(sidecar.read_text())
-    expected_usable_draws = (
-        None if n_control_draws is None else required_usable_null_draws(n_control_draws)
+    record = matching_sidecar(
+        artifact,
+        {
+            "null_classes": None if null_classes is None else sorted(null_classes),
+            "stop_cohort": stop_cohort,
+            "stop_table_sha256": stop_table_sha256,
+            "is_swr_definition": IS_SWR_DEFINITION,
+            "canonical_event_table_sha256": event_table_sha256,
+            "data_over_time_sha256": data_over_time_sha256,
+            "swr_interval_source": swr_interval_source,
+            "swr_events_sha256": swr_events_sha256,
+            "fitter": fitter,
+            "estimator": ESTIMATOR,
+            "inference": INFERENCE,
+            "penalty_sigma_log_rate": penalty_sigma,
+            "n_folds": n_folds,
+            "fold_seed": fold_seed,
+            "n_control_draws": n_control_draws,
+            "control_draw_seed": control_draw_seed,
+            "empirical_pvalue_method": EMPIRICAL_PVALUE_METHOD,
+            "control_null_event_policy": CONTROL_NULL_EVENT_POLICY,
+            "min_usable_null_draws": (
+                None
+                if n_control_draws is None
+                else required_usable_null_draws(n_control_draws)
+            ),
+            "matched_control_placement_method": MATCHED_CONTROL_PLACEMENT_METHOD,
+        },
     )
     return (
-        record.get("event_set", "canonical") == event_set
-        and record.get("null_classes")
-        == (None if null_classes is None else sorted(null_classes))
-        and record.get("stop_cohort") == stop_cohort
-        and record.get("stop_table_sha256") == stop_table_sha256
-        and record.get("is_swr_definition") == IS_SWR_DEFINITION
-        and record.get("canonical_event_table_sha256") == event_table_sha256
-        and record.get("data_over_time_sha256") == data_over_time_sha256
-        and record.get("swr_interval_source") == swr_interval_source
-        and record.get("swr_events_sha256") == swr_events_sha256
-        and record.get("fitter") == fitter
-        and record.get("estimator") == ESTIMATOR
-        and record.get("inference") == INFERENCE
-        and record.get("penalty_sigma_log_rate") == penalty_sigma
-        and record.get("n_folds") == n_folds
-        and record.get("fold_seed") == fold_seed
-        and record.get("n_control_draws") == n_control_draws
-        and record.get("control_draw_seed") == control_draw_seed
-        and record.get("empirical_pvalue_method") == EMPIRICAL_PVALUE_METHOD
-        and record.get("control_null_event_policy") == CONTROL_NULL_EVENT_POLICY
-        and record.get("min_usable_null_draws") == expected_usable_draws
+        record is not None
+        and record.get("event_set", "canonical") == event_set
         and (
             n_control_draws in (None, 0)
             or isinstance(record.get("null_usable_draws"), dict)
         )
-        and record.get("matched_control_placement_method")
-        == MATCHED_CONTROL_PLACEMENT_METHOD
     )
 
 

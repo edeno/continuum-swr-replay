@@ -173,6 +173,20 @@ def test_results_exist_does_not_confuse_the_two_cohorts(tmp_path):
     )
 
 
+@pytest.mark.parametrize("text", ["", "{not json", "[1, 2]"])
+def test_an_unreadable_sidecar_is_refit(tmp_path, text):
+    # The sidecar is the bundle's commit marker; one cut short or overwritten
+    # marks no bundle, so the session is refit rather than the batch stopped.
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(tmp_path, epoch_identifier, "at_well", "at_well")
+    artifact = runner.modulation_path(tmp_path, epoch_identifier, "at_well")
+    artifact.with_suffix(".provenance.json").write_text(text)
+
+    assert not _results_exist(
+        tmp_path, epoch_identifier, False, "at_well", "abc123", EVENT_TABLE_SHA, DOT_SHA
+    )
+
+
 def test_a_bundle_cut_from_another_stop_table_is_refit(tmp_path):
     # Regenerating the stop table changes which bins and events the cohort
     # holds, so a bundle cut from the previous generation is not this run's
