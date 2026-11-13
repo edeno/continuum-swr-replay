@@ -29,6 +29,7 @@ from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
 )
 from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
     ANALYSIS_COHORTS,
+    HORSERACE_SUMMARY,
     analysis_cohort_counts,
     build_trial_leaf_table,
     quartile_profiles_and_contrasts,
@@ -358,8 +359,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     horserace.to_csv(
         args.output_dir / "horserace_session_coefficients.csv", index=False
     )
-    horserace_summary.to_csv(args.output_dir / "horserace_summary.csv", index=False)
-    for artifact in ("horserace_summary.csv", "horserace_session_coefficients.csv"):
+    horserace_summary.to_csv(args.output_dir / HORSERACE_SUMMARY, index=False)
+    for artifact in (HORSERACE_SUMMARY, "horserace_session_coefficients.csv"):
         write_fit_provenance(
             args.output_dir / artifact,
             fit_inputs,

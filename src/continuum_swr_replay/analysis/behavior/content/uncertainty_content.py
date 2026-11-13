@@ -847,6 +847,12 @@ def within_arm_horserace(
     return pd.DataFrame(rows)
 
 
+#: The file :func:`summarize_horserace`'s table is written to, in
+#: ``paths.UNCERTAINTY_CONTENT_DIR``; the behavior summary and the uncertainty
+#: figure read it.
+HORSERACE_SUMMARY = "horserace_summary.csv"
+
+
 def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
     """Animal-balanced across-session summary of :func:`within_arm_horserace`.
 
@@ -1201,6 +1207,7 @@ __all__ = [
     "DEFAULT_EXAMPLE_SESSION",
     "EVENT_SHARE_COLUMNS",
     "HORSERACE_PREDICTORS",
+    "HORSERACE_SUMMARY",
     "LEAF_FRACTION_COLUMNS",
     "QUARTILE_PROFILE_CONFIGURATIONS",
     "RESPONSE_COLUMNS",

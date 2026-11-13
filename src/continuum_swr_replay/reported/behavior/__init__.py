@@ -74,6 +74,9 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.coefficient_statistics import fit_rows
 from continuum_swr_replay.analysis.behavior.content import content_statistics
+from continuum_swr_replay.analysis.behavior.content.estimator_comparison import (
+    COEFFICIENTS_BASENAME,
+)
 from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.behavior.choice import (
@@ -276,9 +279,7 @@ def summarize(inputs: BehaviorInputs, produced_by: str) -> Summary:
                 f"{rel(inputs.estimator_summary.parent)} (content.estimator_comparison)",
             ),
             fit_staleness(
-                inputs.estimator_summary.with_name(
-                    "content_estimator_comparison.parquet"
-                )
+                inputs.estimator_summary.with_name(f"{COEFFICIENTS_BASENAME}.parquet")
             ),
         )
     )

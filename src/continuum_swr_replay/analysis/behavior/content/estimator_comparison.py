@@ -91,6 +91,15 @@ SE_TYPE_LABELS = {
 N_BOOTSTRAP = 2000
 BOOTSTRAP_SEED = 0
 
+#: The comparison's output files, without their extensions, in
+#: ``paths.CONTENT_ESTIMATOR_COMPARISON_DIR``: the per-session coefficients
+#: (``.parquet``, with its fit-provenance sidecar), the summary, the bootstrap
+#: and the skipped sessions (``.csv``). The behavior summary reads the first three.
+COEFFICIENTS_BASENAME = "content_estimator_comparison"
+SUMMARY_BASENAME = "content_estimator_comparison_summary"
+BOOTSTRAP_BASENAME = "content_estimator_bootstrap"
+SKIPS_BASENAME = "content_estimator_comparison_skips"
+
 
 def se_ratio_column(label: str) -> str:
     """Name of the SE-ratio column for estimator ``label``, SE types spelled out."""

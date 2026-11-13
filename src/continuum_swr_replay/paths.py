@@ -174,6 +174,17 @@ CONTENT_ESTIMATOR_COMPARISON_DIR = "content_estimator_comparison"
 EVENT_SOURCE_COMPARISON_DIR = "event_source_comparison"
 """The choice fits by event source, under the replay-content root
 (``scripts/behavior/content/compare_event_source_models.py``)."""
+
+
+def event_source_comparison_fits_name(event_source: str, brain_area: str) -> str:
+    """One event source's comparison fits, in ``EVENT_SOURCE_COMPARISON_DIR``.
+
+    ``brain_area`` is the area whose data the source's events come from (HPC
+    for ``non_local``). The behavior summary reads ``non_local`` on HPC.
+    """
+    return f"{event_source}_{brain_area}_comparison_fits.pkl"
+
+
 UNCERTAINTY_CONTENT_DIR = "uncertainty_content"
 """The within-arm horse race and the uncertainty tables, under the
 replay-content root (``scripts/behavior/content/analyze_uncertainty_content.py``)."""

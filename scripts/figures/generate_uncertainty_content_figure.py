@@ -27,6 +27,9 @@ import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
+from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
+    HORSERACE_SUMMARY,
+)
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.paths import (
     UNCERTAINTY_CONTENT_DIR,
@@ -79,7 +82,7 @@ def _load_results(results_dir: Path) -> dict[str, pd.DataFrame | dict]:
         "mu_sessions": results_dir / "mu_session_coefficients.csv",
         "mu_animals": results_dir / "mu_animal_coefficients.csv",
         "mu_overall": results_dir / "mu_overall_coefficients.csv",
-        "horserace_summary": results_dir / "horserace_summary.csv",
+        "horserace_summary": results_dir / HORSERACE_SUMMARY,
         "audit": results_dir / "cohort_audit.json",
     }
     missing = [str(path) for path in paths.values() if not path.exists()]

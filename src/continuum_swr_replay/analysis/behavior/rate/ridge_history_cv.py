@@ -50,6 +50,7 @@ __all__ = [
     "FOLD_SEED",
     "MIN_SESSION_EVENTS",
     "N_FOLDS",
+    "RIDGE_CV_FILE",
     "SIGMA_GRID",
     "RidgeFit",
     "assign_stop_folds",
@@ -72,6 +73,9 @@ FOLD_SEED = 20261030
 #: A session with fewer response onsets than this is left out: an unpenalised
 #: session effect with no events in a training set has its estimate at -inf.
 MIN_SESSION_EVENTS = 10
+#: The file the per-animal cross-validation results are written to, in
+#: ``paths.CROSS_HISTORY_RIDGE_CV_DIR``; the behavior summary reads it.
+RIDGE_CV_FILE = "cross_history_ridge_cv.pkl"
 #: Elements of the largest ``(rows, n_fits, n_features)`` block a batched pass
 #: holds (1 GB in float64).
 _CHUNK_ELEMENTS = 125_000_000

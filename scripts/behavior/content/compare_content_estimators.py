@@ -76,7 +76,9 @@ from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import
     ESTIMATOR as DIRICHLET_MULTINOMIAL,
 )
 from continuum_swr_replay.analysis.behavior.content.estimator_comparison import (  # noqa: E402
+    BOOTSTRAP_BASENAME,
     BOOTSTRAP_SEED,
+    COEFFICIENTS_BASENAME,
     COUNT_RESPONSE,
     ESTIMATOR_LABELS,
     ESTIMATORS,
@@ -84,6 +86,8 @@ from continuum_swr_replay.analysis.behavior.content.estimator_comparison import 
     LOG_PHI_IS_SWR,
     N_BOOTSTRAP,
     QUASI_SCALE,
+    SKIPS_BASENAME,
+    SUMMARY_BASENAME,
     identified_rows,
     n_fits_delta_aic_row_mismatch,
     n_unpaired_triples,
@@ -131,10 +135,6 @@ logger = logging.getLogger(__name__)
 
 SC = list(SESSION_COLUMNS)
 
-COEFFICIENTS_BASENAME = "content_estimator_comparison"
-SUMMARY_BASENAME = "content_estimator_comparison_summary"
-BOOTSTRAP_BASENAME = "content_estimator_bootstrap"
-SKIPS_BASENAME = "content_estimator_comparison_skips"
 PROVENANCE_ESTIMATOR = "three_estimator_comparison"
 
 #: Rung whose Dirichlet-multinomial concentration the log-phi figure shows.

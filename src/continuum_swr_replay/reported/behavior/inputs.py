@@ -10,17 +10,28 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.content.estimator_comparison import (
+    BOOTSTRAP_BASENAME,
+    SUMMARY_BASENAME,
+)
 from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
     belief_chain_output_subdir,
 )
+from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
+    HORSERACE_SUMMARY,
+)
 from continuum_swr_replay.analysis.behavior.model_specs import (
     PER_BIN_DESIGN,
+)
+from continuum_swr_replay.analysis.behavior.rate.ridge_history_cv import (
+    RIDGE_CV_FILE,
 )
 from continuum_swr_replay.paths import (
     CONTENT_ESTIMATOR_COMPARISON_DIR,
     CROSS_HISTORY_RIDGE_CV_DIR,
     EVENT_SOURCE_COMPARISON_DIR,
     UNCERTAINTY_CONTENT_DIR,
+    event_source_comparison_fits_name,
     model_dir,
     replay_content_dir,
     table_path,
@@ -74,12 +85,12 @@ def default_inputs() -> BehaviorInputs:
         per_stop_audit=model_dir("per_stop_rate") / "all_models_cohort_audit.csv",
         per_stop=model_dir("per_stop_rate") / "all_models.pkl",
         content_contrast_dir=rc / "models_swr_contrast",
-        estimator_summary=estimators / "content_estimator_comparison_summary.csv",
-        estimator_bootstrap=estimators / "content_estimator_bootstrap.csv",
+        estimator_summary=estimators / f"{SUMMARY_BASENAME}.csv",
+        estimator_bootstrap=estimators / f"{BOOTSTRAP_BASENAME}.csv",
         leaf_dir=rc / belief_chain_output_subdir(),
         choice_fits=rc
         / EVENT_SOURCE_COMPARISON_DIR
-        / "non_local_HPC_comparison_fits.pkl",
+        / event_source_comparison_fits_name("non_local", "HPC"),
         stay_leave_dir=rc,
         swr_power=model_dir("per_event_swr_power") / "swr_power_model.pkl",
         event_table=table_path("event_table", rc),
@@ -90,8 +101,8 @@ def default_inputs() -> BehaviorInputs:
         / "duration_aware_history_pooled.pkl",
         cross_ridge_cv=model_dir("per_bin_rate")
         / CROSS_HISTORY_RIDGE_CV_DIR
-        / "cross_history_ridge_cv.pkl",
-        horserace_summary=rc / UNCERTAINTY_CONTENT_DIR / "horserace_summary.csv",
+        / RIDGE_CV_FILE,
+        horserace_summary=rc / UNCERTAINTY_CONTENT_DIR / HORSERACE_SUMMARY,
     )
 
 

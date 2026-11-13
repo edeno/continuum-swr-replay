@@ -58,6 +58,7 @@ from continuum_swr_replay.analysis.behavior.rate.ridge_history_cv import (
     FOLD_SEED,
     MIN_SESSION_EVENTS,
     N_FOLDS,
+    RIDGE_CV_FILE,
     SIGMA_GRID,
     compare_cross_history,
 )
@@ -207,7 +208,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         del design
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    out = args.out_dir / "cross_history_ridge_cv.pkl"
+    out = args.out_dir / RIDGE_CV_FILE
     pd.to_pickle({"stop_cohort": args.stop_cohort, "results": results}, out)
     write_fit_provenance(
         out,

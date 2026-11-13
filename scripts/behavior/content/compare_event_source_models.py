@@ -63,6 +63,7 @@ from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.paths import (
     EVENT_SOURCE_COMPARISON_DIR,
     contfrag_replay_content_dir,
+    event_source_comparison_fits_name,
     replay_content_dir,
 )
 from continuum_swr_replay.runs.fit_provenance import (
@@ -140,7 +141,7 @@ def _comparison_metadata(event_source: str, brain_area: str) -> dict[str, object
 def _comparison_output_path(out_dir: Path, event_source: str, brain_area: str) -> Path:
     """Comparison pickle path keyed by the effective data source."""
     effective_area = _effective_brain_area(event_source, brain_area)
-    return out_dir / f"{event_source}_{effective_area}_comparison_fits.pkl"
+    return out_dir / event_source_comparison_fits_name(event_source, effective_area)
 
 
 def _table_paths(event_source: str, brain_area: str) -> dict[str, Path]:
