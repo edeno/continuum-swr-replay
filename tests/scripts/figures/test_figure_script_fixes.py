@@ -339,21 +339,25 @@ def _figure02_events() -> pd.DataFrame:
     )
 
 
-FIGURE02_FRAME_COUNTS = {"swr_contained": 1, "swr_partial": 2, "non_swr": 5, "total": 8}
+#: ``_figure02_events``'s overlap classes, and the decode frames' event counts
+#: by SWR overlap that agree with them.
+FIGURE02_CLASS_COUNTS = {"swr_contained": 1, "swr_partial": 2, "non_swr": 5, "total": 8}
+FIGURE02_FRAME_COUNTS = {"swr": 3, "non_swr": 5, "total": 8}
 
 
 def test_figure02_panels_b_and_d_come_from_the_canonical_event_table(offline):
     """Panel b's counts and panel d's offsets are computed from the event table
-    the summary cites, and the figure is refused when that table's class counts
-    are not the decode frames', or the table holds an event that is not immobile."""
+    the summary cites, and the figure is refused when that table's event counts
+    by SWR overlap are not the decode frames', or the table holds an event that
+    is not immobile."""
     figure02 = offline("scripts.figures.generate_figure02")
     events = _figure02_events()
     panels = figure02.event_table_panels(events, FIGURE02_FRAME_COUNTS)
-    assert panels["class_counts"] == FIGURE02_FRAME_COUNTS
+    assert panels["class_counts"] == FIGURE02_CLASS_COUNTS
     offsets = panels["offsets"]
     np.testing.assert_allclose(offsets["start_offset_s"], [0.0025, -0.125, 0.5])
     np.testing.assert_allclose(offsets["end_offset_s"], [-0.25, -0.0045, 0.5])
-    with pytest.raises(ValueError, match="overlap-class counts are not those"):
+    with pytest.raises(ValueError, match="counts by SWR overlap are not"):
         figure02.event_table_panels(
             events, {**FIGURE02_FRAME_COUNTS, "non_swr": 6, "total": 9}
         )
@@ -428,8 +432,9 @@ def test_figure02_panels_b_and_d_print_the_digits_of_the_events_summary(offline)
 def test_figure02_checks_the_event_table_against_the_cached_frame_counts(
     offline, tmp_path, monkeypatch
 ):
-    """With a cached bundle, panels b and d are still read from the event table
-    in the data folder, and checked against the bundle's class counts."""
+    """With a cached bundle, panels a, b, d and e are still read when the figure
+    is drawn -- a, b and d from the event table in the data folder, checked
+    against the bundle's frame counts, and e from the stored decoder quality."""
     import joblib
 
     from continuum_swr_replay.paths import (
@@ -450,29 +455,134 @@ def test_figure02_checks_the_event_table_against_the_cached_frame_counts(
     monkeypatch.setattr(
         figure02, "_render_figure", lambda inputs, window_sec: drawn.update(inputs)
     )
-
-    joblib.dump(
-        {"classified_class_counts": FIGURE02_FRAME_COUNTS, "chosen": "cached"}, cache
+    read = {}
+    monkeypatch.setattr(
+        figure02,
+        "example_events",
+        lambda events, ripples, nwb, epoch: read.setdefault("a", len(events)),
     )
+    monkeypatch.setattr(
+        figure02, "read_decoding_error", lambda data_dir: read.setdefault("e", data_dir)
+    )
+
+    data = {"ripple_times": pd.DataFrame(columns=["start_time", "end_time"])}
+    joblib.dump({"frame_event_counts": FIGURE02_FRAME_COUNTS, "data": data}, cache)
     figure02.generate_figure(data_dir=tmp_path)
-    assert drawn["chosen"] == "cached"
-    assert drawn["class_counts"] == FIGURE02_FRAME_COUNTS
+    assert drawn["chosen"] == 8
+    assert drawn["error_df"] == tmp_path
+    assert drawn["class_counts"] == FIGURE02_CLASS_COUNTS
     assert drawn["class_percents"]["non_swr"] == "63"
     assert len(drawn["offsets"]) == 3
 
     # the frames give one more non-SWR event than the table holds
     joblib.dump(
         {
-            "classified_class_counts": {
-                **FIGURE02_FRAME_COUNTS,
-                "non_swr": 6,
-                "total": 9,
-            }
+            "frame_event_counts": {**FIGURE02_FRAME_COUNTS, "non_swr": 6, "total": 9},
+            "data": data,
         },
         cache,
     )
-    with pytest.raises(ValueError, match="overlap-class counts are not those"):
+    with pytest.raises(ValueError, match="counts by SWR overlap are not"):
         figure02.generate_figure(data_dir=tmp_path)
+
+
+def _figure02_session_events() -> pd.DataFrame:
+    """The example session's four events, one of another session, and one
+    non-SWR event the immobility rule does not keep."""
+    return pd.DataFrame(
+        {
+            "animal": "wilbur",
+            "session_date": [20210329] * 5 + [20210330],
+            "epoch": "02_r1",
+            "event_id": ["c", "p", "n1", "n2", "moving", "other"],
+            "overlap_class": ["swr_contained", "swr_partial", "non_swr", "non_swr"]
+            + ["non_swr", "non_swr"],
+            "whole_event_speed_eligible": [True] * 4 + [False, True],
+            "event_start_s": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            "event_end_s": [1.1, 2.2, 3.05, 4.3, 5.1, 6.1],
+            "event_duration_s": [0.102, 0.202, 0.052, 0.302, 0.102, 0.102],
+            "peak_nonlocal_prob": [0.95, 0.95, 0.95, 0.95, 0.99, 0.99],
+        }
+    )
+
+
+def test_figure02_examples_are_the_sessions_rows_of_the_event_table(offline):
+    figure02 = offline("scripts.figures.generate_figure02")
+    ripples = pd.DataFrame({"start_time": [0.9, 2.1], "end_time": [1.2, 2.5]})
+
+    chosen = figure02.example_events(
+        _figure02_session_events(), ripples, "wilbur20210329_.nwb", "02_r1"
+    )
+
+    assert {cls: ev["event_id"] for cls, ev in chosen.items()} == {
+        "swr_contained": "c",
+        "swr_partial": "p",
+        # the session's two kept non-SWR events are equally near their median
+        # duration; the earlier is taken, and never the moving or other one
+        "non_swr": "n1",
+    }
+    assert chosen["swr_partial"]["start_time"] == 2.0
+    assert chosen["swr_partial"]["duration"] == 0.202
+
+    # an example drawn under an SWR that contradicts its class is refused
+    with pytest.raises(AssertionError):
+        figure02.example_events(
+            _figure02_session_events(),
+            pd.DataFrame({"start_time": [0.9, 2.1, 3.0], "end_time": [1.2, 2.5, 3.1]}),
+            "wilbur20210329_.nwb",
+            "02_r1",
+        )
+
+
+def test_figure02_counts_the_frames_events_by_swr_overlap(offline):
+    figure02 = offline("scripts.figures.generate_figure02")
+    rows = pd.DataFrame(
+        {
+            "animal": "a",
+            "day": 1,
+            "epoch": "e",
+            # bins of three events; event 2 has two bins
+            "non_local_event": [1, 2, 2, 3],
+        }
+    )
+
+    counts = figure02.frame_event_counts(
+        {
+            "non_local_event_immobile": rows,
+            "non_local_event_immobile_overlap_SWR_event": rows.iloc[1:3],
+            "non_local_event_immobile_no_overlap_SWR_event": rows.iloc[[0, 3]],
+        }
+    )
+
+    assert counts == {"swr": 1, "non_swr": 2, "total": 3}
+
+
+def test_figure02_panel_e_reads_the_stored_decoder_quality(
+    offline, tmp_path, monkeypatch
+):
+    from continuum_swr_replay.data_loaders import epoch_register
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    monkeypatch.setattr(
+        epoch_register,
+        "REGISTER_PATH",
+        _register(tmp_path / "register.csv", ["02_r1", "04_r2"]),
+    )
+    folder = tmp_path / "decoder_quality"
+    folder.mkdir()
+    sessions = pd.DataFrame(
+        {
+            "epoch_id": ["wilbur20210329_02_r1_HPC", "wilbur20210329_04_r2_HPC"],
+            "median_error_cm": [3.0, 4.0],
+        }
+    )
+    sessions.to_parquet(folder / "sessions.parquet")
+
+    pd.testing.assert_frame_equal(figure02.read_decoding_error(tmp_path), sessions)
+
+    sessions.iloc[:1].to_parquet(folder / "sessions.parquet")
+    with pytest.raises(ValueError, match="analysed"):
+        figure02.read_decoding_error(tmp_path)
 
 
 def test_the_figure02_cache_is_keyed_on_the_analysed_epochs(

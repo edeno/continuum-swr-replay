@@ -34,15 +34,17 @@ from the event bounds. The percents and medians printed on them are those
 functions' numbers, rounded by the summary's rule (``reported.formatting``),
 so a panel prints the digits the text cites.
 
-Panels a, c and e are drawn from the decode frames. Panel a picks its
-examples from ``build_classified_nonlocal_event_table``, computed once over the
-aggregated ``data_over_time`` (one row per non-local event, full label-window
-timing, strict positive-duration SWR overlap, matched SWR); panel c keeps
-``get_event_types`` (parity-tested against the same table) for its
-event-triggered windows. The class counts of the events classified from the
-frames must equal the canonical table's, or the figure is not drawn: the table
-was then built from other decode frames than the ones read here. Equal counts
-do not prove that the two hold the same events.
+Panel a picks its examples from the same table (the example session's rows),
+and draws them on the example session's decode. Panel e is the stored decoder
+quality (``decoder_quality/sessions.parquet``, written by
+``scripts/decoding/measure_decoder_quality.py``), the file the events summary
+reads its decoding error from. Panel c is the only panel drawn from the
+aggregated decode frames: its event-triggered averages are per-time-bin
+signals no stored output holds, around the events of ``get_event_types``. The
+frames' event counts by SWR overlap must equal the canonical table's, or the
+figure is not drawn: the table was then built from other decode frames than
+the ones read here. Equal counts do not prove that the two hold the same
+events.
 
 Remaining validation panels (non-local probability threshold,
 calibration curve, full four-signal triggered averages, moving-vs-
@@ -71,9 +73,6 @@ import pandas as pd
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
-    compute_local_decoding_error,
-)
 from continuum_swr_replay.analysis.detection.nonlocal_events import (
     get_event_types,
     load_data_over_time,
@@ -84,7 +83,6 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
 )
 from continuum_swr_replay.analysis.event_definition.classified_table import (
     assert_drawn_class_matches_ripples,
-    build_classified_nonlocal_event_table,
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     select_typical_event_by_class,
@@ -97,7 +95,6 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     boundary_offset_statistics,
     boundary_offsets,
-    compute_swr_overlap_class_counts,
     overlap_class_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
@@ -116,6 +113,7 @@ from continuum_swr_replay.decoding.identifiers import (
 )
 from continuum_swr_replay.decoding.results import load_results
 from continuum_swr_replay.paths import (
+    DECODER_QUALITY_DIR,
     processed_data_dir,
     replay_content_dir,
     table_path,
@@ -158,7 +156,10 @@ TRIGGERED_SIGNALS = ["Non-Local_prob", "SWR_zscore"]
 # 3: panels b and d are read from the canonical event table when the figure is
 #    drawn; the cache keeps the class counts of the events classified from the
 #    decode frames, to check against that table.
-FIGURE02_CACHE_VERSION = 3
+# 4: panel a's examples are read from the event table and panel e from the
+#    stored decoder quality when the figure is drawn; the cache keeps the
+#    frames' event counts by SWR overlap (``frame_event_counts``) instead.
+FIGURE02_CACHE_VERSION = 4
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -180,39 +181,176 @@ CLASS_TITLES = {
 
 
 def pick_example_events(
-    classified_events_all: pd.DataFrame,
+    events: pd.DataFrame,
     nwb_file_name: str,
     epoch_name: str,
     peak_threshold: float = 0.9,
 ) -> dict:
     """Deterministic three-example selection for panel a.
 
-    Filters the pre-built classified table to the example session,
-    restricts to canonical whole-event-immobile events (matching panel b) with
-    ``peak_nonlocal_prob >= peak_threshold``, then runs
-    :func:`select_typical_event_by_class` per overlap class (median
-    duration within class). Returns a dict ``{class -> pd.Series}`` whose
-    series carry ``start_time`` / ``end_time`` / ``duration`` / ``peak_prob``
-    (renamed from the table's columns) plus ``event_id`` / ``overlap_class``.
+    Filters the canonical event table to the example session's whole-event
+    immobile events (matching panel b) and runs
+    :func:`select_typical_event_by_class` per overlap class: among the events
+    with ``peak_nonlocal_prob >= peak_threshold``, the one nearest its class's
+    median duration.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        The canonical event table, with the session columns, ``event_id``,
+        ``event_start_s``, ``event_end_s``, ``event_duration_s``,
+        ``peak_nonlocal_prob``, ``overlap_class`` and
+        ``whole_event_speed_eligible``.
+    nwb_file_name, epoch_name : str
+        The example session.
+    peak_threshold : float, default 0.9
+        The peak non-local probability an example should reach.
+
+    Returns
+    -------
+    dict
+        ``{class -> pd.Series}``, each series carrying ``start_time`` /
+        ``end_time`` / ``duration`` / ``peak_prob`` (renamed from the table's
+        columns) plus ``event_id`` / ``overlap_class``.
     """
     animal, day = parse_nwb_filename(nwb_file_name)
-    session = classified_events_all[
-        (classified_events_all["animal"] == animal)
-        & (classified_events_all["day"] == day)
-        & (classified_events_all["epoch"] == epoch_name)
-        & classified_events_all["whole_event_speed_eligible"]
+    session = events[
+        (events["animal"] == animal)
+        & (events["session_date"] == day)
+        & (events["epoch"] == epoch_name)
+        & events["whole_event_speed_eligible"]
     ]
     # select_typical_event_by_class expects ``overlap_class``, ``duration``,
     # and (via the precomputed path) a ``peak_prob`` column.
     session = session.rename(
         columns={
             "peak_nonlocal_prob": "peak_prob",
-            "event_duration": "duration",
-            "event_start": "start_time",
-            "event_end": "end_time",
+            "event_duration_s": "duration",
+            "event_start_s": "start_time",
+            "event_end_s": "end_time",
         }
     )
     return select_typical_event_by_class(session, peak_threshold=peak_threshold)
+
+
+def example_events(
+    events: pd.DataFrame,
+    ripple_times: pd.DataFrame,
+    nwb_file_name: str,
+    epoch_name: str,
+) -> dict:
+    """Panel a's three examples, checked against what the panel draws.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        The canonical event table (see :func:`pick_example_events`).
+    ripple_times : pd.DataFrame
+        The example session's SWR source intervals, which panel a shades.
+    nwb_file_name, epoch_name : str
+        The example session.
+
+    Returns
+    -------
+    dict
+        :func:`pick_example_events`'s ``{class -> pd.Series}``.
+
+    Raises
+    ------
+    RuntimeError
+        If the session lacks an event of one of the three classes.
+    AssertionError
+        If an example's class contradicts the SWRs drawn over it, or its
+        ``event_id`` is not one row of the table.
+    """
+    chosen = pick_example_events(events, nwb_file_name, epoch_name)
+    missing = set(CLASS_ORDER) - set(chosen)
+    if missing:
+        raise RuntimeError(
+            f"Example session lacks events in classes: {sorted(missing)}"
+        )
+    for cls in CLASS_ORDER:
+        ev = chosen[cls]
+        logging.info(
+            f"  {cls}: {1000 * ev.duration:.0f} ms, peak prob {ev.peak_prob:.2f}"
+        )
+        if ev.peak_prob < 0.9:
+            logging.warning(
+                "  %s example falls back below peak_threshold 0.9 "
+                "(actual peak prob %.2f)",
+                cls,
+                ev.peak_prob,
+            )
+
+    # Guard: panel a shades the SWR source's intervals; fail if a chosen example
+    # would be drawn with an SWR span that contradicts its column label.
+    assert_drawn_class_matches_ripples(chosen, ripple_times)
+    # Cheap hash-collision guard: each chosen event_id must resolve to
+    # exactly one row of the table.
+    for cls, ev in chosen.items():
+        n = int((events["event_id"] == ev["event_id"]).sum())
+        if n != 1:
+            raise AssertionError(
+                f"event_id {ev['event_id']!r} (column {cls!r}) matches {n} rows "
+                f"in the event table (expected 1) — hash collision."
+            )
+    return chosen
+
+
+def frame_event_counts(event_types: dict) -> dict[str, int]:
+    """The decode frames' immobile non-local events, by SWR overlap.
+
+    Parameters
+    ----------
+    event_types : dict
+        :func:`get_event_types` of the aggregated frames.
+
+    Returns
+    -------
+    dict
+        ``swr``, ``non_swr`` and ``total``: the events (one per session and
+        label) that overlap an SWR, that do not, and all of them.
+    """
+
+    def n_events(frame: pd.DataFrame) -> int:
+        return len(
+            frame[["animal", "day", "epoch", "non_local_event"]].drop_duplicates()
+        )
+
+    return {
+        "swr": n_events(event_types["non_local_event_immobile_overlap_SWR_event"]),
+        "non_swr": n_events(
+            event_types["non_local_event_immobile_no_overlap_SWR_event"]
+        ),
+        "total": n_events(event_types["non_local_event_immobile"]),
+    }
+
+
+def read_decoding_error(data_dir: Path) -> pd.DataFrame:
+    """Panel e's per-epoch Local-state decoding error, as stored.
+
+    Parameters
+    ----------
+    data_dir : Path
+        The processed-data folder holding ``decoder_quality/sessions.parquet``.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_epochs, n_columns)
+        One row per analysed epoch, with ``median_error_cm``.
+
+    Raises
+    ------
+    ValueError
+        If the stored epochs are not the epoch register's analysed ones.
+    """
+    sessions = pd.read_parquet(data_dir / DECODER_QUALITY_DIR / "sessions.parquet")
+    if set(sessions["epoch_id"]) != set(analysed_epoch_ids()):
+        raise ValueError(
+            f"{DECODER_QUALITY_DIR}/sessions.parquet does not hold the analysed "
+            "epochs; rerun scripts/decoding/measure_decoder_quality.py"
+        )
+    return sessions
 
 
 # ---------------------------------------------------------------------------
@@ -276,15 +414,14 @@ def _compute_figure_inputs(
     epoch_name: str,
     data_dir: Path,
 ) -> dict:
-    """Run the expensive loads/derivations and return all render inputs.
+    """Run the expensive loads/derivations and return the cached render inputs.
 
-    Everything the figure needs is reduced here to a single dict that is
-    cheap to cache: the example session's ``data``/``results``/``detector``
-    /``env`` plus the chosen example events (panel a), the triggered-average
-    curves (panel c), the per-session decoding-error table (panel e), and the
-    overlap-class counts of the events classified from the decode frames, which
-    :func:`event_table_panels` checks the canonical event table against.
-    The multi-GB ``data_over_time`` is consumed here and intentionally not
+    Reduced here to a single dict that is cheap to cache: the example session's
+    ``data``/``results``/``detector``/``env`` (panel a draws its examples on
+    them), the triggered-average curves (panel c), and the frames' immobile
+    non-local events by SWR overlap (:func:`frame_event_counts`), which
+    :func:`event_table_panels` checks the canonical event table against. The
+    multi-GB ``data_over_time`` is consumed here and intentionally not
     returned, so the cached bundle stays small.
     """
     # ── Load data ──
@@ -301,65 +438,23 @@ def _compute_figure_inputs(
         nwb_file_name, epoch_name, decoding_brain_area="HPC", root=data_dir
     )
 
-    logging.info("Loading aggregated data for stats panels...")
+    logging.info("Loading aggregated data for panel c...")
     data_over_time = load_data_over_time(data_dir)
     # Panel a's SWR shading: the session's SWR source intervals, the ones the
-    # classes below are computed against (not load_data's stored ripples).
+    # event table's classes are computed against (not load_data's stored
+    # ripples).
     data["ripple_times"] = swr_intervals(
         data_over_time, nwb_file_name=nwb_file_name, epoch_name=epoch_name
     )
     event_types = get_event_types(data_over_time)
-
-    # The events classified from the decode frames: the unfiltered classified
-    # table with full label-window timing, computed once over the
-    # multi-session aggregate. Panel a picks its examples from it, and its
-    # class counts are what the canonical event table (panels b and d) is
-    # checked against. Panel c stays on ``get_event_types`` (parity-tested
-    # against this table).
-    classified_events_all = build_classified_nonlocal_event_table(data_over_time)
-    classified_class_counts = compute_swr_overlap_class_counts(classified_events_all)
+    event_counts = frame_event_counts(event_types)
     logging.info(
-        "Classified %d non-local events; %d pass whole-event immobility; "
-        "by class: contained=%d, partial=%d, non_swr=%d",
-        len(classified_events_all),
-        classified_class_counts["total"],
-        classified_class_counts["swr_contained"],
-        classified_class_counts["swr_partial"],
-        classified_class_counts["non_swr"],
+        "The decode frames hold %d immobile non-local events: %d overlap an SWR, "
+        "%d do not",
+        event_counts["total"],
+        event_counts["swr"],
+        event_counts["non_swr"],
     )
-
-    logging.info("Selecting three example events...")
-    chosen = pick_example_events(classified_events_all, nwb_file_name, epoch_name)
-    missing = set(CLASS_ORDER) - set(chosen)
-    if missing:
-        raise RuntimeError(
-            f"Example session lacks events in classes: {sorted(missing)}"
-        )
-    for cls in CLASS_ORDER:
-        ev = chosen[cls]
-        logging.info(
-            f"  {cls}: {1000 * ev.duration:.0f} ms, peak prob {ev.peak_prob:.2f}"
-        )
-        if ev.peak_prob < 0.9:
-            logging.warning(
-                "  %s example falls back below peak_threshold 0.9 "
-                "(actual peak prob %.2f)",
-                cls,
-                ev.peak_prob,
-            )
-
-    # Guard: panel a shades data["ripple_times"]; fail if a chosen example would
-    # be drawn with an SWR span that contradicts its column label.
-    assert_drawn_class_matches_ripples(chosen, data["ripple_times"])
-    # Cheap hash-collision guard: each chosen event_id must resolve to
-    # exactly one classified row.
-    for cls, ev in chosen.items():
-        n = int((classified_events_all["event_id"] == ev["event_id"]).sum())
-        if n != 1:
-            raise AssertionError(
-                f"event_id {ev['event_id']!r} (column {cls!r}) matches {n} rows "
-                f"in classified_events_all (expected 1) — hash collision."
-            )
 
     logging.info("Computing triggered-average curves (panel c)...")
     triggered_curves = compute_triggered_average_curves(
@@ -369,9 +464,6 @@ def _compute_figure_inputs(
         time_col="start_time",
     )
 
-    logging.info("Computing per-session decoding error (panel e)...")
-    error_df = compute_local_decoding_error(data_over_time)
-
     return {
         "nwb_file_name": nwb_file_name,
         "epoch_name": epoch_name,
@@ -379,31 +471,27 @@ def _compute_figure_inputs(
         "results": results,
         "detector": detector,
         "env": env,
-        "chosen": chosen,
-        "classified_class_counts": classified_class_counts,
+        "frame_event_counts": event_counts,
         "triggered_curves": triggered_curves,
-        "error_df": error_df,
     }
 
 
-def event_table_panels(
-    events: pd.DataFrame, classified_class_counts: dict[str, int]
-) -> dict:
+def event_table_panels(events: pd.DataFrame, frame_counts: dict[str, int]) -> dict:
     """Panels b and d, from the canonical event table.
 
-    The table is checked against the decode frames by its class counts alone.
-    Equal counts do not prove that the two hold the same events: a table built
-    from other frames that happen to give the same three counts is not refused.
+    The table is checked against the decode frames by its event counts by SWR
+    overlap alone. Equal counts do not prove that the two hold the same events:
+    a table built from other frames that happen to give the same counts is not
+    refused.
 
     Parameters
     ----------
     events : pd.DataFrame, shape (n_events, n_columns)
         The canonical event table (``replay_content/event_table.parquet``): one
         row per immobile non-local event.
-    classified_class_counts : dict
-        The overlap-class counts of the events classified from the decode
-        frames (:func:`compute_swr_overlap_class_counts`), which panels a, c
-        and e are drawn from.
+    frame_counts : dict
+        The decode frames' immobile non-local events by SWR overlap
+        (:func:`frame_event_counts`), around which panel c is drawn.
 
     Returns
     -------
@@ -427,18 +515,22 @@ def event_table_panels(
     ------
     ValueError
         If an event of the table is not immobile as a whole, or the table's
-        class counts are not those of the events classified from the decode
-        frames.
+        event counts by SWR overlap are not the decode frames'.
     """
     classes = overlap_class_statistics(events)
     class_counts = {cls: classes[f"n_{cls}"] for cls in CLASS_ORDER}
     class_counts["total"] = classes["n_events"]
-    if class_counts != classified_class_counts:
+    table_counts = {
+        "swr": classes["n_events"] - classes["n_non_swr"],
+        "non_swr": classes["n_non_swr"],
+        "total": classes["n_events"],
+    }
+    if table_counts != frame_counts:
         raise ValueError(
-            "the canonical event table's overlap-class counts are not those of "
-            f"the events classified from the decode frames (table {class_counts}, "
-            f"frames {classified_class_counts}); rebuild the canonical tables from "
-            "these decode frames before drawing the figure"
+            "the canonical event table's event counts by SWR overlap are not "
+            f"the decode frames' (table {table_counts}, frames {frame_counts}); "
+            "rebuild the canonical tables from these decode frames before "
+            "drawing the figure"
         )
     offsets = boundary_offsets(events)
     medians = boundary_offset_statistics(offsets)
@@ -505,10 +597,15 @@ def generate_figure(
         "event_table",
         data_dir / replay_content_dir().relative_to(processed_data_dir()),
     )
-    logging.info(f"Reading panels b and d from {event_table}...")
-    panels = event_table_panels(
-        read_swr_table(event_table), inputs["classified_class_counts"]
+    logging.info(f"Reading panels a, b and d from {event_table}...")
+    events = read_swr_table(event_table)
+    panels = event_table_panels(events, inputs["frame_event_counts"])
+    logging.info("Selecting three example events...")
+    panels["chosen"] = example_events(
+        events, inputs["data"]["ripple_times"], nwb_file_name, epoch_name
     )
+    logging.info("Reading panel e's stored decoding error...")
+    panels["error_df"] = read_decoding_error(data_dir)
     class_counts = panels["class_counts"]
     logging.info(
         f"  {class_counts['total']:,} immobile NL events; "
