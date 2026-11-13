@@ -83,6 +83,25 @@ class TestPlotHistRelativeToEvent:
 
         plt.close(fig)
 
+    def test_the_bars_are_the_peri_event_rate(self, mock_spike_times, mock_event_times):
+        # lags within 0.5 s: -0.4, -0.3, 0.0, 0.3 (event 0.5) and -0.5, 0.1
+        # (event 2.0); six spikes over 2 events and 0.25 s bins
+        fig, ax = plt.subplots()
+        plot_hist_relative_to_event(
+            mock_spike_times, mock_event_times, window=(-0.5, 0.5), ax=ax, bin_size=0.25
+        )
+        heights = [patch.get_height() for patch in ax.patches]
+        lefts = [patch.get_x() for patch in ax.patches]
+        np.testing.assert_allclose(lefts, [-0.5, -0.25, 0.0, 0.25])
+        np.testing.assert_allclose(heights, np.array([3, 0, 2, 1]) / (2 * 0.25))
+        plt.close(fig)
+
+    def test_no_event_is_refused(self, mock_spike_times):
+        with pytest.raises(ValueError, match="no events"):
+            plot_hist_relative_to_event(
+                mock_spike_times, np.array([]), window=(-0.5, 0.5)
+            )
+
 
 class TestPlotAICs:
     """Test AIC comparison plotting."""

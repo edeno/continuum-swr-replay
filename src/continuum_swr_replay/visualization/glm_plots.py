@@ -46,7 +46,8 @@ from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
-from non_local_detector.likelihoods.common import get_spikecount_per_time_bin
+
+from continuum_swr_replay.analysis.pfc.modulation import peri_event_rate
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -146,9 +147,8 @@ def plot_hist_relative_to_event(
 ) -> Axes:
     """Plot peri-stimulus time histogram (PSTH) aligned to event times.
 
-    Creates an event-aligned histogram showing average firing rate across all
-    events. The firing rate is computed by binning spikes relative to event
-    onset and normalizing by the number of events and bin size.
+    Draws :func:`~continuum_swr_replay.analysis.pfc.modulation.peri_event_rate`:
+    the firing rate around the events, averaged over events.
 
     Parameters
     ----------
@@ -170,6 +170,12 @@ def plot_hist_relative_to_event(
     -------
     Axes
         The axes object with the histogram plot.
+
+    Raises
+    ------
+    ValueError
+        If the window is empty, the bin size is not positive, or there is no
+        event.
 
     Notes
     -----
@@ -204,44 +210,14 @@ def plot_hist_relative_to_event(
     if bin_size <= 0:
         raise ValueError(f"bin_size must be positive, got bin_size={bin_size}")
 
-    # Create bins
-    bins = np.arange(window[0], window[1] + bin_size, bin_size)
     event_times = np.asarray(event_times)
+    if event_times.size == 0:
+        raise ValueError("no events to align the spikes to")
 
-    # Accumulate spike counts across events
-    relative_spike_counts = np.zeros_like(bins)
-    for event_time in event_times:
-        # Compute spike times relative to this event
-        event_relative_spike_times = spike_times - event_time
-
-        # Filter to window (inclusive boundaries)
-        in_window = np.logical_and(
-            event_relative_spike_times >= window[0],
-            event_relative_spike_times <= window[1],
-        )
-
-        # Bin spikes
-        relative_spike_counts += get_spikecount_per_time_bin(
-            event_relative_spike_times[in_window],
-            bins,
-        )
-
-    # Normalize by number of events and bin size to get firing rate
-    n_events = len(event_times)
-    if n_events == 0:
-        # No events - return zeros with correct shape
-        firing_rate = np.zeros_like(bins)
-    else:
-        firing_rate = relative_spike_counts / (n_events * bin_size)
-
-    # Plot histogram
-    ax.bar(
-        bins,
-        firing_rate,
-        width=bin_size,
-        color=color,
-        align="edge",
+    centers, firing_rate = peri_event_rate(
+        np.asarray(spike_times), event_times, window, bin_size
     )
+    ax.bar(centers, firing_rate, width=bin_size, color=color, align="center")
     ax.set_xlim(window)
     ax.axvline(0, color="black", linestyle="--")
 
