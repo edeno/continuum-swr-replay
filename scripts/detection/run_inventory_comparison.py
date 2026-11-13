@@ -130,7 +130,11 @@ from continuum_swr_replay.paths import (
     memoryless_root,
 )
 from continuum_swr_replay.runs.batch import RunManifest, run_lock
-from continuum_swr_replay.runs.cli import parse_run_id, select_analysed_epochs
+from continuum_swr_replay.runs.cli import (
+    add_epoch_filters,
+    parse_run_id,
+    select_analysed_epochs,
+)
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.io import (
     json_ready,
@@ -344,16 +348,7 @@ def main(argv: list[str] | None = None) -> None:
         type=parse_run_id,
         help="The memoryless run folder's name.",
     )
-    parser.add_argument("--animal", help="Only this animal's epochs, such as chimi.")
-    parser.add_argument(
-        "--date", type=int, help="Only epochs recorded on this date, such as 20200225."
-    )
-    parser.add_argument("--epoch", help="Only this epoch, such as 02_r1.")
-    parser.add_argument(
-        "--epoch-id",
-        help="Only this epoch, such as chimi20200225_02_r1_HPC; not with --animal, "
-        "--date or --epoch.",
-    )
+    add_epoch_filters(parser, epoch_id=True)
     parser.add_argument(
         "--overwrite", action="store_true", help="Redo epochs already written."
     )

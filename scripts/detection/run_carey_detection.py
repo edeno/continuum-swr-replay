@@ -117,7 +117,11 @@ from continuum_swr_replay.runs.batch import (
     run_epochs,
     run_lock,
 )
-from continuum_swr_replay.runs.cli import filter_epoch_info, parse_run_id
+from continuum_swr_replay.runs.cli import (
+    add_epoch_filters,
+    filter_epoch_info,
+    parse_run_id,
+)
 from continuum_swr_replay.runs.io import (
     array_sha256,
     json_ready,
@@ -460,11 +464,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--animal", help="Only this animal's epochs, such as chimi.")
-    parser.add_argument(
-        "--date", type=int, help="Only epochs recorded on this date, such as 20200225."
-    )
-    parser.add_argument("--epoch", help="Only this epoch, such as 02_r1.")
+    add_epoch_filters(parser)
     parser.add_argument(
         "--overwrite", action="store_true", help="Redo epochs already written."
     )
@@ -502,7 +502,13 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     settings = run_settings(
         provenance, None if artifact_dir is None else artifact_dir.name
     )
-    epochs = list(dict.fromkeys(filter_epoch_info(epochs_to_run(), args).index))
+    epochs = list(
+        dict.fromkeys(
+            filter_epoch_info(
+                epochs_to_run(), animal=args.animal, date=args.date, epoch=args.epoch
+            ).index
+        )
+    )
     if not epochs:
         sys.exit("No epochs match --animal, --date and --epoch.")
 

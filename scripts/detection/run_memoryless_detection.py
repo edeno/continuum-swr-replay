@@ -198,7 +198,7 @@ from continuum_swr_replay.runs.batch import (
     run_epoch_logged,
 )
 from continuum_swr_replay.runs.batch import run_epochs as batch_run_epochs
-from continuum_swr_replay.runs.cli import parse_run_id
+from continuum_swr_replay.runs.cli import epoch_ids_matching, parse_run_id
 from continuum_swr_replay.runs.device import xla_flags
 from continuum_swr_replay.runs.io import sha256_file, write_json
 from continuum_swr_replay.runs.provenance import (
@@ -291,39 +291,6 @@ def find_epochs(
         else:
             epochs.add(epoch_id)
     return sorted(epochs), skipped
-
-
-def select_epochs(
-    epoch_ids: list[str], *, date: int | None, epoch: str | None
-) -> list[str]:
-    """The epochs recorded on `date` and named `epoch`, in their given order.
-
-    Parameters
-    ----------
-    epoch_ids : list of str
-    date : int or None
-        Such as ``20200225``: the identifier's ``EpochKey.date``, the last 8
-        digits of the NWB file's stem, so ``j1620210707`` is 20210707. None
-        keeps every date.
-    epoch : str or None
-        Such as ``02_r1``, the identifier's epoch name. None keeps every epoch.
-
-    Returns
-    -------
-    list of str
-    """
-    if date is None and epoch is None:
-        # nothing is parsed, so a name no decode writes still reaches run_one,
-        # which records it as failed
-        return list(epoch_ids)
-    selected = []
-    for epoch_id in epoch_ids:
-        key = parse_epoch_identifier(epoch_id)
-        if (date is None or key.date == date) and (
-            epoch is None or key.epoch_name == epoch
-        ):
-            selected.append(epoch_id)
-    return selected
 
 
 def _one_value(frame: pd.DataFrame, column: str) -> Any:
@@ -948,7 +915,7 @@ def main(argv: list[str] | None = None) -> None:
             include_variants=args.include_variants,
             left_out=NOT_PENDING if args.pending_only else NOT_ANALYSED,
         )
-    epoch_ids = select_epochs(epoch_ids, date=args.date, epoch=args.epoch)
+    epoch_ids = epoch_ids_matching(epoch_ids, date=args.date, epoch=args.epoch)
     for epoch_id, why in sorted(skipped.items()):
         log.info("left out %s: %s", epoch_id, why)
     if skipped:

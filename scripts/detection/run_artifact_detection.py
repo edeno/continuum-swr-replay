@@ -109,7 +109,11 @@ from continuum_swr_replay.runs.batch import (
     run_epochs,
     run_lock,
 )
-from continuum_swr_replay.runs.cli import filter_epoch_info, parse_run_id
+from continuum_swr_replay.runs.cli import (
+    add_epoch_filters,
+    filter_epoch_info,
+    parse_run_id,
+)
 from continuum_swr_replay.runs.io import array_sha256, json_ready
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.runs.provenance import run_id as run_id_of
@@ -398,11 +402,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--animal", help="Only this animal's epochs, such as chimi.")
-    parser.add_argument(
-        "--date", type=int, help="Only epochs recorded on this date, such as 20200225."
-    )
-    parser.add_argument("--epoch", help="Only this epoch, such as 02_r1.")
+    add_epoch_filters(parser)
     which = parser.add_mutually_exclusive_group()
     which.add_argument(
         "--include-pending",
@@ -454,7 +454,13 @@ def run(args: argparse.Namespace, output_dir: Path) -> None:
     run_id = output_dir.name
     settings = run_settings()
     selected = register_epochs(args.include_pending, args.pending_only)
-    epochs = list(dict.fromkeys(filter_epoch_info(selected, args).index))
+    epochs = list(
+        dict.fromkeys(
+            filter_epoch_info(
+                selected, animal=args.animal, date=args.date, epoch=args.epoch
+            ).index
+        )
+    )
     if not epochs:
         sys.exit("No epochs match --animal, --date and --epoch.")
 

@@ -277,7 +277,12 @@ def run_batch(
 
     # Before any cluster starts: a register that does not match Spyglass stops
     # the batch here, with no GPU worker started.
-    epoch_info = filter_epoch_info(epochs_to_run(args.pending_only), args)
+    epoch_info = filter_epoch_info(
+        epochs_to_run(args.pending_only),
+        animal=args.animal,
+        date=args.date,
+        epoch=args.epoch,
+    )
 
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.99"
 

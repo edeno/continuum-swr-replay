@@ -126,7 +126,6 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     MAX_NONCONVERGED_UNIT_FRACTION,
     STOP_COHORT,
     fails_convergence_gate,
-    filter_epoch_info,
     is_nonempty_file,
     json_safe,
     matching_sidecar,
@@ -138,6 +137,7 @@ from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import processed_data_dir, table_path
 from continuum_swr_replay.runs.batch import setup_logger
+from continuum_swr_replay.runs.cli import add_epoch_filters, filter_epoch_info
 
 OUTPUT_SUBDIR = "pfc_marked_model_family"
 ESTIMATOR = "joint_multimark_ridge_poisson_temporal_glm"
@@ -1118,9 +1118,7 @@ def get_command_line_arguments() -> Namespace:
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionHelpFormatter
     )
-    parser.add_argument("--animal")
-    parser.add_argument("--date", type=int)
-    parser.add_argument("--epoch")
+    add_epoch_filters(parser)
     parser.add_argument("--sessions", type=Path)
     parser.add_argument("--max-sessions", type=int)
     parser.add_argument("--brain-area", choices=["mPFC", "OFC"], default="mPFC")

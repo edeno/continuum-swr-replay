@@ -76,6 +76,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.runs.cli import add_epoch_filters
 from continuum_swr_replay.runs.io import json_ready, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import git_commit, git_dirty
 from continuum_swr_replay.tables.io import read_table, write_table
@@ -111,8 +112,8 @@ def selected_sessions(args: Namespace) -> list[tuple[str, str]]:
     FileNotFoundError
         If a cohort epoch has no canonical mPFC bundle.
     """
-    from continuum_swr_replay.analysis.pfc.runner_support import filter_epoch_info
     from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+    from continuum_swr_replay.runs.cli import filter_epoch_info
 
     epochs = filter_epoch_info(
         analysed_epochs(), animal=args.animal, date=args.date, epoch=args.epoch
@@ -387,9 +388,7 @@ def get_command_line_arguments() -> Namespace:
     """Parse the CLI."""
     parser = ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("step", choices=["assemble", "fit"])
-    parser.add_argument("--animal")
-    parser.add_argument("--date", type=int)
-    parser.add_argument("--epoch")
+    add_epoch_filters(parser)
     parser.add_argument("--max-sessions", type=int)
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--overwrite", action="store_true")

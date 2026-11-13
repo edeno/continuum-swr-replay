@@ -86,7 +86,6 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     MAX_NONCONVERGED_UNIT_FRACTION,
     STOP_COHORT,
     fails_convergence_gate,
-    filter_epoch_info,
     is_nonempty_file,
     json_safe,
     matching_sidecar,
@@ -98,6 +97,7 @@ from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import processed_data_dir, table_path
 from continuum_swr_replay.runs.batch import setup_logger
+from continuum_swr_replay.runs.cli import add_epoch_filters, filter_epoch_info
 
 # This reference is descriptive, not a selection rule. A real 430-unit A100 profile
 # projected 1,000 exact five-fold refits at about 5.2 GPU-hours per session;
@@ -715,9 +715,7 @@ def get_command_line_arguments() -> Namespace:
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionHelpFormatter
     )
-    parser.add_argument("--animal")
-    parser.add_argument("--date", type=int)
-    parser.add_argument("--epoch")
+    add_epoch_filters(parser)
     parser.add_argument("--sessions", type=Path)
     parser.add_argument("--max-sessions", type=int)
     parser.add_argument("--brain-area", default="mPFC", choices=["mPFC", "OFC"])

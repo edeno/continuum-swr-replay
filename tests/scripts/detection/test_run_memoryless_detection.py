@@ -148,26 +148,6 @@ def set_xla_flags(monkeypatch, value: str | None) -> None:
         monkeypatch.setenv("XLA_FLAGS", value)
 
 
-class TestSelectEpochs:
-    def test_date_and_epoch_filters_select_epochs(self):
-        """The date is the NWB stem's last 8 characters, as prepare_data.py
-        reads it, so j16's own digits are not read as part of it."""
-        epoch_ids = [
-            "chimi20990225_02_r1_HPC",
-            "chimi20990225_04_r2_HPC",
-            "chimi20990226_02_r1_HPC",
-            "j1620990707_06_r3_HPC",
-        ]
-
-        assert runner.select_epochs(epoch_ids, date=20990225, epoch="02_r1") == [
-            "chimi20990225_02_r1_HPC"
-        ]
-        assert runner.select_epochs(epoch_ids, date=20990707, epoch=None) == [
-            "j1620990707_06_r3_HPC"
-        ]
-        assert runner.select_epochs(epoch_ids, date=None, epoch=None) == epoch_ids
-
-
 def touch(path):
     path.write_bytes(b"")
 

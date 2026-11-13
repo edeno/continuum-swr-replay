@@ -118,7 +118,6 @@ from continuum_swr_replay.analysis.pfc.modulation import (  # noqa: E402
     in_report_window,
 )
 from continuum_swr_replay.analysis.pfc.runner_support import (  # noqa: E402
-    read_session_list,
     session_seed,
 )
 from continuum_swr_replay.analysis.pfc.scoring import (  # noqa: E402
@@ -143,6 +142,10 @@ from continuum_swr_replay.runs.batch import (  # noqa: E402
     raise_open_file_limit,
     release_nwb_files,
     setup_logger,
+)
+from continuum_swr_replay.runs.cli import (  # noqa: E402
+    add_epoch_filters,
+    read_session_list,
 )
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.io import write_atomically  # noqa: E402
@@ -897,24 +900,7 @@ def get_command_line_arguments(argv: Sequence[str] | None = None) -> Namespace:
         default=4,
         help="Number of Dask workers (default: 4)",
     )
-    parser.add_argument(
-        "--animal",
-        type=str,
-        default=None,
-        help="Filter to specific animal (e.g., wilbur)",
-    )
-    parser.add_argument(
-        "--date",
-        type=int,
-        default=None,
-        help="Filter to specific date (e.g., 20210329)",
-    )
-    parser.add_argument(
-        "--epoch",
-        type=str,
-        default=None,
-        help="Filter to specific epoch (e.g., 02_r1)",
-    )
+    add_epoch_filters(parser)
     parser.add_argument(
         "--brain_area",
         type=str,

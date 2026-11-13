@@ -1,11 +1,14 @@
-"""The runners' shared command line: run ids, the decoders' options, epoch filters,
-and the fit figures' ``--allow-stale``."""
+"""The runners' shared command line: run ids, the decoders' options, epoch filters
+(:func:`add_epoch_filters`, read by :func:`filter_epoch_info`,
+:func:`select_analysed_epochs` and :func:`epoch_ids_matching`), and the fit
+figures' ``--allow-stale``."""
 
 from __future__ import annotations
 
 import re
 import sys
 from argparse import ArgumentParser, ArgumentTypeError, Namespace
+from collections.abc import Iterable
 from pathlib import Path
 
 import numpy as np
@@ -22,9 +25,12 @@ from continuum_swr_replay.paths import processed_data_dir
 __all__ = [
     "RUN_ID_PATTERN",
     "add_common_args",
+    "add_epoch_filters",
+    "epoch_ids_matching",
     "filter_epoch_info",
     "fit_figure_parser",
     "parse_run_id",
+    "read_session_list",
     "select_analysed_epochs",
 ]
 
@@ -59,37 +65,124 @@ def parse_run_id(value: str) -> str:
     return value
 
 
-def filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFrame:
-    """Keep the epochs that ``--animal``, ``--date`` and ``--epoch`` name.
+def read_session_list(path: Path) -> list[tuple[str, str]]:
+    """Read unique ``nwb_file_name epoch_name`` pairs in file order.
+
+    Parameters
+    ----------
+    path : Path
+        Text file with one whitespace- or comma-separated session per line;
+        ``#`` starts a comment.
+
+    Returns
+    -------
+    list of tuple of str
+        ``(nwb_file_name, epoch_name)`` pairs, de-duplicated, in file order.
+
+    Raises
+    ------
+    ValueError
+        If a line does not hold exactly two fields, or the file names no
+        sessions.
+    """
+    pairs: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for number, raw in enumerate(path.read_text().splitlines(), start=1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        fields = line.replace(",", " ").split()
+        if len(fields) != 2:
+            raise ValueError(
+                f"{path}:{number}: expected '<nwb_file_name> <epoch_name>', "
+                f"got {raw.strip()!r}"
+            )
+        key = (fields[0], fields[1])
+        if key not in seen:
+            seen.add(key)
+            pairs.append(key)
+    if not pairs:
+        raise ValueError(f"{path} names no sessions")
+    return pairs
+
+
+def filter_epoch_info(
+    epoch_info: pd.DataFrame,
+    *,
+    sessions: Path | None = None,
+    animal: str | None = None,
+    date: int | None = None,
+    epoch: str | None = None,
+) -> pd.DataFrame:
+    """Keep the epochs that ``--sessions``, ``--animal``, ``--date`` and
+    ``--epoch`` name (:func:`add_epoch_filters`); None leaves a filter off.
+
+    The filters are taken as explicit fields rather than as a parsed
+    ``Namespace`` so that runners with different remaining command lines
+    still select epochs identically.
 
     Parameters
     ----------
     epoch_info : pd.DataFrame
-        ``get_epoch_info``'s frame (or a subset of its rows), indexed by
-        ``(nwb_file_name, interval_list_name)``.
-    args : Namespace
-        Parsed arguments with ``animal``, ``date`` and ``epoch``; ``None``
-        leaves that filter off. ``epoch`` is the full epoch name, such as
-        ``"02_r1"``, matched exactly against ``interval_list_name``.
+        Session table indexed by ``(nwb_file_name, interval_list_name)``.
+    sessions : Path, optional
+        ``--sessions`` file listing the sessions to keep, in the order they
+        should run.
+    animal : str, optional
+        Keep only this animal.
+    date : int, optional
+        Keep only this session date.
+    epoch : str, optional
+        Keep only this interval list name: the full epoch name, such as
+        ``"02_r1"``, matched exactly.
 
     Returns
     -------
     pd.DataFrame
-        The matching rows, in their order.
+        The selected rows, in `sessions` order when that file is given and in
+        source order otherwise.
+
+    Raises
+    ------
+    ValueError
+        If `sessions` names a session that is not available.
     """
-    is_epoch = np.ones(len(epoch_info), dtype=bool)
-
-    if args.animal is not None:
-        is_epoch = np.logical_and(epoch_info.animal == args.animal, is_epoch)
-
-    if args.date is not None:
-        is_epoch = np.logical_and(epoch_info.date == args.date, is_epoch)
-
-    if args.epoch is not None:
-        epoch_names = epoch_info.index.get_level_values("interval_list_name")
-        is_epoch = np.logical_and(epoch_names == args.epoch, is_epoch)
-
-    return epoch_info.loc[is_epoch, :]
+    keep = np.ones(len(epoch_info), dtype=bool)
+    keys = list(
+        zip(
+            epoch_info.index.get_level_values("nwb_file_name"),
+            epoch_info.index.get_level_values("interval_list_name"),
+            strict=True,
+        )
+    )
+    requested_order = read_session_list(sessions) if sessions is not None else None
+    if requested_order is not None:
+        available = set(keys)
+        missing = [key for key in requested_order if key not in available]
+        if missing:
+            raise ValueError(f"{sessions} names unavailable session(s): {missing[:10]}")
+        requested = set(requested_order)
+        keep &= np.array([key in requested for key in keys], dtype=bool)
+    if animal is not None:
+        keep &= epoch_info.animal.to_numpy() == animal
+    if date is not None:
+        keep &= epoch_info.date.to_numpy() == date
+    if epoch is not None:
+        keep &= (
+            epoch_info.index.get_level_values("interval_list_name").to_numpy() == epoch
+        )
+    filtered = epoch_info.loc[keep]
+    if requested_order is not None:
+        order = {key: index for index, key in enumerate(requested_order)}
+        filtered_keys = list(
+            zip(
+                filtered.index.get_level_values("nwb_file_name"),
+                filtered.index.get_level_values("interval_list_name"),
+                strict=True,
+            )
+        )
+        filtered = filtered.iloc[np.argsort([order[key] for key in filtered_keys])]
+    return filtered
 
 
 def select_analysed_epochs(args: Namespace) -> list[str]:
@@ -115,16 +208,80 @@ def select_analysed_epochs(args: Namespace) -> list[str]:
         if args.epoch_id not in analysed:
             sys.exit(f"{args.epoch_id} is not an analysed epoch of the epoch register.")
         return [args.epoch_id]
+    return epoch_ids_matching(
+        analysed, animal=args.animal, date=args.date, epoch=args.epoch
+    )
+
+
+def epoch_ids_matching(
+    identifiers: Iterable[str],
+    *,
+    animal: str | None = None,
+    date: int | None = None,
+    epoch: str | None = None,
+) -> list[str]:
+    """The epoch ids of `animal`, recorded on `date` and named `epoch`, in their
+    given order; None leaves a filter off.
+
+    Parameters
+    ----------
+    identifiers : Iterable of str
+        Epoch ids such as ``"chimi20200225_02_r1_HPC"``.
+    animal : str, optional
+    date : int, optional
+        Such as ``20200225``: the last 8 digits of the NWB file's stem.
+    epoch : str, optional
+        The full epoch name, such as ``"02_r1"``.
+
+    Returns
+    -------
+    list of str
+        With no filter, `identifiers` as given, none parsed (so a name no
+        decode writes still reaches a runner, which records it as failed).
+
+    Raises
+    ------
+    ValueError
+        With a filter, if an identifier cannot be parsed.
+    """
+    if animal is None and date is None and epoch is None:
+        return list(identifiers)
     selected = []
-    for identifier in analysed:
+    for identifier in identifiers:
         key = parse_epoch_identifier(identifier)
         if (
-            (args.animal is None or key.animal == args.animal)
-            and (args.date is None or key.date == args.date)
-            and (args.epoch is None or key.epoch_name == args.epoch)
+            (animal is None or key.animal == animal)
+            and (date is None or key.date == date)
+            and (epoch is None or key.epoch_name == epoch)
         ):
             selected.append(identifier)
     return selected
+
+
+def add_epoch_filters(parser: ArgumentParser, *, epoch_id: bool = False) -> None:
+    """Add a runner's epoch filters: ``--animal``, ``--date`` and ``--epoch``.
+
+    They are what :func:`filter_epoch_info` and :func:`select_analysed_epochs`
+    read; each left out keeps every epoch.
+
+    Parameters
+    ----------
+    parser : ArgumentParser
+    epoch_id : bool, optional
+        Also add ``--epoch-id``, one epoch by its id, for the runners that select
+        through :func:`select_analysed_epochs`.
+    """
+    parser.add_argument("--animal", help="Only this animal's epochs, such as chimi.")
+    parser.add_argument(
+        "--date", type=int, help="Only epochs recorded on this date, such as 20200225."
+    )
+    parser.add_argument("--epoch", help="Only this epoch, such as 02_r1.")
+    if epoch_id:
+        parser.add_argument(
+            "--epoch-id",
+            help="Only this epoch, such as chimi20200225_02_r1_HPC; not with "
+            "--animal, --date or --epoch.",
+        )
 
 
 def fit_figure_parser(description: str | None) -> ArgumentParser:
@@ -169,9 +326,7 @@ def add_common_args(parser: ArgumentParser) -> ArgumentParser:
     )
     parser.add_argument("--non_stationary", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
-    parser.add_argument("--animal", type=str)
-    parser.add_argument("--date", type=int)
-    parser.add_argument("--epoch", type=str)
+    add_epoch_filters(parser)
     parser.add_argument(
         "--save_dir",
         type=Path,
