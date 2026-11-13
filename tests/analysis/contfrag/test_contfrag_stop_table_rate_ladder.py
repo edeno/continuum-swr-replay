@@ -29,14 +29,14 @@ from continuum_swr_replay.analysis.behavior.design_constants import (
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import MODEL_PER_STOP_RATE
-from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
-    fit_event_source_rate_hierarchy,
-)
-from continuum_swr_replay.analysis.behavior.tables.tables_stop import build_stop_table
 from continuum_swr_replay.analysis.contfrag.tables import (
     _CONTFRAG_STOP_TABLE_COLUMNS,
     build_contfrag_stop_table,
+)
+from continuum_swr_replay.analysis.event_tables.stop_table import build_stop_table
+from continuum_swr_replay.analysis.replay_models.model_specs import MODEL_PER_STOP_RATE
+from continuum_swr_replay.analysis.replay_models.rate.per_stop_rate_model import (
+    fit_event_source_rate_hierarchy,
 )
 from tests.analysis.events.test_artifact_exposure import TIME, _graph
 from tests.analysis.events.test_artifact_exposure import _dot as _exposure_dot

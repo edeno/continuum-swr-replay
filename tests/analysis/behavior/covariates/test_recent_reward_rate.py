@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior import trial_outcome_times
 from continuum_swr_replay.analysis.behavior.covariates import (
     recent_reward_rate_all_events as _recent_reward_rate_all_events,
 )
+from continuum_swr_replay.analysis.behavior.covariates import trial_outcome_times
 from tests.support._port_experience_fixtures import port_experiences_from_trials
 
 

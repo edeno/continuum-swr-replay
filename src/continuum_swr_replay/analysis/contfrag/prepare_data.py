@@ -6,7 +6,7 @@ stop tables with the builders in
 decode (``*_contfrag_data_over_time.pkl``, ``*_contfrag_environment.pkl`` and
 the combined posterior of ``*_contfrag_results.nc``) and the session's trials
 and track graph from the behavioral cache that the replay build shares
-(``analysis.behavior.tables.prepare_data.load_behavioral_context``).
+(``analysis.event_tables.prepare_data.load_behavioral_context``).
 :func:`rebuild_contfrag_session_tables` builds the same tables without the
 posterior, carrying its aggregates over from a preserved bundle, and
 :func:`contfrag_event_patch_table` projects the event-patch table from the
@@ -25,15 +25,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.tables import (
-    prepare_data as replay_prepare_data,
-)
-from continuum_swr_replay.analysis.behavior.tables.summaries import (
-    arm_fraction_from_event_total,
-)
-from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
-    build_event_patch_table,
-)
 from continuum_swr_replay.analysis.contfrag.posterior_analysis import (
     get_contfrag_posterior,
 )
@@ -41,6 +32,15 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_arm_table,
     build_contfrag_event_table,
     build_contfrag_stop_table,
+)
+from continuum_swr_replay.analysis.event_tables import (
+    prepare_data as replay_prepare_data,
+)
+from continuum_swr_replay.analysis.event_tables.arm_patch_tables import (
+    build_event_patch_table,
+)
+from continuum_swr_replay.analysis.event_tables.summaries import (
+    arm_fraction_from_event_total,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (
     read_dot_with_swr_source,
@@ -57,7 +57,7 @@ def contfrag_table_basenames(event_source: str, brain_area: str) -> dict[str, st
     """Return the canonical ContFrag table basenames for one (source, area).
 
     The fitter resolves its inputs through the matching helper
-    ``resolve_contfrag_paths`` in ``analysis/behavior/content/fit_outputs.py``;
+    ``resolve_contfrag_paths`` in ``analysis/replay_models/content/fit_outputs.py``;
     keeping the format string in one place lets a unit test pin the
     prep ↔ fitter contract.
     """

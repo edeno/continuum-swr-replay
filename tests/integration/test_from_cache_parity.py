@@ -19,7 +19,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.covariates import load_contingency
-from continuum_swr_replay.analysis.behavior.tables import prepare_data as pdm
+from continuum_swr_replay.analysis.event_tables import prepare_data as pdm
 from continuum_swr_replay.paths import replay_content_dir
 from scripts.tables._table_runner import find_sessions
 

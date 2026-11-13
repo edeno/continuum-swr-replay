@@ -170,10 +170,10 @@ summary reads ``<stem>_stats.csv`` and ``<stem>.provenance.json``."""
 # written by its script and read by the behavior summary.
 CONTENT_ESTIMATOR_COMPARISON_DIR = "content_estimator_comparison"
 """The three content estimators compared, under the replay-content root
-(``scripts/behavior/content/compare_content_estimators.py``)."""
+(``scripts/replay_models/content/compare_content_estimators.py``)."""
 EVENT_SOURCE_COMPARISON_DIR = "event_source_comparison"
 """The choice fits by event source, under the replay-content root
-(``scripts/behavior/content/compare_event_source_models.py``)."""
+(``scripts/replay_models/content/compare_event_source_models.py``)."""
 
 
 def event_source_comparison_fits_name(event_source: str, brain_area: str) -> str:
@@ -187,10 +187,10 @@ def event_source_comparison_fits_name(event_source: str, brain_area: str) -> str
 
 UNCERTAINTY_CONTENT_DIR = "uncertainty_content"
 """The within-arm horse race and the uncertainty tables, under the
-replay-content root (``scripts/behavior/content/analyze_uncertainty_content.py``)."""
+replay-content root (``scripts/replay_models/content/analyze_uncertainty_content.py``)."""
 CROSS_HISTORY_RIDGE_CV_DIR = "cross_history_ridge_cv"
 """The cross-history ridge cross-validation, under ``model_dir("per_bin_rate")``
-(``scripts/behavior/rate/fit_cross_history_ridge_cv.py``)."""
+(``scripts/replay_models/rate/fit_cross_history_ridge_cv.py``)."""
 
 # The mpfc summary's inputs beside the unit bundles, under the processed-data
 # root: each is written by its script and read by the mpfc summary.

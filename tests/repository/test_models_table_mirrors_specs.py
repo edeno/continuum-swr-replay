@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from continuum_swr_replay.analysis.behavior import model_specs as specs
+from continuum_swr_replay.analysis.replay_models import model_specs as specs
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOC_PATH = Path(

@@ -4,11 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from continuum_swr_replay.analysis.behavior.covariate_timing import (
-    FUTURE_REFERENCING,
-    KNOWN_ATOMS,
-    POST_OUTCOME,
-)
 from continuum_swr_replay.analysis.behavior.covariates import (
     COVARIATE_DEFINITIONS,
     POST_CHOICE_COVARIATES,
@@ -16,6 +11,11 @@ from continuum_swr_replay.analysis.behavior.covariates import (
     QueryClock,
     definition_for,
     definitions_frame,
+)
+from continuum_swr_replay.analysis.replay_models.covariate_timing import (
+    FUTURE_REFERENCING,
+    KNOWN_ATOMS,
+    POST_OUTCOME,
 )
 
 

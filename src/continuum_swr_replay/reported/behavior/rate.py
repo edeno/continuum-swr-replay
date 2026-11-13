@@ -5,8 +5,8 @@ The per-bin conditional-intensity ladder (Family B; :func:`per_bin_values`,
 (:func:`rate_contrast_separation_values`, :func:`rate_contrast_audit_values`),
 the per-stop ladder (Family A; :func:`per_stop_values`) and the cohort
 audits of both (:func:`cohort_audit_values`). The statistics are computed in
-``analysis.behavior.rate.rate_fit_statistics`` and
-``analysis.behavior.coefficient_statistics``.
+``analysis.replay_models.rate.rate_fit_statistics`` and
+``analysis.replay_models.coefficient_statistics``.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from collections.abc import Callable, Mapping
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     aic_difference_statistics,
     audited_drop_statistics,
     fit_rows,
@@ -28,14 +28,14 @@ from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
     separated_fraction,
     term_separation_statistics,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     PER_BIN_HISTORY_COLUMNS,
     RATE_BIN_S,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
     TMAX_ARRIVAL,
 )
-from continuum_swr_replay.analysis.behavior.rate import (
+from continuum_swr_replay.analysis.replay_models.rate import (
     rate_fit_statistics,
 )
 from continuum_swr_replay.reported.behavior.common import (
@@ -1227,7 +1227,7 @@ def cohort_audit_values(inputs: BehaviorInputs) -> list[Value]:
 
 def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
     """Question 3.3: the per-stop reward step ``R1 - R0`` on the well-anchored
-    cohort (:func:`~continuum_swr_replay.analysis.behavior.coefficient_statistics.aic_difference_statistics`): a session counts
+    cohort (:func:`~continuum_swr_replay.analysis.replay_models.coefficient_statistics.aic_difference_statistics`): a session counts
     only when both rungs saw the same stops; negative = child better."""
     make = value_factory(per_stop_values, source, TAGS["rate"])
     _require(

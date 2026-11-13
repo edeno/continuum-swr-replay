@@ -43,7 +43,7 @@ decode's stored ``RippleTimesV1`` ones. This is the same label source used by
 the Figure 2 bar / triggered-average / timing panels and by the replay-content
 tables, so a single population and overlap convention governs the whole figure.
 
-The replay-content tables in ``analysis/behavior/tables/tables_*.py`` build on top of
+The replay-content tables in ``analysis/event_tables/tables_*.py`` build on top of
 this table: ``build_event_table`` computes aggregates over this same complete,
 atomically validated label window and merges the classification columns here.
 """

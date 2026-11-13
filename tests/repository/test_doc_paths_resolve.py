@@ -23,10 +23,12 @@ A path written with a placeholder (``scripts/qa/<name>.py``) or a glob
 ``(removed in <commit>)`` right after it, and is not checked.
 
 Historical records are not checked: implementation plans
-(``.claude/docs/plans/``), review and audit reports (``.claude/docs/reviews/``)
-and the known-issues log (``docs/known_issues/``) describe the tree as it was
-when they were written. Nor are the vendored agent skills
-(``.claude/skills/``), which name files relative to the skill's own directory.
+(``.claude/docs/plans/``), review and audit reports (``.claude/docs/reviews/``),
+the known-issues log (``docs/known_issues/``), the dated design specs
+(``docs/design/YYYY-MM-DD-*.md``) and the record of moved code
+(``docs/history/``) describe the tree as it was when they were written. Nor
+are the vendored agent skills (``.claude/skills/``), which name files relative
+to the skill's own directory.
 """
 
 from __future__ import annotations
@@ -50,7 +52,11 @@ HISTORICAL_PREFIXES = (
     ".claude/docs/reviews/",
     "docs/known_issues/",
     ".claude/skills/",
+    "docs/history/",
 )
+
+#: A dated design spec, a historical record like those above.
+_DATED_DESIGN = re.compile(r"docs/design/\d{4}-\d{2}-\d{2}-[^/]*\.md")
 
 #: Package subdirectories a doc may cite by bare path
 #: (``analysis/events/classified_table.py``).
@@ -87,7 +93,11 @@ def _tracked_docs() -> list[str]:
     ).stdout
     docs = [p for p in out.split("\0") if p]
     assert docs, "git ls-files found no Markdown; the scan would be vacuous"
-    return [p for p in docs if not p.startswith(HISTORICAL_PREFIXES)]
+    return [
+        p
+        for p in docs
+        if not p.startswith(HISTORICAL_PREFIXES) and not _DATED_DESIGN.fullmatch(p)
+    ]
 
 
 def _code_spans(text: str) -> list[tuple[int, str]]:
@@ -184,8 +194,10 @@ def test_resolver_on_known_names() -> None:
     assert _resolves("continuum_swr_replay.parameters")
     assert _resolves("continuum_swr_replay.paths.processed_data_dir")
     assert _resolves("continuum_swr_replay.analysis.behavior")
+    assert _resolves(
+        "continuum_swr_replay.analysis.replay_models.fitting.fit_conditional_poisson"
+    )
     # A lazily exported name, found in the package's _LAZY_EXPORTS table.
-    assert _resolves("continuum_swr_replay.analysis.behavior.fit_conditional_poisson")
     assert _resolves("continuum_swr_replay.data_loaders.load_data")
     assert not _resolves("continuum_swr_replay.parameters.NO_SUCH_NAME")
     assert not _resolves("continuum_swr_replay.no_such_module")

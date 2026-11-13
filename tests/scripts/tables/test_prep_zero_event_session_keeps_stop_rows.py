@@ -84,7 +84,7 @@ def _stop_call_index_and_event_return_index(
     ("script", "session_builder", "stop_builder"),
     [
         (
-            "src/continuum_swr_replay/analysis/behavior/tables/prepare_data.py",
+            "src/continuum_swr_replay/analysis/event_tables/prepare_data.py",
             "build_session_tables",
             "build_stop_table",
         ),

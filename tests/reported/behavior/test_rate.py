@@ -13,13 +13,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
 )
-from continuum_swr_replay.analysis.behavior.per_bin_design import reward_kernel_weights
+from continuum_swr_replay.analysis.replay_models.per_bin_design import (
+    reward_kernel_weights,
+)
 from continuum_swr_replay.reported.behavior import rate
 from continuum_swr_replay.reported.behavior.inputs import BehaviorInputs
 from continuum_swr_replay.reported.behavior.rate import cohort_audit_values

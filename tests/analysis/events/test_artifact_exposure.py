@@ -26,7 +26,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
+from continuum_swr_replay.analysis.event_tables.stop_table import build_stop_table
+from continuum_swr_replay.analysis.event_tables.timebin_tables import (
+    build_stop_timebin_table,
+)
+from continuum_swr_replay.analysis.events import analysed_time, swr_source
+from continuum_swr_replay.analysis.pfc.event_sets import build_session_fit_mask
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_PER_BIN_RATE,
     N_HISTORY_LAGS,
     RATE_BIN_S,
@@ -34,17 +41,10 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
     SWR_CONTRAST_RATE_S_SPECS,
     longest_history_window_s,
 )
-from continuum_swr_replay.analysis.behavior.per_bin_design import (
+from continuum_swr_replay.analysis.replay_models.per_bin_design import (
     NO_EXCLUDED_TIME,
     aggregate_to_timebins,
 )
-from continuum_swr_replay.analysis.behavior.tables.tables_stop import build_stop_table
-from continuum_swr_replay.analysis.behavior.tables.timebin_tables import (
-    build_stop_timebin_table,
-)
-from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
-from continuum_swr_replay.analysis.events import analysed_time, swr_source
-from continuum_swr_replay.analysis.pfc.event_sets import build_session_fit_mask
 from continuum_swr_replay.tables.io import SWR_SOURCE_TABLES
 from tests.support._port_experience_fixtures import port_experiences_from_trials
 from tests.support._swr_inventory_fixtures import use_artifact_run, write_artifact_run
@@ -490,17 +490,17 @@ def test_every_rate_fit_drops_the_excluded_bins():
 
     wanted = {"history_window_s"}
     scripts = Path(__file__).resolve().parents[3] / "scripts"
-    rate = scripts / "behavior" / "rate"
+    rate = scripts / "replay_models" / "rate"
     offenders, n_calls = [], 0
     package = scripts.parent / "src" / "continuum_swr_replay" / "analysis"
     runners = [
         *rate.glob("fit_*.py"),
         rate / "plot_model_checking.py",
         # the per-session fits the runners call
-        package / "behavior" / "rate" / "per_bin_rate_ladder.py",
-        package / "behavior" / "rate" / "swr_contrast_rate.py",
-        package / "behavior" / "rate" / "uncertainty_rate.py",
-        package / "behavior" / "rate" / "cross_history.py",
+        package / "replay_models" / "rate" / "per_bin_rate_ladder.py",
+        package / "replay_models" / "rate" / "swr_contrast_rate.py",
+        package / "replay_models" / "rate" / "uncertainty_rate.py",
+        package / "replay_models" / "rate" / "cross_history.py",
     ]
     for path in sorted(runners):
         tree = ast.parse(path.read_text())
@@ -577,7 +577,7 @@ class TestNoArtifactsChangeNothing:
 
     @staticmethod
     def _outputs(tmp_path) -> dict[str, pd.DataFrame]:
-        from continuum_swr_replay.analysis.behavior.tables.timebin_tables import (
+        from continuum_swr_replay.analysis.event_tables.timebin_tables import (
             build_event_onset_table,
         )
         from continuum_swr_replay.analysis.events.classified_table import (
@@ -721,7 +721,7 @@ def test_every_per_bin_runner_checks_its_tables_source():
     run, say), and its provenance names the source."""
     from pathlib import Path
 
-    rate = Path(__file__).resolve().parents[3] / "scripts" / "behavior" / "rate"
+    rate = Path(__file__).resolve().parents[3] / "scripts" / "replay_models" / "rate"
     runners = [
         "fit_per_bin_rate_models.py",
         "fit_swr_contrast_rate.py",
@@ -749,7 +749,7 @@ CONTRAST_ASSEMBLY = (
     / "src"
     / "continuum_swr_replay"
     / "analysis"
-    / "behavior"
+    / "replay_models"
     / "contrast_aggregation.py"
 )
 
@@ -769,13 +769,13 @@ def _supported_scripts() -> list[Path]:
 
 
 def _fit_runners() -> list[Path]:
-    """The rate and content runners: ``behavior/rate/fit_*``,
-    ``behavior/content/*fit*`` and ``behavior/content/analyze_*content*``."""
+    """The rate and content runners: ``replay_models/rate/fit_*``,
+    ``replay_models/content/*fit*`` and ``replay_models/content/analyze_*content*``."""
     return sorted(
         {
-            *SCRIPTS.glob("behavior/rate/fit_*.py"),
-            *SCRIPTS.glob("behavior/content/*fit*.py"),
-            *SCRIPTS.glob("behavior/content/analyze_*content*.py"),
+            *SCRIPTS.glob("replay_models/rate/fit_*.py"),
+            *SCRIPTS.glob("replay_models/content/*fit*.py"),
+            *SCRIPTS.glob("replay_models/content/analyze_*content*.py"),
         }
     )
 

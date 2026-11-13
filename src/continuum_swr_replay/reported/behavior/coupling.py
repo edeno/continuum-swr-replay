@@ -1,12 +1,12 @@
 """The behavior summary's SWR-power values (question 3.8): how a non-local
 event's ripple power depends on the task. The statistics are computed in
-``analysis.behavior.coefficient_statistics``."""
+``analysis.replay_models.coefficient_statistics``."""
 
 from __future__ import annotations
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     coefficient_statistics,
 )
 from continuum_swr_replay.reported.behavior.common import TAGS

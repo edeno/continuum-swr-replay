@@ -1,22 +1,47 @@
-"""Analysis modules for continuum replay project.
+"""The analyses, one package per subject.
 
-This package provides analysis tools for hippocampal and prefrontal cortex
-data, including event detection, posterior analysis, and data aggregation.
+How a non-local event is defined -> ``analysis/events``; how SWRs are detected
+-> ``analysis/hippocampus/swr_detectors``; how detectors are compared ->
+``analysis/inventory_comparison``.
 
-Submodules
-----------
-hippocampus
-    Analysis functions specific to hippocampal replay events
-pfc
-    Analysis functions specific to prefrontal cortex
-constants
-    Shared analysis constants and default parameters
-
-See Also
+Packages
 --------
-continuum_swr_replay.analysis.constants : Default thresholds and bin definitions
-continuum_swr_replay.analysis.hippocampus : Hippocampus-specific analysis
+events
+    The analysed-time rule, the SWR source, event eligibility, the classified
+    non-local event table and the event cohorts every table reads.
+hippocampus
+    Decode masks and aggregation, posterior and quality metrics, the SWR
+    detectors and inventories, and the artifact detector.
+inventory_comparison
+    Event inventories from different detectors brought onto one substrate and
+    compared.
+behavior
+    What the animal did and what the behavioral model says: the covariates,
+    the behavioral-model values, the design constants and the track lookups.
+event_tables
+    The canonical event, arm, patch, stop and time-bin tables and their
+    contracts.
+replay_models
+    The Part 3 rate, content, coupling and choice models and the fitting
+    machinery they share.
+contfrag
+    The Continuous-Fragmented classifier analysis and its tables.
+pfc
+    mPFC and OFC unit analysis.
 
+Modules
+-------
+constants
+    Shared analysis constants and default parameters.
+shared_statistics
+    Task-agnostic statistics (signed-rank p, Benjamini-Hochberg) any package
+    may use.
+literature_survey
+    Statistics of the published replay studies surveyed in Supplementary
+    Table S1.
+
+``behavior``, ``event_tables`` and ``replay_models`` import in that order:
+each imports only those before it.
 """
 
 __all__ = []

@@ -1,11 +1,11 @@
 """The behavior summary's event-history values: the self- and cross-history
 kernels of the duration-aware refit and its ridge cross-validated comparison
 (question 3.3). The statistics are computed in
-``analysis.behavior.rate.history_kernel_statistics``."""
+``analysis.replay_models.rate.history_kernel_statistics``."""
 
 from __future__ import annotations
 
-from continuum_swr_replay.analysis.behavior.rate import (
+from continuum_swr_replay.analysis.replay_models.rate import (
     history_kernel_statistics,
 )
 from continuum_swr_replay.reported.behavior.common import TAGS, _require
@@ -28,7 +28,7 @@ CROSS_DIRECTIONS = {
     "swr_from_non_swr": ("non_local_swr", "SWR-coupled rate after non-SWR events"),
 }
 CROSS_LAG_MS = 45
-#: The ridge cross-validated rungs (``analysis/behavior/rate/ridge_history_cv.py``).
+#: The ridge cross-validated rungs (``analysis/replay_models/rate/ridge_history_cv.py``).
 RIDGE_SELF_RUNG = "Mself_long_dur"
 RIDGE_CROSS_RUNG = "Mselfcross_long_dur"
 

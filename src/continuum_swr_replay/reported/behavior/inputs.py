@@ -10,20 +10,20 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.content.estimator_comparison import (
+from continuum_swr_replay.analysis.replay_models.content.estimator_comparison import (
     BOOTSTRAP_BASENAME,
     SUMMARY_BASENAME,
 )
-from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
+from continuum_swr_replay.analysis.replay_models.content.fit_outputs import (
     belief_chain_output_subdir,
 )
-from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
+from continuum_swr_replay.analysis.replay_models.content.uncertainty_content import (
     HORSERACE_SUMMARY,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     PER_BIN_DESIGN,
 )
-from continuum_swr_replay.analysis.behavior.rate.ridge_history_cv import (
+from continuum_swr_replay.analysis.replay_models.rate.ridge_history_cv import (
     RIDGE_CV_FILE,
 )
 from continuum_swr_replay.paths import (

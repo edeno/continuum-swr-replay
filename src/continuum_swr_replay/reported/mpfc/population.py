@@ -12,7 +12,6 @@ from typing import Any
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import group_range
 from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.bundle_files import MPFC_STEM
 from continuum_swr_replay.analysis.pfc.heldout import empirical_pvalue_floor
@@ -22,6 +21,9 @@ from continuum_swr_replay.analysis.pfc.load_population import (
 from continuum_swr_replay.analysis.pfc.population_statistics import (
     BEST_MODELS,
     EFFECT_CURVES,
+)
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
+    group_range,
 )
 from continuum_swr_replay.reported.mpfc.common import (
     ANIMAL_WORDS,

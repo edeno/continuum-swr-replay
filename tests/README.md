@@ -62,8 +62,10 @@ The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
 Markers combine as usual: `-m "real_data and not slow"`.
 
 The package roots (`continuum_swr_replay/__init__.py`,
-`continuum_swr_replay/data_loaders/__init__.py` and the `analysis.behavior`,
-`analysis.pfc` and `analysis.hippocampus` `__init__`s) re-export through PEP 562 `__getattr__`, and modules with Spyglass
+`continuum_swr_replay/data_loaders/__init__.py` and the
+`analysis.pfc` and `analysis.hippocampus` `__init__`s) re-export through PEP 562 `__getattr__`
+(the `analysis.behavior`, `analysis.event_tables` and `analysis.replay_models`
+`__init__`s import nothing), and modules with Spyglass
 dependencies defer those imports into the functions that need them. The lazy
 contract is pinned by [`tests/repository/test_lazy_imports.py`](repository/test_lazy_imports.py).
 A regression there brings back the import-time DataJoint hang on machines
@@ -95,8 +97,8 @@ tests/
 ```
 
 **Where a test goes.** Tests mirror `src` and `scripts`: the tests of
-`src/continuum_swr_replay/analysis/behavior/rate/<module>.py` go in
-`tests/analysis/behavior/rate/test_<module>.py`, those of `data_loaders/` in
+`src/continuum_swr_replay/analysis/replay_models/rate/<module>.py` go in
+`tests/analysis/replay_models/rate/test_<module>.py`, those of `data_loaders/` in
 `tests/data_loaders/`, and those of `scripts/<dir>/<script>.py` in
 `tests/scripts/<dir>/`. A test goes beside the module it tests, which is the one it
 imports for that purpose; a test of a rule several modules share (every SWR consumer
@@ -205,7 +207,7 @@ They break on any restructuring of the file:
 - [`test_figure_script_fixes.py`](../tests/scripts/figures/test_figure_script_fixes.py)
   (`scripts/figures/plot_swr_contrast_coefs.py`, its plotting functions);
 - [`test_prep_zero_event_session_keeps_stop_rows.py`](../tests/scripts/tables/test_prep_zero_event_session_keeps_stop_rows.py)
-  (the syntax of `build_session_tables` in `analysis/behavior/tables/prepare_data.py`
+  (the syntax of `build_session_tables` in `analysis/event_tables/prepare_data.py`
   and `build_contfrag_session_tables` in `analysis/contfrag/prepare_data.py`);
 - [`test_contfrag_hash_safety.py`](../tests/analysis/contfrag/test_contfrag_hash_safety.py)
   (`analysis/contfrag/tables.py` and `tables/event_ids.py`, both importable now).

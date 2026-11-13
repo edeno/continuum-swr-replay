@@ -4,11 +4,11 @@ The package's two top-level ``__init__.py`` files re-export loader
 functions lazily via PEP 562 ``__getattr__``, and the loaders import
 ``spyglass`` (which opens a DataJoint connection at import time) only
 inside the functions that read through it, so that pure-analysis leaf
-imports (e.g. ``continuum_swr_replay.analysis.behavior.fitting``) finish
+imports (e.g. ``continuum_swr_replay.analysis.replay_models.fitting``) finish
 without touching Spyglass — keeping the offline test slice fast.
 
 A regression here would re-introduce the hang that
-``timeout 8 uv run python -c "from continuum_swr_replay.analysis.behavior.fitting import fit_conditional_poisson"``
+``timeout 8 uv run python -c "from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson"``
 used to hit on no-VPN machines.
 
 Each heavy-import check runs all of its imports in a single subprocess
@@ -110,7 +110,7 @@ _LAZY_IMPORTS: list[str] = [
     # ``data_aggregation`` (which imported ``get_labels`` → spyglass);
     # the PFC leaves used to be poisoned by the eager re-export from
     # ``analysis/pfc/__init__.py``.
-    "from continuum_swr_replay.analysis.behavior.fitting import fit_conditional_poisson",
+    "from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson",
     "from continuum_swr_replay.analysis.hippocampus.event_analysis import get_event_start_end_times",
     "from continuum_swr_replay.analysis.events.nonlocal_detection import get_confident_times",
     "from continuum_swr_replay.analysis.pfc.load_population import _extract_animal",
@@ -140,7 +140,7 @@ _NO_SCHEDULER_IMPORTS: list[str] = [
     "import continuum_swr_replay.analysis.hippocampus.data_aggregation",
     "import continuum_swr_replay.analysis.hippocampus.state_evidence.terms",
     "import continuum_swr_replay.analysis.contfrag.data_aggregation",
-    "import continuum_swr_replay.analysis.behavior.tables.prepare_data",
+    "import continuum_swr_replay.analysis.event_tables.prepare_data",
 ]
 
 
@@ -163,17 +163,22 @@ NOT_JAX_FREE = {
 # Leaf modules other packages import for a row key, a cohort rule, a column
 # registry or a model ladder, and every foundation module but those in
 # ``NOT_JAX_FREE``. Each one is free of JAX, ``non_local_detector`` and
-# ``statsmodels`` now that the replay and PFC package ``__init__``s are lazy;
-# before, every analysis leaf cost ~4.5 s and loaded all three (the
-# code-organization review, F1). The two package roots are listed first: a
-# re-export made eager again would load the heavy chain for every leaf.
+# ``statsmodels`` now that the behavior, event-table and replay-model package
+# ``__init__``s import nothing and the PFC one is lazy; before, every analysis
+# leaf cost ~4.5 s and loaded all three (the code-organization review, F1). The
+# package roots are listed first: a re-export made eager again would load the
+# heavy chain for every leaf.
 JAX_FREE: list[str] = [
     "continuum_swr_replay.analysis.behavior",
+    "continuum_swr_replay.analysis.event_tables",
+    "continuum_swr_replay.analysis.replay_models",
     "continuum_swr_replay.analysis.pfc",
     "continuum_swr_replay.analysis.events.cohort_selection",
     "continuum_swr_replay.analysis.behavior.design_constants",
+    "continuum_swr_replay.analysis.behavior.history_basis",
+    "continuum_swr_replay.analysis.behavior.spatial_mapping",
     "continuum_swr_replay.analysis.pfc.cohort",
-    "continuum_swr_replay.analysis.behavior.model_specs",
+    "continuum_swr_replay.analysis.replay_models.model_specs",
     *(
         f"continuum_swr_replay.{m}"
         for m in _FOUNDATION_MODULES
@@ -260,7 +265,6 @@ def test_intervals_and_runs_load_no_dask():
 @pytest.mark.parametrize(
     "package",
     [
-        "continuum_swr_replay.analysis.behavior",
         "continuum_swr_replay.analysis.pfc",
         "continuum_swr_replay.analysis.hippocampus",
     ],
@@ -279,7 +283,7 @@ def test_every_lazy_export_imports_by_name(package):
 
 
 def test_an_unknown_name_is_an_attribute_error():
-    module = importlib.import_module("continuum_swr_replay.analysis.behavior")
+    module = importlib.import_module("continuum_swr_replay.analysis.pfc")
     with pytest.raises(AttributeError, match="no_such_name"):
         module.no_such_name  # noqa: B018
 
@@ -318,7 +322,7 @@ def _unresolved_exports(init: Path, root: Path) -> list[tuple[str, str, str]]:
 
 
 def test_the_lazy_inits_are_found():
-    assert SRC / "analysis" / "behavior" / "__init__.py" in _LAZY_INITS
+    assert SRC / "analysis" / "pfc" / "__init__.py" in _LAZY_INITS
     assert SRC / "data_loaders" / "__init__.py" in _LAZY_INITS
     assert SRC / "analysis" / "hippocampus" / "__init__.py" in _LAZY_INITS
 

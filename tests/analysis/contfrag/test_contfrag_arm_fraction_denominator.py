@@ -21,21 +21,21 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.behavior._helpers import build_well_to_arm_map
 from continuum_swr_replay.analysis.behavior.covariates import (
     arm_never_visited_all_events,
     recent_reward_rate_all_events,
     rolling_reward_count_all_events,
     visit_recency_all_events,
 )
-from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
-    build_event_patch_table,
-)
+from continuum_swr_replay.analysis.behavior.spatial_mapping import build_well_to_arm_map
 from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_arm_table as _build_contfrag_event_arm_table,
 )
 from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_table as _build_contfrag_event_table,
+)
+from continuum_swr_replay.analysis.event_tables.arm_patch_tables import (
+    build_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from tests.support._port_experience_fixtures import port_experiences_from_trials

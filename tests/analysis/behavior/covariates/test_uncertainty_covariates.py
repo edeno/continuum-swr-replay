@@ -15,16 +15,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior import add_uncertainty_covariates
 from continuum_swr_replay.analysis.behavior.covariates import (
     CANONICAL_SWITCH_WINDOW,
+    add_uncertainty_covariates,
     canonical_port_value_history,
     canonical_trial_switch_history,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
-from continuum_swr_replay.analysis.behavior.rate import uncertainty_rate as fur
+from continuum_swr_replay.analysis.replay_models.rate import uncertainty_rate as fur
 from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.io import read_table, table_exists
 from continuum_swr_replay.tables.session_keys import subset_max_per_animal
@@ -786,8 +786,10 @@ def test_runner_smoke():
     ``uncertainty_rate_smoke.pkl`` and checks the tidy schema carries every
     uncertainty/value coefficient across the three populations.
     """
-    from continuum_swr_replay.analysis.behavior import (
+    from continuum_swr_replay.analysis.replay_models.model_specs import (
         REWARD_HISTORY_COLUMNS,
+    )
+    from continuum_swr_replay.analysis.replay_models.per_bin_design import (
         attach_is_swr_to_onsets,
     )
 

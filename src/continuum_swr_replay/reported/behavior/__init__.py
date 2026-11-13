@@ -42,7 +42,7 @@ Each aggregate is computed with the rule the producing script or its audit
 states, named in the value's description. The content-ladder, leaf-ladder and
 choice coefficients aggregated for this summary are read through the shipped
 per-term identifiability gate
-(:func:`~continuum_swr_replay.analysis.behavior.contrast_aggregation.gate_term_sessions`).
+(:func:`~continuum_swr_replay.analysis.replay_models.contrast_aggregation.gate_term_sessions`).
 The per-bin rate values pass the same per-term gate: a reward kernel is read
 over the sessions whose three reward-basis terms all pass it, and a single
 coefficient over the sessions where that term does; the counts left out, and
@@ -72,13 +72,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import fit_rows
-from continuum_swr_replay.analysis.behavior.content import content_statistics
-from continuum_swr_replay.analysis.behavior.content.estimator_comparison import (
-    COEFFICIENTS_BASENAME,
-)
 from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import fit_rows
+from continuum_swr_replay.analysis.replay_models.content import content_statistics
+from continuum_swr_replay.analysis.replay_models.content.estimator_comparison import (
+    COEFFICIENTS_BASENAME,
+)
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.behavior.choice import (
     STAY_STRATA,

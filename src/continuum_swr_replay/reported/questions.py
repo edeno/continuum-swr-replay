@@ -118,7 +118,7 @@ FIGURES: dict[str, Figure] = {
     ),
     "content_estimators": Figure(
         "Content models under three estimators",
-        "scripts/behavior/content/compare_content_estimators.py",
+        "scripts/replay_models/content/compare_content_estimators.py",
     ),
     "uncertainty_content": Figure(
         "Content against reward-belief uncertainty",

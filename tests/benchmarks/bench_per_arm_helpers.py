@@ -46,13 +46,13 @@ def _make_trials(n_trials: int, rng: np.random.Generator) -> pd.DataFrame:
 
 
 def main():
-    from continuum_swr_replay.analysis.behavior._helpers import (
-        build_well_to_arm_map,
-    )
     from continuum_swr_replay.analysis.behavior.covariates import (
         recent_reward_rate_all_events,
         rolling_reward_count_all_events,
         visit_recency_all_events,
+    )
+    from continuum_swr_replay.analysis.behavior.spatial_mapping import (
+        build_well_to_arm_map,
     )
     from continuum_swr_replay.data_loaders.constants import ALL_ARMS
     from tests.support._port_experience_fixtures import port_experiences_from_trials

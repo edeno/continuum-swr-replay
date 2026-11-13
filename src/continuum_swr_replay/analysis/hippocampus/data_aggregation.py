@@ -231,7 +231,7 @@ def validate_results_position_time_alignment(
     here — and calling it from both aggregators — keeps the two paths
     in lockstep so a regression on either path fails the same
     regression test (mirrors the alignment check used in
-    ``analysis.behavior._helpers.align_posterior_to_dot``).
+    ``analysis.event_tables._common.align_posterior_to_dot``).
     """
     if len(results_time) != len(position_index):
         raise ValueError(

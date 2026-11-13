@@ -14,7 +14,7 @@ from continuum_swr_replay.analysis.behavior.covariates import (
     behavioral_location_from_port_experiences,
     summarize_behavioral_location,
 )
-from continuum_swr_replay.analysis.behavior.tables.bouts import (
+from continuum_swr_replay.analysis.event_tables.bouts import (
     nearest_well_distance_cm,
 )
 from continuum_swr_replay.data_loaders.constants import (

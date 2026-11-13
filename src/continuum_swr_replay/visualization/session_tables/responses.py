@@ -9,11 +9,11 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.patches import Rectangle
 
-from continuum_swr_replay.analysis.behavior import (
-    single_arm_from_well,
+from continuum_swr_replay.analysis.behavior.covariates import (
     trial_arrival_times,
     trial_context_at_times,
 )
+from continuum_swr_replay.analysis.behavior.spatial_mapping import single_arm_from_well
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS as _ALL_ARMS
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
 from continuum_swr_replay.intervals import sample_step

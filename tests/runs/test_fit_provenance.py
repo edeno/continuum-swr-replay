@@ -21,8 +21,8 @@ from types import ModuleType
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.content import fit_outputs
-from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
+from continuum_swr_replay.analysis.replay_models.content import fit_outputs
+from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
     contrast_fit_inputs,
 )
 from continuum_swr_replay.paths import model_dir, table_path
@@ -43,15 +43,15 @@ from continuum_swr_replay.runs.fit_provenance import (
 from continuum_swr_replay.tables.io import write_table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RATE = REPO_ROOT / "scripts" / "behavior" / "rate"
-CONTENT = REPO_ROOT / "scripts" / "behavior" / "content"
+RATE = REPO_ROOT / "scripts" / "replay_models" / "rate"
+CONTENT = REPO_ROOT / "scripts" / "replay_models" / "content"
 FIGURES = REPO_ROOT / "scripts" / "figures"
 CONTRAST_AGGREGATION = (
     REPO_ROOT
     / "src"
     / "continuum_swr_replay"
     / "analysis"
-    / "behavior"
+    / "replay_models"
     / "contrast_aggregation.py"
 )
 
@@ -742,7 +742,7 @@ def _mapping_arguments(path: Path) -> dict[str, list[str]]:
 def test_the_assemblers_default_to_the_contrast_fit_inputs(
     assembler, replay_content_root, monkeypatch
 ):
-    from continuum_swr_replay.analysis.behavior import contrast_aggregation
+    from continuum_swr_replay.analysis.replay_models import contrast_aggregation
 
     read = []
 

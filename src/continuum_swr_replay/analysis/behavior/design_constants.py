@@ -44,7 +44,7 @@ __all__ = [
 # all nine dummies the set is collinear with the conditional
 # likelihood's per-event normalization. These are generated at fit
 # time from the canonical ``arm`` column by
-# ``_helpers.add_arm_fixed_effects`` (they are not stored in the
+# ``replay_models.model_specs.add_arm_fixed_effects`` (they are not stored in the
 # canonical event-arm table).
 ARM_FE_PREDICTORS: tuple[str, ...] = tuple(f"is_candidate_arm_{a}" for a in range(8))
 

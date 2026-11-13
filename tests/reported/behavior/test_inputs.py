@@ -9,7 +9,7 @@ import json
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.model_specs import PER_BIN_DESIGN
+from continuum_swr_replay.analysis.replay_models.model_specs import PER_BIN_DESIGN
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.reported.behavior import inputs
 from continuum_swr_replay.reported.behavior.inputs import fit_staleness

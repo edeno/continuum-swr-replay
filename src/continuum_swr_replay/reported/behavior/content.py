@@ -7,7 +7,7 @@ The content ``is_swr``-contrast ladders (:func:`content_contrast_values`,
 the within-arm horse race (:func:`horserace_values`), the trunk shares
 (:func:`trunk_values`) and the paired current-arm difference
 (:func:`current_arm_paired_values`). The statistics are computed in
-``analysis.behavior.content`` and ``analysis.behavior.coefficient_statistics``.
+``analysis.replay_models.content`` and ``analysis.replay_models.coefficient_statistics``.
 """
 
 from __future__ import annotations
@@ -17,21 +17,21 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     fit_rows,
     gated_coefficient_difference_statistics,
     gated_coefficient_statistics,
 )
-from continuum_swr_replay.analysis.behavior.content import content_statistics
-from continuum_swr_replay.analysis.behavior.content.model_comparison import (
+from continuum_swr_replay.analysis.replay_models.content import content_statistics
+from continuum_swr_replay.analysis.replay_models.content.model_comparison import (
     compare_nested_models,
     summarize_comparison,
 )
-from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
+from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
     LOG_PHI_EVENT_LENGTH,
     LOG_PHI_IS_SWR,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import MODEL_HIERARCHY
+from continuum_swr_replay.analysis.replay_models.model_specs import MODEL_HIERARCHY
 from continuum_swr_replay.reported.behavior.common import (
     TAGS,
     _gate_note,
@@ -608,7 +608,7 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
     """Question 3.7: the leaf-only arm ladder's uncertainty and value rungs.
 
     Each step is compared from the two rungs' per-session fits
-    (:func:`~continuum_swr_replay.analysis.behavior.content.model_comparison.summarize_comparison`),
+    (:func:`~continuum_swr_replay.analysis.replay_models.content.model_comparison.summarize_comparison`),
     not read from the bundle's ``model_comparison.pkl``: the AIC difference is
     the child's minus the parent's, and a stored comparison written before that
     convention holds the opposite sign."""

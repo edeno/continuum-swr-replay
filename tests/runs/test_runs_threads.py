@@ -14,9 +14,9 @@ from tests.support._imports import REPO
 
 #: The runners that pin BLAS threads.
 ENTRY_POINTS = (
-    "scripts/behavior/rate/fit_per_bin_rate_models.py",
-    "scripts/behavior/rate/fit_swr_contrast_rate.py",
-    "scripts/behavior/rate/fit_uncertainty_rate.py",
+    "scripts/replay_models/rate/fit_per_bin_rate_models.py",
+    "scripts/replay_models/rate/fit_swr_contrast_rate.py",
+    "scripts/replay_models/rate/fit_uncertainty_rate.py",
     "scripts/detection/run_event_features.py",
     "scripts/pfc/run_pfc_analysis_bandit.py",
 )

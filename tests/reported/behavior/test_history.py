@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.behavior.rate.history_kernel_statistics import (
+from continuum_swr_replay.analysis.replay_models.rate.history_kernel_statistics import (
     HISTORY_MAX_SE,
 )
 from continuum_swr_replay.reported.behavior.history import duration_aware_history_values

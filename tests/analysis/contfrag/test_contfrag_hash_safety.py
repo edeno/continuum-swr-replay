@@ -5,7 +5,7 @@ concatenating SWR and MUA tables (or HPC and mPFC tables) produces
 silent ID collisions on every join keyed by ``event_id`` / ``stop_id``.
 
 These tests must run offline — Spyglass is not reachable on machines
-without the lab VPN. ``analysis.behavior._helpers`` and
+without the lab VPN. ``analysis.event_tables._common`` and
 ``analysis.contfrag.tables`` cannot be imported directly because both
 trigger ``data_loaders/__init__.py → bandit_task → spyglass``.
 Instead we load just the named function bodies via ``ast`` so the

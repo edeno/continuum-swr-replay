@@ -906,7 +906,9 @@ def test_the_rate_summary_panel_b_takes_its_box_statistics_in_log_space():
     sit at beta = log(RR) for plain RR values and are labelled with the RR."""
     import matplotlib.pyplot as plt
 
-    summary = importlib.import_module("scripts.behavior.rate.plot_per_bin_rate_summary")
+    summary = importlib.import_module(
+        "scripts.replay_models.rate.plot_per_bin_rate_summary"
+    )
     rng = np.random.default_rng(0)
     no_swr = np.exp(rng.uniform(np.log(0.5), np.log(20.0), 60))
     no_swr[0] = 1e-4  # one extreme low value among values between 0.5 and 20
@@ -1034,7 +1036,7 @@ def _contrast_plotting_namespace() -> dict:
     """
     import matplotlib.pyplot as plt
 
-    from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
+    from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
         animal_median_bootstrap,
     )
     from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
@@ -1188,7 +1190,7 @@ def test_the_arrival_retention_note_gives_the_shares_the_fit_stored(
 ):
     """The shares are the SWR and the non-local no-SWR populations' event bins
     kept by the arrival window, over their frozen cohort, in whole percent."""
-    checking = importlib.import_module("scripts.behavior.rate.plot_model_checking")
+    checking = importlib.import_module("scripts.replay_models.rate.plot_model_checking")
 
     note = checking.arrival_retention_note(_fits_with_arrival_cohort(swr, no_swr))
 
@@ -1200,7 +1202,7 @@ def test_the_arrival_retention_note_gives_the_shares_the_fit_stored(
 
 
 def test_the_arrival_retention_note_is_words_only_without_the_cohort_tallies():
-    checking = importlib.import_module("scripts.behavior.rate.plot_model_checking")
+    checking = importlib.import_module("scripts.replay_models.rate.plot_model_checking")
     fits = _fits_with_arrival_cohort((190, 200), (7, 10))
     del fits.attrs["arrival_clock_cohort"]
 
@@ -1220,7 +1222,7 @@ def test_the_gof_ladder_title_carries_the_computed_retention_note(
     import matplotlib.pyplot as plt
 
     # the figure goes beside the data root, under processed_data_root's tmp_path
-    checking = importlib.import_module("scripts.behavior.rate.plot_model_checking")
+    checking = importlib.import_module("scripts.replay_models.rate.plot_model_checking")
     figures = []
     # ``checking.plt`` is pyplot itself, so keep the real close for the cleanup.
     real_close = plt.close
@@ -1250,7 +1252,7 @@ def test_the_isi_autocorrelation_window_is_centred_on_the_zero_lag(n_spikes, lag
     """non_local_detector#64: ``slice(-lag_max + 1, lag_max)`` is empty for every
     ``lag_max <= n_spikes`` because its start counts from the end of the array and
     its stop from the start."""
-    checking = importlib.import_module("scripts.behavior.rate.plot_model_checking")
+    checking = importlib.import_module("scripts.replay_models.rate.plot_model_checking")
     autocorrelation = _symmetric_autocorrelation(n_spikes)
     assert autocorrelation.size == 2 * n_spikes - 1
 
@@ -1270,7 +1272,7 @@ def test_the_isi_autocorrelation_panel_draws_its_points_and_the_bounds():
     import matplotlib.pyplot as plt
     from non_local_detector.model_checking.sorted_spikes import TimeRescaling
 
-    checking = importlib.import_module("scripts.behavior.rate.plot_model_checking")
+    checking = importlib.import_module("scripts.replay_models.rate.plot_model_checking")
     rng = np.random.default_rng(3)
     rate = np.full(4000, 0.05)
     is_spike = rng.random(rate.size) < rate

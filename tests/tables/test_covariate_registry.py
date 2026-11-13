@@ -131,7 +131,7 @@ def test_fitted_model_specs_do_not_reference_legacy_names() -> None:
     """Executable predictor/formula registries use canonical vocabulary only."""
     import re
 
-    from continuum_swr_replay.analysis.behavior import model_specs as specs
+    from continuum_swr_replay.analysis.replay_models import model_specs as specs
 
     model_groups = (
         specs.MODEL_HIERARCHY,

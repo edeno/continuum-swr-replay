@@ -15,14 +15,8 @@ import pandas as pd
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS
 from continuum_swr_replay.tables.columns import require_columns
 
-from .._helpers import (
-    arm_to_patch,
-    build_well_to_arm_map,
-    eq_indicator,
-    eq_indicator_or_nan,
-)
 from ..design_constants import RECENCY_SPLINE_COLUMNS
-from ..spatial_mapping import arm_to_well
+from ..spatial_mapping import arm_to_patch, arm_to_well, build_well_to_arm_map
 from .history import (
     attach_arm_uncertainty,
     attach_contingency_value_block,
@@ -300,3 +294,54 @@ def attach_candidate_arm_covariates(
         },
     )
     return output
+
+
+# ── Elementwise indicators ──
+
+
+def eq_indicator(values: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    """Elementwise ``int(values == reference)`` with NaN-in-reference = 0.
+
+    Use this only where an absent reference genuinely means "no arm
+    qualifies" -- ``is_prev`` on the first trip of a session, or
+    ``is_last_rewarded`` before the first reward.  Where an absent
+    reference instead means "unobserved", use
+    :func:`eq_indicator_or_nan` so the row is excluded by complete-case
+    fitting rather than silently labelled a zero.
+    """
+    values = np.asarray(values, dtype=float)
+    reference = np.asarray(reference, dtype=float)
+    out = (values == reference).astype(int)
+    out[np.isnan(reference)] = 0
+    return out
+
+
+def eq_indicator_or_nan(values: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    """Elementwise ``values == reference`` as 1.0/0.0, NaN where reference is NaN.
+
+    The missing-data counterpart of :func:`eq_indicator`, for indicators
+    whose reference can be *unobserved* rather than merely absent.
+    ``occupancy_well_arm`` is NaN whenever an event window is not wholly at one
+    well (``in_transit``, ``mixed``, ``unknown``); the animal still
+    occupies some arm, we just cannot say which.  Encoding that as 0 on
+    every arm would assert "not the current arm" for all nine, which is
+    a fabricated observation.  Propagating NaN instead lets complete-case
+    cohort selection drop the event through its logged path.
+
+    Parameters
+    ----------
+    values : np.ndarray, shape (n_rows,)
+        Per-row candidate values (e.g. arm or patch IDs).
+    reference : np.ndarray, shape (n_rows,)
+        Per-row reference value, broadcast alongside ``values``.
+
+    Returns
+    -------
+    np.ndarray, shape (n_rows,), dtype float
+        1.0 where equal, 0.0 where unequal, NaN where ``reference`` is NaN.
+    """
+    values = np.asarray(values, dtype=float)
+    reference = np.asarray(reference, dtype=float)
+    out = (values == reference).astype(float)
+    out[np.isnan(reference)] = np.nan
+    return out

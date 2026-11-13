@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.tables import prepare_data
-from continuum_swr_replay.analysis.behavior.tables._tables_common import (
+from continuum_swr_replay.analysis.event_tables import prepare_data
+from continuum_swr_replay.analysis.event_tables._common import (
     _EVENT_SEQUENCE_TABLE_COLUMNS,
 )
 from continuum_swr_replay.tables.io import read_table, write_table

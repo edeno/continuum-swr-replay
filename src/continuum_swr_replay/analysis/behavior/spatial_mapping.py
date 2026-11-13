@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import logging
 
+import networkx as nx
 import numpy as np
+import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 
@@ -199,3 +201,104 @@ def well_to_arm_set(well_id: float, track_graph) -> set[int]:
     if len(arms) == 0:
         logger.warning("No arms found for well %d", well_id)
     return arms
+
+
+# ── Well, arm and patch lookups on the track graph ──
+
+
+def single_arm_from_well(well: float, track_graph: nx.Graph) -> float:
+    """Deterministic scalar arm for a well, ``NaN`` if the well is NaN or isolated."""
+    if well is None or (isinstance(well, float) and np.isnan(well)):
+        return np.nan
+    arms = well_to_arm_set(well, track_graph)
+    if len(arms) == 0:
+        return np.nan
+    return float(min(arms))
+
+
+def arms_of_wells(wells: np.ndarray, track_graph: nx.Graph) -> np.ndarray:
+    """:func:`single_arm_from_well` of each well, ``NaN`` for a ``NaN`` well.
+
+    Parameters
+    ----------
+    wells : np.ndarray, shape (n,)
+        Well node IDs as floats.
+    track_graph : nx.Graph
+        Session track graph.
+
+    Returns
+    -------
+    np.ndarray, shape (n,)
+        Arm IDs as floats.
+    """
+    arm_of = {
+        well: single_arm_from_well(well, track_graph)
+        for well in np.unique(wells[~np.isnan(wells)])
+    }
+    return pd.Series(wells, dtype=float).map(arm_of).to_numpy(dtype=float)
+
+
+def arm_to_patch(arm: float) -> float:
+    """Patch ID for an arm, ``NaN`` propagating."""
+    if arm is None or (isinstance(arm, float) and np.isnan(arm)):
+        return np.nan
+    return float(TRACK_SEGMENT_TO_PATCH.get(int(arm), np.nan))
+
+
+def build_well_to_arm_map(track_graph: nx.Graph) -> dict[int, int]:
+    """Precompute well -> arm mapping from the track graph.
+
+    On the real bandit graph each well (degree-1 node) maps to exactly
+    one arm (edge).  Building this once avoids repeated graph traversals
+    inside the per-event helpers.
+    """
+    mapping: dict[int, int] = {}
+    for u, v, data in track_graph.edges(data=True):
+        eid = data.get("edge_id")
+        if eid is None:
+            continue
+        for node in (u, v):
+            if track_graph.degree(node) == 1:
+                mapping[node] = eid
+    return mapping
+
+
+# ── Stay / switch ──
+
+
+def stay_indicator_from_patches(
+    next_patch: float | np.ndarray, current_patch: float | np.ndarray
+) -> float | np.ndarray:
+    """1.0 when the next trip stays in the current patch, 0.0 when it switches.
+
+    ``NaN`` propagates: an unknown patch on either side is not evidence of a
+    stay *or* a switch, and encoding it as 0 would tell a model the animal
+    switched. Accepts scalars or equal-length arrays and returns the matching
+    shape.
+
+    Parameters
+    ----------
+    next_patch, current_patch : float or np.ndarray
+        Patch IDs, already mapped from arms by :func:`arm_to_patch`.
+
+    Returns
+    -------
+    float or np.ndarray
+        1.0 / 0.0 / ``NaN``, elementwise.
+    """
+    nxt = np.asarray(next_patch, dtype=float)
+    cur = np.asarray(current_patch, dtype=float)
+    out = np.where(np.isnan(nxt) | np.isnan(cur), np.nan, (nxt == cur).astype(float))
+    return float(out) if out.ndim == 0 else out
+
+
+def stay_indicator(next_arm: float, current_arm: float) -> float:
+    """``is_stay`` for one row, from the two arms rather than their patches.
+
+    The arm-level entry point to :func:`stay_indicator_from_patches`; the
+    stay/switch distinction is a *patch* comparison, so both arms are mapped
+    through :func:`arm_to_patch` first. Two arms of the same patch are a stay.
+    """
+    return stay_indicator_from_patches(
+        arm_to_patch(next_arm), arm_to_patch(current_arm)
+    )

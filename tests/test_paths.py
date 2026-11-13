@@ -240,7 +240,7 @@ def test_every_swr_power_output_resolves_under_its_own_model_dir(tmp_path):
     """The per-event ripple-power model is not a per-bin rate fit."""
     import pandas as pd
 
-    from scripts.behavior.coupling import fit_swr_power_model as mod
+    from scripts.replay_models.coupling import fit_swr_power_model as mod
 
     out_dir = paths.model_dir("per_event_swr_power", tmp_path)
     mod._write_outputs(
@@ -285,7 +285,7 @@ def test_table_path_refuses_a_name_outside_the_registry(name):
 
 
 def test_the_swr_power_command_line_writes_under_its_own_model_dir():
-    from scripts.behavior.coupling import fit_swr_power_model as mod
+    from scripts.replay_models.coupling import fit_swr_power_model as mod
 
     assert mod.build_parser().parse_args([]).output_dir == (
         RC / "models_per_event_swr_power"
@@ -331,7 +331,7 @@ def test_figure_dir_on_a_staging_root_sits_beside_it():
 def test_content_occupancy_writes_its_table_under_the_data_root(tmp_path, monkeypatch):
     # The events summary reads the table from the data root, so a default run
     # must write it there, on whichever root the run is given.
-    from scripts.behavior.content import analyze_content_occupancy
+    from scripts.replay_models.content import analyze_content_occupancy
 
     monkeypatch.setenv(paths.PROCESSED_DATA_DIR_ENV, str(tmp_path))
 
@@ -345,15 +345,15 @@ def test_content_occupancy_writes_its_table_under_the_data_root(tmp_path, monkey
 # also draws), and where it writes: an expression on the imported script, or,
 # for one that calls ``figure_dir`` where it saves, None (its source is checked).
 FIGURE_SCRIPT_DEFAULTS = {
-    "scripts/behavior/rate/plot_per_bin_rate_models.py": (None, "rate"),
-    "scripts/behavior/rate/plot_per_bin_rate_summary.py": (None, "rate"),
-    "scripts/behavior/rate/plot_model_checking.py": (None, "rate"),
-    "scripts/behavior/rate/plot_uncertainty_rate.py": (None, "rate"),
+    "scripts/replay_models/rate/plot_per_bin_rate_models.py": (None, "rate"),
+    "scripts/replay_models/rate/plot_per_bin_rate_summary.py": (None, "rate"),
+    "scripts/replay_models/rate/plot_model_checking.py": (None, "rate"),
+    "scripts/replay_models/rate/plot_uncertainty_rate.py": (None, "rate"),
     "scripts/figures/generate_uncertainty_content_figure.py": (
         "_parse_args([]).output_dir",
         "uncertainty_content",
     ),
-    "scripts/behavior/content/generate_replay_content_figures.py": (
+    "scripts/replay_models/content/generate_replay_content_figures.py": (
         "output_dir()",
         "replay_content",
     ),
@@ -362,7 +362,7 @@ FIGURE_SCRIPT_DEFAULTS = {
         "qc_diagnosis",
     ),
     "scripts/figures/plot_swr_contrast_coefs.py": (None, "swr_contrast"),
-    "scripts/behavior/content/compare_content_estimators.py": (
+    "scripts/replay_models/content/compare_content_estimators.py": (
         "_parse_args([]).figures_dir",
         "content_estimators",
     ),

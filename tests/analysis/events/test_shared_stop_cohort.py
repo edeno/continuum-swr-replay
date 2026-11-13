@@ -17,9 +17,6 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior import contrast_aggregation
-from continuum_swr_replay.analysis.behavior.content import cohort as content_cohort
-from continuum_swr_replay.analysis.behavior.model_specs import MODEL_HIERARCHY
 from continuum_swr_replay.analysis.events.cohort_selection import (
     STOP_COHORT_RULES,
     STOP_COHORTS,
@@ -27,10 +24,13 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     select_stop_cohort,
     stop_cohort_suffix,
 )
-from scripts.behavior.rate import fit_per_bin_rate_models as per_bin_mod
-from scripts.behavior.rate import fit_per_stop_rate_models as per_stop_mod
-from scripts.behavior.rate import fit_swr_contrast_rate as contrast_rate_mod
-from scripts.behavior.rate import fit_uncertainty_rate as uncertainty_mod
+from continuum_swr_replay.analysis.replay_models import contrast_aggregation
+from continuum_swr_replay.analysis.replay_models.content import cohort as content_cohort
+from continuum_swr_replay.analysis.replay_models.model_specs import MODEL_HIERARCHY
+from scripts.replay_models.rate import fit_per_bin_rate_models as per_bin_mod
+from scripts.replay_models.rate import fit_per_stop_rate_models as per_stop_mod
+from scripts.replay_models.rate import fit_swr_contrast_rate as contrast_rate_mod
+from scripts.replay_models.rate import fit_uncertainty_rate as uncertainty_mod
 
 RATE_RUNNERS = (per_bin_mod, per_stop_mod, contrast_rate_mod, uncertainty_mod)
 

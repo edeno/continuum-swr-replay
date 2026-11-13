@@ -8,7 +8,7 @@ from continuum_swr_replay.tables import versions
 
 
 def test_reexports_match_centralized_values():
-    from continuum_swr_replay.analysis.behavior.tables.prepare_data import (
+    from continuum_swr_replay.analysis.event_tables.prepare_data import (
         BEHAVIORAL_CONTEXT_CACHE_VERSION,
     )
     from continuum_swr_replay.tables.covariate_registry import (
@@ -61,7 +61,7 @@ def test_require_schema_rejects_old_version():
 
 def test_stale_behavioral_cache_stamp_is_reported_not_raised():
     """A cache-version mismatch is a miss (a reason string), never an exception."""
-    from continuum_swr_replay.analysis.behavior.tables import prepare_data
+    from continuum_swr_replay.analysis.event_tables import prepare_data
 
     assert prepare_data._behavioral_cache_version_error(None) is not None
     assert "comrie_photogate_trials_v3" in str(

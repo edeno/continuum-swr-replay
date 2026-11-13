@@ -39,11 +39,11 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.behavior.tables.trajectory import brain_state_means
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.analysis.event_tables.trajectory import brain_state_means
 from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.events.immobility import (
     filter_event_labels_by_speed,
@@ -298,7 +298,7 @@ def load_session_swr_intervals(
 
 #: The decode frame's ripple-power column: the Kay consensus z-score
 #: (``swr_source.ripple_power_inputs``). Its event mean is the event table's
-#: ``ripple_power_z`` (``analysis/behavior/tables/trajectory.py``, ``_SIGNAL_COLUMNS``).
+#: ``ripple_power_z`` (``analysis/event_tables/trajectory.py``, ``_SIGNAL_COLUMNS``).
 RIPPLE_POWER_COLUMN = "SWR_zscore"
 
 
@@ -309,7 +309,7 @@ def event_mean_ripple_power(
 
     The rule the event table's ``ripple_power_z`` is built by: the NaN-aware
     mean of the frame's ``SWR_zscore`` over the event's bins
-    (:func:`~continuum_swr_replay.analysis.behavior.tables.trajectory.brain_state_means`).
+    (:func:`~continuum_swr_replay.analysis.event_tables.trajectory.brain_state_means`).
     An event's bins are the frame rows from its ``start_time`` to its
     ``end_time``, both included: the bounds are sampled bounds of a contiguous
     label, so these are exactly the label's rows.

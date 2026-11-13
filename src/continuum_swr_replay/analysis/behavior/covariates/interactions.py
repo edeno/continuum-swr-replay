@@ -6,7 +6,7 @@ answer to "what is this product made of?":
 
 - the builders write every product from it (:func:`attach_interactions`):
   ``contrast_aggregation`` its fit-time products, ``candidate_arm.py`` the
-  event-arm table's (Replay and ContFrag), ``tables_arm_patch.py`` the
+  event-arm table's (Replay and ContFrag), ``arm_patch_tables.py`` the
   event-patch table's, ``contfrag/tables.py`` the ContFrag-only ones, and
   ``simulation.py`` the simulator's;
 - ``covariate_timing`` resolves a product to the timing atoms of its factors;
@@ -125,7 +125,7 @@ INTERACTION_FACTORS: dict[str, tuple[str, ...]] = {
     ),
     # Also an event-patch table column; the fit-time build overwrites it.
     "swr_x_is_current_patch": ("is_swr", "is_current_patch"),
-    # --- Event-patch table (tables_arm_patch.py). ---
+    # --- Event-patch table (arm_patch_tables.py). ---
     "swr_x_is_last_rewarded_noncurrent_patch": (
         "is_swr",
         "is_last_rewarded_noncurrent_patch",

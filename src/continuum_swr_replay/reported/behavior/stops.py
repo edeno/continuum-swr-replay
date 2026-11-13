@@ -1,19 +1,19 @@
 """The behavior summary's stop- and onset-table values: dwell by outcome,
 survival, the outcome boundary and the onset times the rate docs quote. The
-statistics are computed in ``analysis.behavior.rate.stop_statistics``."""
+statistics are computed in ``analysis.replay_models.rate.stop_statistics``."""
 
 from __future__ import annotations
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.model_specs import (
-    TMAX,
-)
-from continuum_swr_replay.analysis.behavior.rate import (
-    stop_statistics,
-)
 from continuum_swr_replay.analysis.events.cohort_selection import (
     select_stop_cohort,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (
+    TMAX,
+)
+from continuum_swr_replay.analysis.replay_models.rate import (
+    stop_statistics,
 )
 from continuum_swr_replay.reported.behavior.common import TAGS
 from continuum_swr_replay.reported.values import (
@@ -29,7 +29,7 @@ def stop_table_values(
     well-anchored cohort (the analysed immobility: the stop's span less the
     excluded time inside it), survival past 2 s and 4 s (from the stop's
     start, excluded time not taken out), the outcome-boundary shift
-    (:func:`~continuum_swr_replay.analysis.behavior.rate.stop_statistics.outcome_boundary_statistics`), and the share of onsets
+    (:func:`~continuum_swr_replay.analysis.replay_models.rate.stop_statistics.outcome_boundary_statistics`), and the share of onsets
     inside the ``TMAX`` truncation."""
     make = value_factory(stop_table_values, source, TAGS["rate"])
     anchored, _ = select_stop_cohort(stops, cohort="at_well")

@@ -30,18 +30,18 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior import cohort_audit as coh
-from continuum_swr_replay.analysis.behavior import contrast_aggregation as ca
-from continuum_swr_replay.analysis.behavior import covariate_timing as ct
-from continuum_swr_replay.analysis.behavior.content import simulation as sim
 from continuum_swr_replay.analysis.behavior.covariates.interactions import (
     INTERACTION_FACTORS,
     LEGACY_PRODUCT_NAMES,
     UNFITTED_PRODUCTS,
     factor_source,
 )
+from continuum_swr_replay.analysis.replay_models import cohort_audit as coh
+from continuum_swr_replay.analysis.replay_models import contrast_aggregation as ca
+from continuum_swr_replay.analysis.replay_models import covariate_timing as ct
+from continuum_swr_replay.analysis.replay_models.content import simulation as sim
 from continuum_swr_replay.tables.io import read_table
-from tests.analysis.behavior.test_covariate_timing import _all_ladder_predictors
+from tests.analysis.replay_models.test_covariate_timing import _all_ladder_predictors
 
 ANSWERS_436C4538 = (
     Path(__file__).parents[3]

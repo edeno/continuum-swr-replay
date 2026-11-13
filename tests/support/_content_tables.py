@@ -10,16 +10,16 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.content.simulation import (
+from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
+from continuum_swr_replay.analysis.replay_models.content.simulation import (
     simulate_dirichlet_multinomial_counts,
     simulate_with_event_covariates,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_HIERARCHY,
     MODEL_PATCH,
     default_content_model_names,
 )
-from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
     TRACK_SEGMENT_TO_PATCH,
@@ -229,7 +229,7 @@ def logit_session(epoch: str, seed: int) -> pd.DataFrame:
 
 def fail_logit_for(monkeypatch, epoch: str, n_predictors: int, error: Exception):
     """Make ConditionalLogit raise ``error`` for one session at one rung."""
-    from continuum_swr_replay.analysis.behavior import fitting
+    from continuum_swr_replay.analysis.replay_models import fitting
 
     real = fitting.ConditionalLogit
 

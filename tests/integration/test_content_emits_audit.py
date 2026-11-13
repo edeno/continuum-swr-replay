@@ -14,12 +14,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior import contrast_aggregation
-from continuum_swr_replay.analysis.behavior.cohort_audit import (
+from continuum_swr_replay.analysis.replay_models import contrast_aggregation
+from continuum_swr_replay.analysis.replay_models.cohort_audit import (
     DROP_FIELDS,
     write_cohort_audit,
 )
-from continuum_swr_replay.analysis.behavior.content.session_fits import (
+from continuum_swr_replay.analysis.replay_models.content.session_fits import (
     fit_contrast_ladder,
 )
 

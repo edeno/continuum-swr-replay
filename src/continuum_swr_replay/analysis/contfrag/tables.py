@@ -3,7 +3,7 @@
 This module produces event tables from externally-defined events (SWR or
 high-MUA times), using the ContFrag classifier's decoded posterior for
 content analysis. The key difference from the NonLocal tables
-(``analysis.behavior.tables.tables_*``) is that events come from external detectors,
+(``analysis.event_tables``) is that events come from external detectors,
 not from model-detected non-local probability thresholding.
 
 The ContFrag model has 2 states (Continuous, Fragmented), both of which
@@ -35,18 +35,6 @@ from continuum_swr_replay.tables.session_keys import one_session
 
 from ...data_loaders.constants import ALL_ARMS
 from ...parameters import PLACE_BIN_SIZE_1D
-from ..behavior._helpers import (
-    align_count_matrix,
-    align_posterior_to_dot,
-    arm_to_patch,
-    arms_of_wells,
-    assert_event_label_alignment,
-    assert_single_session_alignment,
-    first_row_floats,
-    safe_mode,
-    single_arm_from_well,
-    stay_indicator,
-)
 from ..behavior.covariates import (
     add_trial_context,
     recent_trial_reward_rate,
@@ -62,8 +50,22 @@ from ..behavior.design_constants import (
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
 )
-from ..behavior.spatial_mapping import map_estimate_to_arm
-from ..behavior.tables.bouts import (
+from ..behavior.spatial_mapping import (
+    arm_to_patch,
+    arms_of_wells,
+    map_estimate_to_arm,
+    single_arm_from_well,
+    stay_indicator,
+)
+from ..event_tables._common import (
+    align_count_matrix,
+    align_posterior_to_dot,
+    assert_event_label_alignment,
+    assert_single_session_alignment,
+    first_row_floats,
+    safe_mode,
+)
+from ..event_tables.bouts import (
     assign_bout,
     bout_exposure_s,
     bout_start_context,
@@ -71,19 +73,19 @@ from ..behavior.tables.bouts import (
     nearest_well_distance_cm,
     time_since_stop,
 )
-from ..behavior.tables.summaries import (
+from ..event_tables.summaries import (
     arm_count_hard,
     arm_count_soft,
     arm_fraction_from_event_total,
     arm_posterior_mass,
     posterior_to_arm_marginal,
 )
-from ..behavior.tables.table_contracts import validate_event_arm_table
-from ..behavior.tables.trajectory import (
+from ..event_tables.table_contracts import validate_event_arm_table
+from ..event_tables.trajectory import (
     SHARED_TRAJECTORY_COLUMNS,
     compute_trajectory_rollups,
 )
-from ..behavior.tables.uncertainty import (
+from ..event_tables.uncertainty import (
     posterior_entropy_mean,
     posterior_hpd_widths,
     posterior_peak_mean,

@@ -11,25 +11,28 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import continuum_swr_replay.analysis.behavior as replay_pkg
 from continuum_swr_replay.analysis.behavior import (
-    _helpers,
     covariates,
-    per_bin_design,
+    history_basis,
+    spatial_mapping,
 )
 from continuum_swr_replay.analysis.behavior.covariates.history import (
     diagnostics,
     value_uncertainty,
 )
+from continuum_swr_replay.analysis.event_tables import _common as table_common
+from continuum_swr_replay.analysis.replay_models import per_bin_design
 from continuum_swr_replay.tables import event_ids
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
 from continuum_swr_replay.tables.io import write_table
+from tests.support._imports import SRC, imported_modules
 from tests.support._port_experience_fixtures import port_experiences_from_trials
 
-# Scientific definitions must have one owning module.  ``_helpers`` is for
-# generic table-building mechanics; it must not re-export covariate functions.
+# Scientific definitions must have one owning module.  The generic
+# table-building modules (``event_tables._common``, ``behavior.spatial_mapping``)
+# must not re-export covariate functions.
 HISTORY_NAMES = [
     "UNCERTAINTY_COVARIATES",
     "visit_recency_all_events",
@@ -49,15 +52,6 @@ CONTEXT_NAMES = [
 
 CLOCK_NAMES = ["trial_arrival_times", "trial_outcome_times"]
 
-# Names exposed from ``analysis.behavior`` before the ownership cleanup remain
-# available there and now resolve through the covariates package.
-PUBLIC_NAMES = [
-    "UNCERTAINTY_COVARIATES",
-    "add_uncertainty_covariates",
-    *CONTEXT_NAMES,
-    *CLOCK_NAMES,
-]
-
 
 def test_covariate_definitions_have_one_owner():
     """Package exports are identical to their coherent owning submodules."""
@@ -75,17 +69,11 @@ def test_covariate_definitions_have_one_owner():
         assert getattr(covariates, name) is getattr(clocks, name)
 
 
-def test_helpers_has_no_covariate_reexport_shim():
-    """The generic helper module must not regain scientific covariate ownership."""
+@pytest.mark.parametrize("module", [table_common, spatial_mapping])
+def test_generic_helper_modules_have_no_covariate_reexport_shim(module):
+    """The generic helper modules must not regain scientific covariate ownership."""
     for name in (*HISTORY_NAMES, *CONTEXT_NAMES, *CLOCK_NAMES):
-        assert not hasattr(_helpers, name), f"_helpers unexpectedly re-exports {name}"
-
-
-def test_public_names_resolve_via_package():
-    """The public covariate names resolve off the package and match covariates."""
-    for name in PUBLIC_NAMES:
-        assert getattr(replay_pkg, name) is getattr(covariates, name)
-        assert name in replay_pkg.__all__
+        assert not hasattr(module, name), f"{module.__name__} re-exports {name}"
 
 
 def test_q_learner_lives_in_its_diagnostics_module():
@@ -136,19 +124,17 @@ def test_covariates_imports_standalone_without_cycle():
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize("module", [_helpers, per_bin_design])
+@pytest.mark.parametrize("module", [history_basis, per_bin_design])
 def test_shared_primitive_module_does_not_import_covariates_package(module):
     """Static guard against recreating the former two-way import dependency.
 
     ``covariates.history.reward_history`` imports the raised-cosine basis and
-    its projection from ``per_bin_design``, so ``per_bin_design`` importing
-    back would be a cycle; ``_helpers`` carries the same constraint from when
-    it owned those primitives.
+    its projection from ``history_basis``, so ``history_basis`` importing the
+    covariates back would be a cycle; ``per_bin_design``, which owned those
+    primitives before, carries the same constraint.
     """
-    source = Path(module.__file__).read_text()
-    assert "from .covariates" not in source
-    assert "import .covariates" not in source
-    assert "replay.covariates" not in source
+    imported = imported_modules(Path(module.__file__), SRC)
+    assert not any(".behavior.covariates" in m for m in imported), sorted(imported)
 
 
 # ── q_all_arm (per-arm leaky-Q rollout) ──
@@ -782,7 +768,7 @@ class TestAlignCountMatrix:
 
     def test_reindexes_rows_to_target_order(self):
         counts = np.array([[1, 2], [3, 4]], dtype=np.int64)
-        out = _helpers.align_count_matrix(
+        out = table_common.align_count_matrix(
             counts, np.array([10, 20]), np.array([20, 10]), n_arms=2
         )
         np.testing.assert_array_equal(out, np.array([[3, 4], [1, 2]]))
@@ -790,7 +776,7 @@ class TestAlignCountMatrix:
     def test_missing_event_fills_zero_for_integer_counts(self):
         """A hard count genuinely observed zero real-arm bins."""
         counts = np.array([[1, 2]], dtype=np.int64)
-        out = _helpers.align_count_matrix(
+        out = table_common.align_count_matrix(
             counts, np.array([10]), np.array([10, 99]), n_arms=2
         )
         np.testing.assert_array_equal(out[1], np.array([0, 0]))
@@ -799,7 +785,7 @@ class TestAlignCountMatrix:
     def test_missing_event_fills_nan_for_float_counts(self):
         """A fraction's 0/0 must stay undefined, not become 0 or +inf."""
         counts = np.array([[1.0, 2.0]], dtype=float)
-        out = _helpers.align_count_matrix(
+        out = table_common.align_count_matrix(
             counts, np.array([10]), np.array([10, 99]), n_arms=2
         )
         assert np.isnan(out[1]).all()
@@ -807,7 +793,7 @@ class TestAlignCountMatrix:
 
 class TestEventLabelAlignment:
     def test_accepts_same_event_set_in_different_order(self):
-        _helpers.assert_event_label_alignment(
+        table_common.assert_event_label_alignment(
             np.array([2, 1, 2, 1]), np.array([1, 2]), source_name="dot"
         )
 
@@ -822,7 +808,7 @@ class TestEventLabelAlignment:
     )
     def test_rejects_missing_extra_or_nonfinite_event_ids(self, source, target):
         with pytest.raises(ValueError, match="event-label alignment"):
-            _helpers.assert_event_label_alignment(
+            table_common.assert_event_label_alignment(
                 np.asarray(source), np.asarray(target), source_name="dot"
             )
 
@@ -833,9 +819,11 @@ class TestEventLabelAlignment:
         target = pd.DataFrame({"animal": ["b"], "day": [1], "epoch": ["e"]})
 
         with pytest.raises(ValueError, match="session alignment failed"):
-            _helpers.assert_single_session_alignment(source, target, source_name="dot")
+            table_common.assert_single_session_alignment(
+                source, target, source_name="dot"
+            )
 
-        _helpers.assert_single_session_alignment(
+        table_common.assert_single_session_alignment(
             source,
             target.assign(animal="a"),
             source_name="dot",
@@ -1055,14 +1043,3 @@ def test_reward_basis_from_lags_is_nan_only_where_a_bump_has_no_support():
     assert np.isnan(out[0, 2])
     assert np.isnan(out[1, 0])
     np.testing.assert_allclose(out[1, 1:], 1.0)
-
-
-def test_package_all_is_a_working_star_import_surface():
-    """Every ``__all__`` name resolves, including the deferred DM estimators."""
-    namespace: dict[str, object] = {}
-    exec(  # noqa: S102 -- the star-import surface is only testable by executing one
-        "from continuum_swr_replay.analysis.behavior import *", namespace
-    )
-    exported = set(replay_pkg.__all__)
-    assert exported - set(namespace) == set()
-    assert set(replay_pkg._LAZY_EXPORTS) <= exported

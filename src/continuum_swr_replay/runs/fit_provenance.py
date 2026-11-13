@@ -493,7 +493,7 @@ def load_per_sd_scale(provenance_path: str | Path, cohort: str) -> dict[str, flo
 def load_fit_time_sd_reference(meta_path: str | Path) -> dict[str, float]:
     """Per-SD units the rate contrast's audited table states its coefficients in.
 
-    ``scripts/behavior/rate/fit_swr_contrast_rate.py`` takes one SD per raw-scale rate
+    ``scripts/replay_models/rate/fit_swr_contrast_rate.py`` takes one SD per raw-scale rate
     covariate over the stop cohort its per-session fits name (at-well for the
     canonical bundle), aggregates with it, and records it in the run's meta
     JSON. Readers must take the unit from there: the same covariates measured

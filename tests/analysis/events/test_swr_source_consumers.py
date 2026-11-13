@@ -267,7 +267,7 @@ def saved_decode(tmp_path):
 def test_the_replay_tables_build_on_the_sources_labels(
     source, saved_decode, monkeypatch
 ):
-    from continuum_swr_replay.analysis.behavior.tables import prepare_data
+    from continuum_swr_replay.analysis.event_tables import prepare_data
 
     seen: list = []
     monkeypatch.setattr(prepare_data, "validate_dot_event_contract", recorder(seen))
@@ -374,7 +374,7 @@ def test_the_stop_table_rebuild_builds_on_the_sources_labels(
 def test_the_content_occupancy_scan_reads_the_sources_labels(
     source, monkeypatch, tmp_path
 ):
-    import scripts.behavior.content.analyze_content_occupancy as occupancy
+    import scripts.replay_models.content.analyze_content_occupancy as occupancy
 
     decode_frame().to_pickle(tmp_path / f"{EPOCH_ID}_80_data_over_time.pkl")
     seen: list = []
@@ -404,7 +404,7 @@ def test_the_spike_evidence_scan_reads_the_sources_labels(
 def test_the_overlap_geometry_count_classifies_against_the_source(
     source, saved_decode, monkeypatch, offline, tmp_path
 ):
-    script = offline("scripts.behavior.content.quantify_swr_overlap_geometry")
+    script = offline("scripts.replay_models.content.quantify_swr_overlap_geometry")
     position = pd.DataFrame({"head_speed": np.zeros(TIME.size)}, index=TIME)
     states = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
     results = xr.Dataset(
@@ -652,7 +652,7 @@ def test_the_stop_shard_assembly_needs_every_shard_from_the_source(
 def test_the_content_occupancy_refuses_an_arm_table_from_another_source(
     source, monkeypatch, tmp_path
 ):
-    import scripts.behavior.content.analyze_content_occupancy as occupancy
+    import scripts.replay_models.content.analyze_content_occupancy as occupancy
 
     folder = tmp_path / "replay_content"
     folder.mkdir()
@@ -850,7 +850,7 @@ def test_the_overlap_geometry_count_drops_the_events_the_mask_reaches(
     """The script re-detects non-local events from the posterior, so it applies
     the one analysed-time rule itself: an event in excluded time [101.75,
     102.55] (the configured mask widened by 0.3 s) is not counted."""
-    script = offline("scripts.behavior.content.quantify_swr_overlap_geometry")
+    script = offline("scripts.replay_models.content.quantify_swr_overlap_geometry")
     position = pd.DataFrame({"head_speed": np.zeros(TIME.size)}, index=TIME)
     states = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
     probabilities = np.zeros((TIME.size, len(states)))

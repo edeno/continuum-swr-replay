@@ -357,7 +357,7 @@ _DEFINITIONS = [
         clock=QueryClock.GOAL_ARRIVAL,
         availability=Availability.PRE_OUTCOME,
         support="stops after at least one completed arrival",
-        producer="covariates.context.add_trial_context -> replay.tables_stop.build_stop_table",
+        producer="covariates.context.add_trial_context -> event_tables.stop_table.build_stop_table",
         missingness="no completed arrival at the bout start",
     ),
     _definition(
@@ -368,7 +368,7 @@ _DEFINITIONS = [
         clock=QueryClock.OUTCOME_AVAILABILITY,
         availability=Availability.POST_OUTCOME,
         support="stops after at least one completed arrival",
-        producer="covariates.context.add_trial_context -> replay.tables_stop.build_stop_table",
+        producer="covariates.context.add_trial_context -> event_tables.stop_table.build_stop_table",
         missingness="no completed arrival at the bout start",
     ),
     _definition(
@@ -469,7 +469,7 @@ _DEFINITIONS = [
         clock=QueryClock.FUTURE_CHOICE,
         availability=Availability.FUTURE_REFERENCING,
         support="stops with an observed next choice",
-        producer="replay.tables_stop.build_stop_table (stop grain); also computed per "
+        producer="event_tables.stop_table.build_stop_table (stop grain); also computed per "
         "event window in build_event_table (event_table.is_stay), which "
         "has wider coverage than the joined stop value",
         missingness="next choice unavailable",
@@ -511,7 +511,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.EVENT_START,
             availability=Availability.PRE_OUTCOME,
             support="all three candidate patches",
-            producer="replay.tables_arm_patch.build_event_patch_table",
+            producer="event_tables.arm_patch_tables.build_event_patch_table",
             window="all arrivals through event start",
             missingness="either leaf-arm recency in the patch is unavailable",
         ),
@@ -523,7 +523,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.EVENT_START,
             availability=Availability.PRE_OUTCOME,
             support="all three candidate patches",
-            producer="replay.tables_arm_patch.build_event_patch_table",
+            producer="event_tables.arm_patch_tables.build_event_patch_table",
             missingness="leaf-arm novelty support is incomplete",
         ),
         _definition(
@@ -534,7 +534,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.EVENT_START,
             availability=Availability.PRE_OUTCOME,
             support="all three candidate patches",
-            producer="replay.tables_arm_patch.build_event_patch_table",
+            producer="event_tables.arm_patch_tables.build_event_patch_table",
             missingness="event is not wholly at one well",
         ),
         _definition(
@@ -545,7 +545,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.GOAL_ARRIVAL,
             availability=Availability.PRE_OUTCOME,
             support="all three candidate patches",
-            producer="replay.tables_arm_patch.build_event_patch_table",
+            producer="event_tables.arm_patch_tables.build_event_patch_table",
             missingness="no completed trip; encoded as all-zero indicators",
         ),
         _definition(
@@ -556,7 +556,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.EVENT_START,
             availability=Availability.PRE_OUTCOME,
             support="all three candidate patches",
-            producer="replay.tables_arm_patch.build_event_patch_table",
+            producer="event_tables.arm_patch_tables.build_event_patch_table",
             missingness="current occupancy is unresolved",
         ),
         _definition(
@@ -579,7 +579,7 @@ _DEFINITIONS.extend(
             availability=Availability.PRE_OUTCOME,
             support="all response bins/events",
             producer=(
-                "replay.per_bin_design.aggregate_to_timebins or the replay "
+                "replay_models.per_bin_design.aggregate_to_timebins or the replay "
                 "table builders"
             ),
             missingness="response time or stop start unavailable",
@@ -592,7 +592,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.EVENT_RESPONSE,
             availability=Availability.PRE_OUTCOME,
             support="all non-local events; at least one bin by construction",
-            producer="replay.tables_event.build_event_table",
+            producer="event_tables.event_table.build_event_table",
             missingness="never missing on a materialized event",
         ),
         _definition(
@@ -701,7 +701,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.FUTURE_CHOICE,
             availability=Availability.FUTURE_REFERENCING,
             support="stops with an observed subsequent trip",
-            producer="replay.tables_stop.build_stop_table",
+            producer="event_tables.stop_table.build_stop_table",
             missingness="no subsequent trip",
         ),
         _definition(
@@ -723,7 +723,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.FUTURE_CHOICE,
             availability=Availability.FUTURE_REFERENCING,
             support="events with future choice and decoded arm fractions",
-            producer="replay.retrospective.chosen_arm_fraction",
+            producer="event_tables.retrospective_metrics.chosen_arm_fraction",
             missingness="future choice or decoded content unavailable",
         ),
         _definition(
@@ -734,7 +734,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.FUTURE_CHOICE,
             availability=Availability.FUTURE_REFERENCING,
             support="events with a future choice",
-            producer="replay.retrospective.ends_at_next",
+            producer="event_tables.retrospective_metrics.ends_at_next",
             missingness="future choice unavailable; missing endpoint is observed failure",
         ),
         _definition(
@@ -745,7 +745,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.FUTURE_CHOICE,
             availability=Availability.FUTURE_REFERENCING,
             support="events with future choice and at least one decoded arm",
-            producer="replay.retrospective.contains_path_to_next",
+            producer="event_tables.retrospective_metrics.contains_path_to_next",
             missingness="future choice or decoded sequence unavailable",
         ),
         _definition(
@@ -756,7 +756,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.EVENT_RESPONSE,
             availability=Availability.PRE_OUTCOME,
             support="candidate arms in stops containing at least one replay event",
-            producer="replay.choice_prediction.build_choice_dataset",
+            producer="replay_models.choice.choice_prediction.build_choice_dataset",
             window="all selected replay events in the stop, equally weighted by event",
             missingness="stop contains no selected replay event",
         ),
@@ -768,7 +768,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.EVENT_RESPONSE,
             availability=Availability.PRE_OUTCOME,
             support="candidate arms in stops containing an SWR-overlapping replay event",
-            producer="replay.choice_prediction.build_choice_dataset",
+            producer="replay_models.choice.choice_prediction.build_choice_dataset",
             window="SWR-overlapping replay events in the stop, equally weighted by event",
             missingness="stop contains no SWR-overlapping replay event",
         ),
@@ -780,7 +780,7 @@ _DEFINITIONS.extend(
             clock=QueryClock.EVENT_RESPONSE,
             availability=Availability.PRE_OUTCOME,
             support="candidate arms in stops containing a non-SWR replay event",
-            producer="replay.choice_prediction.build_choice_dataset",
+            producer="replay_models.choice.choice_prediction.build_choice_dataset",
             window="non-SWR replay events in the stop, equally weighted by event",
             missingness="stop contains no non-SWR replay event",
         ),
@@ -814,7 +814,7 @@ for arm in range(8):
             clock=QueryClock.EVENT_RESPONSE,
             availability=Availability.PRE_OUTCOME,
             support="all nine candidate arms",
-            producer="replay._helpers.add_arm_fixed_effects",
+            producer="replay_models.model_specs.add_arm_fixed_effects",
             missingness="candidate arm unavailable",
         )
     )
@@ -896,7 +896,7 @@ for lag in range(1, N_HISTORY_LAGS + 1):
                 clock=QueryClock.EVENT_RESPONSE,
                 availability=Availability.PRE_OUTCOME,
                 support="per-bin rate design",
-                producer="replay.per_bin_design.aggregate_to_timebins",
+                producer="replay_models.per_bin_design.aggregate_to_timebins",
                 missingness="lag precedes stop start",
             )
         )
@@ -917,7 +917,7 @@ for basis in range(N_HISTORY_BASIS):
                 clock=QueryClock.EVENT_RESPONSE,
                 availability=Availability.PRE_OUTCOME,
                 support="per-bin rate design",
-                producer="replay.per_bin_design.aggregate_to_timebins",
+                producer="replay_models.per_bin_design.aggregate_to_timebins",
                 window="past 150 ms",
                 missingness="none; pre-stop history is structural zero",
             )
@@ -940,7 +940,7 @@ for basis in range(N_HISTORY_BASIS, N_CROSS_LONG_BASIS):
                 clock=QueryClock.EVENT_RESPONSE,
                 availability=Availability.PRE_OUTCOME,
                 support="per-bin rate design",
-                producer="replay.per_bin_design.aggregate_to_timebins",
+                producer="replay_models.per_bin_design.aggregate_to_timebins",
                 window="past 1 s",
                 missingness="none; pre-stop history is structural zero",
             )
@@ -955,7 +955,7 @@ _DEFINITIONS.append(
         clock=QueryClock.EVENT_RESPONSE,
         availability=Availability.PRE_OUTCOME,
         support="all three task patches",
-        producer="replay.tables_arm_patch.build_event_patch_table",
+        producer="event_tables.arm_patch_tables.build_event_patch_table",
         window="all in-event timebins whose MAP estimate lands on a real arm",
         missingness="event has no real-arm bins",
     )
@@ -970,7 +970,7 @@ _DEFINITIONS.append(
         clock=QueryClock.EVENT_RESPONSE,
         availability=Availability.PRE_OUTCOME,
         support="per-bin rate design",
-        producer="replay.per_bin_design.aggregate_to_timebins",
+        producer="replay_models.per_bin_design.aggregate_to_timebins",
         missingness="none for constructed bins",
     )
 )
@@ -992,8 +992,8 @@ _DEFINITIONS.append(
         availability=Availability.PRE_OUTCOME,
         support="event table; per-bin rate design; requires a completed arrival",
         producer=(
-            "replay.tables_event.build_event_table (event grain); "
-            "replay.per_bin_design.aggregate_to_timebins (per-bin grain)"
+            "event_tables.event_table.build_event_table (event grain); "
+            "replay_models.per_bin_design.aggregate_to_timebins (per-bin grain)"
         ),
         missingness="no completed arrival before the event / at the bout start",
     )
@@ -1010,7 +1010,7 @@ _DEFINITIONS.append(
         clock=QueryClock.OUTCOME_AVAILABILITY,
         availability=Availability.POST_OUTCOME,
         support="per-bin rate design; stops with a completed arrival",
-        producer="replay.per_bin_design.aggregate_to_timebins",
+        producer="replay_models.per_bin_design.aggregate_to_timebins",
         missingness="no completed arrival at the bout start",
     )
 )

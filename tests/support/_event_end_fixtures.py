@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (
+from continuum_swr_replay.analysis.replay_models.rate.duration_aware_history import (
     END_COLUMN,
 )
 

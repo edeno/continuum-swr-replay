@@ -146,7 +146,7 @@ def test_session_key_matches_columns_day():
     so this pins its field names/order to the canonical day-grain column tuple;
     a future ``day``->``session_date`` rename that missed it would fail here.
     """
-    from continuum_swr_replay.analysis.behavior.tables.tables_event import _SessionKey
+    from continuum_swr_replay.analysis.event_tables.event_table import _SessionKey
 
     assert _SessionKey._fields == SESSION_COLUMNS_DAY
 

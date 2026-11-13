@@ -1,23 +1,23 @@
 """The behavior summary's choice values: the event-source suite's choice block
 (question 3.4, :func:`choice_values`) and the stay/leave fits (question 3.5,
 :func:`stay_leave_values`). The statistics are computed in
-``analysis.behavior.choice.learning`` and
-``analysis.behavior.coefficient_statistics``."""
+``analysis.replay_models.choice.stay_leave`` and
+``analysis.replay_models.coefficient_statistics``."""
 
 from __future__ import annotations
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.choice.learning import (
+from continuum_swr_replay.analysis.replay_models.choice.stay_leave import (
     cross_session_role_summary,
     fit_status_counts,
     pooled_gee_role_summary,
     smallest_adjusted_p,
 )
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     gated_coefficient_statistics,
 )
-from continuum_swr_replay.analysis.behavior.rate import (
+from continuum_swr_replay.analysis.replay_models.rate import (
     stop_statistics,
 )
 from continuum_swr_replay.reported.behavior.common import (
@@ -121,7 +121,7 @@ def stay_leave_values(
 ) -> list[Value]:
     """Question 3.5: stay/leave against content, per stratum.
 
-    The per-session Wilcoxon is ``learning.cross_session_role_summary`` (the
+    The per-session Wilcoxon is ``stay_leave.cross_session_role_summary`` (the
     runner's own); the pooled GEE's q is BH across converged roles within a
     stratum, as ``run_stay_leave.py`` logs it.
     """

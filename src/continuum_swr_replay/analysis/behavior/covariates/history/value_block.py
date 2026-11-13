@@ -123,7 +123,7 @@ def attach_contingency_value_block(
     """Per-(event, arm) nominal p(R) and model value (Q) from the contingency.
 
     Single source for the per-arm value block shared by the NonLocal
-    (``analysis/behavior/tables/tables_arm_patch.py``) and ContFrag
+    (``analysis/event_tables/arm_patch_tables.py``) and ContFrag
     (``analysis/contfrag/tables.py``) event-arm builders, both through
     ``covariates.candidate_arm.attach_candidate_arm_covariates``
     (``docs/covariate_dictionary.md`` D2/D3). Both builders previously inlined

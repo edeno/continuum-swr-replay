@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.tables.trajectory import brain_state_means
+from continuum_swr_replay.analysis.event_tables.trajectory import brain_state_means
 from continuum_swr_replay.analysis.hippocampus import start_and_rest_theta as module
 
 RUNNING_THETA = 0.5

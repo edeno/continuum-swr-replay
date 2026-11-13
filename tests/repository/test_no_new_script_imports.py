@@ -26,7 +26,7 @@ SCRIPTS = REPO / "scripts"
 ALLOWED: dict[tuple[str, str], str] = {
     (
         "scripts/exploratory/_content_cohort_control.py",
-        "scripts.behavior.content.fit_swr_contrast_content",
+        "scripts.replay_models.content.fit_swr_contrast_content",
     ): "an unsupported one-off that drives the runner's main with the cohort "
     "rule bypassed",
 }
@@ -81,7 +81,7 @@ def test_the_rule_reads_the_module_not_the_imported_name(tmp_path):
         "checks/_report.py",
         "detection/report_inventory_comparison.py",
         "detection/run_event_features.py",
-        "behavior/content/fit_replay_content_models.py",
+        "replay_models/content/fit_replay_content_models.py",
     ):
         (root / module).parent.mkdir(parents=True, exist_ok=True)
         (root / module).write_text("")
@@ -91,19 +91,19 @@ def test_the_rule_reads_the_module_not_the_imported_name(tmp_path):
         "from scripts.detection import run_event_features\n"
         "from scripts.detection.report_inventory_comparison import _private\n"
         "def run():\n"
-        "    import scripts.behavior.content.fit_replay_content_models as fitter\n"
+        "    import scripts.replay_models.content.fit_replay_content_models as fitter\n"
     )
     assert _script_imports(probe, root) == {
         "scripts.checks._report",
         "scripts.detection.run_event_features",
         "scripts.detection.report_inventory_comparison",
-        "scripts.behavior.content.fit_replay_content_models",
+        "scripts.replay_models.content.fit_replay_content_models",
     }
     assert _forbidden_imports(root) == {
         ("scripts/checks/probe.py", "scripts.detection.run_event_features"),
         ("scripts/checks/probe.py", "scripts.detection.report_inventory_comparison"),
         (
             "scripts/checks/probe.py",
-            "scripts.behavior.content.fit_replay_content_models",
+            "scripts.replay_models.content.fit_replay_content_models",
         ),
     }

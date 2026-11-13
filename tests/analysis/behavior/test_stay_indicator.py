@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior._helpers import (
+from continuum_swr_replay.analysis.behavior.spatial_mapping import (
     arm_to_patch,
     stay_indicator,
     stay_indicator_from_patches,

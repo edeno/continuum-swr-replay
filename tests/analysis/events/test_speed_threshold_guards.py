@@ -17,14 +17,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
-    build_event_arm_table,
-)
-from continuum_swr_replay.analysis.behavior.tables.tables_event import (
-    build_event_sequence_table,
-    build_event_table,
-)
-from continuum_swr_replay.analysis.behavior.tables.tables_stop import build_stop_table
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
@@ -33,6 +25,14 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_table,
     build_contfrag_stop_table,
 )
+from continuum_swr_replay.analysis.event_tables.arm_patch_tables import (
+    build_event_arm_table,
+)
+from continuum_swr_replay.analysis.event_tables.event_table import (
+    build_event_sequence_table,
+    build_event_table,
+)
+from continuum_swr_replay.analysis.event_tables.stop_table import build_stop_table
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )

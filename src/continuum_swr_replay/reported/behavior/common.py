@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
+from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
     MAX_UNIDENTIFIED_SHARE,
     MIN_SESSIONS_PER_TERM,
 )
@@ -41,7 +41,7 @@ def _gate_note(statistics: Mapping[str, Any], term: str) -> str | None:
 
     The per-term session gate refuses a term when it keeps too few sessions or
     leaves out too large a share of them
-    (:attr:`~continuum_swr_replay.analysis.behavior.contrast_aggregation.TermSessionGate.refusal`),
+    (:attr:`~continuum_swr_replay.analysis.replay_models.contrast_aggregation.TermSessionGate.refusal`),
     and the audited aggregates publish no row for such a term. The values read
     here over the kept sessions are then kept and marked pending.
     """

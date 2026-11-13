@@ -6,11 +6,13 @@ graph (:func:`tests.support._imports.module_edges`) and the package graph built
 from it (:func:`package_graph`). Nothing is imported, so a violation is
 reported as a plain edge rather than as an ``ImportError`` from a cycle:
 
-- ``covariates_import_no_model_specs``: covariate builders must not import the
-  model ladders. A builder writes columns; a ladder names them. Letting a
-  builder read ``model_specs`` couples the persisted table to the fitted
-  specification, and the shared design constants (``design_constants``) exist
-  precisely so both sides can read the same numbers without that edge.
+- ``covariates_import_no_model_specs``: covariate builders
+  (``analysis.behavior.covariates``) must not import the model ladders
+  (``analysis.replay_models.model_specs``). A builder writes columns; a ladder
+  names them. Letting a builder read ``model_specs`` couples the persisted
+  table to the fitted specification, and the shared design constants
+  (``behavior.design_constants``) exist precisely so both sides can read the
+  same numbers without that edge.
 - ``data_loaders_import_no_analysis``: loading is upstream of every analysis;
   the reverse edge makes the loaders unusable on their own and invites an
   import cycle.
@@ -27,18 +29,25 @@ reported as a plain edge rather than as an ``ImportError`` from a cycle:
   nothing from ``scripts``.
 - ``hippocampus_imports_no_behavior`` and
   ``hippocampus_imports_no_pfc_or_inventory_comparison``: the hippocampus
-  package does not reach into those analysis packages. Today each of them
-  imports hippocampus, so a back edge is also a cycle; these rules hold
+  package does not reach into ``behavior``, ``event_tables``,
+  ``replay_models``, ``pfc`` or ``inventory_comparison``. Today several of
+  them import hippocampus, so a back edge is also a cycle; these rules hold
   hippocampus below them even if one stops importing it.
-- ``behavior_subpackages_import_one_way``: inside ``analysis.behavior`` the
-  subpackages import in the order ``covariates``, ``choice``, ``tables``, then
-  ``rate``, ``content`` and ``coupling`` (:data:`BEHAVIOR_SUBPACKAGE_RANK`): one
-  imports only subpackages before it, so the last three never import one another.
-- ``behavior_top_level_imports_no_subpackage``: a module at the top level of
-  ``analysis.behavior`` imports no subpackage, except that the modules of
-  :data:`BEHAVIOR_TOP_LEVEL_MAY_IMPORT_COVARIATES` import ``covariates``. The
-  package's own ``__init__`` names every export for type checkers and is not a
-  module of that kind.
+- ``data_flow_packages_import_one_way``: ``analysis.behavior``,
+  ``analysis.event_tables`` and ``analysis.replay_models`` import in that
+  order (:data:`DATA_FLOW_RANK`): ``behavior`` imports neither of the others,
+  and ``event_tables`` does not import ``replay_models``.
+- ``behavior_top_level_imports_no_covariates``: a module at the top level of
+  ``analysis.behavior`` (``design_constants``, ``history_basis``,
+  ``spatial_mapping``) does not import the ``covariates`` subpackage, which
+  reads them.
+- ``replay_models_subpackages_import_no_other``: inside
+  ``analysis.replay_models`` the subpackages ``rate``, ``content``,
+  ``coupling`` and ``choice`` (:data:`REPLAY_MODELS_SUBPACKAGES`) do not
+  import one another.
+- ``replay_models_top_level_imports_no_subpackage``: a module at the top level
+  of ``analysis.replay_models`` (the ladders, the per-bin design, the fitters,
+  the cohort and contrast machinery) imports none of those subpackages.
 - ``analysis_and_visualization_import_no_reported``: nothing in ``analysis`` or
   ``visualization`` imports ``reported``; the analysis does not depend on the
   reporting.
@@ -68,22 +77,15 @@ EVENTS_MAY_IMPORT = frozenset(
     {"analysis.events", "analysis.constants", "analysis.shared_statistics"}
 )
 
-#: The ``analysis.behavior`` subpackages, ranked: one imports only those of a
-#: lower rank. ``rate``, ``content`` and ``coupling`` share a rank, so none imports
-#: another.
-BEHAVIOR_SUBPACKAGE_RANK = {
-    "covariates": 0,
-    "choice": 1,
-    "tables": 2,
-    "rate": 3,
-    "content": 3,
-    "coupling": 3,
+#: The three data-flow packages, ranked: one imports only those of a lower rank.
+DATA_FLOW_RANK = {
+    "analysis.behavior": 0,
+    "analysis.event_tables": 1,
+    "analysis.replay_models": 2,
 }
 
-#: Top-level ``analysis.behavior`` modules that read the ``covariates`` subpackage.
-BEHAVIOR_TOP_LEVEL_MAY_IMPORT_COVARIATES = frozenset(
-    {"cohort_audit", "covariate_timing", "contrast_aggregation"}
-)
+#: The ``analysis.replay_models`` subpackages; none imports another.
+REPLAY_MODELS_SUBPACKAGES = frozenset({"rate", "content", "coupling", "choice"})
 
 
 def package_graph(root: Path = SRC) -> dict[str, set[str]]:
@@ -114,20 +116,30 @@ def _starts_with(module: str, *prefixes: str) -> bool:
     return any(module == p or module.startswith(f"{p}.") for p in prefixes)
 
 
-def _behavior_part(module: str) -> tuple[str | None, str | None]:
-    """``(subpackage, top-level module)`` of an ``analysis.behavior`` module.
+def _subpackage_part(
+    module: str, package: str, subpackages: frozenset[str]
+) -> tuple[str | None, str | None]:
+    """``(subpackage, top-level module)`` of a module of ``package``.
 
-    A subpackage module gives ``(subpackage, None)``, a top-level module
-    ``(None, module)``; the package's own ``__init__`` and anything outside
-    ``analysis.behavior`` give ``(None, None)``.
+    A module of one of ``subpackages`` gives ``(subpackage, None)``, a top-level
+    module ``(None, module)``; the package's own ``__init__`` and anything
+    outside ``package`` give ``(None, None)``.
     """
-    prefix = "analysis.behavior."
+    prefix = f"{package}."
     if not module.startswith(prefix):
         return None, None
     first = module[len(prefix) :].split(".")[0]
-    if first in BEHAVIOR_SUBPACKAGE_RANK:
+    if first in subpackages:
         return first, None
     return None, first
+
+
+def _replay_models_part(module: str) -> tuple[str | None, str | None]:
+    return _subpackage_part(module, "analysis.replay_models", REPLAY_MODELS_SUBPACKAGES)
+
+
+def _behavior_part(module: str) -> tuple[str | None, str | None]:
+    return _subpackage_part(module, "analysis.behavior", frozenset({"covariates"}))
 
 
 def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
@@ -145,7 +157,7 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
             (a, b)
             for a, b in edges
             if _starts_with(a, "analysis.behavior.covariates")
-            and _starts_with(b, "analysis.behavior.model_specs")
+            and _starts_with(b, "analysis.replay_models.model_specs")
         },
         "data_loaders_import_no_analysis": {
             (a, b)
@@ -175,7 +187,7 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
             (a, b)
             for a, b in edges
             if _starts_with(a, "analysis.hippocampus")
-            and _starts_with(b, "analysis.behavior")
+            and _starts_with(b, *DATA_FLOW_RANK)
         },
         "hippocampus_imports_no_pfc_or_inventory_comparison": {
             (a, b)
@@ -183,22 +195,30 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
             if _starts_with(a, "analysis.hippocampus")
             and _starts_with(b, "analysis.pfc", "analysis.inventory_comparison")
         },
-        "behavior_subpackages_import_one_way": {
+        "data_flow_packages_import_one_way": {
             (a, b)
             for a, b in edges
-            if (sa := _behavior_part(a)[0]) is not None
-            and (sb := _behavior_part(b)[0]) is not None
-            and sa != sb
-            and BEHAVIOR_SUBPACKAGE_RANK[sb] >= BEHAVIOR_SUBPACKAGE_RANK[sa]
+            if (pa := package_of(a)) in DATA_FLOW_RANK
+            and (pb := package_of(b)) in DATA_FLOW_RANK
+            and DATA_FLOW_RANK[pb] > DATA_FLOW_RANK[pa]
         },
-        "behavior_top_level_imports_no_subpackage": {
+        "behavior_top_level_imports_no_covariates": {
             (a, b)
             for a, b in edges
-            if (top := _behavior_part(a)[1]) is not None
-            and (sub := _behavior_part(b)[0]) is not None
-            and not (
-                top in BEHAVIOR_TOP_LEVEL_MAY_IMPORT_COVARIATES and sub == "covariates"
-            )
+            if _behavior_part(a)[1] is not None and _behavior_part(b)[0] is not None
+        },
+        "replay_models_subpackages_import_no_other": {
+            (a, b)
+            for a, b in edges
+            if (sa := _replay_models_part(a)[0]) is not None
+            and (sb := _replay_models_part(b)[0]) is not None
+            and sa != sb
+        },
+        "replay_models_top_level_imports_no_subpackage": {
+            (a, b)
+            for a, b in edges
+            if _replay_models_part(a)[1] is not None
+            and _replay_models_part(b)[0] is not None
         },
         "analysis_and_visualization_import_no_reported": {
             (a, b)
@@ -220,12 +240,17 @@ def test_the_graph_is_not_vacuous() -> None:
         "analysis.events",
         "analysis.hippocampus",
         "analysis.behavior",
+        "analysis.event_tables",
+        "analysis.replay_models",
         "analysis.pfc",
         "data_loaders",
     ):
         assert node in graph, f"{node} missing from the package graph"
     assert "analysis.behavior.covariates" in module_index(SRC)
-    assert "analysis.hippocampus" in graph["analysis.behavior"]
+    assert "analysis.replay_models.model_specs" in module_index(SRC)
+    assert "analysis.hippocampus" in graph["analysis.event_tables"]
+    assert "analysis.behavior" in graph["analysis.event_tables"]
+    assert "analysis.event_tables" in graph["analysis.replay_models"]
     assert set(FOUNDATION) <= set(graph), sorted(set(FOUNDATION) - set(graph))
 
 
@@ -238,20 +263,25 @@ def test_layering_rule(rule: str) -> None:
 def test_relative_import_in_a_package_init_is_not_missed(tmp_path: Path) -> None:
     """A ``covariates/__init__.py`` must not escape the rule on its dot count.
 
-    ``from ..model_specs import BIN_S`` inside ``covariates/__init__.py`` names
-    the same module as the absolute spelling. Resolving it against the module's
-    own dotted name instead of its package would yield
-    ``analysis.model_specs`` -- a module that does not exist -- and the edge
-    would silently pass.
+    ``from ...replay_models.model_specs import BIN_S`` inside
+    ``covariates/__init__.py`` names the same module as the absolute spelling.
+    Resolving it against the module's own dotted name instead of its package
+    would yield ``replay_models.model_specs`` -- a module that does not exist --
+    and the edge would silently pass.
     """
     root = tmp_path / "continuum_swr_replay"
     covariates = root / "analysis" / "behavior" / "covariates"
     covariates.mkdir(parents=True)
-    (covariates / "__init__.py").write_text("from ..model_specs import BIN_S\n")
-    (root / "analysis" / "behavior" / "model_specs.py").write_text("BIN_S = 0.02\n")
+    (covariates / "__init__.py").write_text(
+        "from ...replay_models.model_specs import BIN_S\n"
+    )
+    (root / "analysis" / "replay_models").mkdir()
+    (root / "analysis" / "replay_models" / "model_specs.py").write_text(
+        "BIN_S = 0.02\n"
+    )
 
     assert rule_violations(root)["covariates_import_no_model_specs"] == {
-        ("analysis.behavior.covariates", "analysis.behavior.model_specs")
+        ("analysis.behavior.covariates", "analysis.replay_models.model_specs")
     }
 
 
@@ -345,47 +375,73 @@ def test_events_rule_allows_only_foundation_constants_and_itself(
     }
 
 
-def test_behavior_and_reporting_rules_see_a_planted_import(tmp_path: Path) -> None:
+def test_data_flow_and_reporting_rules_see_a_planted_import(tmp_path: Path) -> None:
     """Each new rule reports the import it forbids and none of its neighbours.
 
-    Forbidden: ``choice`` importing ``tables``, ``rate`` and ``content``
-    importing each other (one of them inside a function), a top-level module
-    other than the three allowed ones importing a subpackage, one of the three
-    importing ``choice``, and ``analysis`` and ``visualization`` importing
-    ``reported``. Allowed, so not reported: ``choice`` importing
-    ``covariates``, ``tables`` importing ``choice``, ``rate`` importing
-    ``tables``, ``cohort_audit`` importing ``covariates``, a top-level module
-    importing a top-level module, and ``reported`` importing ``analysis``.
+    Forbidden: ``behavior`` importing ``event_tables``, ``event_tables``
+    importing ``replay_models``, a top-level ``behavior`` module importing
+    ``covariates``, ``rate`` and ``content`` importing each other (one of them
+    inside a function), a top-level ``replay_models`` module importing a
+    subpackage, and ``analysis`` and ``visualization`` importing ``reported``.
+    Allowed, so not reported: ``event_tables`` importing ``behavior``,
+    ``choice`` importing ``event_tables``, ``rate`` importing ``covariates``,
+    ``cohort_audit`` importing ``covariates``, a top-level module importing a
+    top-level module, ``covariates`` importing a top-level ``behavior`` module,
+    and ``reported`` importing ``analysis``.
     """
     root = tmp_path / "continuum_swr_replay"
-    behavior = root / "analysis" / "behavior"
-    for package in ("covariates", "choice", "tables", "rate", "content"):
-        (behavior / package).mkdir(parents=True)
-        (behavior / package / "__init__.py").write_text("")
+    analysis = root / "analysis"
+    packages = (
+        "behavior",
+        "behavior/covariates",
+        "event_tables",
+        "replay_models",
+        "replay_models/choice",
+        "replay_models/rate",
+        "replay_models/content",
+    )
+    for package in packages:
+        (analysis / package).mkdir(parents=True)
+        (analysis / package / "__init__.py").write_text("")
     for package in (root / "reported", root / "visualization"):
         package.mkdir()
         (package / "__init__.py").write_text("")
-    for init in (root, root / "analysis", behavior):
+    for init in (root, analysis):
         (init / "__init__.py").write_text("")
-    base = "continuum_swr_replay.analysis.behavior"
-    (behavior / "covariates" / "c.py").write_text("")
-    (behavior / "choice" / "k.py").write_text(
-        f"from {base}.covariates import c\nfrom {base}.tables import t\n"
+    base = "continuum_swr_replay.analysis"
+    (analysis / "behavior" / "design_constants.py").write_text("")
+    (analysis / "behavior" / "spatial_mapping.py").write_text(
+        f"from {base}.behavior.covariates import c\n"
     )
-    (behavior / "tables" / "t.py").write_text(f"from {base}.choice import k\n")
-    (behavior / "rate" / "r.py").write_text(
-        f"from {base}.tables import t\ndef f():\n    from ..content import q\n"
+    (analysis / "behavior" / "covariates" / "c.py").write_text(
+        f"from {base}.behavior import design_constants\n"
+        f"from {base}.event_tables import t\n"
     )
-    (behavior / "content" / "q.py").write_text(f"from {base}.rate import r\n")
-    (behavior / "cohort_audit.py").write_text(f"from {base}.covariates import c\n")
-    (behavior / "contrast_aggregation.py").write_text(f"from {base}.choice import k\n")
-    (behavior / "fitting.py").write_text(
-        f"from {base}.covariates import c\nfrom {base} import cohort_audit\n"
+    (analysis / "event_tables" / "t.py").write_text(
+        f"from {base}.behavior.covariates import c\n"
+        f"from {base}.replay_models.choice import k\n"
+    )
+    (analysis / "replay_models" / "choice" / "k.py").write_text(
+        f"from {base}.event_tables import t\n"
+    )
+    (analysis / "replay_models" / "rate" / "r.py").write_text(
+        f"from {base}.behavior.covariates import c\n"
+        "def f():\n    from ..content import q\n"
+    )
+    (analysis / "replay_models" / "content" / "q.py").write_text(
+        f"from {base}.replay_models.rate import r\n"
+    )
+    (analysis / "replay_models" / "cohort_audit.py").write_text(
+        f"from {base}.behavior.covariates import c\n"
+    )
+    (analysis / "replay_models" / "fitting.py").write_text(
+        f"from {base}.replay_models.rate import r\n"
+        f"from {base}.replay_models import cohort_audit\n"
     )
     (root / "reported" / "values.py").write_text(
-        "from continuum_swr_replay.analysis.behavior import fitting\n"
+        f"from {base}.replay_models import fitting\n"
     )
-    (root / "analysis" / "shared.py").write_text(
+    (analysis / "shared.py").write_text(
         "from continuum_swr_replay.reported import values\n"
     )
     (root / "visualization" / "v.py").write_text(
@@ -393,14 +449,19 @@ def test_behavior_and_reporting_rules_see_a_planted_import(tmp_path: Path) -> No
     )
 
     found = rule_violations(root)
-    assert found["behavior_subpackages_import_one_way"] == {
-        ("analysis.behavior.choice.k", "analysis.behavior.tables.t"),
-        ("analysis.behavior.rate.r", "analysis.behavior.content.q"),
-        ("analysis.behavior.content.q", "analysis.behavior.rate.r"),
+    assert found["data_flow_packages_import_one_way"] == {
+        ("analysis.behavior.covariates.c", "analysis.event_tables.t"),
+        ("analysis.event_tables.t", "analysis.replay_models.choice.k"),
     }
-    assert found["behavior_top_level_imports_no_subpackage"] == {
-        ("analysis.behavior.contrast_aggregation", "analysis.behavior.choice.k"),
-        ("analysis.behavior.fitting", "analysis.behavior.covariates.c"),
+    assert found["behavior_top_level_imports_no_covariates"] == {
+        ("analysis.behavior.spatial_mapping", "analysis.behavior.covariates.c"),
+    }
+    assert found["replay_models_subpackages_import_no_other"] == {
+        ("analysis.replay_models.rate.r", "analysis.replay_models.content.q"),
+        ("analysis.replay_models.content.q", "analysis.replay_models.rate.r"),
+    }
+    assert found["replay_models_top_level_imports_no_subpackage"] == {
+        ("analysis.replay_models.fitting", "analysis.replay_models.rate.r"),
     }
     assert found["analysis_and_visualization_import_no_reported"] == {
         ("analysis.shared", "reported.values"),

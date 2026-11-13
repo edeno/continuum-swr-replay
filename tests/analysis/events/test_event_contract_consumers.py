@@ -8,8 +8,8 @@ import pytest
 from continuum_swr_replay.analysis.events.immobility import (
     EventDefinitionError,
 )
-from scripts.behavior.content import analyze_content_occupancy
 from scripts.detection import analyze_event_spike_evidence
+from scripts.replay_models.content import analyze_content_occupancy
 
 
 def _noncontiguous_dot() -> pd.DataFrame:

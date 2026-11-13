@@ -11,13 +11,13 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     coefficient_family_statistics,
 )
-from continuum_swr_replay.analysis.behavior.content.model_comparison import (
+from continuum_swr_replay.analysis.replay_models.content.model_comparison import (
     fit_metric_statistics,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_HIERARCHY,
 )
 from continuum_swr_replay.visualization.palettes import COLORS
@@ -200,7 +200,7 @@ def plot_pseudo_r2_progression(
     """Plot pseudo-R² progression across the model hierarchy.
 
     Each rung's median over sessions, with its interquartile band
-    (:func:`~continuum_swr_replay.analysis.behavior.content.model_comparison.fit_metric_statistics`,
+    (:func:`~continuum_swr_replay.analysis.replay_models.content.model_comparison.fit_metric_statistics`,
     which the content runner prints too).
 
     Parameters
