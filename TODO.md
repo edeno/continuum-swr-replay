@@ -87,6 +87,18 @@ Work that is deferred on purpose. Each item says when it should be done.
   reported value reads either. *When:* the next content regeneration, which writes
   fresh staging bundles and fits with the current code.
 
+- [ ] **Refit after the one-owner merge, with the changes that wait for it.** The
+  user decided (2026-11-12) to refit once `one-owner` is on master. With the
+  content refit above, land the code changes that can only be proven by a refit
+  (`.claude/research/one-owner/scope.md`, section D and the d2 line): one seed
+  module (a changed key format changes the draws); one update loop in
+  `analysis/pfc/batched_glm.py` (`_sweep` and `_sweep_prediction_batch`, and the
+  held-out and full-fit loops, are bit-identical on CPU but contract differently,
+  so GPU results can move in the last bits); and one ridge-Poisson fitter
+  (`ridge_history_cv` is Newton with step halving where `batched_glm` is IRLS; on
+  a synthetic design their parameters differ by about 3e-11). Show every reported
+  value that moves before merging. *When:* after `one-owner` is merged into master.
+
 - [ ] **Decide the open choices in the reported statistics.**
   `docs/known_issues/reported_statistics_choices.md` lists them: where each is
   made, what the code does, what is open, and what was measured on the current
