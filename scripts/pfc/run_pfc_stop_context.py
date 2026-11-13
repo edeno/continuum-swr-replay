@@ -57,6 +57,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.pfc import bundle_files
 from continuum_swr_replay.analysis.pfc.load_population import (
     CALLED_ALPHA,
     HELDOUT_P_COLUMNS,
@@ -94,7 +95,7 @@ def default_output_dir() -> Path:
 def bundle_path(nwb_file_name: str, epoch_name: str) -> Path:
     """The session's canonical mPFC modulation bundle."""
     identifier = format_epoch_identifier(nwb_file_name, epoch_name, BRAIN_AREA)
-    return processed_data_dir() / f"{identifier}_modulation.pkl"
+    return bundle_files.bundle_path(processed_data_dir(), identifier)
 
 
 def pfc_left_out() -> set[tuple[str, str]]:

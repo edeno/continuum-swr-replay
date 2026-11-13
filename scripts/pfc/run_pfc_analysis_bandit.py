@@ -74,7 +74,7 @@ from numpy.typing import NDArray  # noqa: E402
 from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
     stop_cohort_suffix,
 )
-from continuum_swr_replay.analysis.pfc import run_session  # noqa: E402
+from continuum_swr_replay.analysis.pfc import bundle_files, run_session  # noqa: E402
 from continuum_swr_replay.analysis.pfc.batched_glm import (  # noqa: E402
     DEFAULT_PENALTY_SIGMA,
     implied_prior_sd,
@@ -197,7 +197,7 @@ def modulation_path(
     population, or another prior -- can never be mistaken for it.
     """
     suffix = stop_cohort_suffix(stop_cohort) + penalty_sigma_suffix(penalty_sigma)
-    return save_folder / f"{epoch_identifier}_modulation{suffix}.pkl"
+    return bundle_files.bundle_path(save_folder, epoch_identifier, suffix)
 
 
 def results_exist(
@@ -362,11 +362,6 @@ def drop_retired_statistics(neuron_stats: pd.DataFrame) -> pd.DataFrame:
     return neuron_stats.drop(columns=retired)
 
 
-def session_identifier(nwb_file_name: str, epoch_name: str, brain_area: str) -> str:
-    """The session's name in its artifacts and its log: ``wilbur20210329_02_r1_mPFC``."""
-    return format_epoch_identifier(nwb_file_name, epoch_name, brain_area)
-
-
 def run_analysis(
     nwb_file_name: str,
     epoch_name: str,
@@ -474,7 +469,7 @@ def run_analysis(
     """
     if output_dir is None:
         output_dir = processed_data_dir()
-    epoch_identifier = session_identifier(nwb_file_name, epoch_name, brain_area)
+    epoch_identifier = format_epoch_identifier(nwb_file_name, epoch_name, brain_area)
     save_file = modulation_path(
         output_dir, epoch_identifier, stop_cohort, penalty_sigma
     )
@@ -879,7 +874,7 @@ def run_analysis_then_release(
         run_analysis(nwb_file_name, epoch_name, brain_area=brain_area, **kwargs)
     finally:
         logging.getLogger(
-            session_identifier(nwb_file_name, epoch_name, brain_area)
+            format_epoch_identifier(nwb_file_name, epoch_name, brain_area)
         ).info("NWB files Spyglass held open closed: %s", release_nwb_files())
 
 

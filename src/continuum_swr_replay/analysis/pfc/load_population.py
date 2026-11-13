@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
+from continuum_swr_replay.analysis.pfc import bundle_files
 from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
 from continuum_swr_replay.analysis.pfc.design import symmetric_lags
 from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
@@ -374,10 +375,12 @@ def load_population_data(
     )
     lag_time = fit_lag_time[in_report_window(fit_lag_time)]
 
-    stem = f"_mPFC_modulation{artifact_suffix}"
-    pkls = sorted(data_dir.glob(f"*{stem}.pkl"))
+    pkls = list(bundle_files.bundle_sessions(data_dir, artifact_suffix).values())
     if not pkls:
-        raise FileNotFoundError(f"No *{stem}.pkl files in {data_dir}")
+        raise FileNotFoundError(
+            f"No *{bundle_files.session_bundle_path(Path(), '', artifact_suffix)} "
+            f"files in {data_dir}"
+        )
 
     dfs = []
     loaded_artifacts: list[Path] = []

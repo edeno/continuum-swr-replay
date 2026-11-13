@@ -31,6 +31,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.pfc import bundle_files
 from continuum_swr_replay.analysis.pfc.load_population import MIN_FIRING_RATE_HZ
 from continuum_swr_replay.decoding.identifiers import session_name
 
@@ -169,7 +170,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         if not reference.is_file():
             continue
         session = candidate.name.split("_mPFC_")[0]
-        canonical = processed_data_dir() / f"{session}_mPFC_modulation.pkl"
+        canonical = bundle_files.session_bundle_path(processed_data_dir(), session)
         rates = pd.read_pickle(canonical)["immobility_avg_firing_rate"].to_numpy(float)
         rows += compare_pair(reference, candidate, rates, args.min_rate)
     table = pd.DataFrame(rows)

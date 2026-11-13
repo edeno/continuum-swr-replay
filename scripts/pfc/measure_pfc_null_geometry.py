@@ -50,7 +50,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.pfc import population_statistics
+from continuum_swr_replay.analysis.pfc import bundle_files, population_statistics
 from continuum_swr_replay.analysis.pfc.event_sets import EVENT_CLASSES
 from continuum_swr_replay.analysis.pfc.heldout import (
     _matchable_subset_seed,
@@ -72,16 +72,6 @@ from continuum_swr_replay.paths import processed_data_dir
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.checks._report import _md  # noqa: E402
-
-
-def bundle_paths(data_dir: Path) -> list[Path]:
-    """Canonical mPFC bundles in a tree, in session order."""
-    return sorted(data_dir.glob("*_mPFC_modulation.pkl"))
-
-
-def session_of(path: Path) -> str:
-    """Session key from a bundle path (``chimi20200223_02_r1``)."""
-    return path.name.replace("_mPFC_modulation.pkl", "")
 
 
 def read_sidecar(path: Path) -> dict[str, Any]:
@@ -297,7 +287,7 @@ def spacing_section(
     """Onset spacing of real events, shipped control and null draws."""
     rows: list[dict[str, Any]] = []
     for session in sessions:
-        bundle = data_dir / f"{session}_mPFC_modulation.pkl"
+        bundle = bundle_files.session_bundle_path(data_dir, session)
         sidecar = read_sidecar(bundle)
         real, drawn = session_window_sets(
             str(sidecar["nwb_file_name"]),
@@ -355,12 +345,12 @@ def overlap_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
     :func:`~continuum_swr_replay.analysis.pfc.population_statistics.engagement_null_overlap_statistics`'s.
     """
     rows = []
-    for bundle in bundle_paths(data_dir):
+    for session, bundle in bundle_files.bundle_sessions(data_dir).items():
         record = read_sidecar(bundle)
         overlap = record.get("engagement_null_overlap") or {}
         rows.append(
             {
-                "session": session_of(bundle),
+                "session": session,
                 "median_overlap_fraction": overlap.get("median", np.nan),
                 "max_overlap_fraction": overlap.get("max", np.nan),
             }
@@ -450,12 +440,12 @@ def excluded_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
     :func:`~continuum_swr_replay.analysis.pfc.population_statistics.unmatchable_event_statistics`'s.
     """
     rows = []
-    for bundle in bundle_paths(data_dir):
+    for session, bundle in bundle_files.bundle_sessions(data_dir).items():
         record = read_sidecar(bundle)
         for class_name, window in (record.get("null_windows") or {}).items():
             rows.append(
                 {
-                    "session": session_of(bundle),
+                    "session": session,
                     "event_class": class_name,
                     "total": int(window["n_events_total"]),
                     "excluded": int(window["n_events_excluded_unmatchable"]),

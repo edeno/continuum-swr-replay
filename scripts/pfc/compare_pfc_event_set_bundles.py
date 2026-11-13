@@ -31,7 +31,6 @@ CURVES = (
     "non_local_no_SWR",
     "matched_control",
 )
-STEM = "_mPFC_modulation"
 
 
 def compare_session(canonical: Path, extended: Path) -> dict[str, object]:
@@ -88,6 +87,7 @@ def compare_session(canonical: Path, extended: Path) -> dict[str, object]:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    from continuum_swr_replay.analysis.pfc import bundle_files
     from continuum_swr_replay.paths import processed_data_dir
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -95,12 +95,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--canonical", type=Path, default=None)
     args = parser.parse_args(argv)
     canonical_dir = args.canonical or processed_data_dir()
-    for extended in sorted(args.extended.glob(f"*{STEM}.pkl")):
+    for session, extended in bundle_files.bundle_sessions(args.extended).items():
         canonical = canonical_dir / extended.name
         sidecar = json.loads(extended.with_suffix(".provenance.json").read_text())
         result = compare_session(canonical, extended)
         print(
-            f"{extended.name.removesuffix(STEM + '.pkl')}: units {result['n_units']}, "
+            f"{session}: units {result['n_units']}, "
             f"max |column diff| {result['max_abs_column_difference']:.3g} "
             f"({result['worst_column']}), max |curve diff| "
             f"{max(result['max_abs_curve_difference'].values()):.3g}; "

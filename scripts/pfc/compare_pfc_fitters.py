@@ -56,6 +56,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.pfc import bundle_files
 from continuum_swr_replay.runs.fit_provenance import fit_provenance_path
 
 # Sibling-script import: run as a script, only this file's directory is on
@@ -105,9 +106,7 @@ def _column_tolerance(column: str) -> float:
 
 def bundle_stems(directory: Path, suffix: str = "") -> set[str]:
     """Epoch identifiers of the modulation bundles in ``directory``."""
-    pattern = f"*_modulation{suffix}.pkl"
-    trim = len(f"_modulation{suffix}.pkl")
-    return {path.name[:-trim] for path in directory.glob(pattern)}
+    return set(bundle_files.bundle_identifiers(directory, suffix))
 
 
 def load_bundle(directory: Path, stem: str, suffix: str = "") -> dict[str, Any]:
@@ -128,7 +127,7 @@ def load_bundle(directory: Path, stem: str, suffix: str = "") -> dict[str, Any]:
         ``stats`` (DataFrame), ``modulations`` (dict of array), ``sidecar``
         (dict) and ``diagnostics`` (dict of arrays, or ``None``).
     """
-    artifact = directory / f"{stem}_modulation{suffix}.pkl"
+    artifact = bundle_files.bundle_path(directory, stem, suffix)
     base = artifact.with_suffix("")
     sidecar_path = fit_provenance_path(artifact)
     diagnostics_path = base.with_suffix(".fit_diagnostics.npz")

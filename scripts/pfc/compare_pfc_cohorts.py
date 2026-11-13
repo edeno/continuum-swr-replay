@@ -60,7 +60,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.pfc import population_statistics
+from continuum_swr_replay.analysis.pfc import bundle_files, population_statistics
 from continuum_swr_replay.analysis.pfc.load_population import (
     CALLED_ALPHA,
     MIN_FIRING_RATE_HZ,
@@ -199,15 +199,14 @@ def read_sidecars(data_dir: Path, artifact_suffix: str = "") -> pd.DataFrame:
         an ``align_`` prefix (NaN for sidecars written before the alignment
         step existed).
     """
-    stem = f"_mPFC_modulation{artifact_suffix}"
-    paths = sorted(data_dir.glob(f"*{stem}.provenance.json"))
+    paths = bundle_files.bundle_sessions(data_dir, artifact_suffix, ".provenance.json")
     rows = []
-    for path in paths:
+    for session, path in paths.items():
         sidecar = json.loads(path.read_text())
         counts = dict(sidecar.get("cohort_counts", {}))
         alignment = counts.pop("alignment", None) or {}
         row = {
-            "session": path.name.replace(f"{stem}.provenance.json", ""),
+            "session": session,
             "nwb_file_name": sidecar.get("nwb_file_name", ""),
             "stop_cohort": sidecar.get("stop_cohort"),
             "stop_table_sha256": sidecar.get("stop_table_sha256"),
@@ -222,7 +221,10 @@ def read_sidecars(data_dir: Path, artifact_suffix: str = "") -> pd.DataFrame:
         }
         rows.append(row)
     if not rows:
-        raise FileNotFoundError(f"No *{stem}.provenance.json sidecars in {data_dir}")
+        pattern = bundle_files.session_bundle_path(
+            Path(), "", artifact_suffix, ".provenance.json"
+        )
+        raise FileNotFoundError(f"No *{pattern} sidecars in {data_dir}")
     frame = pd.DataFrame(rows).sort_values("session").reset_index(drop=True)
     # Every bundle must have a sidecar. A bundle without one is invisible to the
     # bins/events tables while ``load_population_data`` still counts its
@@ -319,8 +321,7 @@ def bundle_sessions(data_dir: Path, artifact_suffix: str = "") -> set[str]:
     Read from the pickle names rather than the sidecars, so a tree that
     predates provenance sidecars still reports its sessions.
     """
-    stem = f"_mPFC_modulation{artifact_suffix}.pkl"
-    return {path.name.removesuffix(stem) for path in data_dir.glob(f"*{stem}")}
+    return set(bundle_files.bundle_sessions(data_dir, artifact_suffix))
 
 
 def session_cohort_table(sidecars: pd.DataFrame) -> pd.DataFrame:
@@ -734,12 +735,14 @@ def event_count_agreement(
 
 def _bundle_statistics(data_dir: Path, session: str, suffix: str) -> pd.DataFrame:
     """One session's statistics table, unfiltered."""
-    return pd.read_pickle(data_dir / f"{session}_mPFC_modulation{suffix}.pkl")
+    return pd.read_pickle(bundle_files.session_bundle_path(data_dir, session, suffix))
 
 
 def _bundle_modulation(data_dir: Path, session: str, suffix: str, name: str) -> NDArray:
     """One session's modulation array, shape ``(n_lag_times, n_neurons)``."""
-    return np.load(data_dir / f"{session}_mPFC_modulation{suffix}.{name}.npy")
+    return np.load(
+        bundle_files.session_bundle_path(data_dir, session, suffix, f".{name}.npy")
+    )
 
 
 def _max_abs_difference(before: NDArray, after: NDArray) -> tuple[float, int]:
@@ -957,7 +960,9 @@ def matched_control_arrays(data_dir: Path, artifact_suffix: str = "") -> pd.Data
     """
     rows = []
     for session in sorted(bundle_sessions(data_dir, artifact_suffix)):
-        base = data_dir / f"{session}_mPFC_modulation{artifact_suffix}"
+        base = bundle_files.session_bundle_path(
+            data_dir, session, artifact_suffix, extension=""
+        )
         array_path = Path(f"{base}.{MATCHED_CONTROL_ARRAY}.npy")
         reference = Path(f"{base}.non_local_no_SWR_modulation.npy")
         present = array_path.exists()
