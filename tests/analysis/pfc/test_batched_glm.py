@@ -28,6 +28,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     poisson_deviance_from_params,
     prepare_heldout_response,
     score_poisson_designs_heldout,
+    unusable_as_nan,
 )
 from continuum_swr_replay.analysis.pfc.design import (
     convolve_event_basis,
@@ -1005,3 +1006,16 @@ def test_column_variants_equal_the_assembled_designs():
 
     np.testing.assert_array_equal(variants.params, assembled.params)
     np.testing.assert_array_equal(variants.converged, assembled.converged)
+
+
+def test_unusable_as_nan_blanks_whole_units_and_leaves_its_input():
+    params = np.arange(6.0).reshape(3, 2)
+    covariance = np.ones((3, 2, 2))
+    usable = np.array([True, False, True])
+
+    masked = unusable_as_nan(params, usable)
+
+    np.testing.assert_array_equal(masked, [[0.0, 1.0], [np.nan, np.nan], [4.0, 5.0]])
+    assert np.isfinite(params).all()
+    assert np.isnan(unusable_as_nan(covariance, usable)[1]).all()
+    assert np.isfinite(unusable_as_nan(covariance, usable)[[0, 2]]).all()

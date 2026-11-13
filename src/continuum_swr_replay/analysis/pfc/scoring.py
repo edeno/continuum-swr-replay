@@ -24,6 +24,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     fit_poisson_glms,
     prepare_heldout_response,
     score_poisson_designs_heldout,
+    unusable_as_nan,
 )
 from continuum_swr_replay.analysis.pfc.event_sets import (
     EVENT_CLASSES,
@@ -445,10 +446,10 @@ def maximum_likelihood_comparison(
         model_separated = is_separated(raw_params[:, 1:])
         converged = np.asarray(result.converged, dtype=bool)
         usable = converged & ~model_separated
-        params = raw_params[:, block].copy()
-        covariance = np.asarray(result.covariance)[:, block, block].copy()
-        params[~usable] = np.nan
-        covariance[~usable] = np.nan
+        params = unusable_as_nan(raw_params[:, block], usable)
+        covariance = unusable_as_nan(
+            np.asarray(result.covariance)[:, block, block], usable
+        )
         mle = peak_log_modulation(params, spline_basis, lag_time)
         mle_se = peak_modulation_se(covariance, spline_basis, mle.index)
         penalised_peak = curve_peaks(modulation_curves[curve])
@@ -505,8 +506,7 @@ def extended_curves(
         ],
         compute_covariance=False,
     )
-    params = np.asarray(fit.params).copy()
-    params[~np.asarray(fit.converged, dtype=bool)] = np.nan
+    params = unusable_as_nan(fit.params, fit.converged)
     for name in EXTENDED_CURVE_SOURCES:
         _, block = curve_coefficients(name, n_basis, EXTENDED_CURVE_SOURCES)
         curves[name] = basis[report] @ params[:, block].T

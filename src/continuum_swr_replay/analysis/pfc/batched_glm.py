@@ -328,6 +328,28 @@ class BatchedGLMResults:
         )
 
 
+def unusable_as_nan(values: NDArray, usable: NDArray) -> NDArray:
+    """Per-unit fit values with every unit that has no usable fit set to NaN.
+
+    Parameters
+    ----------
+    values : NDArray, shape (n_units, ...)
+        One row per unit: parameters, a block of them, or their covariance.
+    usable : NDArray of bool, shape (n_units,)
+        Which units' fits are usable. What makes a fit usable is the caller's:
+        a penalised fit that converged, or an unpenalised one that converged
+        and is not separated.
+
+    Returns
+    -------
+    masked : NDArray of float, shape (n_units, ...)
+        A copy of ``values``; ``values`` is not changed.
+    """
+    masked = np.array(values, dtype=float)
+    masked[~np.asarray(usable, dtype=bool)] = np.nan
+    return masked
+
+
 @dataclass(frozen=True)
 class PreparedHeldoutResponse:
     """One session's response and folds, resident on the configured device.

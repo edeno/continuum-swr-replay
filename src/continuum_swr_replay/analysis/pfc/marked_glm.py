@@ -32,6 +32,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     make_ridge_penalty,
     prepare_heldout_response,
     score_poisson_designs_heldout,
+    unusable_as_nan,
 )
 from continuum_swr_replay.analysis.pfc.design import convolve_event_basis
 from continuum_swr_replay.analysis.pfc.event_sets import EVENT_SETS, SWR_NO_NON_LOCAL
@@ -1782,10 +1783,8 @@ def fit_marked_kernel_ladder(
         mark_slice = ladder.full.block_slices[
             _block_name(event_class, ladder.scientific_mark)
         ]
-        base_params = np.asarray(fitted.params[:, base_slice], dtype=float).copy()
-        mark_params = np.asarray(fitted.params[:, mark_slice], dtype=float).copy()
-        base_params[~usable] = np.nan
-        mark_params[~usable] = np.nan
+        base_params = unusable_as_nan(fitted.params[:, base_slice], usable)
+        mark_params = unusable_as_nan(fitted.params[:, mark_slice], usable)
         typical_curves[event_class] = ladder.spline_basis @ base_params.T
         mark_curves[event_class] = ladder.spline_basis @ mark_params.T
 

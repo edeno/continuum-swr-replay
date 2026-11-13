@@ -36,6 +36,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     make_ridge_penalty,
     prepare_heldout_response,
     score_poisson_designs_heldout,
+    unusable_as_nan,
 )
 from continuum_swr_replay.analysis.pfc.event_sets import SWR_NO_NON_LOCAL
 from continuum_swr_replay.analysis.pfc.marked_glm import (
@@ -2409,15 +2410,13 @@ def fit_marked_family_ladder(
     mark_curves: dict[str, dict[str, NDArray]] = {}
     for event_class in ladder.classes:
         base = ladder.full.block_slices[_block_name(event_class)]
-        parameters = np.asarray(fitted.params[:, base], dtype=float).copy()
-        parameters[~usable] = np.nan
+        parameters = unusable_as_nan(fitted.params[:, base], usable)
         typical_curves[event_class] = ladder.spline_basis @ parameters.T
     for target_class in ladder.target_classes:
         mark_curves[target_class] = {}
         for mark in ladder.spec.scientific_marks:
             span = ladder.full.block_slices[_block_name(target_class, mark)]
-            parameters = np.asarray(fitted.params[:, span], dtype=float).copy()
-            parameters[~usable] = np.nan
+            parameters = unusable_as_nan(fitted.params[:, span], usable)
             mark_curves[target_class][mark] = ladder.spline_basis @ parameters.T
 
     diagnostics: dict[str, Any] = {
