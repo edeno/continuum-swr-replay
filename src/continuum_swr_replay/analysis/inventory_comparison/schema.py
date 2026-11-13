@@ -37,6 +37,7 @@ __all__ = [
     "SessionIdentity",
     "combine_inventories",
     "empty_inventory",
+    "event_keys",
     "from_classified_nonlocal_table",
     "from_memoryless_table",
     "inventory_from_intervals",
@@ -239,7 +240,7 @@ def combine_inventories(
     )
 
 
-def _event_keys(
+def event_keys(
     detector: str, animal: object, day: object, epoch: object, native: Sized
 ) -> list[str]:
     """``"<detector>:<animal><day>_<epoch>:<native key>"`` for each event.
@@ -247,6 +248,24 @@ def _event_keys(
     ``animal``, ``day`` and ``epoch`` are one value or one per event; the middle
     part is ``identifiers.session_name``. :func:`native_event_keys` reads the
     native key back.
+
+    Parameters
+    ----------
+    detector : str
+        The inventory's detector; it must not hold ``":"``.
+    animal, day, epoch : object or array-like
+        One value, or one per event.
+    native : sized, shape (n_events,)
+        Each event's key in its detector's own output.
+
+    Returns
+    -------
+    list of str, length n_events
+
+    Raises
+    ------
+    ValueError
+        `detector` holds ``":"``.
     """
     if ":" in detector:
         raise ValueError(f"A detector name must not hold ':', got {detector!r}.")
@@ -362,7 +381,7 @@ def inventory_from_intervals(
             "epoch": session.epoch,
             "brain_area": session.brain_area,
             "detector": detector,
-            "event_key": _event_keys(
+            "event_key": event_keys(
                 detector, session.animal, session.day, session.epoch, keys
             ),
             "run_id": run_id,
@@ -413,7 +432,7 @@ def from_classified_nonlocal_table(
             "epoch": classified.epoch,
             "brain_area": brain_area,
             "detector": STATE_SPACE,
-            "event_key": _event_keys(
+            "event_key": event_keys(
                 STATE_SPACE,
                 classified.animal,
                 classified.day,
@@ -527,7 +546,7 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
             "epoch": table.epoch,
             "brain_area": table.brain_area,
             "detector": MEMORYLESS,
-            "event_key": _event_keys(
+            "event_key": event_keys(
                 MEMORYLESS, table.animal, table.day, table.epoch, table.ms_event_id
             ),
             "run_id": table.run_id,

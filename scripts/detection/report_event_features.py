@@ -83,7 +83,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa:
     MEMORYLESS,
     MEMORYLESS_CRITERIA,
     STATE_SPACE,
-    _event_keys,
+    event_keys,
 )
 from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
     REJECTION_COHORTS,
@@ -844,7 +844,7 @@ def memoryless_cohort_by_session(
         memoryless events of the features table.
     """
     keyed = candidates.assign(
-        event_key=_event_keys(
+        event_key=event_keys(
             MEMORYLESS_CRITERIA,
             candidates.animal,
             candidates.day,

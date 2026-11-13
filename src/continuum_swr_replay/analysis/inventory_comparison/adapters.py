@@ -70,8 +70,8 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     MEMORYLESS_COHORTS,
     STATE_SPACE,
     SessionIdentity,
-    _event_keys,
     empty_inventory,
+    event_keys,
     from_classified_nonlocal_table,
     from_memoryless_table,
     inventory_from_intervals,
@@ -174,7 +174,7 @@ def _set_aside(
             "day": session.day,
             "epoch": session.epoch,
             "detector": detector,
-            "event_key": _event_keys(
+            "event_key": event_keys(
                 detector, session.animal, session.day, session.epoch, native_keys
             ),
             "interval_start_s": np.asarray(starts, dtype=np.float64),

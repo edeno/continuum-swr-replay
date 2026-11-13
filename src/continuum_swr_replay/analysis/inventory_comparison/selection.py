@@ -98,7 +98,7 @@ from continuum_swr_replay.analysis.inventory_comparison.populations import ALL
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     MEMORYLESS,
     MEMORYLESS_COHORTS,
-    _event_keys,
+    event_keys,
 )
 from continuum_swr_replay.intervals import (
     intersect,
@@ -792,7 +792,7 @@ def rejection_stages(
         if (candidate_start[1:] < candidate_end[:-1]).any():
             raise ValueError("The candidates are not disjoint and in time order.")
         keys = np.asarray(
-            _event_keys(
+            event_keys(
                 cohort,
                 table["animal"],
                 table["day"],
