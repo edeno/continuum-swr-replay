@@ -301,6 +301,12 @@ class PopulationTiming(NamedTuple):
     n_animals: int
 
 
+#: Nested-bootstrap replicates behind the reported population timing intervals,
+#: and their seed.
+TIMING_BOOTSTRAP_DRAWS = 1_000
+TIMING_BOOTSTRAP_SEED = 0
+
+
 def population_timing(
     curves: NDArray,
     peak: NDArray,
@@ -308,8 +314,8 @@ def population_timing(
     animals: NDArray,
     lag_time: NDArray,
     *,
-    n_boot: int = 1_000,
-    seed: int = 0,
+    n_boot: int = TIMING_BOOTSTRAP_DRAWS,
+    seed: int = TIMING_BOOTSTRAP_SEED,
     fraction: float = 0.5,
     baseline: str | tuple[float, float] = "zero",
 ) -> PopulationTiming:
@@ -460,11 +466,6 @@ def _mean_curve_timing(
 
 #: The sign of a unit's peak, by the word for its direction.
 DIRECTIONS = {"enhanced": 1.0, "suppressed": -1.0}
-
-#: Nested-bootstrap replicates behind the reported population timing intervals,
-#: and their seed.
-TIMING_BOOTSTRAP_DRAWS = 1_000
-TIMING_BOOTSTRAP_SEED = 0
 
 _MS = 1e3
 
@@ -675,8 +676,8 @@ def called_response_timing(
     groups: NDArray,
     animals: NDArray,
     *,
-    n_boot: int = 1_000,
-    seed: int = 0,
+    n_boot: int = TIMING_BOOTSTRAP_DRAWS,
+    seed: int = TIMING_BOOTSTRAP_SEED,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """When the response of the units called for an event class peaks and starts.
 
