@@ -265,7 +265,6 @@ def _create_non_local_probability_view(results: xr.Dataset) -> vv.TimeseriesGrap
     non_local_times = get_confident_times(
         results.sel(states="Non-Local Continuous").acausal_state_probabilities
         + results.sel(states="Non-Local Fragmented").acausal_state_probabilities,
-        minimum_duration=0.015,
     )
 
     non_local_probability_view = vv.TimeseriesGraph()

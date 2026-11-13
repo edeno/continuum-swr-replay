@@ -55,7 +55,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep import 
     DURATION_S,
     MATCH_TOLERANCE_CM,
     MIDPOINT_CM,
-    NON_LOCAL_MINIMUM_DURATION_S,
     NON_LOCAL_PROB_THRESHOLD,
     PATH_CM,
     PEAK_RATE_HZ,
@@ -73,6 +72,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_summari
     replay_sweep_summary,
     share,
 )
+from continuum_swr_replay.parameters import NON_LOCAL_MINIMUM_DURATION_S
 from continuum_swr_replay.paths import detection_comparison_dir
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by

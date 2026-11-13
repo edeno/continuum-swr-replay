@@ -38,6 +38,8 @@ PROBABILITY_THRESHOLDS : list
 DEFAULT_NON_LOCAL_THRESHOLD : float
     Default probability threshold (0.8) for classifying non-local events; the
     canonical decode's ``data_over_time`` file is named for it.
+NON_LOCAL_MINIMUM_DURATION_S : float
+    Nominal minimum duration (0.015 s) of a non-local event.
 
 Notes
 -----
@@ -103,6 +105,13 @@ PROBABILITY_THRESHOLDS: Final[list[float]] = [0.50, 0.80, 0.95]
 DEFAULT_NON_LOCAL_THRESHOLD: Final[float] = 0.8
 """Default probability threshold for classifying non-local events (0-1)."""
 
+NON_LOCAL_MINIMUM_DURATION_S: Final[float] = 0.015
+"""Nominal minimum duration (s) of a non-local event.
+
+``get_confident_times`` converts it to a sample count (7 samples on the decode
+grid); the memoryless sweep applies it as a first-to-last timestamp span
+(``docs/known_issues/nonlocal_minimum_duration_rounding.md``)."""
+
 
 def __getattr__(name: str) -> Path:
     # PROCESSED_DATA_DIR is resolved when read, not bound at import.
@@ -117,6 +126,7 @@ __all__ = [
     "DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC",
     "PROBABILITY_THRESHOLDS",
     "DEFAULT_NON_LOCAL_THRESHOLD",
+    "NON_LOCAL_MINIMUM_DURATION_S",
     # HSE detection parameters
     "HSE_MINIMUM_DURATION_SEC",
     "HSE_ZSCORE_THRESHOLD",

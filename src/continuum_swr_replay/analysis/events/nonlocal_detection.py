@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.events.immobility import (
     intervals_from_labels,
 )
 from continuum_swr_replay.intervals import total_duration
+from continuum_swr_replay.parameters import NON_LOCAL_MINIMUM_DURATION_S
 from continuum_swr_replay.tables.columns import require_columns
 
 # Interval-arithmetic tolerance for floating-point noise (1 μs). Used in
@@ -58,7 +59,7 @@ def get_confident_times(
     speed: np.ndarray | None = None,
     time: np.ndarray | None = None,
     prob_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
-    minimum_duration: float = 0.015,
+    minimum_duration: float = NON_LOCAL_MINIMUM_DURATION_S,
 ) -> pd.DataFrame:
     """Extract time intervals where probability exceeds threshold.
 
@@ -74,7 +75,8 @@ def get_confident_times(
         Threshold for confident state classification (strictly above), by
         default ``DEFAULT_NON_LOCAL_THRESHOLD`` (0.8).
     minimum_duration : float, optional
-        Minimum duration (seconds) for confident state, by default 0.015.
+        Minimum duration (seconds) for confident state, by default
+        ``NON_LOCAL_MINIMUM_DURATION_S`` (0.015).
         Converted to a sample count, not compared with a timestamp span; see
         Notes.
 

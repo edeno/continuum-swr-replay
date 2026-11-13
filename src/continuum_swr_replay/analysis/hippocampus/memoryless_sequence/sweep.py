@@ -57,14 +57,16 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.intervals import contiguous_true_runs
-from continuum_swr_replay.parameters import LOCAL_POSITION_STD
+from continuum_swr_replay.parameters import (
+    LOCAL_POSITION_STD,
+    NON_LOCAL_MINIMUM_DURATION_S,
+)
 
 __all__ = [
     "DECODE_MARGIN_S",
     "DURATION_S",
     "MATCH_TOLERANCE_CM",
     "MIDPOINT_CM",
-    "NON_LOCAL_MINIMUM_DURATION_S",
     "NON_LOCAL_PROB_THRESHOLD",
     "PATH_CM",
     "PEAK_RATE_HZ",
@@ -106,7 +108,6 @@ pieces left after cutting out the recording's own events can still hold an
 event."""
 
 NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
-NON_LOCAL_MINIMUM_DURATION_S = 0.015
 """The project's non-local event threshold and nominal minimum, applied with a
 timestamp-span test (:func:`non_local_intervals`): non-local probability above
 0.8 over a first-to-last span of at least 15 ms, i.e. 9 samples on the sweep's
