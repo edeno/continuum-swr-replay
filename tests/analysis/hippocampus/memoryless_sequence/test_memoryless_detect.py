@@ -12,7 +12,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import
     WindowGates,
     apply_speed_gate,
     assemble_sequences,
-    contiguous_runs,
     detect_candidate_sequences,
     gate_windows,
     merge_runs,
@@ -225,33 +224,6 @@ class TestSequenceAssemblyInvariants:
                 pre_merge_runs=np.array([[0, 9]]),
                 kept=np.ones(5, bool),
             )
-
-
-class TestContiguousRuns:
-    def test_no_windows_kept_gives_no_runs(self):
-        runs = contiguous_runs(np.zeros(5, dtype=bool))
-
-        assert runs.shape == (0, 2)
-
-    def test_an_empty_mask_gives_no_runs(self):
-        runs = contiguous_runs(np.zeros(0, dtype=bool))
-
-        assert runs.shape == (0, 2)
-
-    def test_boundaries_are_inclusive(self):
-        runs = contiguous_runs(np.array([False, True, True, True, False]))
-
-        np.testing.assert_array_equal(runs, [[1, 3]])
-
-    def test_separated_runs_stay_separate(self):
-        runs = contiguous_runs(np.array([True, True, False, True, False, True]))
-
-        np.testing.assert_array_equal(runs, [[0, 1], [3, 3], [5, 5]])
-
-    def test_a_run_touching_both_ends(self):
-        runs = contiguous_runs(np.ones(4, dtype=bool))
-
-        np.testing.assert_array_equal(runs, [[0, 3]])
 
 
 class TestMergeRuns:

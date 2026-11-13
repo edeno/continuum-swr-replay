@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.intervals import interval_mask
+from continuum_swr_replay.intervals import contiguous_true_runs, interval_mask
 
 STATES = ("Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented")
 """The decoder's states, in its own order."""
@@ -101,18 +101,6 @@ def analysed_regimes(
     return regime, in_excluded
 
 
-def _runs(mask: NDArray) -> NDArray[np.int64]:
-    """``(n_runs, 2)``: first and last index (inclusive) of each run of True."""
-    idx = np.flatnonzero(mask)
-    if idx.size == 0:
-        return np.zeros((0, 2), dtype=np.int64)
-    breaks = np.flatnonzero(np.diff(idx) > 1)
-    runs: NDArray[np.int64] = np.c_[
-        np.r_[idx[0], idx[breaks + 1]], np.r_[idx[breaks], idx[-1]]
-    ].astype(np.int64)
-    return runs
-
-
 def _valid_starts(mask: NDArray, length: int) -> NDArray[np.int64]:
     """Every s with ``mask[s : s + length]`` all True."""
     if length > mask.size:
@@ -163,10 +151,11 @@ def state_bouts(
     if probability.shape != regime.shape:
         raise ValueError("probability and regime must be the same length")
     confident = probability > threshold
-    full = _runs(confident)
+    # first and last bin (inclusive) of each run
+    full = contiguous_true_runs(confident) - [0, 1]
     frames = []
     for name in REGIMES:
-        runs = _runs(confident & (regime == name))
+        runs = contiguous_true_runs(confident & (regime == name)) - [0, 1]
         runs = runs[runs[:, 1] - runs[:, 0] + 1 >= min_bins]
         n_found = len(runs)
         if n_found > cap:

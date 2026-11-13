@@ -51,6 +51,7 @@ from continuum_swr_replay.analysis.inventory_comparison.recount import (
     FRAGMENT_GAPS_S,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import STATE_SPACE
+from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
@@ -531,8 +532,7 @@ def _runs_above(
     longest_s : NDArray, shape (n_intervals,)
         The longest run's last sample time less its first; NaN with no run.
     """
-    padded = np.concatenate([[False], above, [False]])
-    run_start, run_stop = np.flatnonzero(padded[1:] != padded[:-1]).reshape(-1, 2).T
+    run_start, run_stop = contiguous_true_runs(above).T
     stop = first + n_rows
     # runs are disjoint and ordered: those ending after the interval's first
     # row and starting before its end are its own

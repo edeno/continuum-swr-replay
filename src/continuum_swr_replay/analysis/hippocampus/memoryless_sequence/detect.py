@@ -40,6 +40,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
     forward_jumps_cm,
     window_center_and_spread,
 )
+from continuum_swr_replay.intervals import contiguous_true_runs
 
 __all__ = [
     "CandidateSequences",
@@ -48,7 +49,6 @@ __all__ = [
     "WindowGates",
     "apply_speed_gate",
     "assemble_sequences",
-    "contiguous_runs",
     "detect_candidate_sequences",
     "gate_windows",
     "merge_runs",
@@ -358,26 +358,6 @@ def window_decisions(
     )
 
 
-def contiguous_runs(kept: NDArray) -> NDArray:
-    """Unbroken stretches of kept windows.
-
-    Parameters
-    ----------
-    kept : ndarray of bool, shape (n_windows,)
-
-    Returns
-    -------
-    runs : ndarray of int, shape (n_runs, 2)
-        Inclusive first and last window index of each run.
-
-    """
-    kept = np.asarray(kept, dtype=bool)
-    edges = np.diff(np.concatenate(([False], kept, [False])).astype(np.int8))
-    starts = np.flatnonzero(edges == 1)
-    stops = np.flatnonzero(edges == -1) - 1
-    return np.column_stack([starts, stops]).astype(int)
-
-
 def merge_runs(
     runs: NDArray,
     center_index: NDArray,
@@ -487,7 +467,8 @@ def assemble_sequences(
 
     """
     kept = np.asarray(kept, dtype=bool)
-    runs = contiguous_runs(kept)
+    # first and last window (inclusive) of each unbroken stretch of kept windows
+    runs = contiguous_true_runs(kept) - [0, 1]
     if config.drop_single_window_runs:
         runs = runs[runs[:, 1] > runs[:, 0]]
 

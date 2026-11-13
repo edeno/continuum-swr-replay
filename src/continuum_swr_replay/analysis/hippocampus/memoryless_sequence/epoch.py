@@ -24,7 +24,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
     CandidateSequences,
-    contiguous_runs,
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
@@ -49,6 +48,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
     normalize_windows,
     windows_holding,
 )
+from continuum_swr_replay.intervals import contiguous_true_runs
 
 __all__ = ["EpochDetection", "observation_table", "run_epoch"]
 
@@ -273,7 +273,10 @@ def observation_table(
     midpoints = window_midpoints_s(time[:-1], config)
     rows = [
         ("decoded_windows", midpoints[first], midpoints[last])
-        for first, last in contiguous_runs(~np.asarray(missing_windows, dtype=bool))
+        for first, last in contiguous_true_runs(
+            ~np.asarray(missing_windows, dtype=bool)
+        )
+        - [0, 1]
     ]
     rows += [("swr_labels", start, end) for start, end in swr_observed]
     return pd.DataFrame(rows, columns=["kind", "start_s", "end_s"]).astype(

@@ -54,6 +54,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
     aggregate_windows,
     normalize_windows,
 )
+from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD
 
 __all__ = [
@@ -424,8 +425,7 @@ def non_local_intervals(
     ``NON_LOCAL_MINIMUM_DURATION_S`` (a span test, not get_confident_times'
     sample count; see that constant)."""
     above = probability > NON_LOCAL_PROB_THRESHOLD
-    edges = np.diff(above.astype(np.int8), prepend=0, append=0)
-    starts, stops = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1
+    starts, stops = (contiguous_true_runs(above) - [0, 1]).T
     return [
         (a, b)
         for a, b in zip(starts, stops, strict=True)

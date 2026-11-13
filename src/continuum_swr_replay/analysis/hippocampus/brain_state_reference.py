@@ -22,6 +22,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.hippocampus.state_evidence.windows import regimes
+from continuum_swr_replay.intervals import contiguous_true_runs
 
 SIGNALS = {
     "theta": "theta_power_zscore",
@@ -95,9 +96,8 @@ def matched_window_means(
     finite = np.isfinite(values)
     total = np.concatenate([[0.0], np.cumsum(np.where(finite, values, 0.0))])
     count = np.concatenate([[0], np.cumsum(finite)])
-    edges = np.diff(np.concatenate([[0], np.asarray(eligible, dtype=np.int8), [0]]))
-    run_start = np.flatnonzero(edges == 1)
-    run_length = np.flatnonzero(edges == -1) - run_start
+    run_start, run_stop = contiguous_true_runs(eligible).T
+    run_length = run_stop - run_start
     means = np.full((len(lengths), n_windows), np.nan)
     for k, length in enumerate(np.asarray(lengths, dtype=np.int64)):
         n_starts = np.clip(run_length - length + 1, 0, None)

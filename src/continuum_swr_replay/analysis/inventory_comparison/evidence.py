@@ -48,6 +48,7 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
     _grid_rows,
     _over_rows,
 )
+from continuum_swr_replay.intervals import contiguous_true_runs
 
 __all__ = [
     "BLOCK_ROWS",
@@ -88,13 +89,6 @@ def _block_spans(
             low = min(max(first - 1, 0), n_time - n_call)
             spans.append((first, stop, low, low + n_call))
     return spans
-
-
-def _runs(rows: NDArray[np.bool_]) -> list[tuple[int, int]]:
-    """``(start, stop)`` of each run of True in ``rows``."""
-    edges = np.diff(np.r_[0, rows.astype(np.int8), 0])
-    starts, stops = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)
-    return list(zip(starts.tolist(), stops.tolist(), strict=True))
 
 
 def log_likelihood_blocks(
@@ -194,7 +188,7 @@ def log_likelihood_blocks(
         reachable = _drop_the_unreachable_row(
             np.asarray(log_likelihood), time[low:high], encargs
         ).log_likelihood
-        for start, end in _runs(in_block[first:stop]):
+        for start, end in contiguous_true_runs(in_block[first:stop]).tolist():
             yield first + start, reachable[first + start - low : first + end - low]
 
 

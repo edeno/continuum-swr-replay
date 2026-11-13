@@ -50,7 +50,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-# the canonical matched-SWR rule itself, not a copy that could drift from it
 from continuum_swr_replay.analysis.events.classified_table import match_swr
 from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
 from continuum_swr_replay.analysis.events.immobility import (
@@ -73,6 +72,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
     dispersion_cm,
 )
 from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS
+
+# the canonical matched-SWR rule itself, not a copy that could drift from it
+from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
@@ -497,9 +499,7 @@ def observed_intervals(data_over_time: pd.DataFrame, column: str) -> NDArray:
     """
     time = data_over_time.index.to_numpy(dtype=np.float64)
     observed = np.isfinite(data_over_time[column].to_numpy(dtype=np.float64))
-    edges = np.diff(observed.astype(np.int8), prepend=0, append=0)
-    first = np.flatnonzero(edges == 1)
-    last = np.flatnonzero(edges == -1) - 1
+    first, last = (contiguous_true_runs(observed) - [0, 1]).T
     return np.column_stack([time[first], time[last]]).reshape(-1, 2)
 
 

@@ -30,6 +30,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from continuum_swr_replay.intervals import contiguous_true_runs
+
 __all__ = [
     "TRUTH_LABELS",
     "Gap",
@@ -579,8 +581,7 @@ def immobile_intervals(
     """
     time = np.asarray(time, dtype=np.float64)
     still = np.asarray(speed_cm_per_s, dtype=np.float64) < threshold_cm_per_s
-    edges = np.diff(still.astype(np.int8), prepend=0, append=0)
-    starts, stops = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1
+    starts, stops = (contiguous_true_runs(still) - [0, 1]).T
     if starts.size == 0:
         return np.zeros((0, 2), dtype=np.float64)
 

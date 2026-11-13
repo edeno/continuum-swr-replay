@@ -70,7 +70,7 @@ from continuum_swr_replay.analysis.hippocampus.artifacts.features import (
     window_centers,
     window_valid,
 )
-from continuum_swr_replay.intervals import interval_mask
+from continuum_swr_replay.intervals import contiguous_true_runs, interval_mask
 
 __all__ = [
     "CONSTANT_NAMES",
@@ -242,12 +242,6 @@ _EVENT_DTYPES = {
 }
 
 
-def _runs(flags: NDArray[np.bool_]) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
-    """First index and one past the last index of each run of True."""
-    edges = np.diff(np.r_[0, flags.astype(np.int8), 0])
-    return np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)
-
-
 def _events(
     signature: str, time: NDArray[np.float64], **evidence: NDArray
 ) -> pd.DataFrame:
@@ -292,13 +286,13 @@ def s_cores(
         windows included) and ``n_windows``.
     """
     spec = np.asarray(specificity, dtype=np.float64)
-    core_first, core_stop = _runs(spec >= S_CORE)
+    core_first, core_stop = contiguous_true_runs(spec >= S_CORE).T
     long_enough = (core_stop - core_first) >= S_CORE_RUN
     in_core = np.zeros(spec.size + 1, dtype=np.int64)
     np.add.at(in_core, core_first[long_enough], 1)
     np.add.at(in_core, core_stop[long_enough], -1)
     in_core = np.cumsum(in_core)[:-1] > 0
-    ext_first, ext_stop = _runs(spec >= S_EXT)
+    ext_first, ext_stop = contiguous_true_runs(spec >= S_EXT).T
     cores_in = np.r_[0, np.cumsum(in_core)]
     holds_core = (cores_in[ext_stop] - cores_in[ext_first]) > 0
     first, stop = ext_first[holds_core], ext_stop[holds_core]

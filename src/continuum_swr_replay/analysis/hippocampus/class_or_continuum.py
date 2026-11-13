@@ -64,6 +64,7 @@ from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import SplineTransformer
 
 from continuum_swr_replay.analysis.hippocampus.swr_detectors import DETECTOR_SETTINGS
+from continuum_swr_replay.intervals import contiguous_true_runs
 
 KAY_ZSCORE_THRESHOLD = float(DETECTOR_SETTINGS["kay"]["zscore_threshold"])
 """The z-score the Kay detector's SWRs must reach (2.0)."""
@@ -492,14 +493,6 @@ inventory's labels better than 7 on a check of one epoch per animal (7 calls
 more brief crossings SWRs); the choice reads the labels only, no property."""
 
 
-def _runs(mask: NDArray[np.bool_]) -> NDArray[np.int64]:
-    """First and last index (inclusive) of each run of True, shape (n_runs, 2)."""
-    edges = np.diff(np.concatenate([[0], np.asarray(mask, dtype=np.int8), [0]]))
-    return np.column_stack(
-        [np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1]
-    ).astype(np.int64)
-
-
 def sustained_level(z: NDArray, minimum_samples: int) -> NDArray[np.float64]:
     """Each sample's sustained level: the minimum of ``z`` over the
     ``minimum_samples`` samples starting there.
@@ -537,7 +530,8 @@ def kay_like_intervals(
         First and last sample of each SWR (inclusive).
     """
     z = np.asarray(z, dtype=np.float64)
-    positive = _runs(np.isfinite(z) & (z > 0))
+    # first and last sample (inclusive) of each run of positive power
+    positive = contiguous_true_runs(np.isfinite(z) & (z > 0)) - [0, 1]
     level = sustained_level(z, minimum_samples)
     if positive.size == 0:
         return positive
@@ -577,7 +571,8 @@ def kay_criterion(
     z = np.asarray(z, dtype=np.float64)
     first = np.asarray(first, dtype=np.int64)
     last = np.asarray(last, dtype=np.int64)
-    positive = _runs(np.isfinite(z) & (z > 0))
+    # first and last sample (inclusive) of each run of positive power
+    positive = contiguous_true_runs(np.isfinite(z) & (z > 0)) - [0, 1]
     level = sustained_level(z, minimum_samples)
     # the runs overlapping [first, last]: starts at or before last, ends at or
     # after first; runs are sorted and disjoint
