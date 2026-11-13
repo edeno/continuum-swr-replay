@@ -62,6 +62,9 @@ from continuum_swr_replay.analysis.inventory_comparison.pooling import (  # noqa
     session_tables,
     summed,
 )
+from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
+    compared_events,
+)
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
@@ -669,7 +672,7 @@ def report_tables(
         ),
     }
 
-    compared = tables["inventory"][tables["inventory"].whole_event_speed_eligible]
+    compared = compared_events(tables["inventory"])
     durations = ["interval_span_s", "native_duration_s"]
     for level, keys in (("by_session", SESSION), ("by_animal", ["animal"])):
         out[f"native_durations_{level}"] = _distribution(
@@ -893,8 +896,7 @@ def draw_figures(
         paths.append(path)
 
     # native durations
-    inventory = tables["inventory"]
-    compared = inventory[inventory.whole_event_speed_eligible]
+    compared = compared_events(tables["inventory"])
     bins = _log_bins()
     n_rows = -(-len(roster) // 3)
     fig, axes = plt.subplots(
