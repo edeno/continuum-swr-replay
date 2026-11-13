@@ -835,8 +835,9 @@ estimable per session in a three-alternative model.
 
 Membership lists referenced by the cohort and timing rules in
 [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md), and by
-the leaf-only candidate-set rule above. All three are frozensets in
-`model_specs.py`.
+the leaf-only candidate-set rule above, and the rungs the content estimators
+are compared on. The first three are frozensets in `model_specs.py`; the last
+is a tuple.
 
 ### Leaf-only contrast rungs
 
@@ -898,6 +899,36 @@ G5_rpe
 G7_update
 S7_rpe
 S9_update
+```
+
+### Content estimator comparison rungs
+
+`CONTENT_ESTIMATOR_COMPARISON_RUNGS` — the rungs
+`scripts/behavior/content/compare_content_estimators.py` fits with all three
+content estimators (see [Estimators](#estimators) and
+[design/content_estimator_comparison.md](design/content_estimator_comparison.md)).
+A tuple of `ComparisonRung`, in fitting order: each rung's ΔAIC is taken against
+its parent, per session and estimator. The `M` rungs are the arm hierarchy's,
+the `C` / `CS` rungs the arm contrast ladder's; `_leaf` rungs are fit over the
+six leaf arms only.
+
+```rungs
+M2
+M3
+  parent M2
+M4
+  parent M3
+C2_base
+C2_base_leaf
+  C2_base over the leaf arms
+C2_base_swr_leaf
+  C2_base plus the SWR x arm fixed effects, over the leaf arms
+CS1_current
+  parent C2_base
+CS4_armreward
+  parent C2_base
+CS5_armvalue
+  parent C2_base_swr_leaf; over the leaf arms
 ```
 
 ### Cohort-audit tables

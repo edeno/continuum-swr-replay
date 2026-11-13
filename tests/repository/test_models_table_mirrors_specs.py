@@ -70,6 +70,9 @@ EXPECTED: dict[str, frozenset[str]] = {
     "Leaf-only contrast rungs": specs.LEAF_ONLY_CONTRAST_RUNGS,
     "Descriptive rungs": specs.DESCRIPTIVE_CONTENT_RUNGS | specs.DESCRIPTIVE_RATE_RUNGS,
     "Post-outcome cohort rungs": specs.POST_OUTCOME_RATE_RUNGS,
+    "Content estimator comparison rungs": frozenset(
+        rung.name for rung in specs.CONTENT_ESTIMATOR_COMPARISON_RUNGS
+    ),
 }
 
 # Families whose rungs also carry a per-rung markdown table row (formula /
