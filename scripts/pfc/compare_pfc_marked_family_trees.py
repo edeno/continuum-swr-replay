@@ -32,6 +32,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.pfc.load_population import MIN_FIRING_RATE_HZ
+from continuum_swr_replay.decoding.identifiers import session_name
 
 SUFFIX = "_marked_family"
 
@@ -102,8 +103,9 @@ def compare_pair(
             )
             rows.append(
                 {
-                    "session": f"{ref_extra['nwb_file_name'].replace('_.nwb', '')}_"
-                    f"{ref_extra['epoch_name']}",
+                    "session": session_name(
+                        ref_extra["nwb_file_name"], ref_extra["epoch_name"]
+                    ),
                     "model": ref_extra["model_name"],
                     "event_class": event_class,
                     "target": target,

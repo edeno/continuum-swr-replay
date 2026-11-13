@@ -108,6 +108,7 @@ from continuum_swr_replay.decoding.files import data_over_time_suffix, decode_pa
 from continuum_swr_replay.decoding.identifiers import (
     format_epoch_identifier,
     parse_nwb_filename,
+    session_name,
 )
 from continuum_swr_replay.paths import (
     processed_data_dir,
@@ -252,7 +253,6 @@ def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) ->
     and environment objects, and several small DataFrames; joblib (pickle)
     preserves them all exactly.
     """
-    animal, day = parse_nwb_filename(nwb_file_name)
     # ``load_data_over_time`` reads every analysed epoch, so the cohort is the
     # register's analysed epochs.
     cohort = hashlib.sha256("\n".join(analysed_epoch_ids()).encode()).hexdigest()
@@ -260,7 +260,7 @@ def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) ->
     return (
         data_dir
         / "intermediates"
-        / f"{animal}{day}_{epoch_name}_figure02_v{FIGURE02_CACHE_VERSION}_"
+        / f"{session_name(nwb_file_name, epoch_name)}_figure02_v{FIGURE02_CACHE_VERSION}_"
         f"{swr_source_name()}_register{cohort[:12]}_decodes{decodes[:12]}"
         "_cache.joblib"
     )

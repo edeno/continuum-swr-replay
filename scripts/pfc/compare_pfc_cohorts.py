@@ -70,7 +70,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
 )
 from continuum_swr_replay.analysis.pfc.modulation import curve_peaks
 from continuum_swr_replay.analysis.shared_statistics import benjamini_hochberg
-from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename, session_name
 from continuum_swr_replay.paths import processed_data_dir
 
 # Sibling-script import: run as a script, only this file's directory is on
@@ -1452,10 +1452,15 @@ def restrict_to_sessions(frame: pd.DataFrame, sessions: set[str]) -> pd.DataFram
     """
     if not {"nwb_file_name", "epoch_name"} <= set(frame.columns):
         return frame
-    key = (
-        frame["nwb_file_name"].str.replace("_.nwb", "", regex=False)
-        + "_"
-        + frame["epoch_name"]
+    key = pd.Series(
+        [
+            session_name(name, epoch)
+            for name, epoch in zip(
+                frame["nwb_file_name"], frame["epoch_name"], strict=True
+            )
+        ],
+        index=frame.index,
+        dtype=object,
     )
     return frame.loc[key.isin(sessions)].reset_index(drop=True)
 

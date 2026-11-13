@@ -96,7 +96,7 @@ from continuum_swr_replay.analysis.shared_statistics import (
     animal_curve_sem,
     session_mean_curve,
 )
-from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename, session_name
 from continuum_swr_replay.paths import processed_data_dir
 
 BUNDLE_SUBDIR = "pfc_marked_model_family"
@@ -173,7 +173,7 @@ def load_bundles(
         model_sets.add(extra.get("model_set") or _model_set(model))
         tier = extra.get("tier", "joint")
         animal, _ = parse_nwb_filename(extra["nwb_file_name"])
-        session = f"{extra['nwb_file_name'].replace('_.nwb', '')}_{extra['epoch_name']}"
+        session = session_name(extra["nwb_file_name"], extra["epoch_name"])
         base = sidecar.with_name(sidecar.name.replace(".provenance.json", ""))
         stats = pd.read_pickle(base.with_suffix(".pkl"))
         if lag_time is None:

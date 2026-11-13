@@ -27,6 +27,7 @@ from continuum_swr_replay.decoding.identifiers import (
     parse_epoch_identifier,
     parse_epoch_name,
     parse_nwb_filename,
+    parse_session_name,
     session_name,
 )
 
@@ -308,6 +309,16 @@ class TestSessionNames:
             == session_name("j1620210706_.nwb", "02_r1") + "_HPC"
         )
 
+    def test_a_session_name_parses_back_to_its_file_and_epoch(self):
+        assert parse_session_name("j1620210706_02_r1") == ("j1620210706_.nwb", "02_r1")
+
+    @pytest.mark.parametrize(
+        "bad", ["j1620210706_02", "j1620210706_02_r1_HPC", "_02_r1", "a__r1"]
+    )
+    def test_a_name_that_is_not_a_session_name_is_refused(self, bad):
+        with pytest.raises(ValueError, match="is not"):
+            parse_session_name(bad)
+
     @pytest.mark.parametrize(
         ("epoch_name", "parsed"),
         [("02_r1", (2, "r1")), ("16_r10", (16, "r10")), ("01_s1", (1, "s1"))],
@@ -344,6 +355,7 @@ def test_every_analysed_epoch_round_trips_through_its_names():
         assert f"{number:02d}_{tag}" == epoch
         identifier = format_epoch_identifier(name, epoch, "HPC")
         assert identifier == f"{session_name(name, epoch)}_HPC"
+        assert parse_session_name(session_name(name, epoch)) == (name, epoch)
         key = parse_epoch_identifier(identifier)
         assert (key.nwb_file_name, key.epoch_name, key.animal, key.date) == (
             name,

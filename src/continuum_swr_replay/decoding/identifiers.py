@@ -16,7 +16,8 @@ Both directions live here, with the defaults they share:
 
 The names an identifier is made of are built here too: the NWB file name of an
 animal and date (:func:`nwb_file_name`), its stem (:func:`nwb_stem`), the
-area-less session name ``{stem}_{epoch}`` (:func:`session_name`), and an epoch
+area-less session name ``{stem}_{epoch}`` (:func:`session_name`, read back by
+:func:`parse_session_name`), and an epoch
 name's number (:func:`parse_epoch_name`, :data:`RUN_EPOCH_PATTERN`).
 
 A leaf module: it imports only the standard library, so an offline reader of
@@ -145,6 +146,38 @@ def session_name(nwb_file_name: str, epoch_name: object) -> str:
     'chimi20200212_02_r1'
     """
     return f"{nwb_stem(nwb_file_name)}_{epoch_name}"
+
+
+def parse_session_name(name: str) -> tuple[str, str]:
+    """Split a session name ``{animal}{date}_{epoch}`` into its NWB file and epoch.
+
+    The inverse of :func:`session_name`.
+
+    Parameters
+    ----------
+    name : str
+        Such as ``"chimi20200212_02_r1"``.
+
+    Returns
+    -------
+    tuple[str, str]
+        ``(nwb_file_name, epoch_name)``, such as ``("chimi20200212_.nwb", "02_r1")``.
+
+    Raises
+    ------
+    ValueError
+        If `name` is not three non-empty ``_``-separated parts.
+
+    Examples
+    --------
+    >>> parse_session_name("j1620210706_02_r1")
+    ('j1620210706_.nwb', '02_r1')
+    """
+    parts = name.split("_")
+    if len(parts) != 3 or not all(parts):
+        raise ValueError(f"{name!r} is not {{animal}}{{date}}_{{epoch}}.")
+    stem, number, tag = parts
+    return f"{stem}_.nwb", f"{number}_{tag}"
 
 
 def parse_epoch_name(epoch_name: str) -> tuple[int, str]:

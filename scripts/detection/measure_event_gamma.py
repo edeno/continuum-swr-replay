@@ -50,7 +50,6 @@ from continuum_swr_replay.analysis.hippocampus.gamma_power import (
 )
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
-from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.paths import (
     EVENT_GAMMA_DIR,
     processed_data_dir,
@@ -133,7 +132,7 @@ def epochs_to_measure(
         If the SWR source cannot serve an epoch of the table.
     """
     by_epoch = {
-        format_epoch_identifier(f"{animal}{day}_.nwb", epoch, "HPC"): frame
+        swr_source.swr_epoch_id_of_session(animal, day, epoch): frame
         for (animal, day, epoch), frame in events.groupby(KEYS)
     }
     return [

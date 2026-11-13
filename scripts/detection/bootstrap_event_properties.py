@@ -38,6 +38,7 @@ from continuum_swr_replay.analysis.hippocampus.property_contrast import (
     bootstrap_contrasts,
     bootstrap_intervals,
 )
+from continuum_swr_replay.decoding import identifiers
 from continuum_swr_replay.paths import (
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_START_REST_THETA_DIR,
@@ -82,9 +83,12 @@ def load_events() -> tuple[pd.DataFrame, list[Path]]:
         raise ValueError(
             f"no start distance in {processed_data_dir() / EVENT_START_REST_THETA_DIR}"
         )
-    events["session"] = (
-        events.animal + events.session_date.astype(str) + "_" + events.epoch
-    )
+    events["session"] = [
+        identifiers.session_name(identifiers.nwb_file_name(animal, date), epoch)
+        for animal, date, epoch in zip(
+            events.animal, events.session_date, events.epoch, strict=True
+        )
+    ]
     return events, paths
 
 

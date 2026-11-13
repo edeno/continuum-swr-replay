@@ -34,6 +34,7 @@ from continuum_swr_replay.data_loaders.lfp import get_ripple, get_theta  # noqa:
 from continuum_swr_replay.data_loaders.position import get_position_info  # noqa: E402
 from continuum_swr_replay.data_loaders.spikes import get_spike_data  # noqa: E402
 from continuum_swr_replay.data_loaders.utils import get_epoch_info  # noqa: E402
+from continuum_swr_replay.decoding import identifiers  # noqa: E402
 
 
 def check_position(nwb_file_name: str, epoch_name: str) -> dict:
@@ -260,7 +261,7 @@ def main(argv: Sequence[str] | None = None):
     for i, ((nwb_file_name, epoch_name), row) in enumerate(epoch_info.iterrows()):
         animal = row["animal"]
         date = row["date"]
-        label = f"{animal}{date}_{epoch_name}"
+        label = identifiers.session_name(nwb_file_name, epoch_name)
         print(f"[{i + 1}/{n_epochs}] {label}...", end=" ", flush=True)
 
         try:

@@ -179,10 +179,10 @@ def rebuild_session(
         artifact_dropped_events,
     )
     from continuum_swr_replay.data_loaders import load_data
+    from continuum_swr_replay.decoding.identifiers import parse_session_name
     from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
-    animal_date, epoch = session.rsplit("_", 2)[0], "_".join(session.split("_")[-2:])
-    nwb_file_name = f"{animal_date}_.nwb"
+    nwb_file_name, epoch = parse_session_name(session)
 
     cohort_stops, _ = load_session_stop_cohort(nwb_file_name, epoch, cohort="at_well")
     results, _, _ = load_results(

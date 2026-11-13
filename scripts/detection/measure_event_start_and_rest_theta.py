@@ -29,6 +29,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events import analysed_time
+from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_session
 from continuum_swr_replay.analysis.hippocampus.start_and_rest_theta import (
     start_and_rest_theta,
 )
@@ -36,7 +37,6 @@ from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
     EVENT_FEATURES_RUN,
 )
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.paths import (
     EVENT_START_REST_THETA_DIR,
     event_features_root,
@@ -87,7 +87,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         columns=["event_id", "animal", "session_date", "epoch", "non_local_event"],
     )
     events["epoch_id"] = [
-        format_epoch_identifier(f"{animal}{day}_.nwb", epoch, "HPC")
+        swr_epoch_id_of_session(animal, day, epoch)
         for animal, day, epoch in zip(
             events.animal, events.session_date, events.epoch, strict=True
         )

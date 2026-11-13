@@ -55,6 +55,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import nwb_stem
 from continuum_swr_replay.paths import processed_data_dir
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -196,7 +197,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = p.parse_args(argv)
 
     geom = quantify_session(args.nwb, args.epoch)
-    session_label = f"{args.nwb.replace('_.nwb', '')} {args.epoch}"
+    session_label = f"{nwb_stem(args.nwb)} {args.epoch}"
     print_report(geom, session_label)
 
     if args.save is not None:

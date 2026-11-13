@@ -38,6 +38,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
+from continuum_swr_replay.decoding import identifiers
 
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_OUT_DIR = REPO / ".claude" / "research" / "pfc_event_diagnostic_outputs"
@@ -323,7 +324,7 @@ def get_command_line_arguments(argv: Sequence[str] | None = None) -> argparse.Na
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = get_command_line_arguments(argv)
-    nwb_file_name = f"{args.animal}{args.date}_.nwb"
+    nwb_file_name = identifiers.nwb_file_name(args.animal, args.date)
 
     per_event, summary = build_comparison(
         nwb_file_name,
@@ -336,7 +337,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     out_path = args.out_dir / (
-        f"{args.animal}{args.date}_{args.epoch}_event_definition.csv"
+        f"{identifiers.session_name(nwb_file_name, args.epoch)}_event_definition.csv"
     )
     per_event.to_csv(out_path, index=False)
     print(f"Wrote {len(per_event)} rows to {out_path}")

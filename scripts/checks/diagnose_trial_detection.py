@@ -34,6 +34,7 @@ from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_sess
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import nwb_file_name
 from continuum_swr_replay.paths import processed_data_dir, replay_content_dir
 
 ARM_COLORS = {
@@ -61,7 +62,7 @@ def figure_trial_sanity(
     """Plot a window of position + speed + trip boundaries for one session."""
     base = swr_epoch_id_of_session(animal, day, epoch)
     dot = pd.read_pickle(decode_paths(base, processed_data_dir()).data_over_time)
-    nwb = f"{animal}{day}_.nwb"
+    nwb = nwb_file_name(animal, day)
     data = load_data(nwb, epoch, include=frozenset({SessionDataKeys.TRIALS}))
     trials = data["trials"].sort_values("movement_start_time").reset_index(drop=True)
 
