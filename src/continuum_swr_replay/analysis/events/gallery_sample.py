@@ -24,6 +24,7 @@ from continuum_swr_replay.analysis.events.nonlocal_detection import (
     strict_overlap_matrix,
 )
 from continuum_swr_replay.intervals import min_gap_to_intervals
+from continuum_swr_replay.tables.session_keys import one_session
 
 __all__ = [
     "CATEGORIES",
@@ -74,8 +75,8 @@ def event_catalog(dot: pd.DataFrame, epoch_id: str, epoch_name: str) -> pd.DataF
     rows: list[dict] = []
 
     if len(ct):
-        animal = ct["animal"].iloc[0]
-        day = int(ct["day"].iloc[0])
+        animal, day, _ = one_session(ct, "The gallery catalog")
+        day = int(day)
         # Immobile only (matches the regression analysis population).
         ct = ct[ct["whole_event_speed_eligible"]].copy()
         ev_dur = (ct["event_end"] - ct["event_start"]).to_numpy()

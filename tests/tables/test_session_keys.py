@@ -13,10 +13,34 @@ from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,
     SESSION_COLUMNS_DAY,
     n_sessions,
+    one_session,
     session_key_frame,
     session_key_set,
     subset_max_per_animal,
 )
+
+
+def _epoch_frame(animals, days, epochs):
+    return pd.DataFrame({"animal": animals, "day": days, "epoch": epochs, "x": 0.0})
+
+
+def test_one_session_is_the_frame_s_one_epoch():
+    frame = _epoch_frame(["chimi"] * 3, [20200212] * 3, ["02_r1"] * 3)
+    assert one_session(frame, "a reader") == ("chimi", 20200212, "02_r1")
+
+
+@pytest.mark.parametrize(
+    "frame",
+    [
+        _epoch_frame(["chimi", "chimi"], [20200212, 20200212], ["02_r1", "04_r2"]),
+        _epoch_frame(["chimi", "j16"], [20200212, 20200212], ["02_r1", "02_r1"]),
+        _epoch_frame([], [], []),
+    ],
+    ids=["two epochs", "two animals", "no row"],
+)
+def test_one_session_refuses_a_frame_of_other_than_one_epoch(frame):
+    with pytest.raises(ValueError, match="a reader reads one epoch at a time"):
+        one_session(frame, "a reader")
 
 
 def test_session_columns_sourced_from_registry():

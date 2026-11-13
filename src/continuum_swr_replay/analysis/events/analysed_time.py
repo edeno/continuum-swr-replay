@@ -108,6 +108,7 @@ from continuum_swr_replay.tables.io import SWR_SOURCE_ATTR, publish_canonical
 from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,
     SESSION_COLUMNS_DAY,
+    one_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -486,9 +487,7 @@ def _frame_epoch(
     missing = [c for c in (*SESSION_COLUMNS_DAY, "head_speed") if c not in dot.columns]
     if missing:
         raise ValueError(f"{what}: data_over_time lacks columns {missing}")
-    sessions = dot[list(SESSION_COLUMNS_DAY)].drop_duplicates()
-    if len(sessions) != 1:
-        raise ValueError(f"{what} reads one epoch at a time, not {len(sessions)}")
+    animal, day, epoch = one_session(dot, what)
     require_time_index(dot, what)
     if "non_local_event" in dot.columns:
         validate_nonlocal_event_probability_contract(
@@ -497,7 +496,6 @@ def _frame_epoch(
     for column in LABEL_COLUMNS:
         if column in dot.columns:
             validate_whole_event_immobility_contract(dot, column)
-    animal, day, epoch = sessions.iloc[0]
     time = dot.index.to_numpy()
     return swr_epoch_id_of_session(animal, day, epoch), np.asarray(time, float)
 

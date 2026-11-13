@@ -80,7 +80,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
 from continuum_swr_replay.intervals import intersect, interval_mask
 from continuum_swr_replay.runs.io import read_manifest, sha256_file
 from continuum_swr_replay.tables.event_ids import hash_event_id
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
+from continuum_swr_replay.tables.session_keys import one_session
 
 __all__ = [
     "NATIVE_IS_ELIGIBLE",
@@ -146,10 +146,7 @@ class _Epoch(NamedTuple):
 def _epoch(dot: pd.DataFrame) -> _Epoch:
     """The one epoch a frame read through the SWR source holds."""
     analysed_time.require_swr_source(dot, what="the decode frame")
-    sessions = dot[list(SESSION_COLUMNS_DAY)].drop_duplicates()
-    if len(sessions) != 1:
-        raise ValueError(f"An adapter reads one epoch at a time, not {len(sessions)}.")
-    animal, day, epoch = sessions.iloc[0]
+    animal, day, epoch = one_session(dot, "An adapter")
     time = dot.index.to_numpy(dtype=np.float64)
     return _Epoch(
         session=SessionIdentity(

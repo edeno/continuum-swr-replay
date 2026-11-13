@@ -15,6 +15,7 @@ from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schem
 from continuum_swr_replay.tables.event_ids import (
     hash_stop_id as _hash_stop_id,
 )
+from continuum_swr_replay.tables.session_keys import one_session
 
 from .._helpers import (
     first_row_floats as _first_row_floats,
@@ -113,9 +114,8 @@ def build_stop_table(
     """
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
-    animal = str(dot["animal"].iloc[0])
-    day = int(dot["day"].iloc[0])
-    epoch = str(dot["epoch"].iloc[0])
+    animal, day, epoch = one_session(dot, "build_stop_table")
+    animal, day, epoch = str(animal), int(day), str(epoch)
 
     dot = dot.copy()
     dot["nonlocal_prob"] = (

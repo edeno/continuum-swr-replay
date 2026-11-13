@@ -30,6 +30,7 @@ from continuum_swr_replay.analysis.events.nonlocal_detection import (
 )
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import hash_stop_id
+from continuum_swr_replay.tables.session_keys import one_session
 
 from ...data_loaders.constants import ALL_ARMS
 from ...parameters import PLACE_BIN_SIZE_1D
@@ -291,9 +292,8 @@ def build_contfrag_event_table(
         raise KeyError(
             "dot must carry 'animal' column (set by get_contfrag_data_over_time)"
         )
-    animal = str(dot["animal"].iloc[0])
-    day = int(dot["day"].iloc[0])
-    epoch = str(dot["epoch"].iloc[0])
+    animal, day, epoch = one_session(dot, "build_contfrag_event_table")
+    animal, day, epoch = str(animal), int(day), str(epoch)
 
     event_col = _resolve_event_col(event_source)
 
@@ -745,9 +745,8 @@ def build_contfrag_stop_table(
     """
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column")
-    animal = str(dot["animal"].iloc[0])
-    day = int(dot["day"].iloc[0])
-    epoch = str(dot["epoch"].iloc[0])
+    animal, day, epoch = one_session(dot, "build_contfrag_stop_table")
+    animal, day, epoch = str(animal), int(day), str(epoch)
 
     event_col = _resolve_event_col(event_source)
 

@@ -29,6 +29,7 @@ from continuum_swr_replay.tables.event_ids import (
 from continuum_swr_replay.tables.event_ids import (
     hash_stop_id as _hash_stop_id,
 )
+from continuum_swr_replay.tables.session_keys import one_session
 
 from .._helpers import (
     align_posterior_to_dot as _align_posterior_to_dot,
@@ -141,9 +142,8 @@ def _annotate_dot_for_events(
     """
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
-    animal = str(dot["animal"].iloc[0])
-    day = int(dot["day"].iloc[0])
-    epoch = str(dot["epoch"].iloc[0])
+    animal, day, epoch = one_session(dot, "_annotate_dot_for_events")
+    animal, day, epoch = str(animal), int(day), str(epoch)
 
     dot = _prepare_dot(dot, env)
     mua_overlap_keys = (
@@ -801,9 +801,8 @@ def build_event_sequence_table(
     """
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
-    animal = str(dot["animal"].iloc[0])
-    day = int(dot["day"].iloc[0])
-    epoch = str(dot["epoch"].iloc[0])
+    animal, day, epoch = one_session(dot, "build_event_sequence_table")
+    animal, day, epoch = str(animal), int(day), str(epoch)
 
     dot = _prepare_dot(dot, env)
     in_event_mask = _in_event_mask(dot, nonlocal_threshold)

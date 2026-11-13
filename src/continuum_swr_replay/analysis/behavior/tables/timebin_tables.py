@@ -35,6 +35,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import hash_stop_id
+from continuum_swr_replay.tables.session_keys import one_session
 
 from ....intervals import overlaps_intervals
 from .bouts import assign_bout, immobility_bout_intervals
@@ -86,11 +87,8 @@ def _reward_bout_mask(
 
 
 def _session_keys(dot: pd.DataFrame) -> tuple[str, int, str]:
-    return (
-        str(dot["animal"].iloc[0]),
-        int(dot["day"].iloc[0]),
-        str(dot["epoch"].iloc[0]),
-    )
+    animal, day, epoch = one_session(dot, "a time-bin table")
+    return str(animal), int(day), str(epoch)
 
 
 def build_event_onset_table(

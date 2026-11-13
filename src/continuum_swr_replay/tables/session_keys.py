@@ -10,9 +10,10 @@ The hippocampus event table names its date column ``day`` rather than
 ``session_date``; that column name is load-bearing for that grain, so
 ``SESSION_COLUMNS_DAY`` serves it without forcing a rename.
 
-The table builders and the analyses that group by an id share two helpers
-here: :func:`present_session_columns` (the session columns a frame carries)
-and :func:`require_session_unique_ids` (an id names one session).
+The table builders and the analyses that group by an id share three helpers
+here: :func:`present_session_columns` (the session columns a frame carries),
+:func:`require_session_unique_ids` (an id names one session) and
+:func:`one_session` (the one epoch a per-epoch frame holds).
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ __all__ = [
     "n_sessions",
     "session_key_frame",
     "subset_max_per_animal",
+    "one_session",
     "present_session_columns",
     "require_session_unique_ids",
 ]
@@ -95,6 +97,32 @@ def subset_max_per_animal(
         keep = keep.sort_values(list(SESSION_COLUMNS))
     keep = keep.groupby("animal", sort=False).head(n)
     return frame.merge(keep, on=list(SESSION_COLUMNS))
+
+
+def one_session(frame: pd.DataFrame, what: str) -> tuple:
+    """The ``(animal, day, epoch)`` of a frame that holds one epoch.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        A per-epoch frame (a decode frame) carrying :data:`SESSION_COLUMNS_DAY`.
+    what : str
+        What reads the frame, for the error.
+
+    Returns
+    -------
+    tuple
+        The frame's one ``(animal, day, epoch)``, as stored.
+
+    Raises
+    ------
+    ValueError
+        If the frame holds rows of more than one epoch, or no row.
+    """
+    sessions = frame[list(SESSION_COLUMNS_DAY)].drop_duplicates()
+    if len(sessions) != 1:
+        raise ValueError(f"{what} reads one epoch at a time, not {len(sessions)}")
+    return tuple(sessions.iloc[0])
 
 
 def present_session_columns(df: pd.DataFrame) -> list[str]:
