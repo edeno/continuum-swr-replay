@@ -1028,7 +1028,7 @@ What the marked-kernel content mark is entangled with, session by session.
 
 What the mPFC held-out null's windows look like, beside the real events.
 
-`bundle_paths`, `session_of`, `read_sidecar`, `spacing_summary`, `draw_spacing_summary`, `session_window_sets`, `spacing_section`, `overlap_section`, `non_positive_section`, `excluded_section`, `main`
+`read_sidecar`, `spacing_summary`, `draw_spacing_summary`, `session_window_sets`, `spacing_section`, `overlap_section`, `non_positive_section`, `excluded_section`, `main`
 
 ### `scripts/pfc/part4_rate_threshold_sensitivity.py`
 
@@ -1106,13 +1106,13 @@ Speed regimes and the windows scored: bouts, matched windows, calibration window
 
 The one naming rule for a decode's files.
 
-`non_local_threshold_percent`, `data_over_time_suffix`, `DecodePaths`, `decode_paths`, `results_exist`
+`non_local_threshold_percent`, `data_over_time_suffix`, `DecodePaths`, `decode_paths`, `epoch_identifier_of`, `results_exist`
 
 ### `src/continuum_swr_replay/decoding/identifiers.py`
 
 The epoch identifier: how a decode is named, built and read back.
 
-`TrainingType`, `parse_nwb_filename`, `EpochKey`, `format_epoch_identifier`, `decode_identifier`, `parse_epoch_identifier`
+`TrainingType`, `nwb_file_name`, `nwb_stem`, `session_name`, `parse_session_name`, `parse_epoch_name`, `parse_nwb_filename`, `EpochKey`, `format_epoch_identifier`, `decode_identifier`, `parse_epoch_identifier`
 
 ### `src/continuum_swr_replay/decoding/results.py`
 
@@ -1252,6 +1252,6 @@ The per-bin replay rate vs behavioral uncertainty and value, by population.
 
 ### `src/continuum_swr_replay/tables/columns.py`
 
-The one check that a table carries the columns a step reads.
+The required-column check, for the code that reads the canonical tables.
 
-`require_columns`
+_No module-level public symbols._
