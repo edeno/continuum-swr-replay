@@ -87,6 +87,7 @@ from continuum_swr_replay.analysis.behavior.tables.bouts import (
 )
 from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
     build_event_arm_table,
+    build_event_patch_table,
 )
 from continuum_swr_replay.analysis.behavior.tables.tables_event import build_event_table
 from continuum_swr_replay.analysis.constants import (
@@ -109,7 +110,6 @@ from continuum_swr_replay.analysis.hippocampus import load_results
 from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     load_conditional_posterior,
 )
-from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_decode_files,
     analysed_epoch_ids,
@@ -845,18 +845,20 @@ def _plot_arm_predictor_heatmap(ax, arm_rows: pd.DataFrame) -> None:
 
 def _plot_patch_content_bar(
     ax,
-    arm_rows: pd.DataFrame,
+    patch_rows: pd.DataFrame | None,
     et_row: pd.Series | None,
 ) -> None:
-    """Per-patch posterior mass — content for the P0-P4 patch models.
+    """Per-patch content — the response of the P0-P4 patch models.
 
-    Patch mass is the arm posterior mass summed over the arms in each patch
-    (``TRACK_SEGMENT_TO_PATCH``), the same collapse the patch models use. The
-    current/prev/next patch predictors are flagged above the bars.
+    Bars are the event's ``patch_fraction`` from the patch table
+    (:func:`~continuum_swr_replay.analysis.behavior.tables.tables_arm_patch.build_event_patch_table`):
+    the share of its decoded real-arm bins whose arm lies in each patch, the
+    column the patch models read. The current/prev/next patch predictors are
+    flagged above the bars.
     """
     patches = [1, 2, 3]
     ax.set_title("per-patch content (P0–P4)", fontsize=7)
-    if arm_rows is None or not len(arm_rows):
+    if patch_rows is None or not len(patch_rows):
         ax.text(
             0.5,
             0.5,
@@ -870,23 +872,19 @@ def _plot_patch_content_bar(
         ax.set_xticks([])
         ax.set_yticks([])
         return
-    by_patch = (
-        arm_rows.assign(patch=arm_rows["candidate_arm"].map(TRACK_SEGMENT_TO_PATCH))
-        .groupby("patch")["arm_posterior_mass"]
-        .sum()
-        .reindex(patches)
-        .fillna(0.0)
-    )
+    # NaN (not drawn) when the event has no decoded real-arm bin.
+    fraction = patch_rows.set_index("patch")["patch_fraction"].reindex(patches)
     colors = ["tab:blue", "tab:orange", "tab:green"]
-    ax.bar(patches, by_patch.to_numpy(), color=colors, edgecolor="black", linewidth=0.3)
+    ax.bar(patches, fraction.to_numpy(), color=colors, edgecolor="black", linewidth=0.3)
     ax.set_xticks(patches)
     # Label which wells each patch contains (P1=W0/1, P2=W2/3, P3=W4/5).
     patch_wells = {1: "W0/1", 2: "W2/3", 3: "W4/5"}
     ax.set_xticklabels([f"P{p}\n{patch_wells[p]}" for p in patches], fontsize=5)
     ax.tick_params(axis="y", labelsize=5)
-    ax.set_ylabel("post. mass", fontsize=6)
-    ymax = float(by_patch.max()) or 1.0
+    ax.set_ylabel("share of bins", fontsize=6)
+    ymax = float(fraction.max()) if fraction.max() > 0 else 1.0
     ax.set_ylim(0, ymax * 1.35)
+    by_patch = fraction.fillna(0.0)
     if et_row is not None:
         flags = {
             "cur": et_row.get("current_patch"),
@@ -1318,12 +1316,16 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
 
     time_slice = slice(center - WINDOW_SEC, center + WINDOW_SEC)
     arm_rows = None
+    patch_rows = None
     if (
         cls != "swr_not_nonlocal"
         and ctx["arm_table"] is not None
         and et_row is not None
     ):
         arm_rows = ctx["arm_table"][ctx["arm_table"]["event_id"] == row["event_id"]]
+        patch_rows = ctx["patch_table"][
+            ctx["patch_table"]["event_id"] == row["event_id"]
+        ]
 
     fig = plt.figure(figsize=(9.0, 14.0), dpi=200)
     # Two outer rows: the panels (two columns) on top, a full-width
@@ -1379,7 +1381,7 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
         fig.add_subplot(gs_left[2]), arm_rows, et_row, ctx["arm_colors"]
     )
     _plot_arm_predictor_heatmap(fig.add_subplot(gs_left[3]), arm_rows)
-    _plot_patch_content_bar(fig.add_subplot(gs_left[4]), arm_rows, et_row)
+    _plot_patch_content_bar(fig.add_subplot(gs_left[4]), patch_rows, et_row)
     _plot_behavioral_context(
         fig.add_subplot(gs_left[5]), ctx["data"], center, row, ctx["imm_bouts"]
     )
@@ -1486,6 +1488,7 @@ def render_epoch(
 
     event_table = None
     arm_table = None
+    patch_table = None
     if (sel["category"] != "swr_not_nonlocal").any():
         posterior = load_conditional_posterior(
             decode_paths(hpc_epoch_id, data_dir).results
@@ -1507,6 +1510,7 @@ def render_epoch(
             data["track_graph"],
             conditional_posterior=posterior,
         )
+        patch_table = build_event_patch_table(event_table, arm_table)
 
     arm_of_edge = _arm_of_edge_map()
     ctx = {
@@ -1516,6 +1520,7 @@ def render_epoch(
         "env": env,
         "event_table": event_table,
         "arm_table": arm_table,
+        "patch_table": patch_table,
         "arm_of_edge": arm_of_edge,
         "arm_colors": _arm_colors(data["linear_edge_order"], arm_of_edge),
         "imm_bouts": imm_bouts,

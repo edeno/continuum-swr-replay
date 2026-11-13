@@ -9,8 +9,30 @@ from scripts.figures.generate_event_gallery import (
     _active_trip_at_time,
     _completed_trials_at,
     _outcome_known_trials_at,
+    _plot_patch_content_bar,
     _regression_footer,
 )
+
+
+def test_gallery_patch_bars_draw_the_patch_tables_patch_fraction():
+    import matplotlib.pyplot as plt
+
+    # Rows out of patch order, so the bars must be placed by ``patch``.
+    patch_rows = pd.DataFrame(
+        {"event_id": ["e"] * 3, "patch": [3, 1, 2], "patch_fraction": [0.25, 0.6, 0.15]}
+    )
+    fig, ax = plt.subplots()
+    _plot_patch_content_bar(ax, patch_rows, None)
+    assert [bar.get_height() for bar in ax.patches] == [0.6, 0.15, 0.25]
+    plt.close(fig)
+
+    # An event with no decoded real-arm bin has no fraction: no bar is drawn.
+    undefined = patch_rows.assign(patch_fraction=np.nan)
+    fig, ax = plt.subplots()
+    _plot_patch_content_bar(ax, undefined, None)
+    assert all(np.isnan(bar.get_height()) for bar in ax.patches)
+    assert ax.get_ylim() == (0.0, 1.35)
+    plt.close(fig)
 
 
 def test_gallery_separates_active_trip_from_completed_regression_history():
