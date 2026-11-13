@@ -73,6 +73,9 @@ from continuum_swr_replay.analysis.pfc.stop_context import (
 )
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.paths import (
+    PFC_STOP_CONTEXT_DIR,
+    PFC_STOP_CONTEXT_RESULTS,
+    pfc_cohort_name,
     processed_data_dir,
     replay_content_dir,
     table_path,
@@ -89,7 +92,7 @@ BRAIN_AREA = "mPFC"
 
 def default_output_dir() -> Path:
     """``pfc_response_followups/stop_context`` under the processed-data root."""
-    return processed_data_dir() / "pfc_response_followups" / "stop_context"
+    return processed_data_dir() / PFC_STOP_CONTEXT_DIR
 
 
 def bundle_path(nwb_file_name: str, epoch_name: str) -> Path:
@@ -101,7 +104,7 @@ def bundle_path(nwb_file_name: str, epoch_name: str) -> Path:
 def pfc_left_out() -> set[tuple[str, str]]:
     """The analysed epochs the PFC cohort record leaves out, as (file, epoch)."""
     record = json.loads(
-        (processed_data_dir() / f"pfc_cohort_{BRAIN_AREA}.json").read_text()
+        (processed_data_dir() / pfc_cohort_name(BRAIN_AREA)).read_text()
     )
     return {tuple(key.split(" ")) for key in record["left_out"]}
 
@@ -355,7 +358,7 @@ def fit(args: Namespace) -> None:
                         flush=True,
                     )
     results = pd.concat(rows, ignore_index=True)
-    results_path = output_dir / "results.csv"
+    results_path = output_dir / PFC_STOP_CONTEXT_RESULTS
     results.to_csv(results_path, index=False)
     write_json(
         output_dir / "results.provenance.json",

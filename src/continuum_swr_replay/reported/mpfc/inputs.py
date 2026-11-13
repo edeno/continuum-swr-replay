@@ -9,29 +9,18 @@ from pathlib import Path
 from typing import Any
 
 from continuum_swr_replay.paths import (
+    PFC_MARKED_FAMILY_DIR,
+    PFC_MARKED_FAMILY_SUMMARY,
+    PFC_STOP_CONTEXT_DIR,
+    PFC_STOP_CONTEXT_RESULTS,
+    PFC_SWR_WITHOUT_REPLAY_DIR,
+    PFC_TIMING_CALIBRATION,
+    pfc_cohort_name,
     processed_data_dir,
     replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.runs.staleness import stale_counts
-
-TIMING_CALIBRATION = "pfc_response_followups/timing_calibration.json"
-"""The timing calibration ``scripts/pfc/calibrate_pfc_kernel_timing.py`` writes,
-relative to the processed-data root."""
-
-SWR_WITHOUT_REPLAY_TREE = "pfc_response_followups/swr_without_replay"
-"""The extended-event-set bundles (``run_pfc_analysis_bandit.py --event-set
-with_swr_without_replay``), relative to the processed-data root."""
-
-STOP_CONTEXT_RESULTS = "pfc_response_followups/stop_context/results.csv"
-"""The stop-level context fits (``scripts/pfc/run_pfc_stop_context.py fit``)."""
-
-MARKED_FAMILY_SUMMARY = (
-    "pfc_response_followups/marked_family_well_unknown/summary.parquet"
-)
-"""The marked-family summary (``scripts/pfc/summarize_pfc_marked_family.py``)
-of the follow-up models fit with the per-stop baseline prior and the
-``well_unknown`` baseline column (bundle contract 3)."""
 
 
 @dataclass(frozen=True)
@@ -52,13 +41,13 @@ def default_inputs() -> MpfcInputs:
     data = processed_data_dir()
     return MpfcInputs(
         bundle_dir=data,
-        pfc_cohort=data / "pfc_cohort_mPFC.json",
+        pfc_cohort=data / pfc_cohort_name("mPFC"),
         event_table=table_path("event_table", replay_content_dir()),
         stop_table=table_path("stop_table", replay_content_dir()),
-        timing_calibration=data / TIMING_CALIBRATION,
-        swr_without_replay_dir=data / SWR_WITHOUT_REPLAY_TREE,
-        marked_family_summary=data / MARKED_FAMILY_SUMMARY,
-        stop_context_results=data / STOP_CONTEXT_RESULTS,
+        timing_calibration=data / PFC_TIMING_CALIBRATION,
+        swr_without_replay_dir=data / PFC_SWR_WITHOUT_REPLAY_DIR,
+        marked_family_summary=data / PFC_MARKED_FAMILY_DIR / PFC_MARKED_FAMILY_SUMMARY,
+        stop_context_results=data / PFC_STOP_CONTEXT_DIR / PFC_STOP_CONTEXT_RESULTS,
     )
 
 

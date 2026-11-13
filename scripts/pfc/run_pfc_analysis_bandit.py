@@ -129,7 +129,11 @@ from continuum_swr_replay.parameters import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     SAMPLING_FREQUENCY,
 )
-from continuum_swr_replay.paths import processed_data_dir, table_path  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    pfc_cohort_name,
+    processed_data_dir,
+    table_path,
+)
 from continuum_swr_replay.runs.batch import (  # noqa: E402
     raise_open_file_limit,
     release_nwb_files,
@@ -1261,7 +1265,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.max_sessions is not None:
         epoch_info = epoch_info.iloc[: args.max_sessions]
     write_cohort_record(
-        args.output_dir / f"pfc_cohort_{args.brain_area}.json",
+        args.output_dir / pfc_cohort_name(args.brain_area),
         n_analysed=len(analysed),
         pfc_cohort=pfc_cohort,
         ran=epoch_info,

@@ -97,7 +97,7 @@ from continuum_swr_replay.analysis.shared_statistics import (
     session_mean_curve,
 )
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename, session_name
-from continuum_swr_replay.paths import processed_data_dir
+from continuum_swr_replay.paths import PFC_MARKED_FAMILY_SUMMARY, processed_data_dir
 
 BUNDLE_SUBDIR = "pfc_marked_model_family"
 CLASS_LABEL = {
@@ -564,7 +564,7 @@ def main() -> None:
             )
         )
         args.out.write_text(report)
-    summary_path = args.summary_parquet or args.bundle_dir / "summary.parquet"
+    summary_path = args.summary_parquet or args.bundle_dir / PFC_MARKED_FAMILY_SUMMARY
     summary_table(fractions, peaks, bands, tiers, correlations).to_parquet(
         summary_path, index=False
     )

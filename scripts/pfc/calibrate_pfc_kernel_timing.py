@@ -78,7 +78,7 @@ from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 
 def parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
-    from continuum_swr_replay.paths import processed_data_dir
+    from continuum_swr_replay.paths import PFC_TIMING_CALIBRATION, processed_data_dir
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -101,9 +101,7 @@ def parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     args = parser.parse_args(argv)
     if args.output is None:
-        args.output = (
-            processed_data_dir() / "pfc_response_followups" / "timing_calibration.json"
-        )
+        args.output = processed_data_dir() / PFC_TIMING_CALIBRATION
     return args
 
 

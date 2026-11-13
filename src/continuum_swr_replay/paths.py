@@ -181,6 +181,34 @@ CROSS_HISTORY_RIDGE_CV_DIR = "cross_history_ridge_cv"
 """The cross-history ridge cross-validation, under ``model_dir("per_bin_rate")``
 (``scripts/behavior/rate/fit_cross_history_ridge_cv.py``)."""
 
+# The mpfc summary's inputs beside the unit bundles, under the processed-data
+# root: each is written by its script and read by the mpfc summary.
+PFC_TIMING_CALIBRATION = "pfc_response_followups/timing_calibration.json"
+"""The timing calibration (``scripts/pfc/calibrate_pfc_kernel_timing.py``)."""
+PFC_SWR_WITHOUT_REPLAY_DIR = "pfc_response_followups/swr_without_replay"
+"""The extended-event-set bundles (``scripts/pfc/run_pfc_analysis_bandit.py
+--event-set with_swr_without_replay --output-dir`` this folder)."""
+PFC_STOP_CONTEXT_DIR = "pfc_response_followups/stop_context"
+"""The stop-level context fits (``scripts/pfc/run_pfc_stop_context.py fit``)."""
+PFC_STOP_CONTEXT_RESULTS = "results.csv"
+"""The stop-context fits' table, in their folder."""
+PFC_MARKED_FAMILY_DIR = "pfc_response_followups/marked_family_well_unknown"
+"""The follow-up marked models fit with the per-stop baseline prior and the
+``well_unknown`` baseline column (bundle contract 3;
+``scripts/pfc/run_pfc_marked_model_family.py --output-dir`` this folder)."""
+PFC_MARKED_FAMILY_SUMMARY = "summary.parquet"
+"""The marked-family summary (``scripts/pfc/summarize_pfc_marked_family.py``),
+in its bundle folder."""
+
+
+def pfc_cohort_name(brain_area: str) -> str:
+    """The PFC cohort record's file name, beside the bundles of ``brain_area``.
+
+    ``scripts/pfc/run_pfc_analysis_bandit.py`` writes it; the mpfc summary and
+    ``scripts/pfc/run_pfc_stop_context.py`` read it.
+    """
+    return f"pfc_cohort_{brain_area}.json"
+
 
 _LEGACY_ROOTS: dict[str, Callable[[], Path]] = {
     "REPLAY_CONTENT_DIR": replay_content_dir,
