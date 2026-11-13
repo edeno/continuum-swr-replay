@@ -11,7 +11,9 @@ same rules:
   (:func:`marks_sha256`);
 - a memoryless run's per-epoch files (:func:`memoryless_output_paths`);
 - a decode's marks with its encoding model (:func:`decode_marks`), as the Carey
-  and event-feature runners and the inventory examples read them.
+  and event-feature runners and the inventory examples read them;
+- the LFP samples inside an epoch's position span and the head speed at them
+  (:func:`position_span_samples`), as the SWR and Carey runners cut them.
 
 It imports foundation modules and the memoryless likelihood's reader of a
 saved encoding model, so a runner reads these without importing another
@@ -51,6 +53,7 @@ __all__ = [
     "marks_cache_path",
     "marks_sha256",
     "memoryless_output_paths",
+    "position_span_samples",
 ]
 
 MARKS_RULE = (
@@ -61,6 +64,44 @@ MARKS_RULE = (
 
 MARKS_RULE_TAG = "loader"
 """:data:`MARKS_RULE`'s name in a marks cache file; another rule needs another tag."""
+
+
+def position_span_samples(
+    time: NDArray[np.float64], position_info: pd.DataFrame
+) -> tuple[tuple[float, float], slice, NDArray[np.float64]]:
+    """The samples of an ascending LFP clock inside the epoch's position span,
+    and the head speed at them.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_samples,)
+        The LFP's timestamps in seconds, ascending.
+    position_info : pandas.DataFrame
+        Indexed by position time in seconds (ascending), with ``head_speed``
+        (cm/s).
+
+    Returns
+    -------
+    span_s : (float, float)
+        The first and last position times.
+    samples : slice
+        The samples of ``time`` with ``span_s[0] <= time <= span_s[1]``: one
+        slice, since ``time`` ascends, so arrays cut by it stay views.
+    speed : ndarray, shape (n_kept,)
+        ``head_speed`` linearly interpolated to ``time[samples]``; NaN outside
+        the position's samples.
+    """
+    position_time = position_info.index.to_numpy(dtype=np.float64)
+    head_speed = position_info["head_speed"].to_numpy(dtype=np.float64)
+    span_s = (float(position_time[0]), float(position_time[-1]))
+    samples = slice(
+        int(np.searchsorted(time, span_s[0], side="left")),
+        int(np.searchsorted(time, span_s[1], side="right")),
+    )
+    speed = np.interp(
+        time[samples], position_time, head_speed, left=np.nan, right=np.nan
+    )
+    return span_s, samples, speed
 
 
 def marks_cache_dir() -> Path:

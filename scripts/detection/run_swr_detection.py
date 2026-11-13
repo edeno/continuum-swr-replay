@@ -158,6 +158,9 @@ from continuum_swr_replay.analysis.events.artifact_intervals import (
 from continuum_swr_replay.analysis.events.artifact_masks import (
     PADDING_S,
 )
+from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
+    position_span_samples,
+)
 from continuum_swr_replay.analysis.hippocampus.ripple_tetrodes import (
     COUPLING_CUT,
     LOO_SMOOTHING_SIGMA_S,
@@ -593,18 +596,15 @@ def _detect(
     position_info = fetch_position(nwb_file_name, epoch_name)["position_info"]
     position_time = position_info.index.to_numpy(dtype=np.float64)
     head_speed = position_info["head_speed"].to_numpy(dtype=np.float64)
-    span_s = (float(position_time[0]), float(position_time[-1]))
     # The band's timestamps ascend (get_ripple_band_inputs checks them against
     # the raw ones), so the span is one slice, and the arrays stay views.
-    first = int(np.searchsorted(inputs["time"], span_s[0], side="left"))
-    stop = int(np.searchsorted(inputs["time"], span_s[1], side="right"))
-    time = inputs["time"][first:stop]
-    ripple_band = inputs["ripple_band"][first:stop]
-    raw_referenced = inputs["raw_referenced"][first:stop]
+    span_s, samples, speed = position_span_samples(inputs["time"], position_info)
+    time = inputs["time"][samples]
+    ripple_band = inputs["ripple_band"][samples]
+    raw_referenced = inputs["raw_referenced"][samples]
     electrode_ids = inputs["electrode_ids"]
     reference_ids = inputs["reference_ids"]
     electrode_group_names = inputs["electrode_group_names"]
-    speed = np.interp(time, position_time, head_speed, left=np.nan, right=np.nan)
     sampling_frequency = inputs["sampling_frequency"]
     unobserved = interval_mask(time, artifact_mask)
 

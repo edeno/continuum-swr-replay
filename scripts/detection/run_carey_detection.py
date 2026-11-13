@@ -87,6 +87,7 @@ from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
     carey_output_paths,
     decode_marks,
     marks_sha256,
+    position_span_samples,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     check_marks_match_encoding,
@@ -207,15 +208,11 @@ def _detect(
     identifier = swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     inputs = fetch_inputs(nwb_file_name, epoch_name)
     position_info = fetch_position(nwb_file_name, epoch_name)["position_info"]
-    position_time = position_info.index.to_numpy(dtype=np.float64)
-    head_speed = position_info["head_speed"].to_numpy(dtype=np.float64)
-    span_s = (float(position_time[0]), float(position_time[-1]))
     # the band's timestamps ascend, so the span is one slice, as the SWR
     # runner cuts it
-    first = int(np.searchsorted(inputs["time"], span_s[0], side="left"))
-    stop = int(np.searchsorted(inputs["time"], span_s[1], side="right"))
-    time = inputs["time"][first:stop]
-    ripple_band = inputs["ripple_band"][first:stop]
+    span_s, samples, speed = position_span_samples(inputs["time"], position_info)
+    time = inputs["time"][samples]
+    ripple_band = inputs["ripple_band"][samples]
 
     swr_run = fetch_swr_inputs(identifier)
     swr_run_id = swr_source.SWR_INVENTORY_RUN_ID
@@ -252,7 +249,6 @@ def _detect(
                 "swr_input_sha256": dict(swr_run["input_sha256"]),
             }, {}
 
-    speed = np.interp(time, position_time, head_speed, left=np.nan, right=np.nan)
     artifact_mask = epoch_artifact_intervals(artifact_dir, identifier)
     unobserved = interval_mask(time, artifact_mask)
 
