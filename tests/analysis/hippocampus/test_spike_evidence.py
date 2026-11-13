@@ -132,18 +132,16 @@ def _session_frame() -> pd.DataFrame:
             "Non-Local_Fragmented_prob": probability / 2,
             "head_speed": speed,
             "ahead_behind_distance": ab,
+            "in_excluded_time": np.zeros(n, dtype=bool),
         },
         index=pd.Index(0.002 * np.arange(n), name="time"),
     )
 
 
-def test_the_events_are_grouped_by_swr_overlap_and_distance_and_the_quiet_windows_are_analysed_time(
-    monkeypatch,
-):
+def test_the_events_are_grouped_by_swr_overlap_and_distance_and_the_quiet_windows_are_analysed_time():
     frame = _session_frame()
     # bins 30 and 31 are excluded time
-    excluded = pd.DataFrame({"start_time": [0.0595], "end_time": [0.0625]})
-    monkeypatch.setattr(spike_evidence, "excluded_intervals_of", lambda _f: excluded)
+    frame.iloc[30:32, frame.columns.get_loc("in_excluded_time")] = True
 
     windows = spike_evidence.build_session_events(frame)
 
@@ -176,11 +174,6 @@ def test_an_event_that_is_not_one_run_refuses(monkeypatch):
         spike_evidence,
         "validate_dot_event_contract",
         lambda _dot: None,  # the contract check would refuse it first
-    )
-    monkeypatch.setattr(
-        spike_evidence,
-        "excluded_intervals_of",
-        lambda _f: pd.DataFrame({"start_time": [], "end_time": []}),
     )
     with pytest.raises(ValueError, match="not one contiguous run"):
         spike_evidence.build_session_events(frame)

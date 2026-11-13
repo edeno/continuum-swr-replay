@@ -21,10 +21,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
-from continuum_swr_replay.analysis.events.analysed_time import analysed_bins
+from continuum_swr_replay.analysis.events.analysed_time import immobile_analysed_bins
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
     event_strict_overlap_mask,
 )
@@ -55,10 +52,7 @@ def well_positions(dot: pd.DataFrame) -> list[float]:
     list of float
         One linear position (cm) per leaf arm that places a well, in arm order.
     """
-    analysed = analysed_bins(dot)
-    immobile = (
-        dot["head_speed"].to_numpy() < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ) & analysed
+    immobile = immobile_analysed_bins(dot)
     segment = dot["track_segment_id"].to_numpy()
     linear = dot["linear_position"].to_numpy()
     wells = []

@@ -24,11 +24,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    REMOTE_CM,
-)
-from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
+from continuum_swr_replay.analysis.constants import REMOTE_CM
+from continuum_swr_replay.analysis.events.analysed_time import immobile_analysed_bins
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
     event_strict_overlap_mask,
 )
@@ -38,7 +35,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     nearest_interior_bins,
 )
-from continuum_swr_replay.intervals import contiguous_true_runs, interval_mask
+from continuum_swr_replay.intervals import contiguous_true_runs
 
 NON_EVENT_THRESHOLD = 0.2
 """Non-local probability below this marks a bin clearly local (a quiet window)."""
@@ -63,16 +60,17 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
     ``SWR-remote`` and ``nonSWR-remote`` above ``REMOTE_CM``, ``nonSWR-close``
     below :data:`CLOSE_CM`; the 40-100 cm band and SWR-close events are left
     out. The ``baseline`` windows are the runs of bins with non-local
-    probability below :data:`NON_EVENT_THRESHOLD`, head speed below 4 cm/s and
-    outside excluded time, of :data:`MIN_EVENT_BINS` to
-    :data:`MAX_BASELINE_BINS` bins.
+    probability below :data:`NON_EVENT_THRESHOLD`, immobile and outside
+    excluded time
+    (:func:`~continuum_swr_replay.analysis.events.analysed_time.immobile_analysed_bins`),
+    of :data:`MIN_EVENT_BINS` to :data:`MAX_BASELINE_BINS` bins.
 
     Parameters
     ----------
     dot : pd.DataFrame
         Per-timebin ``data_over_time`` (decode time axis), read through the SWR
-        source, with the state-prob, ``SWR_event``, ``head_speed`` and
-        ``ahead_behind_distance`` columns.
+        source, with the state-prob, ``SWR_event``, ``head_speed``,
+        ``in_excluded_time`` and ``ahead_behind_distance`` columns.
 
     Returns
     -------
@@ -91,7 +89,6 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
     nlp = (
         dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
     ).to_numpy()
-    immobile = dot["head_speed"].to_numpy() < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
     ab = dot["ahead_behind_distance"].to_numpy()
     # The read holds the labels to the speed rule and the probability contract.
     nonlocal_labels = dot["non_local_event"].to_numpy()
@@ -131,9 +128,7 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
 
     # the null is analysed time too: no baseline window touches excluded time
     # (the artifact mask widened by 0.3 s; the low-non-local label is decoded)
-    time = dot.index.to_numpy()
-    observed = ~interval_mask(time, excluded_intervals_of(dot))
-    quiet = (nlp < NON_EVENT_THRESHOLD) & immobile & observed
+    quiet = (nlp < NON_EVENT_THRESHOLD) & immobile_analysed_bins(dot)
     for s, stop in contiguous_true_runs(quiet):
         e = stop - 1
         n_bins = e - s + 1
