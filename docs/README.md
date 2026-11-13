@@ -95,7 +95,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 `src/continuum_swr_replay/` is layered. Code may import from its own layer and the
 layers below it, never from a layer above:
 
-1. **Foundation**: `data_loaders/`, `data_types.py`, `decoding/`, `intervals.py`,
+1. **Foundation**: `columns.py`, `data_loaders/`, `data_types.py`, `decoding/`, `intervals.py`,
    `parameters.py`, `paths.py`, `runs/`, `tables/`. A foundation module imports only
    other foundation modules.
 2. **`analysis/events/`**, the analysed-time rule and the event substrate. It imports

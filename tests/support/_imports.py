@@ -21,6 +21,7 @@ assert SRC.is_dir(), f"package root not found at {SRC}; the scan would be vacuou
 #: ``scripts`` (``test_import_layering``).
 FOUNDATION = frozenset(
     {
+        "columns",
         "data_loaders",
         "decoding",
         "intervals",

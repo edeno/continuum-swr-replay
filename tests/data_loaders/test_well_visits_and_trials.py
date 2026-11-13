@@ -747,3 +747,25 @@ def test_task_record_alignment_rejects_an_internal_behavior_mismatch():
 
     with pytest.raises(ValueError, match="contiguous port/reward sequence"):
         align_port_experiences_to_task_records(experiences, comrie)
+
+
+def test_a_loader_input_without_a_required_column_is_refused_by_name():
+    """The loaders use the package's one required-column check."""
+    with pytest.raises(
+        ValueError, match=r"^well_visits lacks required column\(s\) \['end_time'"
+    ):
+        make_trials_df_from_well_visits(pd.DataFrame(columns=["start_time"]))
+    with pytest.raises(
+        ValueError,
+        match=r"^the physical poke intervals lacks required column\(s\) \['end_time'\]$",
+    ):
+        photogate_engagement_at_times(
+            np.array([1.0]), pd.DataFrame({"start_time": [0.0], "port": [0]})
+        )
+    experiences = pd.DataFrame(
+        {"port": [0], "is_reward": [1], "arrival_time": [0.0], "departure_time": [1.0]}
+    )
+    with pytest.raises(
+        ValueError, match=r"^task_records lacks required column\(s\) \['reward'\]$"
+    ):
+        align_port_experiences_to_task_records(experiences, pd.DataFrame({"port": [0]}))

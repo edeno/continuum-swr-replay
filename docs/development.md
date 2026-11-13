@@ -86,6 +86,7 @@ src/continuum_swr_replay/
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, atomic writes, parity
 ├── visualization/         # Plotting utilities; palettes.py holds COLORS, figure_utilities.py the publication-figure helpers
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
+├── columns.py             # require_columns, the one check that a table carries the columns a step reads
 ├── reported/              # reported numbers: the summary builders (survey, detection, events, and behavior/ and mpfc/, packages with one module per subject), the question list, values, the code record, rounding, the macro emitter, Table S1
 ├── parameters.py          # global parameters
 ├── paths.py               # data roots, read at call time from $CSR_PROCESSED_DATA_DIR (processed_data_dir(), ...), canonical table names, table_path()

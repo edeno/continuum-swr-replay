@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.tables.columns import require_columns
+from continuum_swr_replay.columns import require_columns
 
 
 def test_a_table_with_every_column_passes():

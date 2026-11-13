@@ -13,5 +13,6 @@ a table read loads none of the analysis code.
 - ``event_ids``: the content-hashed event and stop ids.
 - ``standardization``: the z-scoring reference of the standardized columns.
 - ``parity``: keyed table-to-table parity checks.
-- ``columns``: the check that a table carries the columns a step reads.
+- ``columns``: re-exports the check that a table carries the columns a step
+  reads (:mod:`continuum_swr_replay.columns`).
 """

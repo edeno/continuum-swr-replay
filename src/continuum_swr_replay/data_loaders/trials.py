@@ -111,6 +111,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+from ..columns import require_columns
 from ..data_types import WellNodeData
 from .constants import POKE_EVENT_TO_WELL, PUMP_EVENT_TO_WELL, WELL_PATCH_MAPPING
 from .trial_clocks import outcome_known_time_from_task_visit
@@ -366,7 +367,7 @@ def make_physical_poke_intervals(
     pump_names = _event_names(pump_events, kind="pump")
     if "start_time" not in pump_events.columns:
         if not pump_events.empty:
-            raise KeyError("pump events require start_time")
+            require_columns(pump_events, ["start_time"], "pump events")
         pump_times = np.empty(0, dtype=float)
     else:
         pump_times = pd.to_numeric(pump_events["start_time"], errors="coerce").to_numpy(
@@ -468,9 +469,7 @@ def _collapse_physical_pokes_to_port_experiences(
         "is_reward",
         "reward_on_time",
     }
-    missing = sorted(required - set(physical_pokes.columns))
-    if missing:
-        raise KeyError(f"physical poke table is missing columns: {missing}")
+    require_columns(physical_pokes, required, "the physical poke table")
     pokes = physical_pokes.sort_values("start_time", kind="stable").reset_index(
         drop=True
     )
@@ -848,9 +847,7 @@ def make_trials_df_from_well_visits(well_visits: pd.DataFrame) -> pd.DataFrame:
         "is_reward",
         "reward_on_time",
     }
-    missing = sorted(required - set(well_visits.columns))
-    if missing:
-        raise KeyError(f"well_visits is missing physical-poke columns: {missing}")
+    require_columns(well_visits, required, "well_visits")
     physical = well_visits.loc[well_visits["is_observed_poke"].astype(bool)].copy()
     physical = physical.sort_values("start_time", kind="stable").reset_index(drop=True)
     if "physical_poke_id" not in physical:
@@ -962,11 +959,7 @@ def make_port_experiences_df(
         "is_reward",
         "reward_on_time",
     }
-    missing_visits = sorted(required_visits - set(well_visits.columns))
-    if missing_visits:
-        raise KeyError(
-            f"port experiences require physical-poke columns; missing={missing_visits}"
-        )
+    require_columns(well_visits, required_visits, "well_visits")
     physical = well_visits.loc[well_visits["is_observed_poke"].astype(bool)].copy()
     physical = physical.sort_values("start_time", kind="stable").reset_index(drop=True)
     if "physical_poke_id" not in physical:
@@ -1001,12 +994,7 @@ def make_port_experiences_df(
         "outcome_known_time",
         "is_reward",
     }
-    missing_trials = sorted(required_trials - set(trials.columns))
-    if missing_trials:
-        raise KeyError(
-            "port experiences require canonical movement-trial columns; "
-            f"missing={missing_trials}"
-        )
+    require_columns(trials, required_trials, "the movement trials")
     ordered_trials = trials.sort_values("destination_first_poke_in_time", kind="stable")
     if len(experiences) != len(ordered_trials) + 1:
         raise ValueError(
@@ -1117,9 +1105,7 @@ def photogate_engagement_at_times(
         frame = frame.loc[frame["is_observed_poke"].astype(bool)]
     port_column = "port" if "port" in frame else "from_well"
     required = {"start_time", "end_time", port_column}
-    missing = sorted(required - set(frame.columns))
-    if missing:
-        raise KeyError(f"physical poke intervals are missing columns: {missing}")
+    require_columns(frame, required, "the physical poke intervals")
     pokes = frame.sort_values("start_time", kind="stable")
     starts = pd.to_numeric(pokes["start_time"], errors="coerce").to_numpy(dtype=float)
     ends = pd.to_numeric(pokes["end_time"], errors="coerce").to_numpy(dtype=float)
@@ -1167,11 +1153,7 @@ def align_port_experiences_to_task_records(
     gate while retaining exact differences in the returned audit metadata.
     """
     required_experience = {"port", "is_reward", "arrival_time", "departure_time"}
-    missing_experience = sorted(required_experience - set(port_experiences.columns))
-    if missing_experience:
-        raise KeyError(
-            f"port experiences are missing alignment columns: {missing_experience}"
-        )
+    require_columns(port_experiences, required_experience, "port_experiences")
     if "leaf" in task_records:
         task_ports = (
             pd.to_numeric(task_records["leaf"], errors="coerce").to_numpy(dtype=float)
@@ -1183,8 +1165,7 @@ def align_port_experiences_to_task_records(
         )
     else:
         raise KeyError("task records require leaf (1-6) or port (0-5)")
-    if "reward" not in task_records:
-        raise KeyError("task records require reward")
+    require_columns(task_records, ["reward"], "task_records")
     task_reward_raw = pd.to_numeric(task_records["reward"], errors="coerce").to_numpy(
         dtype=float
     )
