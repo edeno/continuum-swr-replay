@@ -8,7 +8,7 @@ reads, and each session was only recorded with status ``missing_columns``.
 These tests pin the builder half of the fix. The ContFrag stop table carries
 the ladder's predictors, computed by the same helper as the NonLocal stop
 table, also when the session has no immobility bout. The comparison's hard
-error for a missing column is tested in ``test_compare_event_source_models.py``.
+error for a missing column is tested in ``test_per_stop_rate_model.py``.
 
 The session reuses the dot frame and graph of ``test_artifact_exposure.py``,
 which builds both stop tables from one input. Four trips with mixed outcomes
@@ -30,6 +30,9 @@ from continuum_swr_replay.analysis.behavior.design_constants import (
     REWARD_HISTORY_INCOMPLETE,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import MODEL_PER_STOP_RATE
+from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
+    fit_event_source_rate_hierarchy,
+)
 from continuum_swr_replay.analysis.behavior.tables.tables_stop import build_stop_table
 from continuum_swr_replay.analysis.contfrag.tables import (
     _CONTFRAG_STOP_TABLE_COLUMNS,
@@ -37,9 +40,6 @@ from continuum_swr_replay.analysis.contfrag.tables import (
 )
 from tests.analysis.events.test_artifact_exposure import TIME, _graph
 from tests.analysis.events.test_artifact_exposure import _dot as _exposure_dot
-from tests.scripts.behavior.content.test_compare_event_source_models import (
-    _load_compare_script,
-)
 from tests.support._port_experience_fixtures import port_experiences_from_trials
 
 REWARD_HISTORY = [*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE]
@@ -104,12 +104,11 @@ def test_the_contfrag_stop_table_carries_every_per_stop_rate_predictor():
 
 def test_the_comparison_rate_block_accepts_the_contfrag_stop_table():
     """The block's own required columns, not a copy of them, are checked."""
-    compare = _load_compare_script()
     contfrag, _, _ = _stop_tables()
 
     # The check is that this call does not raise. The fixture's one session has
     # fewer stops than the block's minimum, so it is not fit.
-    _, provenance = compare.fit_per_stop_rate_hierarchy(contfrag, "SWR")
+    _, provenance = fit_event_source_rate_hierarchy(contfrag, "SWR")
 
     assert len(provenance) == 1
     assert set(provenance["status"]) == {"too_few_units"}

@@ -555,3 +555,52 @@ def test_a_fit_counts_as_separated_only_when_its_flag_is_true(
         mod.PER_STOP_RATE_OUTCOMES
     )
     assert {r["n_sessions_flagged_separated"] for r in records} == {n_flagged}
+
+
+def _rate_stop_table(n_stops: int = 40, seed: int = 0) -> pd.DataFrame:
+    """One session's complete per-stop table for the rate block.
+
+    The first three stops carry an incomplete history (zero-filled features,
+    flag 1), like the epoch prefix of the real tables.
+    """
+    rng = np.random.default_rng(seed)
+    history = rng.uniform(0.0, 1.0, size=(n_stops, len(REWARD_HISTORY_COLUMNS)))
+    history[:3] = 0.0
+    incomplete = np.zeros(n_stops)
+    incomplete[:3] = 1.0
+    duration = rng.uniform(1.0, 10.0, size=n_stops)
+    table = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": 1,
+            "epoch": "02_r1",
+            "stop_id": np.arange(n_stops),
+            "n_selected_events": rng.poisson(0.3 * duration),
+            "immobility_duration_s": duration,
+        }
+    )
+    for j, column in enumerate(REWARD_HISTORY_COLUMNS):
+        table[column] = history[:, j]
+    table[REWARD_HISTORY_INCOMPLETE] = incomplete
+    return table
+
+
+def test_rate_block_fits_a_complete_stop_table():
+    fits, provenance = mod.fit_event_source_rate_hierarchy(_rate_stop_table(), "SWR")
+
+    assert provenance["status"].tolist() == ["fit"]
+    assert tuple(fits) == ("R0", "R1")
+    for fit in fits.values():
+        assert len(fit) == 1
+        assert fit.loc[0, "cohort_n_units"] == 40
+
+
+def test_rate_block_refuses_a_stop_table_without_a_ladder_column():
+    """R6 fit 0 of 242 sessions this way and still exited 0."""
+    stops = _rate_stop_table().drop(columns="reward_history_rcos_0")
+
+    with pytest.raises(ValueError, match="rate_hierarchy") as raised:
+        mod.fit_event_source_rate_hierarchy(stops, "SWR")
+
+    assert "reward_history_rcos_0" in str(raised.value)
+    assert "'SWR'" in str(raised.value)

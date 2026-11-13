@@ -39,7 +39,6 @@ from continuum_swr_replay.analysis.behavior import (
     MODEL_PER_STOP_RATE,
     build_event_patch_table,
     build_switch_aligned_table,
-    fit_per_stop_rate_model,
 )
 from continuum_swr_replay.analysis.behavior.choice.choice_prediction import (
     CHOICE_MODELS,
@@ -50,9 +49,6 @@ from continuum_swr_replay.analysis.behavior.cohort_audit import (
     records_from_common_cohort_provenance,
     write_cohort_audit,
 )
-from continuum_swr_replay.analysis.behavior.common_cohort import (
-    fit_per_session_common_cohort,
-)
 from continuum_swr_replay.analysis.behavior.content.session_fits import (
     fit_patch_hierarchy,
     fit_patch_switch,
@@ -62,6 +58,9 @@ from continuum_swr_replay.analysis.behavior.content.session_fits import (
 from continuum_swr_replay.analysis.behavior.fit_provenance import (
     record_inputs,
     write_fit_provenance,
+)
+from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
+    fit_event_source_rate_hierarchy,
 )
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
@@ -178,24 +177,6 @@ def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
     return tables
 
 
-def fit_per_stop_rate_hierarchy(
-    stop_table: pd.DataFrame, event_source: str
-) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
-    """Fit the source-appropriate Poisson rate hierarchy per session."""
-    return fit_per_session_common_cohort(
-        stop_table,
-        _RATE_MODELS,
-        lambda g, spec: fit_per_stop_rate_model(g, list(spec.predictors), min_stops=20),
-        analysis="rate_hierarchy",
-        unit_col="stop_id",
-        required_base=["n_selected_events", "immobility_duration_s"],
-        response_col="n_selected_events",
-        offset_col="immobility_duration_s",
-        min_units=20,
-        event_source=event_source,
-    )
-
-
 def run_switch_aligned(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Switch-aligned replay content by lag."""
     return build_switch_aligned_table(
@@ -251,7 +232,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     patch_switch, patch_switch_prov = fit_patch_switch(
         patch_table, tables["event_arm_table"], src
     )
-    rate_hierarchy, rate_hierarchy_prov = fit_per_stop_rate_hierarchy(
+    rate_hierarchy, rate_hierarchy_prov = fit_event_source_rate_hierarchy(
         tables["stop_table"], src
     )
     choice_blocks, choice_provenance = fit_choice_blocks(

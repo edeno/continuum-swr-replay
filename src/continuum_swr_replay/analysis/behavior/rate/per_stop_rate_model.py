@@ -35,6 +35,8 @@ the predictor is active.
 
 :func:`fit_per_stop_rate_hierarchy` fits the ladder over sessions, each on one
 cohort frozen over every rung's predictors, and returns its cohort audit.
+:func:`fit_event_source_rate_hierarchy` is the event-source comparison's
+rate block: the ladder of ``n_selected_events`` on the common-cohort freeze.
 """
 
 from __future__ import annotations
@@ -60,6 +62,7 @@ from .._fit_diagnostics import (
     fold_flag_counts,
 )
 from ..cohort_audit import cohort_record
+from ..common_cohort import fit_per_session_common_cohort
 from ..model_specs import MODEL_PER_STOP_RATE
 
 logger = logging.getLogger(__name__)
@@ -464,3 +467,42 @@ def fit_per_stop_rate_hierarchy(
         for (name, outcome), a in acc.items()
     ]
     return pd.DataFrame(rows), records
+
+
+def fit_event_source_rate_hierarchy(
+    stop_table: pd.DataFrame, event_source: str
+) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
+    """The event-source comparison's rate block: ``MODEL_PER_STOP_RATE`` of each
+    session's ``n_selected_events``, every rung on one cohort per session.
+
+    The cohort is the common-cohort freeze over the ladder's predictors, the
+    count and a positive ``immobility_duration_s``
+    (:func:`~continuum_swr_replay.analysis.behavior.common_cohort.fit_per_session_common_cohort`);
+    a session with fewer than 20 stops in it is not fit.
+
+    Parameters
+    ----------
+    stop_table : pd.DataFrame
+        The event source's stop table, one row per stop.
+    event_source : str
+        ``non_local``, ``SWR`` or ``MUA``, recorded in the provenance and named
+        in a refusal.
+
+    Returns
+    -------
+    (fits, provenance)
+        One frame per rung, one row per fitted session; one provenance row per
+        session.
+    """
+    return fit_per_session_common_cohort(
+        stop_table,
+        MODEL_PER_STOP_RATE,
+        lambda g, spec: fit_per_stop_rate_model(g, list(spec.predictors), min_stops=20),
+        analysis="rate_hierarchy",
+        unit_col="stop_id",
+        required_base=["n_selected_events", "immobility_duration_s"],
+        response_col="n_selected_events",
+        offset_col="immobility_duration_s",
+        min_units=20,
+        event_source=event_source,
+    )
