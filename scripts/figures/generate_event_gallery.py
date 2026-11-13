@@ -82,9 +82,6 @@ from continuum_swr_replay.analysis.behavior.covariates import (
     trial_arrival_times,
     trial_outcome_times,
 )
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     load_conditional_posterior,
 )
@@ -124,6 +121,7 @@ from continuum_swr_replay.decoding.identifiers import (
     session_name,
 )
 from continuum_swr_replay.decoding.results import load_results
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import (

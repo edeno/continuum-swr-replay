@@ -32,9 +32,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.event_definition.immobility import (
     intervals_from_labels,
 )
@@ -42,6 +39,7 @@ from continuum_swr_replay.intervals import (
     overlaps_intervals,
     pad_intervals,
 )
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
 __all__ = [
     "ARTIFACT_REACH_S",

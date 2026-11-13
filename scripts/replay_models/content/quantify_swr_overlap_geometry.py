@@ -27,10 +27,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
 from continuum_swr_replay.analysis.detection.nonlocal_events import (
     validate_results_position_time_alignment,
 )
@@ -58,6 +54,10 @@ from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import nwb_stem
 from continuum_swr_replay.decoding.results import load_results
+from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+)
 from continuum_swr_replay.paths import processed_data_dir
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

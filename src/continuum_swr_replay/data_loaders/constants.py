@@ -1,7 +1,9 @@
-"""Constants for the bandit task data loading.
+"""The task and recording facts the loaders need: NWB files, wells, patches, track.
 
-This module contains all constant values used across the data loading pipeline,
-including NWB file lists, spatial mappings, and task structure definitions.
+What belongs here is a fact of the experiment (the NWB file list, the track
+graph's wells, patches and segments, task timing). The decode's settings and
+the event thresholds are in ``parameters.py``; analysis-only settings are in
+``analysis/constants.py``.
 
 Attributes
 ----------

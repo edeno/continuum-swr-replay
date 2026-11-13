@@ -27,10 +27,7 @@ import seaborn as sns
 from scipy.stats import mannwhitneyu, wilcoxon
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.constants import (
     NWB_FILES,

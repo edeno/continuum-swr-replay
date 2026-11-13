@@ -1,39 +1,16 @@
-"""Analysis constants and default parameters.
+"""Constants the analyses share: windows, bin sizes, cohort and labelling settings.
 
-This module defines constants used across analysis and figure generation scripts.
-Follows the pattern established in continuum_swr_replay.parameters.
-
-Usage
------
-Import constants as needed::
-
-    from continuum_swr_replay.analysis.constants import (
-        DEFAULT_NON_LOCAL_THRESHOLD,
-        BINS_DURATION_MS,
-    )
-
-Notes
------
-- Color definitions are in continuum_swr_replay.visualization.palettes.COLORS
-- NWB file lists and other data parameters are in continuum_swr_replay.parameters
-- This module focuses on analysis-specific constants shared across figure scripts
-
+What belongs here is a setting of an analysis, read by more than one analysis
+package or figure. The decode's settings and the event thresholds
+(``DEFAULT_NON_LOCAL_THRESHOLD``, ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``) are
+in ``continuum_swr_replay.parameters``; the task and recording facts (NWB file
+lists, wells, patches, track segments) are in ``data_loaders/constants.py``.
+Colors are in ``visualization.palettes.COLORS``.
 """
 
 import numpy as np
 
 from continuum_swr_replay.data_loaders.constants import OMISSION_KNOWN_LATENCY_SEC
-from continuum_swr_replay.parameters import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC as DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
-from continuum_swr_replay.parameters import (
-    DEFAULT_NON_LOCAL_THRESHOLD as DEFAULT_NON_LOCAL_THRESHOLD,
-)
-
-# Event detection thresholds: DEFAULT_NON_LOCAL_THRESHOLD and
-# DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC (the whole-event immobility speed
-# threshold, cm/s) are the :mod:`continuum_swr_replay.parameters` values,
-# re-exported here for the analysis code that reads them from this module.
 
 # The omission latency itself is a loading-side task constant (see
 # ``data_loaders.constants``); the semantics string that reports it is an

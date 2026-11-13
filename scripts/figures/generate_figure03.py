@@ -52,10 +52,6 @@ import pandas as pd
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
 from continuum_swr_replay.analysis.detection.nonlocal_events import (
     load_data_over_time,
     validate_results_position_time_alignment,
@@ -92,6 +88,10 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.results import load_results
+from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+)
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.reported.events import EventsInputs, default_inputs
 from continuum_swr_replay.visualization.figure_panels import (

@@ -538,7 +538,6 @@ def prepare_session_stop_context(
         If the bundle's units do not match the counted units.
     """
     # Deferred: these open Spyglass / DataJoint resources at import time.
-    from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
     from continuum_swr_replay.analysis.pfc.canonical_events import (
         load_session_canonical_events,
         load_session_swr_intervals,
@@ -557,6 +556,7 @@ def prepare_session_stop_context(
         format_epoch_identifier,
         parse_nwb_filename,
     )
+    from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
     from continuum_swr_replay.runs.io import sha256_file
 
     stop_cohort = "at_well"

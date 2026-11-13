@@ -17,9 +17,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
     excluded_intervals_of,
 )
@@ -29,7 +26,10 @@ from continuum_swr_replay.analysis.event_definition.immobility import (
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     event_strict_overlap_keys,
 )
-from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    SAMPLING_FREQUENCY,
+)
 from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import hash_stop_id

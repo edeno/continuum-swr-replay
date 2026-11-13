@@ -34,11 +34,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.constants import (
+from continuum_swr_replay.decoding import identifiers
+from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.decoding import identifiers
 
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_OUT_DIR = REPO / ".claude" / "research" / "pfc_event_diagnostic_outputs"

@@ -25,7 +25,6 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
     make_simulated_data,
 )
 
-from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     CONFIG,
     DECODE_BIN_STRIDE,
@@ -58,6 +57,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.parameters import (
+    DEFAULT_NON_LOCAL_THRESHOLD,
     LOCAL_POSITION_STD,
     NON_LOCAL_MINIMUM_DURATION_S,
 )

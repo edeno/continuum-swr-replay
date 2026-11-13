@@ -117,9 +117,7 @@ def _plot_conditional_posterior(ax: Axes, ctx: _PanelContext) -> None:
 
 def _plot_speed(ax: Axes, ctx: _PanelContext) -> None:
     plot_speed(ctx.data, ctx.time_slice, ax)
-    from continuum_swr_replay.analysis.constants import (
-        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    )
+    from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
     ax.axhline(
         DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,

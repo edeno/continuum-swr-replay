@@ -58,9 +58,6 @@ import numpy as np
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     stop_cohort_suffix,
 )
@@ -93,7 +90,10 @@ from continuum_swr_replay.analysis.pfc.modulation import (
     peri_event_rate,
 )
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
-from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.parameters import (
+    DEFAULT_NON_LOCAL_THRESHOLD,
+    SAMPLING_FREQUENCY,
+)
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.device import configure_jax_gpu
 from continuum_swr_replay.visualization.figure_utilities import (

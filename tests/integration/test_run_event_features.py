@@ -44,9 +44,6 @@ from non_local_detector.likelihoods.clusterless_kde import (
 
 import scripts.detector_comparison.run_event_features as runner
 import scripts.detector_comparison.run_inventory_comparison as comparison
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.detection.detection_inputs import (
     input_paths,
     marks_cache_dir,
@@ -86,7 +83,10 @@ from continuum_swr_replay.analysis.detector_comparison.selection import (
 )
 from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
-from continuum_swr_replay.parameters import DECODE_SAMPLE_S
+from continuum_swr_replay.parameters import (
+    DECODE_SAMPLE_S,
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
 from continuum_swr_replay.paths import (
     PROCESSED_DATA_DIR_ENV,
     carey_root,

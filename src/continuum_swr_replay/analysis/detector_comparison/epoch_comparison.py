@@ -18,9 +18,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.detector_comparison.adapters import (
     CAREY,
     MUA,
@@ -92,7 +89,10 @@ from continuum_swr_replay.intervals import (
     contains,
     total_duration,
 )
-from continuum_swr_replay.parameters import DECODE_SAMPLE_S
+from continuum_swr_replay.parameters import (
+    DECODE_SAMPLE_S,
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [

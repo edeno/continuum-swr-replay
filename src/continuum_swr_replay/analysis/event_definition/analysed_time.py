@@ -70,11 +70,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
-
 # Called through the module, not bound by name, so a patch on
 # ``swr_source.artifact_intervals`` / ``swr_source_files`` /
 # ``swr_source_name`` / ``epoch_source`` reaches every caller here too.
@@ -104,6 +99,10 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
 )
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.intervals import as_frame, interval_mask
+from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+)
 from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.io import (
     SWR_SOURCE_ATTR,

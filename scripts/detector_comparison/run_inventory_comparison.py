@@ -89,9 +89,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.detector_comparison.adapters import (
     NATIVE_IS_ELIGIBLE,
 )
@@ -122,7 +119,11 @@ from continuum_swr_replay.analysis.event_definition import (
     analysed_time,
     swr_source,
 )
-from continuum_swr_replay.parameters import DECODE_SAMPLE_S, ROOT_DIR
+from continuum_swr_replay.parameters import (
+    DECODE_SAMPLE_S,
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    ROOT_DIR,
+)
 from continuum_swr_replay.paths import (
     carey_root,
     inventory_comparison_root,

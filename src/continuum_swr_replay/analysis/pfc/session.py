@@ -15,10 +15,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
 from continuum_swr_replay.analysis.pfc.design import (
     _make_design_matrices,
     build_theta_design,
@@ -64,7 +60,11 @@ from continuum_swr_replay.intervals import (
     interval_mask,
     sample_step,
 )
-from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+    SAMPLING_FREQUENCY,
+)
 from continuum_swr_replay.paths import table_path
 
 # ``load_data`` and the hippocampus helpers below open a Spyglass /
@@ -848,7 +848,7 @@ def run_session(
     non_local_threshold : float
         Probability threshold the events were cut at. It is not applied here:
         non-local events are read from the canonical event table, which is cut
-        at :data:`~continuum_swr_replay.analysis.constants.DEFAULT_NON_LOCAL_THRESHOLD`,
+        at :data:`~continuum_swr_replay.parameters.DEFAULT_NON_LOCAL_THRESHOLD`,
         and a different value is refused rather than silently ignored. It does
         select the cached decode frame the SWR labels are read from.
     run_parallel : bool
@@ -967,7 +967,7 @@ def run_session(
     describes the same ``event_id``s as the content and rate families.
 
     Immobility is ``head_speed`` strictly below
-    :data:`~continuum_swr_replay.analysis.constants.DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC`,
+    :data:`~continuum_swr_replay.parameters.DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC`,
     on the fit mask and on the SWR speed gate alike: the one threshold the
     canonical events and the SWRs behind ``is_swr`` were speed-gated at.
 

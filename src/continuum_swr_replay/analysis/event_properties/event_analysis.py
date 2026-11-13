@@ -12,13 +12,11 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.event_definition.immobility import (
     event_speeds_are_immobile,
     intervals_from_labels,
 )
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 from continuum_swr_replay.tables.columns import require_columns
 
 logger = logging.getLogger(__name__)

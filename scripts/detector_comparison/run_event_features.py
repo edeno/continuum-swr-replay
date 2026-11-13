@@ -98,11 +98,7 @@ import pandas as pd  # noqa: E402
 from dask.distributed import LocalCluster  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
-from continuum_swr_replay.analysis.constants import (  # noqa: E402
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-    REMOTE_CM,
-)
+from continuum_swr_replay.analysis.constants import REMOTE_CM  # noqa: E402
 from continuum_swr_replay.analysis.detection.detection_inputs import (  # noqa: E402
     MARKS_RULE,
     decode_marks,
@@ -187,7 +183,12 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
-from continuum_swr_replay.parameters import DECODE_SAMPLE_S, ROOT_DIR  # noqa: E402
+from continuum_swr_replay.parameters import (  # noqa: E402  # noqa: E402
+    DECODE_SAMPLE_S,
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+    ROOT_DIR,
+)
 from continuum_swr_replay.paths import (  # noqa: E402
     event_features_root,
     inventory_comparison_root,

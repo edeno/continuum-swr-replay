@@ -57,9 +57,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.event_definition.artifact_intervals import (
     ArtifactRunError,
     epoch_artifact_intervals,
@@ -73,6 +70,7 @@ from continuum_swr_replay.decoding.identifiers import (
     nwb_file_name,
 )
 from continuum_swr_replay.intervals import subtract_intervals
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 from continuum_swr_replay.paths import artifact_intervals_root, swr_inventory_root
 from continuum_swr_replay.runs.io import read_manifest, recorded_output
 

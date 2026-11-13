@@ -29,9 +29,6 @@ import pandas as pd
 import pytest
 
 import scripts.detector_comparison.run_inventory_comparison as runner
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.detector_comparison import (
     epoch_comparison,
     inventory_run,
@@ -57,6 +54,7 @@ from continuum_swr_replay.intervals import (
     intersect,
     total_duration,
 )
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 from continuum_swr_replay.paths import (
     carey_root,
     inventory_comparison_root,

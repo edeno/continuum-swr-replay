@@ -1,8 +1,10 @@
-"""Global parameters and configuration for neural decoding analysis.
+"""The decode's settings and the event thresholds every layer reads.
 
-This module provides centralized configuration for the continuum-swr-replay
-project, including spatial binning parameters, decoding model parameters,
-file paths, and analysis constants.
+What belongs here is a parameter of the decode or of the event definition
+(sampling rate, place bins, model settings, the non-local and immobility
+thresholds) that foundation code needs too. Analysis-only settings are in
+``analysis/constants.py``; the task and recording facts (NWB file lists, wells,
+patches, track segments) are in ``data_loaders/constants.py``.
 
 Constants
 ---------

@@ -39,10 +39,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
 from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
 from continuum_swr_replay.analysis.event_definition.immobility import (
     filter_event_labels_by_speed,
@@ -57,6 +53,10 @@ from continuum_swr_replay.decoding.files import (
 from continuum_swr_replay.decoding.identifiers import (
     format_epoch_identifier,
     parse_nwb_filename,
+)
+from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.paths import processed_data_dir, table_path
 from continuum_swr_replay.runs.io import sha256_file

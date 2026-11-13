@@ -20,9 +20,6 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.event_definition.immobility import (
     validate_nonlocal_event_probability_contract,
     validate_whole_event_immobility_contract,
@@ -31,6 +28,7 @@ from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
 )
 from continuum_swr_replay.decoding.results import nonlocal_probability
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 

@@ -9,10 +9,10 @@ immobility rule and track geometry, as each field's description says.
 import math
 from dataclasses import dataclass, fields
 
-from continuum_swr_replay.analysis.constants import (
+from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    SAMPLING_FREQUENCY,
 )
-from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 __all__ = ["MemorylessSequenceConfig"]
 
@@ -58,7 +58,7 @@ class MemorylessSequenceConfig:
         A window is kept when the speed at its midpoint is below this. This
         project's canonical immobility rule, 4.0 cm/s, shared with every other
         event cohort through
-        :data:`~continuum_swr_replay.analysis.constants.DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC`.
+        :data:`~continuum_swr_replay.parameters.DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC`.
         The original uses 5.0.
     merge_gap_cm, merge_gap_s : float
         Neighboring runs merge when separated by less than both, 20.0 cm and

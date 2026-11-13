@@ -98,16 +98,16 @@ import pandas as pd
 from scipy import stats
 from scipy.ndimage import find_objects, label
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
     analysed_bins,
     immobile_analysed_bins,
 )
 from continuum_swr_replay.decoding.results import nonlocal_probability
-from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+    SAMPLING_FREQUENCY,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 logger = logging.getLogger(__name__)

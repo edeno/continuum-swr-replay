@@ -23,11 +23,11 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.constants import (
+from continuum_swr_replay.data_loaders.utils import get_labels
+from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.data_loaders.utils import get_labels
 from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 

@@ -39,9 +39,7 @@ from numpy.typing import NDArray
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import hilbert
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
 __all__ = [
     "COUPLING_CUT",

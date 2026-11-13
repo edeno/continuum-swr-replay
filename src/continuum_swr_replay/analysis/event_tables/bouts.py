@@ -16,13 +16,11 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.intervals import (
     covered_seconds,
     interval_mask,
 )
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
 from ..behavior.covariates.context import summarize_behavioral_location
 from ..behavior.spatial_mapping import (

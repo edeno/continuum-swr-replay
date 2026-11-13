@@ -146,10 +146,6 @@ def rebuild_session(
     session-keyed control seed, so the design is the one the reference was fit
     on rather than a fresh cut of the data.
     """
-    from continuum_swr_replay.analysis.constants import (
-        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        DEFAULT_NON_LOCAL_THRESHOLD,
-    )
     from continuum_swr_replay.analysis.detection.nonlocal_events import (
         align_results_to_position,
     )
@@ -178,6 +174,10 @@ def rebuild_session(
     from continuum_swr_replay.decoding.identifiers import parse_session_name
     from continuum_swr_replay.decoding.results import load_results
     from continuum_swr_replay.intervals import get_spikecount_per_time_bin
+    from continuum_swr_replay.parameters import (
+        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        DEFAULT_NON_LOCAL_THRESHOLD,
+    )
 
     nwb_file_name, epoch = parse_session_name(session)
 

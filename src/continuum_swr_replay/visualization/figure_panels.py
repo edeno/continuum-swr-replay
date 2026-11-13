@@ -15,10 +15,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from continuum_swr_replay.analysis.constants import (
-    BINS_DURATION_MS,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
+from continuum_swr_replay.analysis.constants import BINS_DURATION_MS
 from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     normalized_replay_position_by_swr,
 )
@@ -43,6 +40,7 @@ from continuum_swr_replay.analysis.event_properties.event_analysis import (
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     compute_triggered_average_curves,
 )
+from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.visualization.figure_utilities import (
     PANEL_SINGLE,
     get_figure_size,

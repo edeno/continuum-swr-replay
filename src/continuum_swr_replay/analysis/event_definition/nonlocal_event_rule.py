@@ -41,12 +41,14 @@ import pandas as pd
 import xarray as xr
 from ripple_detection.core import segment_boolean_series
 
-from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.event_definition.immobility import (
     intervals_from_labels,
 )
 from continuum_swr_replay.intervals import total_duration
-from continuum_swr_replay.parameters import NON_LOCAL_MINIMUM_DURATION_S
+from continuum_swr_replay.parameters import (
+    DEFAULT_NON_LOCAL_THRESHOLD,
+    NON_LOCAL_MINIMUM_DURATION_S,
+)
 from continuum_swr_replay.tables.columns import require_columns
 
 # Interval-arithmetic tolerance for floating-point noise (1 μs). Used in

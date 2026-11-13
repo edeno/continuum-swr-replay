@@ -587,9 +587,6 @@ def prepare_marked_session_context(
         )
     # These imports open Spyglass/DataJoint resources at import time, so keep
     # them off the pure marked-design import path used by unit tests.
-    from continuum_swr_replay.analysis.constants import (
-        DEFAULT_NON_LOCAL_THRESHOLD,
-    )
     from continuum_swr_replay.analysis.pfc.canonical_events import (
         load_session_event_ripple_power,
     )
@@ -606,6 +603,7 @@ def prepare_marked_session_context(
         _session_fit_population,
     )
     from continuum_swr_replay.intervals import get_spikecount_per_time_bin
+    from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 
     stop_cohort = "at_well"
     logger = logging.getLogger(

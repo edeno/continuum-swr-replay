@@ -75,9 +75,6 @@ import pandas as pd
 for _cat in (UserWarning, FutureWarning, DeprecationWarning):
     warnings.filterwarnings("ignore", category=_cat)
 
-from continuum_swr_replay.analysis.constants import (  # noqa: E402
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
 from continuum_swr_replay.analysis.detection.nonlocal_events import (  # noqa: E402
     validate_dot_event_contract,
 )
@@ -121,6 +118,7 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
 )
 from continuum_swr_replay.decoding.results import open_results  # noqa: E402
 from continuum_swr_replay.intervals import sample_step  # noqa: E402
+from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD  # noqa: E402
 from continuum_swr_replay.paths import processed_data_dir  # noqa: E402
 
 # --- Parameters ---------------------------------------------------------------

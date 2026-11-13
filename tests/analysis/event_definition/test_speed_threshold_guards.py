@@ -17,9 +17,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_arm_table,
     build_contfrag_event_table,
@@ -48,6 +45,7 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_swr_intervals,
 )
 from continuum_swr_replay.analysis.pfc.session import run_session
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
 CANONICAL = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
