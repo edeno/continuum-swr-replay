@@ -48,11 +48,7 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     std_factor,
 )
 from continuum_swr_replay.analysis.behavior.fit_provenance import require_fresh_inputs
-from continuum_swr_replay.analysis.behavior.model_specs import (
-    POST_OUTCOME_COHORT,
-    POST_OUTCOME_RATE_RUNGS,
-    PRIMARY_COHORT,
-)
+from continuum_swr_replay.analysis.behavior.rate.swr_contrast_rate import home_cohort
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.paths import (
     figure_dir,
@@ -156,8 +152,7 @@ def sessions(df, mod, pop, term, sd):
     # the ladder null beside them, so a rung name alone can match two rows per
     # session. Keep the cohort the rung's coefficients are reported from.
     if "cohort" in g.columns:
-        home = POST_OUTCOME_COHORT if mod in POST_OUTCOME_RATE_RUNGS else PRIMARY_COHORT
-        g = g[g.cohort == home]
+        g = g[g.cohort == home_cohort(mod)]
     c = f"coef_{term}"
     if c not in g.columns:
         raise KeyError(
