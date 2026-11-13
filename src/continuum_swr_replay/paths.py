@@ -156,6 +156,21 @@ DECODER_QUALITY_DIR = "decoder_quality"
 """Each analysed epoch's decoder quality
 (``scripts/decoding/measure_decoder_quality.py``)."""
 
+# The behavior summary's inputs that are not one of MODEL_SUBDIRS: each folder is
+# written by its script and read by the behavior summary.
+CONTENT_ESTIMATOR_COMPARISON_DIR = "content_estimator_comparison"
+"""The three content estimators compared, under the replay-content root
+(``scripts/behavior/content/compare_content_estimators.py``)."""
+EVENT_SOURCE_COMPARISON_DIR = "event_source_comparison"
+"""The choice fits by event source, under the replay-content root
+(``scripts/behavior/content/compare_event_source_models.py``)."""
+UNCERTAINTY_CONTENT_DIR = "uncertainty_content"
+"""The within-arm horse race and the uncertainty tables, under the
+replay-content root (``scripts/behavior/content/analyze_uncertainty_content.py``)."""
+CROSS_HISTORY_RIDGE_CV_DIR = "cross_history_ridge_cv"
+"""The cross-history ridge cross-validation, under ``model_dir("per_bin_rate")``
+(``scripts/behavior/rate/fit_cross_history_ridge_cv.py``)."""
+
 
 _LEGACY_ROOTS: dict[str, Callable[[], Path]] = {
     "REPLAY_CONTENT_DIR": replay_content_dir,

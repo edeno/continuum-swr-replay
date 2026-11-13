@@ -42,6 +42,7 @@ from continuum_swr_replay.analysis.behavior.model_specs import LEAF_ONLY_N_CATEG
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.paths import (
     STANDARDIZATION_REFERENCE,
+    UNCERTAINTY_CONTENT_DIR,
     replay_content_dir,
     table_path,
 )
@@ -87,7 +88,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=replay_content_dir() / "uncertainty_content",
+        default=replay_content_dir() / UNCERTAINTY_CONTENT_DIR,
         help="Directory for derived uncertainty-content tables.",
     )
     parser.add_argument(

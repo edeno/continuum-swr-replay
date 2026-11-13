@@ -28,7 +28,9 @@ from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
 )
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
+    EVENT_SOURCE_COMPARISON_DIR,
     MODEL_SUBDIRS,
+    UNCERTAINTY_CONTENT_DIR,
     replay_content_dir,
     table_path,
 )
@@ -61,8 +63,8 @@ _MODEL_DIRS = (
     MODEL_SUBDIRS["per_stop_rate"],
     MODEL_SUBDIRS["per_bin_rate"],
     MODEL_SUBDIRS["per_event_swr_power"],
-    "uncertainty_content",
-    "event_source_comparison",
+    UNCERTAINTY_CONTENT_DIR,
+    EVENT_SOURCE_COMPARISON_DIR,
 )
 
 

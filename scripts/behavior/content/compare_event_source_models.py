@@ -60,7 +60,11 @@ from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
 )
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
-from continuum_swr_replay.paths import contfrag_replay_content_dir, replay_content_dir
+from continuum_swr_replay.paths import (
+    EVENT_SOURCE_COMPARISON_DIR,
+    contfrag_replay_content_dir,
+    replay_content_dir,
+)
 from continuum_swr_replay.runs.fit_provenance import (
     record_inputs,
     write_fit_provenance,
@@ -220,7 +224,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             name: frame.merge(keep, on=list(SESSION_COLUMNS))
             for name, frame in tables.items()
         }
-    out_dir = replay_content_dir() / "event_source_comparison"
+    out_dir = replay_content_dir() / EVENT_SOURCE_COMPARISON_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Built once — both patch fits consume it.

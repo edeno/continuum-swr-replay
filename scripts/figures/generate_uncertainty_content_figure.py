@@ -28,7 +28,11 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
-from continuum_swr_replay.paths import figure_dir, replay_content_dir
+from continuum_swr_replay.paths import (
+    UNCERTAINTY_CONTENT_DIR,
+    figure_dir,
+    replay_content_dir,
+)
 from continuum_swr_replay.visualization.figure_utilities import (
     WONG,
     label_panels,
@@ -50,7 +54,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--results-dir",
         type=Path,
-        default=replay_content_dir() / "uncertainty_content",
+        default=replay_content_dir() / UNCERTAINTY_CONTENT_DIR,
         help="Directory written by analyze_uncertainty_content.py.",
     )
     parser.add_argument(

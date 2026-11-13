@@ -107,7 +107,11 @@ from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
     ComparisonRung,
     resolve_comparison_rungs,
 )
-from continuum_swr_replay.paths import figure_dir, replay_content_dir
+from continuum_swr_replay.paths import (
+    CONTENT_ESTIMATOR_COMPARISON_DIR,
+    figure_dir,
+    replay_content_dir,
+)
 from continuum_swr_replay.runs.fit_provenance import (  # noqa: E402
     record_inputs,
     write_fit_provenance,
@@ -400,7 +404,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=replay_content_dir() / "content_estimator_comparison",
+        default=replay_content_dir() / CONTENT_ESTIMATOR_COMPARISON_DIR,
     )
     parser.add_argument(
         "--figures-dir", type=Path, default=figure_dir("content_estimators")

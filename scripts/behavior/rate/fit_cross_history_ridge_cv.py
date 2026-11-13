@@ -24,7 +24,7 @@ per-(animal, stream) records and a ``.provenance.json`` sidecar.
 
 Usage::
 
-    python scripts/behavior/rate/fit_cross_history_ridge_cv.py --out-dir DIR
+    python scripts/behavior/rate/fit_cross_history_ridge_cv.py [--out-dir DIR]
         [--animals wilbur j16] [--outcomes non_local_swr non_local_no_swr]
         [--workers N] [--gpu K] [--stop-cohort at_well]
 """
@@ -67,7 +67,7 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     select_stop_cohort,
 )
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
-from continuum_swr_replay.paths import table_path
+from continuum_swr_replay.paths import CROSS_HISTORY_RIDGE_CV_DIR, model_dir, table_path
 from continuum_swr_replay.runs.device import configure_jax_gpu
 from continuum_swr_replay.runs.fit_provenance import (
     record_inputs,
@@ -116,7 +116,13 @@ def _stack_one(animal: str, outcome: str, sessions: list) -> dict:
 
 def main(argv: Sequence[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--out-dir", type=Path, required=True)
+    p.add_argument(
+        "--out-dir",
+        type=Path,
+        default=model_dir("per_bin_rate") / CROSS_HISTORY_RIDGE_CV_DIR,
+        help="where the pickle is written (default: the folder the behavior "
+        "summary reads)",
+    )
     p.add_argument("--animals", nargs="*", default=None)
     p.add_argument("--outcomes", nargs="*", choices=OUTCOMES, default=list(OUTCOMES))
     p.add_argument("--workers", type=int, default=4, help="design-building processes")

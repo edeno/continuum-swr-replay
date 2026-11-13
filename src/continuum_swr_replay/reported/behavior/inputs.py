@@ -10,10 +10,17 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
+    belief_chain_output_subdir,
+)
 from continuum_swr_replay.analysis.behavior.model_specs import (
     PER_BIN_DESIGN,
 )
 from continuum_swr_replay.paths import (
+    CONTENT_ESTIMATOR_COMPARISON_DIR,
+    CROSS_HISTORY_RIDGE_CV_DIR,
+    EVENT_SOURCE_COMPARISON_DIR,
+    UNCERTAINTY_CONTENT_DIR,
     model_dir,
     replay_content_dir,
     table_path,
@@ -57,7 +64,7 @@ class BehaviorInputs:
 
 def default_inputs() -> BehaviorInputs:
     rc = replay_content_dir()
-    estimators = rc / "content_estimator_comparison"
+    estimators = rc / CONTENT_ESTIMATOR_COMPARISON_DIR
     return BehaviorInputs(
         per_bin=model_dir("per_bin_rate") / "all_models.pkl",
         per_bin_all_stops=model_dir("per_bin_rate") / "all_models_allstops.pkl",
@@ -69,9 +76,9 @@ def default_inputs() -> BehaviorInputs:
         content_contrast_dir=rc / "models_swr_contrast",
         estimator_summary=estimators / "content_estimator_comparison_summary.csv",
         estimator_bootstrap=estimators / "content_estimator_bootstrap.csv",
-        leaf_dir=rc / "models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu",
+        leaf_dir=rc / belief_chain_output_subdir(),
         choice_fits=rc
-        / "event_source_comparison"
+        / EVENT_SOURCE_COMPARISON_DIR
         / "non_local_HPC_comparison_fits.pkl",
         stay_leave_dir=rc,
         swr_power=model_dir("per_event_swr_power") / "swr_power_model.pkl",
@@ -82,9 +89,9 @@ def default_inputs() -> BehaviorInputs:
         duration_aware_pooled=model_dir("per_bin_rate")
         / "duration_aware_history_pooled.pkl",
         cross_ridge_cv=model_dir("per_bin_rate")
-        / "cross_history_ridge_cv"
+        / CROSS_HISTORY_RIDGE_CV_DIR
         / "cross_history_ridge_cv.pkl",
-        horserace_summary=rc / "uncertainty_content" / "horserace_summary.csv",
+        horserace_summary=rc / UNCERTAINTY_CONTENT_DIR / "horserace_summary.csv",
     )
 
 

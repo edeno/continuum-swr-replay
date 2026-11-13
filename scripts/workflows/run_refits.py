@@ -55,8 +55,8 @@ Not here: the prerequisites above, the Part 1 and Part 2 checks, the PFC unit GL
 which runs on GPUs for 14-17 h per card under its own launcher (Figure 4 reads
 it and is drawn after it), and the ridge cross-validated cross-history fit
 (``rate.cross_history_ridge_cv.at_well``, Part 3), which needs one GPU for
-about 5 min: ``scripts/behavior/rate/fit_cross_history_ridge_cv.py --out-dir
-<models_per_bin_rate>/cross_history_ridge_cv --workers 5 --gpu N`` (never card 0).
+about 5 min: ``scripts/behavior/rate/fit_cross_history_ridge_cv.py --workers 5
+--gpu N`` (never card 0), which writes ``<models_per_bin_rate>/cross_history_ridge_cv``.
 
 Usage
 -----

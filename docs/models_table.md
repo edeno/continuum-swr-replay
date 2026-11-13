@@ -331,8 +331,8 @@ Mselfcross_dur         count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + CROSSCOS + 
 ```
 
 ## Cross-history coupling, long window — ridge cross-validated (auxiliary)
-`scripts/behavior/rate/fit_cross_history_ridge_cv.py` → `cross_history_ridge_cv.pkl` in its `--out-dir`, with its
-`.provenance.json`. Module: `analysis/behavior/rate/ridge_history_cv.py`.
+`scripts/behavior/rate/fit_cross_history_ridge_cv.py` → `cross_history_ridge_cv.pkl` in its `--out-dir`
+(default `models_per_bin_rate/cross_history_ridge_cv/`), with its `.provenance.json`. Module: `analysis/behavior/rate/ridge_history_cv.py`.
 
 `MODEL_CROSS_HISTORY_LONG_RATE` in `model_specs.py`: `Mself_dur` and `Mselfcross_dur` with the cross
 block (onset- and end-locked) reaching 1 s after the other stream's event (`N_CROSS_LONG_LAGS` = 67
