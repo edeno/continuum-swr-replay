@@ -398,7 +398,7 @@ def test_missing_required_column_raises():
     frame = _blank_session("m", 1, "01_r1", n=50)
     _label(frame, "non_local_event", {1: (5, 8)})
     frame = frame.drop(columns=["Non-Local_Fragmented_prob"])
-    with pytest.raises(KeyError, match="Non-Local_Fragmented_prob"):
+    with pytest.raises(ValueError, match="Non-Local_Fragmented_prob"):
         build_classified_nonlocal_event_table(frame)
 
 

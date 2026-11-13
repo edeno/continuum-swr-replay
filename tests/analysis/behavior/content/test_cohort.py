@@ -326,7 +326,7 @@ def test_off_well_events_leave_before_the_freeze_and_are_not_counted_in() -> Non
 
 
 def test_a_table_without_occupancy_state_cannot_state_a_cohort() -> None:
-    with pytest.raises(KeyError, match="occupancy_state"):
+    with pytest.raises(ValueError, match="occupancy_state"):
         _select(canonical_arm_table().drop(columns="occupancy_state"))
 
 

@@ -236,7 +236,9 @@ def test_value_block_missing_cols_raises():
     arm = np.array([0, 6])
     sid = np.array([1, 2])
     bad = pd.DataFrame({"stop_id": [1, 2]})  # no port/q cols
-    with pytest.raises(ValueError, match="missing per-arm value columns"):
+    with pytest.raises(
+        ValueError, match=r"qvals_table\) lacks .*task_reward_probability"
+    ):
         covariates.attach_contingency_value_block(arm, sid, bad)
 
 

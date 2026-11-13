@@ -1050,7 +1050,7 @@ class TestPatchPanels:
             event_patch_table=ept.drop(columns=[column]), event_table=et
         )
         fig, ax = plt.subplots()
-        with pytest.raises(KeyError, match=column):
+        with pytest.raises(ValueError, match=column):
             patch_covariates._plot_reward_belief_mean_candidate_arm_preoutcome_patch(
                 ax, ctx
             )
@@ -1223,7 +1223,7 @@ class TestStopGrainPanels:
     def test_missing_stop_column_raises(self):
         st = self._stop_table().drop(columns=["reward_fraction_last10_known_trials"])
         fig, ax = plt.subplots()
-        with pytest.raises(KeyError, match="reward_fraction_last10_known_trials"):
+        with pytest.raises(ValueError, match="reward_fraction_last10_known_trials"):
             stop_covariates._plot_reward_rate_trial_k10(
                 ax, _ctx_for_covariates(stop_table=st)
             )

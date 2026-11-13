@@ -104,6 +104,7 @@ from continuum_swr_replay.analysis.events.swr_source import (
 )
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.intervals import as_frame, interval_mask
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.io import SWR_SOURCE_ATTR, publish_canonical
 from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,
@@ -484,9 +485,9 @@ def _frame_epoch(
     either is stale and is refused, never clipped. ``SWR_event`` is the
     source's own and its speed rule is a drop (``moving``), in :func:`_drops`.
     """
-    missing = [c for c in (*SESSION_COLUMNS_DAY, "head_speed") if c not in dot.columns]
-    if missing:
-        raise ValueError(f"{what}: data_over_time lacks columns {missing}")
+    require_columns(
+        dot, [*SESSION_COLUMNS_DAY, "head_speed"], f"{what}: data_over_time"
+    )
     animal, day, epoch = one_session(dot, what)
     require_time_index(dot, what)
     if "non_local_event" in dot.columns:
@@ -832,9 +833,7 @@ def with_swr_source(
 def _session_epoch_ids(frame: pd.DataFrame, what: str) -> list[tuple]:
     date = "session_date" if "session_date" in frame.columns else "day"
     columns = ["animal", date, "epoch"]
-    missing = [column for column in columns if column not in frame.columns]
-    if missing:
-        raise ValueError(f"{what}: the frame lacks columns {missing}")
+    require_columns(frame, columns, what)
     return list(frame[columns].drop_duplicates().itertuples(index=False))
 
 

@@ -41,6 +41,8 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
+from continuum_swr_replay.tables.columns import require_columns
+
 from .._fit_diagnostics import (
     EXPECTED_FIT_ERRORS,
     NUISANCE_TERMS,
@@ -118,7 +120,7 @@ def freeze_per_bin_cohort(
 
     Raises
     ------
-    KeyError
+    ValueError
         If any required column is absent from ``design`` — a design that cannot
         carry the ladder is a configuration error, not a data drop.
     """
@@ -128,9 +130,7 @@ def freeze_per_bin_cohort(
     required += list(extra_columns)
     required = list(dict.fromkeys(required))
 
-    missing = [c for c in (*required, "stop_id") if c not in design.columns]
-    if missing:
-        raise KeyError(f"freeze_per_bin_cohort missing required column(s): {missing}")
+    require_columns(design, [*required, "stop_id"], "the per-bin design")
 
     keep = design[required].notna().all(axis=1) & (design["exposure"] > 0)
     frozen = design.loc[keep].reset_index(drop=True)
@@ -195,18 +195,12 @@ def apply_arrival_window(
 
     Raises
     ------
-    KeyError
-        If the arrival clock column is absent.
     ValueError
-        If it carries a missing value — the cohort was not frozen over a union
-        that included it, so the arrival rungs would not share the ladder's
-        cohort.
+        If the arrival clock column is absent, or carries a missing value — the
+        cohort was not frozen over a union that included it, so the arrival
+        rungs would not share the ladder's cohort.
     """
-    if ARRIVAL_CLOCK_COLUMN not in design.columns:
-        raise KeyError(
-            f"apply_arrival_window needs {ARRIVAL_CLOCK_COLUMN}; the per-bin "
-            "design was built without the stop's arrival clock."
-        )
+    require_columns(design, [ARRIVAL_CLOCK_COLUMN], "the per-bin design")
     clock = design[ARRIVAL_CLOCK_COLUMN].to_numpy(dtype=float)
     if np.isnan(clock).any():
         raise ValueError(

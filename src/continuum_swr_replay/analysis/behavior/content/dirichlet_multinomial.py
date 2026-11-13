@@ -58,6 +58,7 @@ from continuum_swr_replay.analysis.shared_statistics import (
     bayesian_information_criterion,
     mcfadden_pseudo_r2,
 )
+from continuum_swr_replay.tables.columns import require_columns
 
 from .._fit_diagnostics import NUISANCE_TERMS, separated_terms
 from ..fitting import within_group_full_rank
@@ -250,12 +251,10 @@ def _pack_events(
     silently-repaired fit would be read as a real estimate.
     """
     concentration_cols = tuple(concentration_cols)
-    required = [event_col, response_col, *predictors, *concentration_cols]
-    missing = [c for c in dict.fromkeys(required) if c not in long_df.columns]
-    if missing:
-        raise ValueError(f"long_df is missing required column(s): {missing}")
-
-    required = list(dict.fromkeys(required))
+    required = list(
+        dict.fromkeys([event_col, response_col, *predictors, *concentration_cols])
+    )
+    require_columns(long_df, required, "long_df")
 
     # Event-wise complete cases, as in ``fit_conditional_poisson``: dropping rows
     # would leave the event with a smaller candidate set than the model assumes.
@@ -927,13 +926,9 @@ def animal_pooled_log_phi(
         frame would silently pin every short session to a number derived from
         the wrong sessions.
     """
-    required = ["animal", "n_events", "coef_log_phi_intercept"]
-    missing = [column for column in required if column not in rows.columns]
-    if missing:
-        raise ValueError(
-            f"animal_pooled_log_phi needs column(s) {missing} on the first-pass "
-            "fits to pool a concentration intercept"
-        )
+    require_columns(
+        rows, ["animal", "n_events", "coef_log_phi_intercept"], "the first-pass fits"
+    )
     if rows.empty:
         return {}
     qualifying = rows.loc[

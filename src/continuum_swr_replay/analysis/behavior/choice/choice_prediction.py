@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import WELL_ARMS
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import require_session_unique_ids
 
 from .._fit_diagnostics import (
@@ -278,13 +279,7 @@ def build_choice_dataset(
         event_arm_table, "stop_id", helper_name="build_choice_dataset"
     )
 
-    required_location = ["occupancy_state", "at_well"]
-    missing_location = [c for c in required_location if c not in stop_table.columns]
-    if missing_location:
-        raise KeyError(
-            "build_choice_dataset requires explicit stop location columns; "
-            f"missing {missing_location}. Regenerate the canonical tables."
-        )
+    require_columns(stop_table, ["occupancy_state", "at_well"], "stop_table")
 
     replay_stops = stop_table["has_replay"]
     # Strictly at-well stops, not ``select_stop_cohort``'s well-anchored

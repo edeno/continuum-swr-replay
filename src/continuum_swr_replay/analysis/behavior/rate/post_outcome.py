@@ -18,6 +18,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.tables.columns import require_columns
+
 from ..model_specs import BIN_S, POST_OUTCOME_COVARIATES, PerBinRateModelSpec
 from .per_bin_rate_model import _design_columns
 
@@ -53,16 +55,16 @@ def mask_post_outcome_covariates(
     n_masked_by_state : pd.Series
         Number of masked stops per ``occupancy_state`` category.
     """
-    required = ("stop_start", "outcome_known_time", "occupancy_state")
-    missing = [
-        c for c in (*required, *POST_OUTCOME_COVARIATES) if c not in stop.columns
-    ]
-    if missing:
-        raise ValueError(
-            f"post-outcome gate needs {missing} on the joined stop table "
-            "(stop_start + occupancy_state from the stop table, "
-            "outcome_known_time from qvals_table)"
-        )
+    require_columns(
+        stop,
+        [
+            "stop_start",
+            "outcome_known_time",
+            "occupancy_state",
+            *POST_OUTCOME_COVARIATES,
+        ],
+        "the stop table joined to qvals_table",
+    )
     stop_start = stop["stop_start"].to_numpy(dtype=float)
     outcome_known = stop["outcome_known_time"].to_numpy(dtype=float)
     pre_outcome = stop_start < outcome_known
@@ -159,19 +161,11 @@ def gate_bins_after_outcome(
         outcome; whether the balance guard held; and the retained time-course
         support (:func:`retained_time_course_support`).
     """
-    required = (
-        "stop_id",
-        "stop_start",
-        "binj",
-        "outcome_known_time",
-        "trial_reward",
+    require_columns(
+        design,
+        ["stop_id", "stop_start", "binj", "outcome_known_time", "trial_reward"],
+        "the per-bin design",
     )
-    missing = [column for column in required if column not in design.columns]
-    if missing:
-        raise KeyError(
-            "Post-outcome bin gating requires physical timing "
-            f"column(s): {missing}. Regenerate qvals_table and stop_table."
-        )
 
     timing = design.groupby("stop_id", sort=False)[
         ["stop_start", "outcome_known_time", "trial_reward"]
@@ -187,11 +181,7 @@ def gate_bins_after_outcome(
         )
 
     fit_columns = [*_design_columns(spec), "exposure"]
-    missing_fit = [column for column in fit_columns if column not in design.columns]
-    if missing_fit:
-        raise KeyError(
-            f"Post-outcome bin gating requires exact fit column(s): {missing_fit}"
-        )
+    require_columns(design, fit_columns, "the per-bin design")
 
     output = design.copy()
     stop_start = output["stop_start"].to_numpy(dtype=float)

@@ -39,6 +39,7 @@ from continuum_swr_replay.analysis.shared_statistics import (
     signed_rank_p,
 )
 from continuum_swr_replay.data_loaders.constants import LEAF_ARMS, port_columns
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ..covariate_timing import assert_predictor_timing
@@ -66,12 +67,6 @@ LEAF_FRACTION_COLUMNS: Mapping[str, str] = {
     "soft_count": "soft_leaf_fraction",
     "posterior_mass": "posterior_leaf_fraction",
 }
-
-
-def _require_columns(frame: pd.DataFrame, columns: set[str], label: str) -> None:
-    missing = sorted(columns - set(frame.columns))
-    if missing:
-        raise ValueError(f"{label} is missing required columns: {missing}")
 
 
 def _require_unique(frame: pd.DataFrame, columns: list[str], label: str) -> None:
@@ -125,7 +120,7 @@ def assign_within_arm_quantiles(
     """
     if n_quantiles < 2:
         raise ValueError("n_quantiles must be at least 2")
-    _require_columns(
+    require_columns(
         frame,
         {"session_id", "candidate_arm", uncertainty_col},
         "uncertainty frame",
@@ -199,9 +194,9 @@ def build_trial_leaf_table(
         "pump_on_at_bout_mid",
         *UNCERTAINTY_COLUMNS,
     }
-    _require_columns(event_arm_table, event_required, "event_arm_table")
-    _require_columns(stop_table, stop_required, "stop_table")
-    _require_columns(qvals_table, qval_required, "qvals_table")
+    require_columns(event_arm_table, event_required, "event_arm_table")
+    require_columns(stop_table, stop_required, "stop_table")
+    require_columns(qvals_table, qval_required, "qvals_table")
     _require_unique(event_arm_table, ["event_id", "candidate_arm"], "event_arm_table")
     _require_unique(stop_table, ["stop_id"], "stop_table")
     _require_unique(qvals_table, ["stop_id"], "qvals_table")
@@ -492,7 +487,7 @@ def hierarchical_quartile_profile(
     }
     if denominator_col is not None:
         required.add(denominator_col)
-    _require_columns(trial_leaf, required, "trial_leaf")
+    require_columns(trial_leaf, required, "trial_leaf")
     if scope not in {"all", "unchosen"}:
         raise ValueError("scope must be 'all' or 'unchosen'")
 
@@ -590,7 +585,7 @@ def paired_quartile_contrasts(
     error (``sem``), the animals (``n_animals``) and the animals whose own
     contrast is above zero (``n_animals_positive``).
     """
-    _require_columns(
+    require_columns(
         arm_profile,
         {"animal", "session_id", "candidate_arm", quartile_col, "value"},
         "arm profile",
@@ -645,7 +640,7 @@ def summarize_mu_coefficients(mu_results: pd.DataFrame) -> dict[str, pd.DataFram
         "converged",
         "separated",
     }
-    _require_columns(mu_results, required, "Mu results")
+    require_columns(mu_results, required, "Mu results")
     _require_unique(mu_results, list(SESSION_COLUMNS), "Mu results")
     sessions = mu_results.copy()
     sessions["session_id"] = _session_id(sessions)
@@ -775,7 +770,7 @@ def within_arm_horserace(
         response,
         *predictors,
     }
-    _require_columns(event_arm, needed, "event-arm table")
+    require_columns(event_arm, needed, "event-arm table")
     frame = event_arm[
         (event_arm["candidate_arm"] <= 5) & (event_arm["is_current_arm"] == 0)
     ].copy()

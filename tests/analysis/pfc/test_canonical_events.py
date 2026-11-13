@@ -169,7 +169,7 @@ class TestLoadSessionCanonicalEvents:
         path = tmp_path / "event_table.parquet"
         write_table(analysed_time.stamp_swr_source(frame), path)
 
-        with pytest.raises(KeyError, match="event_start_s"):
+        with pytest.raises(ValueError, match="event_start_s"):
             load_session_canonical_events(
                 "j1620210706_.nwb", "02_r1", event_table_path=path
             )

@@ -22,6 +22,8 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
+from continuum_swr_replay.tables.columns import require_columns
+
 
 def _as_python_scalar(value: Any) -> Any:
     """Convert NumPy-style scalar IDs to stable Python scalars."""
@@ -92,10 +94,9 @@ def freeze_common_cohort(
 
     Raises
     ------
-    KeyError
-        If any required column is absent.
     ValueError
-        If zero-response filtering is requested without ``response_col``.
+        If any required column is absent, or if zero-response filtering is
+        requested without ``response_col``.
     """
     if isinstance(required_cols, (str, bytes)):
         raise TypeError("required_cols must be a sequence of column names")
@@ -113,11 +114,7 @@ def freeze_common_cohort(
             ]
         )
     )
-    missing_cols = [column for column in required if column not in frame.columns]
-    if missing_cols:
-        raise KeyError(
-            f"freeze_common_cohort missing required column(s): {missing_cols}"
-        )
+    require_columns(frame, required, "the table to freeze")
     if frame[unit_col].isna().any():
         raise ValueError(f"{unit_col} must not contain missing unit identifiers")
 
@@ -309,12 +306,7 @@ def _cohort_mask(frame: pd.DataFrame, cohort: str, grain: str) -> pd.Series:
         raise ValueError(
             f"unknown cohort {cohort!r}; expected one of {list(STOP_COHORTS)}"
         )
-    if _OCCUPANCY_COLUMN not in frame.columns:
-        raise KeyError(
-            f"cohort selection needs the {_OCCUPANCY_COLUMN!r} column; the frame "
-            f"carries {list(frame.columns)[:12]}... . Regenerate the canonical "
-            "stop/event tables, which carry it by construction."
-        )
+    require_columns(frame, [_OCCUPANCY_COLUMN], f"the {grain} table")
     if cohort == "all_stops":
         return pd.Series(True, index=frame.index)
     # A KeyError here means an unrecognized grain, not a data problem.
@@ -357,10 +349,9 @@ def select_stop_cohort(
 
     Raises
     ------
-    KeyError
-        If ``occupancy_state`` is absent.
     ValueError
-        If ``cohort`` is not one of the three accepted names.
+        If ``occupancy_state`` is absent, or ``cohort`` is not one of the three
+        accepted names.
     """
     keep = _cohort_mask(stop_table, cohort, "stop")
     selected = stop_table.loc[keep].reset_index(drop=True)
@@ -418,14 +409,12 @@ def select_event_cohort(
 
     Raises
     ------
-    KeyError
-        If ``occupancy_state`` or ``event_col`` is absent.
     ValueError
-        If ``cohort`` is not one of the three accepted names.
+        If ``occupancy_state`` or ``event_col`` is absent, or ``cohort`` is not
+        one of the three accepted names.
     """
     keep = _cohort_mask(long_df, cohort, "event")
-    if event_col not in long_df.columns:
-        raise KeyError(f"event cohort selection needs the {event_col!r} column")
+    require_columns(long_df, [event_col], "the event table")
     selected = long_df.loc[keep].reset_index(drop=True)
     report = {
         "cohort": cohort,
@@ -459,18 +448,11 @@ def _stop_bounds(stops: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
 
     Raises
     ------
-    KeyError
-        If either bound column is absent.
     ValueError
-        If a bound is missing/non-finite, a stop ends before it starts, or two
-        stops overlap.
+        If either bound column is absent, a bound is missing/non-finite, a stop
+        ends before it starts, or two stops overlap.
     """
-    missing = [column for column in _STOP_BOUND_COLUMNS if column not in stops.columns]
-    if missing:
-        raise KeyError(
-            f"stop interval selection needs column(s) {missing}; the frame "
-            f"carries {list(stops.columns)[:12]}..."
-        )
+    require_columns(stops, _STOP_BOUND_COLUMNS, "the stop table")
     order = np.argsort(stops["stop_start"].to_numpy(dtype=float), kind="stable")
     starts = stops["stop_start"].to_numpy(dtype=float)[order]
     ends = stops["stop_end"].to_numpy(dtype=float)[order]
@@ -513,10 +495,9 @@ def stop_interval_mask(times: np.ndarray, stops: pd.DataFrame) -> np.ndarray:
 
     Raises
     ------
-    KeyError
-        If ``stop_start`` or ``stop_end`` is absent.
     ValueError
-        If the stops are non-finite, inverted, or overlapping.
+        If ``stop_start`` or ``stop_end`` is absent, or the stops are
+        non-finite, inverted, or overlapping.
     """
     times = np.asarray(times, dtype=float)
     starts, ends = _stop_bounds(stops)

@@ -75,7 +75,7 @@ def test_helper_return_types():
 
 
 def test_missing_columns_raise():
-    with pytest.raises(KeyError, match="session columns"):
+    with pytest.raises(ValueError, match="lacks required column"):
         session_key_set(pd.DataFrame({"animal": ["a"]}))
 
 

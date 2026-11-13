@@ -60,6 +60,7 @@ from continuum_swr_replay.decoding.identifiers import (
 )
 from continuum_swr_replay.paths import processed_data_dir, table_path
 from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.io import read_table, resolved_table_path
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -123,7 +124,7 @@ def load_session_canonical_events(
     ------
     FileNotFoundError
         If no event table exists at ``event_table_path``.
-    KeyError
+    ValueError
         If the table lacks the session or event columns.
     SwrSourceError
         If the table was not built from the configured SWR source
@@ -145,13 +146,9 @@ def load_session_canonical_events(
 
     event_table = read_table(path)
     analysed_time.require_swr_source(event_table, what=f"the event table at {path}")
-    missing = [
-        column
-        for column in (*SESSION_COLUMNS, *_EVENT_COLUMNS)
-        if column not in event_table.columns
-    ]
-    if missing:
-        raise KeyError(f"event table at {path} is missing column(s) {missing}")
+    require_columns(
+        event_table, [*SESSION_COLUMNS, *_EVENT_COLUMNS], f"the event table at {path}"
+    )
 
     is_session = (
         (event_table["animal"] == animal)

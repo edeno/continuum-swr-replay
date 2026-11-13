@@ -158,7 +158,7 @@ def test_freeze_common_cohort_ignores_unobserved_categorical_unit_ids():
 def test_freeze_common_cohort_fails_loudly_for_missing_columns():
     frame = pd.DataFrame({"event_id": [1, 2], "response": [1, 1]})
 
-    with pytest.raises(KeyError, match=r"missing required column\(s\).*predictor"):
+    with pytest.raises(ValueError, match=r"lacks required column\(s\).*predictor"):
         freeze_common_cohort(
             frame,
             unit_col="event_id",
@@ -282,7 +282,7 @@ def test_select_stop_cohort_all_stops_keeps_the_missing_state():
 def test_select_stop_cohort_raises_without_occupancy_state():
     stops = _occupancy_stops().drop(columns=["occupancy_state"])
 
-    with pytest.raises(KeyError, match="occupancy_state"):
+    with pytest.raises(ValueError, match="occupancy_state"):
         select_stop_cohort(stops, cohort="at_well")
 
 
@@ -326,7 +326,7 @@ def test_select_event_cohort_selects_whole_events_and_counts_them():
 def test_select_event_cohort_raises_without_the_event_column():
     long_df = pd.DataFrame({"occupancy_state": ["at_well"], "x": [1.0]})
 
-    with pytest.raises(KeyError, match="event_id"):
+    with pytest.raises(ValueError, match="event_id"):
         select_event_cohort(long_df, cohort="at_well")
 
 
@@ -388,7 +388,7 @@ def test_stop_interval_mask_rejects_an_inverted_stop():
 def test_stop_interval_mask_raises_without_the_bound_columns():
     stops = pd.DataFrame({"start_time": [10.0], "end_time": [12.0]})
 
-    with pytest.raises(KeyError, match="stop_start"):
+    with pytest.raises(ValueError, match="stop_start"):
         stop_interval_mask(np.array([10.5]), stops)
 
 

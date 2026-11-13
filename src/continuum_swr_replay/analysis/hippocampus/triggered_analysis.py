@@ -18,6 +18,7 @@ from continuum_swr_replay.analysis.hippocampus.event_analysis import (
 )
 from continuum_swr_replay.intervals import overlaps_intervals
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.tables.columns import require_columns
 
 logger = logging.getLogger(__name__)
 
@@ -104,17 +105,11 @@ def get_signal_windows(
     if window_sec <= 0:
         raise ValueError(f"window_sec must be positive, got {window_sec}")
 
-    required_data_cols = ["animal", "day", "epoch"] + signal_cols
-    missing_cols = set(required_data_cols) - set(data.columns)
-    if missing_cols:
-        raise ValueError(f"data missing required columns: {missing_cols}")
-
+    require_columns(data, ["animal", "day", "epoch", *signal_cols], "data")
     required_event_cols = ["animal", "day", "epoch", time_col]
     if event_id_col is not None:
         required_event_cols.append(event_id_col)
-    missing_cols = set(required_event_cols) - set(event_times.columns)
-    if missing_cols:
-        raise ValueError(f"event_times missing required columns: {missing_cols}")
+    require_columns(event_times, required_event_cols, "event_times")
 
     # Compute window parameters
     half_window_sec = window_sec / 2.0

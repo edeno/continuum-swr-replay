@@ -55,6 +55,7 @@ from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
     WELL_PATCH_MAPPING,
 )
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,
     present_session_columns,
@@ -116,17 +117,15 @@ def _visit_context_ids(event_table: pd.DataFrame) -> pd.Series:
 
     Raises
     ------
-    KeyError
+    ValueError
         If ``completed_trial_id`` is absent, which marks a table built before
         the event schema carried per-event trial context.
     """
-    required = ("stop_id", "completed_trial_id", "occupancy_well_arm")
-    missing = [column for column in required if column not in event_table.columns]
-    if missing:
-        raise KeyError(
-            "Retrospective visit contexts require event-grain column(s) "
-            f"{missing}; regenerate event_table with the current builder"
-        )
+    require_columns(
+        event_table,
+        ["stop_id", "completed_trial_id", "occupancy_well_arm"],
+        "event_table",
+    )
     if event_table.empty:
         return pd.Series(index=event_table.index, dtype=object)
     return pd.Series(
@@ -178,16 +177,9 @@ def at_well_event_cohort(
             event_arm_table.iloc[0:0].copy(),
             event_sequence_table.iloc[0:0].copy(),
         )
-    missing = [
-        column
-        for column in ("at_well", "occupancy_state", "occupancy_well_arm")
-        if column not in event_table
-    ]
-    if missing:
-        raise KeyError(
-            "at-well retrospective cohort requires canonical location column(s) "
-            f"{missing}; regenerate event tables"
-        )
+    require_columns(
+        event_table, ["at_well", "occupancy_state", "occupancy_well_arm"], "event_table"
+    )
     at_well, _ = select_event_cohort(event_table, cohort="at_well")
     current = pd.to_numeric(at_well["occupancy_well_arm"], errors="coerce")
     events = at_well.loc[np.isfinite(current)].reset_index(drop=True)
@@ -197,11 +189,7 @@ def at_well_event_cohort(
     def _restrict(frame: pd.DataFrame) -> pd.DataFrame:
         if frame.empty:
             return frame.iloc[0:0].copy()
-        missing = [column for column in key_cols if column not in frame]
-        if missing:
-            raise KeyError(
-                f"Event-family table is missing at-well cohort key column(s): {missing}"
-            )
+        require_columns(frame, key_cols, "event-family table")
         return frame.merge(keys, on=key_cols, how="inner", validate="many_to_one")
 
     return events, _restrict(event_arm_table), _restrict(event_sequence_table)
@@ -838,10 +826,9 @@ def _observable_event_keys(
     if any(
         metric in {"chosen_arm_fraction", "chosen_patch_fraction"} for metric in metrics
     ):
-        if not {"candidate_arm", "arm_fraction"}.issubset(event_arm_table):
-            raise KeyError(
-                "Arm-fraction retrospective metrics require arm and arm_fraction"
-            )
+        require_columns(
+            event_arm_table, ["candidate_arm", "arm_fraction"], "event_arm_table"
+        )
         arm = event_arm_table.copy()
         arm["_finite_fraction"] = np.isfinite(
             pd.to_numeric(arm["arm_fraction"], errors="coerce")
@@ -862,8 +849,9 @@ def _observable_event_keys(
     path_metrics = {"contains_path_to_next"}
     requested_sequence_metrics = set(metrics) & (endpoint_metrics | path_metrics)
     if requested_sequence_metrics:
-        if "decoded_arm_map" not in event_sequence_table:
-            raise KeyError("Sequence retrospective metrics require decoded_arm_map")
+        require_columns(
+            event_sequence_table, ["decoded_arm_map"], "event_sequence_table"
+        )
 
     if set(metrics) & path_metrics:
         sequence = event_sequence_table.assign(
@@ -902,22 +890,17 @@ def _freeze_retrospective_cohort_with_audit(
         )
     family = matching_families[0]
     n_events_input = int(len(event_table))
-    required_event_columns = {
+    required_event_columns = [
         "occupancy_well_arm",
         "next_arm",
         "stop_id",
         "event_midpoint_s",
-    }
+    ]
     if family == "patch":
-        required_event_columns.update({"current_patch", "next_patch"})
+        required_event_columns += ["current_patch", "next_patch"]
     if family == "path":
-        required_event_columns.add("n_nonlocal_bins")
-    missing = sorted(required_event_columns.difference(event_table.columns))
-    if missing:
-        raise KeyError(
-            "Calibrated retrospective shuffle requires canonical event "
-            f"column(s) {missing}; regenerate event tables"
-        )
+        required_event_columns.append("n_nonlocal_bins")
+    require_columns(event_table, required_event_columns, "event_table")
     session_cols = present_session_columns(event_table)
     if session_cols and event_table[session_cols].drop_duplicates().shape[0] > 1:
         raise ValueError(
@@ -982,12 +965,7 @@ def _freeze_retrospective_cohort_with_audit(
     ) -> pd.DataFrame:
         if frame.empty:
             return frame.iloc[0:0].copy()
-        missing_keys = sorted(set(key_cols).difference(frame.columns))
-        if missing_keys:
-            raise KeyError(
-                "Event-family table is missing retrospective cohort key "
-                f"column(s): {missing_keys}"
-            )
+        require_columns(frame, key_cols, "event-family table")
         return frame.merge(keys, on=key_cols, how="inner", validate="many_to_one")
 
     event_keys = events[key_cols].drop_duplicates()
@@ -1254,7 +1232,7 @@ def retrospective_alignment_with_shuffle(
 
     Raises
     ------
-    KeyError
+    ValueError
         If a required column is absent.
     RuntimeError
         If a metric's observed count disagrees with the frozen cohort

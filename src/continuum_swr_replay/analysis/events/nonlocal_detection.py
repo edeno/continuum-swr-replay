@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.events.immobility import (
     intervals_from_labels,
 )
 from continuum_swr_replay.intervals import total_duration
+from continuum_swr_replay.tables.columns import require_columns
 
 # Interval-arithmetic tolerance for floating-point noise (1 μs). Used in
 # classify_swr_overlap_geometry when comparing an event's duration to
@@ -285,10 +286,9 @@ def event_strict_overlap_mask(
     deliberately different from a raw per-bin coincidence mask, which splits
     partially overlapping events across both comparison groups.
     """
-    required = [*session_cols, primary_col, other_col]
-    missing = [column for column in required if column not in data_over_time]
-    if missing:
-        raise KeyError(f"data_over_time is missing required columns: {missing}")
+    require_columns(
+        data_over_time, [*session_cols, primary_col, other_col], "data_over_time"
+    )
 
     active = data_over_time[primary_col].to_numpy() > 0
     mask = np.zeros(len(data_over_time), dtype=bool)

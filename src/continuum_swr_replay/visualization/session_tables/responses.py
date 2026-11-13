@@ -17,6 +17,7 @@ from continuum_swr_replay.analysis.behavior import (
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS as _ALL_ARMS
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
 from continuum_swr_replay.intervals import sample_step
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.visualization.palettes import COLORS
 
 from ..plots import (
@@ -31,8 +32,17 @@ from ._common import (
     _MISSING_CELL_COLOR,
     _draw_event_arm_heatmap,
     _PanelContext,
-    _require_columns,
     _validate_binary,
+)
+
+#: The trial columns the trial panels and the next-arm audit read.
+_TRIAL_COLUMNS = (
+    "movement_start_time",
+    "end_time",
+    "from_well",
+    "to_well",
+    "is_reward",
+    "is_patch_change",
 )
 
 _MISMATCH_COLUMNS: tuple[str, ...] = (
@@ -134,18 +144,7 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
     """
     trials = ctx.trials
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
-    _require_columns(
-        trials,
-        "trials",
-        (
-            "movement_start_time",
-            "end_time",
-            "from_well",
-            "to_well",
-            "is_reward",
-            "is_patch_change",
-        ),
-    )
+    require_columns(trials, _TRIAL_COLUMNS, "trials")
     if len(trials) == 0:
         ax.text(
             0.5,
@@ -286,25 +285,14 @@ def _compute_mismatch_table(
     has no next trip). Any other combination is a mismatch and will be
     drawn in red by :func:`_plot_mismatch_pointers`.
     """
-    _require_columns(
+    require_columns(
         event_table,
-        "event_table",
         ("event_id", "event_start_s", "event_midpoint_s", "next_arm"),
+        "event_table",
     )
     if len(event_table) == 0:
         return pd.DataFrame(columns=_MISMATCH_COLUMNS)
-    _require_columns(
-        trials,
-        "trials",
-        (
-            "movement_start_time",
-            "end_time",
-            "from_well",
-            "to_well",
-            "is_reward",
-            "is_patch_change",
-        ),
-    )
+    require_columns(trials, _TRIAL_COLUMNS, "trials")
 
     event_starts = event_table["event_start_s"].to_numpy(dtype=float)
     event_midpoints = event_table["event_midpoint_s"].to_numpy(dtype=float)
@@ -1126,7 +1114,7 @@ def _plot_context_flags(ax: Axes, ctx: _PanelContext) -> None:
         )
         return
 
-    _require_columns(view, "event_table", flag_names)
+    require_columns(view, flag_names, "event_table")
     n_events = len(view)
     starts = view["event_start_s"].to_numpy(dtype=float)
     ends = view["event_end_s"].to_numpy(dtype=float)

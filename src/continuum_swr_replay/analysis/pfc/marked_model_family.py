@@ -60,6 +60,7 @@ from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.io import read_table, resolved_table_path
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -913,15 +914,15 @@ def stop_patch_switch_marks(stops: pd.DataFrame) -> pd.DataFrame:
 
     Raises
     ------
-    KeyError
-        If a required column is missing.
     ValueError
-        If ``stop_idx`` repeats, or if two stops disagree on a trial's arm.
+        If a required column is missing, ``stop_idx`` repeats, or two stops
+        disagree on a trial's arm.
     """
-    required = {"stop_idx", "completed_trial_id", "completed_trial_arm", "next_arm"}
-    missing = sorted(required - set(stops))
-    if missing:
-        raise KeyError(f"stops are missing column(s) {missing}")
+    require_columns(
+        stops,
+        ["stop_idx", "completed_trial_id", "completed_trial_arm", "next_arm"],
+        "the stops",
+    )
     if stops["stop_idx"].duplicated().any():
         raise ValueError("stop_idx must be unique within a session")
     trial = pd.to_numeric(stops["completed_trial_id"], errors="coerce").to_numpy(
@@ -1270,17 +1271,19 @@ def attach_recommended_event_marks(
     Raises
     ------
     KeyError
-        If ``mark_table`` lacks a required column or a class is missing.
+        If a class is missing.
     ValueError
-        If an ``event_id`` is duplicated or unmarked, if the marks' ``is_swr``
+        If ``mark_table`` lacks a required column, if an ``event_id`` is
+        duplicated or unmarked, if the marks' ``is_swr``
         or timing disagree with a class frame, if an already-present mark
         column disagrees with the family table, or if the join changes a
         frame's row order.
     """
-    required = {"event_id", "event_start_s", "event_end_s", "is_swr"}
-    missing = sorted(required - set(mark_table))
-    if missing:
-        raise KeyError(f"mark table is missing columns {missing}")
+    require_columns(
+        mark_table,
+        ["event_id", "event_start_s", "event_end_s", "is_swr"],
+        "the mark table",
+    )
     if mark_table.event_id.duplicated().any():
         raise ValueError("mark table must contain one row per event_id")
     requested: list[object] = []
@@ -1390,11 +1393,10 @@ def load_session_recommended_event_marks(
 
     Raises
     ------
-    KeyError
-        If either table lacks the canonical session columns.
     ValueError
-        If the session has no rows in either table, or if mark derivation or
-        attachment refuses the session's tables.
+        If either table lacks the canonical session columns, if the session has
+        no rows in either table, or if mark derivation or attachment refuses the
+        session's tables.
     """
     arm_path = (
         table_path("event_arm_table")
@@ -1408,10 +1410,8 @@ def load_session_recommended_event_marks(
     )
     arm_table = read_table(arm_path)
     event_table = read_table(event_path)
-    for name, table in (("event-arm", arm_table), ("event", event_table)):
-        missing = sorted(set(SESSION_COLUMNS) - set(table))
-        if missing:
-            raise KeyError(f"{name} table is missing session columns {missing}")
+    for name, table in (("event_arm_table", arm_table), ("event_table", event_table)):
+        require_columns(table, SESSION_COLUMNS, name)
     animal, session_date = parse_nwb_filename(nwb_file_name)
 
     def session_rows(table: pd.DataFrame) -> pd.DataFrame:

@@ -30,6 +30,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events.cohort_selection import select_stop_cohort
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ..cohort_audit import fitted_cohort_record, stop_own_missing, term_diagnostics
@@ -444,12 +445,7 @@ def join_contrast_qvals(
         ladders need (``SWR_CONTRAST_RATE_STOP_COVARS``) is not on the joined
         table.
     """
-    missing = [c for c in QVALS_COLUMNS if c not in q.columns]
-    if missing:
-        raise ValueError(
-            f"qvals_table missing {missing}; regenerate it "
-            "(uv run python scripts/behavior/build_qvals_table.py --write)"
-        )
+    require_columns(q, QVALS_COLUMNS, "qvals_table")
     n0 = len(stop)
     stop = stop.merge(
         q[QVALS_COLUMNS], on="stop_id", how="inner", validate="many_to_one"
@@ -457,12 +453,7 @@ def join_contrast_qvals(
     # fail loudly if a task covariate the specs need never made it onto the stop
     # table (rename / add_uncertainty_covariates / qvals regression) -- otherwise
     # every model using it would silently drop out of the output.
-    missing_cov = [c for c in STOP_COVARS if c not in stop.columns]
-    if missing_cov:
-        raise ValueError(
-            f"stop table missing task covariates {missing_cov} "
-            "(check add_uncertainty_covariates + the qvals merge)"
-        )
+    require_columns(stop, STOP_COVARS, "the stop table joined to qvals_table")
     logger.info(
         "stop x qvals join: %d -> %d stops (%.0f%% kept)",
         n0,

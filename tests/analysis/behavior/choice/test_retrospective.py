@@ -719,7 +719,7 @@ class TestRetrospectiveAlignmentWithShuffle:
         ).drop(columns="at_well")
         ea = _make_event_arm_table({1: [1.0] + [0.0] * 8})
         es = _make_event_sequence_table({1: [0, 1]})
-        with pytest.raises(KeyError, match="regenerate event tables"):
+        with pytest.raises(ValueError, match=r"event_table lacks .*'at_well'"):
             at_well_event_cohort(ev, ea, es)
 
     def test_rejects_singleton_after_explicit_at_well_cohort(self):

@@ -561,7 +561,7 @@ def test_freeze_per_bin_cohort_requires_its_columns():
     from continuum_swr_replay.analysis.behavior import freeze_per_bin_cohort
 
     design = make_per_bin_rate_design(n_stops=20, n_bins=5, seed=0)
-    with pytest.raises(KeyError, match="hist_rcos_0"):
+    with pytest.raises(ValueError, match="hist_rcos_0"):
         freeze_per_bin_cohort(design, [MODEL_PER_BIN_RATE["M3r_histcos"]])
 
 

@@ -25,6 +25,7 @@ from continuum_swr_replay.analysis.events.analysed_time import (
     excluded_intervals_by_session,
 )
 from continuum_swr_replay.intervals import overlaps_intervals
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .design_constants import (
@@ -619,10 +620,10 @@ def aggregate_to_timebins(
         immobility_duration_s)``) AND land in a bin the exposure filter keeps --
         e.g. an onset at or past the end of its stop's immobility, which is
         binned into the stop's last bin but earns no exposure there.
-    KeyError
-        If excluded time has rows and ``stop_table`` has no ``stop_start``, or
-        if ``stop_table`` lacks a column ``arrival_clocks`` or (with
-        ``reward_basis``) ``outcome_shift`` needs.
+        Also if excluded time has rows and ``stop_table`` has no
+        ``stop_start``, if ``stop_table`` lacks a column ``arrival_clocks`` or
+        (with ``reward_basis``) ``outcome_shift`` needs, or if
+        ``offset_history`` is set and an onset table lacks the event end.
     SwrSourceError
         With the default ``excluded_intervals``, if an artifact run is
         configured but does not serve one of ``stop_table``'s sessions (as
@@ -649,8 +650,7 @@ def aggregate_to_timebins(
         if cross_history_lags:
             streams["cross_onset_times"] = cross_onset_times
         for name, frame in streams.items():
-            if _END_COLUMN not in frame.columns:
-                raise KeyError(f"offset_history needs {_END_COLUMN!r} in {name}")
+            require_columns(frame, [_END_COLUMN], f"{name} (offset_history=True)")
     reward_cols = (
         [*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE] if reward_basis else []
     )
@@ -664,18 +664,13 @@ def aggregate_to_timebins(
         ),
     }
     for flag, columns in required.items():
-        missing = [c for c in dict.fromkeys(columns) if c not in stop_table.columns]
-        if missing:
-            raise KeyError(
-                f"aggregate_to_timebins({flag}=True) needs {missing} in "
-                f"stop_table; pass {flag}=False to build the design without it"
-            )
+        require_columns(stop_table, columns, f"stop_table ({flag}=True)")
     if excluded_intervals is None:
         excluded_intervals = excluded_intervals_by_session(stop_table)
     # an empty mask masks nothing, so a stop table without bounds still builds
     mask_excluded = len(excluded_intervals) > 0
-    if mask_excluded and "stop_start" not in stop_table.columns:
-        raise KeyError("excluded_intervals needs stop_start in stop_table")
+    if mask_excluded:
+        require_columns(stop_table, ["stop_start"], "stop_table (excluded time)")
     internal_cols = list(
         dict.fromkeys(
             (_ARRIVAL_CLOCK_STOP_COLUMNS if arrival_clocks else ())

@@ -28,6 +28,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.data_loaders.utils import get_labels
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 logger = logging.getLogger(__name__)
@@ -173,10 +174,7 @@ def whole_event_immobility_mask(
     """
     threshold = _validate_speed_threshold(speed_threshold)
     key_cols = [*group_cols, event_col]
-    required = [*key_cols, speed_col]
-    missing = [column for column in required if column not in data.columns]
-    if missing:
-        raise KeyError(f"data is missing required columns: {missing}")
+    require_columns(data, [*key_cols, speed_col], "data")
 
     labels = data[event_col].to_numpy()
     speed = data[speed_col].to_numpy(dtype=float)
@@ -301,16 +299,13 @@ def validate_nonlocal_event_probability_contract(
         raise ValueError(
             f"probability_threshold must be finite, got {probability_threshold!r}"
         )
-    if event_col not in data.columns:
-        raise KeyError(f"data is missing required column: {event_col!r}")
+    require_columns(data, [event_col], "data")
     labels = data[event_col].to_numpy()
     active = labels > 0
     if not active.any():
         return
 
-    missing = [column for column in probability_cols if column not in data.columns]
-    if missing:
-        raise KeyError(f"data is missing required columns: {missing}")
+    require_columns(data, probability_cols, "data")
 
     probability = np.zeros(len(data), dtype=float)
     for column in probability_cols:
@@ -344,13 +339,7 @@ def filter_event_intervals_by_speed(
     surviving count.
     """
     threshold = _validate_speed_threshold(speed_threshold)
-    missing = [
-        column
-        for column in ("start_time", "end_time")
-        if column not in event_times.columns
-    ]
-    if missing:
-        raise KeyError(f"event_times is missing required columns: {missing}")
+    require_columns(event_times, ["start_time", "end_time"], "event_times")
 
     time_values = np.asarray(time, dtype=float)
     speed_values = np.asarray(speed, dtype=float)
@@ -409,13 +398,11 @@ def intervals_from_labels(
 
     Raises
     ------
-    KeyError
-        If `label_col` is missing.
     ValueError
-        If the frame's index is not a time axis (:func:`require_time_index`).
+        If `label_col` is missing, or the frame's index is not a time axis
+        (:func:`require_time_index`).
     """
-    if label_col not in session_df.columns:
-        raise KeyError(f"session_df is missing required column: {label_col!r}")
+    require_columns(session_df, [label_col], "session_df")
     require_time_index(session_df, "intervals_from_labels")
 
     is_active = session_df[label_col].to_numpy() > 0

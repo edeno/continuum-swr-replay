@@ -34,6 +34,7 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.io import sha256_file, write_json
 from continuum_swr_replay.runs.provenance import git, git_commit, git_dirty
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.io import (
     SWR_SOURCE_ATTR,
     SWR_SOURCE_TABLES,
@@ -156,18 +157,11 @@ def _validate_model_bundle(
         raise ValueError(f"{directory} is missing model outputs: {missing}")
 
     results = pd.read_pickle(required_paths["all_models"])
-    required_columns = {
-        *SESSION_COLUMNS,
-        "model",
-        "n_events",
-        "aic",
-        "bic",
-        "llf",
-        "pseudo_r2",
-    }
-    missing_columns = sorted(required_columns.difference(results.columns))
-    if missing_columns:
-        raise ValueError(f"{directory} is missing model fields: {missing_columns}")
+    require_columns(
+        results,
+        [*SESSION_COLUMNS, "model", "n_events", "aic", "bic", "llf", "pseudo_r2"],
+        f"{directory}/all_models.pkl",
+    )
     if results.empty:
         raise ValueError(f"{directory} contains no model results")
     key_columns = [*SESSION_COLUMNS, "model"]

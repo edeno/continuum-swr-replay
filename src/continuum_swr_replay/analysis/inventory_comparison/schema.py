@@ -27,6 +27,7 @@ from continuum_swr_replay.analysis.events.immobility import (
     event_speeds_are_immobile,
 )
 from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
@@ -345,12 +346,6 @@ def inventory_from_intervals(
     return _finish(frame)
 
 
-def _require_columns(frame: pd.DataFrame, columns: Iterable[str], source: str) -> None:
-    missing = [column for column in columns if column not in frame.columns]
-    if missing:
-        raise ValueError(f"The {source} table lacks {missing}.")
-
-
 def from_classified_nonlocal_table(
     classified: pd.DataFrame, *, brain_area: str, run_id: str
 ) -> pd.DataFrame:
@@ -360,7 +355,7 @@ def from_classified_nonlocal_table(
     an event of the cohort; whole-event speed eligibility travels as a flag
     and is applied to every inventory alike by :func:`combine_inventories`.
     """
-    _require_columns(
+    require_columns(
         classified,
         (
             "animal",
@@ -374,7 +369,7 @@ def from_classified_nonlocal_table(
             "animal_mean_speed_cm_s",
             "whole_event_speed_eligible",
         ),
-        "classified non-local event",
+        "the classified non-local event table",
     )
     frame = pd.DataFrame(
         {
@@ -438,7 +433,7 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
             f"cohort must be one of {list(MEMORYLESS_COHORTS)}, got {cohort!r}."
         )
     flag = MEMORYLESS_COHORTS[cohort]
-    _require_columns(
+    require_columns(
         table,
         (
             "animal",
@@ -458,7 +453,7 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
             "n_shuffles",
             "swr_definition",
         ),
-        "memoryless event",
+        "the memoryless event table",
     )
     untested = table.is_replay.to_numpy(dtype=bool) & (table.n_shuffles.to_numpy() == 0)
     if cohort == "published" and untested.any():

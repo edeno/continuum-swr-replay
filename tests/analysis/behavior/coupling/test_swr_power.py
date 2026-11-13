@@ -212,7 +212,7 @@ def test_swr_power_gate_requires_timing_columns():
             mod.POWER_COL: [0.0],
         }
     )
-    with pytest.raises(KeyError, match="event_start_s"):
+    with pytest.raises(ValueError, match="event_start_s"):
         mod.power_cohort_records(df, pd.DataFrame())
 
 

@@ -20,6 +20,7 @@ from continuum_swr_replay.data_loaders.constants import (
     WELL_ARMS,
     port_columns,
 )
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -167,17 +168,11 @@ def attach_contingency_value_block(
     n_rows = len(arm)
     if contingency is None:
         return np.full(n_rows, np.nan), np.full(n_rows, np.nan)
-    missing = {"stop_id", *_P_REWARD_PORT_COLS, *_Q_PORT_COLS} - set(
-        contingency.columns
+    require_columns(
+        contingency,
+        ["stop_id", *_P_REWARD_PORT_COLS, *_Q_PORT_COLS],
+        "the contingency (qvals_table)",
     )
-    if missing:
-        raise ValueError(
-            "contingency is missing per-arm value columns "
-            f"{sorted(missing)}; qvals_table is the sole source and must carry "
-            "task_reward_probability_port_{0..5} / "
-            "reward_belief_mean_port_{0..5} (regenerate with "
-            "`uv run python scripts/behavior/build_qvals_table.py --write`)"
-        )
     merged = _merge_contingency_on_stop(
         stop_id,
         arm,
@@ -245,14 +240,9 @@ def attach_arm_uncertainty(
     n_rows = len(arm)
     if contingency is None:
         return np.full(n_rows, np.nan)
-    missing = {"stop_id", *_BETADIST_VAR_COLS} - set(contingency.columns)
-    if missing:
-        raise ValueError(
-            "contingency is missing per-leaf beta-variance columns "
-            f"{sorted(missing)}; regenerate qvals_table with "
-            "`uv run python scripts/behavior/build_qvals_table.py --write` "
-            "(carries reward_belief_variance_port_{0..5})."
-        )
+    require_columns(
+        contingency, ["stop_id", *_BETADIST_VAR_COLS], "the contingency (qvals_table)"
+    )
     merged = _merge_contingency_on_stop(
         stop_id, arm, contingency, list(_BETADIST_VAR_COLS), alignment="uncertainty"
     )
@@ -343,12 +333,10 @@ def assert_qvals_aligned(
     """
     if contingency is None or contingency.empty or stop_table.empty:
         return
-    missing_cols = {"stop_id", "qvals_context_time", "epoch"} - set(contingency.columns)
-    if missing_cols:
-        raise ValueError(f"qvals table is missing columns {sorted(missing_cols)}")
-    missing_cols = {"stop_id", "stop_start", "epoch"} - set(stop_table.columns)
-    if missing_cols:
-        raise ValueError(f"stop table is missing columns {sorted(missing_cols)}")
+    require_columns(
+        contingency, ["stop_id", "qvals_context_time", "epoch"], "qvals_table"
+    )
+    require_columns(stop_table, ["stop_id", "stop_start", "epoch"], "stop_table")
 
     expected = contingency.loc[
         _qvals_rows_expected_in(stop_table, contingency),

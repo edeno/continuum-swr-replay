@@ -76,6 +76,7 @@ from continuum_swr_replay.paths import (
     processed_data_dir,
     table_path,
 )
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
@@ -651,9 +652,7 @@ def _copy_by_key(
     """
     if target.duplicated(keys).any() or source.duplicated(keys).any():
         raise ValueError(f"posterior transfer requires unique keys {keys}")
-    missing = sorted(set(columns) - set(source))
-    if missing:
-        raise ValueError(f"posterior source is missing columns {missing}")
+    require_columns(source, columns, "the posterior source")
     left_keys = pd.MultiIndex.from_frame(target.loc[:, keys])
     right = source.copy()
     right.index = pd.MultiIndex.from_frame(source.loc[:, keys])

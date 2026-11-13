@@ -856,7 +856,7 @@ FROZEN_DIGEST = "7a2311d8acfde43383573a07f6da8a08c7220eb6797a38a3bb962c3dc014fc3
 def test_arrival_clocks_raise_on_a_missing_clock_column(arrival_clock_stops, column):
     """The clocks are on by default; a stop table without their input says so."""
     stops, onsets = arrival_clock_stops
-    with pytest.raises(KeyError, match=rf"arrival_clocks=True.*'{column}'"):
+    with pytest.raises(ValueError, match=rf"arrival_clocks=True.*'{column}'"):
         aggregate_to_timebins(stops.drop(columns=column), onsets, bin_s=0.1, tmax=0.5)
 
 
@@ -866,7 +866,7 @@ def test_arrival_clocks_raise_on_a_missing_clock_column(arrival_clock_stops, col
 def test_outcome_shift_raises_on_a_missing_shift_column(arrival_clock_stops, column):
     """With the reward basis the shift is on by default; its inputs are required."""
     stops, onsets = arrival_clock_stops
-    with pytest.raises(KeyError, match=rf"outcome_shift=True.*'{column}'"):
+    with pytest.raises(ValueError, match=rf"outcome_shift=True.*'{column}'"):
         aggregate_to_timebins(
             stops.drop(columns=column), onsets, bin_s=0.1, tmax=0.5, reward_basis=True
         )

@@ -29,6 +29,7 @@ from continuum_swr_replay.paths import (
     QVALS_STANDARDIZATION_REFERENCE,
     table_path,
 )
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import (
     REGISTRY,
     require_covariate_schema,
@@ -308,16 +309,11 @@ def add_beta_belief_entropy(vals: pd.DataFrame) -> pd.DataFrame:
     HMM discrete Shannon entropy) -- expected; the covariate is used standardized.
     Mutates and returns ``vals``. Raises if the posterior params are absent.
     """
-    missing = [
-        f"betadist_{g}{i}"
-        for i in range(1, 7)
-        for g in ("α", "β")
-        if f"betadist_{g}{i}" not in vals.columns
-    ]
-    if missing:
-        raise ValueError(
-            f"beta posterior params missing {missing}; cannot build beta_reward_entropy"
-        )
+    require_columns(
+        vals,
+        [f"betadist_{g}{i}" for i in range(1, 7) for g in ("α", "β")],
+        "the behavior model's trial table",
+    )
     ent = np.zeros(len(vals))
     for i in range(1, 7):
         a = vals[f"betadist_α{i}"].to_numpy(dtype=float)
@@ -506,20 +502,11 @@ def _model_covariate_columns(vals: pd.DataFrame) -> list[str]:
     contrast, paper-fitted predictors and the columns required to verify or
     attach them are mandatory and produce a targeted error at ingestion.
     """
-    missing_fitted = sorted(set(REQUIRED_FITTED_MODEL_COVARIATES) - set(vals.columns))
-    if missing_fitted:
-        raise ValueError(
-            "behavior model is missing required fitted model covariates "
-            f"{missing_fitted}"
-        )
-    missing_contract = sorted(
-        set(_REQUIRED_MODEL_CONTRACT_COVARIATES) - set(vals.columns)
+    require_columns(
+        vals,
+        [*REQUIRED_FITTED_MODEL_COVARIATES, *_REQUIRED_MODEL_CONTRACT_COVARIATES],
+        "the behavior model's trial table",
     )
-    if missing_contract:
-        raise ValueError(
-            "behavior model is missing required qvals contract covariates "
-            f"{missing_contract}"
-        )
     return [column for column in COVARIATES if column in vals.columns]
 
 
@@ -527,11 +514,7 @@ def _validate_trial_keys(
     frame: pd.DataFrame, *, source: str, require_consecutive: bool
 ) -> None:
     """Validate one-row-per-trial keys before any timing/model alignment."""
-    missing_columns = set(KEYS) - set(frame.columns)
-    if missing_columns:
-        raise ValueError(
-            f"{source} trial table is missing key columns {sorted(missing_columns)}"
-        )
+    require_columns(frame, KEYS, f"the {source} trial table")
     if frame[KEYS].isna().any().any():
         raise ValueError(f"{source} trial keys contain missing values")
     duplicate = frame.duplicated(KEYS, keep=False)
@@ -643,18 +626,8 @@ def _join_model_to_trial_timebase(
     _validate_trial_keys(times, source="timing", require_consecutive=True)
     _validate_trial_keys(vals, source="model", require_consecutive=False)
 
-    required_model_columns = {"leaf", "reward", *model_cols}
-    missing_model_columns = required_model_columns - set(vals.columns)
-    if missing_model_columns:
-        raise ValueError(
-            f"model trial table is missing join columns {sorted(missing_model_columns)}"
-        )
-    missing_timing_columns = {"leaf", "reward", *TIME_COLS} - set(times.columns)
-    if missing_timing_columns:
-        raise ValueError(
-            "timing trial table is missing authoritative columns "
-            f"{sorted(missing_timing_columns)}"
-        )
+    require_columns(vals, ["leaf", "reward", *model_cols], "the model trial table")
+    require_columns(times, ["leaf", "reward", *TIME_COLS], "the timing trial table")
 
     timing = times.copy()
     timing["_timing_row_order"] = np.arange(len(timing), dtype=np.int64)
@@ -920,24 +893,25 @@ def build_animal(
 
 def _validate_qvals_output(tab: pd.DataFrame) -> None:
     """Validate the persisted stop-value contract before standardization/write."""
-    required = {
-        "stop_id",
-        "task_reward_probability_chosen_arm",
-        "chosen_arm",
-        "reward_belief_mean_chosen_arm_preoutcome",
-        "rpe_postoutcome_abs",
-        *REQUIRED_FITTED_MODEL_COVARIATES,
-        *port_columns("task_reward_probability"),
-        *port_columns("reward_belief_mean"),
-        *port_columns("reward_belief_variance"),
-        "reward_belief_differential_entropy_leaf_mean_preoutcome",
-        "outcome_known_time",
-        "qvals_context_time",
-        "trial_reward",
-    }
-    missing = required - set(tab.columns)
-    if missing:
-        raise ValueError(f"qvals_table is missing required columns {sorted(missing)}")
+    require_columns(
+        tab,
+        [
+            "stop_id",
+            "task_reward_probability_chosen_arm",
+            "chosen_arm",
+            "reward_belief_mean_chosen_arm_preoutcome",
+            "rpe_postoutcome_abs",
+            *REQUIRED_FITTED_MODEL_COVARIATES,
+            *port_columns("task_reward_probability"),
+            *port_columns("reward_belief_mean"),
+            *port_columns("reward_belief_variance"),
+            "reward_belief_differential_entropy_leaf_mean_preoutcome",
+            "outcome_known_time",
+            "qvals_context_time",
+            "trial_reward",
+        ],
+        "qvals_table",
+    )
     if tab["stop_id"].isna().any() or tab["stop_id"].duplicated().any():
         duplicates = int(tab["stop_id"].duplicated(keep=False).sum())
         raise ValueError(

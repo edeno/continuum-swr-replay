@@ -246,7 +246,7 @@ def test_nonlocal_probability_columns_are_required_only_for_active_labels():
         pd.DataFrame({"non_local_event": [0, 0]})
     )
 
-    with pytest.raises(KeyError, match="Non-Local_Continuous_prob"):
+    with pytest.raises(ValueError, match="Non-Local_Continuous_prob"):
         validate_nonlocal_event_probability_contract(
             pd.DataFrame({"non_local_event": [0, 1]})
         )

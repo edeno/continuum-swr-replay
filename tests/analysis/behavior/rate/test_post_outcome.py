@@ -167,7 +167,7 @@ def test_gate_audit_exposes_asymmetric_time_course_truncation():
 
 def test_post_outcome_bin_gate_fails_loud_without_physical_timing():
     design = pd.DataFrame({"stop_id": [1], "binj": [0]})
-    with pytest.raises(KeyError, match="outcome_known_time"):
+    with pytest.raises(ValueError, match="outcome_known_time"):
         gate_bins_after_outcome(design, MU_UNCERTAINTY)
 
 

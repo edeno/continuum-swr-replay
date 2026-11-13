@@ -26,6 +26,7 @@ from continuum_swr_replay.analysis.events.cohort_selection import select_stop_co
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.io import parquet_path, read_table
 
 __all__ = ["load_session_stop_cohort", "split_sorted_epochs"]
@@ -97,10 +98,9 @@ def load_session_stop_cohort(
     ------
     FileNotFoundError
         If no stop table exists at ``stop_table_path``.
-    KeyError
-        If the table lacks ``occupancy_state`` or the session columns.
     ValueError
-        If the session has no stops at all -- a missing session is a data
+        If the table lacks ``occupancy_state`` or the session columns, or if
+        the session has no stops at all -- a missing session is a data
         problem, not an empty cohort, and fitting the whole epoch instead would
         silently reintroduce the population this restriction exists to remove.
     """
@@ -110,13 +110,9 @@ def load_session_stop_cohort(
     animal, session_date = parse_nwb_filename(nwb_file_name)
 
     stop_table = read_table(path)
-    missing = [
-        column
-        for column in ("animal", "session_date", "epoch")
-        if column not in stop_table.columns
-    ]
-    if missing:
-        raise KeyError(f"stop table at {path} is missing session column(s) {missing}")
+    require_columns(
+        stop_table, ["animal", "session_date", "epoch"], f"the stop table at {path}"
+    )
 
     is_session = (
         (stop_table["animal"] == animal)

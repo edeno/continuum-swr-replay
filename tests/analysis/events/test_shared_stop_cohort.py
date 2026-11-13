@@ -201,7 +201,7 @@ def test_content_runner_cohort_step_refuses_a_table_without_the_column():
     """
     frame = pd.DataFrame({"event_id": ["e0"], "candidate_arm": [0]})
 
-    with pytest.raises(KeyError, match="occupancy_state"):
+    with pytest.raises(ValueError, match="occupancy_state"):
         content_cohort.select_event_cohort(frame, cohort="at_well")
 
     with pytest.raises(ValueError, match="occupancy_state"):

@@ -30,6 +30,7 @@ from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
 )
 from continuum_swr_replay.paths import STANDARDIZATION_REFERENCE
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.tables.standardization import (
     assert_standardized_matches_reference,
@@ -74,14 +75,6 @@ _CV_COUNT_COLUMNS = (
     "cv_n_nonconverged_folds",
     "cv_n_separated_folds",
 )
-
-
-def _require_columns(
-    frame: pd.DataFrame, columns: Iterable[str], *, table_name: str
-) -> None:
-    missing = sorted(set(columns) - set(frame.columns))
-    if missing:
-        raise ValueError(f"{table_name} is missing required columns {missing}")
 
 
 def _require_stable_event_context(frame: pd.DataFrame, columns: Iterable[str]) -> None:
@@ -138,7 +131,7 @@ def _require_exact_group_members(
 def _require_event_set_matches(
     derived: pd.DataFrame, event_table: pd.DataFrame, *, table_name: str
 ) -> None:
-    _require_columns(event_table, ("event_id",), table_name="event_table")
+    require_columns(event_table, ["event_id"], "event_table")
     if (
         event_table["event_id"].isna().any()
         or event_table["event_id"].duplicated().any()
@@ -314,11 +307,7 @@ def validate_event_arm_table(
     frame: pd.DataFrame, *, event_table: pd.DataFrame | None = None
 ) -> None:
     """Validate the complete nine-choice scientific row contract."""
-    _require_columns(
-        frame,
-        ("event_id", "candidate_arm"),
-        table_name="event_arm",
-    )
+    require_columns(frame, ["event_id", "candidate_arm"], "event_arm")
     _require_exact_group_members(
         frame,
         group_column="event_id",
@@ -356,7 +345,7 @@ def validate_event_patch_table(
     frame: pd.DataFrame, *, event_table: pd.DataFrame | None = None
 ) -> None:
     """Validate the complete three-patch scientific row contract."""
-    _require_columns(frame, ("event_id", "patch"), table_name="event_patch")
+    require_columns(frame, ["event_id", "patch"], "event_patch")
     _require_exact_group_members(
         frame,
         group_column="event_id",

@@ -156,7 +156,7 @@ def test_overlapping_at_risk_events_raise():
 
 def test_offset_history_needs_event_ends_and_self_lags():
     no_end = RESP.drop(columns="t_end_since_stop_onset")
-    with pytest.raises(KeyError, match="t_end_since_stop_onset"):
+    with pytest.raises(ValueError, match="t_end_since_stop_onset"):
         aggregate_to_timebins(
             _stops(),
             no_end,

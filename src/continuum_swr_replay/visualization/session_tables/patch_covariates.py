@@ -11,6 +11,8 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.cm import ScalarMappable
 
+from continuum_swr_replay.tables.columns import require_columns
+
 from ._common import (
     _MISSING_CELL_COLOR,
     _PROBABILITY_CMAP,
@@ -18,7 +20,6 @@ from ._common import (
     _add_interval_cells,
     _overlay_missing_references,
     _PanelContext,
-    _require_columns,
     _validate_binary,
 )
 
@@ -47,17 +48,13 @@ def _patch_view_with_times(ctx: _PanelContext, value_col: str) -> pd.DataFrame:
             "plot_session_tables(event_patch_table=...)"
         )
     ept = ctx.event_patch_table
-    if value_col not in ept.columns:
-        raise KeyError(
-            f"event_patch_table has no column {value_col!r}; "
-            f"available: {sorted(ept.columns)}"
-        )
+    require_columns(ept, [value_col], "event_patch_table")
     if ctx._event_patch_with_times is None:
-        _require_columns(ept, "event_patch_table", ("event_id", "patch"))
-        _require_columns(
+        require_columns(ept, ("event_id", "patch"), "event_patch_table")
+        require_columns(
             ctx.event_table,
-            "event_table",
             ("event_id", "event_start_s", "event_end_s"),
+            "event_table",
         )
         if ept[["event_id", "patch"]].isna().any().any():
             raise ValueError("event_patch_table event_id and patch must be non-missing")
@@ -117,8 +114,7 @@ def _patch_view_with_times(ctx: _PanelContext, value_col: str) -> pd.DataFrame:
         )
 
     merged = ctx._event_patch_with_times
-    if value_col not in merged.columns:
-        raise KeyError(f"event_patch_table has no column {value_col!r}")
+    require_columns(merged, [value_col], "event_patch_table")
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     return merged[(merged["event_start_s"] <= hi) & (merged["event_end_s"] >= lo)]
 

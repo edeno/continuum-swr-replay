@@ -59,6 +59,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
 from continuum_swr_replay.decoding.results import nonlocal_probability
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.event_ids import hash_event_id, validate_event_ids
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
@@ -223,14 +224,11 @@ def build_classified_nonlocal_event_table(
     ``event_duration`` are in seconds; the four ``animal_*_speed_cm_s``
     columns are in cm/s.
     """
-    missing = [c for c in _REQUIRED_DOT_COLUMNS if c not in dot.columns]
-    if missing:
-        raise KeyError(
-            f"build_classified_nonlocal_event_table: dot is missing required "
-            f"columns {missing}. Pass a data_over_time frame read through the "
-            f"SWR source (analysed_time.read_dot_with_swr_source, or "
-            f"analysed_time.with_swr_source on a decode's frame)."
-        )
+    require_columns(
+        dot,
+        _REQUIRED_DOT_COLUMNS,
+        "dot (a data_over_time frame read through the SWR source)",
+    )
 
     validate_nonlocal_event_probability_contract(
         dot,

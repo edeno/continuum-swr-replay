@@ -8,6 +8,7 @@ import numpy as np
 from matplotlib.axes import Axes
 
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS as _ALL_ARMS
+from continuum_swr_replay.tables.columns import require_columns
 
 from ._common import (
     _ANNOTATION_FONTSIZE,
@@ -20,7 +21,6 @@ from ._common import (
     _format_arm_axis,
     _overlay_missing_references,
     _PanelContext,
-    _require_columns,
     _validate_binary,
 )
 
@@ -46,10 +46,10 @@ def _draw_event_arm_indicator(
     """
     lo, hi = ctx.time_slice.start, ctx.time_slice.stop
     eat = ctx.event_arm_table
-    _require_columns(
+    require_columns(
         eat,
-        "event_arm_table",
         ("event_start_s", "event_end_s", "candidate_arm", value_col),
+        "event_arm_table",
     )
     view = eat[(eat["event_start_s"] <= hi) & (eat["event_end_s"] >= lo)]
 

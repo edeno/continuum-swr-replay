@@ -51,6 +51,7 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .._fit_diagnostics import (
@@ -64,8 +65,8 @@ from .._fit_diagnostics import (
 )
 from ..cohort_audit import cohort_record
 from ..common_cohort import (
-    _require_block_columns,
     block_required_columns,
+    block_table_name,
     freeze_session_cohort,
 )
 from ..model_specs import MODEL_PER_STOP_RATE
@@ -417,13 +418,12 @@ def fit_per_stop_rate_hierarchy(
     """
     responses = list(outcomes.values())
     required_base = [*responses, OFFSET_COL]
-    _require_block_columns(
+    require_columns(
         stop_table,
         block_required_columns(
             MODEL_PER_STOP_RATE, unit_col="stop_id", required_base=required_base
         ),
-        analysis="rate_hierarchy",
-        event_source=event_source,
+        block_table_name("rate_hierarchy", event_source),
     )
 
     rows = []

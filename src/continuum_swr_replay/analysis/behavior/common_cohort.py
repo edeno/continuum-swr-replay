@@ -23,6 +23,7 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     freeze_common_cohort,
     sorted_unit_ids,
 )
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .covariate_timing import assert_predictor_timing
@@ -45,26 +46,10 @@ def block_required_columns(
     return list(dict.fromkeys([unit_col, *required_base, *predictor_union(models)]))
 
 
-def _require_block_columns(
-    table: pd.DataFrame,
-    required_cols: list[str],
-    *,
-    analysis: str,
-    event_source: str | None,
-) -> None:
-    """Raise if the block's table lacks a column the block reads.
-
-    A missing column is a broken table contract, not a gap in one session's
-    data: every session would lose the block. The run stops here rather than
-    saving a block that fit nothing.
-    """
-    missing = [col for col in required_cols if col not in table.columns]
-    if missing:
-        source = "" if event_source is None else f" (event source {event_source!r})"
-        raise ValueError(
-            f"{analysis}{source}: the table lacks required column(s) {missing}; "
-            "rebuild the table so it carries every column the block's models read"
-        )
+def block_table_name(analysis: str, event_source: str | None) -> str:
+    """How a refusal names a block's table: the block, and its event source."""
+    source = "" if event_source is None else f" of event source {event_source!r}"
+    return f"the {analysis} table{source}"
 
 
 def hash_unit_ids(ids: tuple) -> str:
@@ -224,11 +209,10 @@ def fit_per_session_common_cohort(
     provenance_rows = []
     if len(table) == 0:
         return {name: pd.DataFrame() for name in models}, pd.DataFrame()
-    _require_block_columns(
+    require_columns(
         table,
         block_required_columns(models, unit_col=unit_col, required_base=required_base),
-        analysis=analysis,
-        event_source=event_source,
+        block_table_name(analysis, event_source),
     )
 
     for keys, group in table.groupby(SESS):

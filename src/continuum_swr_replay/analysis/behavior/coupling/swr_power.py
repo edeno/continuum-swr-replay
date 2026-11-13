@@ -32,6 +32,7 @@ from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS
 from continuum_swr_replay.analysis.hippocampus.class_or_continuum import (
     sarle_bimodality,
 )
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.tables.standardization import (
     Reference,
@@ -75,13 +76,11 @@ def post_outcome_masks(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     eligible : np.ndarray, shape (n_events,)
         Finite *and* starting at/after the outcome boundary.
     """
-    required = (*SC, "event_start_s", "outcome_known_time", "trial_reward")
-    missing = [column for column in required if column not in df.columns]
-    if missing:
-        raise KeyError(
-            "Post-outcome SWR-power gating requires physical timing column(s): "
-            f"{missing}. Regenerate event_table and qvals_table."
-        )
+    require_columns(
+        df,
+        [*SC, "event_start_s", "outcome_known_time", "trial_reward"],
+        "the SWR-power event frame",
+    )
 
     event_start = df["event_start_s"].to_numpy(dtype=float)
     boundary = df["outcome_known_time"].to_numpy(dtype=float)
@@ -103,9 +102,7 @@ def post_outcome_masks(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
 
 def _power_fit_complete_mask(df: pd.DataFrame) -> np.ndarray:
     """Rows retained by the OLS model's exact listwise-finite filter."""
-    missing = [column for column in POWER_FIT_COLUMNS if column not in df.columns]
-    if missing:
-        raise KeyError(f"SWR-power fit requires model column(s): {missing}")
+    require_columns(df, POWER_FIT_COLUMNS, "the SWR-power event frame")
     return np.isfinite(df[list(POWER_FIT_COLUMNS)].to_numpy(dtype=float)).all(axis=1)
 
 

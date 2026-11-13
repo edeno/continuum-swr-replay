@@ -18,6 +18,7 @@ from matplotlib.patches import Rectangle
 
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS as _ALL_ARMS
 from continuum_swr_replay.data_loaders.constants import TRUNK_ARMS
+from continuum_swr_replay.tables.columns import require_columns
 
 _TRUNK_ARMS: frozenset[int] = frozenset(TRUNK_ARMS)
 _COLLECTION_THRESHOLD = 128
@@ -73,17 +74,6 @@ class _PanelContext:
     _colorbar_requests: dict[str, _ColorbarRequest] = field(
         default_factory=dict, init=False, repr=False
     )
-
-
-def _require_columns(
-    frame: pd.DataFrame,
-    frame_name: str,
-    columns: Sequence[str],
-) -> None:
-    """Raise an actionable error when a plotting input lacks columns."""
-    missing = [column for column in columns if column not in frame.columns]
-    if missing:
-        raise KeyError(f"{frame_name} has no column(s) {missing}")
 
 
 def _validate_binary(values: np.ndarray, value_name: str) -> None:
@@ -317,10 +307,10 @@ def _draw_event_arm_heatmap(
     # ``event_start_s`` / ``event_end_s`` per row (canonical
     # schema), so no merge with ``event_table`` is needed.
     eat = ctx.event_arm_table
-    _require_columns(
+    require_columns(
         eat,
-        "event_arm_table",
         ("event_start_s", "event_end_s", "candidate_arm", value_col),
+        "event_arm_table",
     )
     view = eat[(eat["event_start_s"] <= hi) & (eat["event_end_s"] >= lo)]
 

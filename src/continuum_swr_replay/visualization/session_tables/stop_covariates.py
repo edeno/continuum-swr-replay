@@ -10,6 +10,7 @@ from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection
 
 from continuum_swr_replay.analysis.behavior.model_specs import N_REWARD_LAGS
+from continuum_swr_replay.tables.columns import require_columns
 
 from ._common import (
     _MISSING_CELL_COLOR,
@@ -17,7 +18,6 @@ from ._common import (
     _ZERO_CELL_COLOR,
     _add_interval_cells,
     _PanelContext,
-    _require_columns,
     _validate_binary,
 )
 
@@ -32,7 +32,7 @@ from ._common import (
 def _stop_view(ctx: _PanelContext, cols: Sequence[str]) -> pd.DataFrame:
     """Validated, chronologically sorted stop rows overlapping the window."""
     st = ctx.stop_table
-    _require_columns(st, "stop_table", ("stop_start", "stop_end", *cols))
+    require_columns(st, ("stop_start", "stop_end", *cols), "stop_table")
     starts = st["stop_start"].to_numpy(dtype=float)
     ends = st["stop_end"].to_numpy(dtype=float)
     if not (np.isfinite(starts).all() and np.isfinite(ends).all()):

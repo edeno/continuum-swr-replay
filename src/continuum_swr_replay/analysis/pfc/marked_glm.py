@@ -43,6 +43,7 @@ from continuum_swr_replay.decoding.identifiers import (
 )
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.io import read_table, resolved_table_path
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -418,15 +419,21 @@ def build_baseline_columns(
 
     Raises
     ------
-    KeyError
-        If ``cohort_stops`` lacks a required column.
     ValueError
-        If a fitted bin lies outside every cohort stop.
+        If ``cohort_stops`` lacks a required column, or a fitted bin lies
+        outside every cohort stop.
     """
-    required = {"stop_start", "stop_end", "occupancy_well_id", "is_rewarded_outcome"}
-    missing = sorted((required | set(context_columns)) - set(cohort_stops))
-    if missing:
-        raise KeyError(f"cohort stops are missing column(s) {missing}")
+    require_columns(
+        cohort_stops,
+        [
+            "stop_start",
+            "stop_end",
+            "occupancy_well_id",
+            "is_rewarded_outcome",
+            *context_columns,
+        ],
+        "the cohort stops",
+    )
     time = fit_mask.index.to_numpy(dtype=float)
     rows = fit_mask.to_numpy(dtype=bool)
     fitted_time = time[rows]
@@ -738,23 +745,22 @@ def attach_current_arm_marks(
         current-arm content columns of :data:`CONTENT_MARK_COLUMNS` and
         :data:`EVENT_DURATION_MARK` appended.
     """
-    required_arm_columns = {
-        "event_id",
-        "is_current_arm",
-        "is_swr",
-        "event_start_s",
-        "event_end_s",
-        "event_duration_s",
-        "occupancy_state",
-        "at_well",
-        "occupancy_well_arm",
-        *CONTENT_MARK_COLUMNS,
-    }
-    missing_columns = sorted(required_arm_columns - set(event_arm_table.columns))
-    if missing_columns:
-        raise KeyError(
-            f"event-arm table is missing required column(s) {missing_columns}"
-        )
+    require_columns(
+        event_arm_table,
+        [
+            "event_id",
+            "is_current_arm",
+            "is_swr",
+            "event_start_s",
+            "event_end_s",
+            "event_duration_s",
+            "occupancy_state",
+            "at_well",
+            "occupancy_well_arm",
+            *CONTENT_MARK_COLUMNS,
+        ],
+        "event_arm_table",
+    )
     if len(classes) == 0 or len(classes) != len(set(classes)):
         raise ValueError("classes must be a non-empty sequence of unique names")
 
@@ -763,12 +769,11 @@ def attach_current_arm_marks(
         if event_class not in events:
             raise KeyError(f"event class {event_class!r} is missing")
         frame = events[event_class]
-        required_event_columns = {"event_id", "start_time", "end_time"}
-        missing = sorted(required_event_columns - set(frame.columns))
-        if missing:
-            raise KeyError(
-                f"event class {event_class!r} is missing column(s) {missing}"
-            )
+        require_columns(
+            frame,
+            ["event_id", "start_time", "end_time"],
+            f"the {event_class!r} event table",
+        )
         requested_ids.extend(frame["event_id"].tolist())
     requested_index = pd.Index(requested_ids)
     if requested_index.has_duplicates:
@@ -964,9 +969,7 @@ def load_session_current_arm_marks(
         else Path(event_arm_table_path)
     )
     table = read_table(path)
-    missing = [column for column in SESSION_COLUMNS if column not in table]
-    if missing:
-        raise KeyError(f"event-arm table at {path} is missing column(s) {missing}")
+    require_columns(table, SESSION_COLUMNS, f"the event-arm table at {path}")
     animal, session_date = parse_nwb_filename(nwb_file_name)
     is_session = (
         table["animal"].eq(animal)

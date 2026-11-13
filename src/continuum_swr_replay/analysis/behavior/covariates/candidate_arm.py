@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS
+from continuum_swr_replay.tables.columns import require_columns
 
 from .._helpers import (
     arm_to_patch,
@@ -154,23 +155,24 @@ def attach_candidate_arm_covariates(
     pandas.DataFrame
         A copy with all shared candidate-arm predictors attached.
     """
-    required = {
-        "event_id",
-        "candidate_arm",
-        "occupancy_well_arm",
-        "prev_arm",
-        "next_arm",
-        "last_rewarded_arm",
-        "current_patch",
-        "event_start_s",
-        "time_since_stop_start_s",
-        "is_swr",
-        "is_mua",
-        "is_rewarded_outcome",
-    }
-    missing = sorted(required - set(frame.columns))
-    if missing:
-        raise ValueError(f"candidate-arm input is missing columns {missing}")
+    require_columns(
+        frame,
+        [
+            "event_id",
+            "candidate_arm",
+            "occupancy_well_arm",
+            "prev_arm",
+            "next_arm",
+            "last_rewarded_arm",
+            "current_patch",
+            "event_start_s",
+            "time_since_stop_start_s",
+            "is_swr",
+            "is_mua",
+            "is_rewarded_outcome",
+        ],
+        "the candidate-arm input",
+    )
     if len(frame) != len(event_table) * len(ALL_ARMS):
         raise ValueError(
             "candidate-arm input must contain exactly nine rows per event; "

@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
+from continuum_swr_replay.tables.columns import require_columns
 
 from .clocks import trial_arrival_times, trial_outcome_times
 from .history import (
@@ -55,10 +56,11 @@ def _prepare_trials_for_context(
     if trials.empty:
         return trials.copy(), np.array([], dtype=float)
 
-    base_columns = {"movement_start_time", "end_time", "to_well", *required_columns}
-    missing = sorted(base_columns.difference(trials.columns))
-    if missing:
-        raise KeyError(f"trial context requires columns {missing}")
+    require_columns(
+        trials,
+        ["movement_start_time", "end_time", "to_well", *required_columns],
+        "the trial table",
+    )
 
     prepared = trials.copy()
     starts = prepared["movement_start_time"].to_numpy(dtype=float)
@@ -364,10 +366,9 @@ def summarize_behavioral_location(
     if isinstance(states, pd.DataFrame):
         if wells is not None:
             raise ValueError("wells must be omitted when states is a DataFrame")
-        required = {"occupancy_state", "occupancy_well_id"}
-        missing = sorted(required.difference(states.columns))
-        if missing:
-            raise KeyError(f"location frame requires columns {missing}")
+        require_columns(
+            states, ["occupancy_state", "occupancy_well_id"], "the location frame"
+        )
         wells = states["occupancy_well_id"]
         states = states["occupancy_state"]
 

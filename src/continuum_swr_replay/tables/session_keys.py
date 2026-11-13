@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import row_keys
 
 # The canonical session columns, in join order: the first three segments of
@@ -42,19 +43,12 @@ __all__ = [
 ]
 
 
-def _require(frame: pd.DataFrame, columns: tuple[str, ...]) -> list[str]:
-    missing = [column for column in columns if column not in frame.columns]
-    if missing:
-        raise KeyError(f"frame missing session columns {missing}")
-    return list(columns)
-
-
 def session_key_set(
     frame: pd.DataFrame, *, columns: tuple[str, ...] = SESSION_COLUMNS
 ) -> set[tuple]:
     """The set of distinct session keys present in ``frame`` (order-independent)."""
-    cols = _require(frame, columns)
-    return set(frame.loc[:, cols].itertuples(index=False, name=None))
+    require_columns(frame, columns, "the frame")
+    return set(frame.loc[:, list(columns)].itertuples(index=False, name=None))
 
 
 def n_sessions(
@@ -68,8 +62,8 @@ def session_key_frame(
     frame: pd.DataFrame, *, columns: tuple[str, ...] = SESSION_COLUMNS
 ) -> pd.DataFrame:
     """The distinct session-key rows of ``frame``, columns in canonical order."""
-    cols = _require(frame, columns)
-    return frame.loc[:, cols].drop_duplicates().reset_index(drop=True)
+    require_columns(frame, columns, "the frame")
+    return frame.loc[:, list(columns)].drop_duplicates().reset_index(drop=True)
 
 
 def subset_max_per_animal(

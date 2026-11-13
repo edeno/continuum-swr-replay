@@ -8,6 +8,7 @@ import pandas as pd
 from continuum_swr_replay.data_loaders.constants import (
     WELL_PATCH_MAPPING,
 )
+from continuum_swr_replay.tables.columns import require_columns
 
 _PORT_EXPERIENCE_COLUMNS = (
     "experience_id",
@@ -27,12 +28,7 @@ _PORT_EXPERIENCE_COLUMNS = (
 
 def _prepare_port_experiences(port_experiences: pd.DataFrame) -> pd.DataFrame:
     """Validate and chronologically order the canonical experience stream."""
-    missing = sorted(set(_PORT_EXPERIENCE_COLUMNS) - set(port_experiences.columns))
-    if missing:
-        raise KeyError(
-            "history covariates require the canonical port-experience stream; "
-            f"missing {missing}. Regenerate the behavioral session cache."
-        )
+    require_columns(port_experiences, _PORT_EXPERIENCE_COLUMNS, "the port experiences")
     out = port_experiences.copy()
     if out.empty:
         return out

@@ -104,7 +104,7 @@ def test_compute_rollups_fails_loud_on_missing_column():
         )
     }
     nl = pd.DataFrame(cols).drop(columns=["hpd"])  # simulate a builder dropping hpd
-    with pytest.raises(KeyError, match="hpd"):
+    with pytest.raises(ValueError, match="hpd"):
         compute_trajectory_rollups(
             nl=nl,
             event_id=np.array([1, 1]),

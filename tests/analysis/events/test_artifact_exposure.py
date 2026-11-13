@@ -704,7 +704,7 @@ def test_an_empty_mask_needs_no_stop_bounds():
             arrival_clocks=False,
         ),
     )
-    with pytest.raises(KeyError, match="stop_start"):
+    with pytest.raises(ValueError, match="stop_start"):
         aggregate_to_timebins(
             stops,
             onsets,

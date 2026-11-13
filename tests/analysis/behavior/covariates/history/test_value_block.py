@@ -101,9 +101,9 @@ def test_absent_contingency_is_not_an_error():
 
 def test_missing_columns_raise():
     stop = _stop_table()
-    with pytest.raises(ValueError, match="missing columns"):
+    with pytest.raises(ValueError, match=r"qvals_table lacks .*'qvals_context_time'"):
         assert_qvals_aligned(stop, _qvals(stop).drop(columns=["qvals_context_time"]))
-    with pytest.raises(ValueError, match="missing columns"):
+    with pytest.raises(ValueError, match=r"stop_table lacks .*'stop_start'"):
         assert_qvals_aligned(stop.drop(columns=["stop_start"]), _qvals(stop))
 
 

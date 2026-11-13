@@ -16,6 +16,7 @@ import pandas as pd
 import xarray as xr
 
 from ....data_loaders.constants import TRACK_SEGMENT_TO_PATCH, TRUNK_ARMS
+from ....tables.columns import require_columns
 from ...hippocampus.posterior_analysis import map_estimate_to_map_nodes
 from ..covariates.spatial import arm_adjacency, path_continuity
 from .summaries import _group_by_event
@@ -634,19 +635,17 @@ def compute_trajectory_rollups(
     # Fail loud with the full missing set if the data_over_time schema and the
     # rollups have drifted apart (e.g. after a re-decode that changes builder
     # columns) — clearer than a KeyError deep inside one family.
-    required = {
-        *_REQUIRED_DOT_COLUMNS,
-        *_SIGNAL_COLUMNS.values(),
-        *state_prob_cols.values(),
-        continuous_col,
-        fragmented_col,
-    }
-    missing = sorted(required - set(nl.columns))
-    if missing:
-        raise KeyError(
-            "compute_trajectory_rollups: in-event frame is missing required "
-            f"data_over_time columns {missing}"
-        )
+    require_columns(
+        nl,
+        [
+            *_REQUIRED_DOT_COLUMNS,
+            *_SIGNAL_COLUMNS.values(),
+            *state_prob_cols.values(),
+            continuous_col,
+            fragmented_col,
+        ],
+        "the in-event data_over_time frame",
+    )
 
     def col(name: str) -> np.ndarray:
         return nl[name].to_numpy()

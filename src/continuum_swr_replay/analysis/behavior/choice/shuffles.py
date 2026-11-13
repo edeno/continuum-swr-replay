@@ -23,6 +23,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .._helpers import stay_indicator_from_patches
@@ -237,15 +238,13 @@ def next_arm_circular_shift(
         unit_col = "stop_id" if "stop_id" in out.columns else temporary_unit_col
     if unit_col == temporary_unit_col:
         out[unit_col] = np.arange(len(out), dtype=np.int64)
-    elif unit_col not in out.columns:
-        raise KeyError(f"next-label shuffle requires unit column {unit_col!r}")
+    else:
+        require_columns(out, [unit_col], "next-label shuffle input")
     if out[unit_col].isna().any():
         raise ValueError(f"next-label shuffle unit column {unit_col!r} contains NaN")
 
     required_unit_columns = tuple(dict.fromkeys((*label_cols, *strata_cols)))
-    missing = sorted(set(required_unit_columns).difference(out.columns))
-    if missing:
-        raise KeyError(f"next-label shuffle is missing unit column(s): {missing}")
+    require_columns(out, required_unit_columns, "next-label shuffle input")
     grouped = out.groupby(unit_col, sort=False, dropna=False)
     for column in required_unit_columns:
         n_unique = grouped[column].nunique(dropna=False)

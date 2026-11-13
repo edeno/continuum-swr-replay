@@ -118,7 +118,7 @@ def _model_trials(trial_numbers=(0, 1, 2)) -> pd.DataFrame:
 def test_required_fitted_model_covariates_are_not_silently_optional():
     model = _model_trials().drop(columns=["rpe_postoutcome"])
 
-    with pytest.raises(ValueError, match="required fitted model covariates"):
+    with pytest.raises(ValueError, match="trial table lacks required column"):
         _model_covariate_columns(model)
 
 
@@ -800,5 +800,7 @@ def test_beta_belief_entropy_decreases_with_concentration():
 
 def test_beta_belief_entropy_missing_param_raises():
     frame = _beta_frame([(2.0, 2.0)] * 6).drop(columns=["betadist_α3"])
-    with pytest.raises(ValueError, match="beta posterior params missing"):
+    with pytest.raises(
+        ValueError, match=r"lacks required column\(s\) \['betadist_α3'\]"
+    ):
         add_beta_belief_entropy(frame)

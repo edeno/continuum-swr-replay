@@ -82,6 +82,7 @@ from matplotlib.patches import Patch
 from matplotlib.ticker import FixedFormatter, FixedLocator, MaxNLocator
 
 from continuum_swr_replay.analysis.behavior.model_specs import RECENCY_SPLINE_COLUMNS
+from continuum_swr_replay.tables.columns import require_columns
 
 from ..palettes import patch_grouped_arm_palette
 from ._common import (
@@ -92,7 +93,6 @@ from ._common import (
     _STRUCTURAL_NA_COLOR,
     _ZERO_CELL_COLOR,
     _PanelContext,
-    _require_columns,
 )
 from .arm_covariates import (
     _make_recency_spline_panel,
@@ -577,16 +577,10 @@ def _relative_time_ticks(
 
 def _validate_event_intervals(event_table: pd.DataFrame) -> None:
     """Validate interval columns used by every public figure."""
-    _require_columns(
+    require_columns(
         event_table,
+        ("event_id", "event_start_s", "event_end_s", "event_midpoint_s", "next_arm"),
         "event_table",
-        (
-            "event_id",
-            "event_start_s",
-            "event_end_s",
-            "event_midpoint_s",
-            "next_arm",
-        ),
     )
     if (
         event_table["event_id"].isna().any()

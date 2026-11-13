@@ -238,7 +238,7 @@ class TestGetSignalWindows:
 
     def test_missing_data_columns_raise_error(self, mock_data, mock_events):
         """Missing required columns in data should raise ValueError."""
-        with pytest.raises(ValueError, match="data missing required columns"):
+        with pytest.raises(ValueError, match=r"^data lacks required column"):
             get_signal_windows(
                 mock_data,
                 mock_events,
@@ -251,7 +251,7 @@ class TestGetSignalWindows:
     def test_missing_event_columns_raise_error(self, mock_data, mock_events):
         """Missing required columns in event_times should raise ValueError."""
         # Missing time_col
-        with pytest.raises(ValueError, match="event_times missing required columns"):
+        with pytest.raises(ValueError, match=r"^event_times lacks required column"):
             get_signal_windows(
                 mock_data,
                 mock_events,
