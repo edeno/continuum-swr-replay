@@ -61,12 +61,8 @@ def _nearest_bin_index(bin_positions: np.ndarray, x: np.ndarray) -> np.ndarray:
 def map_estimate_to_patch(map_estimate: np.ndarray, env) -> np.ndarray:
     """Map decoded linear position to patch ID (1, 2, or 3).
 
-    Finds the nearest real track place bin for each MAP estimate and
-    maps its edge_id to a patch via TRACK_SEGMENT_TO_PATCH.
-
-    Junction bins (edge_id=-1) are excluded from the nearest-neighbor
-    lookup because they are interpolation placeholders at edge gaps in
-    the linearization, not real spatial positions.
+    The arm of each MAP estimate (:func:`map_estimate_to_arm`, the nearest
+    real track place bin) mapped to its patch via TRACK_SEGMENT_TO_PATCH.
 
     Parameters
     ----------
@@ -80,23 +76,12 @@ def map_estimate_to_patch(map_estimate: np.ndarray, env) -> np.ndarray:
     np.ndarray
         Patch IDs (1, 2, or 3). NaN where map_estimate is NaN.
     """
-    map_est = np.asarray(map_estimate, dtype=float)
-    bin_df = env.place_bin_centers_nodes_df_
-    lp = np.asarray(bin_df["linear_position"])
-    ei = np.asarray(bin_df["edge_id"])
-
-    # Exclude junction bins (edge_id == -1) from nearest-neighbor lookup
-    real_mask = ei >= 0
-    lp_real = lp[real_mask]
-    ei_real = ei[real_mask]
-
-    result = np.full(len(map_est), np.nan)
-    valid = ~np.isnan(map_est)
-    if valid.any() and len(lp_real) > 0:
-        idx = _nearest_bin_index(lp_real, map_est[valid])
-        result[valid] = [
-            TRACK_SEGMENT_TO_PATCH.get(int(ei_real[j]), np.nan) for j in idx
-        ]
+    arms = map_estimate_to_arm(map_estimate, env)
+    result = np.full(len(arms), np.nan)
+    valid = ~np.isnan(arms)
+    result[valid] = [
+        TRACK_SEGMENT_TO_PATCH.get(int(arm), np.nan) for arm in arms[valid]
+    ]
     return result
 
 
