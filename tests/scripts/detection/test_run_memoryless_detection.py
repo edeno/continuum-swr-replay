@@ -35,9 +35,15 @@ from continuum_swr_replay.analysis.detection.detection_inputs import (
 from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     MEMORYLESS_EVENT_TABLE_DTYPES,
     MemorylessSequenceConfig,
+    encoding,
+)
+from continuum_swr_replay.analysis.detection.memoryless_sequence.encoding import (
+    DECODER,
+    PAPER,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     ENCODING_KEY,
+    clusterless_encoding_model,
     likelihood_grid,
 )
 from continuum_swr_replay.analysis.event_definition import swr_source
@@ -307,15 +313,17 @@ SIM_EPOCH_IDS = (
 """Every simulated epoch these tests run."""
 
 
-def write_swr_source(root, *, swrs=None, observed=None):
+def write_swr_source(root, *, swrs=None, observed=None, artifact_run_id=None):
     """The SWR source of the simulated epochs: by default one SWR early on, where
-    ``write_epoch`` also labels one, observed over the whole grid."""
+    ``write_epoch`` also labels one, observed over the whole grid; masked with
+    `artifact_run_id` when given."""
     swrs = [(SIM_TIME[50], SIM_TIME[89])] if swrs is None else swrs
     observed = (SIM_TIME[0], SIM_TIME[-1]) if observed is None else observed
     return write_swr_inventory(
         root,
         dict.fromkeys(SIM_EPOCH_IDS, swrs),
         observed={epoch_id: [observed] for epoch_id in SIM_EPOCH_IDS},
+        artifact_run_id=artifact_run_id,
     )
 
 
@@ -355,6 +363,8 @@ def write_epoch(root, epoch, epoch_id=EPOCH_ID, *, swr_zscore=None, corrupt=Fals
             "day": int(epoch_id.split("_")[0][-8:]),
             "epoch": epoch_id.split("_")[1] + "_" + epoch_id.split("_")[2],
             "linear_position": epoch.linear_position,
+            "head_position_x": epoch.linear_position,
+            "head_position_y": np.zeros(epoch.time.size),
             "head_speed": np.zeros(epoch.time.size),
             "SWR_event": swr,
             "SWR_zscore": (
@@ -390,6 +400,9 @@ def run(decode_root, tmp_path, **overrides):
         "shuffle": True,
         "n_shuffles": N_SHUFFLES,
         "config": CONFIG,
+        # the stand-in detector cannot be refitted: the paper's rule is
+        # tested in TestEncodingRule and in test_memoryless_encoding.py
+        "encoding": DECODER,
         "provenance": {"git_commit": "test"},
         "marks_loader": lambda key, cache, span, detector_sha256: (
             epoch.spike_times,
@@ -491,6 +504,7 @@ class TestRunOne:
                 shuffle=True,
                 n_shuffles=N_SHUFFLES,
                 config=CONFIG,
+                encoding=DECODER,
                 provenance={"git_commit": "test"},
             )
 
@@ -674,6 +688,55 @@ class TestRunOne:
         }
         table = read_table(record["outputs"]["events"])
         assert table.artifact_drop_reason.isna().all()
+
+    def test_the_papers_rule_refits_on_the_decoders_training_bins(
+        self, decode_root, tmp_path, monkeypatch
+    ):
+        """``run_one`` hands the refit the decode grid, the 2D head position, the
+        speed and the decoder's own training mask, rebuilt from the SWR source,
+        and the record says what was fitted. The refit itself is the stand-in
+        here; ``test_memoryless_encoding.py`` runs the library's."""
+        _, epoch = decode_root
+        given = {}
+
+        def refit(detector, time, position, speed, spike_times, marks, is_training):
+            given.update(
+                time=time, position=position, speed=speed, is_training=is_training
+            )
+            return clusterless_encoding_model(detector), {
+                "n_training_bins": 7,
+                "training_s": 0.014,
+            }
+
+        monkeypatch.setattr(encoding, "running_encoding_model", refit)
+        # the decoder's masks need a named artifact run: one with no artifact
+        artifacts = write_artifact_run(
+            tmp_path, {EPOCH_ID: []}, span=(float(epoch.time[0]), float(epoch.time[-1]))
+        )
+        monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
+        write_swr_source(tmp_path, artifact_run_id=artifacts.name)
+        use_swr_source(monkeypatch, tmp_path)
+        use_artifact_run(monkeypatch, artifacts)
+
+        record = run(decode_root, tmp_path, encoding=PAPER, shuffle=False)
+
+        np.testing.assert_array_equal(given["time"], epoch.time)
+        np.testing.assert_array_equal(given["position"][:, 0], epoch.linear_position)
+        assert given["position"].shape == (epoch.time.size, 2)
+        # the source's one SWR, samples 50 to 89, is not training
+        assert not given["is_training"][50:90].any()
+        assert given["is_training"][:50].all()
+        assert record["encoding"]["rule"] == PAPER
+        assert record["encoding"]["training_s"] == 0.014
+        assert record["encoding"]["n_encoding_spikes"] == [
+            len(p) for p in epoch.encoding_model["encoding_positions"]
+        ]
+
+    def test_the_decoders_rule_is_recorded(self, decode_root, tmp_path):
+        record = run(decode_root, tmp_path, shuffle=False)
+
+        assert record["encoding"]["rule"] == DECODER
+        assert "training_s" not in record["encoding"]
 
 
 KEY = parse_epoch_identifier(EPOCH_ID)
@@ -907,6 +970,8 @@ class TestMain:
             [
                 "--animal",
                 "sim",
+                "--encoding",
+                DECODER,
                 "--run-seed",
                 "7",
                 "--n-shuffles",
@@ -940,6 +1005,7 @@ class TestMain:
             "--root": str(root),
             "--output-root": str(output_root),
             "--cache-dir": str(cache_dir),
+            "--encoding": DECODER,
         }
         for flag, value in zip(extra[::2], extra[1::2], strict=True):
             arguments[flag] = value
@@ -1032,6 +1098,8 @@ class TestMain:
                 [
                     "--animal",
                     "sim",
+                    "--encoding",
+                    DECODER,
                     "--run-seed",
                     "7",
                     "--n-shuffles",
@@ -1061,6 +1129,8 @@ class TestMain:
                 *extra,
                 "--animal",
                 "sim",
+                "--encoding",
+                DECODER,
                 "--run-seed",
                 "7",
                 "--n-shuffles",
@@ -1174,6 +1244,8 @@ class TestMain:
                 "20200102",
                 "--epoch",
                 "02_r1",
+                "--encoding",
+                DECODER,
                 "--run-seed",
                 "7",
                 "--n-shuffles",
@@ -1676,6 +1748,64 @@ class TestMain:
         assert given == [
             f"--xla_gpu_deterministic_ops=false {DETERMINISTIC} {TRITON_OFF}"
         ]
+
+    # --- the encoding rule ------------------------------------------------------
+    def encoding_cli(self, tmp_path, monkeypatch, *extra):
+        """The runner over one epoch, its epoch replaced; returns the run folders
+        and the encoding each epoch was asked for."""
+        self.recording_release(monkeypatch)
+        asked = []
+
+        def run_one(epoch_id, **kwargs):
+            asked.append(kwargs["encoding"])
+            return {"status": "ok", **self.COUNTS}
+
+        monkeypatch.setattr(runner, "run_one", run_one)
+        main(
+            [
+                "--epoch-id",
+                EPOCH_ID,
+                "--run-seed",
+                "7",
+                "--no-shuffle",
+                "--root",
+                str(tmp_path / "processed"),
+                "--output-root",
+                str(tmp_path / "memoryless"),
+                "--cache-dir",
+                str(tmp_path / "cache"),
+                *extra,
+            ]
+        )
+        return asked
+
+    def test_the_papers_encoding_is_the_default(self, tmp_path, monkeypatch):
+        asked = self.encoding_cli(tmp_path, monkeypatch)
+
+        (run_dir,) = (tmp_path / "memoryless").iterdir()
+        settings = json.loads((run_dir / "manifest.json").read_text())["settings"]
+        assert asked == [PAPER]
+        assert settings["encoding"]["rule"] == PAPER
+        assert settings["encoding"]["running_speed_cm_per_s"] == 10.0
+        assert settings["encoding"]["position_std_cm"] == 8.0
+        assert run_dir.name.endswith("-seed7-noshuffle")
+
+    def test_the_decoders_encoding_is_a_run_of_its_own(self, tmp_path, monkeypatch):
+        asked = self.encoding_cli(tmp_path, monkeypatch, "--encoding", DECODER)
+
+        (run_dir,) = (tmp_path / "memoryless").iterdir()
+        settings = json.loads((run_dir / "manifest.json").read_text())["settings"]
+        assert asked == [DECODER]
+        assert settings["encoding"]["rule"] == DECODER
+        assert run_dir.name.endswith("-seed7-noshuffle-decoderencoding")
+
+    def test_a_rerun_under_another_encoding_is_refused(self, tmp_path, monkeypatch):
+        self.encoding_cli(tmp_path, monkeypatch, "--run-id", "cli-run")
+
+        with pytest.raises(SystemExit, match="other settings"):
+            self.encoding_cli(
+                tmp_path, monkeypatch, "--run-id", "cli-run", "--encoding", DECODER
+            )
 
 
 class TestRunEpochs:

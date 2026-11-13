@@ -3,17 +3,21 @@
 
 The Widloski & Foster sliding-window detector, ported in
 ``continuum_swr_replay.analysis.detection.memoryless_sequence``, run on each
-epoch's saved clusterless decode: the encoding model from
+epoch's saved clusterless decode: the saved detector
 ``{epoch_id}_detector.pkl``, the decode grid, position and speed from
 ``{epoch_id}_80_data_over_time.pkl``, the SWR labels and where they were
 observed from the paper's SWR source (``analysis/event_definition/swr_source.py``,
 the direct Kay inventory, on that grid), and the spike marks read as
 ``load_data`` read them for the decode (``MARKS_RULE``): ``get_hpc_marks``,
 then ``filter_spike_times`` over the decode's time span.
-Both procedures therefore read one encoding model. The decode's encoding
-model already leaves out the artifact mask (the decoders' encoding exclusion),
-but this detector computes its own likelihood over every bin, so the runner
-marks the mask's bins on the decode grid missing (``is_missing``, the decoders'
+The encoding model is chosen by ``--encoding``
+(``memoryless_sequence.encoding``). By default it is the paper's: the saved
+detector refitted, in this process, on the decoder's training bins with head
+speed above 10 cm/s, with an 8 cm position kernel. ``--encoding decoder`` reads
+the decoder's saved model instead, so both procedures read one encoding model
+(the shared-input control). Either encoding leaves out the artifact mask (the
+decoders' encoding exclusion), but this detector computes its own likelihood
+over every bin, so the runner marks the mask's bins on the decode grid missing (``is_missing``, the decoders'
 rule: a bin inside a closed interval of ``swr_source.artifact_intervals``).
 No window holding one is decoded, no candidate touches one, and neither the
 shuffle null nor any normalization reads them (``memoryless_sequence.epoch``).
@@ -21,9 +25,9 @@ A candidate in excluded time (the mask widened by
 ``event_definition.eligibility.ARTIFACT_REACH_S``), or overlapping an SWR or MUA event
 dropped for it, keeps its row with an ``artifact_drop_reason`` and is in no
 cohort.
-``check_marks_match_encoding`` refuses them unless every mark the encoding
-model was fitted on is among them. Those are the training span's, so it cannot
-see a spike the reload adds, or one dropped only during SWRs, which
+``check_marks_match_encoding`` refuses the marks unless every mark the
+decoder's encoding model was fitted on is among them. Those are the training
+span's, so it cannot see a spike the reload adds, or one dropped only during SWRs, which
 ``no_ripple`` training leaves out; the refresh design leaves that gap to its
 Stage 8 one-commit check (``docs/design/2026-10-03-full-pipeline-refresh-design.md``).
 
@@ -42,8 +46,9 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless
 
 ``manifest.json`` records the run's settings and, per epoch, the commit, the
 time grid, a hash of every input, the marks' rule and hash, the encoding model's
-settings, and the outcome. It is rewritten atomically after each epoch, so a
-run that stops part way still says what it did, and a rerun under the same
+settings (its rule, the running threshold and kernel, the training seconds
+and the encoding spikes), and the outcome. It is rewritten atomically after
+each epoch, so a run that stops part way still says what it did, and a rerun under the same
 run id refuses to continue with different settings, code, library versions,
 environment (``uv.lock``'s sha256, the commit ``ripple_detection`` was
 installed from, the CUDA plugin's version) or XLA flags. An epoch that fails
@@ -103,6 +108,8 @@ Usage:
     python scripts/detection/run_memoryless_detection.py --run-seed 20260922 \\
         --animal chimi --no-shuffle      # the detector alone, much faster
     python scripts/detection/run_memoryless_detection.py --run-seed 20260922 \\
+        --animal chimi --encoding decoder   # the decoder's encoding model
+    python scripts/detection/run_memoryless_detection.py --run-seed 20260922 \\
         --animal chimi --date 20200212 --epoch 02_r1
     python scripts/detection/run_memoryless_detection.py --run-seed 20260922 \\
         --all --cuda_visible_devices 0,1,2,3   # an epoch at a time on each GPU
@@ -114,6 +121,7 @@ import functools
 import logging
 import os
 import sys
+import time as clock
 import traceback
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import asdict
@@ -142,8 +150,14 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     MemorylessSequenceConfig,
     SequenceIdentity,
     ShuffleSeed,
-    load_clusterless_encoding_model,
     run_epoch,
+)
+from continuum_swr_replay.analysis.detection.memoryless_sequence.encoding import (
+    DECODER,
+    ENCODINGS,
+    PAPER,
+    encoding_settings,
+    epoch_encoding_model,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.epoch import (
     observation_table,
@@ -152,7 +166,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table imp
     canonical_swr_intervals,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    check_marks_match_encoding,
     decoded_windows,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
@@ -314,6 +327,7 @@ def run_one(
     shuffle: bool,
     n_shuffles: int,
     config: MemorylessSequenceConfig,
+    encoding: str,
     provenance: dict,
     marks_loader: Callable[
         [EpochKey, Path, tuple[float, float], str],
@@ -329,9 +343,9 @@ def run_one(
         analysed epoch's decode is missing, and records the epoch as failed;
         :func:`find_epochs` leaves out a variant with a missing input.
     ValueError
-        The marks are not the ones the encoding model was fitted on, or the
-        grid, the identifier or ``data_over_time`` is not what the detector
-        needs.
+        The marks are not the ones the decoder's encoding model was fitted on,
+        or the grid, the identifier or ``data_over_time`` is not what the
+        detector needs.
     """
     key = parse_epoch_identifier(epoch_id)
     inputs = input_paths(epoch_id, root)
@@ -340,7 +354,6 @@ def run_one(
         raise FileNotFoundError(f"{epoch_id}: missing {', '.join(missing)}.")
     input_sha256 = {name: sha256_file(path) for name, path in inputs.items()}
 
-    encoding_model = load_clusterless_encoding_model(inputs["detector"])
     # SWR labels from the one SWR source, whichever decode variant this is
     data_over_time = read_dot_with_swr_source(inputs["data_over_time"])
     identity = SequenceIdentity(
@@ -355,7 +368,6 @@ def run_one(
     spike_times, spike_waveform_features = marks_loader(
         key, cache_dir, (float(time[0]), float(time[-1])), input_sha256["detector"]
     )
-    check_marks_match_encoding(encoding_model, spike_times, spike_waveform_features)
 
     speed = data_over_time["head_speed"].to_numpy(dtype=np.float64)
     # where the source's detector read a gap-free stored band
@@ -364,6 +376,19 @@ def run_one(
     swr_files = swr_source_files(swr_epoch)
     # the one artifact mask, on the decode grid, as the decoders' is_missing
     artifact_mask = artifact_intervals(swr_epoch)
+    # the paper's running-only encoding, or the decoder's; the marks are
+    # checked against the decoder's model either way
+    started = clock.perf_counter()
+    encoding_model, encoding_record = epoch_encoding_model(
+        encoding,
+        inputs["detector"],
+        data_over_time,
+        spike_times,
+        spike_waveform_features,
+        key,
+        artifact_mask,
+    )
+    encoding_s = clock.perf_counter() - started
     is_missing = interval_mask(time, artifact_mask)
     midpoint_s, missing_windows = decoded_windows(time, is_missing, config)
     detection = run_epoch(
@@ -423,11 +448,9 @@ def run_one(
             "sampling_frequency": config.decode_sampling_frequency,
         },
         "encoding": {
+            **encoding_record,
             "n_electrodes": len(encoding_model["encoding_positions"]),
-            "n_encoding_spikes": [
-                int(np.asarray(p).shape[0])
-                for p in encoding_model["encoding_positions"]
-            ],
+            "seconds_to_build": encoding_s,
             "position_std": np.asarray(encoding_model["position_std"]).tolist(),
             "waveform_std": np.asarray(encoding_model["waveform_std"]).tolist(),
             "block_size": int(encoding_model["block_size"]),
@@ -555,6 +578,7 @@ def run_settings(
     n_shuffles: int,
     config: MemorylessSequenceConfig,
     git_commit: str,
+    encoding: str = PAPER,
 ) -> dict:
     """What every epoch of one run must share; a resume must match it.
 
@@ -568,7 +592,9 @@ def run_settings(
     flags is refused. ``known_limits`` states what is known of a run's
     reproducibility: with those flags (deterministic ops on, Triton GEMM off) two
     runs at identical settings are bit-for-bit equal (:data:`KNOWN_LIMITS`;
-    design note, "Run-to-run reproducibility").
+    design note, "Run-to-run reproducibility"). ``encoding`` is the
+    encoding rule (``memoryless_sequence.encoding.encoding_settings``): the
+    paper's running-only refit, or the decoder's model.
     """
     return {
         "git_commit": git_commit,
@@ -582,6 +608,7 @@ def run_settings(
             if name != "dirty"
         },
         "config": asdict(config),
+        "encoding": encoding_settings(encoding),
         "xla_flags": xla_flags(),
         "known_limits": KNOWN_LIMITS,
         "shuffle": {
@@ -851,6 +878,16 @@ def main(argv: list[str] | None = None) -> None:
         "before merging. Recorded in the manifest's config.",
     )
     parser.add_argument(
+        "--encoding",
+        choices=ENCODINGS,
+        default=PAPER,
+        help=f"The encoding model: {PAPER!r} (default), the paper's, refitted per "
+        f"epoch on the decoder's training bins with head speed above 10 cm/s and an "
+        f"8 cm position kernel; or {DECODER!r}, the non-local decoder's saved model "
+        "(the shared-input control). Recorded in the manifest's settings; "
+        f"{DECODER!r} adds -decoderencoding to the default run id.",
+    )
+    parser.add_argument(
         "--cuda_visible_devices",
         help="Run the epochs in parallel on these GPUs, such as 0,1,2: a dask "
         "LocalCUDACluster with one worker per GPU and one epoch per task. "
@@ -883,6 +920,7 @@ def main(argv: list[str] | None = None) -> None:
         f"{commit_label(commit.removesuffix('-dirty'), commit.endswith('-dirty'))}"
         f"-seed{args.run_seed}{'' if shuffle else '-noshuffle'}"
         f"{'-singles' if args.keep_single_window_runs else ''}"
+        f"{'-decoderencoding' if args.encoding == DECODER else ''}"
     )
     output_dir = args.output_root / run_id
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -896,7 +934,9 @@ def main(argv: list[str] | None = None) -> None:
     config = MemorylessSequenceConfig(
         drop_single_window_runs=not args.keep_single_window_runs
     )
-    settings = run_settings(args.run_seed, shuffle, args.n_shuffles, config, commit)
+    settings = run_settings(
+        args.run_seed, shuffle, args.n_shuffles, config, commit, args.encoding
+    )
     provenance = {
         "produced_by": produced_by(__file__),
         "git_commit": commit,
@@ -957,6 +997,7 @@ def main(argv: list[str] | None = None) -> None:
         "shuffle": shuffle,
         "n_shuffles": args.n_shuffles,
         "config": config,
+        "encoding": args.encoding,
         "provenance": provenance,
     }
     write_manifest(manifest_path, manifest())

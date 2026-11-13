@@ -232,6 +232,8 @@ def write_memoryless_run(root: Path, decode_root: Path, simulated: dict) -> None
         shuffle=True,
         n_shuffles=N_SHUFFLES,
         config=MemorylessSequenceConfig(),
+        # the decoder's model: the paper's refit is tested on its own
+        encoding="decoder",
         provenance={"git_commit": "test"},
         marks_loader=lambda key, cache, span, sha: (
             simulated["spike_times"],
