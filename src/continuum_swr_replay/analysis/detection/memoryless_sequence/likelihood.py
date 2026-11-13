@@ -62,6 +62,7 @@ __all__ = [
     "SORTED_SPIKES_LIKELIHOOD_KEYS",
     "EpochLikelihood",
     "check_marks_match_encoding",
+    "clusterless_encoding_model",
     "clusterless_epoch_log_likelihood",
     "decoded_windows",
     "encoding_bins_per_row",
@@ -181,10 +182,7 @@ def load_clusterless_encoding_model(detector_path: str | Path) -> dict:
     Returns
     -------
     encoding_model : dict
-        The entries in :data:`CLUSTERLESS_LIKELIHOOD_KEYS`, plus whatever else
-        the library stored. ``block_size`` is passed through to the decode
-        and the shuffle's re-decode; it sets how many spikes are evaluated at
-        once and does not change the result.
+        As :func:`clusterless_encoding_model`.
 
     Raises
     ------
@@ -192,12 +190,36 @@ def load_clusterless_encoding_model(detector_path: str | Path) -> dict:
         As ``decoding.results.load_saved_detector``.
     ValueError
         The environment has no place grid
-        (``decoding.results.load_saved_detector``), or ``waveform_std`` differs
-        between features, which the per-electrode expansion below could not
-        honor.
+        (``decoding.results.load_saved_detector``), or as
+        :func:`clusterless_encoding_model`.
 
     """
-    detector = load_saved_detector(detector_path)
+    return clusterless_encoding_model(load_saved_detector(detector_path))
+
+
+def clusterless_encoding_model(detector: Any) -> dict:
+    """A clusterless detector's fitted encoding model, as the likelihood takes it.
+
+    Parameters
+    ----------
+    detector
+        A fitted clusterless detector, such as ``load_saved_detector`` returns.
+
+    Returns
+    -------
+    encoding_model : dict
+        The entries in :data:`CLUSTERLESS_LIKELIHOOD_KEYS`, plus whatever else
+        the library stored. ``block_size`` is passed through to the decode
+        and the shuffle's re-decode; it sets how many spikes are evaluated at
+        once and does not change the result.
+
+    Raises
+    ------
+    ValueError
+        ``waveform_std`` differs between features, which the per-electrode
+        expansion below could not honor.
+
+    """
     encoding_model = dict(detector.encoding_model_[ENCODING_KEY])
 
     # electrodes can differ in how many waveform features they have, so a
