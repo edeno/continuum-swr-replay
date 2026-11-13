@@ -36,11 +36,9 @@ from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.decoding.files import data_over_time_suffix
-from continuum_swr_replay.paths import processed_data_dir
+from continuum_swr_replay.paths import DECODER_QUALITY_DIR, processed_data_dir
 from continuum_swr_replay.runs.io import sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
-
-OUT_NAME = "decoder_quality"
 
 
 def measure_epoch(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -88,7 +86,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     sessions = pd.concat([s for s, _ in measured], ignore_index=True)
     calibration = pd.concat([c for _, c in measured], ignore_index=True)
 
-    out_dir = args.out_dir or processed_data_dir() / OUT_NAME
+    out_dir = args.out_dir or processed_data_dir() / DECODER_QUALITY_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     _write_parquet(sessions, out_dir / "sessions.parquet")
     _write_parquet(calibration, out_dir / "calibration.parquet")

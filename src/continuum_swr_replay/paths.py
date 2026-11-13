@@ -136,6 +136,27 @@ def content_occupancy_dir() -> Path:
     return processed_data_dir() / "content_occupancy"
 
 
+# The events measurements' folders, under the processed-data root: each is
+# written by its script and read by the events summary.
+BRAIN_STATE_REFERENCE_DIR = "brain_state_reference"
+"""Each epoch's running and quiet-rest levels
+(``scripts/detection/measure_brain_state_reference.py``)."""
+EVENT_GAMMA_DIR = "event_gamma"
+"""The gamma pass over the events (``scripts/detection/measure_event_gamma.py``)."""
+RIPPLE_CLASS_STRUCTURE_DIR = "ripple_class_structure"
+"""The one-class-or-two tests
+(``scripts/detection/measure_ripple_class_structure.py``)."""
+EVENT_START_REST_THETA_DIR = "event_start_rest_theta"
+"""Each event's start distance and rest-theta share
+(``scripts/detection/measure_event_start_and_rest_theta.py``)."""
+EVENT_PROPERTY_BOOTSTRAP_DIR = "event_property_bootstrap"
+"""The event properties' bootstrap intervals
+(``scripts/detection/bootstrap_event_properties.py``)."""
+DECODER_QUALITY_DIR = "decoder_quality"
+"""Each analysed epoch's decoder quality
+(``scripts/decoding/measure_decoder_quality.py``)."""
+
+
 _LEGACY_ROOTS: dict[str, Callable[[], Path]] = {
     "REPLAY_CONTENT_DIR": replay_content_dir,
     "CONTFRAG_REPLAY_CONTENT_DIR": contfrag_replay_content_dir,

@@ -39,6 +39,8 @@ from continuum_swr_replay.analysis.hippocampus.property_contrast import (
     bootstrap_intervals,
 )
 from continuum_swr_replay.paths import (
+    EVENT_PROPERTY_BOOTSTRAP_DIR,
+    EVENT_START_REST_THETA_DIR,
     processed_data_dir,
     replay_content_dir,
     table_path,
@@ -49,7 +51,6 @@ from continuum_swr_replay.runs.provenance import described_commit, produced_by
 SEED = 20261028
 N_STRATA = 10
 MIN_PER_CLASS = 20
-START_DIR = "event_start_rest_theta"
 
 #: property word (as ``reported.events`` names it) -> (column, scale)
 PROPERTIES = {
@@ -69,14 +70,18 @@ PROPERTIES = {
 
 def load_events() -> tuple[pd.DataFrame, list[Path]]:
     events = pd.read_parquet(table_path("event_table", replay_content_dir()))
-    paths = sorted((processed_data_dir() / START_DIR).glob("*.parquet"))
+    paths = sorted(
+        (processed_data_dir() / EVENT_START_REST_THETA_DIR).glob("*.parquet")
+    )
     start = pd.concat(
         (pd.read_parquet(p, columns=["event_id", "start_distance_cm"]) for p in paths),
         ignore_index=True,
     )
     events = events.merge(start, on="event_id", how="left", validate="1:1")
     if events.start_distance_cm.isna().all():
-        raise ValueError(f"no start distance in {processed_data_dir() / START_DIR}")
+        raise ValueError(
+            f"no start distance in {processed_data_dir() / EVENT_START_REST_THETA_DIR}"
+        )
     events["session"] = (
         events.animal + events.session_date.astype(str) + "_" + events.epoch
     )
@@ -87,7 +92,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--n-replicates", type=int, default=1000)
     parser.add_argument("--properties", nargs="*", default=list(PROPERTIES))
-    parser.add_argument("--out-name", default="event_property_bootstrap")
+    parser.add_argument("--out-name", default=EVENT_PROPERTY_BOOTSTRAP_DIR)
     args = parser.parse_args(argv)
     events, start_paths = load_events()
     values = {
@@ -123,7 +128,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "sha256": sha256_file(event_table),
             },
             "start_distance": {
-                "folder": START_DIR,
+                "folder": EVENT_START_REST_THETA_DIR,
                 "n_files": len(start_paths),
                 "sha256": files_sha256(start_paths),
             },

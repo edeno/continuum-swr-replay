@@ -28,7 +28,11 @@ from continuum_swr_replay.analysis.hippocampus.brain_state_reference import (
     brain_state_reference,
 )
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
-from continuum_swr_replay.paths import event_features_root, processed_data_dir
+from continuum_swr_replay.paths import (
+    BRAIN_STATE_REFERENCE_DIR,
+    event_features_root,
+    processed_data_dir,
+)
 from continuum_swr_replay.runs.io import ok_epochs, read_manifest, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
@@ -61,7 +65,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     ]
     with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
         rows = list(pool.map(_epoch, jobs))
-    out_dir = processed_data_dir() / "brain_state_reference"
+    out_dir = processed_data_dir() / BRAIN_STATE_REFERENCE_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     table = pd.DataFrame(rows)
     tmp = out_dir / "reference.parquet.tmp"

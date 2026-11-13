@@ -38,6 +38,7 @@ from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.paths import (
+    EVENT_START_REST_THETA_DIR,
     event_features_root,
     processed_data_dir,
     replay_content_dir,
@@ -46,7 +47,6 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.runs.io import read_manifest, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
-OUT_NAME = "event_start_rest_theta"
 SEED = 20261028
 
 
@@ -109,7 +109,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 args.n_windows,
             )
         )
-    folder = processed_data_dir() / OUT_NAME
+    folder = processed_data_dir() / EVENT_START_REST_THETA_DIR
     folder.mkdir(parents=True, exist_ok=True)
     with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
         for table in pool.map(measure_epoch, jobs):

@@ -70,7 +70,9 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (  # noq
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     format_epoch_identifier,
 )
-from continuum_swr_replay.paths import (  # noqa: E402
+from continuum_swr_replay.paths import (
+    RIPPLE_CLASS_STRUCTURE_DIR,
+    # noqa: E402
     event_features_root,
     event_spike_evidence_dir,
     processed_data_dir,
@@ -90,12 +92,11 @@ from continuum_swr_replay.runs.provenance import (  # noqa: E402
 )
 from continuum_swr_replay.visualization.palettes import COLORS  # noqa: E402
 
-OUT_NAME = "ripple_class_structure"
 SEED = 20261027
 
 
 def out_dir() -> Path:
-    return processed_data_dir() / OUT_NAME
+    return processed_data_dir() / RIPPLE_CLASS_STRUCTURE_DIR
 
 
 # --- stage measure -------------------------------------------------------------

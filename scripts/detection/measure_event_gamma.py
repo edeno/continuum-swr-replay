@@ -52,6 +52,7 @@ from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.paths import (
+    EVENT_GAMMA_DIR,
     processed_data_dir,
     replay_content_dir,
     table_path,
@@ -63,7 +64,7 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 KEYS = list(SESSION_COLUMNS)
 
 
-def out_dir(name: str = "event_gamma") -> Path:
+def out_dir(name: str = EVENT_GAMMA_DIR) -> Path:
     return processed_data_dir() / name
 
 
@@ -180,7 +181,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--n-workers", type=int, default=1)
     parser.add_argument("--epoch-id", action="append", help="only these epochs")
     parser.add_argument("--overwrite", action="store_true")
-    parser.add_argument("--out-name", default="event_gamma")
+    parser.add_argument("--out-name", default=EVENT_GAMMA_DIR)
     args = parser.parse_args(argv)
 
     event_table = table_path("event_table", replay_content_dir())

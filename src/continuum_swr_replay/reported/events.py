@@ -75,6 +75,12 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_epoch_ids,
 )
 from continuum_swr_replay.paths import (
+    BRAIN_STATE_REFERENCE_DIR,
+    DECODER_QUALITY_DIR,
+    EVENT_GAMMA_DIR,
+    EVENT_PROPERTY_BOOTSTRAP_DIR,
+    EVENT_START_REST_THETA_DIR,
+    RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
     content_occupancy_dir,
     event_features_root,
@@ -179,13 +185,13 @@ def default_inputs() -> EventsInputs:
         / "nl_bouts_by_swr_stats.csv",
         content_occupancy=content_occupancy_dir() / "content_occupancy_per_session.csv",
         brain_state_reference=processed_data_dir()
-        / "brain_state_reference"
+        / BRAIN_STATE_REFERENCE_DIR
         / "reference.parquet",
-        event_gamma=processed_data_dir() / "event_gamma",
-        class_structure=processed_data_dir() / "ripple_class_structure",
-        event_start_rest_theta=processed_data_dir() / "event_start_rest_theta",
-        property_bootstrap=processed_data_dir() / "event_property_bootstrap",
-        decoder_quality=processed_data_dir() / "decoder_quality",
+        event_gamma=processed_data_dir() / EVENT_GAMMA_DIR,
+        class_structure=processed_data_dir() / RIPPLE_CLASS_STRUCTURE_DIR,
+        event_start_rest_theta=processed_data_dir() / EVENT_START_REST_THETA_DIR,
+        property_bootstrap=processed_data_dir() / EVENT_PROPERTY_BOOTSTRAP_DIR,
+        decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
     )
 
 
