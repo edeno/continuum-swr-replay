@@ -108,6 +108,7 @@ filters) moved out of `analysis/` into `runs/`. Paths are under
 | `analysis/pfc/runner_support.is_nonempty_file` (removed: moved) | `runs/io.py` |
 | `analysis/pfc/runner_support.json_safe` (removed) | `runs/io.json_ready` |
 | `analysis/pfc/gpu.py` (removed: moved) | `runs/device.py` |
+| `reported/mpfc/inputs.table_hashes` (removed: moved) | `runs/staleness.py` |
 
 ## Calculations moved out of scripts, 2026-11
 
@@ -138,7 +139,7 @@ the package's `summarize` and `default_inputs` are what
 | Old module | New home |
 |---|---|
 | `reported/behavior.py` (removed: split) | `reported/behavior/__init__.py` (`summarize`); `reported/behavior/inputs.py` (`BehaviorInputs`, `default_inputs`, `fit_staleness`, `_read_per_bin_fits`); `reported/behavior/common.py` (`TAGS`, `_gate_note`, `_require`); `reported/behavior/rate.py` (`per_bin_values`, `per_bin_detail_values`, `per_stop_values`, `rate_contrast_separation_values`, `rate_contrast_audit_values`, `cohort_audit_values`); `reported/behavior/history.py` (`duration_aware_history_values`); `reported/behavior/stops.py` (`stop_table_values`); `reported/behavior/content.py` (`content_contrast_values`, `breadth_derived_values`, `estimator_values`, `leaf_values`, `horserace_values`, `trunk_values`, `current_arm_paired_values`); `reported/behavior/choice.py` (`choice_values`, `stay_leave_values`); `reported/behavior/coupling.py` (`power_values`) |
-| `reported/mpfc.py` (removed: split) | `reported/mpfc/__init__.py` (`summarize`); `reported/mpfc/inputs.py` (`MpfcInputs`, `default_inputs`, `STEM`, `read_sidecars`, `staleness`, `table_hashes`); `reported/mpfc/common.py` (`TAGS`, `ANIMAL_WORDS`, `CLASS_LABELS`); `reported/mpfc/population.py` (`cohort_values`, `estimator_values`, `prior_binding_values`, `called_fraction_values`, `null_geometry_values`, `overlap_and_effect_values`); `reported/mpfc/timing.py` (`timing_values`); `reported/mpfc/swr_without_replay.py` (`swr_without_replay_values`, `SWR_WITHOUT_REPLAY_CURVES`); `reported/mpfc/followups.py` (`marked_family_values`, `stop_context_values`, `followup_values`, `marked_family_staleness`, `stop_context_staleness`); `reported/mpfc/rate_cutoff.py` (`rate_cutoff_check_values`, `CHECK_FIRING_RATE_HZ`) |
+| `reported/mpfc.py` (removed: split) | `reported/mpfc/__init__.py` (`summarize`); `reported/mpfc/inputs.py` (`MpfcInputs`, `default_inputs`, `STEM`, `read_sidecars`, `staleness`; `table_hashes`, since moved to `runs/staleness.py`); `reported/mpfc/common.py` (`TAGS`, `ANIMAL_WORDS`, `CLASS_LABELS`); `reported/mpfc/population.py` (`cohort_values`, `estimator_values`, `prior_binding_values`, `called_fraction_values`, `null_geometry_values`, `overlap_and_effect_values`); `reported/mpfc/timing.py` (`timing_values`); `reported/mpfc/swr_without_replay.py` (`swr_without_replay_values`, `SWR_WITHOUT_REPLAY_CURVES`); `reported/mpfc/followups.py` (`marked_family_values`, `stop_context_values`, `followup_values`, `marked_family_staleness`, `stop_context_staleness`); `reported/mpfc/rate_cutoff.py` (`rate_cutoff_check_values`, `CHECK_FIRING_RATE_HZ`) |
 
 ## Package modules, 2026-10
 
