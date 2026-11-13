@@ -162,21 +162,23 @@ def _fit_one_animal(
 
 
 def _run(fn, items: list[tuple], workers: int) -> list:
-    results = []
+    """``fn`` over ``items``, its results in the order of ``items`` whatever
+    order the workers finish in."""
+    results: list = [None] * len(items)
     done = 0
     if workers > 1:
         with ProcessPoolExecutor(max_workers=workers) as ex:
-            futures = [ex.submit(fn, *item) for item in items]
+            futures = {ex.submit(fn, *item): i for i, item in enumerate(items)}
             for fut in as_completed(futures):
                 keys, out, elapsed = fut.result()
                 done += 1
-                results.append(out)
+                results[futures[fut]] = out
                 logger.info("  [%d/%d] %s in %.1fs", done, len(items), keys, elapsed)
     else:
-        for item in items:
+        for i, item in enumerate(items):
             keys, out, elapsed = fn(*item)
             done += 1
-            results.append(out)
+            results[i] = out
             logger.info("  [%d/%d] %s in %.1fs", done, len(items), keys, elapsed)
     return results
 
