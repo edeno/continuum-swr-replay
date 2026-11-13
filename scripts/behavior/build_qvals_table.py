@@ -60,6 +60,7 @@ from continuum_swr_replay.analysis.behavior.covariates.qvals_table import (
     stop_mapping_agreement,
     write_qvals_outputs,
 )
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.data_loaders.utils import quiet_spyglass
 from continuum_swr_replay.paths import replay_content_dir, table_path
@@ -115,8 +116,10 @@ def run_build_qvals_table(args: argparse.Namespace) -> None:
 
     beh = dj.create_virtual_module("alison_behav", "alison_behav")
     rl = dj.create_virtual_module("alison_rlmodel", "alison_rlmodel")
-    st_all = read_table(table_path("stop_table", replay_content_dir))
+    stop_path = table_path("stop_table", replay_content_dir)
+    st_all = read_table(stop_path)
     require_covariate_schema(st_all, table="stop")
+    require_swr_source(st_all, what=str(stop_path))
 
     parts = []
     for a in animals:
