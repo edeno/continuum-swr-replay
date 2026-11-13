@@ -505,12 +505,15 @@ def _plot_arm_content_bar(
     et_row: pd.Series | None,
     arm_colors: dict,
 ) -> None:
-    """Per-arm posterior mass for the event — the content the M0-M7 models use.
+    """Per-arm content — the response of the M0-M7 arm models.
 
-    Bars are ``arm_posterior_mass`` (conditional posterior marginalized to each
-    arm, summed over the event), colored to match the track. The regression's
-    arm predictors (current/prev/next/last-rewarded) are flagged under the bars
-    so content can be read against the design matrix.
+    Bars are the event's ``arm_fraction`` from the arm table
+    (:func:`~continuum_swr_replay.analysis.behavior.tables.tables_arm_patch.build_event_arm_table`):
+    the share of its decoded real-arm bins whose MAP lies on each arm, the
+    column the arm models read (``content_response``), colored to match the
+    track. The regression's arm predictors (current/prev/next/last-rewarded)
+    are flagged above the bars so content can be read against the design
+    matrix.
     """
     arms = list(range(9))
     if arm_rows is None or not len(arm_rows):
@@ -528,21 +531,21 @@ def _plot_arm_content_bar(
         ax.set_xticks([])
         ax.set_yticks([])
         return
-    mass = (
-        arm_rows.set_index("candidate_arm")["arm_posterior_mass"]
-        .reindex(arms)
-        .fillna(0.0)
-    )
+    # NaN (not drawn) when the event has no decoded real-arm bin.
+    fraction = arm_rows.set_index("candidate_arm")["arm_fraction"].reindex(arms)
     bar_colors = [arm_colors.get(a, "lightgray") for a in arms]
-    ax.bar(arms, mass.to_numpy(), color=bar_colors, edgecolor="black", linewidth=0.3)
+    ax.bar(
+        arms, fraction.to_numpy(), color=bar_colors, edgecolor="black", linewidth=0.3
+    )
     ax.set_xticks(arms)
     ax.set_xticklabels([f"a{a}" for a in arms], fontsize=5)
     ax.tick_params(axis="y", labelsize=5)
-    ax.set_ylabel("post. mass", fontsize=6)
+    ax.set_ylabel("share of bins", fontsize=6)
     ax.set_title("per-arm content (M0–M7)", fontsize=7)
 
-    ymax = float(mass.max()) or 1.0
+    ymax = float(fraction.max()) if fraction.max() > 0 else 1.0
     ax.set_ylim(0, ymax * 1.35)
+    height = fraction.fillna(0.0)
     if et_row is not None:
         flags = {
             "cur": et_row.get("occupancy_well_arm"),
@@ -559,7 +562,7 @@ def _plot_arm_content_bar(
         for arm, names in labels.items():
             ax.annotate(
                 "\n".join(names),
-                (arm, mass.get(arm, 0.0)),
+                (arm, height.get(arm, 0.0)),
                 fontsize=4.2,
                 color="black",
                 ha="center",

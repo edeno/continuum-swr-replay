@@ -9,6 +9,7 @@ from scripts.figures.generate_event_gallery import (
     _active_trip_at_time,
     _completed_trials_at,
     _outcome_known_trials_at,
+    _plot_arm_content_bar,
     _plot_patch_content_bar,
     _regression_footer,
 )
@@ -30,6 +31,38 @@ def test_gallery_patch_bars_draw_the_patch_tables_patch_fraction():
     undefined = patch_rows.assign(patch_fraction=np.nan)
     fig, ax = plt.subplots()
     _plot_patch_content_bar(ax, undefined, None)
+    assert all(np.isnan(bar.get_height()) for bar in ax.patches)
+    assert ax.get_ylim() == (0.0, 1.35)
+    plt.close(fig)
+
+
+def test_gallery_arm_bars_draw_the_arm_tables_arm_fraction():
+    import matplotlib.pyplot as plt
+
+    # Rows out of arm order, and a posterior mass that differs from the
+    # fraction, so drawing the wrong column or in row order fails.
+    fraction = [0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.25, 0.25, 0.0]
+    arm_rows = pd.DataFrame(
+        {
+            "event_id": ["e"] * 9,
+            "candidate_arm": list(range(8, -1, -1)),
+            "arm_fraction": fraction[::-1],
+            "arm_posterior_mass": np.linspace(0.1, 0.9, 9),
+        }
+    )
+    et_row = pd.Series({"occupancy_well_arm": 1.0, "prev_arm": 6.0})
+    fig, ax = plt.subplots()
+    _plot_arm_content_bar(ax, arm_rows, et_row, {})
+    assert [bar.get_height() for bar in ax.patches] == fraction
+    # The predictor flags sit on the drawn bars.
+    flags = {text.get_text(): text.xy for text in ax.texts}
+    assert flags == {"cur": (1, 0.5), "prev": (6, 0.25)}
+    plt.close(fig)
+
+    # An event with no decoded real-arm bin has no fraction: no bar is drawn.
+    undefined = arm_rows.assign(arm_fraction=np.nan)
+    fig, ax = plt.subplots()
+    _plot_arm_content_bar(ax, undefined, None, {})
     assert all(np.isnan(bar.get_height()) for bar in ax.patches)
     assert ax.get_ylim() == (0.0, 1.35)
     plt.close(fig)
