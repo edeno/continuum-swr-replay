@@ -15,11 +15,11 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `3dd3c711accf` | yes | 32 | 0 |
-| `detection.json` | `3dd3c711accf` | yes | 132 | 0 |
-| `events.json` | `3dd3c711accf` | yes | 353 | 0 |
-| `behavior.json` | `3dd3c711accf` | yes | 922 | 0 |
-| `mpfc.json` | `3dd3c711accf` | yes | 604 | 0 |
+| `survey.json` | `80a5d6f651e4` | yes | 32 | 0 |
+| `detection.json` | `80a5d6f651e4` | yes | 132 | 0 |
+| `events.json` | `80a5d6f651e4` | yes | 353 | 0 |
+| `behavior.json` | `80a5d6f651e4` | yes | 922 | 0 |
+| `mpfc.json` | `80a5d6f651e4` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -75,7 +75,7 @@ Status: computed. Figures: 1, memoryless_comparison. Values: 97.
 Sources:
 
 - paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)
-- paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)
+- paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)
 - paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
 - paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)
 
@@ -309,7 +309,7 @@ Status: computed. Figures: 2. Values: 98.
 
 Sources:
 
-- event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)
+- event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -432,8 +432,8 @@ Status: computed. Figures: 3b, 3c. Values: 15.
 
 Sources:
 
-- Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)
-- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)
+- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -471,9 +471,9 @@ Status: computed. Figures: 3c, decoder_validation. Values: 54.
 
 Sources:
 
-- Processed-Data/event_gamma/reference.parquet (scripts/detection/measure_event_gamma.py)
-- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
-- Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)
+- Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -561,14 +561,14 @@ Sources:
 
 Status: computed. Figures: 2. Values: 65.
 
-*Note:* The held-out test split by SWR (the heldout_* values) was made by the tracked scripts/detection/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.
+*Note:* The held-out test split by SWR (the heldout_* values) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.
 
 Sources:
 
-- Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)
+- Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)
 - Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv
 - Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
-- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -738,8 +738,8 @@ Status: partly computed; the own-well share waits for the wider-Local-kernel re-
 Sources:
 
 - Processed-Data/content_occupancy/content_occupancy_per_session.csv
-- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -770,9 +770,9 @@ Status: computed. Figures: 3d, 3e. Values: 9.
 
 Sources:
 
-- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
-- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -792,9 +792,9 @@ Status: computed. Figures: 3. Values: 17.
 
 Sources:
 
-- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
-- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -822,8 +822,8 @@ Status: computed. Figures: 3. Values: 24.
 
 Sources:
 
-- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -858,9 +858,9 @@ Status: computed. Values: 25.
 
 Sources:
 
-- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
-- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -896,9 +896,9 @@ Status: computed. Values: 6.
 
 Sources:
 
-- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
-- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -2813,7 +2813,7 @@ Unlettered: `\DetectionControlsContinuingOursOnePerPartLongestFraction`, `\Detec
 
 ### Figure content_estimators: Content models under three estimators
 
-Script: `scripts/behavior/content/compare_content_estimators.py`. Questions: 3.1, 3.6, 3.7.
+Script: `scripts/replay_models/content/compare_content_estimators.py`. Questions: 3.1, 3.6, 3.7.
 
 Unlettered: `\BehaviorEstArmvalueCountAnimalsPositive`, `\BehaviorEstArmvalueCountHigh`, `\BehaviorEstArmvalueCountLow`, `\BehaviorEstArmvalueCountSessions`, `\BehaviorEstArmvalueCount`, `\BehaviorEstArmvalueDmAnimalsPositive`, `\BehaviorEstArmvalueDmHigh`, `\BehaviorEstArmvalueDmLow`, `\BehaviorEstArmvalueDmSessions`, `\BehaviorEstArmvalueDm`, `\BehaviorEstArmvalueFractionAnimalsPositive`, `\BehaviorEstArmvalueFractionHigh`, `\BehaviorEstArmvalueFractionLow`, `\BehaviorEstArmvalueFractionSessions`, `\BehaviorEstArmvalueFraction`, `\BehaviorEstArmvalueRungDeltaAicCount`, `\BehaviorEstArmvalueRungDeltaAicDm`, `\BehaviorEstArmvalueRungDeltaAicFraction`, `\BehaviorEstBreadthDmHigh`, `\BehaviorEstBreadthDmLow`, `\BehaviorEstCurrentCountAnimalsPositive`, `\BehaviorEstCurrentCountHigh`, `\BehaviorEstCurrentCountLow`, `\BehaviorEstCurrentCountSessions`, `\BehaviorEstCurrentCount`, `\BehaviorEstCurrentDmAnimalsPositive`, `\BehaviorEstCurrentDmHigh`, `\BehaviorEstCurrentDmLow`, `\BehaviorEstCurrentDmSessions`, `\BehaviorEstCurrentDm`, `\BehaviorEstCurrentFractionAnimalsPositive`, `\BehaviorEstCurrentFractionHigh`, `\BehaviorEstCurrentFractionLow`, `\BehaviorEstCurrentFractionSessions`, `\BehaviorEstCurrentFraction`, `\BehaviorEstSwrArmrewardCountAnimalsPositive`, `\BehaviorEstSwrArmrewardCountHigh`, `\BehaviorEstSwrArmrewardCountLow`, `\BehaviorEstSwrArmrewardCountSessions`, `\BehaviorEstSwrArmrewardCount`, `\BehaviorEstSwrArmrewardDmAnimalsPositive`, `\BehaviorEstSwrArmrewardDmHigh`, `\BehaviorEstSwrArmrewardDmLow`, `\BehaviorEstSwrArmrewardDmSessions`, `\BehaviorEstSwrArmrewardDm`, `\BehaviorEstSwrArmrewardFractionAnimalsPositive`, `\BehaviorEstSwrArmrewardFractionHigh`, `\BehaviorEstSwrArmrewardFractionLow`, `\BehaviorEstSwrArmrewardFractionSessions`, `\BehaviorEstSwrArmrewardFraction`, `\BehaviorEstSwrArmvalueCountAnimalsPositive`, `\BehaviorEstSwrArmvalueCountHigh`, `\BehaviorEstSwrArmvalueCountLow`, `\BehaviorEstSwrArmvalueCountSessions`, `\BehaviorEstSwrArmvalueCount`, `\BehaviorEstSwrArmvalueDmAnimalsPositive`, `\BehaviorEstSwrArmvalueDmHigh`, `\BehaviorEstSwrArmvalueDmLow`, `\BehaviorEstSwrArmvalueDmSessions`, `\BehaviorEstSwrArmvalueDm`, `\BehaviorEstSwrArmvalueFractionAnimalsPositive`, `\BehaviorEstSwrArmvalueFractionHigh`, `\BehaviorEstSwrArmvalueFractionLow`, `\BehaviorEstSwrArmvalueFractionSessions`, `\BehaviorEstSwrArmvalueFraction`, `\BehaviorEstSwrCurrentCountAnimalsPositive`, `\BehaviorEstSwrCurrentCountHigh`, `\BehaviorEstSwrCurrentCountLow`, `\BehaviorEstSwrCurrentCountSessions`, `\BehaviorEstSwrCurrentCount`, `\BehaviorEstSwrCurrentDmAnimalsPositive`, `\BehaviorEstSwrCurrentDmHigh`, `\BehaviorEstSwrCurrentDmLow`, `\BehaviorEstSwrCurrentDmSessions`, `\BehaviorEstSwrCurrentDm`, `\BehaviorEstSwrCurrentFractionAnimalsPositive`, `\BehaviorEstSwrCurrentFractionHigh`, `\BehaviorEstSwrCurrentFractionLow`, `\BehaviorEstSwrCurrentFractionSessions`, `\BehaviorEstSwrCurrentFraction`
 
@@ -2839,58 +2839,58 @@ without being called, is not listed.
 |---|---|---|---|
 | `survey.method_values` | `reported/survey.py` | `analysis.literature_survey.method_shares` |  |
 | `survey.parameter_values` | `reported/survey.py` | `analysis.literature_survey.parameter_statistics` |  |
-| `detection.controls_values` | `reported/detection.py` | `analysis.hippocampus.memoryless_sequence.sweep_statistics.burst_share_range`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.carving_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.controls_value`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.no_replay_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.part_recovery_statistics` |  |
-| `detection.heldout_values` | `reported/detection.py` | `analysis.hippocampus.memoryless_sequence.sweep_statistics.heldout_event_classes`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.heldout_fold_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.lowest_estimator_agreement`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.placeless_burst_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.pooled_heldout_rate` |  |
-| `detection.pilot_stray_window_values` | `reported/detection.py` | `analysis.hippocampus.memoryless_sequence.event_table.outside_window_call_statistics` |  |
+| `detection.controls_values` | `reported/detection.py` | `analysis.detection.memoryless_sequence.sweep_statistics.burst_share_range`, `analysis.detection.memoryless_sequence.sweep_statistics.carving_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.controls_value`, `analysis.detection.memoryless_sequence.sweep_statistics.no_replay_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.part_recovery_statistics` |  |
+| `detection.heldout_values` | `reported/detection.py` | `analysis.detection.memoryless_sequence.sweep_statistics.heldout_event_classes`, `analysis.detection.memoryless_sequence.sweep_statistics.heldout_fold_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.lowest_estimator_agreement`, `analysis.detection.memoryless_sequence.sweep_statistics.placeless_burst_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.pooled_heldout_rate` |  |
+| `detection.pilot_stray_window_values` | `reported/detection.py` | `analysis.detection.memoryless_sequence.event_table.outside_window_call_statistics` |  |
 | `detection.recording_values` | `reported/detection.py` | none |  |
 | `detection.state_evidence_values` | `reported/detection.py` | none |  |
-| `detection.sweep_values` | `reported/detection.py` | `analysis.hippocampus.memoryless_sequence.sweep_statistics.sweep_grid_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.sweep_jump_pass_statistics`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.sweep_measures`, `analysis.hippocampus.memoryless_sequence.sweep_statistics.sweep_timing_statistics` |  |
-| `events.boundary_offset_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.boundary_offset_statistics`, `analysis.hippocampus.event_statistics.boundary_offsets` |  |
-| `events.brain_state_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.event_signal_statistics`, `analysis.hippocampus.event_statistics.reference_medians` |  |
-| `events.calibration_values` | `reported/events.py` | `analysis.hippocampus.quality_metrics.calibration_curve_statistics` |  |
-| `events.class_distribution_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.peak_ripple_mode_statistics` |  |
-| `events.class_step_evidence_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.threshold_step_statistics` |  |
-| `events.class_step_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.most_steps`, `analysis.hippocampus.event_statistics.threshold_step_statistics` |  |
-| `events.content_occupancy_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.content_occupancy_shares`, `analysis.hippocampus.event_statistics.n_animals_non_swr_more_at_well` |  |
-| `events.decoding_error_values` | `reported/events.py` | `analysis.hippocampus.quality_metrics.local_decoding_error_statistics` |  |
-| `events.event_cohort_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.overlap_class_statistics` |  |
-| `events.gamma_db_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.power_change_statistics` |  |
-| `events.gamma_z_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.event_signal_statistics`, `analysis.hippocampus.event_statistics.reference_medians` |  |
+| `detection.sweep_values` | `reported/detection.py` | `analysis.detection.memoryless_sequence.sweep_statistics.sweep_grid_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.sweep_jump_pass_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.sweep_measures`, `analysis.detection.memoryless_sequence.sweep_statistics.sweep_timing_statistics` |  |
+| `events.boundary_offset_values` | `reported/events.py` | `analysis.event_properties.event_statistics.boundary_offset_statistics`, `analysis.event_properties.event_statistics.boundary_offsets` |  |
+| `events.brain_state_values` | `reported/events.py` | `analysis.event_properties.event_statistics.event_signal_statistics`, `analysis.event_properties.event_statistics.reference_medians` |  |
+| `events.calibration_values` | `reported/events.py` | `analysis.decode_quality.quality_metrics.calibration_curve_statistics` |  |
+| `events.class_distribution_values` | `reported/events.py` | `analysis.event_properties.event_statistics.peak_ripple_mode_statistics` |  |
+| `events.class_step_evidence_values` | `reported/events.py` | `analysis.event_properties.event_statistics.threshold_step_statistics` |  |
+| `events.class_step_values` | `reported/events.py` | `analysis.event_properties.event_statistics.most_steps`, `analysis.event_properties.event_statistics.threshold_step_statistics` |  |
+| `events.content_occupancy_values` | `reported/events.py` | `analysis.event_properties.event_statistics.content_occupancy_shares`, `analysis.event_properties.event_statistics.n_animals_non_swr_more_at_well` |  |
+| `events.decoding_error_values` | `reported/events.py` | `analysis.decode_quality.quality_metrics.local_decoding_error_statistics` |  |
+| `events.event_cohort_values` | `reported/events.py` | `analysis.event_properties.event_statistics.overlap_class_statistics` |  |
+| `events.gamma_db_values` | `reported/events.py` | `analysis.event_properties.event_statistics.power_change_statistics` |  |
+| `events.gamma_z_values` | `reported/events.py` | `analysis.event_properties.event_statistics.event_signal_statistics`, `analysis.event_properties.event_statistics.reference_medians` |  |
 | `events.heldout_by_swr_values` | `reported/events.py` | none |  |
-| `events.left_out_values` | `reported/events.py` | `analysis.inventory_comparison.nonlocal_comparison.left_out_statistics` |  |
-| `events.other_detector_values` | `reported/events.py` | `analysis.inventory_comparison.nonlocal_comparison.other_detector_statistics` |  |
+| `events.left_out_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.left_out_statistics` |  |
+| `events.other_detector_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.other_detector_statistics` |  |
 | `events.property_interval_values` | `reported/events.py` | none |  |
-| `events.property_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.class_medians`, `analysis.hippocampus.event_statistics.n_animals_in_direction` |  |
-| `events.rest_theta_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.rest_matched_theta_statistics` |  |
-| `events.spike_evidence_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.spike_evidence_statistics` |  |
-| `events.start_distance_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.class_medians`, `analysis.hippocampus.event_statistics.n_animals_in_direction` |  |
-| `events.state_fraction_values` | `reported/events.py` | `analysis.hippocampus.quality_metrics.state_fraction_statistics` |  |
-| `behavior.breadth_derived_values` | `reported/behavior/content.py` | `analysis.behavior.content.content_statistics.concentration_contrast_statistics`, `analysis.behavior.content.content_statistics.event_length_statistics` |  |
-| `behavior.choice_values` | `reported/behavior/choice.py` | `analysis.behavior.coefficient_statistics.gated_coefficient_statistics` |  |
+| `events.property_values` | `reported/events.py` | `analysis.event_properties.event_statistics.class_medians`, `analysis.event_properties.event_statistics.n_animals_in_direction` |  |
+| `events.rest_theta_values` | `reported/events.py` | `analysis.event_properties.event_statistics.rest_matched_theta_statistics` |  |
+| `events.spike_evidence_values` | `reported/events.py` | `analysis.event_properties.event_statistics.spike_evidence_statistics` |  |
+| `events.start_distance_values` | `reported/events.py` | `analysis.event_properties.event_statistics.class_medians`, `analysis.event_properties.event_statistics.n_animals_in_direction` |  |
+| `events.state_fraction_values` | `reported/events.py` | `analysis.decode_quality.quality_metrics.state_fraction_statistics` |  |
+| `behavior.breadth_derived_values` | `reported/behavior/content.py` | `analysis.replay_models.content.content_statistics.concentration_contrast_statistics`, `analysis.replay_models.content.content_statistics.event_length_statistics` |  |
+| `behavior.choice_values` | `reported/behavior/choice.py` | `analysis.replay_models.coefficient_statistics.gated_coefficient_statistics` |  |
 | `behavior.cohort_audit_values` | `reported/behavior/rate.py` | none |  |
 | `behavior.content_contrast_values` | `reported/behavior/content.py` | none |  |
-| `behavior.current_arm_paired_values` | `reported/behavior/content.py` | `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.behavior.coefficient_statistics.gated_coefficient_difference_statistics` |  |
-| `behavior.duration_aware_history_values` | `reported/behavior/history.py` | `analysis.behavior.rate.history_kernel_statistics.cross_history_statistics`, `analysis.behavior.rate.history_kernel_statistics.lag_ms`, `analysis.behavior.rate.history_kernel_statistics.self_history_range_statistics`, `analysis.behavior.rate.history_kernel_statistics.self_history_statistics` |  |
+| `behavior.current_arm_paired_values` | `reported/behavior/content.py` | `analysis.replay_models.coefficient_statistics.fit_rows`, `analysis.replay_models.coefficient_statistics.gated_coefficient_difference_statistics` |  |
+| `behavior.duration_aware_history_values` | `reported/behavior/history.py` | `analysis.replay_models.rate.history_kernel_statistics.cross_history_statistics`, `analysis.replay_models.rate.history_kernel_statistics.lag_ms`, `analysis.replay_models.rate.history_kernel_statistics.self_history_range_statistics`, `analysis.replay_models.rate.history_kernel_statistics.self_history_statistics` |  |
 | `behavior.estimator_values` | `reported/behavior/content.py` | none |  |
 | `behavior.horserace_values` | `reported/behavior/content.py` | none |  |
-| `behavior.leaf_values` | `reported/behavior/content.py` | `analysis.behavior.coefficient_statistics.gated_coefficient_statistics`, `analysis.behavior.content.model_comparison.compare_nested_models`, `analysis.behavior.content.model_comparison.summarize_comparison` |  |
-| `behavior.per_bin_detail_values` | `reported/behavior/rate.py` | `analysis.behavior.coefficient_statistics.aic_difference_statistics`, `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.behavior.coefficient_statistics.fits_carrying`, `analysis.behavior.coefficient_statistics.gated_coefficient_statistics`, `analysis.behavior.coefficient_statistics.group_range`, `analysis.behavior.coefficient_statistics.term_separation_statistics`, `analysis.behavior.rate.rate_fit_statistics.arrival_window_statistics`, `analysis.behavior.rate.rate_fit_statistics.baseline_rate_ratio_statistics`, `analysis.behavior.rate.rate_fit_statistics.baseline_rate_statistics`, `analysis.behavior.rate.rate_fit_statistics.ladder_fit_statistics`, `analysis.behavior.rate.rate_fit_statistics.reward_kernel_statistics` |  |
-| `behavior.per_bin_values` | `reported/behavior/rate.py` | `analysis.behavior.coefficient_statistics.aic_difference_statistics`, `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.behavior.coefficient_statistics.gated_coefficient_statistics`, `analysis.behavior.coefficient_statistics.gated_exp_median_ratio`, `analysis.behavior.coefficient_statistics.group_range`, `analysis.behavior.rate.rate_fit_statistics.arrival_window_statistics`, `analysis.behavior.rate.rate_fit_statistics.baseline_rate_statistics`, `analysis.behavior.rate.rate_fit_statistics.clock_shape_statistics`, `analysis.behavior.rate.rate_fit_statistics.frozen_cohort_statistics`, `analysis.behavior.rate.rate_fit_statistics.ladder_fit_statistics`, `analysis.behavior.rate.rate_fit_statistics.paired_lag_one_kernel_statistics`, `analysis.behavior.rate.rate_fit_statistics.paired_lag_one_reward_kernels`, `analysis.behavior.rate.rate_fit_statistics.reward_kernel_statistics` |  |
-| `behavior.per_stop_values` | `reported/behavior/rate.py` | `analysis.behavior.coefficient_statistics.aic_difference_statistics`, `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.behavior.coefficient_statistics.known_fraction` |  |
-| `behavior.power_values` | `reported/behavior/coupling.py` | `analysis.behavior.coefficient_statistics.coefficient_statistics` |  |
-| `behavior.rate_contrast_audit_values` | `reported/behavior/rate.py` | `analysis.behavior.coefficient_statistics.audited_drop_statistics`, `analysis.behavior.coefficient_statistics.fit_rows` |  |
-| `behavior.rate_contrast_separation_values` | `reported/behavior/rate.py` | `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.behavior.coefficient_statistics.fits_carrying`, `analysis.behavior.coefficient_statistics.rung_separation_range`, `analysis.behavior.coefficient_statistics.separated_fraction`, `analysis.behavior.coefficient_statistics.term_separation_statistics` |  |
-| `behavior.stay_leave_values` | `reported/behavior/choice.py` | `analysis.behavior.choice.learning.cross_session_role_summary`, `analysis.behavior.choice.learning.fit_status_counts`, `analysis.behavior.choice.learning.pooled_gee_role_summary`, `analysis.behavior.choice.learning.smallest_adjusted_p`, `analysis.behavior.rate.stop_statistics.stop_cohort_counts` |  |
-| `behavior.stop_table_values` | `reported/behavior/stops.py` | `analysis.behavior.rate.stop_statistics.dwell_statistics`, `analysis.behavior.rate.stop_statistics.onset_time_statistics`, `analysis.behavior.rate.stop_statistics.outcome_boundary_statistics`, `analysis.behavior.rate.stop_statistics.reward_history_incomplete_statistics`, `analysis.behavior.rate.stop_statistics.still_immobile_fraction`, `analysis.behavior.rate.stop_statistics.stop_cohort_counts`, `analysis.events.cohort_selection.select_stop_cohort` |  |
-| `behavior.summarize` | `reported/behavior/__init__.py` | `analysis.behavior.coefficient_statistics.fit_rows`, `analysis.events.cohort_selection.select_event_cohort` | `behavior.breadth_derived_values`, `behavior.choice_values`, `behavior.cohort_audit_values`, `behavior.content_contrast_values`, `behavior.current_arm_paired_values`, `behavior.duration_aware_history_values`, `behavior.estimator_values`, `behavior.horserace_values`, `behavior.leaf_values`, `behavior.per_bin_detail_values`, `behavior.per_bin_values`, `behavior.per_stop_values`, `behavior.power_values`, `behavior.rate_contrast_audit_values`, `behavior.rate_contrast_separation_values`, `behavior.stay_leave_values`, `behavior.stop_table_values`, `behavior.trunk_values` |
-| `behavior.trunk_values` | `reported/behavior/content.py` | `analysis.behavior.content.content_statistics.current_patch_trunk_fraction`, `analysis.behavior.content.content_statistics.trunk_share_statistics`, `analysis.behavior.content.content_statistics.trunk_shares` |  |
+| `behavior.leaf_values` | `reported/behavior/content.py` | `analysis.replay_models.coefficient_statistics.gated_coefficient_statistics`, `analysis.replay_models.content.model_comparison.compare_nested_models`, `analysis.replay_models.content.model_comparison.summarize_comparison` |  |
+| `behavior.per_bin_detail_values` | `reported/behavior/rate.py` | `analysis.replay_models.coefficient_statistics.aic_difference_statistics`, `analysis.replay_models.coefficient_statistics.fit_rows`, `analysis.replay_models.coefficient_statistics.fits_carrying`, `analysis.replay_models.coefficient_statistics.gated_coefficient_statistics`, `analysis.replay_models.coefficient_statistics.group_range`, `analysis.replay_models.coefficient_statistics.term_separation_statistics`, `analysis.replay_models.rate.rate_fit_statistics.arrival_window_statistics`, `analysis.replay_models.rate.rate_fit_statistics.baseline_rate_ratio_statistics`, `analysis.replay_models.rate.rate_fit_statistics.baseline_rate_statistics`, `analysis.replay_models.rate.rate_fit_statistics.ladder_fit_statistics`, `analysis.replay_models.rate.rate_fit_statistics.reward_kernel_statistics` |  |
+| `behavior.per_bin_values` | `reported/behavior/rate.py` | `analysis.replay_models.coefficient_statistics.aic_difference_statistics`, `analysis.replay_models.coefficient_statistics.fit_rows`, `analysis.replay_models.coefficient_statistics.gated_coefficient_statistics`, `analysis.replay_models.coefficient_statistics.gated_exp_median_ratio`, `analysis.replay_models.coefficient_statistics.group_range`, `analysis.replay_models.rate.rate_fit_statistics.arrival_window_statistics`, `analysis.replay_models.rate.rate_fit_statistics.baseline_rate_statistics`, `analysis.replay_models.rate.rate_fit_statistics.clock_shape_statistics`, `analysis.replay_models.rate.rate_fit_statistics.frozen_cohort_statistics`, `analysis.replay_models.rate.rate_fit_statistics.ladder_fit_statistics`, `analysis.replay_models.rate.rate_fit_statistics.paired_lag_one_kernel_statistics`, `analysis.replay_models.rate.rate_fit_statistics.paired_lag_one_reward_kernels`, `analysis.replay_models.rate.rate_fit_statistics.reward_kernel_statistics` |  |
+| `behavior.per_stop_values` | `reported/behavior/rate.py` | `analysis.replay_models.coefficient_statistics.aic_difference_statistics`, `analysis.replay_models.coefficient_statistics.fit_rows`, `analysis.replay_models.coefficient_statistics.known_fraction` |  |
+| `behavior.power_values` | `reported/behavior/coupling.py` | `analysis.replay_models.coefficient_statistics.coefficient_statistics` |  |
+| `behavior.rate_contrast_audit_values` | `reported/behavior/rate.py` | `analysis.replay_models.coefficient_statistics.audited_drop_statistics`, `analysis.replay_models.coefficient_statistics.fit_rows` |  |
+| `behavior.rate_contrast_separation_values` | `reported/behavior/rate.py` | `analysis.replay_models.coefficient_statistics.fit_rows`, `analysis.replay_models.coefficient_statistics.fits_carrying`, `analysis.replay_models.coefficient_statistics.rung_separation_range`, `analysis.replay_models.coefficient_statistics.separated_fraction`, `analysis.replay_models.coefficient_statistics.term_separation_statistics` |  |
+| `behavior.stay_leave_values` | `reported/behavior/choice.py` | `analysis.replay_models.choice.stay_leave.cross_session_role_summary`, `analysis.replay_models.choice.stay_leave.fit_status_counts`, `analysis.replay_models.choice.stay_leave.pooled_gee_role_summary`, `analysis.replay_models.choice.stay_leave.smallest_adjusted_p`, `analysis.replay_models.rate.stop_statistics.stop_cohort_counts` |  |
+| `behavior.stop_table_values` | `reported/behavior/stops.py` | `analysis.event_definition.cohort_selection.select_stop_cohort`, `analysis.replay_models.rate.stop_statistics.dwell_statistics`, `analysis.replay_models.rate.stop_statistics.onset_time_statistics`, `analysis.replay_models.rate.stop_statistics.outcome_boundary_statistics`, `analysis.replay_models.rate.stop_statistics.reward_history_incomplete_statistics`, `analysis.replay_models.rate.stop_statistics.still_immobile_fraction`, `analysis.replay_models.rate.stop_statistics.stop_cohort_counts` |  |
+| `behavior.summarize` | `reported/behavior/__init__.py` | `analysis.event_definition.analysed_time.read_swr_table`, `analysis.event_definition.cohort_selection.select_event_cohort`, `analysis.replay_models.coefficient_statistics.fit_rows` | `behavior.breadth_derived_values`, `behavior.choice_values`, `behavior.cohort_audit_values`, `behavior.content_contrast_values`, `behavior.current_arm_paired_values`, `behavior.duration_aware_history_values`, `behavior.estimator_values`, `behavior.horserace_values`, `behavior.leaf_values`, `behavior.per_bin_detail_values`, `behavior.per_bin_values`, `behavior.per_stop_values`, `behavior.power_values`, `behavior.rate_contrast_audit_values`, `behavior.rate_contrast_separation_values`, `behavior.stay_leave_values`, `behavior.stop_table_values`, `behavior.trunk_values` |
+| `behavior.trunk_values` | `reported/behavior/content.py` | `analysis.replay_models.content.content_statistics.current_patch_trunk_fraction`, `analysis.replay_models.content.content_statistics.trunk_share_statistics`, `analysis.replay_models.content.content_statistics.trunk_shares` |  |
 | `mpfc.called_fraction_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.best_model_fractions`, `analysis.pfc.population_statistics.bh_called_fraction`, `analysis.pfc.population_statistics.called_fraction_by_animal`, `analysis.pfc.population_statistics.called_fractions` |  |
 | `mpfc.cohort_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.cohort_count_statistics` |  |
 | `mpfc.estimator_values` | `reported/mpfc/population.py` | `analysis.pfc.heldout.empirical_pvalue_floor`, `analysis.pfc.population_statistics.fit_count_statistics` |  |
 | `mpfc.marked_family_values` | `reported/mpfc/followups.py` | `analysis.pfc.marked_family_statistics.wide_statistics` |  |
-| `mpfc.null_geometry_values` | `reported/mpfc/population.py` | `analysis.behavior.coefficient_statistics.group_range`, `analysis.pfc.population_statistics.called_without_improvement`, `analysis.pfc.population_statistics.session_value_statistics`, `analysis.pfc.population_statistics.unmatchable_event_statistics` |  |
+| `mpfc.null_geometry_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.called_without_improvement`, `analysis.pfc.population_statistics.session_value_statistics`, `analysis.pfc.population_statistics.unmatchable_event_statistics`, `analysis.replay_models.coefficient_statistics.group_range` |  |
 | `mpfc.overlap_and_effect_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.peak_modulation_statistics`, `analysis.pfc.population_statistics.replay_class_overlap_statistics`, `analysis.pfc.population_statistics.replay_split_statistics` |  |
-| `mpfc.prior_binding_values` | `reported/mpfc/population.py` | `analysis.behavior.coefficient_statistics.group_range`, `analysis.pfc.population_statistics.prior_binding_percent` |  |
+| `mpfc.prior_binding_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.prior_binding_percent`, `analysis.replay_models.coefficient_statistics.group_range` |  |
 | `mpfc.rate_cutoff_check_values` | `reported/mpfc/rate_cutoff.py` | `analysis.pfc.population_statistics.units_at_or_above_rate` | `mpfc.called_fraction_values`, `mpfc.overlap_and_effect_values`, `mpfc.swr_without_replay_values` |
 | `mpfc.stop_context_values` | `reported/mpfc/followups.py` | none |  |
 | `mpfc.swr_without_replay_values` | `reported/mpfc/swr_without_replay.py` | `analysis.pfc.population_statistics.swr_without_replay_called_by_animal`, `analysis.pfc.population_statistics.swr_without_replay_event_statistics`, `analysis.pfc.population_statistics.swr_without_replay_sessions`, `analysis.pfc.population_statistics.swr_without_replay_timing_statistics`, `analysis.pfc.population_statistics.swr_without_replay_unit_statistics` |  |

@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "3dd3c711accf",
+ "commit": "80a5d6f651e4",
  "code": {
-  "head": "3dd3c711accf4643fabafde0a4e1f95525e25567",
+  "head": "80a5d6f651e418aa68e8ecd426d0eff4ce456e16",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -15,224 +15,236 @@
     "code_sha256": "ab61ce34f3e1d62d6bbc8a3f9f48bb8dc9cdfc70aa5a23490c1d444ecb3a90cb"
    },
    "src/continuum_swr_replay/__init__.py": {
-    "sha256": "6abe095d4750bc5bfe3756b4fdca8a2f2db3ee2e2da968d429adca68295b5314",
+    "sha256": "d63a52c9225273c4261a6bff4f029ce00c5f83632a57b458c976a2f3ff4a579e",
     "code_sha256": "da55fd01482a16ea3f485e7731f53606ebbb1a994b8b2bfe6d6bc2f7dde20d3a"
    },
    "src/continuum_swr_replay/analysis/__init__.py": {
-    "sha256": "3cb8b9dee833f6e01b81a7e5d63d8f61bf531039d42710708bb2a284d4f8d6fd",
+    "sha256": "5603844362f2ff3c4d40b22db56357d3f25746b9e96c0697247d2c1e1e61e343",
     "code_sha256": "f61526fd60590ac016a72fa7fc151d66f027c51433337b022efa558c1684c181"
    },
    "src/continuum_swr_replay/analysis/constants.py": {
-    "sha256": "ac6599e100f5c1de45d8611c66ee4399a7473cd3b695202fc5c1c4a64c3a1ac6",
-    "code_sha256": "b6f7e337f905d41890a4968735aa44108ee324afd55f05bdeb2633da985bedeb"
+    "sha256": "b6e682caca21cf7a8062fe0e0abd9054c5fc8e828d704d5fe327990c36c52f5f",
+    "code_sha256": "9c035b82db6676d89a964f33cf3957a96601177f93f4fa810742738922e6d296"
    },
-   "src/continuum_swr_replay/analysis/events/__init__.py": {
-    "sha256": "12f5946fb717d7fbcc6b803d775ce28baf3e5245c16581aa3428d2e760e51ebc",
+   "src/continuum_swr_replay/analysis/decode_quality/__init__.py": {
+    "sha256": "bdf39c93bcffcc97357cd0d43b19f2871bdf765eec54955a4d40f8975bdd954c",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
-   "src/continuum_swr_replay/analysis/events/analysed_time.py": {
-    "sha256": "f3603576d1684322d2f94de6c1581808ae39dfa41d98eb0c7edbb63f866e8695",
-    "code_sha256": "e94fdf2775f1c31aa03e4403798afee6b0bfd4342ff75bc321c58366a66f6ad8"
+   "src/continuum_swr_replay/analysis/decode_quality/posterior_analysis.py": {
+    "sha256": "9ec37a9eec110fb0bc03d80d516df2c2bd3c8dc60629c1355b23f1fcef742dfa",
+    "code_sha256": "787ddea46e138922855103f0093fc178e1569407967c84d48034c0f645101e37"
    },
-   "src/continuum_swr_replay/analysis/events/artifact_intervals.py": {
-    "sha256": "77cddcc0b16afc601a389e8b31c80f8b3b344daba0ab585cc9e3c3c127328379",
-    "code_sha256": "26c0098a6db08819bebd7417eb627c8b38ec9229710e1732f4d2adc9eb317296"
+   "src/continuum_swr_replay/analysis/decode_quality/quality_metrics.py": {
+    "sha256": "5d54f33103f0c7257a026bd73d8bde92d560356d8acf6588c2f86949fea7966f",
+    "code_sha256": "4b3e51e0894f931c18a9d3dd9fd458cd6bddb905404b35068507794ffadc1510"
    },
-   "src/continuum_swr_replay/analysis/events/artifact_masks.py": {
-    "sha256": "60bdd8dffb88a10fc11396348ffb15f2812877d22d39f2c01f453cc8bfff7b69",
-    "code_sha256": "cdfa979dfc76d95523de60422744635982f10b6f79b38867a73d0ec1d657a843"
+   "src/continuum_swr_replay/analysis/detection/__init__.py": {
+    "sha256": "b964fba148c443c813d55314af43b80741675d5f10dcfe66cb718ca32a2932b2",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
-   "src/continuum_swr_replay/analysis/events/classified_table.py": {
-    "sha256": "9c2b53072095d053a00059e0ca45a954d1e5c8afa96deb0c82dad5fe46cc61bc",
-    "code_sha256": "fb14c97032d0e55f56ed36426a10aa17a720d0f1cc43fb60d1a574bd74657d88"
+   "src/continuum_swr_replay/analysis/detection/detection_inputs.py": {
+    "sha256": "6791ed2c7c5d4ed1d4b87f83fd29a797e1eda5a2426220bddef6dccb6825c1fd",
+    "code_sha256": "a40e456f3db5cbbb0467ae97e10abcf62858e05f647dcd6d92ade4045a12846c"
    },
-   "src/continuum_swr_replay/analysis/events/cohort_selection.py": {
-    "sha256": "1883087f3c8df23eba3e2e792f34c106bb4daeaa8421152cba00044ef6235f97",
-    "code_sha256": "c2bc4efd784f5649ade7ad8abf66112e9899edc86c88024971281177a098728d"
+   "src/continuum_swr_replay/analysis/detection/memoryless_sequence/__init__.py": {
+    "sha256": "82ac09c1b262eff03320255e6426c415192dcd6365bf68dd5ff760e218d8f5fd",
+    "code_sha256": "c87777fde9d9f26d64d3e8b83bebe7baedb9e1da1f066689afdf44128df7c6d4"
    },
-   "src/continuum_swr_replay/analysis/events/eligibility.py": {
-    "sha256": "9b822a9dc94321cf1a7ef368ebeeaa3bd473b5eea915c124487243c803e9831c",
-    "code_sha256": "379a15c677b24a3c015d263ccb5abaae47932ca9a55b05256534e9ac16a09865"
+   "src/continuum_swr_replay/analysis/detection/memoryless_sequence/config.py": {
+    "sha256": "bc753bfb622e376098caa1626a85325b5764dd8cdb286d50cea6d7925ae08055",
+    "code_sha256": "f543aeeeb4eae0b449c1535aa04d84e862b8571321c3a3ad1f6b14969b4e5d15"
    },
-   "src/continuum_swr_replay/analysis/events/epoch_normalizers.py": {
-    "sha256": "1c5ac2c7b6c816854e1d0638e78e3058764b47c9d8c016ee81680ca8bd89a05d",
-    "code_sha256": "8e7c4bdc7fd93c200b4452cfe020a57e624623c6cf4e46ba4bc8eb0727640cf1"
+   "src/continuum_swr_replay/analysis/detection/memoryless_sequence/detect.py": {
+    "sha256": "6af3c8480aee71fcd17ff2755b91c616378aac524f7e396ccc273e8b6ec7255b",
+    "code_sha256": "e4717a42b7f3879f235762506aa697eba90babda3bb419fd6e312b1e42373fe9"
    },
-   "src/continuum_swr_replay/analysis/events/immobility.py": {
-    "sha256": "24080a579ec05322920563eae52ae9dfacb9b01130ec688802f8914ee02a4aa4",
-    "code_sha256": "e21dea285419419ec0439f502927037b336d4f572b461bffebd9d1e87b7c3c7d"
+   "src/continuum_swr_replay/analysis/detection/memoryless_sequence/epoch.py": {
+    "sha256": "c98a0cf5df8bf644d60ecfd3d0e04dea4840836f81fc045fe61ebda3f89ec359",
+    "code_sha256": "587f418a70783fa925d8cd1e6c78bae72b5c0c8c2787c3b0f8d028f8920b8a5e"
    },
-   "src/continuum_swr_replay/analysis/events/nonlocal_detection.py": {
-    "sha256": "d900209358c66e6ba8e233b7415d97f946f549eab09aaab98f20b685433e26a6",
-    "code_sha256": "cd1cd0ffc8cf7f22349a65659a03d2f686c90dcb35d3703d09369d44737af0ec"
+   "src/continuum_swr_replay/analysis/detection/memoryless_sequence/event_table.py": {
+    "sha256": "c2b51632504ebb71444316468fca081ca51c6e6f2bd2832202cc1b2e26a1059f",
+    "code_sha256": "0f867a91c5e7403c699c7ef9278a90799621256648844493ea1cc07b375a3c4d"
    },
-   "src/continuum_swr_replay/analysis/events/swr_source.py": {
-    "sha256": "5d92d0e895c097326b72ac71698c55bc603ceace717f12f9753b888e412937b4",
-    "code_sha256": "382a7049e9e9c90a1f37fd86aec94345ff66ca3e25c0c667721e090bc184031d"
+   "src/continuum_swr_replay/analysis/detection/memoryless_sequence/likelihood.py": {
+    "sha256": "ac85375620163f411fae862aad0659d469cb8f5da9a9b6d67f56bad976732902",
+    "code_sha256": "3b9548793940b19e629dc2a64592278110601c7300903d1be1ef7fd3c3de62c1"
    },
-   "src/continuum_swr_replay/analysis/hippocampus/__init__.py": {
-    "sha256": "8e0b5ee16dcc2d9ec74d4fa5cbc2bf7df353ffd4c99fa403eae9e745ce81d8b6",
-    "code_sha256": "9dfd31371132808f497c7138273e7e3915f1266b2e26fd4bda37c457c256a084"
+   "src/continuum_swr_replay/analysis/detection/memoryless_sequence/shuffle.py": {
+    "sha256": "cb946e66b20fa6aaed31727bd19d374989585b7f8af79cfb1b839dbee4333b0c",
+    "code_sha256": "665dd3bfbe64561b0cd19b86a5c8bb63d7dad49d98f85963a56e3037122bdeac"
    },
-   "src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py": {
-    "sha256": "5dc03839c147b29b247562f859c61f4348081418383847e58bb17819c687e24d",
-    "code_sha256": "1da1bfd16e0e7fab91e15b44239d510bf79ad70ca401663fff4436fccb17d4bd"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/decode_masks.py": {
-    "sha256": "3fd0ce0586032242da1361291bd5d72e4d37483dcc10c03f46b8415f1c471ec8",
-    "code_sha256": "4355ea470352f85ebd9394f07f8f11b54db499fb4e1b54ee471dceba90889955"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/detection_inputs.py": {
-    "sha256": "fa114cb33579534c87bb0c61ab5b34e45a74aaf96b7780cca67dab0397003be6",
-    "code_sha256": "a7e0dae923ea4d8928d342217e4a372f20b13aa84f95aa76150207fdcf1565a8"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/event_statistics.py": {
-    "sha256": "d9010d8da7cc95742c21e9ef5b075de3a8707b5aad38eb46aee264db601be406",
-    "code_sha256": "5a22f13a75c673063afbdedc1b4adb92720bffa1c8cce50b8abc0082a4597e74"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/__init__.py": {
-    "sha256": "be00f35a8fd3f9b5f8f01cffbb8b160bc1c4dcd8b1b3095c1ebf390cb8eb5146",
-    "code_sha256": "ca8087c9d78d2510b606954a741ccc303362a914729d47c36cd7f67d7970cf7f"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/config.py": {
-    "sha256": "94ec379e48afab92cabfaa6b2453f9f84e1197f8e374c1bd8c1c9860e7f33546",
-    "code_sha256": "36e5c9d8ef33bcf101041148b9e868f0c16eaa0aeb8225b53e3aea9517dea947"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/detect.py": {
-    "sha256": "48bb59a0a98d49b54c42028ce147d7c4845e536ebb1851d23c062fb61175ae43",
-    "code_sha256": "94558b5ad59a7dfff7a7da95a8f44dff50ac9f03ada3b3e3b0acbddd06287626"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/epoch.py": {
-    "sha256": "f3cba8bff0266f40f183e7bab16fc952bf19447747249fc40c2ccdd61bc7d16a",
-    "code_sha256": "021cd5400c4857ede7d38f99a70f940c5a6b720c1a9290fc0b99a739589afef6"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/event_table.py": {
-    "sha256": "4934d8535f117f50ed834c1de5f49fc6359bd14c12f558b9c171e46f46ca7426",
-    "code_sha256": "20074d8fd70c9f2e622888e776a01d589033aef4382f6eb0f6afa72296fa4359"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/likelihood.py": {
-    "sha256": "f8b1dab6c7f2ed8512bb0a87eb7f4da070f65e2eac5134d85b4e8e0a284a516c",
-    "code_sha256": "8e209920d783ad5347288865611266954cd5e9a32ab5dbc1996c3a646b906ecf"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/shuffle.py": {
-    "sha256": "675b78999797c34950eb28bb52118cf4b5e3bb02e821f6446572796e18f2472a",
-    "code_sha256": "b1b1c3f934d17a7c694b7b18ac7209f4ca782788ccfa0cc3735fed6aa85aacd8"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/window_statistics.py": {
+   "src/continuum_swr_replay/analysis/detection/memoryless_sequence/window_statistics.py": {
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
     "code_sha256": "4c5ce7aefdaec2986c15bb844ac865127194b243b527466266a091689a0546ea"
    },
-   "src/continuum_swr_replay/analysis/hippocampus/posterior_analysis.py": {
-    "sha256": "bb181267f0af783995631bb37ad11124a2cb8cffa56ff1b03bdc1842fcd4d1b9",
-    "code_sha256": "b9d8f298db42cc1e94e778d662a10894b8e915610e3a06b8fcd236e0bc31ac03"
+   "src/continuum_swr_replay/analysis/detection/nonlocal_events.py": {
+    "sha256": "31555ae27c4616dedaf08077275b3c4d911ac494032bc9c1728bad84a0e97d32",
+    "code_sha256": "da8af4e6e2806bd72576d058bd26e49718936d071d7e0359634844920b071064"
    },
-   "src/continuum_swr_replay/analysis/hippocampus/property_contrast.py": {
-    "sha256": "2b4b58f028dc2e8d220f60016770e29a67efa9b63357d6e112fba215532092d3",
-    "code_sha256": "8b27093a4d1261253891ea1eb3604850a2d589e922066baa5112f3b34b6da59b"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/quality_metrics.py": {
-    "sha256": "cf3569415d5317bbcf930499601793ab7bb36752893b31b2cd840cdbf301e662",
-    "code_sha256": "e50ae6d9d41b64c07c158e3e94733e54162982a0d9976e63259b658b2d65e823"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/spike_evidence.py": {
-    "sha256": "64956c2fd23495e6afd95ed1b8d09d592b35d7912c1b0b5c64743b87474328f1",
-    "code_sha256": "1254c1acca5845947ed77a4c5c1bb8ce1c3b7f4b9fa322468d9d8911e2676023"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/state_evidence/__init__.py": {
-    "sha256": "29bfaa9188ba67d90629a40749da1f38468dcd6097dc7f403e41d628bb57f83f",
-    "code_sha256": "59c61b23fa79500559428ed9cbf0e347536d9f478fbe6a2e25d477092539b8d2"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/state_evidence/evidence.py": {
-    "sha256": "e2b12cb6d63b150e15b16940a09ccb67009495db19dc12eb059dad4077284bd0",
-    "code_sha256": "2d207bd0e54493e81bb9039854b89a03f3e17dfe9d9325d4f638d0615c3e7ae7"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/state_evidence/io.py": {
-    "sha256": "cfaa7833dccd0b6a7a932f184acb00098b4ab179caee2dac940cf243f073a1ae",
-    "code_sha256": "248b8087098bd5f8393300cd6423eda04293e8ae5ca583813af3fa19dd102648"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/state_evidence/summary.py": {
-    "sha256": "9c3df61292ed439a052c774e13316093337db863ed733ff42476ec5fb40ca8b1",
-    "code_sha256": "53fee81380c6eaaebdb8b4223aa112f7d60c1851e187cc0d7e9571d0b8c329c5"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/state_evidence/terms.py": {
-    "sha256": "52b11172b38d15adf5756f73a2acfecab2e8e0019a5216b782e03c033d3e5a81",
-    "code_sha256": "7ee13ac186bb1c28fe0d3e43f3bffd603543b0748c79c959cfa2d3db77dde523"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/state_evidence/windows.py": {
-    "sha256": "0ec3281b988dd789b912e369e1373fe112d1a0285ee7e0b74ad5d5f3abbc6287",
-    "code_sha256": "d2a3a18be600d6c521dabaaf4b35381fa04df77e963a746cf8cfc44cd4532422"
-   },
-   "src/continuum_swr_replay/analysis/hippocampus/swr_detectors.py": {
-    "sha256": "64ae86a9f291187481a1f9bdb91308414006787c5aa56c78d28bfb924293a639",
+   "src/continuum_swr_replay/analysis/detection/swr_detectors.py": {
+    "sha256": "d6632d4c8eeedc4b53d7e3761e6023c849802c883b30f17143da2ac685b39c4c",
     "code_sha256": "bb3322a9ca5c2afae218a30075e5eaff976cf442f5d4176472d6c46af1e5c9fe"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/__init__.py": {
+   "src/continuum_swr_replay/analysis/detector_comparison/__init__.py": {
     "sha256": "e48de542300d0417f2fb98d15d34c8713efd5261deef06696cfdf7106edf3596",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/adapters.py": {
-    "sha256": "6d72c918dc6899ffa4ae263204f74ee2f8740e43acb18ccb2aa8e6c6a7978bac",
-    "code_sha256": "c9bfd3d25bd6bb97a0d01ba2234e0b6c3b4840643095c7e6a49d8a1a66f609c2"
+   "src/continuum_swr_replay/analysis/detector_comparison/adapters.py": {
+    "sha256": "fbab39a4ac8ac4421372cc8e26d8de8ab14a5740684243e133ff8c08e16bd316",
+    "code_sha256": "fc7da7610d47f1067732b16d78a98d915c69e02df49ca56ea24a82238aacaa06"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/availability.py": {
-    "sha256": "aa80e65db81470a39f99d5c8898422f9d31c92744b3b891536510ab3f3b956c9",
-    "code_sha256": "69c43200090d18439520ccfd3db8ffd4c4f3d1b7cfdbb2d26788a8330e858f85"
+   "src/continuum_swr_replay/analysis/detector_comparison/availability.py": {
+    "sha256": "22f1fd87d5258016cca8a15cd6eb555856a766bd0a883885b10a60e663b93c53",
+    "code_sha256": "d3480e37ff94a742e65477009c984ab5e60e43c5866d2e1dad17f919e6d55cb3"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/cells.py": {
-    "sha256": "ec07dbb2f0f575b1ad2e35327627c0f15823578a218ed4d2b9a4da8d7232c857",
-    "code_sha256": "089147dfbf234ced2d28064e64a87d647b079a57b0fe8bf7a754b98ca2fc35b5"
+   "src/continuum_swr_replay/analysis/detector_comparison/cells.py": {
+    "sha256": "6f3b5f25a6a7b1e1baf7270e9f063158a97abb18b4520edc2505f9db6f6ed7e6",
+    "code_sha256": "b892fe19c9e0126deca9ba3966cd9844a1060ee2dd79a7180148eccd18f39ecb"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/components.py": {
-    "sha256": "578058cf73a9c76dd31b9f79215c24cb37a90f2f2184dd9d550dc03a0715ee34",
-    "code_sha256": "9c4b747f3cd155820b8759ef1303822bd2238d2d425b4d8551e160e3593621dc"
+   "src/continuum_swr_replay/analysis/detector_comparison/components.py": {
+    "sha256": "cff4266a2f5def891f5114c112d54300c8a8930ce8657db814bd583755021e0c",
+    "code_sha256": "45791bed04e5ae9d8ce05825baf7e48c7526ade6e75ad518cbefc1a890313338"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/evidence.py": {
-    "sha256": "0e14429501b438f50cd0a394d87cf4838418409f3f110814a1e9c211b394a330",
-    "code_sha256": "ddcc27905f099b32960f640ceb2d430405bc08a3b7058c2eee8f2691ed1abc87"
+   "src/continuum_swr_replay/analysis/detector_comparison/evidence.py": {
+    "sha256": "b951a180f9846a64875a32688c45969eeceb1042f51030147cf46ee84994ffd1",
+    "code_sha256": "dc7821c92076976305c094db009c7a31c39c4e5f6a02c32020d6eb57bd03d5cc"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/feature_run.py": {
-    "sha256": "b4a247cdca91bed09be0bc04d5caa26da29a68f3f36329a21fe672ba3f048260",
-    "code_sha256": "087c96549f9b9b99540618cd7aee0ee5df331eaf090ad8b97c1ff9932911d107"
+   "src/continuum_swr_replay/analysis/detector_comparison/feature_run.py": {
+    "sha256": "926472a38701ae55a3f2bc89ce3f51102b13a88820bfbb0bd2a9410aafcf1eb2",
+    "code_sha256": "6e85563ea2dbca9fa519e873c1c945320e4e4dce8f898d88e04d7fc1068600de"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/features.py": {
-    "sha256": "dc613d3e14c722150d90f6de1ee89bc43f34b6d839caa7304db21594a0630ec4",
-    "code_sha256": "da6700fcac3f2fc2cfd3f9b6209a4238fa784f1775075355fc3a7255f302b132"
+   "src/continuum_swr_replay/analysis/detector_comparison/features.py": {
+    "sha256": "055c51b412a7ac1e1a190aeed712ebf3f00ac5879902fd55e55f1e554876ce32",
+    "code_sha256": "3b0d48d46130807bf8aca104956a916874ccbac8877913a02d9b63ee5afc1dcd"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/inventory_run.py": {
-    "sha256": "acb55e3b2e190e0249152c07275ee3fb6a9647761b75d461e5ed3c1b7d1b55bc",
-    "code_sha256": "e8103436831a7dbcd7d65d5fbd93f31c5d849ff8b07d1f29db2488e21834d2b3"
+   "src/continuum_swr_replay/analysis/detector_comparison/inventory_run.py": {
+    "sha256": "e28f8e185b6e6607ca0a3007dcb578d85e8492ef0d9f09a1a645ddc5aad25094",
+    "code_sha256": "c2ae19e1ac232cbae8972e3d53aed273daf662ad2099637e447a804161991a40"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/nonlocal_comparison.py": {
-    "sha256": "1cf79565bace924600d13a6170cea56d1dac8361f6c7df39035b7db92597b384",
-    "code_sha256": "7329b080e29fc929d9169d32bf94bd8e7f495d417179f1cf072bca5668a41c74"
+   "src/continuum_swr_replay/analysis/detector_comparison/nonlocal_comparison.py": {
+    "sha256": "47ba290ae1c5e5b86ec50667d2f3b959ffd445a078b133ae717de8526ff15772",
+    "code_sha256": "8a800f833b5ac0aef379717cbe0bcc685026f0aa80a2a557468e68214a18d193"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/overlap.py": {
+   "src/continuum_swr_replay/analysis/detector_comparison/overlap.py": {
     "sha256": "a0eeab4df008e1021e79a025ad27f3c8c3d91844ec59d1c69f568f1922afb39f",
     "code_sha256": "284adfb44f77efc4d73be65ba8c575fbfa9fc56bc5d23cf4c5ae63bda5844dab"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/pooling.py": {
-    "sha256": "b25c835b8f11f59f69313cac40bcf2889ca02a63b5d14dc7c17f1a5ae1fd35fc",
+   "src/continuum_swr_replay/analysis/detector_comparison/pooling.py": {
+    "sha256": "d18a5eb2defe61a504655c804cc726f33582d789e01e14dbb0df881d71140749",
     "code_sha256": "98e080b53219c712f33f525fad72fb1f7376a5e8d3087daf2152f75dc97541d4"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/populations.py": {
-    "sha256": "04fa6778b9ed0ba48ad73f532c7ea303b37948088565832a9265c6718d6624e5",
-    "code_sha256": "196b398e2bbe10395101681517cb2f8c1860098425daeda507556a5be36d0754"
+   "src/continuum_swr_replay/analysis/detector_comparison/populations.py": {
+    "sha256": "5b5bcf8d036903f4102b2f93e8d463da697366b766088890d7314a173fbb0d5f",
+    "code_sha256": "449620d01311992d08f7cb773dae6cbcf838cadc702b9cdfe2d60928b6e844a1"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/recount.py": {
-    "sha256": "fc0aa9792185dedb8c727ddda6ae9c952f03d051dd0cc2cfec980d43f8a5b431",
-    "code_sha256": "1e003a0ce4a1be7eb4d1257a60557909ef2d187f440c11489a415b326a25e6df"
+   "src/continuum_swr_replay/analysis/detector_comparison/recount.py": {
+    "sha256": "ec65b46a54927f0588a2593241f6917eec0c03fc2ede56aa42d4f96e27ab0138",
+    "code_sha256": "4de66cd0bd4fcc4ddc9898acc902d5296dceced1fa680ca2cea50e4fba623abb"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/schema.py": {
-    "sha256": "96fdf7957706019b644b2601d0648723cff02e13c51634ffb5c3412987f46bc0",
-    "code_sha256": "8e3da6fab0d04b87c6e435467e0eed754a09b756a5713a4e3e2dea3d73587891"
+   "src/continuum_swr_replay/analysis/detector_comparison/schema.py": {
+    "sha256": "001e4e2800c6ebe8dc575a80855eb85b31a2035376d554820e5598c907f97b26",
+    "code_sha256": "fae716c5c28105fa40a6ad78bc92a01a189e4d625cd9141b0babe4acc6a6aff9"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/selection.py": {
-    "sha256": "9107eba38cd413b74d0067b2790a42078c4003c820a8e21ddc809ba104b1bcd8",
-    "code_sha256": "73c3fbc40f50e50ec8305795786f39070a22bfe7ef8b573839281e162aa222ea"
+   "src/continuum_swr_replay/analysis/detector_comparison/selection.py": {
+    "sha256": "040dc5c3636fcdc463435ca9c6331ff424cd8c39cad1557ff580656263014cbf",
+    "code_sha256": "c63f9b74a643e4d59492720b87db7844919d954bcb43f2a1dd4712a499d467e6"
    },
-   "src/continuum_swr_replay/analysis/inventory_comparison/swr_matrix.py": {
-    "sha256": "6773cefbbd7c079ddcaa48f738068c9cf7fb8ab1bbaece8dde435037cd6d5b78",
-    "code_sha256": "d1a3f3d6fccad518c38e97f521088cc7e82969619d48cc99f8e95f455fed5598"
+   "src/continuum_swr_replay/analysis/detector_comparison/swr_matrix.py": {
+    "sha256": "ff782ffa9a863b5f371919c5c568034beb5a2c9626e39b5815554fa7efc208db",
+    "code_sha256": "8a3d55b79634e02e3bb5df2ee35fc5cd1dd779825836dab9c9178f94a964a666"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/__init__.py": {
+    "sha256": "5c9fc83725abf78b7d12a4fcccc94c9d6550f891e46174959822a76b08490803",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/analysed_time.py": {
+    "sha256": "15cf0bf3871fc8c4dc739a850c0d7fd277cbffad2aff0716eb3d2316cdf24db5",
+    "code_sha256": "ff3774dea97350ee94354fbae2f5cd23b3d88b434bc615e713b94cc688b664c4"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/artifact_intervals.py": {
+    "sha256": "a66ffa26bdedf307a823a8f2591b023a36927ab2200b16b98d2f0a1d19b5e961",
+    "code_sha256": "6c005ee60cb127d13212e4f7bb2730ce35226b8521f77757979c2a127fe334d4"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/artifact_masks.py": {
+    "sha256": "4bf7128b211cbf879b55d08a8b284d9a0365a2e4a55151bc3375bf70dfaf4778",
+    "code_sha256": "cdfa979dfc76d95523de60422744635982f10b6f79b38867a73d0ec1d657a843"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/classified_table.py": {
+    "sha256": "6a6edbb512a052626e9f8f6582e9f1d49f312ff3217c485eb8cddd36e0f474cd",
+    "code_sha256": "229a604ac1d2b8b4cdd172a22e0a4e8f1437aa9ba75304f3ae846b7bb175378b"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/cohort_selection.py": {
+    "sha256": "1883087f3c8df23eba3e2e792f34c106bb4daeaa8421152cba00044ef6235f97",
+    "code_sha256": "c2bc4efd784f5649ade7ad8abf66112e9899edc86c88024971281177a098728d"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/decode_masks.py": {
+    "sha256": "d30724316889f6dc7e44cd02de961782abf3e29bf1eb50155468ce4f662dea26",
+    "code_sha256": "c902f40dcc5772e7b7322b05b26a4b0cb65400222e5c05515b1ca04e72d40532"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/eligibility.py": {
+    "sha256": "6b9c5e6b12df9d3d5b716c6c729a6d6c32d21b68ed6e2a2506d0a32f1a4beb06",
+    "code_sha256": "a99906643986db0f934a193bed7ca2ac0e7c04ed6f1c855069ecfd929fe2f2ca"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/epoch_normalizers.py": {
+    "sha256": "4867761fff99d3f8efd8ce3e1069ce10fc29eee23a7666d04f9a3f5f1e0684d9",
+    "code_sha256": "8e7c4bdc7fd93c200b4452cfe020a57e624623c6cf4e46ba4bc8eb0727640cf1"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/immobility.py": {
+    "sha256": "fa73ace3bb7cf18ad9f929e7aa331aad00c8f635ab33f05c46c713e2be5ef66a",
+    "code_sha256": "35ba5dcd3a19acacfb58ab22b22fd61299cd44fc0071d0d99f8e30e27f930744"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/nonlocal_event_rule.py": {
+    "sha256": "34b5bc22459d46008e4f2bd542c386dd79f688a8fd7ffeeeeefd353d80363a5b",
+    "code_sha256": "aceaf2300baf3b80292158d081f217099746cb2abfdfaba9dea9013dac4c2d72"
+   },
+   "src/continuum_swr_replay/analysis/event_definition/swr_source.py": {
+    "sha256": "3a7bf9c9470c4734f876e01eda1ae04305684939318ac7412ab3d47e3d3f0f23",
+    "code_sha256": "4e39c4fede7d06b90f55b570b9ee38a03ed094ada174193df93d807562da8361"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/__init__.py": {
+    "sha256": "17f2a00de94db68321afa77521d8be4362150438c005e9b8c019cc3e079ebce8",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py": {
+    "sha256": "d48984b34875338d7c4cb1b9e0ebfe8ee947d43d31182dde919dd4867421ff1c",
+    "code_sha256": "158bc4f062fafc6a12c7901b95d0a00bf56d27349fe0c9bf6b468bd71508d359"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/state_evidence/__init__.py": {
+    "sha256": "9e0c326f5c2d789aebd4aac1ef4f0ca1221f4ea6112b0341955177f731625365",
+    "code_sha256": "fa0d6e0ad73d00974a5999cf038a0205995fde9a02909a029081b6046bbc6de6"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/state_evidence/evidence.py": {
+    "sha256": "48f8bc2ebe4730d220df02fbb87b243a69615a33b5d894bfd98e75c4d5b22297",
+    "code_sha256": "7648a255ba7f3e46be43601b246634a2df635a087af662b22685678a1c8b8810"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/state_evidence/io.py": {
+    "sha256": "daa81f9d8700155b476f033992ed8a41f55e65a39720f2a7c3d9c0564cb0ff23",
+    "code_sha256": "bc5234303fc14c6e17855f10f14cb60af613dd0d1f2dd009acabdf9a823e3824"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/state_evidence/summary.py": {
+    "sha256": "9f0ab90c78857caf1603c65ab4fbc9b198f8d051d253c27d2c03f63fbc5c0bbe",
+    "code_sha256": "f46cde33bdebd183605dc3f4b60e889000cfb3cfc6f9f2a46cd248761855befc"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py": {
+    "sha256": "a0f1dec565c89635d03759390988946a667919f8022497791aa72d8ba605a6ae",
+    "code_sha256": "4abc68597071a7c613c1c8e586bc3ff8e7c0a2cfb8125609275adf5ed7cdb192"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/state_evidence/windows.py": {
+    "sha256": "0ec3281b988dd789b912e369e1373fe112d1a0285ee7e0b74ad5d5f3abbc6287",
+    "code_sha256": "d2a3a18be600d6c521dabaaf4b35381fa04df77e963a746cf8cfc44cd4532422"
+   },
+   "src/continuum_swr_replay/analysis/event_properties/__init__.py": {
+    "sha256": "933f33706b5999a73702c0b687a36d8b0ca295a29f84600df0ec994258fec27a",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
+    "sha256": "ad5629c28badb46368ee55e98d356195fb2eb8fcaaa7a524b050d49ae1778d60",
+    "code_sha256": "5a22f13a75c673063afbdedc1b4adb92720bffa1c8cce50b8abc0082a4597e74"
+   },
+   "src/continuum_swr_replay/analysis/event_properties/property_contrast.py": {
+    "sha256": "4989d4b201bbbbdd1551bb4ebd9c749e87f0bab6781cbfd6565296f28b4c8d1b",
+    "code_sha256": "8b27093a4d1261253891ea1eb3604850a2d589e922066baa5112f3b34b6da59b"
    },
    "src/continuum_swr_replay/analysis/shared_statistics.py": {
     "sha256": "64f9274b3a85ae1b5b1f493e438fd85f2a9aafa0f002ff6d96ec2dc97d4b5d73",
@@ -247,7 +259,7 @@
     "code_sha256": "c3b3d414ebf9ae3bf3b9ac658182312806f76afb2eaaf81f16f61338895323e9"
    },
    "src/continuum_swr_replay/data_loaders/constants.py": {
-    "sha256": "4fac9f3ea30a5316d0f1547e55042541aa4a8e24322dc2bdd9a3e6e713ae097e",
+    "sha256": "7e67f23078ea103c5937437c0ce1651d8070e023a970bca796ae65c4d58870a3",
     "code_sha256": "09c11436725a16c73cd9faf504a3ee37d71aa570917b5802e4d655865d2b295c"
    },
    "src/continuum_swr_replay/data_loaders/epoch_register.csv": {
@@ -263,7 +275,7 @@
     "code_sha256": "8f8a7e7061bcbeb36adeb33da34fb7654e832a1b90a23dfebcb5feb37d42e032"
    },
    "src/continuum_swr_replay/data_loaders/utils.py": {
-    "sha256": "35a2277c95b0217d431f6a086a179aeef7849e55d37d0052140e977a85f1c386",
+    "sha256": "99a49886dd7ecc6702b0de2a890273a0ba6fbca9b09491ea5f920ebadb25c4b2",
     "code_sha256": "035bb37a4bdffc4ec1e2fcafc634998781f85f23284f63655ae73f5aef16210d"
    },
    "src/continuum_swr_replay/data_types.py": {
@@ -271,7 +283,7 @@
     "code_sha256": "32db5b6d7aba44b2f9e823467ca2cd471382287b95e21a11928d5325fc82a42d"
    },
    "src/continuum_swr_replay/decoding/__init__.py": {
-    "sha256": "fd2afc791fae372daa3c83ddd5de0eea5025542625baf0f79499ce0928602cf2",
+    "sha256": "fa69a797dea39d737f7b86d47ef720ef96e936bac8e868a592b5e66cb7a9819d",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/decoding/files.py": {
@@ -283,19 +295,19 @@
     "code_sha256": "821ef37d3e6e4a610d54da4c711e27ea6099ba3ecf8e2cab11f270161893c8e9"
    },
    "src/continuum_swr_replay/decoding/results.py": {
-    "sha256": "bab1677ec48d061359e9a70d00000dbdd8351db4e1a57764e45c0bb0647d406c",
-    "code_sha256": "b59f67fab104e7db2288b60475d9c026487dacd37d13a0d39c1c5687c425f4b3"
+    "sha256": "db740b1d5cd930698bf23d6d164592efb7c17ebf5bfaf1a826ad7c2a3269b758",
+    "code_sha256": "0613b8db5b5e128e4da6c47c3fc6d0557698b7c36e89cf843bcd107d6f5cb4c4"
    },
    "src/continuum_swr_replay/intervals.py": {
-    "sha256": "d89410ac55246609a43fac00dd202aed16c81a4f61f22e8ff08e7fa21050210e",
+    "sha256": "12c585e2b0cf731898d27a6539e58ce5418402d5394642fa666496700aa58d63",
     "code_sha256": "d580ad0663706ace187d9cfc4d88e5a898523e6080cb4154e2ecbf4f3eeec7da"
    },
    "src/continuum_swr_replay/parameters.py": {
-    "sha256": "7de3e3692f2022e1ec7e4bb0989c51234af5e73e3fc1f82dde68962d7b112d32",
+    "sha256": "22b54cb52517dcb21b5a9631e299a0e9e30b6121230dc3978b383f9685c034df",
     "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "e2f33a83a32a862a8bef9dac6dc45dff5573761b8fcd20f51f3e1f0e46d3e1f7",
+    "sha256": "678fb7f162967c34f56cb2ec593430196a1b6a848888b6ab3161cb29f97fd7f5",
     "code_sha256": "841cbba5d2c59156bfccab1860530e8c21100891789305741cf8a0148251ff3f"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
@@ -303,8 +315,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "6ff08bec20c3f33511440e9a7ac414220a96e9c044c03be82a3c63f41b7c80ae",
-    "code_sha256": "ef4e847c4525c59e37f672002a2442ed9202e0582e6a1571c650de4f798b7fab"
+    "sha256": "14ad20d9c0c146268eefbd4a225da9850212eb4eaafbca5078d11e0f8fc95ca8",
+    "code_sha256": "f75ee9ccfee8a95dcac61bda04aed033c803794824524ad7d2e0b1a9cbfa4312"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -347,8 +359,8 @@
     "code_sha256": "b9e96960eaf5aeddf470b97b17eafcba991a1a890d767a811648c811c5f46b6a"
    },
    "src/continuum_swr_replay/tables/io.py": {
-    "sha256": "676df26ab4c376c0bb6eb60a63c792d2ef29695fc689deabc0198d73be629f11",
-    "code_sha256": "068f7c9e29e6600614801562847e8e59c86c83e45173b0711a285ed8e516c4c9"
+    "sha256": "851af697463dd5233e9339bb917d403390eae872b9b468e3ae3359bb9591993e",
+    "code_sha256": "5939817368edeba55bdb64c589161d34c68b5b004b315b9d9b62579e968b4769"
    },
    "src/continuum_swr_replay/tables/session_keys.py": {
     "sha256": "1d7c10e05496fe135530fd947772ff1110f284f2d874c18bc2a4a53eeba6d75d",
@@ -557,7 +569,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -573,7 +585,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -589,7 +601,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -605,7 +617,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -621,7 +633,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -637,7 +649,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -653,7 +665,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -669,7 +681,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -924,7 +936,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -938,7 +950,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -952,7 +964,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -966,7 +978,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -980,7 +992,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -994,7 +1006,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1008,7 +1020,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1022,7 +1034,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1036,7 +1048,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1050,7 +1062,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1064,7 +1076,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1078,7 +1090,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1124,7 +1136,7 @@
     "2d.6"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1138,7 +1150,7 @@
     "2d.6"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1152,7 +1164,7 @@
     "2d.6"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1166,7 +1178,7 @@
     "2d.6"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1180,7 +1192,7 @@
     "2d.6"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1264,7 +1276,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1280,7 +1292,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1296,7 +1308,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1312,7 +1324,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1328,7 +1340,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1344,7 +1356,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1360,7 +1372,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1376,7 +1388,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1390,7 +1402,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1404,7 +1416,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1418,7 +1430,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1432,7 +1444,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1446,7 +1458,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -1460,7 +1472,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -1474,7 +1486,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -1488,7 +1500,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -1502,7 +1514,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1516,7 +1528,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1530,7 +1542,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1544,7 +1556,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1718,7 +1730,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1732,7 +1744,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1746,7 +1758,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1760,7 +1772,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1774,7 +1786,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1788,7 +1800,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1802,7 +1814,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1816,7 +1828,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1830,7 +1842,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1844,7 +1856,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1858,7 +1870,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1872,7 +1884,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1886,7 +1898,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1900,7 +1912,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1914,7 +1926,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1928,7 +1940,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1942,7 +1954,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1956,7 +1968,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1970,7 +1982,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1984,7 +1996,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2000,7 +2012,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2016,7 +2028,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2032,7 +2044,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2048,7 +2060,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2064,7 +2076,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2080,7 +2092,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2096,7 +2108,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2112,7 +2124,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2128,7 +2140,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2144,7 +2156,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2160,7 +2172,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2176,7 +2188,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2192,7 +2204,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2208,7 +2220,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2240,7 +2252,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2256,7 +2268,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2272,7 +2284,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2288,7 +2300,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2304,7 +2316,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2320,7 +2332,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2336,7 +2348,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2352,7 +2364,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2366,7 +2378,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2380,7 +2392,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2394,7 +2406,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2408,7 +2420,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2422,7 +2434,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2436,7 +2448,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2450,7 +2462,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2464,7 +2476,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2478,7 +2490,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2492,7 +2504,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2506,7 +2518,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2520,7 +2532,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2534,7 +2546,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2548,7 +2560,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2562,7 +2574,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2576,7 +2588,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2590,7 +2602,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2604,7 +2616,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2618,7 +2630,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2632,7 +2644,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2646,7 +2658,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2660,7 +2672,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2674,7 +2686,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2688,7 +2700,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2702,7 +2714,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2716,7 +2728,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2730,7 +2742,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2744,7 +2756,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3526,7 +3538,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3542,7 +3554,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3558,7 +3570,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3574,7 +3586,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3590,7 +3602,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3606,7 +3618,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3622,7 +3634,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3638,7 +3650,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3652,7 +3664,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3666,7 +3678,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3680,7 +3692,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3694,7 +3706,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3708,7 +3720,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3722,7 +3734,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3736,7 +3748,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3750,7 +3762,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3782,7 +3794,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3798,7 +3810,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3814,7 +3826,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3830,7 +3842,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3846,7 +3858,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3862,7 +3874,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3878,7 +3890,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3894,7 +3906,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3911,7 +3923,7 @@
    "figures": [
     "3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -3928,7 +3940,7 @@
    "figures": [
     "3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -3945,7 +3957,7 @@
    "figures": [
     "3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -3962,7 +3974,7 @@
    "figures": [
     "3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -3979,7 +3991,7 @@
    "figures": [
     "3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -3996,7 +4008,7 @@
    "figures": [
     "3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -4010,7 +4022,7 @@
     "2b.5"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_distribution_values",
    "pending": null
   },
@@ -4024,7 +4036,7 @@
     "2b.5"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_distribution_values",
    "pending": null
   },
@@ -4038,7 +4050,7 @@
     "2b.5"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_distribution_values",
    "pending": null
   },
@@ -4055,7 +4067,7 @@
    "figures": [
     "3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -4072,7 +4084,7 @@
    "figures": [
     "3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -4086,7 +4098,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4100,7 +4112,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4114,7 +4126,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4128,7 +4140,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4142,7 +4154,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -4156,7 +4168,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -4170,7 +4182,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -4184,7 +4196,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -4198,7 +4210,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4212,7 +4224,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4226,7 +4238,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4240,7 +4252,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4256,7 +4268,7 @@
    "figures": [
     "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4272,7 +4284,7 @@
    "figures": [
     "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4288,7 +4300,7 @@
    "figures": [
     "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4304,7 +4316,7 @@
    "figures": [
     "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4320,7 +4332,7 @@
    "figures": [
     "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4336,7 +4348,7 @@
    "figures": [
     "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4352,7 +4364,7 @@
    "figures": [
     "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4368,7 +4380,7 @@
    "figures": [
     "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4384,7 +4396,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "start_distance_values",
    "pending": null
   },
@@ -4400,7 +4412,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4416,7 +4428,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4432,7 +4444,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4448,7 +4460,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4464,7 +4476,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4480,7 +4492,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "start_distance_values",
    "pending": null
   },
@@ -4496,7 +4508,7 @@
    "figures": [
     "3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "start_distance_values",
    "pending": null
   },
@@ -4655,7 +4667,7 @@
     "2c.3"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_step_evidence_values",
    "pending": null
   },
@@ -4670,7 +4682,7 @@
     "2c.3"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_step_evidence_values",
    "pending": null
   },
@@ -4685,7 +4697,7 @@
     "2c.3"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_step_evidence_values",
    "pending": null
   },
@@ -4703,7 +4715,7 @@
     "2d.6"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_step_values",
    "pending": null
   },
@@ -4986,7 +4998,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5000,7 +5012,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5014,7 +5026,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5028,7 +5040,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5042,7 +5054,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "rest_theta_values",
    "pending": null
   },
@@ -5056,7 +5068,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "rest_theta_values",
    "pending": null
   },
@@ -5070,7 +5082,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5084,7 +5096,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "rest_theta_values",
    "pending": null
   },
@@ -5098,7 +5110,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "rest_theta_values",
    "pending": null
   },
@@ -5112,7 +5124,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5126,7 +5138,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5140,7 +5152,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5154,7 +5166,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5168,7 +5180,7 @@
     "2c.1"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5182,7 +5194,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5196,7 +5208,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5210,7 +5222,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5224,7 +5236,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5238,7 +5250,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5252,7 +5264,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5266,7 +5278,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5280,7 +5292,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5294,7 +5306,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5308,7 +5320,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5322,7 +5334,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5336,7 +5348,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5350,7 +5362,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5364,7 +5376,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5378,7 +5390,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5392,7 +5404,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5406,7 +5418,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5420,7 +5432,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5434,7 +5446,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5448,7 +5460,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5462,7 +5474,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5476,7 +5488,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5490,7 +5502,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5504,7 +5516,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5518,7 +5530,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5532,7 +5544,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5546,7 +5558,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5560,7 +5572,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5574,7 +5586,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5588,7 +5600,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5602,7 +5614,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5616,7 +5628,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5630,7 +5642,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5644,7 +5656,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5658,7 +5670,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5672,7 +5684,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5686,7 +5698,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5700,7 +5712,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5714,7 +5726,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5728,7 +5740,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5742,7 +5754,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5756,7 +5768,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5770,7 +5782,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5784,7 +5796,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5798,7 +5810,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5812,7 +5824,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5826,7 +5838,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5840,7 +5852,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   }
