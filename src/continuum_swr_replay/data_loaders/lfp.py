@@ -84,6 +84,7 @@ from ..intervals import (
     get_spikecount_per_time_bin,
     interval_mask,
     overlaps_intervals,
+    sample_step,
 )
 from ..parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
@@ -775,7 +776,7 @@ def get_multiunit_hse(
         - multiunit_rate_zscore: pd.DataFrame with z-scored firing rate
 
     """
-    sampling_frequency = 1 / np.median(np.diff(bin_time))
+    sampling_frequency = 1 / sample_step(bin_time)
     multiunit_spikes = np.stack(
         [
             get_spikecount_per_time_bin(unit_spike_times, bin_time)

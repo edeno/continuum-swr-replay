@@ -64,6 +64,7 @@ from continuum_swr_replay.intervals import (
     get_spikecount_per_time_bin,
     merge_intervals,
     overlaps_open,
+    sample_step,
 )
 
 logger = logging.getLogger(__name__)
@@ -422,7 +423,7 @@ def assemble_stop_context_table(
     baseline = np.zeros((n_units, n_stops), dtype=np.int64)
     stop_count = np.zeros((n_units, n_stops), dtype=np.int64)
     rate = np.zeros(n_units, dtype=float)
-    bin_width_s = float(np.median(np.diff(time)))
+    bin_width_s = sample_step(time)
     for unit, unit_spikes in enumerate(spike_times):
         counts = get_spikecount_per_time_bin(np.asarray(unit_spikes), time)
         fitted = np.where(fit, counts, 0)

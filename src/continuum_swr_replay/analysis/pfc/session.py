@@ -62,6 +62,7 @@ from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.intervals import (
     get_spikecount_per_time_bin,
     interval_mask,
+    sample_step,
 )
 from continuum_swr_replay.paths import table_path
 
@@ -308,7 +309,7 @@ def process_neuron(
             "prebinned_spike_count must have one value per time bin; got "
             f"{neuron_spike_count.shape} for time {np.asarray(time).shape}"
         )
-    sampling_frequency = 1 / np.median(np.diff(time))
+    sampling_frequency = 1 / sample_step(time)
     if fit_mask is None:
         fit_mask = is_immobile
     # The descriptive rates leave excluded time out, as the fit mask does.
@@ -798,7 +799,7 @@ def _prefit_session(
     # passes it to the theta design's reindex tolerance. Derive it the same way
     # here, so the bins the batch is fit on are exactly the bins each neuron's
     # own call will read the regularized fit off.
-    sampling_frequency = 1 / np.median(np.diff(time))
+    sampling_frequency = 1 / sample_step(time)
     joint_mask, theta_design = build_theta_design(
         theta_phase, is_immobile, sampling_frequency=sampling_frequency
     )

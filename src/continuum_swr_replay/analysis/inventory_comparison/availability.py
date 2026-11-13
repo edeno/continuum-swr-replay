@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIde
 from continuum_swr_replay.intervals import (
     intersect,
     normalize,
+    sample_step,
     subtract,
     total_duration,
 )
@@ -113,7 +114,7 @@ def _joined(time: NDArray, valid: NDArray, max_gap_s: float | None) -> NDArray:
         # nothing can continue a run of one sample
         return np.zeros(max(time.size - 1, 0), dtype=bool)
     if max_gap_s is None:
-        max_gap_s = GAP_FACTOR * float(np.median(np.diff(finite)))
+        max_gap_s = GAP_FACTOR * sample_step(finite)
     with np.errstate(invalid="ignore"):
         close = np.diff(time) <= max_gap_s
     # a non-finite timestamp fails the spacing test on both sides

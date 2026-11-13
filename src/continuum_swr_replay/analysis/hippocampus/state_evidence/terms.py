@@ -19,6 +19,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     ENCODING_KEY,
 )
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.paths import processed_data_dir
 
 
@@ -512,7 +513,7 @@ def per_tetrode_terms(
         ),
         time_bin=np.concatenate(time_bins) if time_bins else np.zeros(0, np.int64),
         tetrode=np.concatenate(tetrodes) if tetrodes else np.zeros(0, np.int64),
-        bin_s=float(np.median(np.diff(time))),
+        bin_s=sample_step(time),
     )
 
 

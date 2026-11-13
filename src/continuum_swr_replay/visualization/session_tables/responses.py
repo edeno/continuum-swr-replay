@@ -16,6 +16,7 @@ from continuum_swr_replay.analysis.behavior import (
 )
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS as _ALL_ARMS
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
+from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.visualization.palettes import COLORS
 
 from ..plots import (
@@ -668,7 +669,7 @@ def _plot_arm_posterior_heatmap(ax: Axes, ctx: _PanelContext) -> None:
         if times.size == 1:
             dt = dt_fallback
         else:
-            dt = float(np.median(np.diff(times)))
+            dt = sample_step(times)
         edges_t = np.concatenate([times - dt / 2, [times[-1] + dt / 2]])
         posterior = rows[arm_cols].to_numpy().T  # (n_arms, T)
         ax.pcolormesh(

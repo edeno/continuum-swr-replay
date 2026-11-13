@@ -175,6 +175,7 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,
 )
 from continuum_swr_replay.decoding.results import open_results  # noqa: E402
+from continuum_swr_replay.intervals import sample_step  # noqa: E402
 from continuum_swr_replay.parameters import ROOT_DIR  # noqa: E402
 from continuum_swr_replay.paths import processed_data_dir  # noqa: E402
 from continuum_swr_replay.runs.batch import (  # noqa: E402
@@ -655,7 +656,7 @@ def epoch_table(
     worst = float(np.max(np.abs(probabilities.sum(1) - 1.0)))
     if not np.isfinite(probabilities).all() or worst > PROBABILITY_SUM_TOLERANCE:
         raise ValueError(f"state probabilities are invalid (max |sum - 1| {worst})")
-    bin_s = float(np.median(np.diff(time)))
+    bin_s = sample_step(time)
     checks["decode"] = {
         "decode_dir": str(decode_dir),
         "decode_masks": decode_masks,

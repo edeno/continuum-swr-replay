@@ -2,7 +2,8 @@
 
 Times are seconds. An interval is ``[start, end]``. Two families live here,
 with the array and DataFrame signatures their callers use, beside the overlap
-predicates, the runs of a boolean mask and spike binning.
+predicates, the runs of a boolean mask (:func:`contiguous_true_runs`), a time
+grid's sample step (:func:`sample_step`) and spike binning.
 
 **Interval sets** (:func:`normalize`, :func:`union`, :func:`intersect`,
 :func:`subtract`, :func:`total_duration`, :func:`contains`) work on arrays of
@@ -569,6 +570,22 @@ def contiguous_true_runs(mask: NDArray) -> NDArray:
     padded = np.concatenate([[False], flat, [False]])
     edges = np.flatnonzero(padded[1:] != padded[:-1])
     return edges.reshape(-1, 2).astype(np.int64)
+
+
+def sample_step(time: NDArray) -> float:
+    """The sample step of a time grid: the median of its successive differences.
+
+    Parameters
+    ----------
+    time : NDArray, shape (n_time,)
+        Sample times in seconds, at least two.
+
+    Returns
+    -------
+    float
+        Seconds. The median, so a gap in the grid does not move it.
+    """
+    return float(np.median(np.diff(time)))
 
 
 def min_gap_to_intervals(

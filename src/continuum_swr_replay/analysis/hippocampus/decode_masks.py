@@ -24,7 +24,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.events.artifact_masks import PADDING_S
 from continuum_swr_replay.decoding.identifiers import TrainingType
-from continuum_swr_replay.intervals import interval_mask
+from continuum_swr_replay.intervals import interval_mask, sample_step
 
 
 def require_hpc_decode_sources() -> None:
@@ -238,7 +238,7 @@ def hpc_decode_masks(
         is_swr = np.zeros(time.shape, dtype=bool)
         n_events = None
     is_training = ~is_swr & ~is_missing
-    bin_s = float(np.median(np.diff(time)))
+    bin_s = sample_step(time)
     n_missing = int(np.count_nonzero(is_missing))
     n_removed = int(np.count_nonzero(~is_training))
     record = {

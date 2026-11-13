@@ -116,6 +116,7 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,
 )
 from continuum_swr_replay.decoding.results import open_results  # noqa: E402
+from continuum_swr_replay.intervals import sample_step  # noqa: E402
 from continuum_swr_replay.paths import processed_data_dir  # noqa: E402
 
 # --- Parameters ---------------------------------------------------------------
@@ -278,7 +279,7 @@ def analyze_session(
             raise ValueError(f"{epoch_id}: results.nc and data_over_time times differ")
         log_likelihood = results["log_likelihood"]
         cols = stored_likelihood_columns(results, env)
-        bin_s = float(np.median(np.diff(t)))
+        bin_s = sample_step(t)
 
     records = []
     animal = parse_epoch_identifier(epoch_id).animal

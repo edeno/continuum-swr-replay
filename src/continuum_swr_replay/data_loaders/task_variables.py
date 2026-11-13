@@ -70,6 +70,7 @@ import pandas as pd
 from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 
+from ..intervals import sample_step
 from ..parameters import SAMPLING_FREQUENCY
 
 # Opt in to future pandas behavior: fillna on object dtype will no longer
@@ -342,7 +343,7 @@ def turn_direction(
         return ""
     # Require at least 100 ms of occupancy per segment to filter transient noise.
     # At 500 Hz this is 50 samples.
-    sampling_frequency = 1.0 / np.median(np.diff(times))
+    sampling_frequency = 1.0 / sample_step(times)
     min_segment_samples = int(0.1 * sampling_frequency)
     is_bad = (
         position_info.loc[trial.movement_start_time : trial.end_time]

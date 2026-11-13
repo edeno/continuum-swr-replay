@@ -56,6 +56,7 @@ from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
     PAIRED_LABEL_DTYPES,
 )
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.io import output_path
 
@@ -192,7 +193,7 @@ def speed_trace(dot: pd.DataFrame) -> tuple[NDArray, NDArray]:
         The grid does not step by ``SAMPLE_INTERVAL_S``.
     """
     time = dot.index.to_numpy(dtype=np.float64)
-    step = float(np.median(np.diff(time)))
+    step = sample_step(time)
     if not np.isclose(step, SAMPLE_INTERVAL_S, rtol=0.0, atol=1e-5):
         raise ValueError(
             f"The decode grid steps by {step} s, not {SAMPLE_INTERVAL_S} s, the "

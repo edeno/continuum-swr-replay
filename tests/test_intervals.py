@@ -31,6 +31,7 @@ from continuum_swr_replay.intervals import (
     overlaps_intervals,
     overlaps_open,
     pad_intervals,
+    sample_step,
     subtract,
     subtract_intervals,
     total_duration,
@@ -289,6 +290,15 @@ class TestContiguousTrueRuns:
             contiguous_true_runs(np.ones(3, dtype=bool)), [[0, 3]]
         )
         assert contiguous_true_runs(np.ones(3, dtype=bool)).dtype == np.int64
+
+
+def test_the_sample_step_is_the_median_difference_so_a_gap_does_not_move_it():
+    # differences 0.002, 0.002, 0.5 (a gap), 0.002: median 0.002, mean 0.1265
+    time = np.array([10.0, 10.002, 10.004, 10.504, 10.506])
+    assert sample_step(time) == pytest.approx(0.002)
+    assert isinstance(sample_step(time), float)
+    # an even count takes the mean of the middle two
+    assert sample_step(np.array([0.0, 1.0, 3.0])) == 1.5
 
 
 def test_spike_binning_uses_left_edges_and_keeps_the_last_bin():
