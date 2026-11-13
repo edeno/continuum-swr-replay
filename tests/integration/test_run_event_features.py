@@ -42,8 +42,8 @@ from non_local_detector.likelihoods.clusterless_kde import (
     fit_clusterless_kde_encoding_model,
 )
 
-import scripts.detection.run_event_features as runner
-import scripts.detection.run_inventory_comparison as comparison
+import scripts.detector_comparison.run_event_features as runner
+import scripts.detector_comparison.run_inventory_comparison as comparison
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )

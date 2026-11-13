@@ -6,8 +6,8 @@ where the comparison was unavailable is not summed; it is listed instead
 (:func:`pool_sessions`).
 
 Every per-animal table of the inventory comparison's report
-(``scripts/detection/report_inventory_comparison.py``) and of the event
-features report (``scripts/detection/report_event_features.py``) is pooled by
+(``scripts/detector_comparison/report_inventory_comparison.py``) and of the event
+features report (``scripts/detector_comparison/report_event_features.py``) is pooled by
 :func:`pool_sessions`. Three of them are built here whole, because the events
 summary reads them: from the run's tables (:func:`session_tables`), which
 ``nonlocal_comparison.left_out_statistics`` computes too, each detector's

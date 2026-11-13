@@ -16,7 +16,7 @@ From one epoch's decode frame (read through the SWR source) and environment:
   (``brain_state_reference``). An event's ``rest_theta_like_share`` is the share
   of its windows that are theta-like.
 
-``scripts/detection/measure_event_start_and_rest_theta.py`` reads each epoch's
+``scripts/event_properties/measure_event_start_and_rest_theta.py`` reads each epoch's
 frame, calls :func:`start_and_rest_theta` and writes one table per epoch; the
 events summary reads those tables.
 """

@@ -14,7 +14,7 @@ and a ``manifest.json``.
 
 Usage::
 
-    uv run python scripts/detection/measure_event_start_and_rest_theta.py \\
+    uv run python scripts/event_properties/measure_event_start_and_rest_theta.py \\
         --n-workers 12 [--epochs chimi20200212_02_r1_HPC]
 """
 

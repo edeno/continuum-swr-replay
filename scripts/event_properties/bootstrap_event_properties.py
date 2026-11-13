@@ -19,7 +19,7 @@ raises) and ``manifest.json``.
 
 Usage::
 
-    uv run python scripts/detection/bootstrap_event_properties.py \\
+    uv run python scripts/event_properties/bootstrap_event_properties.py \\
         [--n-replicates 1000] [--properties duration] [--out-name ...]
 """
 

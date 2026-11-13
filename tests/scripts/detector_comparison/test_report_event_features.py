@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import scripts.detection.report_event_features as report
+import scripts.detector_comparison.report_event_features as report
 from continuum_swr_replay.analysis.detection.detection_inputs import (
     memoryless_output_paths as memoryless_outputs,
 )
@@ -978,7 +978,9 @@ def test_every_feature_group_names_columns_of_the_features_table():
 
 
 def test_the_distribution_reads_the_inventory_reports_quantiles():
-    from scripts.detection import report_inventory_comparison as inventory_report
+    from scripts.detector_comparison import (
+        report_inventory_comparison as inventory_report,
+    )
 
     rng = np.random.default_rng(0)
     frame = pd.DataFrame(

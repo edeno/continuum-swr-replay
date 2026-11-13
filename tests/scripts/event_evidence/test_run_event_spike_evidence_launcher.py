@@ -16,7 +16,10 @@ from pathlib import Path
 import pytest
 
 LAUNCHER = (
-    Path(__file__).parents[3] / "scripts" / "detection" / "run_event_spike_evidence.sh"
+    Path(__file__).parents[3]
+    / "scripts"
+    / "event_evidence"
+    / "run_event_spike_evidence.sh"
 )
 METRICS = "event_spike_evidence_metrics.parquet"
 
@@ -49,8 +52,8 @@ esac
 def checkout(tmp_path):
     """A checkout's layout with the launcher and a stand-in ``python``."""
     repo = tmp_path / "repo"
-    (repo / "scripts" / "detection").mkdir(parents=True)
-    shutil.copy(LAUNCHER, repo / "scripts" / "detection" / LAUNCHER.name)
+    (repo / "scripts" / "event_evidence").mkdir(parents=True)
+    shutil.copy(LAUNCHER, repo / "scripts" / "event_evidence" / LAUNCHER.name)
     stand_in_dir = tmp_path / "bin"
     stand_in_dir.mkdir()
     python = stand_in_dir / "python"
@@ -74,7 +77,7 @@ def launch(checkout: Path, epochs: str, *arguments: str, no_root: bool = False):
     if no_root:
         environment["STAND_IN_NO_ROOT"] = "1"
     run = subprocess.run(
-        ["bash", str(checkout / "scripts/detection" / LAUNCHER.name), *arguments],
+        ["bash", str(checkout / "scripts/event_evidence" / LAUNCHER.name), *arguments],
         capture_output=True,
         text=True,
         env=environment,

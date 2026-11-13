@@ -1285,7 +1285,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.controls_summary, "scripts/detection/sweep_memoryless_controls.py"
     )
     heldout = read_summary(
-        args.heldout_summary, "scripts/detection/sweep_memoryless_heldout.py"
+        args.heldout_summary, "scripts/detector_comparison/sweep_memoryless_heldout.py"
     )
     check_caption_settings(config)
     check_summary_claims(summary)

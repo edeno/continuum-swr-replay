@@ -27,7 +27,7 @@ make an event false when evaluation coverage is poor, and its presence says
 nothing about the events no method detected.
 
 :func:`heldout_summary` gives the support and error rates of the held-out check
-on simulated data (``scripts/detection/sweep_memoryless_heldout.py``).
+on simulated data (``scripts/detector_comparison/sweep_memoryless_heldout.py``).
 """
 
 from dataclasses import dataclass

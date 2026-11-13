@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-import scripts.detection.analyze_event_spike_evidence as spike_evidence
+import scripts.event_evidence.analyze_event_spike_evidence as spike_evidence
 from continuum_swr_replay.decoding.files import decode_paths
 
 EPOCH_ID = "aa20200101_02_r1_HPC"

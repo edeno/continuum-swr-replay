@@ -76,4 +76,4 @@ REMOTE_CM = 100.0
 remote: the spike-evidence analysis's "remote" event subset
 (``analysis.event_evidence.spike_evidence``) and the event features'
 evidence over remote bins (``detector_comparison.evidence``,
-``scripts/detection/run_event_features.py``)."""
+``scripts/detector_comparison/run_event_features.py``)."""

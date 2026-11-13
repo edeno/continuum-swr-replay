@@ -22,7 +22,7 @@ import pandas as pd
 import pytest
 
 import scripts.checks.run_quality_metrics as quality_metrics
-import scripts.detection.analyze_event_spike_evidence as spike_evidence
+import scripts.event_evidence.analyze_event_spike_evidence as spike_evidence
 import scripts.figures.generate_event_gallery as event_gallery
 import scripts.replay_models.content.analyze_content_occupancy as content_occupancy
 from continuum_swr_replay.analysis.contfrag.data_aggregation import (

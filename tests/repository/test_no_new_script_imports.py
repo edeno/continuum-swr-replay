@@ -74,13 +74,13 @@ def test_the_rule_reads_the_module_not_the_imported_name(tmp_path):
     assert _is_importable("scripts.checks._report")
     assert _is_importable("scripts.decoding._decode_runner")
     assert _is_importable("scripts.exploratory._statescript_contingency")
-    assert not _is_importable("scripts.detection.report_inventory_comparison")
+    assert not _is_importable("scripts.detector_comparison.report_inventory_comparison")
 
     root = tmp_path / "scripts"
     for module in (
         "checks/_report.py",
-        "detection/report_inventory_comparison.py",
-        "detection/run_event_features.py",
+        "detector_comparison/report_inventory_comparison.py",
+        "detector_comparison/run_event_features.py",
         "replay_models/content/fit_replay_content_models.py",
     ):
         (root / module).parent.mkdir(parents=True, exist_ok=True)
@@ -88,20 +88,23 @@ def test_the_rule_reads_the_module_not_the_imported_name(tmp_path):
     probe = root / "checks" / "probe.py"
     probe.write_text(
         "from scripts.checks import _report\n"
-        "from scripts.detection import run_event_features\n"
-        "from scripts.detection.report_inventory_comparison import _private\n"
+        "from scripts.detector_comparison import run_event_features\n"
+        "from scripts.detector_comparison.report_inventory_comparison import _private\n"
         "def run():\n"
         "    import scripts.replay_models.content.fit_replay_content_models as fitter\n"
     )
     assert _script_imports(probe, root) == {
         "scripts.checks._report",
-        "scripts.detection.run_event_features",
-        "scripts.detection.report_inventory_comparison",
+        "scripts.detector_comparison.run_event_features",
+        "scripts.detector_comparison.report_inventory_comparison",
         "scripts.replay_models.content.fit_replay_content_models",
     }
     assert _forbidden_imports(root) == {
-        ("scripts/checks/probe.py", "scripts.detection.run_event_features"),
-        ("scripts/checks/probe.py", "scripts.detection.report_inventory_comparison"),
+        ("scripts/checks/probe.py", "scripts.detector_comparison.run_event_features"),
+        (
+            "scripts/checks/probe.py",
+            "scripts.detector_comparison.report_inventory_comparison",
+        ),
         (
             "scripts/checks/probe.py",
             "scripts.replay_models.content.fit_replay_content_models",

@@ -23,7 +23,7 @@ table unless ``--overwrite``.
 
 Usage::
 
-    uv run python scripts/detection/measure_event_gamma.py --n-workers 8 \\
+    uv run python scripts/event_properties/measure_event_gamma.py --n-workers 8 \\
         [--out-name event_gamma]
 """
 

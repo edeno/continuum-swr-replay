@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import scripts.detection.run_event_features as runner
+import scripts.detector_comparison.run_event_features as runner
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
 from continuum_swr_replay.parameters import ROOT_DIR
 
@@ -34,7 +34,7 @@ def test_importing_the_runner_installs_no_ignore_filter_for_a_warning_class():
     code = (
         "import warnings\n"
         "before = list(warnings.filters)\n"
-        "import scripts.detection.run_event_features\n"
+        "import scripts.detector_comparison.run_event_features\n"
         "blanket = [f for f in warnings.filters if f not in before"
         " and f[0] == 'ignore' and f[1] is None"
         " and f[2] in (UserWarning, FutureWarning, DeprecationWarning)"

@@ -89,8 +89,8 @@ prototype; they take most of a summary's time (about an hour for every epoch).
 It writes nothing outside ``--output-dir``. Per-epoch logs go to its ``logs/``.
 
 Usage:
-    python scripts/detection/run_state_evidence.py --n-workers 16
-    python scripts/detection/run_state_evidence.py --epochs chimi20200225_02_r1_HPC \\
+    python scripts/event_evidence/run_state_evidence.py --n-workers 16
+    python scripts/event_evidence/run_state_evidence.py --epochs chimi20200225_02_r1_HPC \\
         --decode-dir Processed-Data/_staging_redecode_20261004 \\
         --output-dir /tmp/state_evidence --n-workers 1 --window-level-stats
 """

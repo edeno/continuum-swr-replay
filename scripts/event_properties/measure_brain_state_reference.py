@@ -10,7 +10,7 @@ decode's sha256 must be the one the run recorded), written to
 
 Usage::
 
-    uv run python scripts/detection/measure_brain_state_reference.py \\
+    uv run python scripts/event_properties/measure_brain_state_reference.py \\
         --event-features-run 30cf1cc432e9 --n-workers 8
 """
 

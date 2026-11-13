@@ -54,11 +54,11 @@ events (and baseline windows) with a scored bin whose MAP is in a flagged bin
 Usage
 -----
     # one session
-    uv run python scripts/detection/analyze_event_spike_evidence.py \
+    uv run python scripts/event_evidence/analyze_event_spike_evidence.py \
         --epoch-identifier chimi20200213_02_r1_HPC --make-figures
 
     # all HPC sessions for an animal (metrics only, aggregated)
-    uv run python scripts/detection/analyze_event_spike_evidence.py --animal chimi
+    uv run python scripts/event_evidence/analyze_event_spike_evidence.py --animal chimi
 """
 
 from __future__ import annotations

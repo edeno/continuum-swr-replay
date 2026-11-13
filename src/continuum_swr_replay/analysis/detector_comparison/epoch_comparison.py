@@ -7,7 +7,7 @@ through the SWR source: each detector's inventory through its adapter
 speed, the bridging events set aside (:data:`BRIDGING`), and then the overlap
 pairs, matches, components, the state-space fragment recount, the cells, the
 SWR label matrix and the counts (:func:`detector_counts`).
-``scripts/detection/run_inventory_comparison.py`` runs it per epoch and writes
+``scripts/detector_comparison/run_inventory_comparison.py`` runs it per epoch and writes
 the tables.
 """
 

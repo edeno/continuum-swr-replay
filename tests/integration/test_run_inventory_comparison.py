@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import scripts.detection.run_inventory_comparison as runner
+import scripts.detector_comparison.run_inventory_comparison as runner
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )

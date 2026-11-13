@@ -8,7 +8,7 @@ import pytest
 from continuum_swr_replay.analysis.event_definition.immobility import (
     EventDefinitionError,
 )
-from scripts.detection import analyze_event_spike_evidence
+from scripts.event_evidence import analyze_event_spike_evidence
 from scripts.replay_models.content import analyze_content_occupancy
 
 

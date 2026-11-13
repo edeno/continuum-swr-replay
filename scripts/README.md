@@ -33,7 +33,7 @@ them importable.
 - `measure_decoder_quality.py` — each analysed epoch's Local-state decoding error, state fractions and calibration curve, which the events summary reads.
 
 ## `detection/` — event detectors and the detection comparison
-- `_report.py` — not a script: what the two detection-comparison reports share, imported as `scripts.detection._report`.
+- `_report.py` — not a script: what the two detection-comparison reports share, imported as `scripts.detector_comparison._report`.
 - `run_artifact_detection.py` — the artifact mask of every epoch's CA1 data (`docs/design/2026-10-09-artifact-detection.md`).
 - `run_swr_detection.py` — the four SWR inventories (Kay, Karlsson, Yu, Zugaro) for every epoch, on shared CA1 inputs.
 - `run_carey_detection.py` — Carey's candidate detector, the fifth SWR definition, for every analysed epoch.

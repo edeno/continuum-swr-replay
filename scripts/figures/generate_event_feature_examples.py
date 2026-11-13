@@ -2,7 +2,7 @@
 """Sampled comparator-only and ours-only events of one event features run.
 
 Reads the per-epoch ``features``, ``pair_membership`` and ``rejection`` tables
-that ``scripts/detection/run_event_features.py`` wrote for the run's ``ok`` epochs,
+that ``scripts/detector_comparison/run_event_features.py`` wrote for the run's ``ok`` epochs,
 and the ``cells`` and ``directional`` tables of the inventory comparison run
 it read, and draws events from two populations by :data:`SAMPLING_RULE`.
 Design: ``docs/design/replay_detection_comparison/04-event-features.md``
@@ -99,7 +99,7 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa
 from continuum_swr_replay.visualization import (  # noqa: E402
     inventory_examples,
 )
-from scripts.detection._report import read_run  # noqa: E402
+from scripts.detector_comparison._report import read_run  # noqa: E402
 
 PRODUCED_BY = produced_by(__file__)
 FIGURE_ROOT = FIGURE_DIR / "event_features"

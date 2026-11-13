@@ -21,7 +21,7 @@ epochs already ``ok`` unless ``--overwrite`` is given.
 
 Usage::
 
-    uv run python scripts/detection/add_state_shares.py \\
+    uv run python scripts/detector_comparison/add_state_shares.py \\
         --event-features-run 30cf1cc432e9 --n-workers 8
 """
 

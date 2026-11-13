@@ -15,7 +15,7 @@ import json
 import pandas as pd
 import pytest
 
-import scripts.detection.report_inventory_comparison as report
+import scripts.detector_comparison.report_inventory_comparison as report
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
 from tests.analysis.detector_comparison.test_inventory_pooling import rows, session
 

@@ -25,8 +25,8 @@ it, for each class and fold: the error rates held-out results on recordings
 will be read with.
 
 Usage:
-    python scripts/detection/sweep_memoryless_heldout.py
-    python scripts/detection/sweep_memoryless_heldout.py --n-seeds 1 --folds A --out /tmp/pilot.parquet
+    python scripts/detector_comparison/sweep_memoryless_heldout.py
+    python scripts/detector_comparison/sweep_memoryless_heldout.py --n-seeds 1 --folds A --out /tmp/pilot.parquet
 """
 
 import argparse

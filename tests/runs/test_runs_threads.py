@@ -17,7 +17,7 @@ ENTRY_POINTS = (
     "scripts/replay_models/rate/fit_per_bin_rate_models.py",
     "scripts/replay_models/rate/fit_swr_contrast_rate.py",
     "scripts/replay_models/rate/fit_uncertainty_rate.py",
-    "scripts/detection/run_event_features.py",
+    "scripts/detector_comparison/run_event_features.py",
     "scripts/pfc/run_pfc_analysis_bandit.py",
 )
 

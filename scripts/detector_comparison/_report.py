@@ -5,7 +5,7 @@ marking of the memoryless inventories, the caption and quantile wording,
 and reading a run's tables. Sessions are pooled within an animal by
 ``analysis.detector_comparison.pooling``.
 
-Not a script. The reports import it as ``scripts.detection._report``, after
+Not a script. The reports import it as ``scripts.detector_comparison._report``, after
 putting the repo root on ``sys.path``.
 """
 

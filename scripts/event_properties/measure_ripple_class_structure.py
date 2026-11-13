@@ -29,9 +29,9 @@ writes the tables, figures and ``manifest.json`` to
 
 Usage::
 
-    uv run python scripts/detection/measure_ripple_class_structure.py measure \\
+    uv run python scripts/event_properties/measure_ripple_class_structure.py measure \\
         --n-workers 8 [--epochs chimi20200212_02_r1_HPC]
-    uv run python scripts/detection/measure_ripple_class_structure.py analyze
+    uv run python scripts/event_properties/measure_ripple_class_structure.py analyze
 """
 
 from __future__ import annotations

@@ -11,11 +11,12 @@ summaries, of the labeled recording and of the pilot's events are computed in
 
 - the held-out tetrode test per decoder state
   (``Processed-Data/_refresh_20261016/state_evidence``, from
-  ``scripts/detection/run_state_evidence.py``): its pooled ``bout_stats.csv``
+  ``scripts/event_evidence/run_state_evidence.py``): its pooled ``bout_stats.csv``
   and the per-epoch status in ``manifest.json``;
 - the three simulation sweeps of the two replay detectors
   (``paper/reported/inputs/detection/detection_{sweep,controls,heldout}_summary.csv``,
-  from ``scripts/detection/sweep_memoryless_{detection,controls,heldout}.py``),
+  from ``scripts/detection/sweep_memoryless_{detection,controls}.py`` and
+  ``scripts/detector_comparison/sweep_memoryless_heldout.py``),
   for the memoryless-comparison caption's panels (g-q);
 - the one labeled recording of that caption's panels (a-f)
   (``paper/reported/inputs/detection/memoryless_comparison_recording.json``:
@@ -1062,7 +1063,7 @@ def summarize(inputs: DetectionInputs, produced_by: str) -> Summary:
         *state_evidence_values(
             pd.read_csv(bouts_path),
             read_manifest(inputs.state_evidence_dir),
-            f"{rel(bouts_path)} and manifest.json (scripts/detection/run_state_evidence.py; "
+            f"{rel(bouts_path)} and manifest.json (scripts/event_evidence/run_state_evidence.py; "
             "pooled by the runner's own summarize over the per-epoch records, "
             "2026-10-17)",
         )
@@ -1097,12 +1098,18 @@ def summarize(inputs: DetectionInputs, produced_by: str) -> Summary:
     summary.inputs.append(file_record(inputs.recording_numbers, ROOT_DIR))
 
     for path, build, script in (
-        (inputs.sweep_summary, sweep_values, "sweep_memoryless_detection.py"),
-        (inputs.controls_summary, controls_values, "sweep_memoryless_controls.py"),
-        (inputs.heldout_summary, heldout_values, "sweep_memoryless_heldout.py"),
+        (inputs.sweep_summary, sweep_values, "detection/sweep_memoryless_detection.py"),
+        (
+            inputs.controls_summary,
+            controls_values,
+            "detection/sweep_memoryless_controls.py",
+        ),
+        (
+            inputs.heldout_summary,
+            heldout_values,
+            "detector_comparison/sweep_memoryless_heldout.py",
+        ),
     ):
-        summary.add(
-            *build(pd.read_csv(path), f"{rel(path)} (scripts/detection/{script})")
-        )
+        summary.add(*build(pd.read_csv(path), f"{rel(path)} (scripts/{script})"))
         summary.inputs.append(file_record(path, ROOT_DIR))
     return summary

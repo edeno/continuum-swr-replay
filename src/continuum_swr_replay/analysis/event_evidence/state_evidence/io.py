@@ -4,7 +4,7 @@ Their strict JSON records go through ``runs.io.json_ready`` and
 ``runs.io.write_json``.
 
 It imports nothing that holds JAX to a device. The CPU state-evidence runner
-(``scripts/detection/run_state_evidence.py``) uses it.
+(``scripts/event_evidence/run_state_evidence.py``) uses it.
 
 The module is named ``io`` like the standard-library module on purpose: the
 interpreter loads ``io`` at startup, so a tool run from inside this directory

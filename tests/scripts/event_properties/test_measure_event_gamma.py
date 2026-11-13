@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.event_definition.swr_source import SwrSourceError
-from scripts.detection import measure_event_gamma as script
+from scripts.event_properties import measure_event_gamma as script
 from tests.support._swr_inventory_fixtures import use_swr_source, write_swr_inventory
 
 OK = "j1620210706_02_r1_HPC"

@@ -50,7 +50,7 @@ from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.runs import batch
 from continuum_swr_replay.tables.io import read_table
-from scripts.detection import run_state_evidence as runner
+from scripts.event_evidence import run_state_evidence as runner
 from tests.support._memoryless_clusterless_epoch import _y_track
 from tests.support._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,

@@ -69,7 +69,7 @@ CPU threads follow the process's CPU affinity, so pin the run with
 All memoryless results are pending the Phase 2 pilot checks.
 
 Usage:
-    JAX_PLATFORMS=cpu taskset -c 56-71 python scripts/detection/run_event_features.py \\
+    JAX_PLATFORMS=cpu taskset -c 56-71 python scripts/detector_comparison/run_event_features.py \\
         --inventory-run-id afeb897d850f --epoch-id chimi20200225_02_r1_HPC \\
         --n-workers 1
 """

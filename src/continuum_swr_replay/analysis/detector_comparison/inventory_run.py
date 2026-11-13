@@ -1,6 +1,6 @@
 """The inventory comparison run's layout: its roster, its grid and its tables.
 
-What ``scripts/detection/run_inventory_comparison.py`` compares and writes, and
+What ``scripts/detector_comparison/run_inventory_comparison.py`` compares and writes, and
 what the scripts that read its runs (the event features runner, the two
 reports and the example figures) read it by: the roster of nine inventories
 and the comparisons over them (:data:`ROSTER`, :data:`CELLS`,

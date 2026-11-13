@@ -2,7 +2,7 @@
 """Sampled examples from each cell of one inventory comparison run.
 
 Reads the ``cells`` and ``inventory`` tables that
-``scripts/detection/run_inventory_comparison.py`` wrote for the run's ``ok`` epochs
+``scripts/detector_comparison/run_inventory_comparison.py`` wrote for the run's ``ok`` epochs
 and draws events from each cell by :data:`SAMPLING_RULE`. Design:
 ``docs/design/replay_detection_comparison/03-inventory-comparison.md``
 (Reporting, item 5).

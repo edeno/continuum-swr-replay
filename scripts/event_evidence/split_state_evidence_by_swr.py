@@ -20,7 +20,7 @@ Reads every epoch the run's ``manifest.json`` marks ``ok``. Writes, beside the r
 
 Usage::
 
-    uv run python scripts/detection/split_state_evidence_by_swr.py \\
+    uv run python scripts/event_evidence/split_state_evidence_by_swr.py \\
         Processed-Data/_refresh_20261016/state_evidence
 """
 

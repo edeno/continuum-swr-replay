@@ -4,8 +4,8 @@
 # events summary and measure_ripple_class_structure.py read.
 #
 # Usage, inside tmux so it survives a disconnect:
-#     tmux new -s event_spike_evidence 'scripts/detection/run_event_spike_evidence.sh 8'
-#     scripts/detection/run_event_spike_evidence.sh NJOBS [options passed to
+#     tmux new -s event_spike_evidence 'scripts/event_evidence/run_event_spike_evidence.sh 8'
+#     scripts/event_evidence/run_event_spike_evidence.sh NJOBS [options passed to
 #         analyze_event_spike_evidence.py, such as --cache-dir <folder>]
 # NJOBS is the number of epochs run at once (8 when no argument is given).
 #
@@ -30,7 +30,7 @@ source .venv/bin/activate || exit 1
 # One epoch is a serial CPU job: keep each process to two threads.
 export JAX_PLATFORMS=cpu OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2
 OUT="$(python -c 'from continuum_swr_replay.paths import event_spike_evidence_dir; print(event_spike_evidence_dir())')" || exit 1
-EPOCHS="$(python -c 'from scripts.detection.analyze_event_spike_evidence import find_sessions; print("\n".join(find_sessions(None)))')" || exit 1
+EPOCHS="$(python -c 'from scripts.event_evidence.analyze_event_spike_evidence import find_sessions; print("\n".join(find_sessions(None)))')" || exit 1
 if [ -z "$OUT" ] || [ -z "$EPOCHS" ]; then
   echo "no output folder or no analysed epoch with a decode under the data root" >&2
   exit 1
@@ -56,7 +56,7 @@ run_one() {
   start=$(date +%s)
   # The analysis script exits 0 when an epoch's analysis raises, so an epoch
   # is done only when its metrics file was written.
-  if python scripts/detection/analyze_event_spike_evidence.py \
+  if python scripts/event_evidence/analyze_event_spike_evidence.py \
       --epoch-identifiers "$epoch" --n-sample 1000000 --likelihood stored \
       --output-dir "$partial" "$@" > "logs/event_spike_evidence/$epoch.log" 2>&1 \
       && [ -f "$partial/$metrics" ] && mv "$partial" "$OUT/$epoch"; then

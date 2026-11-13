@@ -20,7 +20,7 @@ from tests.analysis.event_properties.test_start_and_rest_theta import EVENTS, fr
 
 _SCRIPT = (
     Path(__file__).resolve().parents[3]
-    / "scripts/detection/measure_event_start_and_rest_theta.py"
+    / "scripts/event_properties/measure_event_start_and_rest_theta.py"
 )
 _SPEC = importlib.util.spec_from_file_location("measure_start_rest", _SCRIPT)
 assert _SPEC is not None and _SPEC.loader is not None

@@ -140,30 +140,30 @@ def content_occupancy_dir() -> Path:
 # written by its script and read by the events summary.
 BRAIN_STATE_REFERENCE_DIR = "brain_state_reference"
 """Each epoch's running and quiet-rest levels
-(``scripts/detection/measure_brain_state_reference.py``)."""
+(``scripts/event_properties/measure_brain_state_reference.py``)."""
 EVENT_GAMMA_DIR = "event_gamma"
-"""The gamma pass over the events (``scripts/detection/measure_event_gamma.py``)."""
+"""The gamma pass over the events (``scripts/event_properties/measure_event_gamma.py``)."""
 RIPPLE_CLASS_STRUCTURE_DIR = "ripple_class_structure"
 """The one-class-or-two tests
-(``scripts/detection/measure_ripple_class_structure.py``)."""
+(``scripts/event_properties/measure_ripple_class_structure.py``)."""
 EVENT_START_REST_THETA_DIR = "event_start_rest_theta"
 """Each event's start distance and rest-theta share
-(``scripts/detection/measure_event_start_and_rest_theta.py``)."""
+(``scripts/event_properties/measure_event_start_and_rest_theta.py``)."""
 EVENT_PROPERTY_BOOTSTRAP_DIR = "event_property_bootstrap"
 """The event properties' bootstrap intervals
-(``scripts/detection/bootstrap_event_properties.py``)."""
+(``scripts/event_properties/bootstrap_event_properties.py``)."""
 DECODER_QUALITY_DIR = "decoder_quality"
 """Each analysed epoch's decoder quality
 (``scripts/decoding/measure_decoder_quality.py``)."""
 STATE_EVIDENCE_DIR = "state_evidence"
 """A held-out tetrode run's folder inside its run directory
-(``scripts/detection/run_state_evidence.py``); the detection summary reads it."""
+(``scripts/event_evidence/run_state_evidence.py``); the detection summary reads it."""
 STATE_EVIDENCE_RUN = "_refresh_20261016"
 """The held-out tetrode run, under the processed-data root, that the detection
 and events summaries read (242 epochs, all ``ok``)."""
 NL_BOUTS_BY_SWR_STEM = "nl_bouts_by_swr"
 """The stem of the files the SWR split of a held-out tetrode run writes in the
-run's folder (``scripts/detection/split_state_evidence_by_swr.py``); the events
+run's folder (``scripts/event_evidence/split_state_evidence_by_swr.py``); the events
 summary reads ``<stem>_stats.csv`` and ``<stem>.provenance.json``."""
 
 # The behavior summary's inputs that are not one of MODEL_SUBDIRS: each folder is

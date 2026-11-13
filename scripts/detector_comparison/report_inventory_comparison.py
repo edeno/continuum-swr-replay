@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Report one inventory comparison run: its counts per session and per animal.
 
-Reads the per-epoch tables ``scripts/detection/run_inventory_comparison.py`` wrote
+Reads the per-epoch tables ``scripts/detector_comparison/run_inventory_comparison.py`` wrote
 for the run's ``ok`` epochs, concatenated, and its ``manifest.json``. Writes
 plain tables, one CSV each, to ``<inventory run>/report/`` with a
 ``report.md`` that captions them, and a few figures to
@@ -26,7 +26,7 @@ Every row with a ``memoryless`` or ``memoryless_criteria`` inventory carries
 The report states counts only.
 
 Usage:
-    python scripts/detection/report_inventory_comparison.py --run-id <inventory run id>
+    python scripts/detector_comparison/report_inventory_comparison.py --run-id <inventory run id>
 """
 
 import argparse
@@ -74,7 +74,7 @@ from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from scripts.detection._report import (  # noqa: E402
+from scripts.detector_comparison._report import (  # noqa: E402
     PENDING,
     PENDING_DETECTORS,
     PENDING_SENTENCE,

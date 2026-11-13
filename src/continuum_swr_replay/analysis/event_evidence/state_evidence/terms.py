@@ -1,6 +1,6 @@
 """Per-tetrode likelihood terms, and the encodings and decode files they come from.
 
-The loaders are shared with ``scripts/detection/analyze_event_spike_evidence.py``.
+The loaders are shared with ``scripts/event_evidence/analyze_event_spike_evidence.py``.
 """
 
 from __future__ import annotations

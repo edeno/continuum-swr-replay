@@ -13,26 +13,26 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
 - an event features run (``replay_detection_comparison/event_features/<run>``):
   every compared event of the other detectors, whether it overlaps a non-local
   event (``pair_membership`` against ``state_space``), and its state shares
-  (``*_state_shares.parquet``, from ``scripts/detection/add_state_shares.py``);
+  (``*_state_shares.parquet``, from ``scripts/detector_comparison/add_state_shares.py``);
 - the spike-evidence run that scores every event
   (``Processed-Data/event_spike_evidence``, one folder per epoch, from
-  ``scripts/detection/run_event_spike_evidence.sh``);
+  ``scripts/event_evidence/run_event_spike_evidence.sh``);
 - the held-out tetrode test split by SWR (``nl_bouts_by_swr_stats.csv`` beside
   the state-evidence run the detection summary reads, from
-  ``scripts/detection/split_state_evidence_by_swr.py``);
+  ``scripts/event_evidence/split_state_evidence_by_swr.py``);
 - the content-occupancy table (``Processed-Data/content_occupancy``, from
   ``scripts/replay_models/content/analyze_content_occupancy.py``);
 - the one-class-or-two tests (``Processed-Data/ripple_class_structure``, from
-  ``scripts/detection/measure_ripple_class_structure.py``);
+  ``scripts/event_properties/measure_ripple_class_structure.py``);
 - each event's start distance and duration-matched quiet-rest theta
   (``Processed-Data/event_start_rest_theta``, from
-  ``scripts/detection/measure_event_start_and_rest_theta.py``);
+  ``scripts/event_properties/measure_event_start_and_rest_theta.py``);
 - the nested bootstrap of the property contrasts
   (``Processed-Data/event_property_bootstrap``, from
-  ``scripts/detection/bootstrap_event_properties.py``);
+  ``scripts/event_properties/bootstrap_event_properties.py``);
 - the brain-state reference (``Processed-Data/brain_state_reference``, from
-  ``scripts/detection/measure_brain_state_reference.py``) and the gamma pass of
-  ``scripts/detection/measure_event_gamma.py`` (``Processed-Data/event_gamma``):
+  ``scripts/event_properties/measure_brain_state_reference.py``) and the gamma pass of
+  ``scripts/event_properties/measure_event_gamma.py`` (``Processed-Data/event_gamma``):
   the z-scored gamma per event and epoch, and the band power's change against
   quiet rest in dB (its ``reference.parquet``);
 - the decoder quality of each analysed epoch (``Processed-Data/decoder_quality``,
@@ -883,7 +883,7 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
     For each epoch and class: ``10 log10(mean band power over the class's event
     samples / mean band power over quiet rest)`` (below 4 cm/s, in no non-local,
     SWR or MUA event, outside excluded time), on the same band power the z
-    values are made from (``scripts/detection/measure_event_gamma.py``). The
+    values are made from (``scripts/event_properties/measure_event_gamma.py``). The
     median over epochs, and the animals whose median over their epochs is above
     0 dB. The z values (``gamma_z_values``) stay as they are.
     """
@@ -1715,7 +1715,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         raise ValueError("an event has no start-distance and rest-theta row")
     extras_source = (
         f"{source} and {rel(inputs.event_start_rest_theta)} "
-        "(scripts/detection/measure_event_start_and_rest_theta.py)"
+        "(scripts/event_properties/measure_event_start_and_rest_theta.py)"
     )
     extras_stale = stale(inputs.event_start_rest_theta)
     summary.add(*property_values(events_with_extras, extras_source))
@@ -1735,7 +1735,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             property_interval_values(
                 intervals,
                 f"{rel(inputs.property_bootstrap)} "
-                "(scripts/detection/bootstrap_event_properties.py)",
+                "(scripts/event_properties/bootstrap_event_properties.py)",
             ),
             stale(inputs.property_bootstrap),
         )
@@ -1769,9 +1769,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         raise ValueError("an event has no gamma value")
     signal_source = (
         f"{rel(inputs.event_table)} (event theta_z, ripple_power_z, mua_rate_z) "
-        f"and {rel(inputs.brain_state_reference)} (scripts/detection/"
+        f"and {rel(inputs.brain_state_reference)} (scripts/event_properties/"
         "measure_brain_state_reference.py) and the gamma pass "
-        f"{rel(inputs.event_gamma)} (scripts/detection/measure_event_gamma.py)"
+        f"{rel(inputs.event_gamma)} (scripts/event_properties/measure_event_gamma.py)"
     )
     summary.add(*brain_state_values(events_with_gamma, reference, signal_source))
     summary.add(
@@ -1789,7 +1789,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             gamma_db_values(
                 gamma_reference,
                 f"{rel(inputs.event_gamma)}/reference.parquet "
-                "(scripts/detection/measure_event_gamma.py)",
+                "(scripts/event_properties/measure_event_gamma.py)",
             ),
             stale(inputs.event_gamma),
         )
@@ -1812,7 +1812,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         *other_detector_values(
             others,
             f"event features run {run.name}: pair_membership against state_space and "
-            "state_shares (scripts/detection/add_state_shares.py)",
+            "state_shares (scripts/detector_comparison/add_state_shares.py)",
         )
     )
     summary.add(
@@ -1901,7 +1901,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     folder = inputs.class_structure
     names = ("distribution.csv", "step_fits.csv", "manifest.json")
     source = (
-        f"{rel(folder)} (scripts/detection/measure_ripple_class_structure.py: the "
+        f"{rel(folder)} (scripts/event_properties/measure_ripple_class_structure.py: the "
         f"event table, event features run {EVENT_FEATURES_RUN}, the decode frames and "
         "the spike-evidence run)"
     )

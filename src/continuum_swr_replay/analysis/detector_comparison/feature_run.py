@@ -1,6 +1,6 @@
 """The event features run's tables, and what it reads beside them.
 
-What ``scripts/detection/run_event_features.py`` writes for each epoch
+What ``scripts/detector_comparison/run_event_features.py`` writes for each epoch
 (:data:`TABLE_DTYPES`: ``features``, :data:`FEATURE_DTYPES`; ``pair_membership``;
 ``rejection``) and where (:func:`output_paths`), which the event features report
 and its example figures read; and the inventory comparison's and the memoryless
@@ -49,8 +49,8 @@ __all__ = [
 EVENT_FEATURES_RUN = "30cf1cc432e9"
 """The event features run the events summary reads (242 epochs, all ``ok``),
 and the run the scripts that measure the summary's derived inputs from it read
-(``scripts/detection/measure_event_start_and_rest_theta.py``,
-``scripts/detection/measure_ripple_class_structure.py``)."""
+(``scripts/event_properties/measure_event_start_and_rest_theta.py``,
+``scripts/event_properties/measure_ripple_class_structure.py``)."""
 
 MS_DTYPES: Mapping[str, object] = MappingProxyType(
     {

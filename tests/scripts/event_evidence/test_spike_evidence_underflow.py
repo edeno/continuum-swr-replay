@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import scripts.detection.analyze_event_spike_evidence as spike_evidence
+import scripts.event_evidence.analyze_event_spike_evidence as spike_evidence
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     UNDERFLOW_OCCUPANCY_FLOOR,
 )

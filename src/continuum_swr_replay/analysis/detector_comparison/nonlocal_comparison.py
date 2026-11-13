@@ -5,7 +5,7 @@ epochs its manifest marks ``ok`` and no others (``runs.io.ok_epochs``):
 every inventory's compared events (``*_features.parquet``), each event's
 membership against every other inventory (``*_pair_membership.parquet``) and
 its state shares (``*_state_shares.parquet``, from
-``scripts/detection/add_state_shares.py``).
+``scripts/detector_comparison/add_state_shares.py``).
 The non-local detector's inventory is ``state_space``. An event's membership
 against another inventory is known (``matched`` or ``unmatched``) only when the
 event lies wholly inside the pair's shared exposure.

@@ -8,7 +8,7 @@ import json
 import pandas as pd
 import pytest
 
-import scripts.detection.measure_ripple_class_structure as structure
+import scripts.event_properties.measure_ripple_class_structure as structure
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (
     EVENT_FEATURES_RUN,
 )
