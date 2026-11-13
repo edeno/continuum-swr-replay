@@ -68,7 +68,10 @@ from continuum_swr_replay.analysis.events.eligibility import (
     event_drop_reasons,
     excluded_time,
 )
-from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
+from continuum_swr_replay.decoding.identifiers import (
+    format_epoch_identifier,
+    nwb_file_name,
+)
 from continuum_swr_replay.intervals import subtract_intervals
 from continuum_swr_replay.paths import artifact_intervals_root, swr_inventory_root
 from continuum_swr_replay.runs.io import read_manifest, recorded_output
@@ -283,7 +286,7 @@ def swr_epoch_id_of_session(animal: str, day: object, epoch: object) -> str:
     ``swr_epoch_id_of_session("chimi", 20200225, "02_r1")`` is
     ``"chimi20200225_02_r1_HPC"``.
     """
-    return format_epoch_identifier(f"{animal}{day}", str(epoch), "HPC")
+    return swr_epoch_id(nwb_file_name(animal, day), str(epoch))
 
 
 def swr_source_files(epoch_id: str) -> dict[str, dict[str, str]]:

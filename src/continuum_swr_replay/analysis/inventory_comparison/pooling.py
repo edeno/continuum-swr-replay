@@ -24,6 +24,7 @@ from collections.abc import Collection, Mapping, Sequence
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.decoding.identifiers import nwb_file_name, session_name
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 SESSION = list(SESSION_COLUMNS_DAY)
@@ -45,9 +46,16 @@ COUNT_SUMS = (
 
 
 def session_names(frame: pd.DataFrame) -> pd.Series:
-    """``{animal}{day}_{epoch}`` of each row."""
-    return (
-        frame.animal.astype(str) + frame.day.astype(str) + "_" + frame.epoch.astype(str)
+    """``{animal}{day}_{epoch}`` of each row (``identifiers.session_name``)."""
+    return pd.Series(
+        [
+            session_name(nwb_file_name(animal, day), epoch)
+            for animal, day, epoch in zip(
+                frame.animal, frame.day, frame.epoch, strict=True
+            )
+        ],
+        index=frame.index,
+        dtype=object,
     )
 
 

@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import nwb_file_name
 from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.paths import processed_data_dir
@@ -166,7 +167,7 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
     )
 
     animal, day, epoch = (str(dot[c].iloc[0]) for c in ("animal", "day", "epoch"))
-    band = get_ripple_band_inputs(f"{animal}{day}_.nwb", epoch)
+    band = get_ripple_band_inputs(nwb_file_name(animal, day), epoch)
     kept_ids = swr_source.ripple_power_inputs(identifier)["kept_electrode_ids"]
     kept = np.isin(band["electrode_ids"], kept_ids)
     if kept.sum() != len(kept_ids):

@@ -57,7 +57,6 @@ holds analysed epochs' decodes, which the audit checks (``decode_folder``).
 
 from __future__ import annotations
 
-import re
 from collections.abc import Collection
 from enum import StrEnum
 from pathlib import Path
@@ -65,7 +64,11 @@ from typing import NamedTuple
 
 import pandas as pd
 
-from ..decoding.identifiers import format_epoch_identifier, parse_nwb_filename
+from ..decoding.identifiers import (
+    RUN_EPOCH_PATTERN,
+    format_epoch_identifier,
+    parse_nwb_filename,
+)
 from .utils import get_epoch_info
 
 REGISTER_PATH = Path(__file__).with_name("epoch_register.csv")
@@ -88,7 +91,6 @@ RULE = (
 """The project lead's exclusion rule (2026-10-05), with the S-block clause added
 on 2026-10-10."""
 
-_RUN_EPOCH = re.compile(r"^[0-9]+_r[0-9]+$")
 _FLAGS = {"True": True, "False": False}
 """How ``first_exposure`` is written in the CSV, and what it reads as."""
 
@@ -183,7 +185,7 @@ def _problems(frame: pd.DataFrame) -> list[str]:
         problems.append(f"{animal} has more than one first-exposure epoch")
     for row in frame.itertuples(index=False):
         key = f"{row.nwb_file_name} {row.epoch}"
-        if row.epoch != SESSION_WIDE and not _RUN_EPOCH.match(row.epoch):
+        if row.epoch != SESSION_WIDE and not RUN_EPOCH_PATTERN.match(row.epoch):
             problems.append(f"{key}: epoch is neither '*' nor a run epoch name")
         if row.first_exposure not in _FLAGS:
             problems.append(

@@ -72,6 +72,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
     dispersion_cm,
 )
 from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS
+from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 
 # the canonical matched-SWR rule itself, not a copy that could drift from it
 from continuum_swr_replay.intervals import contiguous_true_runs
@@ -209,9 +210,12 @@ class SequenceIdentity:
                 f"brain_area must be one of {BRAIN_AREAS}, got {self.brain_area!r}."
             )
         # the identifier names the same epoch as the parts do
-        if not self.epoch_id.startswith(f"{self.animal}{self.day}_") or (
-            f"_{self.epoch}_{self.brain_area}" not in self.epoch_id
-        ):
+        try:
+            key = parse_epoch_identifier(self.epoch_id)
+            named = (key.animal, key.date, key.epoch_name, key.brain_area)
+        except ValueError:
+            named = None
+        if named != (self.animal, self.day, self.epoch, self.brain_area):
             raise ValueError(
                 f"epoch_id {self.epoch_id!r} does not name animal {self.animal!r}, "
                 f"epoch {self.epoch!r} and brain area {self.brain_area!r}."

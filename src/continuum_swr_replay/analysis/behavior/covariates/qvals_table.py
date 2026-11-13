@@ -25,6 +25,7 @@ from continuum_swr_replay.data_loaders.trial_clocks import (
     outcome_known_time_from_task_visit,
 )
 from continuum_swr_replay.data_loaders.utils import quiet_spyglass
+from continuum_swr_replay.decoding.identifiers import nwb_file_name, parse_epoch_name
 from continuum_swr_replay.paths import (
     QVALS_STANDARDIZATION_REFERENCE,
     table_path,
@@ -797,8 +798,10 @@ def _broadcast_trial_covariates_to_stops(
     that interval in ``pt`` means all later stops keep their true trial index.
     """
     st = stop_table[stop_table.animal == animal].copy()
-    st["nwb_file_name"] = animal + st["session_date"].astype(str) + "_.nwb"
-    st["epoch_number"] = st["epoch"].str.split("_").str[0].astype("int64")
+    st["nwb_file_name"] = [nwb_file_name(animal, date) for date in st["session_date"]]
+    st["epoch_number"] = np.asarray(
+        [parse_epoch_name(epoch)[0] for epoch in st["epoch"]], dtype="int64"
+    )
     context_time = st["stop_start"].to_numpy(dtype=float)
     mid = ((st["stop_start"] + st["stop_end"]) / 2).to_numpy()
     if not np.isfinite(context_time).all():

@@ -37,6 +37,7 @@ from numpy.typing import NDArray
 from track_linearization import get_linearized_position
 
 from ..data_types import PositionInfoDict
+from ..decoding.identifiers import nwb_stem, parse_epoch_name
 from .constants import TRACK_SEGMENT_TO_PATCH
 from .utils import quiet_spyglass
 
@@ -153,7 +154,7 @@ def _track_graph_name(nwb_file_name: str, linearized_graph_names: list[str]) -> 
     ValueError
         Several linearized graphs, none of them the session-named graph.
     """
-    session_graph_name = nwb_file_name.split("_")[0]
+    session_graph_name = nwb_stem(nwb_file_name)
     if len(linearized_graph_names) == 1:
         return linearized_graph_names[0]
     if not linearized_graph_names or session_graph_name in linearized_graph_names:
@@ -272,7 +273,7 @@ def get_position_info(
     linear_edge_order = track_graph_params["linear_edge_order"]
     linear_edge_spacing = track_graph_params["linear_edge_spacing"]
 
-    epoch = int(epoch_name.split("_")[0])
+    epoch = parse_epoch_name(epoch_name)[0]
     dlc_merge_ids = (
         PositionOutput().merge_restrict()
         & {

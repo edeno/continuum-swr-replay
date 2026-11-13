@@ -75,7 +75,12 @@ import pandas as pd
 if TYPE_CHECKING:
     from ..data_types import SessionData
 
-from ..decoding.identifiers import TrainingType, parse_nwb_filename
+from ..decoding.identifiers import (
+    RUN_EPOCH_PATTERN,
+    TrainingType,
+    parse_epoch_name,
+    parse_nwb_filename,
+)
 from ..intervals import interval_mask
 from .constants import (
     FIRST_EXPOSURE_DESCRIPTIONS,
@@ -173,7 +178,7 @@ def get_epoch_info() -> pd.DataFrame:
     # only use run epochs
     epoch_info = epoch_info[
         epoch_info.index.get_level_values("interval_list_name").str.match(
-            r"^[0-9]+_r[0-9]+$"
+            RUN_EPOCH_PATTERN.pattern
         )
     ]
 
@@ -190,7 +195,10 @@ def get_epoch_info() -> pd.DataFrame:
     epoch_info["date"] = date
 
     epoch, epoch_tag = zip(
-        *epoch_info.index.get_level_values("interval_list_name").str.split("_"),
+        *map(
+            parse_epoch_name,
+            epoch_info.index.get_level_values("interval_list_name"),
+        ),
         strict=True,
     )
     epoch_info["epoch"] = np.asarray(epoch, dtype=int)
