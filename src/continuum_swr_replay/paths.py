@@ -158,6 +158,9 @@ DECODER_QUALITY_DIR = "decoder_quality"
 STATE_EVIDENCE_DIR = "state_evidence"
 """A held-out tetrode run's folder inside its run directory
 (``scripts/detection/run_state_evidence.py``); the detection summary reads it."""
+STATE_EVIDENCE_RUN = "_refresh_20261016"
+"""The held-out tetrode run, under the processed-data root, that the detection
+and events summaries read (242 epochs, all ``ok``)."""
 NL_BOUTS_BY_SWR_STEM = "nl_bouts_by_swr"
 """The stem of the files the SWR split of a held-out tetrode run writes in the
 run's folder (``scripts/detection/split_state_evidence_by_swr.py``); the events

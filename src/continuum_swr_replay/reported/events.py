@@ -84,6 +84,7 @@ from continuum_swr_replay.paths import (
     RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
     STATE_EVIDENCE_DIR,
+    STATE_EVIDENCE_RUN,
     content_occupancy_dir,
     event_features_root,
     event_spike_evidence_dir,
@@ -92,7 +93,6 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.reported.detection import STATE_EVIDENCE_RUN
 from continuum_swr_replay.reported.formatting import (
     MS_PER_S,
     format_number,

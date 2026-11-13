@@ -57,6 +57,7 @@ from continuum_swr_replay.analysis.inventory_comparison.heldout_sweep import (
 from continuum_swr_replay.paths import (
     ROOT_DIR,
     STATE_EVIDENCE_DIR,
+    STATE_EVIDENCE_RUN,
     memoryless_root,
     processed_data_dir,
 )
@@ -70,9 +71,6 @@ from continuum_swr_replay.reported.values import (
     value_factory,
 )
 from continuum_swr_replay.runs.io import read_manifest
-
-STATE_EVIDENCE_RUN = "_refresh_20261016"
-"""The held-out tetrode run the detection summary reads (242 epochs, all ``ok``)."""
 
 MEMORYLESS_PILOT_RUN = "0c2548cacf2d-seed20260922"
 """The sliding-window detector's first real-data pilot (chimi20200225_02_r1)."""
