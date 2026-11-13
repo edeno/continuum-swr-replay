@@ -19,6 +19,7 @@ import pytest
 
 from continuum_swr_replay.runs.io import (
     array_sha256,
+    is_nonempty_file,
     json_ready,
     ok_table_paths,
     read_manifest,
@@ -214,3 +215,16 @@ def test_a_manifest_naming_another_folder_is_refused_only_when_asked(tmp_path):
         "run_id": "run0001",
         "epochs": {},
     }
+
+
+class TestIsNonemptyFile:
+    def test_only_a_written_regular_file_counts(self, tmp_path):
+        empty = tmp_path / "empty.npy"
+        empty.touch()
+        written = tmp_path / "written.npy"
+        written.write_bytes(b"x")
+
+        assert not is_nonempty_file(tmp_path / "missing.npy")
+        assert not is_nonempty_file(empty)
+        assert not is_nonempty_file(tmp_path)
+        assert is_nonempty_file(written)

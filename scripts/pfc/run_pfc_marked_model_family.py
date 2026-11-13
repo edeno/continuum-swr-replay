@@ -122,10 +122,6 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     MAX_NONCONVERGED_UNIT_FRACTION,
     STOP_COHORT,
     fails_convergence_gate,
-    is_nonempty_file,
-    json_safe,
-    matching_sidecar,
-    remove_bundle,
     session_seed,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
@@ -135,9 +131,12 @@ from continuum_swr_replay.paths import processed_data_dir, table_path
 from continuum_swr_replay.runs.batch import setup_logger
 from continuum_swr_replay.runs.cli import add_epoch_filters, filter_epoch_info
 from continuum_swr_replay.runs.fit_provenance import (
+    matching_sidecar,
     record_inputs,
+    remove_bundle,
     write_fit_provenance,
 )
+from continuum_swr_replay.runs.io import is_nonempty_file, json_ready
 
 OUTPUT_SUBDIR = "pfc_marked_model_family"
 ESTIMATOR = "joint_multimark_ridge_poisson_temporal_glm"
@@ -455,7 +454,7 @@ def _remove_stale_bundle(artifact: Path, spec: MarkedFamilySpec) -> None:
     """Remove every component of one session x model before refitting it.
 
     Every companion the family can write is removed, the slope nulls included
-    (:func:`~continuum_swr_replay.analysis.pfc.runner_support.remove_bundle`).
+    (:func:`~continuum_swr_replay.runs.fit_provenance.remove_bundle`).
     """
     remove_bundle(
         artifact, family_companion_paths(artifact, spec, slope_permutations=1)
@@ -498,7 +497,7 @@ def _write_marker(
         dict(input_records),
         estimator=ESTIMATOR,
         cli=sys.argv,
-        extra=json_safe({**contract_extra, "bundle_status": status, **dict(extra)}),
+        extra=json_ready({**contract_extra, "bundle_status": status, **dict(extra)}),
     )
 
 
@@ -1063,7 +1062,7 @@ def run_analysis(
                 input_records,
                 estimator=ESTIMATOR,
                 cli=sys.argv,
-                extra=json_safe(
+                extra=json_ready(
                     {
                         **contract_extra,
                         "bundle_status": "complete",

@@ -31,7 +31,9 @@ from continuum_swr_replay.runs.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
     git_hash,
+    matching_sidecar,
     record_inputs,
+    remove_bundle,
     require_fresh_inputs,
     write_fit_provenance,
 )
@@ -939,3 +941,36 @@ def test_a_canonical_input_resolves_at_the_root_not_beside_the_sidecar(tmp_path)
     assert module.resolve_input("event_arm_table_swr_HPC", sidecar, root) == (
         root / "event_arm_table_swr_HPC.parquet"
     )
+
+
+def test_matching_sidecar_needs_a_mapping_that_records_the_contract(tmp_path):
+    artifact = tmp_path / "bundle.pkl"
+    sidecar = fit_provenance_path(artifact)
+    assert matching_sidecar(artifact, {}) is None  # no sidecar
+    sidecar.write_text("")
+    assert matching_sidecar(artifact, {}) is None  # empty
+    sidecar.write_text("{not json")
+    assert matching_sidecar(artifact, {}) is None
+    sidecar.write_text("[1, 2]")
+    assert matching_sidecar(artifact, {}) is None  # not a mapping
+    sidecar.write_text(json.dumps({"version": 3, "status": "complete"}))
+    assert matching_sidecar(artifact, {"version": 3}) == {
+        "version": 3,
+        "status": "complete",
+    }
+    assert matching_sidecar(artifact, {"version": 2}) is None
+    # an unrecorded key reads as None
+    assert matching_sidecar(artifact, {"version": 3, "absent": None}) is not None
+    assert matching_sidecar(artifact, {"absent": 0}) is None
+
+
+def test_remove_bundle_unlinks_sidecar_table_and_companions(tmp_path):
+    artifact = tmp_path / "bundle.pkl"
+    companions = [tmp_path / "bundle.a.npy", tmp_path / "bundle.b.npy"]
+    for path in (artifact, fit_provenance_path(artifact), companions[0]):
+        path.write_text("x")
+    (tmp_path / "other.pkl").write_text("x")
+
+    remove_bundle(artifact, companions)  # one companion was never written
+
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["other.pkl"]

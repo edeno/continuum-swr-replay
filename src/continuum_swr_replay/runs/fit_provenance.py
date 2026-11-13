@@ -25,19 +25,23 @@ time, so a reader can see the window the two bracket.
 The hashed file is the file that was read: a table input is its ``.parquet``
 path (the readers refuse ``.pkl``); a ``.pkl`` input is a fitted bundle, hashed
 as it is.
+
+A runner that skips a bundle already fit reads its sidecar against the fit's
+contract (:func:`matching_sidecar`), and removes a stale bundle whole before
+refitting it (:func:`remove_bundle`).
 """
 
 from __future__ import annotations
 
 import json
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.runs.io import sha256_file, write_json
+from continuum_swr_replay.runs.io import is_nonempty_file, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import git_commit, git_dirty
 from continuum_swr_replay.tables.io import read_attrs, resolved_table_path
 
@@ -48,6 +52,8 @@ __all__ = [
     "write_fit_provenance",
     "check_fit_provenance",
     "require_fresh_inputs",
+    "matching_sidecar",
+    "remove_bundle",
 ]
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -328,3 +334,62 @@ def require_fresh_inputs(
             f"{Path(artifact_path).name} is stale: {', '.join(stale)} changed "
             "since it was fit. Refit it, or pass --allow-stale to read it anyway."
         )
+
+
+def matching_sidecar(
+    artifact: Path, fit_contract: Mapping[str, object]
+) -> Mapping[str, object] | None:
+    """A bundle's provenance sidecar, when it records exactly `fit_contract`.
+
+    The sidecar is the bundle's commit marker: it is written last and removed
+    before a refit. Whether the rest of the bundle is complete is each
+    runner's own rule.
+
+    Parameters
+    ----------
+    artifact : Path
+        The bundle's primary ``.pkl`` statistics table.
+    fit_contract : Mapping of str to object
+        Every key must be recorded with the same value in the sidecar.
+
+    Returns
+    -------
+    Mapping of str to object or None
+        The sidecar's record; None when the sidecar is missing, empty, not a
+        JSON mapping, or records another value for a contract key.
+    """
+    sidecar = fit_provenance_path(artifact)
+    if not is_nonempty_file(sidecar):
+        return None
+    try:
+        record = json.loads(sidecar.read_text())
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(record, Mapping):
+        return None
+    if not all(record.get(key) == value for key, value in fit_contract.items()):
+        return None
+    return record
+
+
+def remove_bundle(artifact: Path, companions: Iterable[Path]) -> None:
+    """Remove every component of a previous bundle before refitting.
+
+    Parameters
+    ----------
+    artifact : Path
+        The bundle's primary ``.pkl`` statistics table.
+    companions : iterable of Path
+        The bundle's other files.
+
+    Returns
+    -------
+    None
+        The sidecar, the table and the companions are unlinked, so an
+        interrupted refit can never leave a mixture of old and new components
+        that looks complete on the next run.
+    """
+    fit_provenance_path(artifact).unlink(missing_ok=True)
+    artifact.unlink(missing_ok=True)
+    for path in companions:
+        path.unlink(missing_ok=True)

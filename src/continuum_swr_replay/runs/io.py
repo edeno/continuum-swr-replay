@@ -39,6 +39,7 @@ from continuum_swr_replay.tables.io import write_atomically, write_table
 __all__ = [
     "array_sha256",
     "files_sha256",
+    "is_nonempty_file",
     "json_ready",
     "ok_epochs",
     "ok_table_paths",
@@ -193,6 +194,22 @@ def replace_outputs(
             path.unlink(missing_ok=True)
         raise
     return written
+
+
+def is_nonempty_file(path: Path) -> bool:
+    """Return whether an artifact component was completely materialized.
+
+    Parameters
+    ----------
+    path : Path
+        Component to test.
+
+    Returns
+    -------
+    bool
+        True when the path is a regular file of non-zero size.
+    """
+    return path.is_file() and path.stat().st_size > 0
 
 
 def output_path(identifier: str, output_dir: Path, name: str) -> Path:

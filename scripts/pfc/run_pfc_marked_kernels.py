@@ -82,10 +82,6 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     MAX_NONCONVERGED_UNIT_FRACTION,
     STOP_COHORT,
     fails_convergence_gate,
-    is_nonempty_file,
-    json_safe,
-    matching_sidecar,
-    remove_bundle,
     session_seed,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
@@ -95,9 +91,12 @@ from continuum_swr_replay.paths import processed_data_dir, table_path
 from continuum_swr_replay.runs.batch import setup_logger
 from continuum_swr_replay.runs.cli import add_epoch_filters, filter_epoch_info
 from continuum_swr_replay.runs.fit_provenance import (
+    matching_sidecar,
     record_inputs,
+    remove_bundle,
     write_fit_provenance,
 )
+from continuum_swr_replay.runs.io import is_nonempty_file, json_ready
 
 # This reference is descriptive, not a selection rule. A real 430-unit A100 profile
 # projected 1,000 exact five-fold refits at about 5.2 GPU-hours per session;
@@ -533,7 +532,7 @@ def run_analysis(
                 input_records,
                 estimator=ESTIMATOR,
                 cli=sys.argv,
-                extra=json_safe(
+                extra=json_ready(
                     {
                         **contract_extra,
                         "n_units": 0,
@@ -630,7 +629,7 @@ def run_analysis(
             input_records,
             estimator=ESTIMATOR,
             cli=sys.argv,
-            extra=json_safe(
+            extra=json_ready(
                 {
                     **contract_extra,
                     "scientific_mark_definition": MARK_DESCRIPTIONS[scientific_mark],
