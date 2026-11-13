@@ -13,16 +13,21 @@ import itertools
 
 import pytest
 
-from continuum_swr_replay.data_loaders.epoch_register import read_register
+from continuum_swr_replay.data_loaders.epoch_register import Status, read_register
 from continuum_swr_replay.decoding.identifiers import (
     DEFAULT_SWR_DEFINITION,
     DEFAULT_TRAINING_TYPE,
     OTHER_RIPPLE_DETECTORS,
+    RUN_EPOCH_PATTERN,
     TrainingType,
     decode_identifier,
     format_epoch_identifier,
+    nwb_file_name,
+    nwb_stem,
     parse_epoch_identifier,
+    parse_epoch_name,
     parse_nwb_filename,
+    session_name,
 )
 
 
@@ -226,10 +231,10 @@ def test_every_register_decode_identifier_round_trips():
         [False, True],
         [t.value for t in TrainingType],
     )
-    for (nwb_file_name, epoch), setting in itertools.product(epochs, list(settings)):
+    for (name, epoch), setting in itertools.product(epochs, list(settings)):
         brain_area, contfrag, ripple, non_stationary, training_type = setting
         stem = format_epoch_identifier(
-            nwb_file_name, epoch, brain_area, "_contfrag" if contfrag else ""
+            name, epoch, brain_area, "_contfrag" if contfrag else ""
         )
         identifier = decode_identifier(
             stem,
@@ -250,7 +255,7 @@ def test_every_register_decode_identifier_round_trips():
             key.training_type,
         ) == (
             identifier,
-            nwb_file_name,
+            name,
             epoch,
             brain_area,
             contfrag,
@@ -258,7 +263,7 @@ def test_every_register_decode_identifier_round_trips():
             non_stationary,
             training_type,
         )
-        assert (key.animal, key.date) == parse_nwb_filename(nwb_file_name)
+        assert (key.animal, key.date) == parse_nwb_filename(name)
         assert key.is_canonical == (identifier == stem and not contfrag)
         rebuilt = decode_identifier(
             format_epoch_identifier(
@@ -272,3 +277,77 @@ def test_every_register_decode_identifier_round_trips():
             training_type=key.training_type,
         )
         assert rebuilt == identifier
+
+
+class TestSessionNames:
+    """The NWB file name, its stem, the session name and the epoch number."""
+
+    @pytest.mark.parametrize(
+        ("animal", "date", "name", "stem"),
+        [
+            ("chimi", 20200212, "chimi20200212_.nwb", "chimi20200212"),
+            ("j16", 20210706, "j1620210706_.nwb", "j1620210706"),
+            ("wilbur", "20210329", "wilbur20210329_.nwb", "wilbur20210329"),
+        ],
+    )
+    def test_the_nwb_name_and_stem_of_an_animal_and_date(
+        self, animal, date, name, stem
+    ):
+        assert nwb_file_name(animal, date) == name
+        assert nwb_stem(name) == stem
+        assert parse_nwb_filename(name) == (animal, int(date))
+
+    def test_only_a_trailing_nwb_extension_is_stripped(self):
+        assert nwb_stem("a_.nwbx_.nwb") == "a_.nwbx"
+        assert nwb_stem("chimi20200212") == "chimi20200212"
+
+    def test_the_session_name_is_the_identifier_without_its_area(self):
+        assert session_name("j1620210706_.nwb", "02_r1") == "j1620210706_02_r1"
+        assert (
+            format_epoch_identifier("j1620210706_.nwb", "02_r1", "HPC")
+            == session_name("j1620210706_.nwb", "02_r1") + "_HPC"
+        )
+
+    @pytest.mark.parametrize(
+        ("epoch_name", "parsed"),
+        [("02_r1", (2, "r1")), ("16_r10", (16, "r10")), ("01_s1", (1, "s1"))],
+    )
+    def test_an_epoch_name_splits_into_its_number_and_tag(self, epoch_name, parsed):
+        assert parse_epoch_name(epoch_name) == parsed
+
+    @pytest.mark.parametrize("bad", ["02", "02_r1_x", "r1_02", "_r1"])
+    def test_an_epoch_name_that_is_not_number_and_tag_is_refused(self, bad):
+        with pytest.raises(ValueError):
+            parse_epoch_name(bad)
+
+    @pytest.mark.parametrize(
+        ("epoch_name", "is_run"),
+        [("02_r1", True), ("16_r10", True), ("01_s1", False), ("02_r1_x", False)],
+    )
+    def test_the_run_epoch_pattern(self, epoch_name, is_run):
+        assert bool(RUN_EPOCH_PATTERN.match(epoch_name)) is is_run
+
+
+def test_every_analysed_epoch_round_trips_through_its_names():
+    """For each of the register's analysed epochs, the NWB name rebuilt from its
+    animal and date is the register's, the session name and the HPC identifier
+    agree, and the identifier parses back to the epoch."""
+    register = read_register()
+    analysed = register.index[register["status"] == Status.ANALYSED]
+    assert len(analysed) == 242
+    for name, epoch in analysed:
+        animal, date = parse_nwb_filename(name)
+        assert nwb_file_name(animal, date) == name
+        assert nwb_stem(name) == f"{animal}{date}"
+        assert RUN_EPOCH_PATTERN.match(epoch)
+        number, tag = parse_epoch_name(epoch)
+        assert f"{number:02d}_{tag}" == epoch
+        identifier = format_epoch_identifier(name, epoch, "HPC")
+        assert identifier == f"{session_name(name, epoch)}_HPC"
+        key = parse_epoch_identifier(identifier)
+        assert (key.nwb_file_name, key.epoch_name, key.animal, key.date) == (
+            name,
+            epoch,
+            animal,
+            date,
+        )

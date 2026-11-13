@@ -14,6 +14,11 @@ Both directions live here, with the defaults they share:
 - read: :func:`parse_epoch_identifier` into an :class:`EpochKey`, and
   :func:`parse_nwb_filename` for the stem's animal and date.
 
+The names an identifier is made of are built here too: the NWB file name of an
+animal and date (:func:`nwb_file_name`), its stem (:func:`nwb_stem`), the
+area-less session name ``{stem}_{epoch}`` (:func:`session_name`), and an epoch
+name's number (:func:`parse_epoch_name`, :data:`RUN_EPOCH_PATTERN`).
+
 A leaf module: it imports only the standard library, so an offline reader of
 decode folders, or a table builder keying rows by epoch, loads nothing else.
 """
@@ -73,6 +78,101 @@ DEFAULT_TRAINING_TYPE = TrainingType.NO_RIPPLE.value
 
 CONTFRAG_SUFFIX = "_contfrag"
 """The suffix a ContFrag classifier decode appends, first of the run suffixes."""
+
+
+RUN_EPOCH_PATTERN = re.compile(r"^[0-9]+_r[0-9]+$")
+"""A run epoch's name, such as ``02_r1``: the epoch number, ``_r``, the run."""
+
+
+def nwb_file_name(animal: str, date: object) -> str:
+    """The NWB file name of `animal`'s recording on `date`: ``{animal}{date}_.nwb``.
+
+    The inverse of :func:`parse_nwb_filename`.
+
+    Parameters
+    ----------
+    animal : str
+        Such as ``"chimi"``.
+    date : int or str
+        The recording date ``YYYYMMDD``, such as ``20200212``.
+
+    Returns
+    -------
+    str
+
+    Examples
+    --------
+    >>> nwb_file_name("j16", 20210706)
+    'j1620210706_.nwb'
+    """
+    return f"{animal}{date}_.nwb"
+
+
+def nwb_stem(nwb_file_name: str) -> str:
+    """`nwb_file_name` without its trailing ``_.nwb``: ``{animal}{date}``.
+
+    Only a trailing ``_.nwb`` is removed; a name without one is returned as is.
+
+    Examples
+    --------
+    >>> nwb_stem("chimi20200212_.nwb")
+    'chimi20200212'
+    """
+    return nwb_file_name.removesuffix("_.nwb")
+
+
+def session_name(nwb_file_name: str, epoch_name: object) -> str:
+    """The area-less session name ``{animal}{date}_{epoch}``.
+
+    The epoch identifier without its brain area and decode suffixes
+    (:func:`format_epoch_identifier`).
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        Such as ``"chimi20200212_.nwb"`` (:func:`nwb_file_name` builds it
+        from an animal and a date).
+    epoch_name : str
+        Such as ``"02_r1"``.
+
+    Returns
+    -------
+    str
+
+    Examples
+    --------
+    >>> session_name("chimi20200212_.nwb", "02_r1")
+    'chimi20200212_02_r1'
+    """
+    return f"{nwb_stem(nwb_file_name)}_{epoch_name}"
+
+
+def parse_epoch_name(epoch_name: str) -> tuple[int, str]:
+    """Split an epoch name ``{number}_{tag}`` into its number and its tag.
+
+    Parameters
+    ----------
+    epoch_name : str
+        Such as ``"02_r1"``.
+
+    Returns
+    -------
+    tuple[int, str]
+        Such as ``(2, "r1")``.
+
+    Raises
+    ------
+    ValueError
+        If `epoch_name` is not two ``_``-separated parts, or its first part is
+        not an integer.
+
+    Examples
+    --------
+    >>> parse_epoch_name("04_r2")
+    (4, 'r2')
+    """
+    number, tag = epoch_name.split("_")
+    return int(number), tag
 
 
 def parse_nwb_filename(filename: str) -> tuple[str, int]:
@@ -189,7 +289,7 @@ def format_epoch_identifier(
     >>> format_epoch_identifier("chimi20200212_.nwb", "02_r1", "mPFC", "_contfrag")
     'chimi20200212_02_r1_mPFC_contfrag'
     """
-    return f"{nwb_file_name.removesuffix('_.nwb')}_{epoch}_{brain_area}{suffix}"
+    return f"{session_name(nwb_file_name, epoch)}_{brain_area}{suffix}"
 
 
 def decode_identifier(
