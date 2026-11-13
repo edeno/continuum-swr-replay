@@ -33,7 +33,6 @@ the rules live here rather than in either script.
 
 from __future__ import annotations
 
-import json
 import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -157,98 +156,6 @@ BINARY_TERMS = frozenset(
 PER_UNIT_TERMS = frozenset(
     [*REWARD_HISTORY_COLUMNS, *(f"is_swr:{c}" for c in REWARD_HISTORY_COLUMNS)]
 )
-
-
-def load_per_sd_scale(provenance_path: str | Path, cohort: str) -> dict[str, float]:
-    """Per-SD units a fitted contrast table states its coefficients in.
-
-    The fitters freeze one pooled SD per raw-scale covariate, over the row
-    support the rungs carrying it are fitted on (the six leaf arms for the arm
-    cohort), and persist it in the run's provenance record. Readers must take
-    the unit from there rather than recomputing an SD of their own: the same
-    covariate measured over all nine candidate arms has a 2.1x larger SD,
-    because the three trunks are structural zeros, and a figure recomputing it
-    would restate every effect in a unit the audited table does not use.
-
-    Parameters
-    ----------
-    provenance_path : str or Path
-        The runner's provenance JSON (``*_provenance.json``).
-    cohort : str
-        Key within ``per_sd_scale`` (``"arm_cohort"`` / ``"patch_cohort"``).
-
-    Returns
-    -------
-    dict of str to float
-        Covariate -> frozen SD, ready to pass as ``aggregate_contrast``'s ``sd``.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the provenance record is absent.
-    KeyError
-        If it carries no ``per_sd_scale`` entry for ``cohort`` -- a record
-        predating the frozen units, whose fits are in an unknown one.
-    """
-    path = Path(provenance_path)
-    if not path.exists():
-        raise FileNotFoundError(
-            f"{path} is required for the per-SD unit the fit's coefficients are "
-            "stated in; re-run the fitter to write it."
-        )
-    scale = json.loads(path.read_text()).get("per_sd_scale") or {}
-    if cohort not in scale:
-        raise KeyError(
-            f"{path} records no per_sd_scale[{cohort!r}]. It predates the frozen "
-            "per-SD units, so the unit its coefficients are stated in is unknown; "
-            "re-run the fitter rather than recomputing an SD here."
-        )
-    return {cov: float(value) for cov, value in scale[cohort].items()}
-
-
-def load_fit_time_sd_reference(meta_path: str | Path) -> dict[str, float]:
-    """Per-SD units the rate contrast's audited table states its coefficients in.
-
-    ``scripts/behavior/rate/fit_swr_contrast_rate.py`` takes one SD per raw-scale rate
-    covariate over the stop cohort its per-session fits name (at-well for the
-    canonical bundle), aggregates with it, and records it in the run's meta
-    JSON. Readers must take the unit from there: the same covariates measured
-    over the full tables differ by up to ~7 %, which would restate every
-    per-SD rate effect in a unit the audited table does not use.
-
-    Parameters
-    ----------
-    meta_path : str or Path
-        The rate runner's meta JSON (``swr_contrast_rate_meta*.json``).
-
-    Returns
-    -------
-    dict of str to float
-        Covariate -> SD, ready to pass as ``aggregate_contrast``'s ``sd``.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the meta record is absent.
-    KeyError
-        If it carries no ``fit_time_sd_reference`` -- the unit the audited
-        table's ``std_*`` columns are stated in is then unknown.
-    """
-    path = Path(meta_path)
-    if not path.exists():
-        raise FileNotFoundError(
-            f"{path} is required for the per-SD unit the rate fit's coefficients "
-            "are stated in; re-run the fitter (or its --aggregate-only path) to "
-            "write it."
-        )
-    reference = json.loads(path.read_text()).get("fit_time_sd_reference")
-    if not reference:
-        raise KeyError(
-            f"{path} records no fit_time_sd_reference, so the unit its audited "
-            "table is stated in is unknown; re-run the fitter rather than "
-            "recomputing an SD here."
-        )
-    return {cov: float(value) for cov, value in reference.items()}
 
 
 def std_factor(term: str, sd: dict) -> tuple[float, str]:

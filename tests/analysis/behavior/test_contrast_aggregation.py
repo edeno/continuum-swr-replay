@@ -27,12 +27,15 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     MIN_SESSIONS_PER_TERM,
     aggregate_contrast,
     gate_term_sessions,
-    load_per_sd_scale,
     session_se,
     std_factor,
     typical_session_se,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import REWARD_HISTORY_COLUMNS
+from continuum_swr_replay.runs.fit_provenance import (
+    load_fit_time_sd_reference,
+    load_per_sd_scale,
+)
 
 SD = {"rpe_postoutcome": 2.0, "reward_history_rcos_0": 0.25}
 
@@ -627,18 +630,6 @@ def test_persisted_units_are_returned_and_used_verbatim(tmp_path: Path) -> None:
     assert load_per_sd_scale(path, "patch_cohort") == {}
 
 
-def test_a_record_without_the_frozen_units_is_refused(tmp_path: Path) -> None:
-    """A fit in an unknown unit must fail, not fall back to a recomputed SD."""
-    with pytest.raises(KeyError, match="per_sd_scale"):
-        load_per_sd_scale(
-            _provenance_file(tmp_path, {"per_sd_scale": {}}), "arm_cohort"
-        )
-    with pytest.raises(KeyError, match="per_sd_scale"):
-        load_per_sd_scale(_provenance_file(tmp_path, {}), "arm_cohort")
-    with pytest.raises(FileNotFoundError):
-        load_per_sd_scale(tmp_path / "absent.json", "arm_cohort")
-
-
 _RATE_UNITS = {
     "periswitch_index_trials": 11.012232609424599,
     "patch_switch_fraction_last5_completed_trips": 0.12789700553254071,
@@ -650,23 +641,12 @@ def test_rate_units_are_returned_verbatim(tmp_path: Path) -> None:
     path = tmp_path / "swr_contrast_rate_meta.json"
     path.write_text(json.dumps({"fit_time_sd_reference": _RATE_UNITS}))
 
-    sd = contrast_aggregation.load_fit_time_sd_reference(path)
+    sd = load_fit_time_sd_reference(path)
 
     assert sd == _RATE_UNITS
     for covariate, unit in _RATE_UNITS.items():
         assert std_factor(covariate, sd) == (unit, "per_SD")
         assert std_factor(f"is_swr:{covariate}", sd) == (unit, "per_SD")
-
-
-@pytest.mark.parametrize("record", [{}, {"fit_time_sd_reference": {}}])
-def test_a_rate_meta_without_the_frozen_units_is_refused(
-    record, tmp_path: Path
-) -> None:
-    path = tmp_path / "swr_contrast_rate_meta.json"
-    path.write_text(json.dumps(record))
-
-    with pytest.raises(KeyError, match="fit_time_sd_reference"):
-        contrast_aggregation.load_fit_time_sd_reference(path)
 
 
 def test_the_sd_reference_is_the_population_sd_of_the_present_values() -> None:
@@ -678,11 +658,6 @@ def test_the_sd_reference_is_the_population_sd_of_the_present_values() -> None:
     # an absent covariate is left out; the order is that of the columns asked
     assert sd == {"b": 0.0, "a": 1.0}
     assert list(sd) == ["b", "a"]
-
-
-def test_an_absent_rate_meta_is_refused(tmp_path: Path) -> None:
-    with pytest.raises(FileNotFoundError):
-        contrast_aggregation.load_fit_time_sd_reference(tmp_path / "absent.json")
 
 
 def test_the_contrast_figure_takes_every_unit_from_the_fits(

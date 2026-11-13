@@ -31,6 +31,8 @@ from continuum_swr_replay.runs.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
     git_hash,
+    load_fit_time_sd_reference,
+    load_per_sd_scale,
     matching_sidecar,
     record_inputs,
     recorded_input_paths,
@@ -1005,3 +1007,38 @@ def test_recorded_input_paths_reads_tables_and_upstream_fits(replay_content_root
 def test_recorded_input_paths_without_a_sidecar_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         recorded_input_paths(tmp_path / "all_models.pkl")
+
+
+# ── The per-SD unit a contrast fit records ──
+
+
+def _per_sd_record(tmp_path: Path, record: dict) -> Path:
+    path = tmp_path / "swr_contrast_content_provenance.json"
+    path.write_text(json.dumps(record))
+    return path
+
+
+def test_a_record_without_the_frozen_units_is_refused(tmp_path: Path) -> None:
+    """A fit in an unknown unit must fail, not fall back to a recomputed SD."""
+    with pytest.raises(KeyError, match="per_sd_scale"):
+        load_per_sd_scale(_per_sd_record(tmp_path, {"per_sd_scale": {}}), "arm_cohort")
+    with pytest.raises(KeyError, match="per_sd_scale"):
+        load_per_sd_scale(_per_sd_record(tmp_path, {}), "arm_cohort")
+    with pytest.raises(FileNotFoundError):
+        load_per_sd_scale(tmp_path / "absent.json", "arm_cohort")
+
+
+@pytest.mark.parametrize("record", [{}, {"fit_time_sd_reference": {}}])
+def test_a_rate_meta_without_the_frozen_units_is_refused(
+    record, tmp_path: Path
+) -> None:
+    path = tmp_path / "swr_contrast_rate_meta.json"
+    path.write_text(json.dumps(record))
+
+    with pytest.raises(KeyError, match="fit_time_sd_reference"):
+        load_fit_time_sd_reference(path)
+
+
+def test_an_absent_rate_meta_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        load_fit_time_sd_reference(tmp_path / "absent.json")

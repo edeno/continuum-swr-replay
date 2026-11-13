@@ -43,8 +43,6 @@ from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
 )
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     gate_term_sessions,
-    load_fit_time_sd_reference,
-    load_per_sd_scale,
     std_factor,
 )
 from continuum_swr_replay.analysis.behavior.rate.swr_contrast_rate import home_cohort
@@ -56,7 +54,11 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs.cli import fit_figure_parser
-from continuum_swr_replay.runs.fit_provenance import require_fresh_inputs
+from continuum_swr_replay.runs.fit_provenance import (
+    load_fit_time_sd_reference,
+    load_per_sd_scale,
+    require_fresh_inputs,
+)
 from continuum_swr_replay.tables.columns import require_columns
 
 

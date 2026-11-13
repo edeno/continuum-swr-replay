@@ -109,6 +109,7 @@ filters) moved out of `analysis/` into `runs/`. Paths are under
 | `analysis/pfc/runner_support.json_safe` (removed) | `runs/io.json_ready` |
 | `analysis/pfc/gpu.py` (removed: moved) | `runs/device.py` |
 | `reported/mpfc/inputs.table_hashes` (removed: moved) | `runs/staleness.py` |
+| `analysis/behavior/contrast_aggregation.load_per_sd_scale`, `load_fit_time_sd_reference` (removed: moved) | `runs/fit_provenance.py` |
 
 ## Calculations moved out of scripts, 2026-11
 
