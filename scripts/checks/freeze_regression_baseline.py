@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
+from continuum_swr_replay.analysis.replay_models.content.fit_outputs import (
     belief_chain_output_subdir,
 )
 from continuum_swr_replay.paths import (

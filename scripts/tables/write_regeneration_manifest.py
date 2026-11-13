@@ -12,20 +12,20 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-from continuum_swr_replay.analysis.behavior._fit_diagnostics import (
-    flagged_nonconverged,
-)
 from continuum_swr_replay.analysis.behavior.covariates.qvals_table import (
     QVALS_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.analysis.behavior.tables._tables_common import (
+from continuum_swr_replay.analysis.event_tables._common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
+from continuum_swr_replay.analysis.event_tables.table_contracts import (
     validate_event_arm_table,
     validate_event_patch_table,
 )
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
+from continuum_swr_replay.analysis.replay_models._fit_diagnostics import (
+    flagged_nonconverged,
+)
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.paths import (
     QVALS_STANDARDIZATION_REFERENCE,

@@ -29,12 +29,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
-    gated_coefficient_statistics,
-)
-from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
-    gate_term_sessions,
-)
 from continuum_swr_replay.analysis.behavior.spatial_mapping import (
     map_estimate_to_arm,
 )
@@ -47,6 +41,12 @@ from continuum_swr_replay.analysis.events.analysed_time import (
     require_swr_source,
 )
 from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_session
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
+    gated_coefficient_statistics,
+)
+from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
+    gate_term_sessions,
+)
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.results import nonlocal_probability  # noqa: E402
 from continuum_swr_replay.paths import (
@@ -238,9 +238,9 @@ def draw_coefficients(ax: plt.Axes, m3_fits: pd.DataFrame) -> None:
     """Panel F: each M3 term's per-session coefficients and their median.
 
     A term's sessions are those its per-term gate keeps
-    (:func:`~continuum_swr_replay.analysis.behavior.contrast_aggregation.gate_term_sessions`),
+    (:func:`~continuum_swr_replay.analysis.replay_models.contrast_aggregation.gate_term_sessions`),
     and the printed median is
-    :func:`~continuum_swr_replay.analysis.behavior.coefficient_statistics.gated_coefficient_statistics`'s,
+    :func:`~continuum_swr_replay.analysis.replay_models.coefficient_statistics.gated_coefficient_statistics`'s,
     printed as the summary prints a coefficient (``sig2s``).
 
     Parameters

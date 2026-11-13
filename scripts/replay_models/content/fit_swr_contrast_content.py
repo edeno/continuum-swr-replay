@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Fit the beta-bernoulli replay-CONTENT ladder (arm + patch), is_swr version.
 
-The content analog of ``scripts/behavior/rate/fit_swr_contrast_rate.py``. Where the rate ladder
+The content analog of ``scripts/replay_models/rate/fit_swr_contrast_rate.py``. Where the rate ladder
 models HOW OFTEN non-local events occur (Poisson count per time bin), this models
 WHICH ARM / PATCH an event represents: a conditional Poisson over the 9 arms (or 3
 patches) within each event (``strata(event_id)`` ≡ clogit). Design spec:
@@ -58,10 +58,10 @@ rigorous population inference; a common complete-case cohort; and within-group-c
 VIF (`fitting.py` uses the raw design).
 
 Usage:
-    uv run python scripts/behavior/content/fit_swr_contrast_content.py               # full
-    uv run python scripts/behavior/content/fit_swr_contrast_content.py --max-per-animal 2   # smoke
-    uv run python scripts/behavior/content/fit_swr_contrast_content.py --estimator dirichlet_multinomial
-    uv run python scripts/behavior/content/fit_swr_contrast_content.py --outcome-stratum rewarded
+    uv run python scripts/replay_models/content/fit_swr_contrast_content.py               # full
+    uv run python scripts/replay_models/content/fit_swr_contrast_content.py --max-per-animal 2   # smoke
+    uv run python scripts/replay_models/content/fit_swr_contrast_content.py --estimator dirichlet_multinomial
+    uv run python scripts/replay_models/content/fit_swr_contrast_content.py --outcome-stratum rewarded
 """
 
 from __future__ import annotations
@@ -76,21 +76,7 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.cohort_audit import (
-    term_diagnostics,
-    write_cohort_audit,
-)
-from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import (
-    DEFAULT_MIN_EVENTS_SESSION_PHI,
-    DEFAULT_N_JOBS,
-)
-from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import (
-    ESTIMATOR as DIRICHLET_MULTINOMIAL,
-)
-from continuum_swr_replay.analysis.behavior.content.session_fits import (
-    fit_contrast_ladder,
-)
-from continuum_swr_replay.analysis.behavior.content_response import (
+from continuum_swr_replay.analysis.event_tables.content_response import (
     ESTIMATOR_CHOICES,
     RESPONSE_CHOICES,
     default_response_for_estimator,
@@ -98,7 +84,21 @@ from continuum_swr_replay.analysis.behavior.content_response import (
     resolve_response_column,
     validate_fraction_response,
 )
-from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
+from continuum_swr_replay.analysis.replay_models.cohort_audit import (
+    term_diagnostics,
+    write_cohort_audit,
+)
+from continuum_swr_replay.analysis.replay_models.content.dirichlet_multinomial import (
+    DEFAULT_MIN_EVENTS_SESSION_PHI,
+    DEFAULT_N_JOBS,
+)
+from continuum_swr_replay.analysis.replay_models.content.dirichlet_multinomial import (
+    ESTIMATOR as DIRICHLET_MULTINOMIAL,
+)
+from continuum_swr_replay.analysis.replay_models.content.session_fits import (
+    fit_contrast_ladder,
+)
+from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
     LOG_EVENT_LENGTH,
     LOG_PHI_EVENT_LENGTH,
     LOG_PHI_IS_SWR,
@@ -112,23 +112,23 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     renormalized_rungs,
     specs_from_ladder,
 )
-from continuum_swr_replay.analysis.behavior.covariate_timing import (
+from continuum_swr_replay.analysis.replay_models.covariate_timing import (
     assert_predictor_timing,
 )
-from continuum_swr_replay.analysis.behavior.fitting import poisson_estimator_name
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.fitting import poisson_estimator_name
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     SWR_CONTRAST_CONTENT_ARM_KEY_TERM as ARM_KEY_TERM,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     SWR_CONTRAST_CONTENT_ARM_LADDER as ARM_LADDER,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_KEY_TERM as PATCH_KEY_TERM,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_LADDER as PATCH_LADDER,
 )
 from continuum_swr_replay.paths import model_dir
@@ -148,7 +148,7 @@ from continuum_swr_replay.tables.standardization import (
 # Quasi-separated coefficients legitimately overflow exp() when rate ratios are formed
 # outside the fit (RuntimeWarning). Convergence/perfect-separation warnings are recorded
 # per fit as converged/separated/n_convergence_warnings flags inside the fitters (see
-# analysis.behavior._fit_diagnostics), so only the benign RuntimeWarning noise is silenced
+# analysis.replay_models._fit_diagnostics), so only the benign RuntimeWarning noise is silenced
 # here -- NOT a blanket ignore that would hide fit-quality signals.
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")

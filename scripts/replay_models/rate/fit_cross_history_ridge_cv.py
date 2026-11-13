@@ -12,7 +12,7 @@ the same question on held-out data:
 - ``Mself_long_dur`` and ``Mselfcross_long_dur`` are fit with a ridge prior on
   the history coefficients, its strength chosen by inner cross-validation;
 - their outer held-out log-likelihoods are compared over five folds of whole
-  stops (``analysis/behavior/rate/ridge_history_cv.py``).
+  stops (``analysis/replay_models/rate/ridge_history_cv.py``).
 
 Designs are built in ``--workers`` CPU processes; every fit of a rung's
 cross-validation runs as one batch on one GPU (``--gpu``, never card 0).
@@ -24,7 +24,7 @@ per-(animal, stream) records and a ``.provenance.json`` sidecar.
 
 Usage::
 
-    python scripts/behavior/rate/fit_cross_history_ridge_cv.py [--out-dir DIR]
+    python scripts/replay_models/rate/fit_cross_history_ridge_cv.py [--out-dir DIR]
         [--animals wilbur j16] [--outcomes non_local_swr non_local_no_swr]
         [--workers N] [--gpu K] [--stop-cohort at_well]
 """
@@ -42,19 +42,27 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior import attach_is_swr_to_onsets
-from continuum_swr_replay.analysis.behavior.covariate_timing import (
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.events.cohort_selection import (
+    STOP_COHORTS,
+    select_stop_cohort,
+)
+from continuum_swr_replay.analysis.events.swr_source import swr_source_name
+from continuum_swr_replay.analysis.replay_models.covariate_timing import (
     assert_predictor_timing,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_CROSS_HISTORY_LONG_RATE,
 )
-from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (
+from continuum_swr_replay.analysis.replay_models.per_bin_design import (
+    attach_is_swr_to_onsets,
+)
+from continuum_swr_replay.analysis.replay_models.rate.duration_aware_history import (
     attach_event_ends,
     lag_support,
     stack_sessions,
 )
-from continuum_swr_replay.analysis.behavior.rate.ridge_history_cv import (
+from continuum_swr_replay.analysis.replay_models.rate.ridge_history_cv import (
     FOLD_SEED,
     MIN_SESSION_EVENTS,
     N_FOLDS,
@@ -62,12 +70,6 @@ from continuum_swr_replay.analysis.behavior.rate.ridge_history_cv import (
     SIGMA_GRID,
     compare_cross_history,
 )
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
-from continuum_swr_replay.analysis.events.cohort_selection import (
-    STOP_COHORTS,
-    select_stop_cohort,
-)
-from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.paths import CROSS_HISTORY_RIDGE_CV_DIR, model_dir, table_path
 from continuum_swr_replay.runs.device import configure_jax_gpu
 from continuum_swr_replay.runs.fit_provenance import (

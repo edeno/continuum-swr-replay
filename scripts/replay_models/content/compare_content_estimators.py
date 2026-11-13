@@ -45,9 +45,9 @@ minus a small-sample t correction over the animals times the draws' standard
 deviation.
 
 Usage:
-    uv run python scripts/behavior/content/compare_content_estimators.py
-    uv run python scripts/behavior/content/compare_content_estimators.py --max-per-animal 1 --n-jobs 4
-    uv run python scripts/behavior/content/compare_content_estimators.py --rungs C2_base
+    uv run python scripts/replay_models/content/compare_content_estimators.py
+    uv run python scripts/replay_models/content/compare_content_estimators.py --max-per-animal 1 --n-jobs 4
+    uv run python scripts/replay_models/content/compare_content_estimators.py --rungs C2_base
 """
 
 from __future__ import annotations
@@ -67,15 +67,15 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import (  # noqa: E402
+from continuum_swr_replay.analysis.replay_models.content.dirichlet_multinomial import (  # noqa: E402
     DEFAULT_MIN_EVENTS_SESSION_PHI,
     DEFAULT_N_JOBS,
     LOG_PHI_INTERCEPT,
 )
-from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import (  # noqa: E402
+from continuum_swr_replay.analysis.replay_models.content.dirichlet_multinomial import (  # noqa: E402
     ESTIMATOR as DIRICHLET_MULTINOMIAL,
 )
-from continuum_swr_replay.analysis.behavior.content.estimator_comparison import (  # noqa: E402
+from continuum_swr_replay.analysis.replay_models.content.estimator_comparison import (  # noqa: E402
     BOOTSTRAP_BASENAME,
     BOOTSTRAP_SEED,
     COEFFICIENTS_BASENAME,
@@ -98,15 +98,15 @@ from continuum_swr_replay.analysis.behavior.content.estimator_comparison import 
 # The cohort this comparison runs on is the shipped contrast runner's own at-well
 # cohort, assembled by the same helpers rather than re-derived here, so the two
 # cannot drift.
-from continuum_swr_replay.analysis.behavior.contrast_aggregation import (  # noqa: E402
+from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (  # noqa: E402
     assemble_arm,
     contrast_fit_inputs,
     select_outcome_stratum,
 )
-from continuum_swr_replay.analysis.behavior.fitting import (  # noqa: E402
+from continuum_swr_replay.analysis.replay_models.fitting import (  # noqa: E402
     CONDITIONAL_POISSON_FRACTION,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
+from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
     CONTENT_ESTIMATOR_COMPARISON_RUNGS,
     ComparisonRung,
     resolve_comparison_rungs,

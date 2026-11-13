@@ -55,7 +55,7 @@ Not here: the prerequisites above, the Part 1 and Part 2 checks, the PFC unit GL
 which runs on GPUs for 14-17 h per card under its own launcher (Figure 4 reads
 it and is drawn after it), and the ridge cross-validated cross-history fit
 (``rate.cross_history_ridge_cv.at_well``, Part 3), which needs one GPU for
-about 5 min: ``scripts/behavior/rate/fit_cross_history_ridge_cv.py --workers 5
+about 5 min: ``scripts/replay_models/rate/fit_cross_history_ridge_cv.py --workers 5
 --gpu N`` (never card 0), which writes ``<models_per_bin_rate>/cross_history_ridge_cv``.
 
 Usage
@@ -122,15 +122,15 @@ def _fig(name, cmd, deps=()):
     return _run(name, cmd, 1, deps, figure=True)
 
 
-_PB = "scripts/behavior/rate/fit_per_bin_rate_models.py"
-_PS = "scripts/behavior/rate/fit_per_stop_rate_models.py"
-_RC = "scripts/behavior/rate/fit_swr_contrast_rate.py"
-_DA = "scripts/behavior/rate/fit_duration_aware_history_rate.py"
-_CL = "scripts/behavior/content/fit_replay_content_models.py"
-_KC = "scripts/behavior/content/fit_swr_contrast_content.py"
-_ES = "scripts/behavior/content/compare_event_source_models.py"
-_S5 = "scripts/behavior/choice/run_retrospective_alignment.py"
-_S6 = "scripts/behavior/choice/run_stay_leave.py"
+_PB = "scripts/replay_models/rate/fit_per_bin_rate_models.py"
+_PS = "scripts/replay_models/rate/fit_per_stop_rate_models.py"
+_RC = "scripts/replay_models/rate/fit_swr_contrast_rate.py"
+_DA = "scripts/replay_models/rate/fit_duration_aware_history_rate.py"
+_CL = "scripts/replay_models/content/fit_replay_content_models.py"
+_KC = "scripts/replay_models/content/fit_swr_contrast_content.py"
+_ES = "scripts/replay_models/content/compare_event_source_models.py"
+_S5 = "scripts/replay_models/choice/run_retrospective_alignment.py"
+_S6 = "scripts/replay_models/choice/run_stay_leave.py"
 _DM = "--estimator dirichlet_multinomial"
 _ARM = "content.arm_ladder.all_arms"
 _PR = "scripts/tables/prepare_replay_content_data.py"
@@ -167,18 +167,18 @@ RUNS: tuple[Run, ...] = (
     _run("rate.per_stop.all_stops", f"{_PS} --stop-cohort all_stops", 1, _RT),
     _run("rate.swr_contrast.at_well", f"{_RC} --stop-cohort at_well --workers 16", 16, _RTB),
     _run("rate.swr_contrast.all_stops", f"{_RC} --stop-cohort all_stops --workers 16", 16, _RTB),
-    _run("rate.uncertainty.at_well", "scripts/behavior/rate/fit_uncertainty_rate.py --stop-cohort at_well", 1, _RTB),
-    _run("coupling.ripple_power", "scripts/behavior/coupling/fit_swr_power_model.py", 1, _RT),
+    _run("rate.uncertainty.at_well", "scripts/replay_models/rate/fit_uncertainty_rate.py --stop-cohort at_well", 1, _RTB),
+    _run("coupling.ripple_power", "scripts/replay_models/coupling/fit_swr_power_model.py", 1, _RT),
     # No worker flag: its parallelism is BLAS threads.
-    _run("rate.cross_history", "scripts/behavior/rate/fit_cross_history_rate.py --write", 8, _RTB, threads=8),
+    _run("rate.cross_history", "scripts/replay_models/rate/fit_cross_history_rate.py --write", 8, _RTB, threads=8),
     # The self- and cross-history on the at-risk design (bins inside an event dropped,
     # history from event onsets and ends): per session, then pooled within animal.
     _run("rate.duration_aware_history.at_well", f"{_DA} --mode session --workers 16", 16, _RTB),
     _run("rate.duration_aware_history.pooled_at_well", f"{_DA} --mode pooled --workers 20", 20, _RTB),
-    _fig("rate.fig.per_bin_ladder", "scripts/behavior/rate/plot_per_bin_rate_models.py", ["rate.per_bin.at_well"]),
-    _fig("rate.fig.per_bin_summary", "scripts/behavior/rate/plot_per_bin_rate_summary.py", ["rate.per_bin.at_well"]),
-    _fig("rate.fig.model_checking", "scripts/behavior/rate/plot_model_checking.py", ["rate.per_bin.at_well"]),
-    _fig("rate.fig.uncertainty", "scripts/behavior/rate/plot_uncertainty_rate.py", ["rate.uncertainty.at_well"]),
+    _fig("rate.fig.per_bin_ladder", "scripts/replay_models/rate/plot_per_bin_rate_models.py", ["rate.per_bin.at_well"]),
+    _fig("rate.fig.per_bin_summary", "scripts/replay_models/rate/plot_per_bin_rate_summary.py", ["rate.per_bin.at_well"]),
+    _fig("rate.fig.model_checking", "scripts/replay_models/rate/plot_model_checking.py", ["rate.per_bin.at_well"]),
+    _fig("rate.fig.uncertainty", "scripts/replay_models/rate/plot_uncertainty_rate.py", ["rate.uncertainty.at_well"]),
     # Content. The arm ladder asks what shapes content; the SWR contrast asks how
     # SWR content differs (paired within session); the breadth contrast is the
     # Dirichlet-multinomial fit of how widely an event spreads over arms.
@@ -201,8 +201,8 @@ RUNS: tuple[Run, ...] = (
     _run("content.breadth_contrast.all_length_adjusted", f"{_KC} {_DM} --n-jobs 16 --concentration-length --outcome-stratum all", 16, _RT),
     _run("content.breadth_contrast.rewarded", f"{_KC} {_DM} --n-jobs 8 --outcome-stratum rewarded", 8, _RT),
     _run("content.breadth_contrast.omitted", f"{_KC} {_DM} --n-jobs 8 --outcome-stratum omitted", 8, _RT),
-    _run("content.estimator_comparison", "scripts/behavior/content/compare_content_estimators.py --n-jobs 16", 16, _RT),
-    _run("content.uncertainty", "scripts/behavior/content/analyze_uncertainty_content.py", 1, ["content.arm_ladder.leaf_arms", *_RT]),
+    _run("content.estimator_comparison", "scripts/replay_models/content/compare_content_estimators.py --n-jobs 16", 16, _RT),
+    _run("content.uncertainty", "scripts/replay_models/content/analyze_uncertainty_content.py", 1, ["content.arm_ladder.leaf_arms", *_RT]),
     # Content of events found by SWR- or MUA-anchored detection (ContFrag).
     _run("content.event_source.swr_arm", f"{_CL} --event-source SWR --brain-area HPC", 2, _CFS, threads=2),
     _run("content.event_source.swr_patch", f"{_CL} --event-source SWR --hierarchy patch --brain-area HPC", 2, _CFS, threads=2),
@@ -212,7 +212,7 @@ RUNS: tuple[Run, ...] = (
     _fig("content.fig.swr_contrast_coefs", "scripts/figures/plot_swr_contrast_coefs.py",
          ["rate.swr_contrast.at_well", "content.swr_contrast.all"]),
     _fig("content.fig.uncertainty", "scripts/figures/generate_uncertainty_content_figure.py", ["content.uncertainty"]),
-    _fig("content.fig.ladder", "scripts/behavior/content/generate_replay_content_figures.py", [_ARM]),
+    _fig("content.fig.ladder", "scripts/replay_models/content/generate_replay_content_figures.py", [_ARM]),
     _fig("content.fig.pipeline_data_flow", "scripts/figures/generate_supp_pipeline_data_flow.py", [_ARM]),
     # Behavior. One suite per event source: the choice prediction (question 3.4), plus
     # patch, per-stop rate, patch-switch and switch-aligned blocks on one common cohort.

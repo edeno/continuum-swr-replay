@@ -4,12 +4,12 @@
 The arm ladder is ``M0``, ``M0a``, ``M1``-``M6`` by default, with the opt-in
 value/uncertainty rungs ``Mv``, ``Mu``, ``Mvu``; the patch ladder is ``P0``-``P3``
 with the opt-in ``Pv`` (``--hierarchy patch``). The rungs are defined in
-``analysis/behavior/model_specs.py``.
+``analysis/replay_models/model_specs.py``.
 
 Primary model: Conditional Poisson regression (multinomial-count softmax).
 Robustness check: Conditional Logit on dominant arm.
 
-Loads the master long-format dataset from analysis/behavior/tables/prepare_data.py
+Loads the master long-format dataset from analysis/event_tables/prepare_data.py
 (built by scripts/tables/prepare_replay_content_data.py),
 fits per-session models for each model in the hierarchy, compares nested
 models via AIC (primary) and LRT, and saves results.
@@ -54,14 +54,14 @@ the multinomial coefficient the conditional one drops, so its AIC is on a
 different scale and must never be differenced against the conditional bundle's.
 
 Usage:
-    uv run python scripts/behavior/content/fit_replay_content_models.py                # base ladder
-    uv run python scripts/behavior/content/fit_replay_content_models.py --response hard_count
-    uv run python scripts/behavior/content/fit_replay_content_models.py --estimator dirichlet_multinomial
-    uv run python scripts/behavior/content/fit_replay_content_models.py --models M0,M1,M2   # -> models_M0-M1-M2/
-    uv run python scripts/behavior/content/fit_replay_content_models.py --models M5,Mv,Mu,Mvu
-    uv run python scripts/behavior/content/fit_replay_content_models.py --leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu
-    uv run python scripts/behavior/content/fit_replay_content_models.py --cv           # + CV
-    uv run python scripts/behavior/content/fit_replay_content_models.py --logit        # + logit robustness
+    uv run python scripts/replay_models/content/fit_replay_content_models.py                # base ladder
+    uv run python scripts/replay_models/content/fit_replay_content_models.py --response hard_count
+    uv run python scripts/replay_models/content/fit_replay_content_models.py --estimator dirichlet_multinomial
+    uv run python scripts/replay_models/content/fit_replay_content_models.py --models M0,M1,M2   # -> models_M0-M1-M2/
+    uv run python scripts/replay_models/content/fit_replay_content_models.py --models M5,Mv,Mu,Mvu
+    uv run python scripts/replay_models/content/fit_replay_content_models.py --leaf-only --models M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu
+    uv run python scripts/replay_models/content/fit_replay_content_models.py --cv           # + CV
+    uv run python scripts/replay_models/content/fit_replay_content_models.py --logit        # + logit robustness
 """
 
 import argparse
@@ -76,23 +76,32 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior._fit_diagnostics import fit_flag_counts
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
+from continuum_swr_replay.analysis.event_tables.content_response import (
+    ESTIMATOR_CHOICES,
+    RESPONSE_CHOICES,
+    resolve_response_choice,
+)
+from continuum_swr_replay.analysis.event_tables.table_contracts import (
+    validate_requested_standardization,
+)
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.replay_models._fit_diagnostics import fit_flag_counts
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     coefficient_family_statistics,
 )
-from continuum_swr_replay.analysis.behavior.cohort_audit import (
+from continuum_swr_replay.analysis.replay_models.cohort_audit import (
     write_cohort_audit,
 )
-from continuum_swr_replay.analysis.behavior.content.cohort import (
+from continuum_swr_replay.analysis.replay_models.content.cohort import (
     content_cohort_record,
     prepare_canonical_fit_request,
     select_content_cohort,
 )
-from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import (
+from continuum_swr_replay.analysis.replay_models.content.dirichlet_multinomial import (
     DEFAULT_MIN_EVENTS_SESSION_PHI,
     DEFAULT_N_JOBS,
 )
-from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
+from continuum_swr_replay.analysis.replay_models.content.fit_outputs import (
     BRAIN_AREA_CHOICES,
     EVENT_SOURCE_CHOICES,
     GRAIN_CHOICES,
@@ -105,21 +114,16 @@ from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
     resolve_contfrag_paths,
     scale_label,
 )
-from continuum_swr_replay.analysis.behavior.content.model_comparison import (
+from continuum_swr_replay.analysis.replay_models.content.model_comparison import (
     fit_metric_statistics,
     run_full_hierarchy_comparison,
 )
-from continuum_swr_replay.analysis.behavior.content.session_fits import (
+from continuum_swr_replay.analysis.replay_models.content.session_fits import (
     LOGIT_SKIP_COLUMNS,
     fit_conditional_logit_robustness,
     fit_content_ladder,
 )
-from continuum_swr_replay.analysis.behavior.content_response import (
-    ESTIMATOR_CHOICES,
-    RESPONSE_CHOICES,
-    resolve_response_choice,
-)
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     LEAF_ONLY_N_CATEGORIES,
     MODEL_HIERARCHY,
     MODEL_HIERARCHY_MUA,
@@ -131,10 +135,6 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
     default_content_model_names,
     rung_predictors,
 )
-from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
-    validate_requested_standardization,
-)
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.paths import contfrag_replay_content_dir, replay_content_dir
 from continuum_swr_replay.runs.fit_provenance import (
     record_inputs,
@@ -727,7 +727,7 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
         if hierarchy is None:
             raise NotImplementedError(
                 f"Event source {args.event_source!r} has no MODEL_HIERARCHY defined "
-                "in analysis/behavior/model_specs.py. Define it before running."
+                "in analysis/replay_models/model_specs.py. Define it before running."
             )
     # The (table_name, output_subdir) contract with the prep scripts
     # lives in ``resolve_contfrag_paths`` so the path-resolution logic
@@ -834,7 +834,7 @@ def _load_and_filter_cohort(
 ) -> _ContentCohort:
     """Load and check the canonical table, then select the fitting cohort.
 
-    The selection is :func:`~continuum_swr_replay.analysis.behavior.content.cohort.select_content_cohort`.
+    The selection is :func:`~continuum_swr_replay.analysis.replay_models.content.cohort.select_content_cohort`.
     """
     hierarchy = config.hierarchy
     input_dir = config.input_dir

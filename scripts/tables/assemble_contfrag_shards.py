@@ -14,13 +14,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
-    validate_event_arm_table,
-    validate_event_patch_table,
-)
 from continuum_swr_replay.analysis.contfrag.prepare_data import (
     contfrag_event_patch_table,
     contfrag_table_basenames,
+)
+from continuum_swr_replay.analysis.event_tables.table_contracts import (
+    validate_event_arm_table,
+    validate_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 

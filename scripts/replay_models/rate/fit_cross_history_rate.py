@@ -22,10 +22,10 @@ improved, per-animal sign consistency, Benjamini-Hochberg q of the signed-rank p
 The two rungs are frozen on their own columns, so a session-direction whose two
 cohorts differ in bins, event bins or stops
 (``fit_comparability.why_not_comparable``) is not fit. The fit loop is
-``analysis/behavior/rate/cross_history.py``; this script reads the tables,
+``analysis/replay_models/rate/cross_history.py``; this script reads the tables,
 prints the summary and writes.
 
-Usage: python scripts/behavior/rate/fit_cross_history_rate.py [--max-per-animal N] [--write]
+Usage: python scripts/replay_models/rate/fit_cross_history_rate.py [--max-per-animal N] [--write]
 """
 
 from __future__ import annotations
@@ -36,22 +36,22 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior import (
-    attach_is_swr_to_onsets,
-)
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
-    coefficient_family_statistics,
-    coefficient_statistics,
-)
-from continuum_swr_replay.analysis.behavior.rate.cross_history import (
-    CROSS_COEFS,
-    fit_cross_history,
-)
 from continuum_swr_replay.analysis.events.analysed_time import (
     require_swr_source,
 )
 from continuum_swr_replay.analysis.events.swr_source import (
     swr_source_name,
+)
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
+    coefficient_family_statistics,
+    coefficient_statistics,
+)
+from continuum_swr_replay.analysis.replay_models.per_bin_design import (
+    attach_is_swr_to_onsets,
+)
+from continuum_swr_replay.analysis.replay_models.rate.cross_history import (
+    CROSS_COEFS,
+    fit_cross_history,
 )
 from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (

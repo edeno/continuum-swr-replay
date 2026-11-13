@@ -21,10 +21,10 @@ import numpy as np
 import pandas as pd
 
 warnings.filterwarnings("ignore")
-from continuum_swr_replay.analysis.behavior import (  # noqa: E402
+from continuum_swr_replay.analysis.behavior.covariates import (  # noqa: E402
     trial_outcome_times,
 )
-from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (  # noqa: E402
+from continuum_swr_replay.analysis.replay_models.rate.per_stop_rate_model import (  # noqa: E402
     fit_per_stop_rate_model,
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402

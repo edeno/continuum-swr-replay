@@ -32,12 +32,12 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
-from continuum_swr_replay.analysis.behavior._helpers import (
+from continuum_swr_replay.analysis.behavior.covariates import add_uncertainty_covariates
+from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson
+from continuum_swr_replay.analysis.replay_models.model_specs import (
+    MODEL_HIERARCHY,
     add_arm_fixed_effects,
 )
-from continuum_swr_replay.analysis.behavior.covariates import add_uncertainty_covariates
-from continuum_swr_replay.analysis.behavior.fitting import fit_conditional_poisson
-from continuum_swr_replay.analysis.behavior.model_specs import MODEL_HIERARCHY
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,

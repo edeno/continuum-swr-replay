@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.cohort_audit import (
+from continuum_swr_replay.analysis.replay_models.cohort_audit import (
     COHORT_COLUMNS,
     DROP_FIELDS,
 )

@@ -28,9 +28,9 @@ re-decode-agnostic (reads whatever ``data_over_time``/``environment`` exist).
 
 Usage
 -----
-    uv run python scripts/behavior/content/analyze_content_occupancy.py --all
-    uv run python scripts/behavior/content/analyze_content_occupancy.py --animal chimi
-    uv run python scripts/behavior/content/analyze_content_occupancy.py --epoch-identifier chimi20200213_02_r1_HPC
+    uv run python scripts/replay_models/content/analyze_content_occupancy.py --all
+    uv run python scripts/replay_models/content/analyze_content_occupancy.py --animal chimi
+    uv run python scripts/replay_models/content/analyze_content_occupancy.py --epoch-identifier chimi20200213_02_r1_HPC
 """
 
 from __future__ import annotations

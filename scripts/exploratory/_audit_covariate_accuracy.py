@@ -41,7 +41,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior import add_uncertainty_covariates
+from continuum_swr_replay.analysis.behavior.covariates import add_uncertainty_covariates
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
@@ -53,7 +53,7 @@ RC = REPLAY_CONTENT_DIR
 
 def _fur():
     """The uncertainty rate fit's module, for its covariate sets."""
-    from continuum_swr_replay.analysis.behavior.rate import uncertainty_rate
+    from continuum_swr_replay.analysis.replay_models.rate import uncertainty_rate
 
     return uncertainty_rate
 
@@ -170,8 +170,10 @@ def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
     (reusing only the topology/timing helpers, not the rate logic under test). Heavy
     (Spyglass), so gated behind --reconstruct-arm-rate. Validated 100% on 2 sessions.
     """
-    from continuum_swr_replay.analysis.behavior import trial_outcome_times
-    from continuum_swr_replay.analysis.behavior._helpers import build_well_to_arm_map
+    from continuum_swr_replay.analysis.behavior.covariates import trial_outcome_times
+    from continuum_swr_replay.analysis.behavior.spatial_mapping import (
+        build_well_to_arm_map,
+    )
     from continuum_swr_replay.data_loaders import load_data
     from continuum_swr_replay.data_types import SessionDataKeys
 

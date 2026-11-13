@@ -38,14 +38,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     animal_median_bootstrap,
 )
-from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
+from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
     gate_term_sessions,
     std_factor,
 )
-from continuum_swr_replay.analysis.behavior.rate.swr_contrast_rate import home_cohort
+from continuum_swr_replay.analysis.replay_models.rate.swr_contrast_rate import (
+    home_cohort,
+)
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.paths import (
     figure_dir,
@@ -475,7 +477,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise RuntimeError(
             f"{rate_meta.name} predates {rate.name}, so "
             "its per-SD units may belong to an earlier fit; re-run "
-            "scripts/behavior/rate/fit_swr_contrast_rate.py --aggregate-only"
+            "scripts/replay_models/rate/fit_swr_contrast_rate.py --aggregate-only"
         )
     sd = _per_sd_units(artifacts)
     out = figure_dir("swr_contrast")

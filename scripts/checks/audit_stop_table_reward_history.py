@@ -29,7 +29,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
 )
@@ -50,7 +50,7 @@ def assert_row_and_column_order(
     ``diff_table`` sorts both sides on the row key, so it is blind to the order
     rows and columns are written in. That order is part of the canonical
     contract here -- ``stop_idx`` is positional and the column tuple is declared
-    in ``_tables_common`` -- so it is pinned separately.
+    in ``event_tables._common`` -- so it is pinned separately.
     """
     if not candidate["stop_id"].equals(reference["stop_id"]):
         raise ValueError("stop_id sequence differs (set or order)")

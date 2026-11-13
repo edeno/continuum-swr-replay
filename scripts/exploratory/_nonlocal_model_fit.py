@@ -43,12 +43,14 @@ from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 
-from continuum_swr_replay.analysis.behavior._helpers import add_arm_fixed_effects
-from continuum_swr_replay.analysis.behavior.choice.choice_prediction import (
+from continuum_swr_replay.analysis.replay_models.choice.choice_prediction import (
     predict_arm_fractions,
 )
-from continuum_swr_replay.analysis.behavior.fitting import fit_conditional_poisson
-from continuum_swr_replay.analysis.behavior.model_specs import MODEL_HIERARCHY
+from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson
+from continuum_swr_replay.analysis.replay_models.model_specs import (
+    MODEL_HIERARCHY,
+    add_arm_fixed_effects,
+)
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (

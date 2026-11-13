@@ -5,8 +5,8 @@ Loads pre-computed results from fit_replay_content_models.py and generates
 publication-quality figures.
 
 Usage:
-    uv run python scripts/behavior/content/generate_replay_content_figures.py
-    uv run python scripts/behavior/content/generate_replay_content_figures.py --allow-stale
+    uv run python scripts/replay_models/content/generate_replay_content_figures.py
+    uv run python scripts/replay_models/content/generate_replay_content_figures.py --allow-stale
 """
 
 import argparse
@@ -21,14 +21,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
+from continuum_swr_replay.analysis.replay_models.content.fit_outputs import (
     frame_estimator,
     scale_label,
 )
-from continuum_swr_replay.analysis.behavior.content.model_comparison import (
+from continuum_swr_replay.analysis.replay_models.content.model_comparison import (
     run_full_hierarchy_comparison,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_HIERARCHY,
 )
 from continuum_swr_replay.paths import (

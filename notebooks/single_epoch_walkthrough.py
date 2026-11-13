@@ -29,9 +29,9 @@
 # comparisons. See `docs/models_table.md` for the full model catalog.
 #
 # **Why one epoch is the right fitting unit.** The production pipeline
-# (`scripts/behavior/content/fit_replay_content_models.py`,
-# `scripts/behavior/content/compare_event_source_models.py`, and
-# `scripts/behavior/rate/fit_per_stop_rate_models.py`) fits models separately for each
+# (`scripts/replay_models/content/fit_replay_content_models.py`,
+# `scripts/replay_models/content/compare_event_source_models.py`, and
+# `scripts/replay_models/rate/fit_per_stop_rate_models.py`) fits models separately for each
 # `(animal, day, epoch)`. The population result aggregates those session fits;
 # this notebook reproduces one fitting unit, not population inference.
 #
@@ -45,7 +45,7 @@
 # all-session reference supplies the correct global standardization.
 #
 # **Current canonical assembly.** Table construction mirrors
-# `continuum_swr_replay.analysis.behavior.tables.prepare_data`: validate `dot`, build the
+# `continuum_swr_replay.analysis.event_tables.prepare_data`: validate `dot`, build the
 # zero-inclusive stop denominator first, construct event/arm/sequence tables,
 # merge retrospective metrics, derive the SWR/non-SWR stop split, and check
 # cross-table invariants. Model fits use the package fitters and freeze one
@@ -94,24 +94,24 @@ from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
-from continuum_swr_replay.analysis.behavior import add_arm_fixed_effects
-from continuum_swr_replay.analysis.behavior.choice.choice_prediction import (
+from continuum_swr_replay.analysis.replay_models.model_specs import add_arm_fixed_effects
+from continuum_swr_replay.analysis.replay_models.choice.choice_prediction import (
     build_choice_dataset,
     fit_choice_model,
 )
-from continuum_swr_replay.analysis.behavior.covariate_timing import (
+from continuum_swr_replay.analysis.replay_models.covariate_timing import (
     assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.behavior.covariates import load_contingency
 
 # --- Fitters (statsmodels conditional models / Poisson GLM) ---
-from continuum_swr_replay.analysis.behavior.fitting import fit_conditional_poisson
-from continuum_swr_replay.analysis.behavior.content.model_checking import (
+from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson
+from continuum_swr_replay.analysis.replay_models.content.model_checking import (
     cross_validate_conditional_poisson,
 )
 
 # --- Model specifications (the four families walked here) ---
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_CHOICE,  # C_*          : next-arm choice
     MODEL_HIERARCHY,  # M0–M7        : arm content
     MODEL_PATCH,  # P0–P4        : patch content
@@ -119,7 +119,7 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
     N_REWARD_LAGS,
     default_content_model_names,
 )
-from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
+from continuum_swr_replay.analysis.replay_models.rate.per_stop_rate_model import (
     PER_STOP_RATE_OUTCOMES,
     cross_validate_per_stop_rate_model,
     fit_per_stop_rate_model,
@@ -127,7 +127,7 @@ from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
 from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     load_conditional_posterior,
 )
-from continuum_swr_replay.analysis.behavior.choice.retrospective import (
+from continuum_swr_replay.analysis.event_tables.retrospective_metrics import (
     compute_retrospective_metrics,
 )
 from continuum_swr_replay.tables.standardization import (
@@ -136,22 +136,22 @@ from continuum_swr_replay.tables.standardization import (
 )
 
 # --- Canonical table assembly (same functions as prepare_data) ---
-from continuum_swr_replay.analysis.behavior.tables._tables_common import (
+from continuum_swr_replay.analysis.event_tables._common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
+from continuum_swr_replay.analysis.event_tables.arm_patch_tables import (
     build_event_arm_table,
     build_event_patch_table,
 )
-from continuum_swr_replay.analysis.behavior.tables.tables_event import (
+from continuum_swr_replay.analysis.event_tables.event_table import (
     build_event_sequence_table,
     build_event_table,
 )
-from continuum_swr_replay.analysis.behavior.tables.tables_stop import (
+from continuum_swr_replay.analysis.event_tables.stop_table import (
     add_nonlocal_swr_split,
     build_stop_table,
 )
-from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
+from continuum_swr_replay.analysis.replay_models.content.uncertainty_content import (
     build_trial_leaf_table,
     hierarchical_quartile_profile,
 )
@@ -1316,7 +1316,7 @@ TRIAL_SCALARS = (
 )
 
 # Every belief value below is produced by the SAME builders that populate the
-# fitted event-arm design matrix (tables_arm_patch.build_event_arm_table), keyed on stop_id --
+# fitted event-arm design matrix (arm_patch_tables.build_event_arm_table), keyed on stop_id --
 # never on trial number, whose origin differs by animal.
 stops = (
     stop_table[["stop_id", "stop_start", "stop_end"]]
@@ -1497,7 +1497,7 @@ TRIAL_SCALARS = (
 )
 
 # Every belief value below is produced by the SAME builders that populate the
-# fitted event-arm design matrix (tables_arm_patch.build_event_arm_table), keyed on stop_id --
+# fitted event-arm design matrix (arm_patch_tables.build_event_arm_table), keyed on stop_id --
 # never on trial number, whose origin differs by animal.
 stops = (
     stop_table[["stop_id", "stop_start", "stop_end"]]
@@ -2142,7 +2142,7 @@ display(  # noqa: F821
 # are fixed cross-session scales, but not identical reference populations. This
 # cell therefore reads the small session-coefficient artifact produced by the
 # full-table workflow rather than re-standardizing this epoch
-# (`scripts/behavior/content/analyze_uncertainty_content.py`). The result is a
+# (`scripts/replay_models/content/analyze_uncertainty_content.py`). The result is a
 # descriptive OLS association after adjustment—not an independent uncertainty
 # effect, a conditional-Poisson rate ratio, or population inference.
 # `SWR` here means SWR-overlapping non-local events, not all detected SWRs.
@@ -2727,7 +2727,7 @@ else:
 # This is **Family A**, the literature-comparable per-stop layer. The
 # time-resolved per-bin conditional-intensity ladder (**Family B**,
 # `MODEL_PER_BIN_RATE`) is not walked in this notebook — see
-# `docs/rate_models.md` and `scripts/behavior/rate/fit_per_bin_rate_models.py`.
+# `docs/rate_models.md` and `scripts/replay_models/rate/fit_per_bin_rate_models.py`.
 
 # %%
 rate_fits = {}

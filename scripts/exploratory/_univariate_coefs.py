@@ -19,9 +19,11 @@ from continuum_swr_replay.analysis.behavior.rate_model import fit_rate_model
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from continuum_swr_replay.analysis.behavior._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.behavior.design_constants import ARM_FE_PREDICTORS
-from continuum_swr_replay.analysis.behavior.fitting import fit_conditional_poisson
+from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson
+from continuum_swr_replay.analysis.replay_models.model_specs import (
+    add_arm_fixed_effects,
+)
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,

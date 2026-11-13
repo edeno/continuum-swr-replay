@@ -2,8 +2,8 @@
 """Build the four canonical replay-content tables across all sessions.
 
 Thin driver over the per-grain table builders in
-``continuum_swr_replay.analysis.behavior.tables.tables_event`` / ``tables_stop`` /
-``tables_arm_patch``. For
+``continuum_swr_replay.analysis.event_tables.event_table`` / ``stop_table`` /
+``arm_patch_tables``. For
 each session it loads the pre-saved ``data_over_time.pkl``,
 ``environment.pkl``, and ``results.nc``, pulls ``trials`` +
 ``track_graph`` from Spyglass, and calls the four table builders.
@@ -26,7 +26,7 @@ Usage::
     uv run python scripts/tables/prepare_replay_content_data.py --from-cache # covariate-only rebuild
 
 Each session's tables are built by
-:func:`continuum_swr_replay.analysis.behavior.tables.prepare_data.build_session_tables`;
+:func:`continuum_swr_replay.analysis.event_tables.prepare_data.build_session_tables`;
 this file runs the session loop, assembles, standardizes and publishes.
 
 **Skipping Spyglass for covariate-only changes** (``--from-cache``): the
@@ -70,14 +70,14 @@ except ImportError:  # pragma: no cover - datajoint always present in practice
 
 
 from continuum_swr_replay.analysis.behavior.covariates import load_contingency
-from continuum_swr_replay.analysis.behavior.tables import prepare_data
-from continuum_swr_replay.analysis.behavior.tables.prepare_data import (
+from continuum_swr_replay.analysis.event_tables import prepare_data
+from continuum_swr_replay.analysis.event_tables.prepare_data import (
     assemble_canonical_tables,
     build_session_tables,
     load_behavioral_context,
     standardize_event_arm,
 )
-from continuum_swr_replay.analysis.behavior.tables.tables_stop import build_stop_table
+from continuum_swr_replay.analysis.event_tables.stop_table import build_stop_table
 from continuum_swr_replay.analysis.events.analysed_time import (
     publish_swr_table,
     read_dot_with_swr_source,
@@ -450,7 +450,7 @@ def run_prepare_data(args: argparse.Namespace) -> None:
     # failed check means the concatenated frames disagree across
     # tables; persisting them would publish an inconsistent dataset
     # to downstream consumers. The full invariant sweep runs in
-    # tests/analysis/behavior/tables/test_replay_tables.py; this is a cheap end-to-end
+    # tests/analysis/event_tables/test_replay_tables.py; this is a cheap end-to-end
     # guard for the concat path.
     sum_n_events = int(stop_table_all["n_selected_events"].sum())
     if sum_n_events != len(event_table_all):

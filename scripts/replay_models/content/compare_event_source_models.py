@@ -19,9 +19,9 @@ and is not repeated here.
 
 Usage::
 
-    uv run python scripts/behavior/content/compare_event_source_models.py --event-source non_local
-    uv run python scripts/behavior/content/compare_event_source_models.py --event-source SWR
-    uv run python scripts/behavior/content/compare_event_source_models.py --event-source MUA
+    uv run python scripts/replay_models/content/compare_event_source_models.py --event-source non_local
+    uv run python scripts/replay_models/content/compare_event_source_models.py --event-source SWR
+    uv run python scripts/replay_models/content/compare_event_source_models.py --event-source MUA
 """
 
 from __future__ import annotations
@@ -35,31 +35,33 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior import (
-    MODEL_PER_STOP_RATE,
+from continuum_swr_replay.analysis.event_tables.arm_patch_tables import (
     build_event_patch_table,
-    build_switch_aligned_table,
 )
-from continuum_swr_replay.analysis.behavior.choice.choice_prediction import (
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.events.swr_source import swr_source_name
+from continuum_swr_replay.analysis.replay_models.choice.choice_prediction import (
     CHOICE_MODELS,
     choice_swr_split_models_for_source,
     fit_choice_blocks,
 )
-from continuum_swr_replay.analysis.behavior.cohort_audit import (
+from continuum_swr_replay.analysis.replay_models.choice.switch_analysis import (
+    build_switch_aligned_table,
+)
+from continuum_swr_replay.analysis.replay_models.cohort_audit import (
     records_from_common_cohort_provenance,
     write_cohort_audit,
 )
-from continuum_swr_replay.analysis.behavior.content.session_fits import (
+from continuum_swr_replay.analysis.replay_models.content.session_fits import (
     fit_patch_hierarchy,
     fit_patch_switch,
     patch_models_for_source,
     patch_switch_models_for_source,
 )
-from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
+from continuum_swr_replay.analysis.replay_models.model_specs import MODEL_PER_STOP_RATE
+from continuum_swr_replay.analysis.replay_models.rate.per_stop_rate_model import (
     fit_event_source_rate_hierarchy,
 )
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
-from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.paths import (
     EVENT_SOURCE_COMPARISON_DIR,
     contfrag_replay_content_dir,
@@ -82,9 +84,9 @@ logging.basicConfig(
 logger = logging.getLogger("compare_event_source")
 # Silence the per-session rank-deficiency / convergence chatter.
 for noisy in (
-    "continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model",
-    "continuum_swr_replay.analysis.behavior.fitting",
-    "continuum_swr_replay.analysis.behavior.choice.choice_prediction",
+    "continuum_swr_replay.analysis.replay_models.rate.per_stop_rate_model",
+    "continuum_swr_replay.analysis.replay_models.fitting",
+    "continuum_swr_replay.analysis.replay_models.choice.choice_prediction",
 ):
     logging.getLogger(noisy).setLevel(logging.CRITICAL)
 

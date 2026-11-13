@@ -33,13 +33,13 @@ Collect one tidy row per (session, population) with every covariate's
 ``Processed-Data/replay_content/models_per_bin_rate/uncertainty_rate.pkl``.
 
 The fit loop, the qvals join, the first-exposure drop, the RL z-scores and the
-cohort audit are ``analysis/behavior/rate/uncertainty_rate.py``; this script
+cohort audit are ``analysis/replay_models/rate/uncertainty_rate.py``; this script
 reads the tables, selects the stop cohort, and writes.
 
 Usage::
 
-    uv run python scripts/behavior/rate/fit_uncertainty_rate.py                    # full
-    uv run python scripts/behavior/rate/fit_uncertainty_rate.py --max-per-animal 1 # smoke
+    uv run python scripts/replay_models/rate/fit_uncertainty_rate.py                    # full
+    uv run python scripts/replay_models/rate/fit_uncertainty_rate.py --max-per-animal 1 # smoke
 """
 
 from __future__ import annotations
@@ -60,33 +60,10 @@ from pathlib import Path  # noqa: E402
 
 import pandas as pd  # noqa: E402
 
-from continuum_swr_replay.analysis.behavior import (  # noqa: E402
-    RATE_BIN_S,
-    add_uncertainty_covariates,
-    attach_is_swr_to_onsets,
-)
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (  # noqa: E402
-    coefficient_statistics,
-)
-from continuum_swr_replay.analysis.behavior.cohort_audit import (  # noqa: E402
-    write_cohort_audit,
-)
 from continuum_swr_replay.analysis.behavior.covariates import (  # noqa: E402
     CANONICAL_SWITCH_WINDOW,
+    add_uncertainty_covariates,
     assert_qvals_aligned,
-)
-from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (  # noqa: E402
-    attach_event_ends,
-)
-from continuum_swr_replay.analysis.behavior.rate.uncertainty_rate import (  # noqa: E402
-    FITTED_COVARIATES,
-    MU_UNCERTAINTY,
-    POPULATIONS_TO_FIT,
-    drop_exposure_sessions,
-    fit_uncertainty_rate,
-    join_uncertainty_qvals,
-    standardize_rl_covariates,
-    uncertainty_cohort_records,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     require_swr_source,
@@ -98,6 +75,31 @@ from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E40
 )
 from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     swr_source_name,
+)
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (  # noqa: E402
+    coefficient_statistics,
+)
+from continuum_swr_replay.analysis.replay_models.cohort_audit import (  # noqa: E402
+    write_cohort_audit,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
+    RATE_BIN_S,
+)
+from continuum_swr_replay.analysis.replay_models.per_bin_design import (  # noqa: E402
+    attach_is_swr_to_onsets,
+)
+from continuum_swr_replay.analysis.replay_models.rate.duration_aware_history import (  # noqa: E402
+    attach_event_ends,
+)
+from continuum_swr_replay.analysis.replay_models.rate.uncertainty_rate import (  # noqa: E402
+    FITTED_COVARIATES,
+    MU_UNCERTAINTY,
+    POPULATIONS_TO_FIT,
+    drop_exposure_sessions,
+    fit_uncertainty_rate,
+    join_uncertainty_qvals,
+    standardize_rl_covariates,
+    uncertainty_cohort_records,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
     model_dir,
@@ -123,7 +125,7 @@ from continuum_swr_replay.tables.standardization import (  # noqa: E402
 )
 
 # separated history coefs legitimately overflow exp(); convergence/separation are
-# recorded per fit as flags in per_bin_rate_model (analysis.behavior._fit_diagnostics),
+# recorded per fit as flags in per_bin_rate_model (analysis.replay_models._fit_diagnostics),
 # so only the benign RuntimeWarning is silenced (not a blanket ignore).
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 

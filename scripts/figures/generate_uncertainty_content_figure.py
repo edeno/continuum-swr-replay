@@ -3,7 +3,7 @@
 
 Requires the derived tables from::
 
-    uv run python scripts/behavior/content/analyze_uncertainty_content.py
+    uv run python scripts/replay_models/content/analyze_uncertainty_content.py
 
 Usage
 -----
@@ -27,7 +27,7 @@ import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
+from continuum_swr_replay.analysis.replay_models.content.uncertainty_content import (
     HORSERACE_SUMMARY,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
@@ -101,7 +101,7 @@ def _load_results(results_dir: Path) -> dict[str, pd.DataFrame | dict]:
     if "n_animals_positive" not in contrasts.columns:
         raise ValueError(
             f"{paths['contrasts']} predates the animals-positive count the figure "
-            "annotates; rerun scripts/behavior/content/analyze_uncertainty_content.py."
+            "annotates; rerun scripts/replay_models/content/analyze_uncertainty_content.py."
         )
     return {
         "trial": pd.read_pickle(paths["trial"]),
@@ -319,7 +319,7 @@ def _positive_animals_note(contrasts: pd.DataFrame, metric: str) -> str:
     if rows.empty:
         raise ValueError(
             f"quartile_contrasts.csv has no overall posterior row for {metric} at "
-            "unchosen wells; rerun scripts/behavior/content/analyze_uncertainty_content.py."
+            "unchosen wells; rerun scripts/replay_models/content/analyze_uncertainty_content.py."
         )
     row = rows.iloc[0]
     return (

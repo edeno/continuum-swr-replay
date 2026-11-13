@@ -5,9 +5,9 @@ The onset-only per-bin design treats each event as an instant onset: every 15 ms
 bin of a stop is at risk, including the bins inside an ongoing event, and
 self-/cross-history count past onsets. On simulated data that alone produces a
 short-lag "refractory" dip, a self-history burst and two-way cross coupling
-(:mod:`continuum_swr_replay.analysis.behavior.rate.duration_history_simulation`).
+(:mod:`continuum_swr_replay.analysis.replay_models.rate.duration_history_simulation`).
 This runner refits the history on the at-risk design
-(``analysis/behavior/rate/duration_aware_history.py:build_design``):
+(``analysis/replay_models/rate/duration_aware_history.py:build_design``):
 
 - a bin's exposure is the time no event of the response's detector covers (bins
   inside an ongoing event drop out): Kay SWR intervals for the detected-SWR
@@ -40,7 +40,7 @@ shift, excluded time and history window. No CV and no GOF. Each output gets a
 
 Usage::
 
-    python scripts/behavior/rate/fit_duration_aware_history_rate.py [--mode session|pooled]
+    python scripts/replay_models/rate/fit_duration_aware_history_rate.py [--mode session|pooled]
         [--workers N] [--stop-cohort at_well] [--max-per-animal N]
 """
 
@@ -55,18 +55,24 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior import (
-    attach_is_swr_to_onsets,
-    fit_per_bin_rate_model,
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.events.cohort_selection import (
+    STOP_COHORTS,
+    select_stop_cohort,
+    stop_cohort_suffix,
 )
-from continuum_swr_replay.analysis.behavior.covariate_timing import (
+from continuum_swr_replay.analysis.events.swr_source import swr_source_name
+from continuum_swr_replay.analysis.replay_models.covariate_timing import (
     assert_predictor_timing,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_CROSS_HISTORY_DURATION_RATE,
     MODEL_CROSS_HISTORY_RATE,
 )
-from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (
+from continuum_swr_replay.analysis.replay_models.per_bin_design import (
+    attach_is_swr_to_onsets,
+)
+from continuum_swr_replay.analysis.replay_models.rate.duration_aware_history import (
     POPULATION_PLAN,
     attach_event_ends,
     build_design,
@@ -75,13 +81,9 @@ from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (
     onset_offset_collinearity,
     stack_sessions,
 )
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
-from continuum_swr_replay.analysis.events.cohort_selection import (
-    STOP_COHORTS,
-    select_stop_cohort,
-    stop_cohort_suffix,
+from continuum_swr_replay.analysis.replay_models.rate.per_bin_rate_model import (
+    fit_per_bin_rate_model,
 )
-from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.runs.fit_provenance import (
     record_inputs,

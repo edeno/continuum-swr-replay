@@ -11,10 +11,10 @@ excluded time (the mask widened by 0.3 s), or overlapping an SWR or MUA event
 dropped for it, is not counted.
 
 Usage:
-    uv run python scripts/behavior/content/quantify_swr_overlap_geometry.py
-    uv run python scripts/behavior/content/quantify_swr_overlap_geometry.py \\
+    uv run python scripts/replay_models/content/quantify_swr_overlap_geometry.py
+    uv run python scripts/replay_models/content/quantify_swr_overlap_geometry.py \\
         --nwb wilbur20210329_.nwb --epoch 02_r1
-    uv run python scripts/behavior/content/quantify_swr_overlap_geometry.py --animal chimi
+    uv run python scripts/replay_models/content/quantify_swr_overlap_geometry.py --animal chimi
 """
 
 from __future__ import annotations

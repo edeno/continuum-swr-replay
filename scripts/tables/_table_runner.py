@@ -7,7 +7,7 @@ tables, :func:`find_contfrag_sessions` for the ContFrag ones), reads the
 per-animal shards a split build writes (:func:`read_disjoint_shards`) and
 publishes a finished table set (:func:`publish_replay_tables`,
 :func:`publish_contfrag_tables`). The tables themselves are built by
-``continuum_swr_replay.analysis.behavior.tables.prepare_data`` and
+``continuum_swr_replay.analysis.event_tables.prepare_data`` and
 ``continuum_swr_replay.analysis.contfrag.prepare_data``.
 
 Importing it sets the drivers' log format.

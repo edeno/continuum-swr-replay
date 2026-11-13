@@ -44,13 +44,13 @@ from pathlib import Path
 import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.covariates import load_contingency
-from continuum_swr_replay.analysis.behavior.tables import (
-    prepare_data as replay_prepare_data,
-)
 from continuum_swr_replay.analysis.contfrag.prepare_data import (
     build_contfrag_session_tables,
     contfrag_event_patch_table,
     contfrag_table_basenames,
+)
+from continuum_swr_replay.analysis.event_tables import (
+    prepare_data as replay_prepare_data,
 )
 from continuum_swr_replay.paths import (
     contfrag_replay_content_dir,

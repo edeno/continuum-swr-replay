@@ -9,16 +9,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.content.session_fits import (
+from continuum_swr_replay.analysis.replay_models.content.session_fits import (
     fit_contrast_ladder,
 )
-from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
+from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
     assemble_arm,
     assemble_patch,
     contrast_fit_inputs,
     prepare_cohorts,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (
+from continuum_swr_replay.analysis.replay_models.model_specs import (
     _TSC,
     BASEc,
     BASEc_NT,

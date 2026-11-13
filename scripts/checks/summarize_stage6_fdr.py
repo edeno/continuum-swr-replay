@@ -7,7 +7,7 @@ from before a cohort change, or the ``_allstops`` sensitivity bundle next to the
 canonical one -- so that a before/after comparison is two readings of one
 statistic rather than two implementations of it. This script is that reading:
 it calls the function the runner logs,
-:func:`~continuum_swr_replay.analysis.behavior.choice.learning.cross_session_role_summary`.
+:func:`~continuum_swr_replay.analysis.replay_models.choice.stay_leave.cross_session_role_summary`.
 
 Usage::
 
@@ -25,7 +25,7 @@ from pathlib import Path
 import pandas as pd
 
 # The statistic is read with the runner's own function, never a second copy.
-from continuum_swr_replay.analysis.behavior.choice.learning import (
+from continuum_swr_replay.analysis.replay_models.choice.stay_leave import (
     cross_session_role_summary,
 )
 

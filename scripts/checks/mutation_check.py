@@ -41,7 +41,7 @@ _DEFAULT_TARGETS = (
 _DEFAULT_TESTS = (
     "tests/analysis/behavior/covariates/test_covariates.py",
     "tests/analysis/behavior/covariates/test_uncertainty_covariates.py",
-    "tests/analysis/behavior/test_covariate_timing.py",
+    "tests/analysis/replay_models/test_covariate_timing.py",
     "tests/analysis/behavior/covariates/history/test_builder_value_floor.py",
     "tests/analysis/behavior/covariates/test_recent_trial_reward_rate.py",
     "tests/analysis/behavior/covariates/test_recent_reward_rate.py",

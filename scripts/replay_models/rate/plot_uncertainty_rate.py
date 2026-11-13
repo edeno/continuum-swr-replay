@@ -19,8 +19,8 @@ latency view here is the rate-ratio per unit trials-since-change per population.
 
 Usage::
 
-    uv run python scripts/behavior/rate/plot_uncertainty_rate.py            # full fit
-    uv run python scripts/behavior/rate/plot_uncertainty_rate.py --smoke    # smoke fit
+    uv run python scripts/replay_models/rate/plot_uncertainty_rate.py            # full fit
+    uv run python scripts/replay_models/rate/plot_uncertainty_rate.py --smoke    # smoke fit
 """
 
 from __future__ import annotations
@@ -38,12 +38,12 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (  # noqa: E402
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (  # noqa: E402
     coefficient_statistics,
     fit_rows,
     paired_coefficient_statistics,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
+from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
 from continuum_swr_replay.paths import figure_dir, model_dir

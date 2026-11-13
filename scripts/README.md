@@ -1,7 +1,7 @@
 # Scripts index
 
 Analysis scripts grouped by domain. Run them from the repository root, so `scripts` is
-importable: `uv run python scripts/behavior/rate/fit_per_bin_rate_models.py`. Scripts
+importable: `uv run python scripts/replay_models/rate/fit_per_bin_rate_models.py`. Scripts
 import the package (`continuum_swr_replay`) and read and write under the data root
 (`$CSR_PROCESSED_DATA_DIR`, else `Processed-Data/`). Each script's docstring and
 `--help` give its options, inputs and outputs; this index says what it is for.
@@ -15,7 +15,7 @@ enforces this for scripts, and
 [`tests/repository/test_import_layering.py`](../tests/repository/test_import_layering.py) for `src/`.
 The first test's `ALLOWED` table is the current exception list, and it only
 shrinks. One entry is left: `exploratory/_content_cohort_control.py`, which runs
-`behavior/content/fit_swr_contrast_content.py` with its cohort rule bypassed.
+`replay_models/content/fit_swr_contrast_content.py` with its cohort rule bypassed.
 
 A runner that computes on the CPU says so first thing in its `main`
 (`default_jax_platforms("cpu")`), not when imported.
@@ -64,7 +64,14 @@ them importable.
 - `convert_tables_to_parquet.py` — the one-time pickle-to-parquet migration of the tables.
 - `_table_runner.py` — not a script: the session selection, shard reading and publishing the drivers above share.
 
-## `behavior/rate/` — event-rate models and their plots
+## `behavior/` — what the animal did and what the behavioral model says
+- `fetch_spatial_bandit_behavior.sh` — pull the canonical SpatialBanditTask behavior CSVs.
+- `build_qvals_table.py` — build the per-stop behavioral-model covariate table (`qvals_table`).
+
+The Part 3 model runners are under `replay_models/`, one folder per subpackage of
+`analysis/replay_models/`.
+
+## `replay_models/rate/` — event-rate models and their plots
 - `fit_per_bin_rate_models.py`, `fit_per_stop_rate_models.py` — Family B / A rate ladders ([../docs/rate_models.md](../docs/rate_models.md)).
 - `fit_swr_contrast_rate.py` — the `is_swr`-contrast per-bin ladder (G0–G8 / S0–S10).
 - `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` — MU / cross-history rate models.
@@ -72,10 +79,10 @@ them importable.
 - `fit_duration_aware_history_rate.py` — self- and cross-history refit on the at-risk design, per session or pooled per animal.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures; each docstring names the panels that are reported values.
 
-## `behavior/coupling/` — SWR-coupling strength of the events
+## `replay_models/coupling/` — SWR-coupling strength of the events
 - `fit_swr_power_model.py` — each non-local event's ripple power against the behavioral covariates.
 
-## `behavior/content/` — replay content / choice models
+## `replay_models/content/` — replay content / choice models
 - `fit_replay_content_models.py` — arm/patch content hierarchy (M0–M7 / P0–P4), per `is_swr` split.
 - `fit_swr_contrast_content.py` — the HMM-harmonized content `is_swr`-contrast ladder (C / CP).
 - `compare_event_source_models.py` — choice (clogit) model comparison.
@@ -84,11 +91,7 @@ them importable.
 - `quantify_swr_overlap_geometry.py`, `generate_replay_content_figures.py`.
 - `analyze_uncertainty_content.py` — reward-belief uncertainty profiles, content rates and response sensitivities.
 
-## `behavior/`
-- `fetch_spatial_bandit_behavior.sh` — pull the canonical SpatialBanditTask behavior CSVs.
-- `build_qvals_table.py` — build the per-stop behavioral-model covariate table (`qvals_table`).
-
-## `behavior/choice/` — content and the choice that follows
+## `replay_models/choice/` — content and the choice that follows
 - `run_retrospective_alignment.py` ("Stage 5B") — does content during a stop match the arm visited next.
 - `run_stay_leave.py` ("Stage 6") — content × reward outcome → stay or leave.
 

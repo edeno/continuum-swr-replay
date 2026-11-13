@@ -8,9 +8,9 @@ physical wells, sessions, and animals hierarchically.
 
 Usage
 -----
-uv run python scripts/behavior/content/analyze_uncertainty_content.py
-uv run python scripts/behavior/content/analyze_uncertainty_content.py --cohort all
-uv run python scripts/behavior/content/analyze_uncertainty_content.py --allow-stale
+uv run python scripts/replay_models/content/analyze_uncertainty_content.py
+uv run python scripts/replay_models/content/analyze_uncertainty_content.py --cohort all
+uv run python scripts/replay_models/content/analyze_uncertainty_content.py --allow-stale
 """
 
 from __future__ import annotations
@@ -24,10 +24,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.replay_models.content.fit_outputs import (
     belief_chain_output_subdir,
 )
-from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
+from continuum_swr_replay.analysis.replay_models.content.uncertainty_content import (
     ANALYSIS_COHORTS,
     HORSERACE_SUMMARY,
     analysis_cohort_counts,
@@ -39,8 +40,9 @@ from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
     summarize_mu_coefficients,
     within_arm_horserace,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import LEAF_ONLY_N_CATEGORIES
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.replay_models.model_specs import (
+    LEAF_ONLY_N_CATEGORIES,
+)
 from continuum_swr_replay.paths import (
     STANDARDIZATION_REFERENCE,
     UNCERTAINTY_CONTENT_DIR,

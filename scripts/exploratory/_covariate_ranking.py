@@ -38,7 +38,10 @@ from concurrent.futures import ProcessPoolExecutor  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from continuum_swr_replay.analysis.behavior import (  # noqa: E402
+from continuum_swr_replay.analysis.behavior.covariates import (  # noqa: E402
+    add_uncertainty_covariates,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     N_REWARD_LAGS,
@@ -46,14 +49,15 @@ from continuum_swr_replay.analysis.behavior import (  # noqa: E402
     STOP_COVARIATES,
     TMAX,
     PerBinRateModelSpec,
-    add_uncertainty_covariates,
+)
+from continuum_swr_replay.analysis.replay_models.per_bin_design import (  # noqa: E402  # noqa: E402
+    POPULATIONS,
     aggregate_to_timebins,
     attach_is_swr_to_onsets,
+)
+from continuum_swr_replay.analysis.replay_models.rate.per_bin_rate_model import (  # noqa: E402
     cross_validate_per_bin_rate_model,
     fit_per_bin_rate_model,
-)
-from continuum_swr_replay.analysis.behavior.per_bin_design import (  # noqa: E402
-    POPULATIONS,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
     REPLAY_CONTENT_DIR,

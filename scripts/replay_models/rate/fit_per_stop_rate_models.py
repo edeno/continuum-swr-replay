@@ -45,8 +45,8 @@ model, session) for R0-R1), its ``.provenance.json`` sidecar, and
 appended in smoke mode.
 
 Usage:
-    uv run python scripts/behavior/rate/fit_per_stop_rate_models.py                    # full
-    uv run python scripts/behavior/rate/fit_per_stop_rate_models.py --max-per-animal 1  # smoke
+    uv run python scripts/replay_models/rate/fit_per_stop_rate_models.py                    # full
+    uv run python scripts/replay_models/rate/fit_per_stop_rate_models.py --max-per-animal 1  # smoke
 """
 
 from __future__ import annotations
@@ -59,24 +59,24 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.cohort_audit import write_cohort_audit
-from continuum_swr_replay.analysis.behavior.covariate_timing import (
-    assert_predictor_timing,
-)
-from continuum_swr_replay.analysis.behavior.model_specs import (
-    MODEL_PER_STOP_RATE,
-    REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_INCOMPLETE,
-)
-from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
-    PER_STOP_RATE_OUTCOMES,
-    fit_per_stop_rate_hierarchy,
-)
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import (
     STOP_COHORTS,
     select_stop_cohort,
     stop_cohort_suffix,
+)
+from continuum_swr_replay.analysis.replay_models.cohort_audit import write_cohort_audit
+from continuum_swr_replay.analysis.replay_models.covariate_timing import (
+    assert_predictor_timing,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (
+    MODEL_PER_STOP_RATE,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
+)
+from continuum_swr_replay.analysis.replay_models.rate.per_stop_rate_model import (
+    PER_STOP_RATE_OUTCOMES,
+    fit_per_stop_rate_hierarchy,
 )
 from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.runs.fit_provenance import (

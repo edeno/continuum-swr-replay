@@ -23,7 +23,7 @@ E's change in AIC from M0 of each rung (it reports only M1_rew's) are drawn but
 not reported.
 
 Usage:
-    uv run python scripts/behavior/rate/plot_per_bin_rate_summary.py
+    uv run python scripts/replay_models/rate/plot_per_bin_rate_summary.py
 """
 
 from __future__ import annotations
@@ -39,42 +39,42 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from continuum_swr_replay.analysis.behavior import (  # noqa: E402
-    POPULATIONS,
-    attach_is_swr_to_onsets,
-)
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (  # noqa: E402
-    aic_difference_statistics,
-    fit_rows,
-    gated_coefficient_statistics,
-)
-from continuum_swr_replay.analysis.behavior.contrast_aggregation import (  # noqa: E402
-    gate_term_sessions,
-)
-from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
-    MODEL_PER_BIN_RATE,
-    RATE_BIN_S,
-    REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_N_LAGS,
-    TMAX,
-)
-from continuum_swr_replay.analysis.behavior.rate.rate_fit_statistics import (  # noqa: E402
-    baseline_rate_statistics,
-    fitted_time_course,
-    ladder_fit_statistics,
-    reward_kernel_by_lag,
-    self_history_kernel_by_lag,
-)
-from continuum_swr_replay.analysis.behavior.rate.stop_statistics import (  # noqa: E402
-    onset_rate_time_course,
-    still_immobile_fraction,
-)
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     excluded_intervals_by_session,
     require_swr_source,
 )
 from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
     select_stop_cohort,
+)
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (  # noqa: E402
+    aic_difference_statistics,
+    fit_rows,
+    gated_coefficient_statistics,
+)
+from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (  # noqa: E402
+    gate_term_sessions,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
+    MODEL_PER_BIN_RATE,
+    RATE_BIN_S,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_N_LAGS,
+    TMAX,
+)
+from continuum_swr_replay.analysis.replay_models.per_bin_design import (  # noqa: E402
+    POPULATIONS,
+    attach_is_swr_to_onsets,
+)
+from continuum_swr_replay.analysis.replay_models.rate.rate_fit_statistics import (  # noqa: E402
+    baseline_rate_statistics,
+    fitted_time_course,
+    ladder_fit_statistics,
+    reward_kernel_by_lag,
+    self_history_kernel_by_lag,
+)
+from continuum_swr_replay.analysis.replay_models.rate.stop_statistics import (  # noqa: E402
+    onset_rate_time_course,
+    still_immobile_fraction,
 )
 from continuum_swr_replay.paths import (
     figure_dir,
@@ -91,7 +91,7 @@ from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
 )
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.visualization.figure_utilities import (
-    save_figure,  # noqa: E402
+    save_figure,
 )
 
 

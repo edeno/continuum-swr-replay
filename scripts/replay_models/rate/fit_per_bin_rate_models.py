@@ -31,7 +31,7 @@ freezing it removes no stop but those without an arrival clock (every other
 column it needs is complete on the canonical stop table by construction).
 Designs are built per session so all sessions' bins are never resident at once.
 The fit loop and the cohort audit are
-``analysis/behavior/rate/per_bin_rate_ladder.py``; this script reads the
+``analysis/replay_models/rate/per_bin_rate_ladder.py``; this script reads the
 tables, selects the stop cohort, and writes.
 
 Each (session, outcome, model) contributes one tidy row with the fit
@@ -65,9 +65,9 @@ ladder is read on. Do not quote one session's SE as a calibrated population
 uncertainty.
 
 Usage:
-    uv run python scripts/behavior/rate/fit_per_bin_rate_models.py               # full, serial
-    uv run python scripts/behavior/rate/fit_per_bin_rate_models.py --workers 16  # full, parallel
-    uv run python scripts/behavior/rate/fit_per_bin_rate_models.py --max-per-animal 1  # smoke
+    uv run python scripts/replay_models/rate/fit_per_bin_rate_models.py               # full, serial
+    uv run python scripts/replay_models/rate/fit_per_bin_rate_models.py --workers 16  # full, parallel
+    uv run python scripts/replay_models/rate/fit_per_bin_rate_models.py --max-per-animal 1  # smoke
 """
 
 from __future__ import annotations
@@ -88,28 +88,6 @@ import time  # noqa: E402
 import warnings  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-from continuum_swr_replay.analysis.behavior import (  # noqa: E402
-    MODEL_PER_BIN_RATE,
-    POPULATIONS,
-    RATE_BIN_S,
-    attach_is_swr_to_onsets,
-)
-from continuum_swr_replay.analysis.behavior.cohort_audit import (  # noqa: E402
-    write_cohort_audit,
-)
-from continuum_swr_replay.analysis.behavior.covariate_timing import (  # noqa: E402
-    assert_predictor_timing,
-)
-from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (  # noqa: E402
-    attach_event_ends,
-)
-from continuum_swr_replay.analysis.behavior.rate.per_bin_rate_ladder import (  # noqa: E402
-    fit_per_bin_rate_models,
-    per_bin_cohort_records,
-)
-from continuum_swr_replay.analysis.behavior.rate.per_bin_rate_model import (  # noqa: E402
-    _design_columns,
-)
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     require_swr_source,
 )
@@ -120,6 +98,30 @@ from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E40
 )
 from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     swr_source_name,
+)
+from continuum_swr_replay.analysis.replay_models.cohort_audit import (  # noqa: E402
+    write_cohort_audit,
+)
+from continuum_swr_replay.analysis.replay_models.covariate_timing import (  # noqa: E402
+    assert_predictor_timing,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
+    MODEL_PER_BIN_RATE,
+    RATE_BIN_S,
+)
+from continuum_swr_replay.analysis.replay_models.per_bin_design import (  # noqa: E402
+    POPULATIONS,
+    attach_is_swr_to_onsets,
+)
+from continuum_swr_replay.analysis.replay_models.rate.duration_aware_history import (  # noqa: E402
+    attach_event_ends,
+)
+from continuum_swr_replay.analysis.replay_models.rate.per_bin_rate_ladder import (  # noqa: E402
+    fit_per_bin_rate_models,
+    per_bin_cohort_records,
+)
+from continuum_swr_replay.analysis.replay_models.rate.per_bin_rate_model import (  # noqa: E402
+    _design_columns,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
     model_dir,
@@ -142,7 +144,7 @@ from continuum_swr_replay.tables.session_keys import (  # noqa: E402
 # Separated self-history coefficients legitimately overflow exp() (-> 0 / inf
 # RR); these are median-robust at read time and are not fit failures. Convergence /
 # perfect-separation are recorded per fit as flags in per_bin_rate_model (see
-# analysis.behavior._fit_diagnostics), so only the benign RuntimeWarning is silenced.
+# analysis.replay_models._fit_diagnostics), so only the benign RuntimeWarning is silenced.
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")

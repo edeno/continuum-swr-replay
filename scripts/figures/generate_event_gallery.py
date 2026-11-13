@@ -82,17 +82,17 @@ from continuum_swr_replay.analysis.behavior.covariates import (
     trial_arrival_times,
     trial_outcome_times,
 )
-from continuum_swr_replay.analysis.behavior.tables.bouts import (
-    immobility_bout_intervals,
-)
-from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
-    build_event_arm_table,
-    build_event_patch_table,
-)
-from continuum_swr_replay.analysis.behavior.tables.tables_event import build_event_table
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
+from continuum_swr_replay.analysis.event_tables.arm_patch_tables import (
+    build_event_arm_table,
+    build_event_patch_table,
+)
+from continuum_swr_replay.analysis.event_tables.bouts import (
+    immobility_bout_intervals,
+)
+from continuum_swr_replay.analysis.event_tables.event_table import build_event_table
 from continuum_swr_replay.analysis.events.analysed_time import (
     excluded_intervals_of,
     read_dot_with_swr_source,
@@ -508,7 +508,7 @@ def _plot_arm_content_bar(
     """Per-arm content — the response of the M0-M7 arm models.
 
     Bars are the event's ``arm_fraction`` from the arm table
-    (:func:`~continuum_swr_replay.analysis.behavior.tables.tables_arm_patch.build_event_arm_table`):
+    (:func:`~continuum_swr_replay.analysis.event_tables.arm_patch_tables.build_event_arm_table`):
     the share of its decoded real-arm bins whose MAP lies on each arm, the
     column the arm models read (``content_response``), colored to match the
     track. The regression's arm predictors (current/prev/next/last-rewarded)
@@ -857,7 +857,7 @@ def _plot_patch_content_bar(
     """Per-patch content — the response of the P0-P4 patch models.
 
     Bars are the event's ``patch_fraction`` from the patch table
-    (:func:`~continuum_swr_replay.analysis.behavior.tables.tables_arm_patch.build_event_patch_table`):
+    (:func:`~continuum_swr_replay.analysis.event_tables.arm_patch_tables.build_event_patch_table`):
     the share of its decoded real-arm bins whose arm lies in each patch, the
     column the patch models read. The current/prev/next patch predictors are
     flagged above the bars.

@@ -34,8 +34,8 @@ sidecar (the hashes of the three tables it read) beside it.
 
 Usage::
 
-    uv run python scripts/behavior/coupling/fit_swr_power_model.py                    # full
-    uv run python scripts/behavior/coupling/fit_swr_power_model.py --max-per-animal 1 # smoke
+    uv run python scripts/replay_models/coupling/fit_swr_power_model.py                    # full
+    uv run python scripts/replay_models/coupling/fit_swr_power_model.py --max-per-animal 1 # smoke
 """
 
 from __future__ import annotations
@@ -48,11 +48,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.events.swr_source import swr_source_name
+from continuum_swr_replay.analysis.hippocampus.class_or_continuum import SARLE_CUTOFF
+from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     coefficient_statistics,
 )
-from continuum_swr_replay.analysis.behavior.cohort_audit import write_cohort_audit
-from continuum_swr_replay.analysis.behavior.coupling.swr_power import (
+from continuum_swr_replay.analysis.replay_models.cohort_audit import write_cohort_audit
+from continuum_swr_replay.analysis.replay_models.coupling.swr_power import (
     COHORT_EXTRA_COLUMNS,
     POWER_COL,
     POWER_PERCENTILES,
@@ -63,9 +66,6 @@ from continuum_swr_replay.analysis.behavior.coupling.swr_power import (
     power_cohort_records,
     power_distribution_statistics,
 )
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
-from continuum_swr_replay.analysis.events.swr_source import swr_source_name
-from continuum_swr_replay.analysis.hippocampus.class_or_continuum import SARLE_CUTOFF
 from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.runs.fit_provenance import (
     record_inputs,

@@ -17,7 +17,7 @@ on, so a Stage 6 statement and a content statement are about the same stops;
 canonical one.
 
 At this grain the choice makes no difference to any fitted number. ``is_stay``
-is derived from the stop's ``occupancy_well_arm`` (``tables_stop.py``), which is
+is derived from the stop's ``occupancy_well_arm`` (``stop_table.py``), which is
 finite only for strictly ``at_well`` stops, so the response is missing for every
 ``mixed``, ``in_transit`` and ``unknown`` stop and the effective population is
 the 67,606 strictly-at-well stops that carry an ``is_stay`` either way. The
@@ -30,10 +30,10 @@ Outputs (next to the input tables):
 
 Usage::
 
-    uv run python scripts/behavior/choice/run_stay_leave.py
-    uv run python scripts/behavior/choice/run_stay_leave.py --content-stratum swr
-    uv run python scripts/behavior/choice/run_stay_leave.py --content-stratum non_swr
-    uv run python scripts/behavior/choice/run_stay_leave.py --stop-cohort all_stops
+    uv run python scripts/replay_models/choice/run_stay_leave.py
+    uv run python scripts/replay_models/choice/run_stay_leave.py --content-stratum swr
+    uv run python scripts/replay_models/choice/run_stay_leave.py --content-stratum non_swr
+    uv run python scripts/replay_models/choice/run_stay_leave.py --stop-cohort all_stops
 """
 
 from __future__ import annotations
@@ -47,17 +47,17 @@ from typing import Any
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.choice.learning import (
+from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.events.cohort_selection import (
+    select_stop_cohort,
+    stop_cohort_suffix,
+)
+from continuum_swr_replay.analysis.replay_models.choice.stay_leave import (
     DEFAULT_MIN_STAY_STOPS,
     cross_session_role_summary,
     fit_stay_leave_roles,
     pooled_gee_role_summary,
     stop_replay_summary,
-)
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
-from continuum_swr_replay.analysis.events.cohort_selection import (
-    select_stop_cohort,
-    stop_cohort_suffix,
 )
 from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.runs.fit_provenance import (

@@ -44,13 +44,13 @@ One tidy row per (population, model, session), each carrying per-term coef + SE
 sign consistency primary, session signed-rank descriptive — see the content runner).
 
 The ladders' fits, the qvals join, the cohort audit and the audited aggregation
-are ``analysis/behavior/rate/swr_contrast_rate.py``; this script reads the
+are ``analysis/replay_models/rate/swr_contrast_rate.py``; this script reads the
 tables, selects the stop cohort, and writes.
 
 Usage:
-    uv run python scripts/behavior/rate/fit_swr_contrast_rate.py --max-per-animal 1   # smoke (~4 min)
-    uv run python scripts/behavior/rate/fit_swr_contrast_rate.py --workers 16         # full
-    uv run python scripts/behavior/rate/fit_swr_contrast_rate.py --aggregate-only     # re-audit
+    uv run python scripts/replay_models/rate/fit_swr_contrast_rate.py --max-per-animal 1   # smoke (~4 min)
+    uv run python scripts/replay_models/rate/fit_swr_contrast_rate.py --workers 16         # full
+    uv run python scripts/replay_models/rate/fit_swr_contrast_rate.py --aggregate-only     # re-audit
 """
 
 from __future__ import annotations
@@ -71,38 +71,9 @@ from pathlib import Path  # noqa: E402
 
 import pandas as pd  # noqa: E402
 
-from continuum_swr_replay.analysis.behavior import (  # noqa: E402
-    add_uncertainty_covariates,
-    attach_is_swr_to_onsets,
-)
-from continuum_swr_replay.analysis.behavior.cohort_audit import (  # noqa: E402
-    write_cohort_audit,
-)
-from continuum_swr_replay.analysis.behavior.covariate_timing import (  # noqa: E402
-    assert_predictor_timing,
-)
 from continuum_swr_replay.analysis.behavior.covariates import (  # noqa: E402
+    add_uncertainty_covariates,
     assert_qvals_aligned,
-)
-from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
-    DESCRIPTIVE_RATE_RUNGS,
-)
-from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
-    SWR_CONTRAST_RATE_G_SPECS as G_SPECS,
-)
-from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
-    SWR_CONTRAST_RATE_S_SPECS as S_SPECS,
-)
-from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (  # noqa: E402
-    attach_event_ends,
-)
-from continuum_swr_replay.analysis.behavior.rate.swr_contrast_rate import (  # noqa: E402
-    aggregate_contrast_fits,
-    cohort_sd_reference,
-    contrast_cohort_records,
-    contrast_term_diagnostics,
-    fit_contrast_sessions,
-    join_contrast_qvals,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     require_swr_source,
@@ -114,6 +85,35 @@ from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E40
 )
 from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     swr_source_name,
+)
+from continuum_swr_replay.analysis.replay_models.cohort_audit import (  # noqa: E402
+    write_cohort_audit,
+)
+from continuum_swr_replay.analysis.replay_models.covariate_timing import (  # noqa: E402
+    assert_predictor_timing,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
+    DESCRIPTIVE_RATE_RUNGS,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
+    SWR_CONTRAST_RATE_G_SPECS as G_SPECS,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
+    SWR_CONTRAST_RATE_S_SPECS as S_SPECS,
+)
+from continuum_swr_replay.analysis.replay_models.per_bin_design import (  # noqa: E402
+    attach_is_swr_to_onsets,
+)
+from continuum_swr_replay.analysis.replay_models.rate.duration_aware_history import (  # noqa: E402
+    attach_event_ends,
+)
+from continuum_swr_replay.analysis.replay_models.rate.swr_contrast_rate import (  # noqa: E402
+    aggregate_contrast_fits,
+    cohort_sd_reference,
+    contrast_cohort_records,
+    contrast_term_diagnostics,
+    fit_contrast_sessions,
+    join_contrast_qvals,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
     model_dir,
@@ -135,7 +135,7 @@ from continuum_swr_replay.tables.session_keys import (  # noqa: E402
 
 # Only the benign exp()-overflow RuntimeWarning (quasi-separated coefs -> rate ratios)
 # is silenced. Convergence/separation are recorded per fit as flags by the fitter (see
-# analysis.behavior._fit_diagnostics), not blanket-ignored.
+# analysis.replay_models._fit_diagnostics), not blanket-ignored.
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)

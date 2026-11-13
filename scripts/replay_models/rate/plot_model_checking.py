@@ -14,7 +14,7 @@ All time-rescaling math is imported from
 here.
 
 Usage:
-    uv run python scripts/behavior/rate/plot_model_checking.py
+    uv run python scripts/replay_models/rate/plot_model_checking.py
 """
 
 from __future__ import annotations
@@ -34,29 +34,33 @@ from non_local_detector.model_checking.sorted_spikes import (  # noqa: E402
     point_process_residuals,
 )
 
-from continuum_swr_replay.analysis.behavior import (  # noqa: E402
-    MODEL_PER_BIN_RATE,
-    STOP_COVARIATES,
-    attach_is_swr_to_onsets,
-    fit_per_bin_rate_model,
-    freeze_per_bin_cohort,
-)
-from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (  # noqa: E402
-    attach_event_ends,
-)
-from continuum_swr_replay.analysis.behavior.rate.per_bin_rate_ladder import (  # noqa: E402
-    ladder_design,
-)
-from continuum_swr_replay.analysis.behavior.rate.rate_fit_statistics import (  # noqa: E402
-    arrival_window_statistics,
-    ladder_fit_statistics,
-    model_checking_examples,
-)
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     require_swr_source,
 )
 from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
     select_stop_cohort,
+)
+from continuum_swr_replay.analysis.replay_models.model_specs import (  # noqa: E402
+    MODEL_PER_BIN_RATE,
+    STOP_COVARIATES,
+)
+from continuum_swr_replay.analysis.replay_models.per_bin_design import (  # noqa: E402
+    attach_is_swr_to_onsets,
+)
+from continuum_swr_replay.analysis.replay_models.rate.duration_aware_history import (  # noqa: E402
+    attach_event_ends,
+)
+from continuum_swr_replay.analysis.replay_models.rate.per_bin_rate_ladder import (  # noqa: E402
+    ladder_design,
+)
+from continuum_swr_replay.analysis.replay_models.rate.per_bin_rate_model import (  # noqa: E402
+    fit_per_bin_rate_model,
+    freeze_per_bin_cohort,
+)
+from continuum_swr_replay.analysis.replay_models.rate.rate_fit_statistics import (  # noqa: E402
+    arrival_window_statistics,
+    ladder_fit_statistics,
+    model_checking_examples,
 )
 from continuum_swr_replay.paths import (
     figure_dir,

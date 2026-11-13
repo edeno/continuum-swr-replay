@@ -28,9 +28,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior import build_stop_table  # noqa: E402
-from continuum_swr_replay.analysis.behavior.tables.tables_stop import (  # noqa: E402
+from continuum_swr_replay.analysis.event_tables.stop_table import (  # noqa: E402
     add_nonlocal_swr_split,
+    build_stop_table,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     publish_swr_table,
