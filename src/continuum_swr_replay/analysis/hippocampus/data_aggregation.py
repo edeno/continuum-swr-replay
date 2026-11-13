@@ -159,6 +159,7 @@ from continuum_swr_replay.analysis.events.nonlocal_detection import (
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD,
     SAMPLING_FREQUENCY,
@@ -779,10 +780,7 @@ def load_data_over_time(data_dir: Path) -> pd.DataFrame:
     """
     files = analysed_decode_files(data_dir, data_over_time_suffix(), require_all=True)
     data_over_time = pd.concat([read_dot_with_swr_source(p) for p in files])
-    data_over_time["Non-Local_prob"] = (
-        data_over_time["Non-Local_Continuous_prob"]
-        + data_over_time["Non-Local_Fragmented_prob"]
-    )
+    data_over_time["Non-Local_prob"] = nonlocal_probability(data_over_time)
     data_over_time["distance"] = np.abs(data_over_time["ahead_behind_distance"])
     return data_over_time
 

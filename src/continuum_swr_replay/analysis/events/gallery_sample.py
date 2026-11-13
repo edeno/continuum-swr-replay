@@ -23,6 +23,7 @@ from continuum_swr_replay.analysis.events.immobility import intervals_from_label
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
     strict_overlap_matrix,
 )
+from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.intervals import min_gap_to_intervals
 from continuum_swr_replay.tables.session_keys import one_session
 
@@ -68,9 +69,7 @@ def event_catalog(dot: pd.DataFrame, epoch_id: str, epoch_name: str) -> pd.DataF
         (:func:`~continuum_swr_replay.intervals.min_gap_to_intervals`); for an
         SWR alone the peak non-local probability inside it.
     """
-    dot["Non-Local_prob"] = (
-        dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
-    )
+    dot["Non-Local_prob"] = nonlocal_probability(dot)
     ct = build_classified_nonlocal_event_table(dot)
     rows: list[dict] = []
 

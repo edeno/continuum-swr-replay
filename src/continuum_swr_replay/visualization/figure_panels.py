@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
 from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
     compute_triggered_average_curves,
 )
+from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.visualization.figure_utilities import (
     PANEL_SINGLE,
     get_figure_size,
@@ -859,9 +860,7 @@ def plot_state_probability_by_theta_phase(
     moving = data_over_time.loc[is_moving].copy()
 
     # Combined non-local probability
-    moving["Non-Local_prob"] = (
-        moving["Non-Local_Continuous_prob"] + moving["Non-Local_Fragmented_prob"]
-    )
+    moving["Non-Local_prob"] = nonlocal_probability(moving)
 
     # Bin theta phase into [0, 2pi) bins
     bin_edges = np.linspace(0, 2 * np.pi, n_bins + 1)

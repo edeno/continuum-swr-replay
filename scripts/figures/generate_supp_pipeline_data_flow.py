@@ -51,6 +51,7 @@ from continuum_swr_replay.analysis.events.analysed_time import (
 )
 from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_session
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.results import nonlocal_probability  # noqa: E402
 from continuum_swr_replay.paths import (
     figure_dir,
     model_dir,
@@ -132,9 +133,7 @@ def load_session(animal: str, day: int, epoch: str):
     with open(env_path, "rb") as f:
         env = pickle.load(f)
     dot["replay_arm"] = map_estimate_to_arm(dot["map_estimate"].values, env)
-    dot["Non-Local_prob"] = (
-        dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
-    )
+    dot["Non-Local_prob"] = nonlocal_probability(dot)
     return dot, env
 
 

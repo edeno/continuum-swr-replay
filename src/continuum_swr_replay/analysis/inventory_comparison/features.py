@@ -51,6 +51,7 @@ from continuum_swr_replay.analysis.inventory_comparison.recount import (
     FRAGMENT_GAPS_S,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import STATE_SPACE
+from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
@@ -248,7 +249,7 @@ class PosteriorTraces:
             no_spike_prob=dot["No-Spike_prob"].to_numpy(dtype=np.float64),
             continuous_prob=continuous.to_numpy(dtype=np.float64),
             fragmented_prob=fragmented.to_numpy(dtype=np.float64),
-            nonlocal_prob=(continuous + fragmented).to_numpy(),
+            nonlocal_prob=nonlocal_probability(dot).to_numpy(),
             hpd_cm=dot["hpd"].to_numpy(dtype=np.float64),
         )
 

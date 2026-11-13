@@ -32,6 +32,7 @@ from continuum_swr_replay.analysis.inventory_comparison.example_windows import (
     recompute_windows,
 )
 from continuum_swr_replay.analysis.inventory_comparison.selection import EXAMPLE_SEED
+from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.intervals import contiguous_true_runs, sample_step
 from continuum_swr_replay.visualization.figure_utilities import WONG
 from continuum_swr_replay.visualization.palettes import COLORS
@@ -200,9 +201,7 @@ def draw_example(
     time = inputs.time[in_plot]
     dot = inputs.dot.loc[in_plot]
     speed = dot["head_speed"].to_numpy(dtype=np.float64)
-    non_local = (
-        dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
-    ).to_numpy(dtype=np.float64)
+    non_local = nonlocal_probability(dot).to_numpy(dtype=np.float64)
 
     fig, axes = plt.subplots(
         7,

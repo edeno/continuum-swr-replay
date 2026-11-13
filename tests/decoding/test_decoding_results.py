@@ -19,7 +19,7 @@ from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     get_conditional_non_local_posterior,
     load_conditional_posterior,
 )
-from continuum_swr_replay.decoding.results import open_results
+from continuum_swr_replay.decoding.results import nonlocal_probability, open_results
 
 STATES = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
 
@@ -90,3 +90,19 @@ def test_closing_it_closes_the_file(tmp_path):
         results.acausal_posterior.load()
         assert open_handles() >= 1
     assert open_handles() == 0
+
+
+def test_the_non_local_probability_sums_the_two_non_local_states_row_by_row():
+    frame = pd.DataFrame(
+        {
+            "Local_prob": np.array([0.5, 0.0, 0.25], dtype=np.float32),
+            "Non-Local_Continuous_prob": np.array([0.25, 0.5, np.nan], np.float32),
+            "Non-Local_Fragmented_prob": np.array([0.25, 0.5, 0.75], np.float32),
+        },
+        index=pd.Index([2.0, 1.0, 3.0], name="time"),
+    )
+    total = nonlocal_probability(frame)
+    pd.testing.assert_series_equal(
+        total,
+        pd.Series(np.array([0.5, 1.0, np.nan], np.float32), index=frame.index),
+    )

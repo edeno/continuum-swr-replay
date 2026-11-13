@@ -11,6 +11,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
+from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import (
     hash_stop_id as _hash_stop_id,
@@ -118,10 +119,7 @@ def build_stop_table(
     animal, day, epoch = str(animal), int(day), str(epoch)
 
     dot = dot.copy()
-    dot["nonlocal_prob"] = (
-        dot["Non-Local_Continuous_prob"].to_numpy()
-        + dot["Non-Local_Fragmented_prob"].to_numpy()
-    )
+    dot["nonlocal_prob"] = nonlocal_probability(dot).to_numpy()
     nonlocal_event_mask = _in_event_mask(dot, nonlocal_threshold).to_numpy()
     dot = add_trial_context(dot, trials, port_experiences)
     dot["nearest_well_distance_cm"] = _nearest_well_distance_cm(dot, track_graph)

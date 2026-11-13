@@ -107,6 +107,7 @@ from continuum_swr_replay.analysis.events.analysed_time import (
     analysed_bins,
     immobile_analysed_bins,
 )
+from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 logger = logging.getLogger(__name__)
@@ -433,9 +434,7 @@ def compute_non_local_during_movement(
                 }
             )
 
-        nonlocal_prob = (
-            group["Non-Local_Continuous_prob"] + group["Non-Local_Fragmented_prob"]
-        )
+        nonlocal_prob = nonlocal_probability(group)
         # Label on the FULL timeline so immobile rows and excluded rows act
         # as gaps that break event runs. Filtering first treated 5/0/5 cm/s
         # as one contiguous moving stretch and merged separate events.
@@ -675,10 +674,7 @@ def compute_bout_nonlocal_dominance(
             )
 
         local = group["Local_prob"].to_numpy()
-        nonlocal_prob = (
-            group["Non-Local_Continuous_prob"].to_numpy()
-            + group["Non-Local_Fragmented_prob"].to_numpy()
-        )
+        nonlocal_prob = nonlocal_probability(group).to_numpy()
 
         bout_nonlocal_means: list[float] = []
         bout_local_means: list[float] = []
@@ -1180,9 +1176,7 @@ def compute_local_state_collapse_details(
 
         session_median_hpd = group.loc[analysed, "hpd"].median()
         error = group["ahead_behind_distance"].abs().to_numpy()
-        nonlocal_prob = (
-            group["Non-Local_Continuous_prob"] + group["Non-Local_Fragmented_prob"]
-        ).to_numpy()
+        nonlocal_prob = nonlocal_probability(group).to_numpy()
         hpd = group["hpd"].to_numpy()
         times = group.index.to_numpy()
 

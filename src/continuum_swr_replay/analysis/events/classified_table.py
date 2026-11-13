@@ -58,6 +58,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
     DEFAULT_SAMPLING_FREQUENCY_HZ,
 )
+from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.tables.event_ids import hash_event_id, validate_event_ids
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
@@ -260,9 +261,7 @@ def build_classified_nonlocal_event_table(
             speed = g["head_speed"]
             start_speed = float(speed.iloc[0])
             end_speed = float(speed.iloc[-1])
-            nonlocal_prob = (
-                g["Non-Local_Continuous_prob"] + g["Non-Local_Fragmented_prob"]
-            )
+            nonlocal_prob = nonlocal_probability(g)
             records.append(
                 {
                     "animal": animal,

@@ -35,6 +35,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 from continuum_swr_replay.analysis.hippocampus.state_evidence import (
     nearest_interior_bins,
 )
+from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.intervals import contiguous_true_runs
 
 NON_EVENT_THRESHOLD = 0.2
@@ -86,9 +87,7 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
     # Business-logic boundary: direct callers get the same fail-closed input
     # contract as the file-loading entry point.
     validate_dot_event_contract(dot)
-    nlp = (
-        dot["Non-Local_Continuous_prob"] + dot["Non-Local_Fragmented_prob"]
-    ).to_numpy()
+    nlp = nonlocal_probability(dot).to_numpy()
     ab = dot["ahead_behind_distance"].to_numpy()
     # The read holds the labels to the speed rule and the probability contract.
     nonlocal_labels = dot["non_local_event"].to_numpy()

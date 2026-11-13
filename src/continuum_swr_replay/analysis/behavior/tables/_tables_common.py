@@ -21,6 +21,7 @@ from continuum_swr_replay.analysis.events.immobility import (
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
 )
+from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 
 from ..model_specs import (
@@ -55,10 +56,7 @@ def _prepare_dot(dot: pd.DataFrame, env) -> pd.DataFrame:
     """
     dot = dot.copy()
     dot["decoded_arm"] = map_estimate_to_arm(dot["map_estimate"].to_numpy(), env)
-    dot["nonlocal_prob"] = (
-        dot["Non-Local_Continuous_prob"].to_numpy()
-        + dot["Non-Local_Fragmented_prob"].to_numpy()
-    )
+    dot["nonlocal_prob"] = nonlocal_probability(dot).to_numpy()
     return dot
 
 
