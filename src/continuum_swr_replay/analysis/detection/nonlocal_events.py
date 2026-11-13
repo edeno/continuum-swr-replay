@@ -1,4 +1,4 @@
-"""Aggregation of analysis results over time.
+"""The paper's non-local event detector applied to a decode, on one time-indexed frame.
 
 This module aggregates decoding results, posterior statistics, event detections, and
 behavioral data into comprehensive time-indexed DataFrames ready for visualization
@@ -115,13 +115,13 @@ Notes
 See Also
 --------
 continuum_swr_replay.analysis.decode_quality.posterior_analysis : Posterior statistics
-continuum_swr_replay.analysis.event_definition.nonlocal_detection : Event detection functions
+continuum_swr_replay.analysis.event_definition.nonlocal_event_rule : Event detection functions
 continuum_swr_replay.data_loaders.bandit_task : Session data loading
 
 Examples
 --------
->>> from continuum_swr_replay.decoding.result_loading import load_results
->>> from continuum_swr_replay.analysis.decode_quality.data_aggregation import get_data_over_time
+>>> from continuum_swr_replay.decoding.results import load_results
+>>> from continuum_swr_replay.analysis.detection.nonlocal_events import get_data_over_time
 >>> results, detector, env = load_results("chimi20200212_.nwb", "02_r1")
 >>> data_df, posterior = get_data_over_time(
 ...     data, results, env, "chimi20200212_.nwb", "02_r1",
@@ -154,7 +154,7 @@ from continuum_swr_replay.analysis.event_definition.immobility import (
     EventDefinitionError,
     build_speed_eligible_event_cohort,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     event_strict_overlap_keys,
     get_confident_times,
     get_overlap_times,
@@ -169,7 +169,7 @@ from continuum_swr_replay.parameters import (
 )
 
 from ...data_types import SessionData
-from .posterior_analysis import (
+from ..decode_quality.posterior_analysis import (
     get_conditional_non_local_posterior,
     get_map_step_distance,
     get_posterior_stats,

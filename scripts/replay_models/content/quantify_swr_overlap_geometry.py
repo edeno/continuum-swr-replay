@@ -31,7 +31,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     validate_results_position_time_alignment,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
@@ -46,7 +46,7 @@ from continuum_swr_replay.analysis.event_definition.immobility import (
     build_speed_eligible_event_cohort,
     intervals_from_labels,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     classify_swr_overlap_geometry,
     get_confident_times,
 )
@@ -57,7 +57,7 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import nwb_stem
-from continuum_swr_replay.decoding.result_loading import load_results
+from continuum_swr_replay.decoding.results import load_results
 from continuum_swr_replay.paths import processed_data_dir
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

@@ -7,7 +7,7 @@ input value is NaN — silently suppressing theta event classification
 downstream in :func:`quality_metrics.compute_non_local_event_context`.
 
 Both paths route through the shared
-:func:`continuum_swr_replay.analysis.decode_quality.data_aggregation.theta_power_zscore`
+:func:`continuum_swr_replay.analysis.detection.nonlocal_events.theta_power_zscore`
 helper, so this test exercises the helper's behavior directly. A
 regression that drops the kwarg, or replaces the helper, fails the
 behavioral assertion below — not a source-grep that could pass while
@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     theta_power_zscore,
 )
 

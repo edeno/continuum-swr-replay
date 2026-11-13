@@ -60,13 +60,13 @@ def build_old_event_sets(
     on purpose, so an event that rule drops counts as an old event without a new
     match.
     """
-    from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    from continuum_swr_replay.analysis.detection.nonlocal_events import (
         align_results_to_position,
     )
     from continuum_swr_replay.analysis.event_definition.immobility import (
         build_speed_eligible_event_cohort,
     )
-    from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+    from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
         get_confident_times,
         get_overlap_times,
     )
@@ -172,7 +172,7 @@ def build_comparison(
         load_session_swr_intervals,
     )
     from continuum_swr_replay.data_loaders import load_data
-    from continuum_swr_replay.decoding.result_loading import load_results
+    from continuum_swr_replay.decoding.results import load_results
 
     results, _, _ = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC", load_detector=False

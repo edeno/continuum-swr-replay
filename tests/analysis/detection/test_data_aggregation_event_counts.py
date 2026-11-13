@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     compute_swr_nl_event_counts,
 )
 

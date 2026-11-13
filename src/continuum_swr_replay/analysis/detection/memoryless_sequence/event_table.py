@@ -70,7 +70,7 @@ from continuum_swr_replay.analysis.event_definition.immobility import (
     intervals_from_labels,
     require_canonical_speed_threshold,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     classify_swr_overlap_geometry,
 )
 from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS

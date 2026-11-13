@@ -50,7 +50,7 @@ See Also
 --------
 non_local_detector.analysis : Core decoding analysis functions
 non_local_detector.model_checking.highest_posterior_density : HPD computation
-continuum_swr_replay.analysis.decode_quality.data_aggregation : Time-series aggregation
+continuum_swr_replay.analysis.detection.nonlocal_events : Time-series aggregation
 
 Examples
 --------
@@ -82,7 +82,7 @@ from non_local_detector.model_checking.highest_posterior_density import (
 )
 from ripple_detection.core import gaussian_smooth
 
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_event_bins_by_swr,
 )
 
@@ -419,7 +419,7 @@ def normalized_replay_position_by_swr(
     Each bin's ``map_estimate`` is divided by its session's
     ``max_linear_position``, so sessions with different track lengths share
     one [0, 1] axis. The bins are split by whether their event overlaps an SWR
-    (:func:`~continuum_swr_replay.analysis.event_definition.nonlocal_detection.nonlocal_event_bins_by_swr`).
+    (:func:`~continuum_swr_replay.analysis.event_definition.nonlocal_event_rule.nonlocal_event_bins_by_swr`).
 
     Parameters
     ----------

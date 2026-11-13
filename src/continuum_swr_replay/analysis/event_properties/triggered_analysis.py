@@ -258,7 +258,7 @@ def get_signal_windows(
             event_id_list, names=["animal", "day", "epoch", event_id_col]
         )
     else:
-        # Use RangeIndex for consistency with project patterns (see event_definition/nonlocal_detection.py)
+        # Use RangeIndex for consistency with project patterns (see event_definition/nonlocal_event_rule.py)
         event_index = pd.RangeIndex(start=0, stop=len(event_id_list), name="event")
 
     return xr.DataArray(

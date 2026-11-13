@@ -12,7 +12,7 @@ from continuum_swr_replay.decoding.identifiers import (
     DEFAULT_TRAINING_TYPE,
     format_epoch_identifier,
 )
-from continuum_swr_replay.decoding.result_loading import _load_saved_decode
+from continuum_swr_replay.decoding.results import _load_saved_decode
 
 
 def load_contfrag_results(

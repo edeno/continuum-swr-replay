@@ -7,7 +7,7 @@ but were time-shifted; that silently attached event labels /
 probabilities / MAP stats to the wrong position rows.
 
 Both aggregators now route through the shared helper
-:func:`continuum_swr_replay.analysis.decode_quality.data_aggregation.validate_results_position_time_alignment`.
+:func:`continuum_swr_replay.analysis.detection.nonlocal_events.validate_results_position_time_alignment`.
 This test exercises that helper directly — a regression that
 keeps the same error strings but computes drift against the wrong
 axis, swaps the reducer, or weakens the tolerance fails the
@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     validate_results_position_time_alignment,
 )
 

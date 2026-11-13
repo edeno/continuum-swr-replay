@@ -56,7 +56,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     load_data_over_time,
     validate_results_position_time_alignment,
 )
@@ -75,7 +75,7 @@ from continuum_swr_replay.analysis.event_definition.eligibility import (
 from continuum_swr_replay.analysis.event_definition.immobility import (
     build_speed_eligible_event_cohort,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     get_confident_times,
     get_overlap_times,
 )
@@ -91,7 +91,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.decoding.result_loading import load_results
+from continuum_swr_replay.decoding.results import load_results
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.reported.events import EventsInputs, default_inputs
 from continuum_swr_replay.visualization.figure_panels import (

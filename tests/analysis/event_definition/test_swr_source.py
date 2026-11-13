@@ -1197,7 +1197,7 @@ class TestTheNormalizers:
     run-speed baseline is the same percentile of head speed outside the mask."""
 
     def _theta_dot(self) -> pd.DataFrame:
-        from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+        from continuum_swr_replay.analysis.detection.nonlocal_events import (
             theta_power_zscore,
         )
 
@@ -1236,7 +1236,7 @@ class TestTheNormalizers:
     ):
         """z is affine in raw power, so re-z-scoring the stored z over the rows
         outside the mask is z-scoring the raw power over those rows."""
-        from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+        from continuum_swr_replay.analysis.detection.nonlocal_events import (
             theta_power_zscore,
         )
 
@@ -1288,7 +1288,7 @@ class TestTheNormalizers:
 
         baseline = with_swr_source(dot)["run_speed_baseline"].to_numpy()
 
-        # the decoders' percentile (data_aggregation, both decoders)
+        # the decoders' percentile (nonlocal_events and the ContFrag aggregator)
         assert RUN_SPEED_BASELINE_PERCENTILE == 90
         expected = np.nanpercentile(speed[~in_mask], 90)
         assert np.unique(baseline).tolist() == [expected]

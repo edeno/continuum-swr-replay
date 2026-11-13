@@ -182,7 +182,7 @@ def session_window_sets(
     drawn : dict of str to list of pandas.DataFrame
         The rebuilt null draws per class, one frame per draw.
     """
-    from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    from continuum_swr_replay.analysis.detection.nonlocal_events import (
         align_results_to_position,
     )
     from continuum_swr_replay.analysis.event_definition.analysed_time import (
@@ -205,7 +205,7 @@ def session_window_sets(
         artifact_dropped_events,
     )
     from continuum_swr_replay.data_loaders import load_data
-    from continuum_swr_replay.decoding.result_loading import load_results
+    from continuum_swr_replay.decoding.results import load_results
 
     stop_cohort = str(sidecar["stop_cohort"])
     cohort_stops = (

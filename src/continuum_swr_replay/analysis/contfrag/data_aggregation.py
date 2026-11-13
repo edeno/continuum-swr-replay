@@ -1,6 +1,6 @@
 """Aggregation of ContFrag decoding results over time.
 
-Mirrors ``decode_quality.data_aggregation`` but for the 2-state
+Mirrors ``detection.nonlocal_events`` but for the 2-state
 Continuous-Fragmented classifier. Key differences:
 
 - State probability columns: ``Continuous_prob``, ``Fragmented_prob``
@@ -18,7 +18,7 @@ import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
 
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     theta_power_zscore,
     validate_required_session_data_keys,
     validate_results_position_time_alignment,
@@ -32,7 +32,7 @@ from continuum_swr_replay.analysis.event_definition.epoch_normalizers import (
 from continuum_swr_replay.analysis.event_definition.immobility import (
     build_speed_eligible_event_cohort,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     get_overlap_times,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files

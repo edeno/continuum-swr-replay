@@ -47,7 +47,7 @@ from typing import Any
 import pandas as pd
 import xarray as xr
 
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     get_data_over_time,
 )
 from continuum_swr_replay.data_types import SessionData
@@ -59,7 +59,7 @@ from continuum_swr_replay.decoding.identifiers import (
     DEFAULT_SWR_DEFINITION,
     DEFAULT_TRAINING_TYPE,
 )
-from continuum_swr_replay.decoding.result_loading import load_results
+from continuum_swr_replay.decoding.results import load_results
 from continuum_swr_replay.decoding.transitions import nonlocal_transition_settings
 from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD,

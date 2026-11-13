@@ -25,13 +25,13 @@ import pandas as pd
 import xarray as xr
 
 from continuum_swr_replay.analysis.constants import REMOTE_CM
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     validate_dot_event_contract,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
     immobile_analysed_bins,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     event_strict_overlap_mask,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (

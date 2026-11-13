@@ -45,7 +45,7 @@ from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     get_event_types,
     load_data_over_time,
 )

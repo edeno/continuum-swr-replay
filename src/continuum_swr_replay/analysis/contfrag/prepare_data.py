@@ -33,7 +33,7 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_event_table,
     build_contfrag_stop_table,
 )
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     validate_dot_event_contract,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import (

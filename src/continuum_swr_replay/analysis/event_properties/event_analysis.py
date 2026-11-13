@@ -1,6 +1,6 @@
 """Analysis functions for manipulating and characterizing detected events.
 
-This module complements event_definition/nonlocal_detection.py (which detects events from signals)
+This module complements event_definition/nonlocal_event_rule.py (which detects events from signals)
 by providing functions to analyze, filter, and characterize already-detected events.
 """
 

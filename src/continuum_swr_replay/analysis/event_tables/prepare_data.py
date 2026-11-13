@@ -25,11 +25,11 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.covariates import assert_qvals_aligned
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
-    validate_dot_event_contract,
-)
 from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     load_conditional_posterior,
+)
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
+    validate_dot_event_contract,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
     read_dot_with_swr_source,

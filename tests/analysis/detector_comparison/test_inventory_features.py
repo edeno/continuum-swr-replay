@@ -48,7 +48,7 @@ from continuum_swr_replay.analysis.detector_comparison.schema import (
     SessionIdentity,
     inventory_from_intervals,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     get_confident_times,
 )
 

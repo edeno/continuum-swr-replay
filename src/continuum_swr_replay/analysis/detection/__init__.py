@@ -12,12 +12,16 @@ inventory the paper uses is ``event_definition.swr_source``'s.
   artifact mask.
 - ``memoryless_sequence``: the Widloski & Foster sliding-window sequence
   detector, its shuffles, simulations and sweeps.
+- ``nonlocal_events``: the paper's non-local event detector applied to a
+  decode: the two non-local states' probability thresholded by
+  ``event_definition.nonlocal_event_rule``, speed-gated and labelled on one
+  time-indexed frame with behavior (``get_data_over_time``), and that frame
+  read back (``load_data_over_time``).
 - ``detection_inputs``: what the detection runners read from a saved HPC
   decode and from each other.
-- ``decode_masks``: the HPC decode's training and missing-data masks from the
-  paper's SWR source.
 
-Imports ``event_definition`` and the foundation; nothing here imports another
-analysis package (``tests/repository/test_import_layering.py``). Submodules are
-imported by name; nothing is re-exported here.
+Imports ``event_definition``, ``decode_quality`` (the posterior summaries
+``nonlocal_events`` writes into its frame) and the foundation
+(``tests/repository/test_import_layering.py``). Submodules are imported by
+name; nothing is re-exported here.
 """

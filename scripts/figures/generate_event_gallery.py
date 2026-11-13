@@ -123,7 +123,7 @@ from continuum_swr_replay.decoding.identifiers import (
     parse_session_name,
     session_name,
 )
-from continuum_swr_replay.decoding.result_loading import load_results
+from continuum_swr_replay.decoding.results import load_results
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import (

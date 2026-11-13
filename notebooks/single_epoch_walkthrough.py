@@ -91,7 +91,7 @@ from matplotlib.lines import Line2D
 
 # --- Data loading + decode outputs ---
 from continuum_swr_replay.analysis.event_definition.cohort_selection import freeze_common_cohort
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     validate_dot_event_contract,
 )
 from continuum_swr_replay.analysis.replay_models.model_specs import add_arm_fixed_effects

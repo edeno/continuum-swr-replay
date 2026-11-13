@@ -416,7 +416,7 @@ def test_invalid_saved_nonlocal_probability_fails_loud(dot):
 # --- Downstream consumers: parity with get_event_types, table-driven counts,
 #     and the matched-SWR columns the timing offsets are taken from. ---
 
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (  # noqa: E402
+from continuum_swr_replay.analysis.detection.nonlocal_events import (  # noqa: E402
     get_event_types,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (  # noqa: E402
@@ -546,7 +546,7 @@ def test_events_and_swrs_are_read_on_the_one_time_index():
 def test_zero_duration_event_inside_swr_is_non_swr():
     # A point event [1.0, 1.0] strictly inside an SWR has no positive
     # duration to overlap; the strict convention classifies it non_swr.
-    from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+    from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
         classify_swr_overlap,
         classify_swr_overlap_geometry,
     )

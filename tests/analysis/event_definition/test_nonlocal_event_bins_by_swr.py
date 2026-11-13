@@ -8,7 +8,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     normalized_replay_position_by_swr,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_event_bins_by_swr,
 )
 

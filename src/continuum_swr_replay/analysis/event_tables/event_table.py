@@ -15,7 +15,7 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.event_definition.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     event_strict_overlap_keys,
 )
 from continuum_swr_replay.data_loaders.constants import (
@@ -598,7 +598,7 @@ def build_event_table(
     ----------
     dot : pd.DataFrame
         Time-indexed data-over-time frame produced by
-        :func:`continuum_swr_replay.analysis.decode_quality.data_aggregation.get_data_over_time`.
+        :func:`continuum_swr_replay.analysis.detection.nonlocal_events.get_data_over_time`.
         Must carry ``animal``, ``day``, ``epoch``, ``non_local_event``,
         ``SWR_event``, ``MUA_event``, ``Non-Local_Continuous_prob``,
         ``Non-Local_Fragmented_prob``, ``map_estimate``, ``head_speed``.

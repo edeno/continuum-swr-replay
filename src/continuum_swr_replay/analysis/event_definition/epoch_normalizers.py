@@ -4,7 +4,7 @@
 a percentile of head speed over the epoch. The trajectory rollups divide an
 event's replay speed by it (``trajectory``'s ``compression_factor``).
 
-Both decoders' aggregators (``data_aggregation.get_data_over_time`` and the
+Both decoders' aggregators (``nonlocal_events.get_data_over_time`` and the
 ContFrag aggregator) write it into the decode frame over every bin. The read
 through the SWR source (``analysed_time.with_swr_source``) computes it again over
 the bins outside the artifact mask, because it is an input: inputs use the

@@ -121,14 +121,14 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
-from continuum_swr_replay.analysis.detection.decode_masks import (  # noqa: E402
-    hpc_artifact_intervals,
-    hpc_decode_masks,
-)
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (  # noqa: E402
     interior_bin_distances_cm,
 )
 from continuum_swr_replay.analysis.event_definition import analysed_time  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.decode_masks import (  # noqa: E402
+    hpc_artifact_intervals,
+    hpc_decode_masks,
+)
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (  # noqa: E402
     CV_BLOCK_S,
     ENCODING_HELD_OUT,

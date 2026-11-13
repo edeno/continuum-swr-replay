@@ -50,7 +50,7 @@ for _cat in (UserWarning, FutureWarning, DeprecationWarning):
 from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (  # noqa: E402
+from continuum_swr_replay.analysis.detection.nonlocal_events import (  # noqa: E402
     validate_dot_event_contract,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import (  # noqa: E402

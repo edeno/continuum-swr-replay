@@ -112,7 +112,7 @@ _LAZY_IMPORTS: list[str] = [
     # ``analysis/pfc/__init__.py``.
     "from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson",
     "from continuum_swr_replay.analysis.event_properties.event_analysis import get_event_start_end_times",
-    "from continuum_swr_replay.analysis.event_definition.nonlocal_detection import get_confident_times",
+    "from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import get_confident_times",
     "from continuum_swr_replay.analysis.pfc.load_population import _extract_animal",
     "from continuum_swr_replay.analysis.pfc.session import process_neuron",
     # The foundation interval algebra and spike binning.
@@ -136,8 +136,7 @@ _NO_SCHEDULER_IMPORTS: list[str] = [
     "import continuum_swr_replay.decoding.files",
     "import continuum_swr_replay.decoding.results",
     "import continuum_swr_replay.analysis.pfc.canonical_events",
-    "import continuum_swr_replay.decoding.result_loading",
-    "import continuum_swr_replay.analysis.decode_quality.data_aggregation",
+    "import continuum_swr_replay.analysis.detection.nonlocal_events",
     "import continuum_swr_replay.analysis.event_evidence.state_evidence.terms",
     "import continuum_swr_replay.analysis.contfrag.data_aggregation",
     "import continuum_swr_replay.analysis.event_tables.prepare_data",
@@ -158,7 +157,6 @@ _FOUNDATION_MODULES = sorted(
 #: Foundation modules the JAX-free check does not import, and why.
 NOT_JAX_FREE = {
     "decoding.transitions": "imports non_local_detector",
-    "decoding.result_loading": "imports non_local_detector",
 }
 
 # Leaf modules other packages import for a row key, a cohort rule, a column
@@ -214,7 +212,7 @@ HIPPOCAMPUS_LIGHT: list[str] = [
     "continuum_swr_replay.analysis.decode_quality",
     "continuum_swr_replay.analysis.event_evidence",
     "continuum_swr_replay.analysis.event_properties",
-    "continuum_swr_replay.analysis.detection.decode_masks",
+    "continuum_swr_replay.analysis.event_definition.decode_masks",
     "continuum_swr_replay.analysis.detection.detection_inputs",
     "continuum_swr_replay.analysis.event_properties.event_analysis",
     "continuum_swr_replay.analysis.decode_quality.hpc_raw_stats",

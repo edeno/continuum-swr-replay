@@ -7,7 +7,7 @@ occur in biologically expected contexts (SWR, theta sequences), and whether
 state classifications are internally consistent.
 
 All functions operate on the ``data_over_time`` DataFrame produced by
-:func:`~continuum_swr_replay.analysis.decode_quality.data_aggregation.get_data_over_time`,
+:func:`~continuum_swr_replay.analysis.detection.nonlocal_events.get_data_over_time`,
 which is already saved as pickle files for all sessions, read through the SWR
 source (``analysed_time.read_dot_with_swr_source``, or ``load_data_over_time``).
 
@@ -77,7 +77,7 @@ Examples
 >>> from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
 ...     compute_session_quality_summary,
 ... )
->>> from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+>>> from continuum_swr_replay.analysis.detection.nonlocal_events import (
 ...     load_data_over_time,
 ... )
 >>> from continuum_swr_replay.paths import processed_data_dir
@@ -997,7 +997,7 @@ def compute_non_local_event_context(
         """Circular mean via complex exponentials.
 
         Drops non-finite phases before averaging. ``_nearest`` in
-        ``data_aggregation`` returns NaN when no theta sample is
+        ``detection.nonlocal_events`` returns NaN when no theta sample is
         within tolerance of an event timebin; without this filter,
         ``np.exp(1j * NaN) = NaN`` and ``np.mean`` propagates NaN to
         the per-event mean phase. That single NaN then poisons the
@@ -1027,7 +1027,7 @@ def compute_non_local_event_context(
     # with ``classify_swr_overlap`` / ``get_overlap_times`` and
     # inflates ``frac_swr``. Use the shared event-bound overlap helper
     # so this stays consistent with the rest of the SWR-overlap path.
-    from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+    from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
         event_strict_overlap_keys,
     )
 

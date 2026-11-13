@@ -70,7 +70,7 @@ except ImportError:  # pragma: no cover - datajoint always present in practice
 
 
 from continuum_swr_replay.analysis.behavior.covariates import load_contingency
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     validate_dot_event_contract,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import (

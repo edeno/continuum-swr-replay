@@ -4,7 +4,7 @@ HPC decodes saved before ``get_position_info`` was trimmed carry a few more
 time bins than ``load_data`` now returns for the same epoch, so
 :func:`validate_results_position_time_alignment` — which refuses any length
 difference — rejects the pair at load.
-:func:`~continuum_swr_replay.analysis.decode_quality.data_aggregation.align_results_to_position`
+:func:`~continuum_swr_replay.analysis.detection.nonlocal_events.align_results_to_position`
 restricts both objects to the timestamps they share, but only when the
 mismatch is a small head/tail trim: an interleaved mismatch, an oversized
 trim, or drift inside the shared run must still raise rather than silently
@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     align_results_to_position,
 )
 

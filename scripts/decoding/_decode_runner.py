@@ -33,14 +33,14 @@ import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
 
-from continuum_swr_replay.analysis.detection.decode_masks import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import with_swr_source
+from continuum_swr_replay.analysis.event_definition.decode_masks import (
     hpc_artifact_intervals,
     hpc_decode_masks,
     hpc_ripple_power_inputs,
     require_hpc_decode_sources,
     require_saved_decode_masks,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import with_swr_source
 from continuum_swr_replay.data_loaders import (
     get_training_timepoints,
     load_data,

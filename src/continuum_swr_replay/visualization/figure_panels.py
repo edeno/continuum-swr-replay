@@ -33,7 +33,7 @@ from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
     immobile_analysed_bins,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_event_bins_by_swr,
 )
 from continuum_swr_replay.analysis.event_properties.event_analysis import (

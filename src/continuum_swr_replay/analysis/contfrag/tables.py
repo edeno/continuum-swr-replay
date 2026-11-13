@@ -26,7 +26,7 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
 from continuum_swr_replay.analysis.event_definition.immobility import (
     whole_event_immobility_mask,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     event_strict_overlap_keys,
 )
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY

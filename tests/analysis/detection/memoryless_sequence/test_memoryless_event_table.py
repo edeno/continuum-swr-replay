@@ -41,7 +41,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table imp
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     ShuffleResult,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     classify_swr_overlap_geometry,
 )
 

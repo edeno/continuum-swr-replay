@@ -150,7 +150,7 @@ def rebuild_session(
         DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
         DEFAULT_NON_LOCAL_THRESHOLD,
     )
-    from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    from continuum_swr_replay.analysis.detection.nonlocal_events import (
         align_results_to_position,
     )
     from continuum_swr_replay.analysis.event_definition.analysed_time import (
@@ -176,7 +176,7 @@ def rebuild_session(
     )
     from continuum_swr_replay.data_loaders import load_data
     from continuum_swr_replay.decoding.identifiers import parse_session_name
-    from continuum_swr_replay.decoding.result_loading import load_results
+    from continuum_swr_replay.decoding.results import load_results
     from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
     nwb_file_name, epoch = parse_session_name(session)

@@ -1,14 +1,15 @@
-"""Non-local event detection and the SWR-overlap classification of those events.
+"""The non-local event rule and the SWR-overlap classification of those events.
 
 ``get_confident_times`` finds the intervals where a decoded state's probability
 stays above a threshold (the non-local events); the rest of the module
-classifies how each event overlaps the SWRs. It detects no ripples itself.
+classifies how each event overlaps the SWRs. It detects no ripples itself. The
+detector that applies the rule to a decode is ``detection.nonlocal_events``.
 
 Examples
 --------
-Detect non-local events from decoding results:
+Apply the rule to decoding results:
 
->>> from continuum_swr_replay.analysis.event_definition.nonlocal_detection import get_confident_times
+>>> from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import get_confident_times
 >>> # Combine non-local state probabilities
 >>> non_local_prob = (
 ...     results.acausal_state_probabilities.sel(states="Non-Local Continuous") +
@@ -26,7 +27,7 @@ Detect non-local events from decoding results:
 
 Find events that overlap with ripples:
 
->>> from continuum_swr_replay.analysis.event_definition.nonlocal_detection import get_overlap_times
+>>> from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import get_overlap_times
 >>> overlap_events, no_overlap_events = get_overlap_times(
 ...     non_local_times, ripple_times
 ... )

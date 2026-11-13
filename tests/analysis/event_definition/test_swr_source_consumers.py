@@ -187,7 +187,7 @@ def offline(monkeypatch):
 
 
 def test_the_nonlocal_loader_returns_the_sources_labels(tmp_path, source, register):
-    from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+    from continuum_swr_replay.analysis.detection.nonlocal_events import (
         load_data_over_time,
     )
 
@@ -748,7 +748,7 @@ STORED_RIPPLE_READERS = {
         "prose naming what it replaces"
     ),
     "src/continuum_swr_replay/data_types.py": "load_data's return types",
-    "src/continuum_swr_replay/analysis/decode_quality/data_aggregation.py": (
+    "src/continuum_swr_replay/analysis/detection/nonlocal_events.py": (
         "get_data_over_time: the stored labels, which an HPC decode replaces "
         "with the source's (organize_results)"
     ),
@@ -756,7 +756,7 @@ STORED_RIPPLE_READERS = {
         "get_contfrag_data_over_time: the stored labels, which an HPC decode "
         "replaces with the source's (organize_results)"
     ),
-    "src/continuum_swr_replay/analysis/event_definition/nonlocal_detection.py": (
+    "src/continuum_swr_replay/analysis/event_definition/nonlocal_event_rule.py": (
         "generic overlap classifiers; 'ripple_times' is a parameter name"
     ),
     "src/continuum_swr_replay/analysis/event_definition/classified_table.py": (

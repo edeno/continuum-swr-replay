@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
     get_data_over_time,
     validate_dot_event_contract,
 )
@@ -271,7 +271,7 @@ class TestGetDataOverTimeValidation:
         the same one ``get_data_over_time`` calls, so this is a
         production-path test, not a re-typed snippet.
         """
-        from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
+        from continuum_swr_replay.analysis.detection.nonlocal_events import (
             validate_required_session_data_keys,
         )
 

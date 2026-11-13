@@ -410,7 +410,7 @@ class TestComputeNonLocalEventContext:
         ``np.mean(np.exp(1j * phases))``, returning
         ``theta_mrl=NaN`` and ``theta_mean_angle=NaN`` even when the
         other theta events had clean phase samples. ``_nearest`` in
-        ``data_aggregation`` returns NaN when no theta sample is within
+        ``nonlocal_events`` returns NaN when no theta sample is within
         tolerance, so this is a routine occurrence — and it silently
         masked otherwise-valid theta locking.
 

@@ -37,7 +37,7 @@ pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 
 
 def test_the_event_sets_are_the_shipped_tables_rows_for_that_session():
-    from continuum_swr_replay.decoding.result_loading import load_results
+    from continuum_swr_replay.decoding.results import load_results
 
     sessions = [s for s in find_sessions(max_per_animal=1) if s["results_file"]]
     assert sessions, "no session with decode results on disk"

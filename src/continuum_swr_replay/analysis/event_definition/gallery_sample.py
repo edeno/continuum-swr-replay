@@ -22,7 +22,7 @@ from continuum_swr_replay.analysis.event_definition.classified_table import (
 from continuum_swr_replay.analysis.event_definition.immobility import (
     intervals_from_labels,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     strict_overlap_matrix,
 )
 from continuum_swr_replay.decoding.results import nonlocal_probability

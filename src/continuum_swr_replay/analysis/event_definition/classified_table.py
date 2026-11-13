@@ -68,7 +68,7 @@ from .immobility import (
     intervals_from_labels,
     validate_nonlocal_event_probability_contract,
 )
-from .nonlocal_detection import (
+from .nonlocal_event_rule import (
     classify_swr_overlap,
     classify_swr_overlap_geometry,
     strict_overlap_matrix,

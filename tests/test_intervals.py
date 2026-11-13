@@ -15,7 +15,7 @@ import pytest
 from continuum_swr_replay.analysis.event_definition.eligibility import (
     overlaps_dropped_events,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     strict_overlap_matrix,
 )
 from continuum_swr_replay.intervals import (

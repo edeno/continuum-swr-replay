@@ -12,8 +12,8 @@ ContFrag and PFC analyses that use it:
   ``artifact_event_drops``).
 - ``eligibility``: excluded time and which events lie wholly outside it.
 - ``immobility``: the whole-event speed rule and labelled event intervals.
-- ``nonlocal_detection``: non-local event detection and SWR-overlap
-  classification.
+- ``nonlocal_event_rule``: the non-local event rule (``get_confident_times``)
+  and SWR-overlap classification.
 - ``classified_table``: the canonical per-non-local-event table
   (``build_classified_nonlocal_event_table``).
 - ``epoch_normalizers``: an epoch's run-speed baseline, recomputed outside
@@ -21,6 +21,8 @@ ContFrag and PFC analyses that use it:
 - ``artifact_masks``: the artifact padding table and the artifact mask.
 - ``artifact_intervals``: the artifact detector's per-epoch cores file and
   run manifest.
+- ``decode_masks``: which time the HPC decode trains on and treats as missing,
+  from the paper's SWR source and artifact mask.
 - ``cohort_selection``: the shared stop and event cohort rules and the
   whole-unit complete-case selection.
 

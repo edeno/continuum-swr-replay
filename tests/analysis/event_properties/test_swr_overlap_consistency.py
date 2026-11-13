@@ -1,9 +1,9 @@
 """Regression test: the table-driven overlap counts agree with the
 direct event-level classifier for every interval geometry.
 
-``classify_swr_overlap`` (event_definition/nonlocal_detection.py) classifies per-event
+``classify_swr_overlap`` (event_definition/nonlocal_event_rule.py) classifies per-event
 intervals directly. ``compute_swr_overlap_class_counts``
-(data_aggregation.py) now tallies the ``overlap_class`` column of
+(detection/nonlocal_events.py) now tallies the ``overlap_class`` column of
 ``build_classified_nonlocal_event_table``, which itself classifies via
 ``classify_swr_overlap_geometry`` — the same event-level,
 strict-positive-duration rule. Both therefore use a single overlap
@@ -21,7 +21,7 @@ import pytest
 from continuum_swr_replay.analysis.event_definition.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     classify_swr_overlap,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (

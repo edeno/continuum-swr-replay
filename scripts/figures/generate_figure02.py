@@ -71,12 +71,12 @@ import pandas as pd
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
-    get_event_types,
-    load_data_over_time,
-)
 from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     compute_local_decoding_error,
+)
+from continuum_swr_replay.analysis.detection.nonlocal_events import (
+    get_event_types,
+    load_data_over_time,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
     read_swr_table,
@@ -86,7 +86,7 @@ from continuum_swr_replay.analysis.event_definition.classified_table import (
     assert_drawn_class_matches_ripples,
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     select_typical_event_by_class,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
@@ -114,7 +114,7 @@ from continuum_swr_replay.decoding.identifiers import (
     parse_nwb_filename,
     session_name,
 )
-from continuum_swr_replay.decoding.result_loading import load_results
+from continuum_swr_replay.decoding.results import load_results
 from continuum_swr_replay.paths import (
     processed_data_dir,
     replay_content_dir,
