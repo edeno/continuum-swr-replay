@@ -33,12 +33,12 @@ from pathlib import Path
 import pandas as pd
 
 from continuum_swr_replay.analysis.hippocampus.property_contrast import (
-    DECODE_SAMPLE_S,
     MAX_NAN_REPLICATE_SHARE,
     bootstrap_contrasts,
     bootstrap_intervals,
 )
 from continuum_swr_replay.decoding import identifiers
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_START_REST_THETA_DIR,

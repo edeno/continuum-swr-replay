@@ -36,7 +36,6 @@ from non_local_detector.discrete_state_transitions import (
     get_transition_prior,
 )
 
-from continuum_swr_replay.decoding import transitions
 from continuum_swr_replay.decoding.config import (
     DecodingConfig,
     contfrag_classifier_classes,
@@ -46,6 +45,7 @@ from continuum_swr_replay.decoding.transitions import (
     contfrag_transition_settings,
     nonlocal_transition_settings,
 )
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 
 BIN_S = 0.002
 """The decode's 2 ms bin, written out so a wrong module constant cannot hide."""
@@ -155,7 +155,7 @@ def _no_batch(*args: Any, **kwargs: Any) -> None:
 def test_rows_sum_to_one_and_expected_stays_are_the_dwell_times() -> None:
     matrix = nonlocal_transition_settings()["discrete_transition_type"].values
 
-    assert transitions.BIN_S == BIN_S
+    assert DECODE_SAMPLE_S == BIN_S
     np.testing.assert_allclose(matrix.sum(axis=1), 1.0, rtol=0, atol=1e-12)
     expected_stay_s = BIN_S / (1 - np.diag(matrix))
     np.testing.assert_allclose(expected_stay_s, [3.0, 0.1, 0.1, 0.1], rtol=1e-9)

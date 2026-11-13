@@ -14,7 +14,7 @@ Per epoch:
 1. **Decode.** The epoch is refused, and writes nothing, unless the decode's
    sha256 is the one the comparison run recorded for it. The frame is read
    through the SWR source, and its grid must step by the comparison's
-   ``SAMPLE_INTERVAL_S`` (the median step; ``inventory_run.speed_trace``).
+   ``DECODE_SAMPLE_S`` (the median step; ``inventory_run.speed_trace``).
 2. **Memberships.** The pairwise memberships are rebuilt from
    the stored tables and the frame's still time (``rebuild_matches``); the
    epoch fails unless they reproduce the stored ``directional`` and ``cells``
@@ -187,7 +187,7 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
-from continuum_swr_replay.parameters import ROOT_DIR  # noqa: E402
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S, ROOT_DIR  # noqa: E402
 from continuum_swr_replay.paths import (  # noqa: E402
     event_features_root,
     inventory_comparison_root,
@@ -390,7 +390,7 @@ def epoch_tables(
         The decode's detector, the decode or the marks are not the ones the
         memoryless run read (its manifest record of the epoch).
     ValueError
-        The grid does not step by the comparison's ``SAMPLE_INTERVAL_S``; the
+        The grid does not step by the comparison's ``DECODE_SAMPLE_S``; the
         rebuilt memberships do not reproduce the stored ``directional`` or
         ``cells``; the marks are not the encoding model's; or the memoryless
         run is not the comparison's.
@@ -398,7 +398,7 @@ def epoch_tables(
     saved = pd.read_pickle(inventory_run.decode_path(identifier))
     dot = analysed_time.with_swr_source(saved)
     del saved
-    # raises unless the grid's median step is SAMPLE_INTERVAL_S, the step
+    # raises unless the grid's median step is DECODE_SAMPLE_S, the step
     # interval_features is given
     time, speed = inventory_run.speed_trace(dot)
     animal, day, epoch = (dot[column].iloc[0] for column in SESSION_COLUMNS_DAY)
@@ -472,9 +472,7 @@ def epoch_tables(
         raise RuntimeError("The evidence is not on the traces' grid.")
 
     intervals = compared[list(INVENTORY_DTYPES)]
-    engagement = interval_features(
-        traces, intervals, sample_interval_s=inventory_run.SAMPLE_INTERVAL_S
-    )
+    engagement = interval_features(traces, intervals, sample_interval_s=DECODE_SAMPLE_S)
     _require_requested(rows, engagement)
 
     stops = pd.read_parquet(
@@ -719,7 +717,7 @@ def run_settings(inventory_run_id: str, inventory: Mapping[str, Any]) -> dict:
             "marks_rule": MARKS_RULE,
             "grid": {
                 "rule": GRID_RULE,
-                "sample_interval_s": inventory_run.SAMPLE_INTERVAL_S,
+                "sample_interval_s": DECODE_SAMPLE_S,
             },
             "evidence": {
                 "likelihood": EVIDENCE_LIKELIHOOD,

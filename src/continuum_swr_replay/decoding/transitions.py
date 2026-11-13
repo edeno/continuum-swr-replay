@@ -33,9 +33,6 @@ from non_local_detector.discrete_state_transitions import (
 
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
-BIN_S: Final[float] = 1 / SAMPLING_FREQUENCY
-"""The decode's time bin (s): 2 ms at ``SAMPLING_FREQUENCY`` = 500 Hz."""
-
 LOCAL_DWELL_S: Final[float] = 3.0
 """Expected stay in Local (s): the interval between awake events during stops.
 

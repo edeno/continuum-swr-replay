@@ -30,7 +30,7 @@ Per epoch:
    step (:data:`MAX_GAP_S`), gives the still intervals, where the speed is
    known (``exclusion_by_reason``'s ``speed_known``) and the samples that were
    not still (the recount's ``not_still_s``). The grid must step by
-   :data:`SAMPLE_INTERVAL_S`. Every detector's epoch is the grid's first to
+   :data:`DECODE_SAMPLE_S`. Every detector's epoch is the grid's first to
    last time, which must be the position span the SWR source run cut its band
    to (its record's ``position_span_s``); otherwise the epoch fails, with that
    reason, and writes nothing.
@@ -109,7 +109,6 @@ from continuum_swr_replay.analysis.inventory_comparison.inventory_run import (
     DETECTORS,
     MAX_GAP_S,
     ROSTER,
-    SAMPLE_INTERVAL_S,
     SEQUENCE_COHORTS,
     SWR_DEFINITIONS,
     decode_path,
@@ -123,7 +122,7 @@ from continuum_swr_replay.analysis.inventory_comparison.recount import (
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     STATE_SPACE,
 )
-from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S, ROOT_DIR
 from continuum_swr_replay.paths import (
     carey_root,
     inventory_comparison_root,
@@ -148,7 +147,7 @@ PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
 
 SPEED_TRACE = "head_speed of the canonical decode frame, on its grid"
-BOUNDS_TOLERANCE_S = SAMPLE_INTERVAL_S / 2
+BOUNDS_TOLERANCE_S = DECODE_SAMPLE_S / 2
 """How far the decode grid's first or last time may lie from the SWR run's
 position span: less than half a sample, so both name the same samples."""
 
@@ -309,7 +308,7 @@ def run_settings(carey_run_id: str, memoryless_run_id: str) -> dict:
             "recount": {
                 "detector": STATE_SPACE,
                 "gaps_s": FRAGMENT_GAPS_S,
-                "sample_interval_s": SAMPLE_INTERVAL_S,
+                "sample_interval_s": DECODE_SAMPLE_S,
             },
             "speed": {
                 "trace": SPEED_TRACE,

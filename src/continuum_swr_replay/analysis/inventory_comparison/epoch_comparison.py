@@ -56,7 +56,6 @@ from continuum_swr_replay.analysis.inventory_comparison.inventory_run import (
     DETECTORS,
     MAX_GAP_S,
     ROSTER,
-    SAMPLE_INTERVAL_S,
     SEQUENCE_COHORTS,
     SWR_DEFINITIONS,
     TABLE_DTYPES,
@@ -93,6 +92,7 @@ from continuum_swr_replay.intervals import (
     contains,
     total_duration,
 )
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 __all__ = [
@@ -291,7 +291,7 @@ def compare_epoch(
             coverage,
             detector=STATE_SPACE,
             gap_s=gap_s,
-            sample_interval_s=SAMPLE_INTERVAL_S,
+            sample_interval_s=DECODE_SAMPLE_S,
             not_still_s=not_still,
         )
         recount.append(

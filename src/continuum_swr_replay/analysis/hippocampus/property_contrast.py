@@ -42,10 +42,8 @@ from continuum_swr_replay.analysis.shared_statistics import (
     nested_codes,
     weighted_median,
 )
-from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 
-#: An event's duration is a whole number of decode samples of this length (s).
-DECODE_SAMPLE_S = 1.0 / SAMPLING_FREQUENCY
 #: The largest share of bootstrap replicates allowed to have no estimate.
 MAX_NAN_REPLICATE_SHARE = 0.01
 

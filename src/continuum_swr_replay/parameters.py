@@ -8,6 +8,8 @@ Constants
 ---------
 SAMPLING_FREQUENCY : int
     Decoding sampling frequency (500 Hz). All temporal analyses use this rate.
+DECODE_SAMPLE_S : float
+    The decode's time step, ``1 / SAMPLING_FREQUENCY`` (0.002 s).
 DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC : float
     Whole-event speed threshold (4.0 cm/s) shared by Non-Local, SWR, and MUA
     analysis cohorts. Every event sample must be finite and strictly below it.
@@ -72,6 +74,9 @@ from continuum_swr_replay.paths import ROOT_DIR, processed_data_dir
 # Decoding sampling frequency in samples per second
 SAMPLING_FREQUENCY = 500
 
+DECODE_SAMPLE_S: Final[float] = 1 / SAMPLING_FREQUENCY
+"""The decode's time step (s): 2 ms at ``SAMPLING_FREQUENCY`` = 500 Hz."""
+
 # Canonical whole-event immobility threshold for Non-Local, SWR, and MUA
 # analysis events (cm/s). Every event-bin speed must be strictly below it.
 DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC = 4.0
@@ -123,6 +128,7 @@ def __getattr__(name: str) -> Path:
 __all__ = [
     # Sampling and thresholds
     "SAMPLING_FREQUENCY",
+    "DECODE_SAMPLE_S",
     "DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC",
     "PROBABILITY_THRESHOLDS",
     "DEFAULT_NON_LOCAL_THRESHOLD",

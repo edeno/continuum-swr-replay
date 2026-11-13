@@ -86,6 +86,7 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_DTYPES,
 )
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (
     PROCESSED_DATA_DIR_ENV,
     carey_root,
@@ -723,7 +724,7 @@ def test_the_manifest_records_the_inputs_and_the_rules(run):
     assert settings["evidence"]["block_rows"] == runner.BLOCK_ROWS
     assert settings["evidence"]["library_block_size"] == 100
     assert "baselines" not in settings
-    assert settings["grid"]["sample_interval_s"] == inventory_run.SAMPLE_INTERVAL_S
+    assert settings["grid"]["sample_interval_s"] == DECODE_SAMPLE_S
     assert "unavailable" in settings["tracking_confidence"]
     assert settings["stop_table"]["path"] == "replay_content/stop_table.parquet"
     assert len(settings["stop_table"]["sha256"]) == 64

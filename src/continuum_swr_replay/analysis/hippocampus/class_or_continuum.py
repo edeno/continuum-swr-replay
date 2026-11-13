@@ -65,6 +65,7 @@ from sklearn.preprocessing import SplineTransformer
 
 from continuum_swr_replay.analysis.hippocampus.swr_detectors import DETECTOR_SETTINGS
 from continuum_swr_replay.intervals import contiguous_true_runs
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 
 KAY_ZSCORE_THRESHOLD = float(DETECTOR_SETTINGS["kay"]["zscore_threshold"])
 """The z-score the Kay detector's SWRs must reach (2.0)."""
@@ -596,7 +597,7 @@ def simulate_ripple_events(
     rng: np.random.Generator,
     *,
     duration_s: float = 600.0,
-    sample_interval_s: float = 0.002,
+    sample_interval_s: float = DECODE_SAMPLE_S,
     burst_rate_hz: float = 1.0,
     amplitude_sigma: float = 0.8,
     background_sd: float = 1.0,

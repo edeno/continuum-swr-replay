@@ -32,7 +32,7 @@ from continuum_swr_replay.analysis.events.swr_source import (
     read_swr_inventory,
     swr_epoch_id_of_session,
 )
-from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .._fit_diagnostics import (
@@ -57,7 +57,6 @@ from .per_bin_rate_model import freeze_per_bin_cohort
 
 __all__ = [
     "CROSS_RUNGS",
-    "DECODE_SAMPLE_S",
     "END_COLUMN",
     "HISTORY_BLOCKS",
     "POPULATION_PLAN",
@@ -77,8 +76,6 @@ CROSS_RUNGS = ("Mselfcross_onset_dur", "Mselfcross_offset_dur", "Mselfcross_dur"
 HISTORY_WINDOW_S = longest_history_window_s(LADDER.values())
 #: An event's end, seconds since its stop's onset.
 END_COLUMN = "t_end_since_stop_onset"
-#: The decode's sample (2 ms at 500 Hz).
-DECODE_SAMPLE_S = 1 / SAMPLING_FREQUENCY
 #: An SWR onset matches its Kay event when their starts differ by at most this
 #: (one 2 ms sample, with rounding).
 SWR_START_TOLERANCE_S = 0.0025

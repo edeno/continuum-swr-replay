@@ -5,7 +5,8 @@ what the scripts that read its runs (the event features runner, the two
 reports and the example figures) read it by: the roster of nine inventories
 and the comparisons over them (:data:`ROSTER`, :data:`CELLS`,
 :data:`COMPARISONS`), the decode it reads and its grid (:func:`decode_path`,
-:func:`speed_trace`, :data:`SAMPLE_INTERVAL_S`), and every table an epoch
+:func:`speed_trace`, which steps by ``parameters.DECODE_SAMPLE_S``, the step
+the recount counts its gaps on), and every table an epoch
 writes (:data:`TABLE_DTYPES`, :func:`output_paths`, :func:`stamped_tables`).
 Design: ``docs/design/replay_detection_comparison/03-inventory-comparison.md``.
 """
@@ -56,6 +57,7 @@ from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.intervals import max_step_s, sample_step
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.io import output_path
 
@@ -68,7 +70,6 @@ __all__ = [
     "DETECTORS",
     "MAX_GAP_S",
     "ROSTER",
-    "SAMPLE_INTERVAL_S",
     "SEQUENCE_COHORTS",
     "SWR_DEFINITIONS",
     "TABLE_DTYPES",
@@ -120,9 +121,7 @@ COMPARISONS: Mapping[str, tuple[str, ...]] = MappingProxyType(
 """Each comparison whose excluded time is split by reason: every pair, all
 nine, and each SWR-matrix population."""
 
-SAMPLE_INTERVAL_S = 0.002
-"""The decode grid's step, on which the recount counts its gaps."""
-MAX_GAP_S = max_step_s(SAMPLE_INTERVAL_S)
+MAX_GAP_S = max_step_s(DECODE_SAMPLE_S)
 """A step longer than this breaks the speed trace's runs."""
 COUNT_DTYPES: Mapping[str, object] = MappingProxyType(
     {
@@ -189,13 +188,13 @@ def speed_trace(dot: pd.DataFrame) -> tuple[NDArray, NDArray]:
     Raises
     ------
     ValueError
-        The grid does not step by ``SAMPLE_INTERVAL_S``.
+        The grid does not step by ``DECODE_SAMPLE_S``.
     """
     time = dot.index.to_numpy(dtype=np.float64)
     step = sample_step(time)
-    if not np.isclose(step, SAMPLE_INTERVAL_S, rtol=0.0, atol=1e-5):
+    if not np.isclose(step, DECODE_SAMPLE_S, rtol=0.0, atol=1e-5):
         raise ValueError(
-            f"The decode grid steps by {step} s, not {SAMPLE_INTERVAL_S} s, the "
+            f"The decode grid steps by {step} s, not {DECODE_SAMPLE_S} s, the "
             "step the recount counts gaps on."
         )
     return time, dot["head_speed"].to_numpy(dtype=np.float64)

@@ -17,6 +17,7 @@ from continuum_swr_replay.analysis.behavior import (
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS as _ALL_ARMS
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
 from continuum_swr_replay.intervals import sample_step
+from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.visualization.palettes import COLORS
 
@@ -646,7 +647,9 @@ def _plot_arm_posterior_heatmap(ax: Axes, ctx: _PanelContext) -> None:
     # them, leaving a confusing lone dot with no background.
     all_times = view["time"].to_numpy()
     diffs = np.diff(all_times)
-    dt_fallback = float(np.median(diffs[diffs > 0])) if (diffs > 0).any() else 0.002
+    dt_fallback = (
+        float(np.median(diffs[diffs > 0])) if (diffs > 0).any() else DECODE_SAMPLE_S
+    )
 
     # Draw one pcolormesh per event — matplotlib doesn't interpolate
     # across discontinuous x, so per-event calls keep gaps white.
