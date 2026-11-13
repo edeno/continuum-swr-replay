@@ -738,9 +738,12 @@ def _build_all_session_tables(
 
     Data-gap failures (missing/corrupt input, unexpected shape) are skipped and
     recorded; a code bug (``KeyError`` / ``AttributeError`` / ``AssertionError``)
-    propagates so a regression is not silently skipped across the run. If any
-    session failed, raise before returning so a partial corpus is never
-    assembled or written. Returns the per-session event / event-arm / stop /
+    propagates so a regression is not silently skipped across the run. A
+    missing required column raises ``ValueError``
+    (:func:`~continuum_swr_replay.tables.columns.require_columns`), so it is
+    recorded as a session failure rather than propagated. If any session
+    failed, raise before returning so a partial corpus is never assembled or
+    written. Returns the per-session event / event-arm / stop /
     event-sequence table lists.
     """
     all_event_tables: list[pd.DataFrame] = []
@@ -768,7 +771,9 @@ def _build_all_session_tables(
             # errors (missing file, corrupt input, unexpected shape).
             # ``KeyError`` / ``AttributeError`` / ``AssertionError``
             # are propagated — they indicate a code bug and silent
-            # skips would hide the regression across the run.
+            # skips would hide the regression across the run. A missing
+            # required column is a ValueError: it lands here and fails the
+            # run after the loop.
             logging.warning("skip %s %s: %s", nwb, epoch, e)
             session_failures.append(
                 {"nwb_file_name": nwb, "epoch": epoch, "reason": str(e)}
