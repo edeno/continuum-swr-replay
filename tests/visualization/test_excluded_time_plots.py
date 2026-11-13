@@ -51,9 +51,6 @@ PANELS = {
     "B5 plot_state_fractions_by_movement": (
         figure_panels.plot_state_fractions_by_movement
     ),
-    "C9 plot_state_probability_by_theta_phase": (
-        figure_panels.plot_state_probability_by_theta_phase
-    ),
     "B3 supp panel a": lambda frame, ax: supp.plot_non_local_prob_distribution(
         frame, ax
     ),
@@ -76,7 +73,6 @@ def test_a_panel_draws_what_it_draws_without_the_excluded_rows(name):
     [
         figure_panels.plot_swr_zscore_by_state,
         figure_panels.plot_state_fractions_by_movement,
-        figure_panels.plot_state_probability_by_theta_phase,
     ],
 )
 def test_a_panel_refuses_a_frame_not_read_through_the_source(plot):

@@ -17,11 +17,9 @@ import seaborn as sns
 
 from continuum_swr_replay.analysis.constants import (
     BINS_DURATION_MS,
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (
-    analysed_bins,
     immobile_analysed_bins,
 )
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
@@ -45,7 +43,6 @@ from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
 from continuum_swr_replay.analysis.hippocampus.triggered_analysis import (
     compute_triggered_average_curves,
 )
-from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.visualization.figure_utilities import (
     PANEL_SINGLE,
     get_figure_size,
@@ -812,109 +809,6 @@ def plot_state_fractions_by_movement(
         fontsize=5,
         frameon=False,
     )
-    sns.despine(ax=ax)
-
-    if standalone:
-        plt.tight_layout()
-
-
-def plot_state_probability_by_theta_phase(
-    data_over_time: pd.DataFrame,
-    n_bins: int = 36,
-    ax: plt.Axes | None = None,
-) -> None:
-    """Plot Local and Non-Local probability as a function of theta phase.
-
-    During movement, non-local activity (theta sequences) should cluster at
-    specific theta phases while local coding dominates others. The phase axis
-    is doubled (0 to 4pi) to show oscillatory structure without edge wrapping.
-
-    Uses per-session binning then median across sessions for consistent
-    aggregation.
-
-    Parameters
-    ----------
-    data_over_time : pd.DataFrame
-        Aggregated ``data_over_time`` DataFrame with ``theta_phase``,
-        ``Local_prob``, ``Non-Local_Continuous_prob``,
-        ``Non-Local_Fragmented_prob``, ``head_speed``, ``in_excluded_time``
-        and session grouping columns (``animal``, ``day``, ``epoch``). Bins in
-        excluded time are left out.
-    n_bins : int, optional
-        Number of phase bins over [0, 2pi]. Default 36 (10-degree bins).
-    ax : matplotlib Axes, optional
-        Axes to plot on. If None, creates standalone figure.
-
-    """
-    standalone = ax is None
-    if standalone:
-        fig, ax = plt.subplots(figsize=PANEL_SINGLE)
-
-    group_cols = ["animal", "day", "epoch"]
-
-    # Movement periods only — theta phase is unreliable during immobility —
-    # outside excluded time
-    is_moving = (
-        data_over_time["head_speed"] > DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    ) & analysed_bins(data_over_time)
-    moving = data_over_time.loc[is_moving].copy()
-
-    # Combined non-local probability
-    moving["Non-Local_prob"] = nonlocal_probability(moving)
-
-    # Bin theta phase into [0, 2pi) bins
-    bin_edges = np.linspace(0, 2 * np.pi, n_bins + 1)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-    moving["phase_bin"] = np.digitize(moving["theta_phase"], bin_edges[1:-1])
-    moving["phase_bin"] = moving["phase_bin"].clip(0, n_bins - 1)
-
-    # Per-session mean probability in each phase bin, then median across sessions
-    prob_cols = ["Local_prob", "Non-Local_prob"]
-    session_binned = (
-        moving.groupby(group_cols + ["phase_bin"], sort=False)[prob_cols]
-        .mean()
-        .reset_index()
-    )
-
-    # Double the phase axis: tile bins for [0, 4pi]
-    centers_doubled = np.concatenate([bin_centers, bin_centers + 2 * np.pi])
-
-    for prob_col, color, label in [
-        ("Local_prob", COLORS["Local"], "Local"),
-        ("Non-Local_prob", COLORS["Non-Local"], "Non-Local"),
-    ]:
-        grouped = session_binned.groupby("phase_bin")[prob_col]
-        median_vals = grouped.median().values
-        q25_vals = grouped.quantile(0.25).values
-        q75_vals = grouped.quantile(0.75).values
-
-        # Tile for doubled axis
-        median_doubled = np.tile(median_vals, 2)
-        q25_doubled = np.tile(q25_vals, 2)
-        q75_doubled = np.tile(q75_vals, 2)
-
-        ax.fill_between(
-            centers_doubled,
-            q25_doubled,
-            q75_doubled,
-            color=color,
-            alpha=0.3,
-        )
-        ax.plot(
-            centers_doubled,
-            median_doubled,
-            color=color,
-            linewidth=1.5,
-            label=label,
-        )
-
-    # Format x-axis as multiples of pi
-    ax.set_xticks([0, np.pi, 2 * np.pi, 3 * np.pi, 4 * np.pi])
-    ax.set_xticklabels(["0", "\u03c0", "2\u03c0", "3\u03c0", "4\u03c0"])
-    ax.set_xlim(0, 4 * np.pi)
-    ax.set_xlabel("Theta Phase")
-    ax.set_ylabel("State Probability")
-    ax.legend(fontsize=5, frameon=False)
     sns.despine(ax=ax)
 
     if standalone:
