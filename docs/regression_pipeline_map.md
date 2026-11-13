@@ -42,9 +42,9 @@ Immobility bouts: where a stop begins and ends, and what falls inside one.
 
 ### `src/continuum_swr_replay/analysis/behavior/tables/prepare_data.py`
 
-Build the four canonical replay-content tables across all sessions.
+The per-session replay-table build and the corpus-level steps around it.
 
-`output_dir`, `session_cache_dir`, `find_sessions`, `behavioral_context_cache_path`, `load_behavioral_context`, `populate_behavioral_context_cache`, `build_stop_table_scope`, `run_prepare_data`, `read_disjoint_shards`, `assemble_replay_content_shards`, `assemble_replay_stop_shards`
+`session_cache_dir`, `behavioral_context_cache_path`, `load_behavioral_context`, `build_session_tables`, `assemble_canonical_tables`, `standardize_event_arm`
 
 ### `src/continuum_swr_replay/analysis/behavior/tables/table_contracts.py`
 
@@ -656,17 +656,23 @@ Run Carey's candidate detector on every epoch's CA1 LFP and multiunit spikes.
 
 `swr_run_inputs`, `observation_table`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
 
+### `scripts/tables/_table_runner.py`
+
+The runner parts the table drivers share.
+
+`find_sessions`, `find_contfrag_sessions`, `read_disjoint_shards`, `publish_replay_tables`, `publish_contfrag_tables`
+
 ### `scripts/tables/assemble_contfrag_shards.py`
 
 Assemble disjoint per-animal ContFrag shards into one canonical bundle.
 
-`main`
+`assemble_contfrag_shards`, `main`
 
 ### `scripts/tables/assemble_replay_content_shards.py`
 
 Assemble disjoint Replay table shards into one canonical candidate bundle.
 
-`main`
+`assemble_replay_content_shards`, `assemble_replay_stop_shards`, `main`
 
 ### `scripts/tables/build_timebin_tables.py`
 
@@ -684,19 +690,19 @@ Convert the materialized canonical tables from pickle to parquet.
 
 Build canonical replay-content tables from ContFrag decoding results.
 
-`build_parser`, `configure_paths`, `main`
+`build_contfrag_tables`, `build_parser`, `configure_paths`, `main`
 
 ### `scripts/tables/prepare_replay_content_data.py`
 
 Build the four canonical replay-content tables across all sessions.
 
-`main`
+`populate_behavioral_context_cache`, `build_stop_table_scope`, `run_prepare_data`, `main`
 
 ### `scripts/tables/refresh_contfrag_behavioral_covariates.py`
 
 Rebuild ContFrag tables while reusing immutable posterior aggregates.
 
-`main`
+`refresh_contfrag_behavioral_covariates`, `main`
 
 ### `scripts/tables/regenerate_stop_table.py`
 
