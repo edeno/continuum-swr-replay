@@ -138,7 +138,6 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
     MIN_BIN_WINDOWS,
     PRIMARY_ENCODING,
     PROBABILITY_BIN_LABELS,
-    RUNNING_ENCODING_MIN_SPEED_CM_S,
     STATES,
     UNDERFLOW_OCCUPANCY_FLOOR,
     analysed_regimes,
@@ -178,7 +177,10 @@ from continuum_swr_replay.decoding.results import (  # noqa: E402
     open_results,
 )
 from continuum_swr_replay.intervals import sample_step  # noqa: E402
-from continuum_swr_replay.parameters import ROOT_DIR  # noqa: E402
+from continuum_swr_replay.parameters import (  # noqa: E402
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    ROOT_DIR,
+)
 from continuum_swr_replay.paths import processed_data_dir  # noqa: E402
 from continuum_swr_replay.runs.batch import (  # noqa: E402
     raise_open_file_limit,
@@ -989,7 +991,7 @@ def run_settings() -> dict:
         "flushes them): no stored-likelihood or library comparison, and no MAP_S "
         "or remote-bin choice, of any encoding",
         "encodings": {
-            "runcv": f"running-only (head_speed >= {RUNNING_ENCODING_MIN_SPEED_CM_S} "
+            "runcv": f"running-only (head_speed >= {DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC} "
             f"cm/s) refit on each fold of alternating {CV_BLOCK_S:g} s blocks; a "
             "window is scored by the fold without its centre bin",
             "run": "running-only refit on every running bin",

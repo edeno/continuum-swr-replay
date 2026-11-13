@@ -29,6 +29,7 @@ from continuum_swr_replay.intervals import (
     overlaps_open,
     pad_intervals,
 )
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def build_session_fit_mask(
     *,
     cohort_stops: pd.DataFrame | None = None,
     stop_cohort: str = "at_well",
-    immobility_threshold: float = 4.0,
+    immobility_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     excluded_intervals: pd.DataFrame | None = None,
     basis_half_window_s: float | None = None,
 ) -> tuple[pd.Series, pd.Series, dict[str, Any]]:

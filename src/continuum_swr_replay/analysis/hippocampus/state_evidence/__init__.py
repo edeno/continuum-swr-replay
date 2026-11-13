@@ -172,7 +172,6 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
 from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (
     CV_BLOCK_S,
     EVENT_MARGIN_BINS,
-    RUNNING_ENCODING_MIN_SPEED_CM_S,
     UNDERFLOW_OCCUPANCY_FLOOR,
     TetrodeTerms,
     encoding_comparison,
@@ -219,7 +218,6 @@ __all__ = [
     "PRIMARY_METRICS",
     "PROBABILITY_BIN_LABELS",
     "REGIMES",
-    "RUNNING_ENCODING_MIN_SPEED_CM_S",
     "SECONDARY_METRICS",
     "SPLIT_COLUMN",
     "STATES",

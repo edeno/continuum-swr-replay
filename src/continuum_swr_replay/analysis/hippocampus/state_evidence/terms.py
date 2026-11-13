@@ -19,6 +19,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.results import ENCODING_KEY, load_saved_detector
 from continuum_swr_replay.intervals import sample_step
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 from continuum_swr_replay.paths import processed_data_dir
 
 
@@ -588,8 +589,6 @@ def training_spike_bins(
     return covered
 
 
-RUNNING_ENCODING_MIN_SPEED_CM_S = 4.0
-"""The running-only encodings are fit on bins at or above this head speed (cm/s)."""
 EVENT_MARGIN_BINS = 2
 """Running bins this close to a non-local event bin are left out of every
 running-only fit. The library pads each training run by one bin width, the
@@ -647,7 +646,8 @@ def running_only_masks(
     ValueError
         An event bin is in a mask's library span, or a mask is empty.
     """
-    at_speed = speed >= RUNNING_ENCODING_MIN_SPEED_CM_S
+    # running-only encodings: bins at or above the immobility threshold
+    at_speed = speed >= DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
     near_event = in_event.copy()
     for shift in range(1, EVENT_MARGIN_BINS + 1):
         near_event[:-shift] |= in_event[shift:]
@@ -660,7 +660,7 @@ def running_only_masks(
         "runcv1": running & (folds == 1),
     }
     record: dict[str, Any] = {
-        "min_speed_cm_s": RUNNING_ENCODING_MIN_SPEED_CM_S,
+        "min_speed_cm_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
         "event_bins": int(in_event.sum()),
         "event_bins_at_running_speed": int((in_event & at_speed).sum()),
         "running_bins_left_out_near_events": int((near_event & at_speed).sum()),

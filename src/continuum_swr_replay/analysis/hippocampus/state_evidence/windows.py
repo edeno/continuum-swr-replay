@@ -14,13 +14,15 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from continuum_swr_replay.intervals import contiguous_true_runs, interval_mask
-from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+)
 
 STATES = ("Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented")
 """The decoder's states, in its own order."""
 
 REGIMES = ("immobile", "running")
-IMMOBILE_BELOW_CM_S = 4.0
 RUNNING_ABOVE_CM_S = 10.0
 
 Seed = int | Sequence[int | str]
@@ -69,7 +71,7 @@ def regimes(head_speed: NDArray) -> NDArray:
     """
     speed = np.asarray(head_speed, dtype=float)
     out = np.full(speed.shape, "", dtype="<U8")
-    out[speed < IMMOBILE_BELOW_CM_S] = "immobile"
+    out[speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC] = "immobile"
     out[speed > RUNNING_ABOVE_CM_S] = "running"
     return out
 
