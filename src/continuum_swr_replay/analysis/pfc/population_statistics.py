@@ -397,6 +397,16 @@ def bh_called_fraction(population: pd.DataFrame, name: str, alpha: float) -> flo
     return (q[np.isfinite(q)] < alpha).mean()
 
 
+#: Figure 4d's best-model bars: the models :func:`best_model_fractions` counts,
+#: by the word the mpfc summary's keys use.
+BEST_MODELS = {
+    "constant": "constant",
+    "swr": "SWR",
+    "nonlocal": "non_local",
+    "joint": "SWR + non_local_no_SWR",
+}
+
+
 def best_model_fractions(
     population: pd.DataFrame,
     models: Sequence[str],
@@ -837,6 +847,16 @@ def replay_split_statistics(population: pd.DataFrame) -> dict[str, float]:
     }
 
 
+#: The curves whose peak sizes the mpfc summary reports
+#: (:func:`peak_modulation_statistics`), by the word its keys use.
+EFFECT_CURVES = {
+    "swr_replay": "non_local_SWR",
+    "non_swr_replay": "non_local_no_SWR",
+    "swr": "SWR",
+    "matched_control": "matched_control",
+}
+
+
 def peak_modulation_statistics(
     population: pd.DataFrame, curves: Sequence[str]
 ) -> pd.DataFrame:
@@ -873,6 +893,15 @@ def peak_modulation_statistics(
 
 
 # --- SWRs without replay ---------------------------------------------------------------
+
+#: The SWR-without-replay class's extra curves, as ``load_population_data``
+#: reads them from the extended event set's bundles.
+SWR_WITHOUT_REPLAY_CURVES = ("SWR_no_non_local", "non_local_SWR_3class")
+
+#: A session-level event floor for the SWR-without-replay check: the main values
+#: are over every session, and the same values over sessions with at least this
+#: many SWRs without replay are the check.
+SWR_WITHOUT_REPLAY_MIN_EVENTS = 10
 
 
 def swr_without_replay_sessions(sidecars: Sequence[Mapping]) -> pd.DataFrame:

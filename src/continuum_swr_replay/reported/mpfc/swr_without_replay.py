@@ -15,25 +15,21 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     CALLED_ALPHA as ALPHA,
 )
 from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
-from continuum_swr_replay.reported.mpfc.common import (
-    ANIMAL_WORDS,
+from continuum_swr_replay.analysis.pfc.population_statistics import (
+    SWR_WITHOUT_REPLAY_MIN_EVENTS,
+)
+from continuum_swr_replay.analysis.pfc.timing import (
     TIMING_BOOTSTRAP_DRAWS,
     TIMING_BOOTSTRAP_SEED,
+)
+from continuum_swr_replay.reported.mpfc.common import (
+    ANIMAL_WORDS,
     TIMING_RESAMPLES,
     _finite_adder,
 )
 from continuum_swr_replay.reported.values import (
     Value,
 )
-
-#: The new class's extra curves, as ``load_population_data`` reads them.
-SWR_WITHOUT_REPLAY_CURVES = ("SWR_no_non_local", "non_local_SWR_3class")
-
-#: A session-level event floor for the new class's check: the main values are
-#: over every session, and the same values over sessions with at least this
-#: many SWRs without replay are the check.
-SWR_WITHOUT_REPLAY_MIN_EVENTS = 10
-
 
 # --- SWRs without replay ------------------------------------------------------------
 

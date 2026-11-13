@@ -53,21 +53,22 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     significant_fraction,
 )
 from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
-from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
-from continuum_swr_replay.paths import ROOT_DIR
-from continuum_swr_replay.reported.mpfc.common import (
+from continuum_swr_replay.analysis.pfc.population_statistics import (
+    BEST_MODELS,
+    EFFECT_CURVES,
+    SWR_WITHOUT_REPLAY_CURVES,
+    SWR_WITHOUT_REPLAY_MIN_EVENTS,
+)
+from continuum_swr_replay.analysis.pfc.timing import (
     TIMING_BOOTSTRAP_DRAWS,
     TIMING_BOOTSTRAP_SEED,
 )
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.mpfc.inputs import (
     STEM,
     default_inputs,
     read_sidecars,
-)
-from continuum_swr_replay.reported.mpfc.population import BEST_MODELS, EFFECT_CURVES
-from continuum_swr_replay.reported.mpfc.swr_without_replay import (
-    SWR_WITHOUT_REPLAY_CURVES,
-    SWR_WITHOUT_REPLAY_MIN_EVENTS,
 )
 
 #: The gates compared, by label. ``none`` is the smallest positive rate: a

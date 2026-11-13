@@ -18,6 +18,10 @@ from continuum_swr_replay.analysis.pfc.heldout import empirical_pvalue_floor
 from continuum_swr_replay.analysis.pfc.load_population import (
     CALLED_ALPHA as ALPHA,
 )
+from continuum_swr_replay.analysis.pfc.population_statistics import (
+    BEST_MODELS,
+    EFFECT_CURVES,
+)
 from continuum_swr_replay.reported.mpfc.common import (
     ANIMAL_WORDS,
     CLASS_LABELS,
@@ -42,22 +46,6 @@ CLASSES = {
 
 #: The curves whose prior binding the audit counts (compare_pfc_cohorts.CURVE_NAMES).
 CURVES = ("SWR", "no_SWR", "non_local_SWR", "non_local_no_SWR", "matched_control")
-
-#: Figure 4d's best-model bars.
-BEST_MODELS = {
-    "constant": "constant",
-    "swr": "SWR",
-    "nonlocal": "non_local",
-    "joint": "SWR + non_local_no_SWR",
-}
-
-#: The curves whose peak sizes are reported, by the word their keys use.
-EFFECT_CURVES = {
-    "swr_replay": "non_local_SWR",
-    "non_swr_replay": "non_local_no_SWR",
-    "swr": "SWR",
-    "matched_control": "matched_control",
-}
 
 
 def _uniform(sidecars: list[dict[str, Any]], name: str) -> Any:

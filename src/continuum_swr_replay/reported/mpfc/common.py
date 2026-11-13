@@ -44,11 +44,8 @@ ANIMAL_WORDS = {
 }
 
 
-#: Nested-bootstrap replicates behind the population timing intervals, and their
-#: seed.
-TIMING_BOOTSTRAP_DRAWS = 1_000
-TIMING_BOOTSTRAP_SEED = 0
-#: What those replicates resample.
+#: What the timing intervals' bootstrap replicates
+#: (``analysis.pfc.timing.TIMING_BOOTSTRAP_DRAWS``) resample.
 TIMING_RESAMPLES = (
     "nested resamples (the animals, then each drawn animal's recording days, then "
     "each drawn day's units)"

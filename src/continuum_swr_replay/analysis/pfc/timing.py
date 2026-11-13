@@ -461,6 +461,11 @@ def _mean_curve_timing(
 #: The sign of a unit's peak, by the word for its direction.
 DIRECTIONS = {"enhanced": 1.0, "suppressed": -1.0}
 
+#: Nested-bootstrap replicates behind the reported population timing intervals,
+#: and their seed.
+TIMING_BOOTSTRAP_DRAWS = 1_000
+TIMING_BOOTSTRAP_SEED = 0
+
 _MS = 1e3
 
 #: The columns of :func:`called_response_timing`.

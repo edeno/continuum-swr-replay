@@ -60,6 +60,9 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     MIN_FIRING_RATE_HZ,
     load_population_data,
 )
+from continuum_swr_replay.analysis.pfc.population_statistics import (
+    SWR_WITHOUT_REPLAY_CURVES,
+)
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.mpfc.common import TAGS
 from continuum_swr_replay.reported.mpfc.followups import followup_values
@@ -80,7 +83,6 @@ from continuum_swr_replay.reported.mpfc.population import (
 )
 from continuum_swr_replay.reported.mpfc.rate_cutoff import rate_cutoff_check_values
 from continuum_swr_replay.reported.mpfc.swr_without_replay import (
-    SWR_WITHOUT_REPLAY_CURVES,
     swr_without_replay_values,
 )
 from continuum_swr_replay.reported.mpfc.timing import timing_values

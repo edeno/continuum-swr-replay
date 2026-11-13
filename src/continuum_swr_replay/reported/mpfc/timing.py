@@ -14,12 +14,14 @@ from continuum_swr_replay.analysis.pfc import population_statistics, timing
 from continuum_swr_replay.analysis.pfc.load_population import (
     CALLED_ALPHA as ALPHA,
 )
+from continuum_swr_replay.analysis.pfc.timing import (
+    TIMING_BOOTSTRAP_DRAWS,
+    TIMING_BOOTSTRAP_SEED,
+)
 from continuum_swr_replay.reported.mpfc.common import (
     ANIMAL_WORDS,
     CLASS_LABELS,
     OWN_CURVE,
-    TIMING_BOOTSTRAP_DRAWS,
-    TIMING_BOOTSTRAP_SEED,
     TIMING_RESAMPLES,
     _finite_adder,
 )
