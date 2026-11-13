@@ -178,7 +178,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
     windows_holding,
 )
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
-from continuum_swr_replay.decoding.files import epoch_identifier_of
+from continuum_swr_replay.decoding.files import (
+    DETECTOR_SUFFIX,
+    epoch_identifier_of,
+)
 from continuum_swr_replay.decoding.identifiers import (
     EpochKey,
     parse_epoch_identifier,
@@ -266,9 +269,9 @@ def find_epochs(
         swr_epoch_id(nwb_file_name, epoch_name) for nwb_file_name, epoch_name in keys
     }
     skipped = {}
-    pattern = f"{animal}*_HPC*_detector.pkl" if animal else "*_HPC*_detector.pkl"
+    pattern = f"{animal if animal else ''}*_HPC*{DETECTOR_SUFFIX}"
     for detector in sorted(root.glob(pattern)):
-        epoch_id = epoch_identifier_of(detector, "_detector.pkl")
+        epoch_id = epoch_identifier_of(detector, DETECTOR_SUFFIX)
         if epoch_id in epochs:
             continue
         try:

@@ -75,6 +75,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
 from continuum_swr_replay.decoding.files import (  # noqa: E402
+    ENVIRONMENT_SUFFIX,
     decode_paths,
     epoch_identifier_of,
 )
@@ -115,8 +116,8 @@ def find_sessions(animal: str | None) -> list[str]:
     glob, so a pending epoch's decode in the folder is not read.
     """
     out = []
-    for env in analysed_decode_files(processed_data_dir(), "_environment.pkl"):
-        epoch_id = epoch_identifier_of(env, "_environment.pkl")
+    for env in analysed_decode_files(processed_data_dir(), ENVIRONMENT_SUFFIX):
+        epoch_id = epoch_identifier_of(env, ENVIRONMENT_SUFFIX)
         if animal is not None and parse_epoch_identifier(epoch_id).animal != animal:
             continue
         if decode_paths(epoch_id, processed_data_dir()).data_over_time.exists():

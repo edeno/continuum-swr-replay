@@ -23,6 +23,11 @@ from typing import NamedTuple
 
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 
+DETECTOR_SUFFIX = "_detector.pkl"
+"""What follows the epoch identifier in a decode's saved detector's name."""
+ENVIRONMENT_SUFFIX = "_environment.pkl"
+"""What follows the epoch identifier in a decode's saved environment's name."""
+
 
 def non_local_threshold_percent(non_local_threshold: float) -> int:
     """The percent a decode's ``data_over_time`` file is named for.
@@ -96,8 +101,8 @@ def decode_paths(
         data_over_time=root
         / f"{epoch_identifier}{data_over_time_suffix(threshold_percent)}",
         results=root / f"{epoch_identifier}_results.nc",
-        detector=root / f"{epoch_identifier}_detector.pkl",
-        environment=root / f"{epoch_identifier}_environment.pkl",
+        detector=root / f"{epoch_identifier}{DETECTOR_SUFFIX}",
+        environment=root / f"{epoch_identifier}{ENVIRONMENT_SUFFIX}",
     )
 
 
@@ -105,7 +110,7 @@ def epoch_identifier_of(path: Path, suffix: str) -> str:
     """The epoch identifier a decode file is named for: its name less `suffix`.
 
     The inverse of :func:`decode_paths` for one of its files, such as
-    ``epoch_identifier_of(path, "_detector.pkl")`` or, for a ``data_over_time``
+    ``epoch_identifier_of(path, DETECTOR_SUFFIX)`` or, for a ``data_over_time``
     file, ``suffix=data_over_time_suffix()``.
 
     Parameters
