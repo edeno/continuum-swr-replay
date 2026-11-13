@@ -41,6 +41,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.paths import (
+    CANONICAL_TABLE_BASENAMES,
+    replay_content_dir,
+    table_path,
+)
 from continuum_swr_replay.runs.io import is_nonempty_file, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import git_commit, git_dirty
 from continuum_swr_replay.tables.io import read_attrs, resolved_table_path
@@ -51,6 +56,7 @@ __all__ = [
     "record_inputs",
     "write_fit_provenance",
     "check_fit_provenance",
+    "recorded_input_paths",
     "require_fresh_inputs",
     "matching_sidecar",
     "remove_bundle",
@@ -299,6 +305,41 @@ def check_fit_provenance(
         if recorded.get(name, {}).get("sha256") != sha256_file(_resolve_input(path))
     ]
     return sorted(stale)
+
+
+def recorded_input_paths(artifact_path: str | Path) -> dict[str, Path]:
+    """The current file of each input a fit's sidecar records.
+
+    A canonical table's name is read at its path in the replay-content folder
+    (``paths.table_path``); any other name is an upstream fit beside the
+    artifact, ``<name>.pkl``.
+
+    Parameters
+    ----------
+    artifact_path : str or Path
+        The fitted artifact whose sidecar is read.
+
+    Returns
+    -------
+    dict of str to Path
+        Recorded name -> current path, in the sidecar's order; empty when the
+        sidecar records no input.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the sidecar is missing.
+    """
+    artifact = Path(artifact_path)
+    recorded = json.loads(fit_provenance_path(artifact).read_text())["inputs"]
+    return {
+        name: (
+            table_path(name, replay_content_dir())
+            if name in CANONICAL_TABLE_BASENAMES
+            else artifact.with_name(f"{name}.pkl")  # an upstream fit beside it
+        )
+        for name in recorded
+    }
 
 
 def require_fresh_inputs(

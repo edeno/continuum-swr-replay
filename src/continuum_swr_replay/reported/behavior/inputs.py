@@ -5,7 +5,6 @@ current: :func:`fit_staleness` reads a fit's provenance sidecar, and
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,7 +14,6 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
     PER_BIN_DESIGN,
 )
 from continuum_swr_replay.paths import (
-    CANONICAL_TABLE_BASENAMES,
     model_dir,
     replay_content_dir,
     table_path,
@@ -26,6 +24,7 @@ from continuum_swr_replay.reported.values import (
 from continuum_swr_replay.runs.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
+    recorded_input_paths,
 )
 
 
@@ -105,20 +104,12 @@ def fit_staleness(*artifacts: Path) -> str | None:
                 f"{rel(artifact)} has no provenance record; refit before citing"
             )
             continue
-        recorded = json.loads(sidecar.read_text())["inputs"]
-        if not recorded:
+        inputs = recorded_input_paths(artifact)
+        if not inputs:
             notes.append(
                 f"{rel(artifact)} records no input it was fit on; refit before citing"
             )
             continue
-        inputs = {
-            name: (
-                table_path(name, replay_content_dir())
-                if name in CANONICAL_TABLE_BASENAMES
-                else artifact.with_name(f"{name}.pkl")  # an upstream fit beside it
-            )
-            for name in recorded
-        }
         stale = check_fit_provenance(artifact, inputs)
         if stale:
             notes.append(

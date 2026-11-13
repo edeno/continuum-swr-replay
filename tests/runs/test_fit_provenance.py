@@ -25,7 +25,7 @@ from continuum_swr_replay.analysis.behavior.content import fit_outputs
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     contrast_fit_inputs,
 )
-from continuum_swr_replay.paths import model_dir
+from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.runs import fit_provenance
 from continuum_swr_replay.runs.fit_provenance import (
     check_fit_provenance,
@@ -33,6 +33,7 @@ from continuum_swr_replay.runs.fit_provenance import (
     git_hash,
     matching_sidecar,
     record_inputs,
+    recorded_input_paths,
     remove_bundle,
     require_fresh_inputs,
     write_fit_provenance,
@@ -974,3 +975,33 @@ def test_remove_bundle_unlinks_sidecar_table_and_companions(tmp_path):
     remove_bundle(artifact, companions)  # one companion was never written
 
     assert sorted(path.name for path in tmp_path.iterdir()) == ["other.pkl"]
+
+
+def test_recorded_input_paths_reads_tables_and_upstream_fits(replay_content_root):
+    """A canonical table is read at its replay-content path; any other recorded
+    name is an upstream fit beside the artifact."""
+    frame = pd.DataFrame({"stop_id": [0, 1], "count": [1, 0]})
+    write_table(frame, table_path("stop_table", replay_content_root))
+    models = replay_content_root / "models"
+    models.mkdir()
+    frame.to_pickle(models / "parent_fit.pkl")
+    artifact = models / "child_fit.pkl"
+    artifact.write_bytes(b"child")
+    write_fit_provenance(
+        artifact,
+        {
+            "stop_table": table_path("stop_table", replay_content_root),
+            "parent_fit": models / "parent_fit.pkl",
+        },
+        "poisson_glm",
+        ["fit.py"],
+    )
+    assert recorded_input_paths(artifact) == {
+        "parent_fit": models / "parent_fit.pkl",
+        "stop_table": table_path("stop_table", replay_content_root),
+    }
+
+
+def test_recorded_input_paths_without_a_sidecar_raises(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        recorded_input_paths(tmp_path / "all_models.pkl")
