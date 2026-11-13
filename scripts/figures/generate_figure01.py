@@ -47,6 +47,9 @@ from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_
 from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     DECODE_BIN_STRIDE,
 )
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    nonlocal_state_probability,
+)
 from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
@@ -730,9 +733,7 @@ def plot_transition_kernels(fig, gs_slot):
 
 def get_non_local_probability(results):
     """Return P(Non-Local Continuous) + P(Non-Local Fragmented)."""
-    non_local_prob = results.acausal_state_probabilities.sel(
-        states=["Non-Local Continuous", "Non-Local Fragmented"]
-    ).sum("states")
+    non_local_prob = nonlocal_state_probability(results.acausal_state_probabilities)
     return np.asarray(non_local_prob.values).squeeze()
 
 

@@ -546,9 +546,9 @@ def plot_acausal_probabilities(
 
     """
     time = results.sel(time=time_slice).time
-    non_local_prob = results.acausal_state_probabilities.sel(
-        time=time_slice, states=["Non-Local Continuous", "Non-Local Fragmented"]
-    ).sum("states")
+    non_local_prob = nonlocal_state_probability(
+        results.acausal_state_probabilities.sel(time=time_slice)
+    )
 
     if plot_local:
         no_spike_prob = results.acausal_state_probabilities.sel(

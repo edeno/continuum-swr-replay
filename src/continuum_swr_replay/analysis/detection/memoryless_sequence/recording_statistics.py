@@ -42,6 +42,9 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
     NO_CENTER,
     dispersion_cm,
 )
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    nonlocal_state_probability,
+)
 
 __all__ = [
     "LOCAL_TOLERANCE_CM",
@@ -108,11 +111,7 @@ def state_space_intervals(decoded: dict) -> list[tuple[float, float]]:
         time=time,
     )
     probability = np.asarray(
-        results.acausal_state_probabilities.sel(
-            states=["Non-Local Continuous", "Non-Local Fragmented"]
-        )
-        .sum("states")
-        .values
+        nonlocal_state_probability(results.acausal_state_probabilities).values
     ).squeeze()
     if not np.isfinite(probability).all() or probability.max() <= 0.0:
         raise RuntimeError(

@@ -658,9 +658,7 @@ def create_multiregion_figurl(
     # Non-local probability view
     non_local_probability_view = vv.TimeseriesGraph()
     for brain_area, results in decoding_results.items():
-        non_local_prob = results.acausal_state_probabilities.sel(
-            states=["Non-Local Continuous", "Non-Local Fragmented"]
-        ).sum("states")
+        non_local_prob = nonlocal_state_probability(results.acausal_state_probabilities)
         non_local_probability_view.add_line_series(
             name=f"{brain_area} Non-Local",
             t=np.asarray(non_local_prob.time),
