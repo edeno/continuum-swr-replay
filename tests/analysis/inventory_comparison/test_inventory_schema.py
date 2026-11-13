@@ -13,6 +13,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     from_classified_nonlocal_table,
     from_memoryless_table,
     inventory_from_intervals,
+    native_event_keys,
     validate_inventory,
 )
 
@@ -69,6 +70,7 @@ class TestInventoryFromIntervals:
         assert inventory.event_start_s.is_monotonic_increasing
         assert inventory.event_index.tolist() == [0, 1]
         assert all(key.startswith("Kay:") for key in inventory.event_key)
+        assert native_event_keys(inventory.event_key).tolist() == ["2", "1"]
 
     def test_speed_is_read_over_every_sample_of_the_event(self):
         speed = still()
@@ -502,3 +504,17 @@ class TestInvariants:
                 speed_time_s=GRID[::-1],
                 speed_cm_per_s=np.zeros(GRID.size),
             )
+
+
+def test_the_native_key_is_everything_after_the_session():
+    keys = pd.Series(
+        ["Kay:sim20200101_02_r1:7", "recount:j1620210706_04_r2:a:b"], index=[5, 9]
+    )
+    native = native_event_keys(keys)
+    assert native.tolist() == ["7", "a:b"]
+    assert native.index.tolist() == [5, 9]
+
+
+def test_a_key_without_a_session_and_native_part_is_refused():
+    with pytest.raises(ValueError, match="is not <detector>"):
+        native_event_keys(pd.Series(["Kay:sim20200101_02_r1:1", "Kay:1"]))

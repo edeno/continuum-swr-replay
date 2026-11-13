@@ -27,6 +27,7 @@ from continuum_swr_replay.analysis.events.immobility import (
     event_speeds_are_immobile,
 )
 from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS
+from continuum_swr_replay.decoding.identifiers import nwb_file_name, session_name
 from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
@@ -39,6 +40,7 @@ __all__ = [
     "from_classified_nonlocal_table",
     "from_memoryless_table",
     "inventory_from_intervals",
+    "native_event_keys",
     "validate_inventory",
 ]
 
@@ -242,7 +244,9 @@ def _event_keys(
 ) -> list[str]:
     """``"<detector>:<animal><day>_<epoch>:<native key>"`` for each event.
 
-    ``animal``, ``day`` and ``epoch`` are one value or one per event.
+    ``animal``, ``day`` and ``epoch`` are one value or one per event; the middle
+    part is ``identifiers.session_name``. :func:`native_event_keys` reads the
+    native key back.
     """
     if ":" in detector:
         raise ValueError(f"A detector name must not hold ':', got {detector!r}.")
@@ -251,7 +255,38 @@ def _event_keys(
         np.broadcast_to(np.asarray(values, dtype=object), (n_events,))
         for values in (animal, day, epoch, native)
     ]
-    return [f"{detector}:{a}{d}_{e}:{k}" for a, d, e, k in zip(*columns, strict=True)]
+    return [
+        f"{detector}:{session_name(nwb_file_name(a, d), e)}:{k}"
+        for a, d, e, k in zip(*columns, strict=True)
+    ]
+
+
+def native_event_keys(event_keys: pd.Series) -> pd.Series:
+    """The detector's own key of each ``event_key``: what follows its session.
+
+    An event key is ``"<detector>:<animal><day>_<epoch>:<native key>"``; neither
+    the detector nor the session holds a ``:``, so the native key is everything
+    after the second one.
+
+    Parameters
+    ----------
+    event_keys : pd.Series of str
+
+    Returns
+    -------
+    pd.Series of str
+        The native keys, on the index of `event_keys`.
+
+    Raises
+    ------
+    ValueError
+        If a key has fewer than three ``:``-separated parts.
+    """
+    parts = event_keys.str.split(":", n=2)
+    if not (parts.str.len() == 3).all():
+        bad = event_keys[parts.str.len() != 3].iloc[0]
+        raise ValueError(f"{bad!r} is not <detector>:<session>:<native key>.")
+    return parts.str[2]
 
 
 def _finish(frame: pd.DataFrame) -> pd.DataFrame:

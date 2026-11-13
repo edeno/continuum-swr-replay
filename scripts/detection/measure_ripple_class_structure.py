@@ -52,6 +52,9 @@ import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.constants import REMOTE_CM  # noqa: E402
 from continuum_swr_replay.analysis.events import analysed_time  # noqa: E402
+from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
+    swr_epoch_id_of_session,
+)
 from continuum_swr_replay.analysis.hippocampus import (  # noqa: E402
     class_or_continuum as cc,
 )
@@ -67,8 +70,8 @@ from continuum_swr_replay.analysis.inventory_comparison.feature_run import (  # 
 from continuum_swr_replay.analysis.inventory_comparison.features import (  # noqa: E402
     _grid_rows,
 )
-from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
-    format_epoch_identifier,
+from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
+    native_event_keys,
 )
 from continuum_swr_replay.paths import (
     RIPPLE_CLASS_STRUCTURE_DIR,
@@ -132,9 +135,7 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
 
 
 def epoch_identifier(row: pd.Series) -> str:
-    return format_epoch_identifier(
-        f"{row.animal}{row.session_date}_.nwb", row.epoch, "HPC"
-    )
+    return swr_epoch_id_of_session(row.animal, row.session_date, row.epoch)
 
 
 def run_measure(args: argparse.Namespace) -> None:
@@ -199,7 +200,7 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
         ),
         ignore_index=True,
     )
-    features["event_id"] = features.event_key.str.split(":").str[-1].astype("uint64")
+    features["event_id"] = native_event_keys(features.event_key).astype("uint64")
     events = events.merge(
         features[["event_id", "ripple_z_max", "ripple_z_mean", "n_spikes"]].rename(
             columns={
