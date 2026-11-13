@@ -45,6 +45,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.pfc import population_statistics
+from continuum_swr_replay.analysis.pfc.bundle_files import MPFC_STEM, read_sidecars
 from continuum_swr_replay.analysis.pfc.load_population import (
     CALLED_ALPHA,
     HELDOUT_FIT_COLUMN,
@@ -65,11 +66,7 @@ from continuum_swr_replay.analysis.pfc.timing import (
 )
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import ROOT_DIR
-from continuum_swr_replay.reported.mpfc.inputs import (
-    STEM,
-    default_inputs,
-    read_sidecars,
-)
+from continuum_swr_replay.reported.mpfc.inputs import default_inputs
 
 #: The gates compared, by label. ``none`` is the smallest positive rate: a
 #: unit with at least one spike on the fitted bins.
@@ -268,7 +265,7 @@ def raw_units(bundle_dir: Path) -> pd.DataFrame:
         ``has_fit`` (a finite ``SWR: heldout_deviance``, the loader's rule).
     """
     frame = pd.concat(
-        [pd.read_pickle(p) for p in sorted(bundle_dir.glob(f"*{STEM}.pkl"))],
+        [pd.read_pickle(p) for p in sorted(bundle_dir.glob(f"*{MPFC_STEM}.pkl"))],
         ignore_index=True,
     )
     out = frame[["nwb_file_name", "epoch_name", "immobility_avg_firing_rate"]].copy()

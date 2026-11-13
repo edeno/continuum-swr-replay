@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import pytest
+
 from continuum_swr_replay.analysis.pfc.bundle_files import (
+    MPFC_STEM,
     bundle_identifiers,
     bundle_path,
     bundle_sessions,
+    read_sidecars,
     session_bundle_path,
 )
 
@@ -53,3 +58,28 @@ def test_the_readers_list_one_suffix_and_area_and_read_the_names_back(tmp_path):
         "j1620210706_10_r5_mPFC",
     ]
     assert bundle_sessions(tmp_path / "absent") == {}
+
+
+def test_read_sidecars_reads_the_canonical_mpfc_sidecars_in_session_order(tmp_path):
+    assert MPFC_STEM == "_mPFC_modulation"
+    for session in ("j1620210706_10_r5", "j1620210706_02_r1"):
+        (tmp_path / f"{session}{MPFC_STEM}.pkl").touch()
+        (tmp_path / f"{session}{MPFC_STEM}.provenance.json").write_text(
+            json.dumps({"session": session})
+        )
+    # Neither a sensitivity bundle nor another area's is canonical mPFC.
+    (tmp_path / f"j1620210706_02_r1{MPFC_STEM}_allstops.provenance.json").touch()
+    (tmp_path / "j1620210706_02_r1_OFC_modulation.provenance.json").touch()
+
+    assert read_sidecars(tmp_path) == [
+        {"session": "j1620210706_02_r1"},
+        {"session": "j1620210706_10_r5"},
+    ]
+
+
+def test_read_sidecars_refuses_no_bundle_or_an_unpaired_one(tmp_path):
+    with pytest.raises(ValueError, match=r"differ: \[\]"):
+        read_sidecars(tmp_path)
+    (tmp_path / f"j1620210706_02_r1{MPFC_STEM}.pkl").touch()
+    with pytest.raises(ValueError, match=r"differ: \['j1620210706_02_r1'\]"):
+        read_sidecars(tmp_path)

@@ -4,7 +4,6 @@ on (:func:`staleness`, counted by ``runs.staleness.stale_counts``)."""
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,11 +14,6 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs.staleness import stale_counts
-
-STEM = "_mPFC_modulation"
-"""The canonical (at-well, sigma 3) bundle name; other cohorts and priors carry
-a suffix after it."""
-
 
 TIMING_CALIBRATION = "pfc_response_followups/timing_calibration.json"
 """The timing calibration ``scripts/pfc/calibrate_pfc_kernel_timing.py`` writes,
@@ -66,27 +60,6 @@ def default_inputs() -> MpfcInputs:
         marked_family_summary=data / MARKED_FAMILY_SUMMARY,
         stop_context_results=data / STOP_CONTEXT_RESULTS,
     )
-
-
-def read_sidecars(bundle_dir: Path) -> list[dict[str, Any]]:
-    """Every canonical bundle's provenance sidecar, in session order.
-
-    Raises
-    ------
-    ValueError
-        A bundle has no sidecar or a sidecar no bundle.
-    """
-    bundles = {
-        p.name.removesuffix(f"{STEM}.pkl") for p in bundle_dir.glob(f"*{STEM}.pkl")
-    }
-    paths = sorted(bundle_dir.glob(f"*{STEM}.provenance.json"))
-    described = {p.name.removesuffix(f"{STEM}.provenance.json") for p in paths}
-    if not bundles or bundles != described:
-        raise ValueError(
-            f"bundles and sidecars in {bundle_dir} differ: "
-            f"{sorted(bundles ^ described)}"
-        )
-    return [json.loads(p.read_text()) for p in paths]
 
 
 def staleness(sidecars: list[dict[str, Any]], current: dict[str, str]) -> str | None:

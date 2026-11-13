@@ -6,12 +6,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.pfc.bundle_files import MPFC_STEM
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
     MATCHED_NULL_OBSERVED_COLUMNS,
 )
 from continuum_swr_replay.reported.mpfc.common import TAGS
-from continuum_swr_replay.reported.mpfc.inputs import STEM
 from continuum_swr_replay.reported.mpfc.population import (
     CURVES,
     called_fraction_values,
@@ -134,7 +134,7 @@ def population() -> pd.DataFrame:
 
 def _sidecar(name: str, counts: tuple, fits: tuple, overlap: float, windows: dict):
     return {
-        "artifact": f"{name}{STEM}.pkl",
+        "artifact": f"{name}{MPFC_STEM}.pkl",
         "stop_cohort": "at_well",
         "cohort_counts": dict(
             zip(

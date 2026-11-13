@@ -56,6 +56,7 @@ from __future__ import annotations
 
 import json
 
+from continuum_swr_replay.analysis.pfc.bundle_files import MPFC_STEM, read_sidecars
 from continuum_swr_replay.analysis.pfc.load_population import (
     MIN_FIRING_RATE_HZ,
     load_population_data,
@@ -67,10 +68,8 @@ from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.mpfc.common import TAGS
 from continuum_swr_replay.reported.mpfc.followups import followup_values
 from continuum_swr_replay.reported.mpfc.inputs import (
-    STEM,
     MpfcInputs,
     default_inputs,
-    read_sidecars,
     staleness,
 )
 from continuum_swr_replay.reported.mpfc.population import (
@@ -109,7 +108,7 @@ def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
     )
     cohort = json.loads(inputs.pfc_cohort.read_text())
     source = (
-        f"{rel(inputs.bundle_dir)}/*{STEM}.pkl and their provenance sidecars "
+        f"{rel(inputs.bundle_dir)}/*{MPFC_STEM}.pkl and their provenance sidecars "
         f"(scripts/pfc/run_pfc_analysis_bandit.py), {len(sidecars)} bundles, "
         "read by Figure 4's loader (analysis/pfc/load_population.py, no "
         "firing-rate cutoff)"
@@ -159,7 +158,7 @@ def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
     summary.add(*values)
     summary.inputs += records
     extended_dir = inputs.swr_without_replay_dir
-    extended_bundles = sorted(extended_dir.glob(f"*{STEM}.pkl"))
+    extended_bundles = sorted(extended_dir.glob(f"*{MPFC_STEM}.pkl"))
     extended_check = None
     if extended_bundles:
         extended_sidecars = read_sidecars(extended_dir)
@@ -189,7 +188,7 @@ def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
                 extended_sidecars,
                 value_factory(
                     swr_without_replay_values,
-                    f"{rel(extended_dir)}/*{STEM}.pkl and sidecars "
+                    f"{rel(extended_dir)}/*{MPFC_STEM}.pkl and sidecars "
                     "(scripts/pfc/run_pfc_analysis_bandit.py --event-set "
                     f"with_swr_without_replay), {len(extended_sidecars)} bundles, "
                     "Figure 4's loader (no firing-rate cutoff)",
@@ -199,10 +198,10 @@ def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
             )
         )
         summary.inputs += [
-            files_record(f"*{STEM}.pkl", extended_bundles, ROOT_DIR),
+            files_record(f"*{MPFC_STEM}.pkl", extended_bundles, ROOT_DIR),
             files_record(
-                f"*{STEM}.*.npy",
-                extended_dir.glob(f"*{STEM}.*.npy"),
+                f"*{MPFC_STEM}.*.npy",
+                extended_dir.glob(f"*{MPFC_STEM}.*.npy"),
                 ROOT_DIR,
             ),
         ]
@@ -216,10 +215,12 @@ def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
 
     data = inputs.bundle_dir
     summary.inputs += [
-        files_record(f"*{STEM}.pkl", data.glob(f"*{STEM}.pkl"), ROOT_DIR),
-        files_record(f"*{STEM}.*.npy", data.glob(f"*{STEM}.*.npy"), ROOT_DIR),
+        files_record(f"*{MPFC_STEM}.pkl", data.glob(f"*{MPFC_STEM}.pkl"), ROOT_DIR),
+        files_record(f"*{MPFC_STEM}.*.npy", data.glob(f"*{MPFC_STEM}.*.npy"), ROOT_DIR),
         files_record(
-            f"*{STEM}.provenance.json", data.glob(f"*{STEM}.provenance.json"), ROOT_DIR
+            f"*{MPFC_STEM}.provenance.json",
+            data.glob(f"*{MPFC_STEM}.provenance.json"),
+            ROOT_DIR,
         ),
         file_record(inputs.pfc_cohort, ROOT_DIR),
         file_record(inputs.event_table, ROOT_DIR),

@@ -15,10 +15,16 @@ so a reader names what was written.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import Any
 
 MODULATION = "_modulation"
 """What follows the epoch identifier in every file of a bundle."""
+
+MPFC_STEM = f"_mPFC{MODULATION}"
+"""What follows the session name in the canonical (at-well, sigma 3) mPFC
+bundle's files; other cohorts and priors carry a suffix after it."""
 
 
 def bundle_path(
@@ -110,3 +116,32 @@ def bundle_sessions(
     return {
         path.name.removesuffix(tail): path for path in sorted(folder.glob(f"*{tail}"))
     }
+
+
+def read_sidecars(folder: Path) -> list[dict[str, Any]]:
+    """Every canonical mPFC bundle's provenance sidecar in `folder`, in session order.
+
+    Parameters
+    ----------
+    folder : Path
+        The folder the bundles were written to.
+
+    Returns
+    -------
+    list of dict
+        Each sidecar's contents, in the order of the sorted sidecar paths.
+
+    Raises
+    ------
+    ValueError
+        `folder` holds no bundle, or a bundle has no sidecar or a sidecar no
+        bundle.
+    """
+    bundles = bundle_sessions(folder)
+    sidecars = bundle_sessions(folder, extension=".provenance.json")
+    if not bundles or bundles.keys() != sidecars.keys():
+        raise ValueError(
+            f"bundles and sidecars in {folder} differ: "
+            f"{sorted(bundles.keys() ^ sidecars.keys())}"
+        )
+    return [json.loads(p.read_text()) for p in sidecars.values()]

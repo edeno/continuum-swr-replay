@@ -14,6 +14,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.coefficient_statistics import group_range
 from continuum_swr_replay.analysis.pfc import population_statistics
+from continuum_swr_replay.analysis.pfc.bundle_files import MPFC_STEM
 from continuum_swr_replay.analysis.pfc.heldout import empirical_pvalue_floor
 from continuum_swr_replay.analysis.pfc.load_population import (
     CALLED_ALPHA as ALPHA,
@@ -26,9 +27,6 @@ from continuum_swr_replay.reported.mpfc.common import (
     ANIMAL_WORDS,
     CLASS_LABELS,
     TAGS,
-)
-from continuum_swr_replay.reported.mpfc.inputs import (
-    STEM,
 )
 from continuum_swr_replay.reported.values import (
     Value,
@@ -489,7 +487,7 @@ def null_geometry_values(
         pd.DataFrame(
             [
                 {
-                    "session": s["artifact"].removesuffix(f"{STEM}.pkl"),
+                    "session": s["artifact"].removesuffix(f"{MPFC_STEM}.pkl"),
                     "event_class": event_class,
                     "total": w["n_events_total"],
                     "excluded": w["n_events_excluded_unmatchable"],
