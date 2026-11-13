@@ -31,10 +31,10 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   (``Processed-Data/event_property_bootstrap``, from
   ``scripts/detection/bootstrap_event_properties.py``);
 - the brain-state reference (``Processed-Data/brain_state_reference``, from
-  ``scripts/detection/measure_brain_state_reference.py``) and the two gamma
-  passes of ``scripts/detection/measure_event_gamma.py``: the z-scored gamma per
-  event and epoch (``Processed-Data/event_gamma``) and the band power's change
-  against quiet rest in dB (``Processed-Data/event_gamma_power``);
+  ``scripts/detection/measure_brain_state_reference.py``) and the gamma pass of
+  ``scripts/detection/measure_event_gamma.py`` (``Processed-Data/event_gamma``):
+  the z-scored gamma per event and epoch, and the band power's change against
+  quiet rest in dB (its ``reference.parquet``);
 - the decoder quality of each analysed epoch (``Processed-Data/decoder_quality``,
   from ``scripts/decoding/measure_decoder_quality.py``): the Local-state
   decoding error, the state fractions moving and immobile, and the calibration
@@ -165,7 +165,6 @@ class EventsInputs:
     class_structure: Path
     event_start_rest_theta: Path
     property_bootstrap: Path
-    event_gamma_power: Path
     decoder_quality: Path
 
 
@@ -186,7 +185,6 @@ def default_inputs() -> EventsInputs:
         class_structure=processed_data_dir() / "ripple_class_structure",
         event_start_rest_theta=processed_data_dir() / "event_start_rest_theta",
         property_bootstrap=processed_data_dir() / "event_property_bootstrap",
-        event_gamma_power=processed_data_dir() / "event_gamma_power",
         decoder_quality=processed_data_dir() / "decoder_quality",
     )
 
@@ -1780,25 +1778,19 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         file_record(inputs.brain_state_reference, ROOT_DIR),
         file_record(inputs.event_gamma / "manifest.json", ROOT_DIR),
     ]
-    gamma_power = pd.read_parquet(inputs.event_gamma_power / "reference.parquet")
-    if len(gamma_power) != n_epochs:
-        raise ValueError(
-            f"{inputs.event_gamma_power} holds {len(gamma_power)} epochs, not {n_epochs}"
-        )
     summary.add(
         *pend(
             gamma_db_values(
-                gamma_power,
-                f"{rel(inputs.event_gamma_power)}/reference.parquet "
-                "(scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+                gamma_reference,
+                f"{rel(inputs.event_gamma)}/reference.parquet "
+                "(scripts/detection/measure_event_gamma.py)",
             ),
-            stale(inputs.event_gamma_power),
+            stale(inputs.event_gamma),
         )
     )
-    summary.inputs += [
-        file_record(inputs.event_gamma_power / name, ROOT_DIR)
-        for name in ("reference.parquet", "manifest.json")
-    ]
+    summary.inputs.append(
+        file_record(inputs.event_gamma / "reference.parquet", ROOT_DIR)
+    )
     summary.inputs.append(
         files_record(
             "*_events.parquet", inputs.event_gamma.glob("*_events.parquet"), ROOT_DIR
