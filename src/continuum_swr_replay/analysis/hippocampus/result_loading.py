@@ -42,7 +42,7 @@ from continuum_swr_replay.decoding.identifiers import (
     decode_identifier,
     format_epoch_identifier,
 )
-from continuum_swr_replay.decoding.results import open_results
+from continuum_swr_replay.decoding.results import load_saved_detector, open_results
 from continuum_swr_replay.paths import processed_data_dir
 
 
@@ -95,7 +95,6 @@ def load_results(
     """
     return _load_saved_decode(
         format_epoch_identifier(nwb_file_name, epoch_name, decoding_brain_area),
-        NonLocalClusterlessDetector,
         load_detector=load_detector,
         non_stationary=non_stationary,
         ripple_detector_name=ripple_detector_name,
@@ -106,7 +105,6 @@ def load_results(
 
 def _load_saved_decode(
     epoch_stem: str,
-    model_class: Any,
     *,
     load_detector: bool,
     non_stationary: bool,
@@ -118,22 +116,21 @@ def _load_saved_decode(
 
     Shared by :func:`load_results` and
     :func:`~continuum_swr_replay.analysis.contfrag.result_loading.load_contfrag_results`,
-    which differ only in ``epoch_stem`` and ``model_class``.
+    which differ only in ``epoch_stem``. The detector is read by
+    :func:`~continuum_swr_replay.decoding.results.load_saved_detector`.
 
     Parameters
     ----------
     epoch_stem : str
         Epoch identifier before the run suffixes, such as
         ``"chimi20200212_02_r1_HPC"``.
-    model_class : type
-        Detector class whose ``load_model`` reads the ``_detector.pkl``.
     load_detector, non_stationary, ripple_detector_name, training_type, root
         As in :func:`load_results`.
 
     Returns
     -------
     results : xr.Dataset
-    detector : model_class instance or None
+    detector : NonLocalClusterlessDetector, ContFragClusterlessClassifier or None
     env : Environment or None
     """
     epoch_identifier = decode_identifier(
@@ -149,7 +146,7 @@ def _load_saved_decode(
     results = open_results(paths.results)
 
     if load_detector:
-        detector = model_class.load_model(paths.detector)
+        detector = load_saved_detector(paths.detector)
         env = detector.environments[0]
     else:
         detector = None

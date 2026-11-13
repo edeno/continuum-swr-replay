@@ -65,7 +65,6 @@ def load_contfrag_results(
         format_epoch_identifier(
             nwb_file_name, epoch_name, decoding_brain_area, CONTFRAG_SUFFIX
         ),
-        ContFragClusterlessClassifier,
         load_detector=load_detector,
         non_stationary=non_stationary,
         ripple_detector_name=ripple_detector_name,

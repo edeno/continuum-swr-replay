@@ -614,25 +614,25 @@ def _saved_results() -> xr.Dataset:
     )
 
 
-def _record_reads(monkeypatch, detector_class: type) -> list[Path]:
-    """Make ``xr.open_dataset`` and ``detector_class.load_model`` record their paths."""
+def _record_reads(monkeypatch) -> list[Path]:
+    """Make ``xr.open_dataset`` and the saved-detector loader record their paths."""
     reads = []
 
     def open_dataset(path: Path, engine: str, **kwargs) -> xr.Dataset:
         reads.append(Path(path))
         return _saved_results()
 
-    def load_model(filename: Path) -> types.SimpleNamespace:
-        reads.append(Path(filename))
+    def load_saved_detector(path: Path) -> types.SimpleNamespace:
+        reads.append(Path(path))
         return types.SimpleNamespace(environments=["environment"])
 
     monkeypatch.setattr(xr, "open_dataset", open_dataset)
-    monkeypatch.setattr(detector_class, "load_model", staticmethod(load_model))
+    monkeypatch.setattr(hpc_loading, "load_saved_detector", load_saved_detector)
     return reads
 
 
 def test_load_results_reads_from_root(monkeypatch, tmp_path, processed_data_root):
-    reads = _record_reads(monkeypatch, hpc_loading.NonLocalClusterlessDetector)
+    reads = _record_reads(monkeypatch)
     stem = DECODERS["nonlocal"].epoch_identifier
 
     *_, env = hpc_loading.load_results(NWB_FILE_NAME, EPOCH_NAME, root=tmp_path)
@@ -648,7 +648,7 @@ def test_load_results_reads_from_root(monkeypatch, tmp_path, processed_data_root
 def test_load_contfrag_results_reads_from_root(
     monkeypatch, tmp_path, processed_data_root
 ):
-    reads = _record_reads(monkeypatch, contfrag_loading.ContFragClusterlessClassifier)
+    reads = _record_reads(monkeypatch)
     stem = DECODERS["contfrag"].epoch_identifier
 
     *_, env = contfrag_loading.load_contfrag_results(

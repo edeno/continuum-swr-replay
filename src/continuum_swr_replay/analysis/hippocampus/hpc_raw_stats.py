@@ -71,7 +71,7 @@ def extract_discrete_transition_matrix(detector) -> dict[str, float]:
     Parameters
     ----------
     detector : NonLocalClusterlessDetector or NonLocalSortedSpikesDetector
-        A fitted detector loaded via ``load_model``. Must expose
+        A fitted detector (``decoding.results.load_saved_detector``). Must expose
         ``discrete_state_transitions_`` and ``state_names``.
 
     Returns

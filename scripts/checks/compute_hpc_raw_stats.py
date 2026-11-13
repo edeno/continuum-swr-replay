@@ -43,6 +43,7 @@ from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_types import DataLoadingPreset
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
+from continuum_swr_replay.decoding.results import load_saved_detector
 from continuum_swr_replay.paths import processed_data_dir
 
 logging.basicConfig(
@@ -61,11 +62,8 @@ def _load_detector(epoch_identifier: str):
     path = decode_paths(epoch_identifier, processed_data_dir()).detector
     if not path.exists():
         return None
-    # Local import to keep module import cheap when --help is requested
-    from non_local_detector import NonLocalClusterlessDetector
-
     try:
-        return NonLocalClusterlessDetector.load_model(path)
+        return load_saved_detector(path)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Failed to load detector %s: %s", path.name, exc)
         return None
