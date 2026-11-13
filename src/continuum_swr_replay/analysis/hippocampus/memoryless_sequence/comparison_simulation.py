@@ -81,10 +81,12 @@ DECODE_BIN_STRIDE = 3
 """Figure 1 strides the 1500 Hz simulation to the project's 500 Hz decode grid."""
 
 N_NEURONS = 25
-"""Cells in the simulation the figure and its recorded numbers are made from."""
+"""Cells in the simulation the figure and its recorded numbers are made from,
+and in the memoryless sweeps' recording (``sweep.build_recording``)."""
 
 CONFIG = MemorylessSequenceConfig(sampling_frequency=500.0)
-"""The sliding-window detector's settings on that 500 Hz grid."""
+"""The sliding-window detector's settings on that 500 Hz grid, in the figure
+and in the sweeps."""
 
 SHORT_REPLAY = InjectedReplay(
     start_cm=35.0,

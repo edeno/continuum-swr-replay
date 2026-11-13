@@ -431,7 +431,7 @@ def compare_variants(
 def decode_sweep_cell(recording: dict, injected: list, window: tuple, key: str) -> dict:
     """The port on one sweep cell, as the sweep's ``memoryless_outcome`` runs it."""
     time, _, speed = window
-    config = sweep.CONFIG
+    config = CONFIG
     result = sorted_spikes_epoch_log_likelihood(
         time, window[1], injected, recording["sliding_encoding_model"], config
     )
@@ -481,12 +481,12 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
     sweep scored.
     """
     recording = sweep.build_recording()
-    means = place_field_means(sweep.N_NEURONS, TRACK_HEIGHT)
+    means = place_field_means(N_NEURONS, TRACK_HEIGHT)
     intervals = without(
         immobile_intervals(
             recording["time"],
             recording["speed"],
-            sweep.CONFIG.speed_threshold_cm_per_s,
+            CONFIG.speed_threshold_cm_per_s,
             minimum_duration_s=1.0,
         ),
         recording["event_times"],
@@ -532,7 +532,7 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
             )
             decoded = decode_sweep_cell(recording, injected, window, key)
             summaries, _ = compare_variants(
-                decoded, recording["encoding_model"], sweep.CONFIG, decoded["seed"]
+                decoded, recording["encoding_model"], CONFIG, decoded["seed"]
             )
             for variant, summary in summaries.items():
                 total = totals[variant]

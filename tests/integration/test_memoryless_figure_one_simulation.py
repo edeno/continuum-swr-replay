@@ -35,8 +35,9 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
     TRACK_HEIGHT,
 )
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
-    MemorylessSequenceConfig,
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+    CONFIG,
+    N_NEURONS,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
     CandidateSequences,
@@ -96,7 +97,6 @@ SHORT_REPLAY_REPLAY = InjectedReplay(
     at_s=44.40,
     seed=1,
 )
-CONFIG = MemorylessSequenceConfig(sampling_frequency=500.0)
 SAME_PLACE_CM = 15.0
 """How close a decoded center must be to count as the animal's own position."""
 
@@ -167,7 +167,7 @@ def decoded() -> Decoded:
         _sampling_frequency,
         is_event,
         _place_fields,
-    ) = make_simulated_data(n_neurons=25)
+    ) = make_simulated_data(n_neurons=N_NEURONS)
     speed = _speed
 
     # a remote place held still, which the package does not simulate. It

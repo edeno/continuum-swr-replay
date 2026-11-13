@@ -21,7 +21,10 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
     TRACK_HEIGHT,
 )
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import sweep
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+    comparison_simulation,
+    sweep,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (
     bound_errors,
     part_agreement,
@@ -326,7 +329,7 @@ def run_trials(recording: dict, n_seeds: int) -> list[dict]:
     spikes it had inside the event and the recording's own spikes everywhere
     else, and its recovery alone is kept beside its recovery inside the event.
     """
-    means = place_field_means(sweep.N_NEURONS, TRACK_HEIGHT)
+    means = place_field_means(comparison_simulation.N_NEURONS, TRACK_HEIGHT)
     intervals = sweep.usable_intervals(recording)
     rows = []
     for condition, level, rate_hz, make, pieces in trials(means, SAMPLING_FREQUENCY):

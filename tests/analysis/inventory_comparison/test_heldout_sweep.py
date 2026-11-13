@@ -4,6 +4,9 @@ import numpy as np
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import sweep
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+    N_NEURONS,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     Gap,
     Segment,
@@ -69,7 +72,7 @@ class TestEventTruth:
 def test_the_tiling_folds_split_every_cell_and_the_other_fold_does_not():
     """A and B's evaluation cells are all the cells between them; C's are half."""
     folds = heldout_sweep.folds()
-    n_cells = sweep.N_NEURONS
+    n_cells = N_NEURONS
 
     assert heldout_sweep.FOLDS == ("A", "B", "C")
     assert heldout_sweep.TILING_FOLDS == ("A", "B")

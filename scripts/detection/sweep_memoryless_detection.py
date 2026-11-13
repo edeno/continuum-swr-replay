@@ -41,6 +41,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+    N_NEURONS,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     REFERENCE_RATE_FLOOR_HZ,
 )
@@ -52,7 +55,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep import 
     DURATION_S,
     MATCH_TOLERANCE_CM,
     MIDPOINT_CM,
-    N_NEURONS,
     NON_LOCAL_MINIMUM_DURATION_S,
     NON_LOCAL_PROB_THRESHOLD,
     PATH_CM,

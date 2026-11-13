@@ -17,6 +17,10 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
     TRACK_HEIGHT,
 )
 
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+    CONFIG,
+    N_NEURONS,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (
     best_scored,
     score_against_injection,
@@ -31,9 +35,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     placements,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep import (
-    CONFIG,
     MATCH_TOLERANCE_CM,
-    N_NEURONS,
     PLACEMENT_MARGIN_S,
     SlidingWindowRun,
     StateSpaceRun,

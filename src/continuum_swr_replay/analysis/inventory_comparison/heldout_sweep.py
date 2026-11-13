@@ -27,6 +27,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
     sweep,
     sweep_controls,
 )
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+    CONFIG,
+    N_NEURONS,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     with_reference_rate_floor,
 )
@@ -74,13 +78,13 @@ PLACEMENT_SEED = 2
 
 def folds() -> dict:
     """The discovery and evaluation cells of each fold, by fold name."""
-    return interleaved_folds(sweep.N_NEURONS) | poor_coverage_fold(sweep.N_NEURONS)
+    return interleaved_folds(N_NEURONS) | poor_coverage_fold(N_NEURONS)
 
 
 FOLDS = tuple(folds())
 """The folds' names, in order: ``("A", "B", "C")``."""
 
-TILING_FOLDS = tuple(interleaved_folds(sweep.N_NEURONS))
+TILING_FOLDS = tuple(interleaved_folds(N_NEURONS))
 """The folds whose evaluation cells tile the track (``A``, ``B``); the other
 fold's evaluation cells cover half of it."""
 
@@ -106,7 +110,7 @@ def fold_models(discovery: np.ndarray, evaluation: np.ndarray, seed: int = 0):
     environment = held["encoding_model"]["environment"]
     interior = np.asarray(environment.is_track_interior_).ravel()
     fields = np.asarray(
-        with_reference_rate_floor(held["encoding_model"], sweep.CONFIG)["place_fields"],
+        with_reference_rate_floor(held["encoding_model"], CONFIG)["place_fields"],
         dtype=np.float64,
     )[:, interior]
     return found, fields
@@ -273,7 +277,7 @@ def run_fold(fold, discovery, evaluation, n_seeds) -> list[dict]:
     shared by the trials in order.
     """
     recording, fields = fold_models(discovery, evaluation)
-    means = place_field_means(sweep.N_NEURONS, TRACK_HEIGHT)
+    means = place_field_means(N_NEURONS, TRACK_HEIGHT)
     intervals = sweep.usable_intervals(recording)
     rng = np.random.default_rng(PLACEMENT_SEED)
     rows = []
