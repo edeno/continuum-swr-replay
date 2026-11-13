@@ -67,8 +67,8 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     select_stop_cohort,
 )
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
-from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.paths import table_path
+from continuum_swr_replay.runs.device import configure_jax_gpu
 from continuum_swr_replay.runs.fit_provenance import (
     record_inputs,
     write_fit_provenance,

@@ -92,7 +92,6 @@ from continuum_swr_replay.analysis.pfc.event_sets import (  # noqa: E402
     EVENT_SETS,
     EXTENDED_EVENT_CLASSES,
 )
-from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu  # noqa: E402
 from continuum_swr_replay.analysis.pfc.heldout import (  # noqa: E402
     CONTROL_NULL_EVENT_POLICY,
     DEFAULT_CONTROL_DRAWS,
@@ -140,6 +139,7 @@ from continuum_swr_replay.runs.cli import (  # noqa: E402
     add_epoch_filters,
     read_session_list,
 )
+from continuum_swr_replay.runs.device import configure_jax_gpu  # noqa: E402
 from continuum_swr_replay.runs.fit_provenance import (  # noqa: E402
     fit_provenance_path,
     write_fit_provenance,

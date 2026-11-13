@@ -117,10 +117,10 @@ import jax.numpy as jnp
 import numpy as np
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.pfc.gpu import require_configured_device
 from continuum_swr_replay.analysis.shared_statistics import (
     akaike_information_criterion,
 )
+from continuum_swr_replay.runs.device import require_configured_device
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")

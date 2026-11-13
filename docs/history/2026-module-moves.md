@@ -104,6 +104,10 @@ filters) moved out of `analysis/` into `runs/`. Paths are under
 |---|---|
 | `analysis/behavior/fit_provenance.py` (removed: moved) | `runs/fit_provenance.py` |
 | `analysis/pfc/runner_support.filter_epoch_info`, `read_session_list` (removed: moved) | `runs/cli.py` |
+| `analysis/pfc/runner_support.matching_sidecar`, `remove_bundle` (removed: moved) | `runs/fit_provenance.py` |
+| `analysis/pfc/runner_support.is_nonempty_file` (removed: moved) | `runs/io.py` |
+| `analysis/pfc/runner_support.json_safe` (removed) | `runs/io.json_ready` |
+| `analysis/pfc/gpu.py` (removed: moved) | `runs/device.py` |
 
 ## Calculations moved out of scripts, 2026-11
 

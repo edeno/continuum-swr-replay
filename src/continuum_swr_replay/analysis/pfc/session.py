@@ -953,7 +953,7 @@ def run_session(
         events were cut at; it cannot be re-cut at run time.
     UnconfiguredDeviceError
         With ``fitter="jax"``, if no JAX device was chosen first. Call
-        :func:`~continuum_swr_replay.analysis.pfc.gpu.configure_jax_gpu` (the
+        :func:`~continuum_swr_replay.runs.device.configure_jax_gpu` (the
         runner does) or pin ``JAX_PLATFORMS=cpu``; otherwise JAX would take
         every card on a shared host.
 

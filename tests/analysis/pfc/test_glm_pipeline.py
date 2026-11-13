@@ -2568,7 +2568,7 @@ class TestTheBatchedFitterRefusesAnUnconfiguredDevice:
 
     @pytest.fixture
     def unconfigured(self, monkeypatch):
-        from continuum_swr_replay.analysis.pfc import gpu as gpu_module
+        from continuum_swr_replay.runs import device as gpu_module
 
         monkeypatch.setattr(gpu_module, "_CONFIGURED", None)
         # The suite pins CPU, which is a legitimate way to fit; lift it so the
@@ -2576,7 +2576,7 @@ class TestTheBatchedFitterRefusesAnUnconfiguredDevice:
         monkeypatch.delenv("JAX_PLATFORMS", raising=False)
 
     def test_fit_models_batched_refuses(self, unconfigured):
-        from continuum_swr_replay.analysis.pfc.gpu import UnconfiguredDeviceError
+        from continuum_swr_replay.runs.device import UnconfiguredDeviceError
 
         design = np.ones((32, 2))
         design[:, 1] = np.arange(32)
@@ -2584,7 +2584,7 @@ class TestTheBatchedFitterRefusesAnUnconfiguredDevice:
             fit_models_batched({"constant": design}, np.ones((32, 3)))
 
     def test_a_cpu_pinned_process_still_fits(self, monkeypatch):
-        from continuum_swr_replay.analysis.pfc import gpu as gpu_module
+        from continuum_swr_replay.runs import device as gpu_module
 
         monkeypatch.setattr(gpu_module, "_CONFIGURED", None)
         monkeypatch.setenv("JAX_PLATFORMS", "cpu")

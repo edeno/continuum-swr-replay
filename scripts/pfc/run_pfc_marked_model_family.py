@@ -82,7 +82,6 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
 from continuum_swr_replay.analysis.pfc.event_sets import EVENT_SETS, SWR_NO_NON_LOCAL
-from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import assign_blocked_folds
 from continuum_swr_replay.analysis.pfc.marked_glm import (
     EXTENDED_MARKED_EVENT_CLASSES,
@@ -130,6 +129,7 @@ from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import processed_data_dir, table_path
 from continuum_swr_replay.runs.batch import setup_logger
 from continuum_swr_replay.runs.cli import add_epoch_filters, filter_epoch_info
+from continuum_swr_replay.runs.device import configure_jax_gpu
 from continuum_swr_replay.runs.fit_provenance import (
     matching_sidecar,
     record_inputs,

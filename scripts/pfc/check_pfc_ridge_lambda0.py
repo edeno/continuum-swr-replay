@@ -430,7 +430,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
 
-    from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
+    from continuum_swr_replay.runs.device import configure_jax_gpu
 
     record = configure_jax_gpu(gpu=args.gpu, allow_cpu=args.allow_cpu)
     print(f"JAX device: {record}")

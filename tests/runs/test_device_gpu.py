@@ -15,8 +15,8 @@ from dataclasses import dataclass
 
 import pytest
 
-from continuum_swr_replay.analysis.pfc import gpu as gpu_module
-from continuum_swr_replay.analysis.pfc.gpu import (
+from continuum_swr_replay.runs import device as gpu_module
+from continuum_swr_replay.runs.device import (
     NoFreeGPUError,
     UnconfiguredDeviceError,
     WrongJAXDeviceError,

@@ -76,7 +76,6 @@ from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
 from continuum_swr_replay.analysis.pfc.design import symmetric_lags
 from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
 from continuum_swr_replay.analysis.pfc.fit import model_penalties
-from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import (
     DEFAULT_CONTROL_DRAWS,
     empirical_pvalue_floor,
@@ -94,6 +93,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (
 )
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 from continuum_swr_replay.paths import processed_data_dir
+from continuum_swr_replay.runs.device import configure_jax_gpu
 from continuum_swr_replay.visualization.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
