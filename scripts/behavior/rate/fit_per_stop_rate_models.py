@@ -57,6 +57,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+import pandas as pd
+
 from continuum_swr_replay.analysis.behavior.cohort_audit import write_cohort_audit
 from continuum_swr_replay.analysis.behavior.covariate_timing import (
     assert_predictor_timing,
@@ -172,7 +174,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         list(PER_STOP_RATE_OUTCOMES),
         stop.groupby(list(SESSION_COLUMNS)).ngroups,
     )
-    rate, cohort_audits = fit_per_stop_rate_hierarchy(stop, run_cv=not args.no_cv)
+    fits, _provenance, cohort_audits = fit_per_stop_rate_hierarchy(
+        stop, run_cv=not args.no_cv
+    )
+    rate = pd.DataFrame(fits)
 
     # Which population every row was fit on, carried on the row itself: a
     # coefficient read out of a concatenated table would otherwise not say, and

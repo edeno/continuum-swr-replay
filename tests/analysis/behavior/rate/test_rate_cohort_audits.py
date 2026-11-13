@@ -223,7 +223,9 @@ def test_per_stop_hierarchy_records_reconcile():
         )
     stop = pd.concat(frames, ignore_index=True)
     stop.loc[0:1, "immobility_duration_s"] = 0.0
-    _, recs = mod.fit_per_stop_rate_hierarchy(stop, run_cv=False)
+    _, _, recs = mod.fit_per_stop_rate_hierarchy(
+        stop, {"non_local": "n_selected_events"}, run_cv=False
+    )
     assert recs and all(_reconciles(r) for r in recs)
     # immobility<=0 stops are attributed as own drops.
     assert any(r["n_drop_own_predictor_missing"] >= 2 for r in recs)

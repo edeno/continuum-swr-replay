@@ -457,7 +457,10 @@ def test_hierarchy_shares_cohort():
         frames.append(df)
     stop = pd.concat(frames, ignore_index=True)
 
-    fits, records = mod.fit_per_stop_rate_hierarchy(stop, run_cv=False)
+    fits, _, records = mod.fit_per_stop_rate_hierarchy(
+        stop, {"non_local": "n_selected_events"}, run_cv=False
+    )
+    fits = pd.DataFrame(fits)
 
     per_session = fits[fits.outcome == "non_local"].set_index(["model", "animal"])
     for animal in ("a", "b"):
@@ -523,7 +526,9 @@ def test_a_fit_without_a_true_convergence_flag_counts_as_not_converged(
 
     monkeypatch.setattr(mod, "fit_per_stop_rate_model", _fit)
 
-    _rows, records = mod.fit_per_stop_rate_hierarchy(_flag_stop_table(), run_cv=False)
+    _rows, _, records = mod.fit_per_stop_rate_hierarchy(
+        _flag_stop_table(), run_cv=False
+    )
 
     assert len(records) == len(mod.MODEL_PER_STOP_RATE) * len(
         mod.PER_STOP_RATE_OUTCOMES
@@ -549,12 +554,73 @@ def test_a_fit_counts_as_separated_only_when_its_flag_is_true(
 
     monkeypatch.setattr(mod, "fit_per_stop_rate_model", _fit)
 
-    _rows, records = mod.fit_per_stop_rate_hierarchy(_flag_stop_table(), run_cv=False)
+    _rows, _, records = mod.fit_per_stop_rate_hierarchy(
+        _flag_stop_table(), run_cv=False
+    )
 
     assert len(records) == len(mod.MODEL_PER_STOP_RATE) * len(
         mod.PER_STOP_RATE_OUTCOMES
     )
     assert {r["n_sessions_flagged_separated"] for r in records} == {n_flagged}
+
+
+def _intercept_only_fits(cohort, predictors, *, response_col):
+    """A fitter whose R0 (no predictors) fits and whose R1 fails."""
+    if predictors:
+        return None
+    return {"n_stops": len(cohort), "converged": True, "separated": False}
+
+
+@pytest.mark.parametrize(("whole_session", "kept"), [(False, ["R0"]), (True, [])])
+def test_a_failed_rung_drops_its_session_only_when_whole_session(
+    monkeypatch, whole_session, kept
+):
+    monkeypatch.setattr(mod, "fit_per_stop_rate_model", _intercept_only_fits)
+
+    fits, provenance, records = mod.fit_per_stop_rate_hierarchy(
+        _flag_stop_table(),
+        {"non_local": "n_selected_events"},
+        whole_session=whole_session,
+        run_cv=False,
+    )
+
+    assert [fit["model"] for fit in fits] == kept
+    assert provenance["status"].tolist() == ["fit_failed"]
+    assert provenance["failed_models"].tolist() == [("R1",)]
+    r0 = next(r for r in records if r["model"] == "R0")
+    assert r0["n_modeled"] == (6 if kept else 0)
+    assert r0["n_excluded_session"] == (0 if kept else 6)
+
+
+def test_a_session_below_min_stops_is_not_fit(monkeypatch):
+    calls = []
+
+    def _fit(cohort, predictors, *, response_col):
+        calls.append(predictors)
+        return {"n_stops": len(cohort), "converged": True, "separated": False}
+
+    monkeypatch.setattr(mod, "fit_per_stop_rate_model", _fit)
+
+    # six stops: a gate of six fits them, a gate of seven does not
+    fits, provenance, _ = mod.fit_per_stop_rate_hierarchy(
+        _flag_stop_table(), {"non_local": "n_selected_events"}, min_stops=6
+    )
+    assert provenance["status"].tolist() == ["fit"]
+    assert len(fits) == 2
+    calls.clear()
+    fits, provenance, records = mod.fit_per_stop_rate_hierarchy(
+        _flag_stop_table(), {"non_local": "n_selected_events"}, min_stops=7
+    )
+    assert (fits, calls) == ([], [])
+    assert provenance["status"].tolist() == ["too_few_units"]
+    assert {r["n_excluded_session"] for r in records} == {6}
+
+
+def test_the_hierarchy_refuses_a_stop_table_without_an_outcome_column():
+    stops = _flag_stop_table().drop(columns="n_swr_events")
+
+    with pytest.raises(ValueError, match="n_swr_events"):
+        mod.fit_per_stop_rate_hierarchy(stops, run_cv=False)
 
 
 def _rate_stop_table(n_stops: int = 40, seed: int = 0) -> pd.DataFrame:

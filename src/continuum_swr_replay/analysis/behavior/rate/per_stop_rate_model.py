@@ -34,22 +34,23 @@ immobility. ``exp(γ) = 1.5`` means 50% more events per second when
 the predictor is active.
 
 :func:`fit_per_stop_rate_hierarchy` fits the ladder over sessions, each on one
-cohort frozen over every rung's predictors, and returns its cohort audit.
-:func:`fit_event_source_rate_hierarchy` is the event-source comparison's
-rate block: the ladder of ``n_selected_events`` on the common-cohort freeze.
+cohort frozen over every rung's predictors and every outcome's count, and
+returns the per-session provenance and the cohort audit; the session gate,
+whether a failed rung drops the session and the cross-validation are its
+arguments. :func:`fit_event_source_rate_hierarchy` is the event-source
+comparison's rate block: that fitter on ``n_selected_events`` with the
+comparison's settings.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
-from continuum_swr_replay.analysis.events.cohort_selection import (
-    freeze_common_cohort,
-)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .._fit_diagnostics import (
@@ -62,7 +63,11 @@ from .._fit_diagnostics import (
     fold_flag_counts,
 )
 from ..cohort_audit import cohort_record
-from ..common_cohort import fit_per_session_common_cohort
+from ..common_cohort import (
+    _require_block_columns,
+    block_required_columns,
+    freeze_session_cohort,
+)
 from ..model_specs import MODEL_PER_STOP_RATE
 
 logger = logging.getLogger(__name__)
@@ -323,11 +328,6 @@ def cross_validate_per_stop_rate_model(
 
 
 OFFSET_COL = "immobility_duration_s"
-# Union of every rung's predictors: the ladder is frozen to one cohort over
-# these, so R0 and R1 are fit to the same stops and their AIC is comparable.
-ALL_PREDICTORS = list(
-    dict.fromkeys(c for spec in MODEL_PER_STOP_RATE.values() for c in spec.predictors)
-)
 
 
 def incomplete_stops(group: pd.DataFrame, columns: list[str]) -> pd.Series:
@@ -353,45 +353,99 @@ def incomplete_stops(group: pd.DataFrame, columns: list[str]) -> pd.Series:
 
 
 def fit_per_stop_rate_hierarchy(
-    stop_table: pd.DataFrame, run_cv: bool = True
-) -> tuple[pd.DataFrame, list[dict]]:
-    """One row per (outcome, model, session): R0-R1 fit stats, coefs, CV-LL.
+    stop_table: pd.DataFrame,
+    outcomes: Mapping[str, str] = PER_STOP_RATE_OUTCOMES,
+    *,
+    min_stops: int = 0,
+    whole_session: bool = False,
+    run_cv: bool = True,
+    event_source: str | None = None,
+) -> tuple[list[dict], pd.DataFrame, list[dict]]:
+    """Fit ``MODEL_PER_STOP_RATE`` per session to each outcome's count.
 
-    Every rung of a session is fit to ONE cohort, frozen once per session over
-    the union of the ladder's predictors, the outcome columns present, and a
-    positive ``immobility_duration_s`` — so R0 and R1 report the same
-    ``n_stops`` and their AIC / BIC / LRT are comparable.
+    Every fit of a session is on ONE cohort, frozen once per session
+    (:func:`~continuum_swr_replay.analysis.behavior.common_cohort.freeze_session_cohort`)
+    over the union of the ladder's predictors, every outcome's count and a
+    positive ``immobility_duration_s``, so R0 and R1 report the same
+    ``n_stops`` and their AIC / BIC / LRT are comparable. Each fit also needs
+    the 20 stops of :func:`fit_per_stop_rate_model`.
 
-    Also returns one stop-grain cohort-audit record per (model, outcome): a
-    stop missing THIS rung's own predictor (or with ``immobility<=0``) goes to
-    ``n_drop_own_predictor_missing``; a stop the freeze removes only because
-    ANOTHER rung's predictor is missing there goes to
-    ``n_drop_common_cohort_other``; a skipped session's remaining stops
-    (min_stops / rank gate) go to ``n_excluded_session``; the fitted
-    ``n_stops`` sum is ``n_modeled``. Reconciles by construction.
+    Parameters
+    ----------
+    stop_table : pd.DataFrame
+        One row per stop: the session keys, ``stop_id``, the outcome counts,
+        ``immobility_duration_s`` and the ladder's predictors.
+    outcomes : mapping of str to str
+        The count column fit, by outcome name. A stop missing any of them is
+        in no fit of its session.
+    min_stops : int
+        A session whose cohort holds fewer stops is not fit (provenance status
+        ``too_few_units``).
+    whole_session : bool
+        When true, a session where any fit fails contributes no fit; when false
+        its other fits are kept.
+    run_cv : bool
+        Add each fit's cross-validated per-stop log-likelihood
+        (:func:`cross_validate_per_stop_rate_model`).
+    event_source : str, optional
+        Named in a refusal.
+
+    Returns
+    -------
+    fits : list of dict
+        One per (outcome, rung, session) fit: ``outcome``, ``model``, the
+        session keys, then the fit's and its cross-validation's statistics.
+    provenance : pd.DataFrame
+        One row per session, from
+        :func:`~continuum_swr_replay.analysis.behavior.common_cohort.freeze_session_cohort`;
+        ``status`` is ``too_few_units``, ``fit_failed`` (a fit returned
+        nothing; ``failed_models`` names its rungs) or ``fit``.
+    audit : list of dict
+        One stop-grain cohort-audit record per (rung, outcome): a stop missing
+        THIS rung's own predictor or count (or with ``immobility<=0``) goes to
+        ``n_drop_own_predictor_missing``; a stop the freeze removes only
+        because another rung's predictor or another outcome's count is missing
+        goes to ``n_drop_common_cohort_other``; the remaining stops of a session
+        not fit go to ``n_excluded_session``; the fitted ``n_stops`` sum is
+        ``n_modeled``. Reconciles by construction.
+
+    Raises
+    ------
+    ValueError
+        If ``stop_table`` lacks ``stop_id``, an outcome's count, the offset or
+        a predictor.
     """
-    missing_predictors = [c for c in ALL_PREDICTORS if c not in stop_table.columns]
-    if missing_predictors:
-        raise KeyError(
-            "stop table is missing per-stop rate predictor(s) "
-            f"{missing_predictors}; the ladder cannot be frozen to one cohort."
-        )
-    responses = [c for c in PER_STOP_RATE_OUTCOMES.values() if c in stop_table.columns]
+    responses = list(outcomes.values())
+    required_base = [*responses, OFFSET_COL]
+    _require_block_columns(
+        stop_table,
+        block_required_columns(
+            MODEL_PER_STOP_RATE, unit_col="stop_id", required_base=required_base
+        ),
+        analysis="rate_hierarchy",
+        event_source=event_source,
+    )
 
     rows = []
+    provenance_rows = []
     acc: dict = {}  # (model, outcome) -> counts
-    for keys, group in stop_table.groupby(list(SESSION_COLUMNS), sort=False):
+    for keys, group in stop_table.groupby(list(SESSION_COLUMNS)):
         # ONE cohort for the whole ladder and every outcome of this session.
-        cohort, _selection = freeze_common_cohort(
+        cohort, provenance = freeze_session_cohort(
             group,
+            keys=keys,
+            analysis="rate_hierarchy",
+            models=MODEL_PER_STOP_RATE,
             unit_col="stop_id",
-            required_cols=[*ALL_PREDICTORS, *responses],
+            required_base=required_base,
+            min_units=min_stops,
             offset_col=OFFSET_COL,
         )
+        provenance_rows.append(provenance)
         dropped = ~group["stop_id"].isin(cohort["stop_id"])
-        for outcome, response_col in PER_STOP_RATE_OUTCOMES.items():
-            if response_col not in group.columns:
-                continue
+        session_fits = []
+        failed_models = []
+        for outcome, response_col in outcomes.items():
             for name, spec in MODEL_PER_STOP_RATE.items():
                 preds = list(spec.predictors)
                 a = acc.setdefault(
@@ -412,19 +466,13 @@ def fit_per_stop_rate_hierarchy(
                 own_bad = incomplete_stops(group, [response_col, *preds])
                 a["n_own"] += int(own_bad.sum())
                 a["n_common"] += int((dropped & ~own_bad).sum())
+                if provenance["status"] != "ok":
+                    continue
 
                 res = fit_per_stop_rate_model(cohort, preds, response_col=response_col)
                 if res is None:
+                    failed_models.append(name)
                     continue
-                a["n_modeled"] += int(res["n_stops"])
-                a["sessions_modeled"] += 1
-                a["animals"].add(keys[0])
-                a["flags"].append(
-                    {
-                        "converged": res.get("converged"),
-                        "separated": res.get("separated"),
-                    }
-                )
                 row = {
                     "outcome": outcome,
                     "model": name,
@@ -437,7 +485,25 @@ def fit_per_stop_rate_hierarchy(
                     )
                     if cv is not None:
                         row.update(cv)
-                rows.append(row)
+                session_fits.append((a, res, row))
+
+        if provenance["status"] != "ok":
+            continue
+        provenance["status"] = "fit_failed" if failed_models else "fit"
+        provenance["failed_models"] = tuple(failed_models)
+        if failed_models and whole_session:
+            continue
+        for a, res, row in session_fits:
+            a["n_modeled"] += int(res["n_stops"])
+            a["sessions_modeled"] += 1
+            a["animals"].add(keys[0])
+            a["flags"].append(
+                {
+                    "converged": res.get("converged"),
+                    "separated": res.get("separated"),
+                }
+            )
+            rows.append(row)
 
     records = [
         cohort_record(
@@ -466,7 +532,7 @@ def fit_per_stop_rate_hierarchy(
         )
         for (name, outcome), a in acc.items()
     ]
-    return pd.DataFrame(rows), records
+    return rows, pd.DataFrame(provenance_rows), records
 
 
 def fit_event_source_rate_hierarchy(
@@ -475,10 +541,11 @@ def fit_event_source_rate_hierarchy(
     """The event-source comparison's rate block: ``MODEL_PER_STOP_RATE`` of each
     session's ``n_selected_events``, every rung on one cohort per session.
 
-    The cohort is the common-cohort freeze over the ladder's predictors, the
-    count and a positive ``immobility_duration_s``
-    (:func:`~continuum_swr_replay.analysis.behavior.common_cohort.fit_per_session_common_cohort`);
-    a session with fewer than 20 stops in it is not fit.
+    :func:`fit_per_stop_rate_hierarchy` with the comparison's settings: the one
+    outcome, no cross-validation, a session with fewer than 20 stops in its
+    cohort not fit, and a session where a rung fails contributing no rung. The
+    fits are laid out as the comparison's other blocks are
+    (:func:`~continuum_swr_replay.analysis.behavior.common_cohort.fit_per_session_common_cohort`).
 
     Parameters
     ----------
@@ -491,18 +558,40 @@ def fit_event_source_rate_hierarchy(
     Returns
     -------
     (fits, provenance)
-        One frame per rung, one row per fitted session; one provenance row per
-        session.
+        One frame per rung, one row per fitted session (the session keys, the
+        cohort's ``cohort_n_units``, ``cohort_n_rows`` and
+        ``cohort_included_ids_hash``, then the fit's statistics); one
+        provenance row per session.
     """
-    return fit_per_session_common_cohort(
+    fits, provenance, _ = fit_per_stop_rate_hierarchy(
         stop_table,
-        MODEL_PER_STOP_RATE,
-        lambda g, spec: fit_per_stop_rate_model(g, list(spec.predictors), min_stops=20),
-        analysis="rate_hierarchy",
-        unit_col="stop_id",
-        required_base=["n_selected_events", "immobility_duration_s"],
-        response_col="n_selected_events",
-        offset_col="immobility_duration_s",
-        min_units=20,
+        {"non_local": "n_selected_events"},
+        min_stops=20,
+        whole_session=True,
+        run_cv=False,
         event_source=event_source,
     )
+    cohorts = {
+        tuple(session[c] for c in SESSION_COLUMNS): {
+            "cohort_n_units": session["n_units_after"],
+            "cohort_n_rows": session["n_rows_after"],
+            "cohort_included_ids_hash": session["included_ids_hash"],
+        }
+        for session in provenance.to_dict("records")
+    }
+    by_rung: dict[str, list[dict]] = {name: [] for name in MODEL_PER_STOP_RATE}
+    for fit in fits:
+        keys = tuple(fit[c] for c in SESSION_COLUMNS)
+        statistics = {
+            k: v
+            for k, v in fit.items()
+            if k not in {"outcome", "model", *SESSION_COLUMNS}
+        }
+        by_rung[fit["model"]].append(
+            {
+                **dict(zip(SESSION_COLUMNS, keys, strict=True)),
+                **cohorts[keys],
+                **statistics,
+            }
+        )
+    return {name: pd.DataFrame(rows) for name, rows in by_rung.items()}, provenance

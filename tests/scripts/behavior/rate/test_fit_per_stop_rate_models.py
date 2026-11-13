@@ -107,16 +107,16 @@ def stubbed_run(monkeypatch, replay_content_root):
 
     def _fit(stop_table, **kwargs):
         seen["stop_ids"] = list(stop_table["stop_id"])
-        rate = pd.DataFrame(
+        fits = [
             {
-                "animal": ["a"],
-                "session_date": [1],
-                "epoch": ["02_r1"],
-                "outcome": ["non_local"],
-                "model": ["R0_offset"],
+                "outcome": "non_local",
+                "model": "R0_offset",
+                "animal": "a",
+                "session_date": 1,
+                "epoch": "02_r1",
             }
-        )
-        return rate, []
+        ]
+        return fits, pd.DataFrame(), []
 
     # stamped by the configured SWR source, as the shipped table is
     monkeypatch.setattr(fpsr, "read_table", lambda _path: stamp_swr_source(stop))
