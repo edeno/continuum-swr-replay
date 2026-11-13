@@ -40,7 +40,7 @@ from continuum_swr_replay.analysis.detection.decode_masks import (
     require_hpc_decode_sources,
     require_saved_decode_masks,
 )
-from continuum_swr_replay.analysis.events.analysed_time import with_swr_source
+from continuum_swr_replay.analysis.event_definition.analysed_time import with_swr_source
 from continuum_swr_replay.data_loaders import (
     get_training_timepoints,
     load_data,

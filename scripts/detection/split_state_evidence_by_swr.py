@@ -32,12 +32,14 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    read_dot_with_swr_source,
+)
+from continuum_swr_replay.analysis.event_definition.swr_source import swr_source_name
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     bout_statistics,
     split_non_local_by_swr,
 )
-from continuum_swr_replay.analysis.events.analysed_time import read_dot_with_swr_source
-from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import NL_BOUTS_BY_SWR_STEM, processed_data_dir

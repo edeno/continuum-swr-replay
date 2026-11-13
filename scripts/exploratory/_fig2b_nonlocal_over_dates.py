@@ -26,13 +26,13 @@ from scipy.stats import spearmanr
 from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
     load_data_over_time,
 )
-from continuum_swr_replay.analysis.events.classified_table import (
+from continuum_swr_replay.analysis.event_definition.classified_table import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC as SPEED_THR,
 )
-from continuum_swr_replay.analysis.events.classified_table import (
+from continuum_swr_replay.analysis.event_definition.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.events.immobility import (
+from continuum_swr_replay.analysis.event_definition.immobility import (
     filter_event_labels_by_speed,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR

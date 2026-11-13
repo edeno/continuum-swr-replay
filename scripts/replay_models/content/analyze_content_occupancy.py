@@ -53,6 +53,13 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
 from continuum_swr_replay.analysis.decode_quality.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,
 )
+from continuum_swr_replay.analysis.event_definition.analysed_time import (  # noqa: E402
+    read_dot_with_swr_source,
+    require_swr_source,
+)
+from continuum_swr_replay.analysis.event_definition.immobility import (  # noqa: E402
+    EventDefinitionError,
+)
 from continuum_swr_replay.analysis.event_properties import (  # noqa: E402
     content_occupancy,
 )
@@ -64,13 +71,6 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (  #
     arm_occupancy_shares,
     content_occupancy_shares,
     quadrant_fractions,
-)
-from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
-    read_dot_with_swr_source,
-    require_swr_source,
-)
-from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
-    EventDefinitionError,
 )
 from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS  # noqa: E402
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402

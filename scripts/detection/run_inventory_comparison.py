@@ -2,7 +2,7 @@
 """Compare the replay-detection inventories, one epoch at a time.
 
 Nine inventories of each analysed epoch are read through their adapters
-(``inventory_comparison.adapters``) and compared on one substrate, with
+(``detector_comparison.adapters``) and compared on one substrate, with
 per-detector denominators. Design:
 ``docs/design/replay_detection_comparison/03-inventory-comparison.md``.
 
@@ -68,8 +68,8 @@ narrowed by ``--animal``, ``--date`` and ``--epoch``, or the one
 ``--epoch-id``, run one at a time in this process, on the CPU.
 
 The roster, the comparisons, the grid and the tables' layout are
-``inventory_comparison.inventory_run``'s, which every reader of a run shares;
-the comparison of one epoch is ``inventory_comparison.epoch_comparison``'s.
+``detector_comparison.inventory_run``'s, which every reader of a run shares;
+the comparison of one epoch is ``detector_comparison.epoch_comparison``'s.
 
 Usage:
     python scripts/detection/run_inventory_comparison.py --carey-run-id <run id> \\
@@ -92,17 +92,13 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events import (
-    analysed_time,
-    swr_source,
-)
-from continuum_swr_replay.analysis.inventory_comparison.adapters import (
+from continuum_swr_replay.analysis.detector_comparison.adapters import (
     NATIVE_IS_ELIGIBLE,
 )
-from continuum_swr_replay.analysis.inventory_comparison.epoch_comparison import (
+from continuum_swr_replay.analysis.detector_comparison.epoch_comparison import (
     compare_epoch,
 )
-from continuum_swr_replay.analysis.inventory_comparison.inventory_run import (
+from continuum_swr_replay.analysis.detector_comparison.inventory_run import (
     CELL_DETECTORS,
     CELLS,
     COMPARISONS,
@@ -116,11 +112,15 @@ from continuum_swr_replay.analysis.inventory_comparison.inventory_run import (
     speed_trace,
     stamped_tables,
 )
-from continuum_swr_replay.analysis.inventory_comparison.recount import (
+from continuum_swr_replay.analysis.detector_comparison.recount import (
     FRAGMENT_GAPS_S,
 )
-from continuum_swr_replay.analysis.inventory_comparison.schema import (
+from continuum_swr_replay.analysis.detector_comparison.schema import (
     STATE_SPACE,
+)
+from continuum_swr_replay.analysis.event_definition import (
+    analysed_time,
+    swr_source,
 )
 from continuum_swr_replay.parameters import DECODE_SAMPLE_S, ROOT_DIR
 from continuum_swr_replay.paths import (

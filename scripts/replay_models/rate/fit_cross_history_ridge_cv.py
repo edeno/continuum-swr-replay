@@ -42,12 +42,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
-from continuum_swr_replay.analysis.events.cohort_selection import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    require_swr_source,
+)
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     STOP_COHORTS,
     select_stop_cohort,
 )
-from continuum_swr_replay.analysis.events.swr_source import swr_source_name
+from continuum_swr_replay.analysis.event_definition.swr_source import swr_source_name
 from continuum_swr_replay.analysis.replay_models.covariate_timing import (
     assert_predictor_timing,
 )

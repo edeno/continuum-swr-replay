@@ -31,6 +31,9 @@ from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
 from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     load_conditional_posterior,
 )
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    read_dot_with_swr_source,
+)
 from continuum_swr_replay.analysis.event_tables._common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
@@ -48,9 +51,6 @@ from continuum_swr_replay.analysis.event_tables.retrospective_metrics import (
 from continuum_swr_replay.analysis.event_tables.stop_table import (
     add_nonlocal_swr_split,
     build_stop_table,
-)
-from continuum_swr_replay.analysis.events.analysed_time import (
-    read_dot_with_swr_source,
 )
 from continuum_swr_replay.data_loaders.constants import WELL_ARMS, port_columns
 from continuum_swr_replay.data_loaders.trials import (

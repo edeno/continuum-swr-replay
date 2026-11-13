@@ -17,7 +17,7 @@ support on pure local coding is measured too.
 Every event either detector reports (our non-local events, the sliding window
 under the published definition) is classed as shared, ours only or the
 comparator's only, labelled with what it truly is, and scored by the one
-held-out rule of ``inventory_comparison.heldout``, under both content
+held-out rule of ``detector_comparison.heldout``, under both content
 estimates: our decoder's non-local posterior and the sliding window's own
 posterior, each from the discovery cells. What comes out is how often held-out
 support falls on events with spatial content and how often on events without
@@ -41,10 +41,10 @@ import pandas as pd
 from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     sweep_controls,
 )
-from continuum_swr_replay.analysis.inventory_comparison.heldout import (
+from continuum_swr_replay.analysis.detector_comparison.heldout import (
     heldout_summary,
 )
-from continuum_swr_replay.analysis.inventory_comparison.heldout_sweep import (
+from continuum_swr_replay.analysis.detector_comparison.heldout_sweep import (
     N_PERMUTATIONS,
     folds,
     run_fold,

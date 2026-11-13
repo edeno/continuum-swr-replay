@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.events.eligibility import (
+from continuum_swr_replay.analysis.event_definition.eligibility import (
     EXCLUDED_TIME_REASONS,
     DropReason,
 )

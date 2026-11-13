@@ -16,7 +16,7 @@ takes proportions from those sums (``n_matched`` over ``n_eligible``), never
 by averaging the sessions' proportions. A session where the comparison was
 unavailable is not summed; it is listed in ``unavailable_sessions``. The
 pooling, and the counts and cells tables the events summary reads, are
-``analysis.inventory_comparison.pooling``'s. An
+``analysis.detector_comparison.pooling``'s. An
 ``unknown`` membership or label is counted apart, never as ``unmatched`` or
 ``non-SWR``. Durations, overlap lengths, IoU and component sizes are given as
 distributions of the events or pairs pooled within the animal.
@@ -49,10 +49,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import matplotlib.ticker  # noqa: E402
 
-from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison import (  # noqa: E402
     inventory_run,
 )
-from continuum_swr_replay.analysis.inventory_comparison.pooling import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.pooling import (  # noqa: E402
     cells_by_animal,
     counts_by_animal,
     directional_by_animal,
@@ -62,7 +62,7 @@ from continuum_swr_replay.analysis.inventory_comparison.pooling import (  # noqa
     session_tables,
     summed,
 )
-from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.populations import (  # noqa: E402
     compared_events,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402

@@ -75,5 +75,5 @@ REMOTE_CM = 100.0
 """How far (cm along the track graph) a place must be from the animal's to be
 remote: the spike-evidence analysis's "remote" event subset
 (``analysis.event_evidence.spike_evidence``) and the event features'
-evidence over remote bins (``inventory_comparison.evidence``,
+evidence over remote bins (``detector_comparison.evidence``,
 ``scripts/detection/run_event_features.py``)."""

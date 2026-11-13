@@ -12,10 +12,10 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.events.classified_table import (
+from continuum_swr_replay.analysis.event_definition.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
     event_strict_overlap_keys,
 )
 from continuum_swr_replay.data_loaders.constants import (
@@ -570,7 +570,7 @@ def build_event_table(
       validates that all bins meet the saved speed and probability contracts;
       it never clips individual bins.
     - **Event timing and SWR classification** come from
-      :func:`continuum_swr_replay.analysis.events.classified_table.build_classified_nonlocal_event_table`,
+      :func:`continuum_swr_replay.analysis.event_definition.classified_table.build_classified_nonlocal_event_table`,
       and are merged on ``event_id``: the canonical ``event_*_s`` window,
       ``is_swr`` (strict positive-duration SWR overlap), ``overlap_class`` /
       ``overlap_subclass`` / ``n_swrs_overlapping`` / ``matched_swr_*``, speed
@@ -643,7 +643,7 @@ def build_event_table(
         and ``is_stay``
     Event-type
         ``is_swr`` (strict positive-duration SWR overlap; see
-        :mod:`continuum_swr_replay.analysis.events.classified_table`),
+        :mod:`continuum_swr_replay.analysis.event_definition.classified_table`),
         ``is_mua`` (strict positive-duration MUA overlap)
     SWR overlap (from the classified table)
         ``overlap_class``, ``overlap_subclass``, ``n_swrs_overlapping``,

@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 
 import scripts.figures.generate_inventory_examples as examples
-from continuum_swr_replay.analysis.inventory_comparison import inventory_run
-from continuum_swr_replay.analysis.inventory_comparison.selection import draw_examples
+from continuum_swr_replay.analysis.detector_comparison import inventory_run
+from continuum_swr_replay.analysis.detector_comparison.selection import draw_examples
 from continuum_swr_replay.runs.io import output_path
 from continuum_swr_replay.tables.io import write_table
 from continuum_swr_replay.visualization import inventory_examples

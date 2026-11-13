@@ -112,7 +112,7 @@ _LAZY_IMPORTS: list[str] = [
     # ``analysis/pfc/__init__.py``.
     "from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson",
     "from continuum_swr_replay.analysis.event_properties.event_analysis import get_event_start_end_times",
-    "from continuum_swr_replay.analysis.events.nonlocal_detection import get_confident_times",
+    "from continuum_swr_replay.analysis.event_definition.nonlocal_detection import get_confident_times",
     "from continuum_swr_replay.analysis.pfc.load_population import _extract_animal",
     "from continuum_swr_replay.analysis.pfc.session import process_neuron",
     # The foundation interval algebra and spike binning.
@@ -174,7 +174,7 @@ JAX_FREE: list[str] = [
     "continuum_swr_replay.analysis.event_tables",
     "continuum_swr_replay.analysis.replay_models",
     "continuum_swr_replay.analysis.pfc",
-    "continuum_swr_replay.analysis.events.cohort_selection",
+    "continuum_swr_replay.analysis.event_definition.cohort_selection",
     "continuum_swr_replay.analysis.behavior.design_constants",
     "continuum_swr_replay.analysis.behavior.history_basis",
     "continuum_swr_replay.analysis.behavior.spatial_mapping",

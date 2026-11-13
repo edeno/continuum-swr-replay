@@ -21,7 +21,7 @@ Per epoch:
 3. **Artifacts.** The epoch's artifact intervals are the configured artifact
    run's cores (``swr_source.ARTIFACT_INTERVALS_RUN_ID``, read once when the
    run starts and recorded in its settings) padded by the one table every
-   stage uses (``events.artifact_masks.PADDING_S``: S by 1 s, a step with an LFP
+   stage uses (``event_definition.artifact_masks.PADDING_S``: S by 1 s, a step with an LFP
    signature by 0.3 s, a spike-only line by 0.1 s). Their time is the artifact
    mask on the LFP times; with no artifact run configured it is empty. A
    configured run that cannot serve the epoch fails it.
@@ -183,17 +183,17 @@ from continuum_swr_replay.analysis.detection.swr_detectors import (
     yu_diagnostics,
     zero_phase_bandpass,
 )
-from continuum_swr_replay.analysis.events import swr_source
-from continuum_swr_replay.analysis.events.artifact_intervals import (
-    epoch_artifact_intervals,
-)
-from continuum_swr_replay.analysis.events.artifact_masks import (
-    PADDING_S,
-)
-from continuum_swr_replay.analysis.inventory_comparison.kay_version import (
+from continuum_swr_replay.analysis.detector_comparison.kay_version import (
     kay_version_check,
 )
-from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
+from continuum_swr_replay.analysis.detector_comparison.schema import SessionIdentity
+from continuum_swr_replay.analysis.event_definition import swr_source
+from continuum_swr_replay.analysis.event_definition.artifact_intervals import (
+    epoch_artifact_intervals,
+)
+from continuum_swr_replay.analysis.event_definition.artifact_masks import (
+    PADDING_S,
+)
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
 from continuum_swr_replay.data_loaders.lfp import (
     _ripple_keys,

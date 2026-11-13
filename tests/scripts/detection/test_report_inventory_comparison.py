@@ -16,8 +16,8 @@ import pandas as pd
 import pytest
 
 import scripts.detection.report_inventory_comparison as report
-from continuum_swr_replay.analysis.inventory_comparison import inventory_run
-from tests.analysis.inventory_comparison.test_inventory_pooling import rows, session
+from continuum_swr_replay.analysis.detector_comparison import inventory_run
+from tests.analysis.detector_comparison.test_inventory_pooling import rows, session
 
 # the runner's simulated run, built once for this module
 from tests.integration.test_run_inventory_comparison import (  # noqa: F401

@@ -6,7 +6,7 @@ The Widloski & Foster sliding-window detector, ported in
 epoch's saved clusterless decode: the encoding model from
 ``{epoch_id}_detector.pkl``, the decode grid, position and speed from
 ``{epoch_id}_80_data_over_time.pkl``, the SWR labels and where they were
-observed from the paper's SWR source (``analysis/events/swr_source.py``,
+observed from the paper's SWR source (``analysis/event_definition/swr_source.py``,
 the direct Kay inventory, on that grid), and the spike marks read as
 ``load_data`` read them for the decode (``MARKS_RULE``): ``get_hpc_marks``,
 then ``filter_spike_times`` over the decode's time span.
@@ -18,7 +18,7 @@ rule: a bin inside a closed interval of ``swr_source.artifact_intervals``).
 No window holding one is decoded, no candidate touches one, and neither the
 shuffle null nor any normalization reads them (``memoryless_sequence.epoch``).
 A candidate in excluded time (the mask widened by
-``events.eligibility.ARTIFACT_REACH_S``), or overlapping an SWR or MUA event
+``event_definition.eligibility.ARTIFACT_REACH_S``), or overlapping an SWR or MUA event
 dropped for it, keeps its row with an ``artifact_drop_reason`` and is in no
 cohort.
 ``check_marks_match_encoding`` refuses them unless every mark the encoding
@@ -35,7 +35,7 @@ Each epoch writes, under ``Processed-Data/replay_detection_comparison/memoryless
   of decoded windows (none holds a masked bin), and the stretches where SWR
   labels were observed. It records what was read, as the SWR runner's
   ``swr_observed.parquet`` does: the comparison's reader
-  (``inventory_comparison.availability.coverage_from_observations``) removes
+  (``detector_comparison.availability.coverage_from_observations``) removes
   excluded time from it, as from every detector's;
 - ``{epoch_id}_memoryless_candidates.pkl``, the per-window statistics, gates
   and pre-merge runs that explain each rejection.
@@ -163,14 +163,14 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     windows_holding,
 )
-from continuum_swr_replay.analysis.events.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
     read_dot_with_swr_source,
     stamp_swr_source,
     swr_observed_stretches,
 )
-from continuum_swr_replay.analysis.events.swr_source import (
+from continuum_swr_replay.analysis.event_definition.swr_source import (
     artifact_intervals,
     swr_epoch_id,
     swr_epoch_id_of_session,
@@ -443,7 +443,7 @@ def run_one(
             "masked_s": masked_seconds(artifact_mask.clip(time[0], time[-1])),
             "n_missing_bins": int(np.count_nonzero(is_missing)),
             "n_missing_windows": int(np.count_nonzero(missing_windows)),
-            # candidates the mask reaches, in no cohort (events.eligibility)
+            # candidates the mask reaches, in no cohort (event_definition.eligibility)
             "n_dropped": {
                 reason: int((table["artifact_drop_reason"] == reason).sum())
                 for reason in ("artifact", "near_artifact", "overlaps_dropped_event")

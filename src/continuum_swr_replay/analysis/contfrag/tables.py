@@ -20,11 +20,13 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
-from continuum_swr_replay.analysis.events.immobility import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    excluded_intervals_of,
+)
+from continuum_swr_replay.analysis.event_definition.immobility import (
     whole_event_immobility_mask,
 )
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
     event_strict_overlap_keys,
 )
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
@@ -154,7 +156,7 @@ def _in_contfrag_event_mask(
     """Boolean mask for in-event timebins using external event detectors.
 
     Thin wrapper over
-    :func:`~continuum_swr_replay.analysis.events.immobility.whole_event_immobility_mask`,
+    :func:`~continuum_swr_replay.analysis.event_definition.immobility.whole_event_immobility_mask`,
     which owns the repo-wide definition. What was once a ContFrag-local
     choice — all-immobile rather than per-timebin or endpoints, so that
     movement-spanning events cannot straddle two immobility bouts and

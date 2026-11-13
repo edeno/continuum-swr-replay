@@ -4,7 +4,7 @@ Each function takes the canonical stop table (one row per stop) or the event
 onset table (one row per event onset, with the stop it falls in) and returns
 named numbers. Times are in seconds. A stop is well-anchored when its
 ``occupancy_state`` is ``at_well`` or ``mixed``
-(:func:`~continuum_swr_replay.analysis.events.cohort_selection.select_stop_cohort`).
+(:func:`~continuum_swr_replay.analysis.event_definition.cohort_selection.select_stop_cohort`).
 """
 
 from __future__ import annotations
@@ -12,10 +12,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
     excluded_intervals_by_session,
 )
-from continuum_swr_replay.analysis.events.cohort_selection import select_stop_cohort
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_stop_cohort,
+)
 from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_PER_BIN_RATE,
     RATE_BIN_S,
@@ -162,7 +164,7 @@ def onset_rate_time_course(
         Each session's excluded time: the session columns, ``start_time`` and
         ``end_time``, in seconds. None (the default) reads it from the SWR
         source
-        (:func:`~continuum_swr_replay.analysis.events.analysed_time.excluded_intervals_by_session`).
+        (:func:`~continuum_swr_replay.analysis.event_definition.analysed_time.excluded_intervals_by_session`).
 
     Returns
     -------

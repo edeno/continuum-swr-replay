@@ -24,7 +24,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    require_swr_source,
+)
 from continuum_swr_replay.analysis.replay_models.content.fit_outputs import (
     belief_chain_output_subdir,
 )

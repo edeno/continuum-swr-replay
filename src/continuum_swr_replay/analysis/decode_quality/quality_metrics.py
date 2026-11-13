@@ -102,7 +102,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.events.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
     analysed_bins,
     immobile_analysed_bins,
 )
@@ -492,7 +492,7 @@ def compute_behavior_state_breakdown(
 
     - the overall running / immobile time split, and
     - the decoder state fractions during **immobility**, the project's rule
-      (:func:`~continuum_swr_replay.analysis.events.analysed_time.immobile_analysed_bins`:
+      (:func:`~continuum_swr_replay.analysis.event_definition.analysed_time.immobile_analysed_bins`:
       ``head_speed < speed_threshold``). A bin at the threshold or without a
       speed is neither running nor immobile.
 
@@ -1027,7 +1027,7 @@ def compute_non_local_event_context(
     # with ``classify_swr_overlap`` / ``get_overlap_times`` and
     # inflates ``frac_swr``. Use the shared event-bound overlap helper
     # so this stays consistent with the rest of the SWR-overlap path.
-    from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
         event_strict_overlap_keys,
     )
 

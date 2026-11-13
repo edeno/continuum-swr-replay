@@ -37,7 +37,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
-from continuum_swr_replay.analysis.events import (  # noqa: E402
+from continuum_swr_replay.analysis.event_definition import (  # noqa: E402
     analysed_time,
     swr_source,
 )
@@ -62,7 +62,7 @@ _SELECT = textwrap.dedent(
 
     import pandas as pd
 
-    from continuum_swr_replay.analysis.events import gallery_sample as gallery
+    from continuum_swr_replay.analysis.event_definition import gallery_sample as gallery
 
     rows = [
         {

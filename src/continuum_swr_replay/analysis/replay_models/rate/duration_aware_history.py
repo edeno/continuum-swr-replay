@@ -28,7 +28,7 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
-from continuum_swr_replay.analysis.events.swr_source import (
+from continuum_swr_replay.analysis.event_definition.swr_source import (
     read_swr_inventory,
     swr_epoch_id_of_session,
 )

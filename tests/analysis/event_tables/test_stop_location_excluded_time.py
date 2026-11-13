@@ -23,10 +23,15 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
+from continuum_swr_replay.analysis.event_definition import analysed_time
 from continuum_swr_replay.analysis.event_tables.stop_table import build_stop_table
-from continuum_swr_replay.analysis.events import analysed_time
-from tests.analysis.events.test_artifact_exposure import CORES, EPOCH_ID, TIME, _graph
-from tests.analysis.events.test_artifact_exposure import _dot as _exposure_dot
+from tests.analysis.event_definition.test_artifact_exposure import (
+    CORES,
+    EPOCH_ID,
+    TIME,
+    _graph,
+)
+from tests.analysis.event_definition.test_artifact_exposure import _dot as _exposure_dot
 from tests.support._port_experience_fixtures import port_experiences_from_trials
 from tests.support._swr_inventory_fixtures import use_artifact_run, write_artifact_run
 

@@ -11,7 +11,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    stamp_swr_source,
+)
 
 _SPEC = importlib.util.spec_from_file_location(
     "fit_per_bin_rate_models",
@@ -139,7 +141,7 @@ def test_unknown_cohort_is_refused_by_the_parser(capsys):
 def test_tables_from_another_swr_source_are_refused(monkeypatch, stubbed_run):
     """The bins are dropped by the configured source's excluded time, so tables
     made under another source (another artifact run, say) would mix two masks."""
-    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.event_definition import swr_source
 
     monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "another_run")
 

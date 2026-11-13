@@ -85,7 +85,7 @@ and compares the result with the stored band. Agreement shows that Zugaro's
 candidates are the channels the other three read, with the same referencing.
 The Kay version check, which marks each event of a direct Kay inventory and of
 the canonical Spyglass one matched, added or missed, is
-``inventory_comparison.kay_version.kay_version_check``.
+``detector_comparison.kay_version.kay_version_check``.
 """
 
 from __future__ import annotations

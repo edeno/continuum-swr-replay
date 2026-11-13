@@ -2,7 +2,7 @@
 
 Covers ``build_classified_nonlocal_event_table`` and its
 ``intervals_from_labels`` helper in
-``continuum_swr_replay.analysis.events.classified_table``.
+``continuum_swr_replay.analysis.event_definition.classified_table``.
 
 The shared fixture synthesises a ``data_over_time``-shaped frame sampled
 at 500 Hz with one event per interval-geometry case, plus a second
@@ -17,13 +17,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.events.classified_table import (
+from continuum_swr_replay.analysis.event_definition.classified_table import (
     assert_drawn_class_matches_ripples,
     build_classified_nonlocal_event_table,
     intervals_from_labels,
     match_swr,
 )
-from continuum_swr_replay.analysis.events.immobility import (
+from continuum_swr_replay.analysis.event_definition.immobility import (
     EventDefinitionError,
 )
 
@@ -546,7 +546,7 @@ def test_events_and_swrs_are_read_on_the_one_time_index():
 def test_zero_duration_event_inside_swr_is_non_swr():
     # A point event [1.0, 1.0] strictly inside an SWR has no positive
     # duration to overlap; the strict convention classifies it non_swr.
-    from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
         classify_swr_overlap,
         classify_swr_overlap_geometry,
     )

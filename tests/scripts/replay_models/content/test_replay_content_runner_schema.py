@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.events.swr_source import SwrSourceError
+from continuum_swr_replay.analysis.event_definition.swr_source import SwrSourceError
 from continuum_swr_replay.analysis.replay_models.content import session_fits
 from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
 from continuum_swr_replay.runs.fit_provenance import check_fit_provenance

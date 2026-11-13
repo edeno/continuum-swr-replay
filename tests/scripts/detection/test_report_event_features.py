@@ -21,15 +21,15 @@ import scripts.detection.report_event_features as report
 from continuum_swr_replay.analysis.detection.detection_inputs import (
     memoryless_output_paths as memoryless_outputs,
 )
-from continuum_swr_replay.analysis.inventory_comparison import (
+from continuum_swr_replay.analysis.detector_comparison import (
     feature_run,
     inventory_run,
 )
-from continuum_swr_replay.analysis.inventory_comparison.features import (
+from continuum_swr_replay.analysis.detector_comparison.features import (
     DURATION_STRATUM_LABELS,
 )
-from continuum_swr_replay.analysis.inventory_comparison.overlap import MATCH_DTYPES
-from continuum_swr_replay.analysis.inventory_comparison.selection import (
+from continuum_swr_replay.analysis.detector_comparison.overlap import MATCH_DTYPES
+from continuum_swr_replay.analysis.detector_comparison.selection import (
     REJECTION_DTYPES,
 )
 from continuum_swr_replay.paths import (

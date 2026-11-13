@@ -58,33 +58,33 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence import (
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     ENCODING_KEY,
 )
-from continuum_swr_replay.analysis.events import analysed_time, swr_source
-from continuum_swr_replay.analysis.inventory_comparison import (
+from continuum_swr_replay.analysis.detector_comparison import (
     feature_run,
     inventory_run,
 )
-from continuum_swr_replay.analysis.inventory_comparison.availability import (
+from continuum_swr_replay.analysis.detector_comparison.availability import (
     still_intervals,
 )
-from continuum_swr_replay.analysis.inventory_comparison.cells import (
+from continuum_swr_replay.analysis.detector_comparison.cells import (
     membership_against,
 )
-from continuum_swr_replay.analysis.inventory_comparison.features import (
+from continuum_swr_replay.analysis.detector_comparison.features import (
     DURATION_STRATUM_LABELS,
     _grid_rows,
 )
-from continuum_swr_replay.analysis.inventory_comparison.overlap import MATCH_DTYPES
-from continuum_swr_replay.analysis.inventory_comparison.populations import (
+from continuum_swr_replay.analysis.detector_comparison.overlap import MATCH_DTYPES
+from continuum_swr_replay.analysis.detector_comparison.populations import (
     rebuild_matches,
 )
-from continuum_swr_replay.analysis.inventory_comparison.schema import (
+from continuum_swr_replay.analysis.detector_comparison.schema import (
     INVENTORY_DTYPES,
     typed_table,
 )
-from continuum_swr_replay.analysis.inventory_comparison.selection import (
+from continuum_swr_replay.analysis.detector_comparison.selection import (
     REJECTION_COHORTS,
     REJECTION_DTYPES,
 )
+from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (

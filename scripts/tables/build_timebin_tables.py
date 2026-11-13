@@ -26,16 +26,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    publish_swr_table,
+    read_dot_with_swr_source,
+    stamp_swr_source,
+)
 from continuum_swr_replay.analysis.event_tables.timebin_tables import (  # noqa: E402
     ONSETS_IN_EXCLUDED_BINS_ATTR,
     build_event_onset_table,
     build_stop_timebin_table,
     concat_session_timebin_tables,
-)
-from continuum_swr_replay.analysis.events.analysed_time import (
-    publish_swr_table,
-    read_dot_with_swr_source,
-    stamp_swr_source,
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.data_types import SessionDataKeys  # noqa: E402

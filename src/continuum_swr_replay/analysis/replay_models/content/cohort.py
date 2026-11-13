@@ -25,7 +25,7 @@ from typing import NamedTuple
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.cohort_selection import (
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     freeze_common_cohort,
     select_event_cohort,
 )
@@ -279,7 +279,7 @@ def select_content_cohort(
     1. the SWR subset (``swr_subset`` ``"T"`` keeps the events with
        ``is_swr``, ``"F"`` those without, ``"all"`` keeps both);
     2. the at-well event cohort
-       (:func:`~continuum_swr_replay.analysis.events.cohort_selection.select_event_cohort`),
+       (:func:`~continuum_swr_replay.analysis.event_definition.cohort_selection.select_event_cohort`),
        applied unconditionally: a table without ``occupancy_state`` raises;
     3. with ``leaf_only``, the six leaf arms, the fraction response rescaled
        to unit mass over them

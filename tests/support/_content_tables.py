@@ -10,7 +10,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    stamp_swr_source,
+)
 from continuum_swr_replay.analysis.replay_models.content.simulation import (
     simulate_dirichlet_multinomial_counts,
     simulate_with_event_covariates,

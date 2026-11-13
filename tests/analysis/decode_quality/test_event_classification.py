@@ -14,7 +14,7 @@ import xarray as xr
 from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
     get_event_types,
 )
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
     select_typical_event_by_class,
 )
 

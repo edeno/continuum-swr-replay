@@ -33,16 +33,18 @@ from track_linearization import get_linearized_position
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     CLUSTERLESS_LIKELIHOOD_KEYS,
 )
+from continuum_swr_replay.analysis.event_definition import analysed_time
+from continuum_swr_replay.analysis.event_definition.artifact_masks import (
+    artifact_intervals,
+)
+from continuum_swr_replay.analysis.event_definition.immobility import (
+    EventDefinitionError,
+)
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     STATES,
     UNDERFLOW_OCCUPANCY_FLOOR,
     interior_bin_mask,
     nearest_interior_bins,
-)
-from continuum_swr_replay.analysis.events import analysed_time
-from continuum_swr_replay.analysis.events.artifact_masks import artifact_intervals
-from continuum_swr_replay.analysis.events.immobility import (
-    EventDefinitionError,
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.intervals import interval_mask

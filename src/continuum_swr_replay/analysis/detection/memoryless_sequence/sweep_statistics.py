@@ -5,7 +5,7 @@ long-format summary, one value per row: the injected-replay sweep
 (``scripts/detection/sweep_memoryless_detection.py``), its controls
 (``sweep_memoryless_controls.py``) and the held-out check
 (``sweep_memoryless_heldout.py``), made by ``sweep_summaries`` (the held-out
-one by ``inventory_comparison.heldout.heldout_summary``). Each function here
+one by ``detector_comparison.heldout.heldout_summary``). Each function here
 takes one of those summaries and returns named numbers: one value, a dict, a
 series with one
 value per measure or level, or a table with one row per true duration

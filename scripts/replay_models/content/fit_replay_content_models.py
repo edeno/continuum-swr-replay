@@ -76,6 +76,9 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    require_swr_source,
+)
 from continuum_swr_replay.analysis.event_tables.content_response import (
     ESTIMATOR_CHOICES,
     RESPONSE_CHOICES,
@@ -84,7 +87,6 @@ from continuum_swr_replay.analysis.event_tables.content_response import (
 from continuum_swr_replay.analysis.event_tables.table_contracts import (
     validate_requested_standardization,
 )
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.replay_models._fit_diagnostics import fit_flag_counts
 from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     coefficient_family_statistics,

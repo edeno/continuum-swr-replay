@@ -14,6 +14,9 @@ import pandas as pd
 import pytest
 import xarray as xr
 
+from continuum_swr_replay.analysis.event_definition.immobility import (
+    EventDefinitionError,
+)
 from continuum_swr_replay.analysis.event_tables._common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
@@ -31,9 +34,6 @@ from continuum_swr_replay.analysis.event_tables.event_table import (
 )
 from continuum_swr_replay.analysis.event_tables.stop_table import (
     build_stop_table as _build_stop_table,
-)
-from continuum_swr_replay.analysis.events.immobility import (
-    EventDefinitionError,
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from tests.support._port_experience_fixtures import port_experiences_from_trials
@@ -887,7 +887,7 @@ class TestEventTableInvariants:
 
     # A movement-spanning SWR or MUA event never reaches these builders: the
     # read drops the SWR and refuses the MUA label
-    # (tests/analysis/events/test_swr_source.py::TestTheLabelContract).
+    # (tests/analysis/event_definition/test_swr_source.py::TestTheLabelContract).
 
     def test_nonlocal_prob_within_unit_interval(self, tiny_session):
         # ``nonlocal_prob`` values in [0, 1]. Exposed here via

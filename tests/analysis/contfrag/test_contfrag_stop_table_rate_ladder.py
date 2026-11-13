@@ -38,8 +38,8 @@ from continuum_swr_replay.analysis.replay_models.model_specs import MODEL_PER_ST
 from continuum_swr_replay.analysis.replay_models.rate.per_stop_rate_model import (
     fit_event_source_rate_hierarchy,
 )
-from tests.analysis.events.test_artifact_exposure import TIME, _graph
-from tests.analysis.events.test_artifact_exposure import _dot as _exposure_dot
+from tests.analysis.event_definition.test_artifact_exposure import TIME, _graph
+from tests.analysis.event_definition.test_artifact_exposure import _dot as _exposure_dot
 from tests.support._port_experience_fixtures import port_experiences_from_trials
 
 REWARD_HISTORY = [*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE]

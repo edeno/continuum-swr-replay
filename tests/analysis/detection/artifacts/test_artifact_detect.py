@@ -21,7 +21,9 @@ from continuum_swr_replay.analysis.detection.artifacts.features import (
     persistent_step_count,
     robust_jump,
 )
-from continuum_swr_replay.analysis.events.artifact_intervals import CORE_COLUMNS
+from continuum_swr_replay.analysis.event_definition.artifact_intervals import (
+    CORE_COLUMNS,
+)
 from continuum_swr_replay.decoding.config import DecodingConfig
 from tests.support._artifact_synthetic import FS, N_TETRODES, NOISE, SyntheticEpoch
 

@@ -5,7 +5,7 @@ The mPFC GLM used to fit every immobile 2 ms bin in the epoch and to key its
 design matrices on every speed-eligible event. It now fits the bins inside
 well-anchored stops and the events whose onset lies inside one, through the
 same selector the hippocampal rate and content ladders read
-(``analysis.events.cohort_selection``). This script states what that did, from
+(``analysis.event_definition.cohort_selection``). This script states what that did, from
 the artifacts themselves:
 
 - the per-session bin and event counts, before and after, read from each new
@@ -1965,7 +1965,7 @@ def build_report(
         "the immobile bins that fall inside a well-anchored stop, and only the "
         "events whose onset lies inside one -- the population the hippocampal "
         "rate and content ladders are read on, selected through the same "
-        "`analysis.events.cohort_selection` functions. The regressor basis "
+        "`analysis.event_definition.cohort_selection` functions. The regressor basis "
         "still spans +/-250 ms around each kept event; bins outside the cohort "
         "are not fit.\n"
     )

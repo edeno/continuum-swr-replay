@@ -29,7 +29,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.cohort_selection import select_stop_cohort
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_stop_cohort,
+)
 from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 

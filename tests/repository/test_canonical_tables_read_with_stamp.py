@@ -68,6 +68,6 @@ def test_matcher_flags_a_raw_read(tmp_path: Path) -> None:
 def test_no_raw_read_of_a_canonical_table(path: Path) -> None:
     assert not _raw_reads(path), (
         f"{path.relative_to(REPO)} reads a canonical table with read_parquet; "
-        "use analysis.events.analysed_time.read_swr_table (or tables.io.read_table "
+        "use analysis.event_definition.analysed_time.read_swr_table (or tables.io.read_table "
         "for qvals)"
     )

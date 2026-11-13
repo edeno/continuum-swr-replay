@@ -62,10 +62,10 @@ from continuum_swr_replay.analysis.detection.swr_detectors import (
     yu_diagnostics,
     zero_phase_bandpass,
 )
-from continuum_swr_replay.analysis.inventory_comparison.kay_version import (
+from continuum_swr_replay.analysis.detector_comparison.kay_version import (
     kay_version_check,
 )
-from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
+from continuum_swr_replay.analysis.detector_comparison.schema import SessionIdentity
 
 FS = 1000.0
 """The nominal LFP rate every filter is designed at, in Hz."""

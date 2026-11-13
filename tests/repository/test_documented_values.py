@@ -75,7 +75,9 @@ def test_settings_table_matches_the_code(setting, value, dotted):
 
 
 def test_analysed_time_margin_and_speed_limit():
-    from continuum_swr_replay.analysis.events.eligibility import ARTIFACT_REACH_S
+    from continuum_swr_replay.analysis.event_definition.eligibility import (
+        ARTIFACT_REACH_S,
+    )
     from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
     margin = re.search(r"widened by ([\d.]+) s on each side", DEVELOPMENT)

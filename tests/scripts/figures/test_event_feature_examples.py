@@ -24,8 +24,8 @@ import pandas as pd
 import pytest
 
 import scripts.figures.generate_event_feature_examples as examples
-from continuum_swr_replay.analysis.inventory_comparison import selection
-from continuum_swr_replay.analysis.inventory_comparison.populations import (
+from continuum_swr_replay.analysis.detector_comparison import selection
+from continuum_swr_replay.analysis.detector_comparison.populations import (
     POPULATION_DTYPES,
 )
 

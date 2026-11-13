@@ -153,11 +153,11 @@ def rebuild_session(
     from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
         align_results_to_position,
     )
-    from continuum_swr_replay.analysis.events.analysed_time import (
+    from continuum_swr_replay.analysis.event_definition.analysed_time import (
         excluded_intervals,
         read_artifact_event_drops,
     )
-    from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id
+    from continuum_swr_replay.analysis.event_definition.swr_source import swr_epoch_id
     from continuum_swr_replay.analysis.pfc import (
         build_session_event_sets,
         build_session_fit_mask,

@@ -27,6 +27,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_event_cohort,
+)
 from continuum_swr_replay.analysis.event_tables.retrospective_metrics import (
     arm_path_well_to_well,
     chosen_arm_fraction,
@@ -39,7 +42,6 @@ from continuum_swr_replay.analysis.event_tables.retrospective_metrics import (
     ends_at_next_patch,
     ends_at_prev,
 )
-from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
 from continuum_swr_replay.analysis.replay_models.choice.retrospective import (
     at_well_event_cohort,
     family_unit_counts,

@@ -35,11 +35,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    require_swr_source,
+)
+from continuum_swr_replay.analysis.event_definition.swr_source import swr_source_name
 from continuum_swr_replay.analysis.event_tables.arm_patch_tables import (
     build_event_patch_table,
 )
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
-from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.analysis.replay_models.choice.choice_prediction import (
     CHOICE_MODELS,
     choice_swr_split_models_for_source,

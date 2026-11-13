@@ -34,7 +34,9 @@ from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     compute_non_local_event_context,
     compute_session_quality_summary,
 )
-from continuum_swr_replay.analysis.events.analysed_time import read_dot_with_swr_source
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    read_dot_with_swr_source,
+)
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.decoding.files import (
     DEFAULT_NON_LOCAL_THRESHOLD_PERCENT,

@@ -10,11 +10,15 @@ import pandas as pd
 import xarray as xr
 from scipy.stats import sem
 
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    excluded_intervals,
+)
+from continuum_swr_replay.analysis.event_definition.swr_source import (
+    swr_epoch_id_of_session,
+)
 from continuum_swr_replay.analysis.event_properties.event_analysis import (
     get_event_start_end_times,
 )
-from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals
-from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_session
 from continuum_swr_replay.intervals import overlaps_intervals
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.tables.columns import require_columns
@@ -254,7 +258,7 @@ def get_signal_windows(
             event_id_list, names=["animal", "day", "epoch", event_id_col]
         )
     else:
-        # Use RangeIndex for consistency with project patterns (see events/nonlocal_detection.py)
+        # Use RangeIndex for consistency with project patterns (see event_definition/nonlocal_detection.py)
         event_index = pd.RangeIndex(start=0, stop=len(event_id_list), name="event")
 
     return xr.DataArray(

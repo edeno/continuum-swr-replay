@@ -128,6 +128,7 @@ from continuum_swr_replay.analysis.detection.decode_masks import (  # noqa: E402
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (  # noqa: E402
     interior_bin_distances_cm,
 )
+from continuum_swr_replay.analysis.event_definition import analysed_time  # noqa: E402
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (  # noqa: E402
     CV_BLOCK_S,
     ENCODING_HELD_OUT,
@@ -164,7 +165,6 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence import (  # noq
     window_evidence,
     window_folds,
 )
-from continuum_swr_replay.analysis.events import analysed_time  # noqa: E402
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )

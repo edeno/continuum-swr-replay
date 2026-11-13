@@ -23,11 +23,11 @@ from typing import Any
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.detector_comparison import inventory_run
+from continuum_swr_replay.analysis.event_definition import analysed_time
 from continuum_swr_replay.analysis.event_properties.brain_state_reference import (
     brain_state_reference,
 )
-from continuum_swr_replay.analysis.events import analysed_time
-from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     event_features_root,

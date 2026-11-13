@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.events.cohort_selection import (
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     events_in_stops,
     stop_interval_mask,
 )
@@ -277,7 +277,7 @@ def build_session_event_sets(
     Both populations are canonical and are read, not re-detected here: the
     non-local events are rows of the shipped event table and the SWR intervals
     are the SWR source's speed-gated ``SWR_event`` labels (the direct Kay
-    inventory, :mod:`continuum_swr_replay.analysis.events.swr_source`), both
+    inventory, :mod:`continuum_swr_replay.analysis.event_definition.swr_source`), both
     loaded by :mod:`continuum_swr_replay.analysis.pfc.canonical_events`. The SWR
     split is
     the event table's own ``is_swr`` column -- strict positive-duration overlap

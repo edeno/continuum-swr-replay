@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 import scripts.detection.run_event_features as runner
-from continuum_swr_replay.analysis.inventory_comparison import inventory_run
+from continuum_swr_replay.analysis.detector_comparison import inventory_run
 from continuum_swr_replay.parameters import ROOT_DIR
 
 

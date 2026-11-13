@@ -21,8 +21,10 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.events.analysed_time import immobile_analysed_bins
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    immobile_analysed_bins,
+)
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
     event_strict_overlap_mask,
 )
 from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS

@@ -39,8 +39,10 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence import (
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     ENCODING_KEY,
 )
-from continuum_swr_replay.analysis.events import swr_source
-from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
+from continuum_swr_replay.analysis.event_definition import swr_source
+from continuum_swr_replay.analysis.event_definition.eligibility import (
+    artifact_drop_reasons,
+)
 from continuum_swr_replay.data_loaders import spikes
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import ROOT_DIR

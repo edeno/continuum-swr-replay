@@ -164,7 +164,7 @@ def no_configured_artifact_run():
     ``test_swr_source.TestTheConfiguredInventory``. Yields that committed value,
     which ``real_data`` tests get back.
     """
-    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.event_definition import swr_source
 
     configured = swr_source.ARTIFACT_INTERVALS_RUN_ID
     with pytest.MonkeyPatch.context() as patch:
@@ -189,7 +189,7 @@ def real_data_sees_the_configured_artifact_run(
     """
     if request.node.get_closest_marker("real_data") is None:
         return
-    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.event_definition import swr_source
 
     monkeypatch.setattr(
         swr_source, "ARTIFACT_INTERVALS_RUN_ID", no_configured_artifact_run

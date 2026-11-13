@@ -122,31 +122,24 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood impo
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (  # noqa: E402
     windows_holding,
 )
-from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (  # noqa: E402
-    encoding_inputs,
-)
-from continuum_swr_replay.analysis.events import (  # noqa: E402
-    analysed_time,
-    swr_source,
-)
-from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison import (  # noqa: E402
     inventory_run,
 )
-from continuum_swr_replay.analysis.inventory_comparison.availability import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.availability import (  # noqa: E402
     still_intervals,
 )
-from continuum_swr_replay.analysis.inventory_comparison.evidence import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.evidence import (  # noqa: E402
     BLOCK_ROWS,
     animal_bins,
     epoch_row_evidence,
     interval_evidence,
 )
-from continuum_swr_replay.analysis.inventory_comparison.feature_run import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.feature_run import (  # noqa: E402
     FEATURE_DTYPES,
     MS_DTYPES,
     output_paths,
 )
-from continuum_swr_replay.analysis.inventory_comparison.features import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.features import (  # noqa: E402
     DURATION_STRATA_S,
     DURATION_STRATUM_LABELS,
     PosteriorTraces,
@@ -160,26 +153,33 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (  # noq
     ss_features,
     stop_context,
 )
-from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.overlap import (  # noqa: E402
     MATCH_DTYPES,
 )
-from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.populations import (  # noqa: E402
     compared_events,
     population_rows,
     rebuild_matches,
 )
-from continuum_swr_replay.analysis.inventory_comparison.recount import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.recount import (  # noqa: E402
     FRAGMENT_GAPS_S,
 )
-from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.schema import (  # noqa: E402
     INVENTORY_DTYPES,
     STATE_SPACE,
     typed_table,
 )
-from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.selection import (  # noqa: E402
     REJECTION_COHORTS,
     REJECTION_DTYPES,
     rejection_stages,
+)
+from continuum_swr_replay.analysis.event_definition import (  # noqa: E402
+    analysed_time,
+    swr_source,
+)
+from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (  # noqa: E402
+    encoding_inputs,
 )
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,

@@ -4,7 +4,7 @@ Both ``run_decoding_bandit.py`` (NonLocal 4-state detector) and
 ``run_decoding_contfrag.py`` (ContFrag 2-state classifier) use them:
 ``is_missing`` (the artifact run's mask) and ``is_training`` (that mask and
 every event of the Kay inventory left out), both from the paper's SWR source
-(``analysis/events/swr_source.py``). An HPC decode refuses to start unless
+(``analysis/event_definition/swr_source.py``). An HPC decode refuses to start unless
 the source names both runs (``require_hpc_decode_sources``). The decode's
 configuration, file names and results reader are in
 ``continuum_swr_replay.decoding``; the run infrastructure the decoders share
@@ -21,8 +21,8 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.events import swr_source
-from continuum_swr_replay.analysis.events.artifact_masks import PADDING_S
+from continuum_swr_replay.analysis.event_definition import swr_source
+from continuum_swr_replay.analysis.event_definition.artifact_masks import PADDING_S
 from continuum_swr_replay.decoding.identifiers import TrainingType
 from continuum_swr_replay.intervals import interval_mask, sample_step
 

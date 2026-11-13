@@ -5,7 +5,7 @@ inventories, the share of its decode-grid rows above the non-local threshold
 (``ss_frac_rows_nonlocal``) but not the shares of the other states. This pass
 reads each ``ok`` epoch's ``features`` table (its ``first_row`` and ``n_rows``)
 and the same decode the run read, and writes
-:func:`~continuum_swr_replay.analysis.inventory_comparison.features.state_row_shares`
+:func:`~continuum_swr_replay.analysis.detector_comparison.features.state_row_shares`
 per event beside the run's tables, as ``{epoch_id}_state_shares.parquet``.
 
 Per epoch it refuses to write unless:
@@ -37,13 +37,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events import analysed_time
-from continuum_swr_replay.analysis.inventory_comparison import inventory_run
-from continuum_swr_replay.analysis.inventory_comparison.features import (
+from continuum_swr_replay.analysis.detector_comparison import inventory_run
+from continuum_swr_replay.analysis.detector_comparison.features import (
     STATE_SHARE_COLUMNS,
     PosteriorTraces,
     state_row_shares,
 )
+from continuum_swr_replay.analysis.event_definition import analysed_time
 from continuum_swr_replay.paths import event_features_root
 from continuum_swr_replay.runs.io import (
     ok_epochs,

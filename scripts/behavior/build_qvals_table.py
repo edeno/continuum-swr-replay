@@ -60,7 +60,9 @@ from continuum_swr_replay.analysis.behavior.covariates.qvals_table import (
     stop_mapping_agreement,
     write_qvals_outputs,
 )
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    require_swr_source,
+)
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.data_loaders.utils import quiet_spyglass
 from continuum_swr_replay.paths import replay_content_dir, table_path

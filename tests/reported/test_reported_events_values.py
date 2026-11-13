@@ -11,16 +11,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.detector_comparison.features import (
+    STATE_SHARE_COLUMNS,
+)
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
-)
-from continuum_swr_replay.analysis.inventory_comparison.features import (
-    STATE_SHARE_COLUMNS,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.reported import events as builder
 from continuum_swr_replay.reported.values import Value
-from tests.analysis.inventory_comparison.test_inventory_nonlocal_comparison import (
+from tests.analysis.detector_comparison.test_inventory_nonlocal_comparison import (
     _write_run,
 )
 

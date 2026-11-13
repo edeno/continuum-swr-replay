@@ -3,10 +3,10 @@
 Runs ``classify_swr_overlap_geometry`` over one or more sessions and prints
 a table of sub-case counts. Useful for Methods-section numbers and for
 auditing what the coarse three-way split aggregates over. The SWRs are the
-paper's SWR source (``analysis/events/swr_source.py``: the direct Kay
+paper's SWR source (``analysis/event_definition/swr_source.py``: the direct Kay
 inventory), on the decode grid, held to the one analysed-time rule as the
 decode frame's read holds them. The non-local events are re-detected from the
-posterior, so the rule is applied here (``events.eligibility``): an event in
+posterior, so the rule is applied here (``event_definition.eligibility``): an event in
 excluded time (the mask widened by 0.3 s), or overlapping an SWR or MUA event
 dropped for it, is not counted.
 
@@ -34,21 +34,23 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
     validate_results_position_time_alignment,
 )
-from continuum_swr_replay.analysis.events.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
     swr_event_labels,
 )
-from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
-from continuum_swr_replay.analysis.events.immobility import (
+from continuum_swr_replay.analysis.event_definition.eligibility import (
+    artifact_drop_reasons,
+)
+from continuum_swr_replay.analysis.event_definition.immobility import (
     build_speed_eligible_event_cohort,
     intervals_from_labels,
 )
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
     classify_swr_overlap_geometry,
     get_confident_times,
 )
-from continuum_swr_replay.analysis.events.swr_source import (
+from continuum_swr_replay.analysis.event_definition.swr_source import (
     artifact_intervals,
     swr_epoch_id,
 )

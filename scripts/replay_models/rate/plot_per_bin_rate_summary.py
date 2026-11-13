@@ -39,11 +39,11 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.analysed_time import (  # noqa: E402
     excluded_intervals_by_session,
     require_swr_source,
 )
-from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (  # noqa: E402
     select_stop_cohort,
 )
 from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (  # noqa: E402

@@ -61,7 +61,9 @@ import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.events.cohort_selection import stop_cohort_suffix
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    stop_cohort_suffix,
+)
 from continuum_swr_replay.analysis.pfc import (
     fit_immobility_models,
     load_aligned_session,

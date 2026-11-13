@@ -17,7 +17,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.events.analysed_time import publish_swr_table
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    publish_swr_table,
+)
 from continuum_swr_replay.tables.io import (
     parquet_path,
     publish_canonical,
@@ -175,7 +177,9 @@ def test_umask_file_mode_respects_umask():
 
 def _valid_stop_frame() -> pd.DataFrame:
     """A stop table as its producer hands it over: stamped with the SWR source."""
-    from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
+    from continuum_swr_replay.analysis.event_definition.analysed_time import (
+        stamp_swr_source,
+    )
 
     return stamp_swr_source(
         pd.DataFrame(
@@ -193,7 +197,7 @@ def _valid_stop_frame() -> pd.DataFrame:
 @pytest.mark.parametrize("stamp", [None, "kay@earlier+artifacts@none"])
 def test_publish_swr_table_refuses_an_swr_table_from_another_source(tmp_path, stamp):
     """A table built from SWR labels must name the configured SWR source."""
-    from continuum_swr_replay.analysis.events.swr_source import SwrSourceError
+    from continuum_swr_replay.analysis.event_definition.swr_source import SwrSourceError
 
     frame = _valid_stop_frame()
     frame.attrs.pop("swr_source")
@@ -220,7 +224,9 @@ def test_publish_canonical_refuses_an_swr_table_without_a_source_stamp(tmp_path,
 
 
 def test_publish_canonical_keeps_the_swr_stamp_and_needs_none_for_qvals(tmp_path):
-    from continuum_swr_replay.analysis.events.swr_source import swr_source_name
+    from continuum_swr_replay.analysis.event_definition.swr_source import (
+        swr_source_name,
+    )
 
     stop = read_table(
         publish_swr_table(

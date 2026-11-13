@@ -32,27 +32,27 @@ import scripts.detection.run_inventory_comparison as runner
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events import analysed_time, swr_source
-from continuum_swr_replay.analysis.inventory_comparison import (
+from continuum_swr_replay.analysis.detector_comparison import (
     epoch_comparison,
     inventory_run,
 )
-from continuum_swr_replay.analysis.inventory_comparison.availability import (
+from continuum_swr_replay.analysis.detector_comparison.availability import (
     coverage_from_observations,
     still_intervals,
     stored_coverage,
 )
-from continuum_swr_replay.analysis.inventory_comparison.cells import (
+from continuum_swr_replay.analysis.detector_comparison.cells import (
     membership_against,
 )
-from continuum_swr_replay.analysis.inventory_comparison.overlap import (
+from continuum_swr_replay.analysis.detector_comparison.overlap import (
     PAIR_DTYPES,
     directional_agreement,
     event_matches,
 )
-from continuum_swr_replay.analysis.inventory_comparison.populations import (
+from continuum_swr_replay.analysis.detector_comparison.populations import (
     rebuild_matches,
 )
+from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
 from continuum_swr_replay.intervals import (
     intersect,
     total_duration,

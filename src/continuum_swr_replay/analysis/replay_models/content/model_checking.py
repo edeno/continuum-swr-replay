@@ -13,7 +13,9 @@ import numpy as np
 import pandas as pd
 from statsmodels.discrete.conditional_models import ConditionalPoisson
 
-from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    freeze_common_cohort,
+)
 
 from .._fit_diagnostics import (
     EXPECTED_FIT_ERRORS,

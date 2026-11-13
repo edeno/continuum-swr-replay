@@ -14,7 +14,9 @@ import pytest
 import statsmodels.api as sm
 from patsy import dmatrix
 
-from continuum_swr_replay.analysis.events.cohort_selection import select_stop_cohort
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_stop_cohort,
+)
 from continuum_swr_replay.analysis.pfc.design import (
     _make_design_matrices,
     build_theta_design,

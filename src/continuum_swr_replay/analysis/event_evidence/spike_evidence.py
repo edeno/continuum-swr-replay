@@ -28,12 +28,14 @@ from continuum_swr_replay.analysis.constants import REMOTE_CM
 from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
     validate_dot_event_contract,
 )
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    immobile_analysed_bins,
+)
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+    event_strict_overlap_mask,
+)
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     nearest_interior_bins,
-)
-from continuum_swr_replay.analysis.events.analysed_time import immobile_analysed_bins
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
-    event_strict_overlap_mask,
 )
 from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.intervals import contiguous_true_runs
@@ -67,7 +69,7 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
     out. The ``baseline`` windows are the runs of bins with non-local
     probability below :data:`NON_EVENT_THRESHOLD`, immobile and outside
     excluded time
-    (:func:`~continuum_swr_replay.analysis.events.analysed_time.immobile_analysed_bins`),
+    (:func:`~continuum_swr_replay.analysis.event_definition.analysed_time.immobile_analysed_bins`),
     of :data:`MIN_EVENT_BINS` to :data:`MAX_BASELINE_BINS` bins.
 
     Parameters

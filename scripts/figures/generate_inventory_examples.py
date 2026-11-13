@@ -30,9 +30,9 @@ inventory. Each figure is one drawn event, its panels on one time axis
 - every inventory's events as bars: compared events solid, moving events
   light, events set aside outlined.
 
-The draw is ``analysis.inventory_comparison.selection.draw_examples``; an
+The draw is ``analysis.detector_comparison.selection.draw_examples``; an
 epoch's inputs and the recomputation are
-``analysis.inventory_comparison.example_windows``'s, run on a GPU under the
+``analysis.detector_comparison.example_windows``'s, run on a GPU under the
 memoryless run's XLA flags (``runs.device.use_memoryless_device``); the figure
 is ``visualization.inventory_examples``'s. ``generate_event_feature_examples.py``
 shares all four.
@@ -57,13 +57,13 @@ import pandas as pd
 
 matplotlib.use("Agg")
 
-from continuum_swr_replay.analysis.inventory_comparison.example_windows import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.example_windows import (  # noqa: E402
     CENTER_TIE_RTOL,
     SPREAD_RTOL,
     EpochInputs,
     load_epoch,
 )
-from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.selection import (  # noqa: E402
     EXAMPLE_SEED,
     N_PER_SIDE,
     draw_examples,

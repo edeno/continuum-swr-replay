@@ -17,8 +17,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
-from continuum_swr_replay.analysis.events.swr_source import SwrSourceError
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    stamp_swr_source,
+)
+from continuum_swr_replay.analysis.event_definition.swr_source import SwrSourceError
 from continuum_swr_replay.analysis.replay_models import contrast_aggregation
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,

@@ -63,10 +63,10 @@ def build_old_event_sets(
     from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
         align_results_to_position,
     )
-    from continuum_swr_replay.analysis.events.immobility import (
+    from continuum_swr_replay.analysis.event_definition.immobility import (
         build_speed_eligible_event_cohort,
     )
-    from continuum_swr_replay.analysis.events.nonlocal_detection import (
+    from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
         get_confident_times,
         get_overlap_times,
     )

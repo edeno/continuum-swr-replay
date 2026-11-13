@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.artifact_intervals import (
+from continuum_swr_replay.analysis.event_definition.artifact_intervals import (
     cores_path,
     make_cores,
     write_cores,
@@ -203,7 +203,7 @@ def use_swr_source(monkeypatch, inventory: Path, artifacts: Path | None = None) 
     The data root becomes the root `inventory` was written under; `artifacts`
     must have been written under the same one.
     """
-    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.event_definition import swr_source
 
     _use_root(monkeypatch, _root_of(inventory.parent, swr_inventory_root))
     monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", inventory.name)
@@ -218,7 +218,7 @@ def use_artifact_run(monkeypatch, artifacts: Path) -> None:
     inventory, if any, was written under too), and the configured artifact run
     its run id.
     """
-    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.event_definition import swr_source
 
     _use_root(monkeypatch, _root_of(artifacts.parent, artifact_intervals_root))
     monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)

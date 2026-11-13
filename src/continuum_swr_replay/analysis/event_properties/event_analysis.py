@@ -1,6 +1,6 @@
 """Analysis functions for manipulating and characterizing detected events.
 
-This module complements events/nonlocal_detection.py (which detects events from signals)
+This module complements event_definition/nonlocal_detection.py (which detects events from signals)
 by providing functions to analyze, filter, and characterize already-detected events.
 """
 
@@ -15,7 +15,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events.immobility import (
+from continuum_swr_replay.analysis.event_definition.immobility import (
     event_speeds_are_immobile,
     intervals_from_labels,
 )
@@ -145,14 +145,14 @@ def get_event_start_end_times(
     ValueError
         If event_col is not found in data, or a session's index is not its
         float, strictly increasing time axis
-        (:func:`~continuum_swr_replay.analysis.events.immobility.require_time_index`).
+        (:func:`~continuum_swr_replay.analysis.event_definition.immobility.require_time_index`).
 
     Notes
     -----
     - Duration is in seconds (end_time - start_time)
     - Events with ID 0 (non-events) are automatically excluded
     - Each session's bounds come from
-      :func:`~continuum_swr_replay.analysis.events.immobility.intervals_from_labels`,
+      :func:`~continuum_swr_replay.analysis.event_definition.immobility.intervals_from_labels`,
       read on the frame's time index
     - Rows are sorted by ``group_cols`` then event ID, with a fresh 0..n-1 index
 

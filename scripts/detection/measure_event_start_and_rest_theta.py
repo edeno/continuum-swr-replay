@@ -28,14 +28,16 @@ from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.detector_comparison.feature_run import (
+    EVENT_FEATURES_RUN,
+)
+from continuum_swr_replay.analysis.event_definition import analysed_time
+from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition.swr_source import (
+    swr_epoch_id_of_session,
+)
 from continuum_swr_replay.analysis.event_properties.start_and_rest_theta import (
     start_and_rest_theta,
-)
-from continuum_swr_replay.analysis.events import analysed_time
-from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
-from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_session
-from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
-    EVENT_FEATURES_RUN,
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (

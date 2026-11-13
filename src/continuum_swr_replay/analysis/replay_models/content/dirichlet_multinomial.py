@@ -52,7 +52,9 @@ from scipy.optimize import minimize
 from scipy.special import gammaln
 from scipy.stats import norm
 
-from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    freeze_common_cohort,
+)
 from continuum_swr_replay.analysis.shared_statistics import (
     akaike_information_criterion,
     bayesian_information_criterion,

@@ -6,12 +6,12 @@
   ``detect_artifacts`` returns an epoch's unpadded cores with their evidence.
 
 The padding table (``PADDING_S``) and the artifact mask live in
-``analysis/events/artifact_masks.py``, and the per-epoch cores file and the
-run manifest in ``analysis/events/artifact_intervals.py``; ``detect`` writes
+``analysis/event_definition/artifact_masks.py``, and the per-epoch cores file and the
+run manifest in ``analysis/event_definition/artifact_intervals.py``; ``detect`` writes
 through the latter.
 
 ``scripts/detection/run_artifact_detection.py`` runs it per epoch;
-``analysis/events/swr_source.py`` reads the artifact mask. Design note:
+``analysis/event_definition/swr_source.py`` reads the artifact mask. Design note:
 ``docs/design/2026-10-09-artifact-detection.md``. The submodules are imported
 by name, so reading a mask does not import the detector.
 """

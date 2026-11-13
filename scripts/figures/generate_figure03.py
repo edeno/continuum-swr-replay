@@ -60,32 +60,34 @@ from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
     load_data_over_time,
     validate_results_position_time_alignment,
 )
-from continuum_swr_replay.analysis.event_properties.event_statistics import (
-    class_medians,
-    event_signal_statistics,
-    reference_medians,
-)
-from continuum_swr_replay.analysis.events.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
     read_swr_table,
     swr_intervals,
 )
-from continuum_swr_replay.analysis.events.classified_table import (
+from continuum_swr_replay.analysis.event_definition.classified_table import (
     assert_drawn_class_matches_ripples,
 )
-from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
-from continuum_swr_replay.analysis.events.immobility import (
+from continuum_swr_replay.analysis.event_definition.eligibility import (
+    artifact_drop_reasons,
+)
+from continuum_swr_replay.analysis.event_definition.immobility import (
     build_speed_eligible_event_cohort,
 )
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
     get_confident_times,
     get_overlap_times,
 )
-from continuum_swr_replay.analysis.events.swr_source import (
+from continuum_swr_replay.analysis.event_definition.swr_source import (
     artifact_intervals,
     ripple_power_inputs,
     swr_epoch_id,
+)
+from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    class_medians,
+    event_signal_statistics,
+    reference_medians,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decoding.files import decode_paths

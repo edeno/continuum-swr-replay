@@ -22,6 +22,10 @@ from pathlib import Path
 import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.covariates import load_contingency
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    publish_swr_table,
+    stamp_swr_source,
+)
 from continuum_swr_replay.analysis.event_tables._common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
@@ -32,10 +36,6 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
 from continuum_swr_replay.analysis.event_tables.table_contracts import (
     validate_event_arm_table,
     validate_event_patch_table,
-)
-from continuum_swr_replay.analysis.events.analysed_time import (
-    publish_swr_table,
-    stamp_swr_source,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.paths import (

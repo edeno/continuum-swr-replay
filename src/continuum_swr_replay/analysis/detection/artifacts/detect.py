@@ -16,7 +16,7 @@ T signatures at most 50 ms apart merge into one T core (:func:`t_cores`); the
 merge chains, so a core can last longer than 50 ms. Each rule is its own
 function, so a further signature is one more event source.
 :func:`detect_artifacts` runs them on one epoch and returns unpadded cores
-with their evidence; one table pads them into the mask (``events.artifact_masks.PADDING_S``).
+with their evidence; one table pads them into the mask (``event_definition.artifact_masks.PADDING_S``).
 
 By construction no rule can mask a ripple seen on one CA1 electrode alone: S
 needs at least 2 channels for at least 2 s, T-ca1 needs at least 3 channels
@@ -64,12 +64,14 @@ from continuum_swr_replay.analysis.detection.artifacts.features import (
     window_centers,
     window_valid,
 )
-from continuum_swr_replay.analysis.events.artifact_intervals import (
+from continuum_swr_replay.analysis.event_definition.artifact_intervals import (
     empty_cores,
     make_cores,
     validate_cores,
 )
-from continuum_swr_replay.analysis.events.artifact_masks import artifact_intervals
+from continuum_swr_replay.analysis.event_definition.artifact_masks import (
+    artifact_intervals,
+)
 from continuum_swr_replay.intervals import contiguous_true_runs, interval_mask
 
 __all__ = [
@@ -281,7 +283,7 @@ def s_cores(
     Returns
     -------
     pd.DataFrame
-        Cores in :data:`~continuum_swr_replay.analysis.events.artifact_intervals.CORE_COLUMNS`,
+        Cores in :data:`~continuum_swr_replay.analysis.event_definition.artifact_intervals.CORE_COLUMNS`,
         kind and signatures ``"S"``, with ``spec_max`` (over the block, gap
         windows included) and ``n_windows``.
     """

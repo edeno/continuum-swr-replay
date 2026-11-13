@@ -21,7 +21,7 @@ from pathlib import Path
 from continuum_swr_replay.analysis.detection.decode_masks import (
     require_saved_decode_masks,
 )
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.decoding.results import open_results
 
 

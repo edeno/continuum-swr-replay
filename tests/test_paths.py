@@ -91,7 +91,7 @@ def test_the_upper_case_names_resolve_when_read(monkeypatch, tmp_path):
         assert parameters.PROCESSED_DATA_DIR == root
         for name, accessor in names.items():
             assert getattr(paths, name) == getattr(paths, accessor)(), name
-    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.event_definition import swr_source
 
     for root in (DATA_ROOT, tmp_path):
         monkeypatch.setenv(paths.PROCESSED_DATA_DIR_ENV, str(root))
@@ -125,7 +125,7 @@ def test_no_supported_module_binds_a_root_by_its_upper_case_name():
     allowed = {
         ROOT_DIR / "src/continuum_swr_replay/paths.py",
         ROOT_DIR / "src/continuum_swr_replay/parameters.py",
-        ROOT_DIR / "src/continuum_swr_replay/analysis/events/swr_source.py",
+        ROOT_DIR / "src/continuum_swr_replay/analysis/event_definition/swr_source.py",
     }
     offenders = []
     for folder in ("src", "scripts"):

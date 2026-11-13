@@ -59,33 +59,33 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import matplotlib.ticker  # noqa: E402
 
-from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison import (  # noqa: E402
     feature_run,
     inventory_run,
 )
-from continuum_swr_replay.analysis.inventory_comparison.feature_run import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.feature_run import (  # noqa: E402
     read_inputs,
 )
-from continuum_swr_replay.analysis.inventory_comparison.pooling import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.pooling import (  # noqa: E402
     MEMBERSHIPS,
     pool_sessions,
     ratio,
     summed,
 )
-from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.populations import (  # noqa: E402
     ALL,
     NO_SHARED_EXPOSURE,
     OUTSIDE_SHARED_EXPOSURE,
     event_populations,
     without_baseline_rows,
 )
-from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.schema import (  # noqa: E402
     MEMORYLESS,
     MEMORYLESS_CRITERIA,
     STATE_SPACE,
     event_keys,
 )
-from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.selection import (  # noqa: E402
     REJECTION_COHORTS,
     REJECTION_DTYPES,
     REJECTION_STAGES,

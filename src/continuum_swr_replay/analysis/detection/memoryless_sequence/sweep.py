@@ -1,7 +1,7 @@
 """The simulated recording the memoryless sweeps share, and each detector's run on it.
 
 The injected-replay sweep (``sweep_replays``), its controls (``sweep_controls``),
-the held-out check (``inventory_comparison.heldout_sweep``) and the reference
+the held-out check (``detector_comparison.heldout_sweep``) and the reference
 check (``scripts/checks/compare_memoryless_to_reference.py``) read one simulated
 recording (:func:`build_recording`, sorted spikes on a linear track, both
 detectors fitted on its non-event data), place events in its immobile stretches

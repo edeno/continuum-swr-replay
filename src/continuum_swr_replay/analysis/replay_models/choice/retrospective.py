@@ -36,7 +36,9 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_event_cohort,
+)
 from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
     WELL_PATCH_MAPPING,
@@ -125,7 +127,7 @@ def at_well_event_cohort(
     """Filter all three event tables to one explicit at-well event cohort.
 
     Membership is the shared event-grain rule and nothing else:
-    :func:`~continuum_swr_replay.analysis.events.cohort_selection.select_event_cohort`
+    :func:`~continuum_swr_replay.analysis.event_definition.cohort_selection.select_event_cohort`
     with ``cohort="at_well"``, the same call the content ladders make. What this
     function adds on top is retrospective-specific: the finite
     ``occupancy_well_arm`` conjunct (an endpoint the path metrics can name) and

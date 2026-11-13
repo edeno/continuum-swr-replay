@@ -88,6 +88,19 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     load_conditional_posterior,
 )
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    excluded_intervals_of,
+    read_dot_with_swr_source,
+    swr_intervals,
+)
+from continuum_swr_replay.analysis.event_definition.gallery_sample import (
+    event_catalog,
+    select_events,
+)
+from continuum_swr_replay.analysis.event_definition.swr_source import (
+    ripple_power_inputs,
+    swr_epoch_id,
+)
 from continuum_swr_replay.analysis.event_tables.arm_patch_tables import (
     build_event_arm_table,
     build_event_patch_table,
@@ -96,19 +109,6 @@ from continuum_swr_replay.analysis.event_tables.bouts import (
     immobility_bout_intervals,
 )
 from continuum_swr_replay.analysis.event_tables.event_table import build_event_table
-from continuum_swr_replay.analysis.events.analysed_time import (
-    excluded_intervals_of,
-    read_dot_with_swr_source,
-    swr_intervals,
-)
-from continuum_swr_replay.analysis.events.gallery_sample import (
-    event_catalog,
-    select_events,
-)
-from continuum_swr_replay.analysis.events.swr_source import (
-    ripple_power_inputs,
-    swr_epoch_id,
-)
 from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_decode_files,
     analysed_epoch_ids,

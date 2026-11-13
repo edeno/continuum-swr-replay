@@ -1258,7 +1258,7 @@ def _session_fit_population(
     """
     # Deferred: opens Spyglass / DataJoint at import time (see the note at
     # the top of this module).
-    from continuum_swr_replay.analysis.events import analysed_time, swr_source
+    from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
 
     # Excluded time (the artifact mask widened by 0.3 s) is not analysed. No
     # fitted bin's peri-event basis window reaches it, and no running bin's
@@ -1346,7 +1346,7 @@ def _session_events(
     """
     # Deferred: opens Spyglass / DataJoint at import time (see the note at
     # the top of this module).
-    from continuum_swr_replay.analysis.events import analysed_time
+    from continuum_swr_replay.analysis.event_definition import analysed_time
     from continuum_swr_replay.analysis.pfc.canonical_events import (
         canonical_event_provenance,
         load_session_canonical_events,

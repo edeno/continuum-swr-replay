@@ -78,6 +78,22 @@ from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
 from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     compute_local_decoding_error,
 )
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    read_swr_table,
+    swr_intervals,
+)
+from continuum_swr_replay.analysis.event_definition.classified_table import (
+    assert_drawn_class_matches_ripples,
+    build_classified_nonlocal_event_table,
+)
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+    select_typical_event_by_class,
+)
+from continuum_swr_replay.analysis.event_definition.swr_source import (
+    ripple_power_inputs,
+    swr_epoch_id,
+    swr_source_name,
+)
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     boundary_offset_statistics,
     boundary_offsets,
@@ -86,22 +102,6 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     compute_triggered_average_curves,
-)
-from continuum_swr_replay.analysis.events.analysed_time import (
-    read_swr_table,
-    swr_intervals,
-)
-from continuum_swr_replay.analysis.events.classified_table import (
-    assert_drawn_class_matches_ripples,
-    build_classified_nonlocal_event_table,
-)
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
-    select_typical_event_by_class,
-)
-from continuum_swr_replay.analysis.events.swr_source import (
-    ripple_power_inputs,
-    swr_epoch_id,
-    swr_source_name,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.epoch_register import (

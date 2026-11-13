@@ -3,7 +3,7 @@
 ``report_inventory_comparison.py`` and ``report_event_features.py``: the pending
 marking of the memoryless inventories, the caption and quantile wording,
 and reading a run's tables. Sessions are pooled within an animal by
-``analysis.inventory_comparison.pooling``.
+``analysis.detector_comparison.pooling``.
 
 Not a script. The reports import it as ``scripts.detection._report``, after
 putting the repo root on ``sys.path``.
@@ -18,10 +18,10 @@ from types import MappingProxyType
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.inventory_comparison.pooling import (
+from continuum_swr_replay.analysis.detector_comparison.pooling import (
     session_names,
 )
-from continuum_swr_replay.analysis.inventory_comparison.schema import (
+from continuum_swr_replay.analysis.detector_comparison.schema import (
     MEMORYLESS,
     MEMORYLESS_CRITERIA,
     typed_table,

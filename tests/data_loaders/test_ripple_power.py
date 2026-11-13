@@ -21,7 +21,7 @@ from ripple_detection import Kay_ripple_detector
 from continuum_swr_replay.analysis.detection.swr_detectors import (
     DETECTOR_SETTINGS,
 )
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.data_loaders.lfp import (
     KAY_MINIMUM_DURATION_S,
     KAY_SMOOTHING_SIGMA_S,

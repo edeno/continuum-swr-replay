@@ -30,7 +30,9 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_session
+from continuum_swr_replay.analysis.event_definition.swr_source import (
+    swr_epoch_id_of_session,
+)
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.decoding.files import decode_paths

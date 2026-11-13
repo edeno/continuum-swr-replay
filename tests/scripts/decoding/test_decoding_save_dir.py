@@ -66,8 +66,8 @@ import xarray as xr
 
 from continuum_swr_replay.analysis.contfrag import result_loading as contfrag_loading
 from continuum_swr_replay.analysis.detection import decode_masks
-from continuum_swr_replay.analysis.events import analysed_time, swr_source
-from continuum_swr_replay.analysis.events.immobility import (
+from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
+from continuum_swr_replay.analysis.event_definition.immobility import (
     EventDefinitionError,
 )
 from continuum_swr_replay.decoding import files as decoding_files

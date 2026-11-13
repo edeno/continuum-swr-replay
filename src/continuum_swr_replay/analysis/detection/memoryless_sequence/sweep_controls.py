@@ -10,7 +10,7 @@ Each trial is scored for the four outputs of :data:`DETECTORS`
 (:func:`score_trial`) against the injected replay's path (:func:`truth_path`)
 and the ground its parts cover (:func:`covered_cm`); each part of a multi-part
 event is also decoded alone (:func:`part_alone_spikes`). The held-out check
-(``inventory_comparison.heldout_sweep``) injects the same conditions.
+(``detector_comparison.heldout_sweep``) injects the same conditions.
 """
 
 import zlib

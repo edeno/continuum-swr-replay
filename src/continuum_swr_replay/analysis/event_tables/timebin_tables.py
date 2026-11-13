@@ -32,7 +32,9 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    excluded_intervals_of,
+)
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import hash_stop_id
 from continuum_swr_replay.tables.session_keys import one_session

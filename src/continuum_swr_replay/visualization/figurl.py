@@ -90,7 +90,9 @@ if TYPE_CHECKING:
 from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     get_conditional_non_local_posterior,
 )
-from continuum_swr_replay.analysis.events.nonlocal_detection import get_confident_times
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+    get_confident_times,
+)
 from continuum_swr_replay.visualization.palettes import COLORS
 
 from .interactive import create_playback_speed_dropdown, create_player

@@ -22,7 +22,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.events.cohort_selection import events_in_stops
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    events_in_stops,
+)
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_canonical_events,
     load_session_swr_intervals,

@@ -12,7 +12,7 @@ replay criteria, as the reference tests every such candidate, so
 whose immobility rule is stricter than the reference's per-window gate. A
 candidate that was not shuffled has ``n_shuffles == 0``. A fourth column,
 ``artifact_drop_reason``, applies the project's one analysed-time rule
-(``events.eligibility``): a candidate sharing time with the artifact mask
+(``event_definition.eligibility``): a candidate sharing time with the artifact mask
 (``"artifact"``), within ``ARTIFACT_REACH_S`` of it (``"near_artifact"``), or
 overlapping an SWR or MUA event dropped for either (``"overlaps_dropped_event"``)
 is in no cohort; it is None for every other candidate.
@@ -60,15 +60,17 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     dispersion_cm,
 )
-from continuum_swr_replay.analysis.events.classified_table import match_swr
-from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
-from continuum_swr_replay.analysis.events.immobility import (
+from continuum_swr_replay.analysis.event_definition.classified_table import match_swr
+from continuum_swr_replay.analysis.event_definition.eligibility import (
+    artifact_drop_reasons,
+)
+from continuum_swr_replay.analysis.event_definition.immobility import (
     event_speeds_are_immobile,
     filter_event_labels_by_speed,
     intervals_from_labels,
     require_canonical_speed_threshold,
 )
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
     classify_swr_overlap_geometry,
 )
 from continuum_swr_replay.data_loaders.constants import BRAIN_AREAS

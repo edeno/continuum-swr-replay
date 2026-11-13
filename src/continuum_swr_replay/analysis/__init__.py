@@ -1,8 +1,8 @@
 """The analyses, one package per subject.
 
-How a non-local event is defined -> ``analysis/events``; how SWRs are detected
+How a non-local event is defined -> ``analysis/event_definition``; how SWRs are detected
 -> ``analysis/detection/swr_detectors``; how detectors are compared ->
-``analysis/inventory_comparison``.
+``analysis/detector_comparison``.
 
 Packages
 --------

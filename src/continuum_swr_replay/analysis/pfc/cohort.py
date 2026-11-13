@@ -4,7 +4,7 @@
 analysed epochs whose session has curated cortical spike sorting.
 
 The hippocampal rate and content families are read on one population -- the
-stops the animal spends at a well (``analysis/events/cohort_selection.py``,
+stops the animal spends at a well (``analysis/event_definition/cohort_selection.py``,
 ``select_stop_cohort``). The PFC unit GLMs describe the same events and so must
 be read on the same population; this module is the one place that loads it for a
 single session, so no PFC script re-derives "at a well" from position.
@@ -22,7 +22,9 @@ from typing import Any
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.cohort_selection import select_stop_cohort
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_stop_cohort,
+)
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
@@ -77,7 +79,7 @@ def load_session_stop_cohort(
         Epoch name, e.g. ``"02_r1"``.
     cohort : {"at_well", "all_stops", "in_transit"}
         Population to keep, passed through to
-        :func:`~continuum_swr_replay.analysis.events.cohort_selection.select_stop_cohort`.
+        :func:`~continuum_swr_replay.analysis.event_definition.cohort_selection.select_stop_cohort`.
         ``at_well`` is canonical and, at the stop grain, means *well-anchored*:
         ``occupancy_state`` of ``at_well`` or ``mixed``.
     stop_table_path : str or Path, optional

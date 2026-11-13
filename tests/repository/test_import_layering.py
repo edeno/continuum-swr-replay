@@ -24,7 +24,7 @@ reported as a plain edge rather than as an ``ImportError`` from a cycle:
   (:data:`FOUNDATION`) imports, from within the package, only other
   foundation modules, and nothing from ``scripts``.
 - ``events_imports_only_foundation``: the analysed-time and event substrate
-  (``analysis.events``) imports, from within the package, only foundation
+  (``analysis.event_definition``) imports, from within the package, only foundation
   modules, ``analysis.constants``, ``analysis.shared_statistics`` and itself, and
   nothing from ``scripts``.
 - ``hippocampus_imports_no_behavior`` and
@@ -72,9 +72,9 @@ from tests.support._imports import (
     package_of,
 )
 
-#: Package nodes, besides the foundation, that ``analysis.events`` may import.
+#: Package nodes, besides the foundation, that ``analysis.event_definition`` may import.
 EVENTS_MAY_IMPORT = frozenset(
-    {"analysis.events", "analysis.constants", "analysis.shared_statistics"}
+    {"analysis.event_definition", "analysis.constants", "analysis.shared_statistics"}
 )
 
 #: The three data-flow packages, ranked: one imports only those of a lower rank.
@@ -180,7 +180,7 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
         "events_imports_only_foundation": {
             (a, b)
             for a, b in edges
-            if package_of(a) == "analysis.events"
+            if package_of(a) == "analysis.event_definition"
             and outside(b, FOUNDATION | EVENTS_MAY_IMPORT)
         },
         "hippocampus_imports_no_behavior": {
@@ -193,7 +193,7 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
             (a, b)
             for a, b in edges
             if _starts_with(a, "analysis.hippocampus")
-            and _starts_with(b, "analysis.pfc", "analysis.inventory_comparison")
+            and _starts_with(b, "analysis.pfc", "analysis.detector_comparison")
         },
         "data_flow_packages_import_one_way": {
             (a, b)
@@ -237,7 +237,7 @@ def test_the_graph_is_not_vacuous() -> None:
     """The scan sees the packages the rules are about, and their known edges."""
     graph = package_graph()
     for node in (
-        "analysis.events",
+        "analysis.event_definition",
         "analysis.hippocampus",
         "analysis.behavior",
         "analysis.event_tables",
@@ -346,11 +346,11 @@ def test_a_longer_cycle_is_reported_in_import_order(tmp_path: Path) -> None:
 def test_events_rule_allows_only_foundation_constants_and_itself(
     tmp_path: Path,
 ) -> None:
-    """An ``analysis.events`` module may import the foundation,
+    """An ``analysis.event_definition`` module may import the foundation,
     ``analysis.constants`` and its own package; a function-local import of
     an analysis package, or of ``scripts``, is a violation."""
     root = tmp_path / "continuum_swr_replay"
-    for package in ("analysis/events", "analysis/hippocampus"):
+    for package in ("analysis/event_definition", "analysis/hippocampus"):
         (root / package).mkdir(parents=True)
         (root / package / "__init__.py").write_text("")
     (root / "__init__.py").write_text("")
@@ -370,8 +370,8 @@ def test_events_rule_allows_only_foundation_constants_and_itself(
     )
 
     assert rule_violations(root)["events_imports_only_foundation"] == {
-        ("analysis.events.e", "analysis.hippocampus.h"),
-        ("analysis.events.e", "scripts.qa.tool"),
+        ("analysis.event_definition.e", "analysis.hippocampus.h"),
+        ("analysis.event_definition.e", "scripts.qa.tool"),
     }
 
 

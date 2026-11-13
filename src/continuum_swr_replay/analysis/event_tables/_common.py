@@ -23,7 +23,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events.immobility import (
+from continuum_swr_replay.analysis.event_definition.immobility import (
     validate_nonlocal_event_probability_contract,
     validate_whole_event_immobility_contract,
 )

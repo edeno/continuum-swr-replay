@@ -4,7 +4,7 @@ Every value is read from an output an analysis already wrote; nothing is
 refitted here. This module names and describes the values. The statistics are
 computed in ``analysis.event_properties.event_statistics``,
 ``analysis.decode_quality.quality_metrics`` and
-``analysis.inventory_comparison.nonlocal_comparison``; here only the size of an
+``analysis.detector_comparison.nonlocal_comparison``; here only the size of an
 input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
 
 - the canonical event table (``replay_content/event_table.parquet``): the
@@ -60,17 +60,17 @@ from pathlib import Path
 import pandas as pd
 
 from continuum_swr_replay.analysis.decode_quality import quality_metrics
+from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
+from continuum_swr_replay.analysis.detector_comparison.feature_run import (
+    EVENT_FEATURES_RUN,
+)
+from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
 )
 from continuum_swr_replay.analysis.event_properties import event_statistics
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
-)
-from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
-from continuum_swr_replay.analysis.inventory_comparison import nonlocal_comparison
-from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
-    EVENT_FEATURES_RUN,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_animals,

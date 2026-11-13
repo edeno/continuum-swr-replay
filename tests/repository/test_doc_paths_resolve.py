@@ -59,7 +59,7 @@ HISTORICAL_PREFIXES = (
 _DATED_DESIGN = re.compile(r"docs/design/\d{4}-\d{2}-\d{2}-[^/]*\.md")
 
 #: Package subdirectories a doc may cite by bare path
-#: (``analysis/events/classified_table.py``).
+#: (``analysis/event_definition/classified_table.py``).
 PACKAGE_DIRS = tuple(
     sorted(p.parent.name for p in (SRC / PACKAGE).glob("*/__init__.py"))
 )
@@ -221,8 +221,8 @@ def test_path_pattern_boundaries() -> None:
         return [m.group(1) for m in _PACKAGE_PATH.finditer(s)]
 
     assert package_found(
-        "`analysis/events/classified_table.py:build_classified_nonlocal_event_table`"
-    ) == ["analysis/events/classified_table.py"]
+        "`analysis/event_definition/classified_table.py:build_classified_nonlocal_event_table`"
+    ) == ["analysis/event_definition/classified_table.py"]
     assert package_found("in data_loaders/constants.py.") == [
         "data_loaders/constants.py"
     ]

@@ -41,7 +41,7 @@ from continuum_swr_replay.analysis.detection.swr_detectors import (
     NoUsableChannelError,
     best_ripple_channel,
 )
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.runs import batch
 from continuum_swr_replay.runs.io import sha256_file

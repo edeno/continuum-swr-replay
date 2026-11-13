@@ -95,7 +95,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_controls import (
     MULTIPART_CONDITIONS,
 )
-from continuum_swr_replay.analysis.inventory_comparison.heldout_sweep import (
+from continuum_swr_replay.analysis.detector_comparison.heldout_sweep import (
     FOLDS,
     OUR_EVENT_CLASSES,
     TILING_FOLDS,

@@ -51,28 +51,28 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.constants import REMOTE_CM  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison import (  # noqa: E402
+    inventory_run,
+)
+from continuum_swr_replay.analysis.detector_comparison.feature_run import (  # noqa: E402
+    EVENT_FEATURES_RUN,
+)
+from continuum_swr_replay.analysis.detector_comparison.features import (  # noqa: E402
+    _grid_rows,
+)
+from continuum_swr_replay.analysis.detector_comparison.schema import (  # noqa: E402
+    native_event_keys,
+)
+from continuum_swr_replay.analysis.event_definition import analysed_time  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition.swr_source import (  # noqa: E402
+    swr_epoch_id_of_session,
+)
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (  # noqa: E402
     SPIKE_EVIDENCE_METRICS,
 )
 from continuum_swr_replay.analysis.event_properties import (
     class_or_continuum as cc,  # noqa: E402
-)
-from continuum_swr_replay.analysis.events import analysed_time  # noqa: E402
-from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
-from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
-    swr_epoch_id_of_session,
-)
-from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
-    inventory_run,
-)
-from continuum_swr_replay.analysis.inventory_comparison.feature_run import (  # noqa: E402
-    EVENT_FEATURES_RUN,
-)
-from continuum_swr_replay.analysis.inventory_comparison.features import (  # noqa: E402
-    _grid_rows,
-)
-from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
-    native_event_keys,
 )
 from continuum_swr_replay.paths import (
     RIPPLE_CLASS_STRUCTURE_DIR,

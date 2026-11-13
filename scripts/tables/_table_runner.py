@@ -21,12 +21,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
     publish_swr_table,
     require_swr_source,
     stamp_swr_source,
 )
-from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id
+from continuum_swr_replay.analysis.event_definition.swr_source import swr_epoch_id
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import (

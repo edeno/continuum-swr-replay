@@ -81,6 +81,12 @@ from continuum_swr_replay.analysis.constants import (  # noqa: E402
 from continuum_swr_replay.analysis.decode_quality.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,
 )
+from continuum_swr_replay.analysis.event_definition.analysed_time import (  # noqa: E402
+    read_dot_with_swr_source,
+)
+from continuum_swr_replay.analysis.event_definition.immobility import (  # noqa: E402
+    EventDefinitionError,
+)
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (  # noqa: E402
     SPIKE_EVIDENCE_METRICS,
     build_session_events,
@@ -98,12 +104,6 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence import (  # noq
 )
 from continuum_swr_replay.analysis.event_properties import (  # noqa: E402
     event_statistics,
-)
-from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
-    read_dot_with_swr_source,
-)
-from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
-    EventDefinitionError,
 )
 from continuum_swr_replay.analysis.shared_statistics import (  # noqa: E402
     animal_medians,

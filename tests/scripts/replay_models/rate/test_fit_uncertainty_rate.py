@@ -15,7 +15,9 @@ import json
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    stamp_swr_source,
+)
 from continuum_swr_replay.analysis.replay_models.rate import uncertainty_rate as unc
 from continuum_swr_replay.data_loaders import epoch_register
 from scripts.replay_models.rate import fit_uncertainty_rate as mod

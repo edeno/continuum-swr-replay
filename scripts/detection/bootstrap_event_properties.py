@@ -32,12 +32,12 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
     bootstrap_contrasts,
     bootstrap_intervals,
 )
-from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.decoding import identifiers
 from continuum_swr_replay.parameters import DECODE_SAMPLE_S
 from continuum_swr_replay.paths import (

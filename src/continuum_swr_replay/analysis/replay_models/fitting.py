@@ -27,7 +27,9 @@ from scipy.stats import norm
 from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
-from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    freeze_common_cohort,
+)
 from continuum_swr_replay.analysis.shared_statistics import (
     akaike_information_criterion,
     bayesian_information_criterion,

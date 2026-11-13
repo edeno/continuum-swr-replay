@@ -90,7 +90,7 @@ from matplotlib import patheffects
 from matplotlib.lines import Line2D
 
 # --- Data loading + decode outputs ---
-from continuum_swr_replay.analysis.events.cohort_selection import freeze_common_cohort
+from continuum_swr_replay.analysis.event_definition.cohort_selection import freeze_common_cohort
 from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
     validate_dot_event_contract,
 )

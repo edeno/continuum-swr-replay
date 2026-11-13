@@ -9,7 +9,7 @@ The analysis pipeline per session:
 1. Load the session's non-local events from the canonical event table
 2. Split them on that table's ``is_swr`` column (strict positive-duration
    overlap with the SWR source's speed-gated ``SWR_event`` labels, the direct
-   Kay inventory of ``analysis/events/swr_source.py``), so Figure 4
+   Kay inventory of ``analysis/event_definition/swr_source.py``), so Figure 4
    describes the same events, with the same classification, as the content
    and rate families
 3. Fit GLMs for each neuron comparing models: constant, SWR, non-local, combined
@@ -71,7 +71,7 @@ import pandas as pd  # noqa: E402
 from dask.distributed import Client, LocalCluster  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
-from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (  # noqa: E402
     stop_cohort_suffix,
 )
 from continuum_swr_replay.analysis.pfc import bundle_files, run_session  # noqa: E402

@@ -4,7 +4,7 @@ The helper used to crash when no event_col_a row was left
 (``int(empty_series.sum())`` → TypeError). The frames here are shaped as the
 read (``analysed_time.with_swr_source``) hands them over: it holds every label to
 the whole-event speed rule and the Non-Local probability contract, so the
-helper neither filters nor validates them (``tests/analysis/events/test_swr_source.py``).
+helper neither filters nor validates them (``tests/analysis/event_definition/test_swr_source.py``).
 """
 
 from __future__ import annotations

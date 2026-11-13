@@ -43,7 +43,7 @@ The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
     SWR-source fixtures in `support/_swr_inventory_fixtures.py` write their run
     folders where `paths` puts them under a root and point the variable at it.
     That one variable is the patch point: no test patches a module's root.
-    And `continuum_swr_replay.analysis.events.swr_source.ARTIFACT_INTERVALS_RUN_ID`
+    And `continuum_swr_replay.analysis.event_definition.swr_source.ARTIFACT_INTERVALS_RUN_ID`
     is None. A `real_data` test gets the live root and the committed run back,
     so the canonical tables pass their SWR-source check. Those restores are
     function-scoped fixtures: a module- or session-scoped fixture in a
@@ -101,7 +101,7 @@ tests/
 `tests/data_loaders/`, and those of `scripts/<dir>/<script>.py` in
 `tests/scripts/<dir>/`. A test goes beside the module it tests, which is the one it
 imports for that purpose; a test of a rule several modules share (every SWR consumer
-reads one source) goes beside the rule's module (`tests/analysis/events/`). A test of
+reads one source) goes beside the rule's module (`tests/analysis/event_definition/`). A test of
 the repository itself rather than of a module goes in `tests/repository/`. Shared
 helpers are in `tests/support/`, imported as `tests.support._name`.
 

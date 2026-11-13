@@ -28,15 +28,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_tables.stop_table import (  # noqa: E402
-    add_nonlocal_swr_split,
-    build_stop_table,
-)
-from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.analysed_time import (  # noqa: E402
     publish_swr_table,
     read_dot_with_swr_source,
     require_swr_source,
     stamp_swr_source,
+)
+from continuum_swr_replay.analysis.event_tables.stop_table import (  # noqa: E402
+    add_nonlocal_swr_split,
+    build_stop_table,
 )
 from continuum_swr_replay.data_types import SessionDataKeys  # noqa: E402
 from continuum_swr_replay.paths import replay_content_dir, table_path

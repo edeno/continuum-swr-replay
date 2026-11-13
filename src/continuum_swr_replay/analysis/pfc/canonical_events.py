@@ -4,7 +4,7 @@ Every family in this paper must describe the same events. The hippocampal
 content and rate ladders read the shipped event table
 (``Processed-Data/replay_content/event_table.parquet``) and the speed-gated
 ``SWR_event`` labels of the SWR source
-(:mod:`~continuum_swr_replay.analysis.events.swr_source`, the direct Kay
+(:mod:`~continuum_swr_replay.analysis.event_definition.swr_source`, the direct Kay
 inventory) on the cached ``*_HPC_80_data_over_time.pkl`` frame's grid; this
 module is the one place the PFC path loads those, so no PFC script re-detects
 non-local events or re-splits them on a separately detected ripple population.
@@ -12,7 +12,7 @@ non-local events or re-splits them on a separately detected ripple population.
 Two definitions are fixed here and nowhere else on the PFC path:
 
 - **A non-local event** is a row of the shipped event table. That table is
-  :func:`~continuum_swr_replay.analysis.events.classified_table.build_classified_nonlocal_event_table`'s
+  :func:`~continuum_swr_replay.analysis.event_definition.classified_table.build_classified_nonlocal_event_table`'s
   output on the canonical cached inputs, so an event carries the same
   ``event_id`` the content and rate tables key on.
 - **``is_swr``** is that table's column: strict positive-duration overlap with
@@ -23,7 +23,7 @@ The SWR interval table returned here is the *same* population that column was
 built from -- ``SWR_event`` labels gated by the canonical whole-event
 immobility rule (every sampled speed finite and strictly ``<`` the threshold)
 and turned into sampled bounds by
-:func:`~continuum_swr_replay.analysis.events.immobility.intervals_from_labels`.
+:func:`~continuum_swr_replay.analysis.event_definition.immobility.intervals_from_labels`.
 
 The session key is the canonical ``(animal, session_date, epoch)`` triple,
 which the PFC runners hold as ``nwb_file_name`` / ``epoch_name`` instead; the
@@ -43,13 +43,13 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.event_tables.trajectory import brain_state_means
-from continuum_swr_replay.analysis.events import analysed_time, swr_source
-from continuum_swr_replay.analysis.events.immobility import (
+from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
+from continuum_swr_replay.analysis.event_definition.immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
     require_canonical_speed_threshold,
 )
+from continuum_swr_replay.analysis.event_tables.trajectory import brain_state_means
 from continuum_swr_replay.decoding.files import (
     decode_paths,
     non_local_threshold_percent,
@@ -212,10 +212,10 @@ def load_session_swr_intervals(
     """Load one session's SWR intervals: the SWR source's, on the cached frame's grid.
 
     The cached decode frame is read through the SWR source
-    (:func:`~continuum_swr_replay.analysis.events.analysed_time.read_dot_with_swr_source`),
+    (:func:`~continuum_swr_replay.analysis.event_definition.analysed_time.read_dot_with_swr_source`),
     so its ``SWR_event`` labels are the direct Kay inventory's, not the
     decode's stored ripples. The intervals are then built exactly as
-    :func:`~continuum_swr_replay.analysis.events.classified_table.build_classified_nonlocal_event_table`
+    :func:`~continuum_swr_replay.analysis.event_definition.classified_table.build_classified_nonlocal_event_table`
     builds them -- the labels, which the read gated atomically by the canonical
     whole-event immobility rule, reduced to their sampled bounds -- so the population
     here and the population the canonical ``is_swr`` column was computed against
@@ -370,7 +370,7 @@ def load_session_event_ripple_power(
     """Mean ripple power of each event, from the session's cached decode frame.
 
     The frame is read through the SWR source
-    (:func:`~continuum_swr_replay.analysis.events.analysed_time.read_dot_with_swr_source`),
+    (:func:`~continuum_swr_replay.analysis.event_definition.analysed_time.read_dot_with_swr_source`),
     as :func:`load_session_swr_intervals` reads it.
 
     Parameters

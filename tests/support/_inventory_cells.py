@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.inventory_comparison import inventory_run
+from continuum_swr_replay.analysis.detector_comparison import inventory_run
 
 
 def cells(records: list[tuple[str, str, str, str, int]]) -> pd.DataFrame:

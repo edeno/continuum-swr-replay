@@ -35,7 +35,7 @@ once and blocks every run after it.
 
 The prerequisites, not run here (GPUs or hours each), are listed in order in
 ``PREREQUISITES``: artifact detection, SWR detection, pinning both run IDs in
-``analysis/events/swr_source.py``, then the HPC and ContFrag decodes.
+``analysis/event_definition/swr_source.py``, then the HPC and ContFrag decodes.
 
 Before a table run starts, a preflight checks they are on disk: both pinned run
 folders, the inventory masked with the pinned artifact run
@@ -321,7 +321,7 @@ PREREQUISITES = (
     ),
     (
         "pin ARTIFACT_INTERVALS_RUN_ID and SWR_INVENTORY_RUN_ID",
-        "in analysis/events/swr_source.py",
+        "in analysis/event_definition/swr_source.py",
     ),
     ("scripts/decoding/run_decoding_bandit.py", "the HPC non-local decodes"),
     (
@@ -348,7 +348,7 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
     from continuum_swr_replay.analysis.detection.decode_masks import (
         require_hpc_decode_sources,
     )
-    from continuum_swr_replay.analysis.events import swr_source
+    from continuum_swr_replay.analysis.event_definition import swr_source
     from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
     from continuum_swr_replay.decoding.files import decode_paths
     from continuum_swr_replay.decoding.identifiers import CONTFRAG_SUFFIX

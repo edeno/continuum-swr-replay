@@ -47,7 +47,7 @@ def compute_swr_overlap_class_counts(
     """Count immobile non-local events by SWR-overlap class.
 
     Operates on the output of
-    :func:`continuum_swr_replay.analysis.events.classified_table.build_classified_nonlocal_event_table`,
+    :func:`continuum_swr_replay.analysis.event_definition.classified_table.build_classified_nonlocal_event_table`,
     restricted to immobile events (``whole_event_speed_eligible``), and
     tallies the ``overlap_class`` column. The single overlap convention
     (strict positive-duration overlap, "contained" = some single SWR spans

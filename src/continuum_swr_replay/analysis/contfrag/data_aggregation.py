@@ -23,14 +23,18 @@ from continuum_swr_replay.analysis.decode_quality.data_aggregation import (
     validate_required_session_data_keys,
     validate_results_position_time_alignment,
 )
-from continuum_swr_replay.analysis.events.analysed_time import read_dot_with_swr_source
-from continuum_swr_replay.analysis.events.epoch_normalizers import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    read_dot_with_swr_source,
+)
+from continuum_swr_replay.analysis.event_definition.epoch_normalizers import (
     run_speed_baseline as epoch_run_speed_baseline,
 )
-from continuum_swr_replay.analysis.events.immobility import (
+from continuum_swr_replay.analysis.event_definition.immobility import (
     build_speed_eligible_event_cohort,
 )
-from continuum_swr_replay.analysis.events.nonlocal_detection import get_overlap_times
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+    get_overlap_times,
+)
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
 from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename

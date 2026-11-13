@@ -18,7 +18,7 @@ from continuum_swr_replay.analysis.detection.decode_masks import (
     hpc_decode_masks,
     require_hpc_decode_sources,
 )
-from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.event_definition import swr_source
 from tests.support._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     RUN_ID,

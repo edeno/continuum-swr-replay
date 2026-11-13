@@ -72,8 +72,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
-from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
+from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_event_cohort,
+)
 from continuum_swr_replay.analysis.replay_models.coefficient_statistics import fit_rows
 from continuum_swr_replay.analysis.replay_models.content import content_statistics
 from continuum_swr_replay.analysis.replay_models.content.estimator_comparison import (

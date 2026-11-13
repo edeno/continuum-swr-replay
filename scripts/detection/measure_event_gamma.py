@@ -40,6 +40,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.detector_comparison import inventory_run
+from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
+from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.event_properties.gamma_power import (
     FILTER_ORDER,
     GAMMA_BANDS,
@@ -47,9 +50,6 @@ from continuum_swr_replay.analysis.event_properties.gamma_power import (
 from continuum_swr_replay.analysis.event_properties.gamma_power import (
     epoch_gamma as epoch_gamma_measures,
 )
-from continuum_swr_replay.analysis.events import analysed_time, swr_source
-from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
-from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.paths import (
     EVENT_GAMMA_DIR,

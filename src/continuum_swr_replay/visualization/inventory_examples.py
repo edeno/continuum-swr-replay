@@ -3,9 +3,9 @@
 What the inventory comparison's examples (``scripts/figures/generate_inventory_examples.py``)
 and the event features' examples (``scripts/figures/generate_event_feature_examples.py``)
 share: one drawn event's figure (:func:`draw_example`). The events are drawn by
-``analysis.inventory_comparison.selection.draw_examples``; the figure's
+``analysis.detector_comparison.selection.draw_examples``; the figure's
 memoryless windows are recomputed for the plotted span and checked against the
-stored ones by ``analysis.inventory_comparison.example_windows``, on the device
+stored ones by ``analysis.detector_comparison.example_windows``, on the device
 the memoryless run used (``runs.device.use_memoryless_device``). Design:
 ``docs/design/replay_detection_comparison/03-inventory-comparison.md``
 (Reporting, item 5).
@@ -25,13 +25,13 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
-from continuum_swr_replay.analysis.inventory_comparison import inventory_run
-from continuum_swr_replay.analysis.inventory_comparison.example_windows import (
+from continuum_swr_replay.analysis.detector_comparison import inventory_run
+from continuum_swr_replay.analysis.detector_comparison.example_windows import (
     SPREAD_RTOL,
     EpochInputs,
     recompute_windows,
 )
-from continuum_swr_replay.analysis.inventory_comparison.selection import EXAMPLE_SEED
+from continuum_swr_replay.analysis.detector_comparison.selection import EXAMPLE_SEED
 from continuum_swr_replay.decoding.results import nonlocal_probability
 from continuum_swr_replay.intervals import contiguous_true_runs, sample_step
 from continuum_swr_replay.visualization.figure_utilities import WONG

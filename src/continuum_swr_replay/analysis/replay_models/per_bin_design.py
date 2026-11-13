@@ -21,7 +21,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
     excluded_intervals_by_session,
 )
 from continuum_swr_replay.intervals import overlaps_intervals

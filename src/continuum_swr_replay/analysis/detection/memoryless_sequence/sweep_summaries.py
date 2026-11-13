@@ -6,7 +6,7 @@ per row, to ``paper/reported/inputs/detection/``: the injected-replay sweep
 (``scripts/detection/sweep_memoryless_detection.py``,
 :func:`replay_sweep_summary`), its controls (``sweep_memoryless_controls.py``,
 :func:`controls_summary`) and the held-out check (``sweep_memoryless_heldout.py``,
-whose summary is ``inventory_comparison.heldout.heldout_summary``, beside the
+whose summary is ``detector_comparison.heldout.heldout_summary``, beside the
 held-out rule it summarizes). The scripts add the provenance rows and write the
 files; the statistics the detection summary reports are read from these
 summaries by ``sweep_statistics``.

@@ -40,7 +40,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    select_event_cohort,
+)
 from continuum_swr_replay.analysis.pfc.runner_support import STOP_COHORT
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.tables.io import read_table

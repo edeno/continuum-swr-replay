@@ -3,7 +3,7 @@
 A *block* is a set of models fit on the same table (the patch hierarchy, the
 per-stop rate hierarchy, the choice models). Within each session every model of
 the block is fit on one cohort, frozen once over the union of the block's
-predictors by :func:`~continuum_swr_replay.analysis.events.cohort_selection.freeze_common_cohort`,
+predictors by :func:`~continuum_swr_replay.analysis.event_definition.cohort_selection.freeze_common_cohort`,
 so the models of a block are compared on the same units. A session whose cohort
 is too small, or where any model fails, contributes no fit to any model of the
 block, and its per-session provenance says why
@@ -19,7 +19,7 @@ from collections.abc import Callable, Mapping
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.cohort_selection import (
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     freeze_common_cohort,
     sorted_unit_ids,
 )
@@ -96,7 +96,7 @@ def freeze_session_cohort(
         Units the cohort needs; below it the status is ``too_few_units``.
     response_col, drop_zero_response, offset_col, choice_response_col
         Passed to
-        :func:`~continuum_swr_replay.analysis.events.cohort_selection.freeze_common_cohort`.
+        :func:`~continuum_swr_replay.analysis.event_definition.cohort_selection.freeze_common_cohort`.
     selection_filter : str, optional
         The selection the table was cut by before the block, recorded as text.
 

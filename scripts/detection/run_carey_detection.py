@@ -90,11 +90,11 @@ from continuum_swr_replay.analysis.detection.swr_detectors import (
     run_carey_detector,
     tetrode_spike_counts,
 )
-from continuum_swr_replay.analysis.events import swr_source
-from continuum_swr_replay.analysis.events.artifact_intervals import (
+from continuum_swr_replay.analysis.event_definition import swr_source
+from continuum_swr_replay.analysis.event_definition.artifact_intervals import (
     epoch_artifact_intervals,
 )
-from continuum_swr_replay.analysis.events.artifact_masks import (
+from continuum_swr_replay.analysis.event_definition.artifact_masks import (
     PADDING_S,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (

@@ -47,31 +47,31 @@ matplotlib.use("Agg")
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison import (  # noqa: E402  # noqa: E402
     example_windows,
     feature_run,
     selection,
 )
-from continuum_swr_replay.analysis.inventory_comparison.feature_run import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.feature_run import (  # noqa: E402
     read_inputs,
 )
-from continuum_swr_replay.analysis.inventory_comparison.inventory_run import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.inventory_run import (  # noqa: E402
     CELL_DETECTORS,
 )
-from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.overlap import (  # noqa: E402
     UNMATCHED,
 )
-from continuum_swr_replay.analysis.inventory_comparison.pooling import (
+from continuum_swr_replay.analysis.detector_comparison.pooling import (
     ratio,  # noqa: E402
 )
-from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.populations import (  # noqa: E402
     event_populations,
     without_baseline_rows,
 )
-from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.schema import (  # noqa: E402
     STATE_SPACE,
 )
-from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
+from continuum_swr_replay.analysis.detector_comparison.selection import (  # noqa: E402
     HIGH,
     LOW,
     REJECTION_COHORTS,

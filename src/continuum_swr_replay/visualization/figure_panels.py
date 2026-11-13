@@ -30,18 +30,18 @@ from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     session_state_fractions,
     state_fraction_statistics,
 )
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    immobile_analysed_bins,
+)
+from continuum_swr_replay.analysis.event_definition.nonlocal_detection import (
+    nonlocal_event_bins_by_swr,
+)
 from continuum_swr_replay.analysis.event_properties.event_analysis import (
     get_event_durations_ms,
     get_event_start_end_times,
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     compute_triggered_average_curves,
-)
-from continuum_swr_replay.analysis.events.analysed_time import (
-    immobile_analysed_bins,
-)
-from continuum_swr_replay.analysis.events.nonlocal_detection import (
-    nonlocal_event_bins_by_swr,
 )
 from continuum_swr_replay.visualization.figure_utilities import (
     PANEL_SINGLE,

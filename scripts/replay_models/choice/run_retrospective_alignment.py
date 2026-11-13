@@ -39,8 +39,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
-from continuum_swr_replay.analysis.events.cohort_selection import STOP_COHORT_RULES
+from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    require_swr_source,
+)
+from continuum_swr_replay.analysis.event_definition.cohort_selection import (
+    STOP_COHORT_RULES,
+)
 from continuum_swr_replay.analysis.replay_models.choice.retrospective import (
     at_well_event_cohort,
     retrospective_alignment_by_session,
