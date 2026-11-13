@@ -25,6 +25,8 @@ from continuum_swr_replay.analysis.behavior.covariates.qvals_table import (
     assign_stops_to_trials,
     canonicalize_behavior_model_columns,
     peri_switch_index,
+    require_complete_mapping,
+    stop_mapping_agreement,
 )
 from continuum_swr_replay.data_loaders.constants import OMISSION_KNOWN_LATENCY_SEC
 
@@ -804,3 +806,82 @@ def test_beta_belief_entropy_missing_param_raises():
         ValueError, match=r"lacks required column\(s\) \['betadist_α3'\]"
     ):
         add_beta_belief_entropy(frame)
+
+
+def _mapping_case() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Five stops, four mapped; three of the mapped are at a well.
+
+    At-well mapped stops 1, 2, 3: arms agree on 1 and 3 (2 of 3); the reward
+    is known on 1 and 2 only and agrees on 1 (1 of 2), so 2 of the 3 at-well
+    stops have a known reward. Stop 4 is mapped but not at a well (its NaN arm
+    must not count as a disagreement); stop 5 is not mapped.
+    """
+    stops = pd.DataFrame(
+        {
+            "stop_id": [1, 2, 3, 4, 5],
+            "at_well": [True, True, True, False, True],
+            "occupancy_well_arm": [0.0, 1.0, 2.0, np.nan, 3.0],
+            "is_rewarded_outcome": [1.0, 1.0, np.nan, 0.0, 1.0],
+        }
+    )
+    mapped = pd.DataFrame(
+        {
+            "stop_id": [1, 2, 3, 4],
+            "chosen_arm": [0.0, 5.0, 2.0, 4.0],
+            "trial_reward": [1.0, 0.0, 1.0, 0.0],
+        }
+    )
+    mapped.attrs["entropy_cov"] = 1.0
+    return mapped, stops
+
+
+def test_stop_mapping_agreement_counts_at_well_stops_only():
+    mapped, stops = _mapping_case()
+
+    agreement = stop_mapping_agreement(mapped, stops)
+
+    assert agreement["n_mapped"] == 4
+    assert agreement["n_stops"] == 5
+    assert agreement["arm_ok"] == pytest.approx(2 / 3)
+    assert agreement["rew_ok"] == pytest.approx(1 / 2)
+    assert agreement["rew_share"] == pytest.approx(2 / 3)
+    assert agreement["entropy_cov"] == 1.0
+
+
+def test_stop_mapping_agreement_reward_is_nan_when_known_nowhere():
+    mapped, stops = _mapping_case()
+    stops["is_rewarded_outcome"] = np.nan
+
+    agreement = stop_mapping_agreement(mapped, stops)
+
+    assert np.isnan(agreement["rew_ok"])
+    assert agreement["rew_share"] == 0.0
+
+
+_COMPLETE = {
+    "n_mapped": 90,
+    "n_stops": 100,
+    "arm_ok": 0.95,
+    "rew_ok": 0.5,
+    "rew_share": 0.8,
+    "entropy_cov": 0.95,
+}
+
+
+def test_require_complete_mapping_accepts_the_thresholds_themselves():
+    require_complete_mapping("chimi", _COMPLETE)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"n_mapped": 89},
+        {"arm_ok": 0.9499},
+        {"arm_ok": np.nan},
+        {"entropy_cov": 0.9499},
+        {"entropy_cov": np.nan},
+    ],
+)
+def test_require_complete_mapping_refuses_a_partial_animal(change):
+    with pytest.raises(ValueError, match="qvals mapping failed for chimi"):
+        require_complete_mapping("chimi", {**_COMPLETE, **change})

@@ -1,42 +1,36 @@
 """Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligned.
 
-Builds the per-stop behavioral-model covariate table, sourcing everything from
-Alison's shared DataJoint schemas (read-only). :func:`run_build_qvals_table` is
-the whole build; the command-line front end that resolves its arguments is
-``scripts/behavior/build_qvals_table.py``, which is also where the sources, the
-join rule, and the validation contract are documented.
+Builds the per-stop behavioral-model covariate table from the model's per-trial
+values and the trial timing, both read from Alison's shared DataJoint schemas
+(read-only) by ``scripts/behavior/build_qvals_table.py``, which runs the build
+and documents the sources, the join rule and the validation contract. Here are
+the steps it calls: :func:`prepare_model_values`, :func:`build_animal`,
+:func:`stop_mapping_agreement` and :func:`require_complete_mapping` for each
+animal, then :func:`standardize_qvals_table` and :func:`write_qvals_outputs`.
 """
 
 from __future__ import annotations
 
-import argparse
 import warnings
 from pathlib import Path
 from typing import Any
 
-import datajoint as dj
 import numpy as np
 import pandas as pd
 from scipy.special import betaln, digamma
 
 from continuum_swr_replay.data_loaders.constants import port_columns
-from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.data_loaders.trial_clocks import (
     outcome_known_time_from_task_visit,
 )
-from continuum_swr_replay.data_loaders.utils import quiet_spyglass
 from continuum_swr_replay.decoding.identifiers import nwb_file_name, parse_epoch_name
-from continuum_swr_replay.paths import (
-    QVALS_STANDARDIZATION_REFERENCE,
-    table_path,
-)
+from continuum_swr_replay.paths import QVALS_STANDARDIZATION_REFERENCE
 from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import (
     REGISTRY,
-    require_covariate_schema,
     stamp_covariate_schema,
 )
-from continuum_swr_replay.tables.io import publish_canonical, read_table
+from continuum_swr_replay.tables.io import publish_canonical
 from continuum_swr_replay.tables.standardization import (
     Reference,
     assert_standardized_present,
@@ -465,37 +459,6 @@ def assign_stops_to_trials(
     return np.where(ti < len(poke_out_ts), ti, -1)
 
 
-def _fetch_model_df(rl: Any, subject: str, key: dict) -> pd.DataFrame:
-    """Read a BehaviorModelResults dataframe (per-trial, keyed by KEYS)."""
-    # Deferred import: pulling spyglass at module top opens a DataJoint
-    # connection on import, which would make DB-free unit tests of the pure
-    # helpers (e.g. _add_nominal_contingency) require live DB access.
-    from spyglass.common import AnalysisNwbfile
-    from spyglass.utils.nwb_helper_fn import get_nwb_file
-
-    quiet_spyglass()
-
-    sel = rl.BehaviorModelResults & {"subject_id": subject, **key}
-    # Resolve the AnalysisNwbfile by hand rather than via ``fetch_nwb``. The
-    # helper only exists on Spyglass mixin tables, and ``rl`` is a virtual
-    # module reflected from Alison's schema, whose tables are plain DataJoint.
-    recs = sel.fetch(
-        "analysis_file_name", "behavior_model_results_object_id", as_dict=True
-    )
-    if not recs:
-        raise ValueError(f"no BehaviorModelResults for {subject!r} with {key}")
-    if len(recs) > 1:
-        raise ValueError(
-            f"{len(recs)} BehaviorModelResults rows for {subject!r} with {key}; "
-            "expected exactly one -- the model key no longer identifies a "
-            "single fit, so which values get used would be arbitrary"
-        )
-    rec = recs[0]
-    path = AnalysisNwbfile.get_abs_path(rec["analysis_file_name"])
-    obj = get_nwb_file(path).objects[rec["behavior_model_results_object_id"]]
-    return obj.to_dataframe().reset_index(drop=True)
-
-
 def _model_covariate_columns(vals: pd.DataFrame) -> list[str]:
     """Return curated model columns after enforcing the scientific contract.
 
@@ -711,15 +674,26 @@ def _join_model_to_trial_timebase(
     return joined
 
 
-def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]:
-    """Join enriched model covariates to poke timestamps, one row per trial.
+def prepare_model_values(vals: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """Enrich the model's per-trial values and name its covariate columns.
 
     Beta values are enriched with the vendored decision-variable pipeline
     (DeltaV, value updates, belief entropy, etc.) and RPE/q_chosen/arm are
-    derived; the curated COVARIATES are broadcast to stops.
+    derived.
+
+    Parameters
+    ----------
+    vals : pd.DataFrame
+        One animal's ``BehaviorModelResults`` dataframe, one row per trial,
+        keyed by :data:`KEYS`, as read from its AnalysisNwbfile.
+
+    Returns
+    -------
+    vals : pd.DataFrame
+        The enriched values, with canonical column names.
+    model_cols : list of str
+        The curated model covariate columns present in ``vals``.
     """
-    subject = ANIMAL_SUBJECT[animal]
-    vals = _fetch_model_df(rl, subject, MODEL_KEY)
     _validate_trial_keys(vals, source="model", require_consecutive=False)
     with warnings.catch_warnings():
         # the vendored DV pipeline inserts many columns one-by-one (Alison's style)
@@ -728,15 +702,22 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     vals = add_experienced_value_columns(vals)  # q_chosen / arm / rpe
     vals = add_beta_belief_entropy(vals)  # beta_reward_entropy (from betadist_α/β)
     vals = canonicalize_behavior_model_columns(vals)
-    model_cols = _model_covariate_columns(vals)
+    return vals, _model_covariate_columns(vals)
+
+
+def _per_trial(
+    vals: pd.DataFrame, model_cols: list[str], times: pd.DataFrame
+) -> tuple[pd.DataFrame, list[str]]:
+    """Join enriched model covariates to poke timestamps, one row per trial.
+
+    ``vals`` and ``model_cols`` are :func:`prepare_model_values`' output;
+    ``times`` is ``TrialsInfoByEpoch.ByTrial`` for ``vals``' NWB files. The
+    curated COVARIATES are broadcast to stops.
+    """
     pt_attrs_entropy = float(
         vals["reward_belief_differential_entropy_leaf_mean_preoutcome"].notna().mean()
     )
 
-    nwbs = vals["nwb_file_name"].unique().tolist()
-    times = pd.DataFrame(
-        (beh.TrialsInfoByEpoch.ByTrial & [{"nwb_file_name": n} for n in nwbs]).fetch()
-    )
     # epoch arrives as an int epoch-number from DataJoint; if it were a string the
     # epoch_number join below would silently drop every stop.
     if not pd.api.types.is_integer_dtype(times["epoch"].dtype):
@@ -888,10 +869,126 @@ def _broadcast_trial_covariates_to_stops(
 
 
 def build_animal(
-    animal: str, beh: Any, rl: Any, stop_table: pd.DataFrame
+    animal: str,
+    vals: pd.DataFrame,
+    model_cols: list[str],
+    times: pd.DataFrame,
+    stop_table: pd.DataFrame,
 ) -> pd.DataFrame:
-    pt, broadcast_cols = _per_trial(animal, beh, rl)
+    """One animal's qvals rows, one per stop inside a modelled trial.
+
+    Parameters
+    ----------
+    animal : str
+        The stop table's animal label.
+    vals, model_cols : pd.DataFrame, list of str
+        :func:`prepare_model_values`' output for the animal.
+    times : pd.DataFrame
+        ``TrialsInfoByEpoch.ByTrial`` rows for ``vals``' NWB files.
+    stop_table : pd.DataFrame
+        The canonical stop table (every animal; this one's rows are used).
+
+    Returns
+    -------
+    pd.DataFrame
+        The animal's stop rows with the trial covariates broadcast to them.
+    """
+    pt, broadcast_cols = _per_trial(vals, model_cols, times)
     return _broadcast_trial_covariates_to_stops(animal, pt, broadcast_cols, stop_table)
+
+
+def stop_mapping_agreement(t: pd.DataFrame, st: pd.DataFrame) -> dict[str, Any]:
+    """How well one animal's qvals rows agree with its stop table.
+
+    Arm / reward agreement is only meaningful where the stop table has a
+    location to agree with. It is restricted to the canonical whole-window
+    ``at_well`` label, NOT ``in_poke``: the latter is read at the bout
+    midpoint, so it marks bouts whose window is not wholly at one well, and
+    those carry ``occupancy_well_arm = NaN`` by construction. Comparing against
+    that NaN scores every such stop as a disagreement and reads as a mapping
+    regression that is not there.
+
+    ``is_rewarded_outcome`` is frozen at the bout start, which is inside the
+    arrival -> outcome window for about a fifth of at-well stops (observable at
+    80.06 % of at-well bout starts, measured 2026-09-06), so it is missing
+    there. Reward agreement is scored only where the reference exists, with the
+    comparable share, rather than counting "not yet known" as "wrong".
+
+    Parameters
+    ----------
+    t : pd.DataFrame
+        :func:`build_animal`'s rows for one animal.
+    st : pd.DataFrame
+        That animal's stop-table rows.
+
+    Returns
+    -------
+    dict
+        ``n_mapped`` and ``n_stops`` (rows of ``t`` and ``st``), ``arm_ok``
+        (at-well arm agreement), ``rew_ok`` (reward agreement where known; NaN
+        when it is known nowhere), ``rew_share`` (that share of the at-well
+        stops) and ``entropy_cov`` (the model trials with a belief entropy).
+    """
+    obs = st.set_index("stop_id")
+    at_well = obs["at_well"].reindex(t["stop_id"]).eq(True).fillna(False).to_numpy()
+    cur = obs["occupancy_well_arm"].reindex(t["stop_id"]).to_numpy(dtype=float)
+    rout = obs["is_rewarded_outcome"].reindex(t["stop_id"]).to_numpy(dtype=float)
+    arm_ok = np.mean(t["chosen_arm"].to_numpy(dtype=float)[at_well] == cur[at_well])
+    rew_known = at_well & np.isfinite(rout)
+    rew_ok = (
+        np.mean(t["trial_reward"].to_numpy(dtype=float)[rew_known] == rout[rew_known])
+        if rew_known.any()
+        else float("nan")
+    )
+    rew_share = float(rew_known.sum()) / max(int(at_well.sum()), 1)
+    return {
+        "n_mapped": len(t),
+        "n_stops": len(st),
+        "arm_ok": arm_ok,
+        "rew_ok": rew_ok,
+        "rew_share": rew_share,
+        "entropy_cov": t.attrs["entropy_cov"],
+    }
+
+
+def require_complete_mapping(animal: str, agreement: dict[str, Any]) -> None:
+    """Refuse an animal whose qvals rows are partial or misaligned.
+
+    ``beta_reward_entropy`` is computed in-process from ``betadist_α/β`` (the
+    same MODEL_KEY pull as Q1..Q6), so its coverage should be ~100 %; anything
+    materially below flags a partial-fit or join regression.
+
+    Parameters
+    ----------
+    animal : str
+        The animal, for the message.
+    agreement : dict
+        :func:`stop_mapping_agreement`'s output.
+
+    Raises
+    ------
+    ValueError
+        If fewer than 90 % of the stops are mapped, the at-well arm agreement
+        is missing or below 95 %, or the belief-entropy coverage is missing or
+        below 95 %.
+    """
+    n_mapped, n_stops = agreement["n_mapped"], agreement["n_stops"]
+    arm_ok = agreement["arm_ok"]
+    entropy_cov = agreement["entropy_cov"]
+    if (
+        n_mapped / n_stops < 0.90
+        or not np.isfinite(arm_ok)
+        or arm_ok < 0.95
+        or not np.isfinite(entropy_cov)
+        or entropy_cov < 0.95
+    ):
+        raise ValueError(
+            f"qvals mapping failed for {animal}: coverage "
+            f"{100 * n_mapped / n_stops:.1f}%, at-well arm agreement "
+            f"{100 * arm_ok:.1f}%, beta entropy coverage "
+            f"{100 * entropy_cov:.1f}%; refusing to publish a partial or "
+            "misaligned scientific covariate table"
+        )
 
 
 def _validate_qvals_output(tab: pd.DataFrame) -> None:
@@ -967,6 +1064,36 @@ def _validate_qvals_output(tab: pd.DataFrame) -> None:
         raise ValueError("rpe_postoutcome_abs != abs(rpe_postoutcome)")
 
 
+def standardize_qvals_table(tab: pd.DataFrame) -> tuple[pd.DataFrame, Reference]:
+    """Validate the concatenated qvals rows and add their ``_z`` columns.
+
+    Fails loudly if the per-arm value block is incomplete: ``model_cols``
+    filters COVARIATES by presence, so an upstream BehaviorModelResults/schema
+    change dropping a Q{i}/p_rew_leaf{i} would silently omit a per-port column
+    and make ``attach_contingency_value_block`` blank the whole value block
+    downstream. The pooled-global standardization of the continuous stop-level
+    covariates (``<col>_z``) belongs to this table (prepare_data reads qvals
+    but must not re-standardize it); it is computed over the full concatenated
+    table and its reference is persisted for reproducibility.
+
+    Parameters
+    ----------
+    tab : pd.DataFrame
+        Every animal's :func:`build_animal` rows, concatenated.
+
+    Returns
+    -------
+    tab : pd.DataFrame
+        The validated table with its ``_z`` columns and covariate-schema stamp.
+    reference : Reference
+        The standardization moments, for :func:`write_qvals_outputs`.
+    """
+    _validate_qvals_output(tab)
+    tab, reference = attach_standardized(tab, QVALS_STANDARDIZED_COLS)
+    assert_standardized_present(tab, QVALS_STANDARDIZED_COLS)
+    return stamp_covariate_schema(tab, table="qvals"), reference
+
+
 def write_qvals_outputs(
     tab: pd.DataFrame, reference: Reference, replay_content_dir: Path
 ) -> Path:
@@ -981,105 +1108,3 @@ def write_qvals_outputs(
     )
     save_reference(reference, replay_content_dir / QVALS_STANDARDIZATION_REFERENCE)
     return out
-
-
-def run_build_qvals_table(args: argparse.Namespace) -> None:
-    """Build every requested animal's qvals rows, validate, and optionally publish."""
-    replay_content_dir = args.replay_content_dir.resolve()
-    animals = [args.animal] if args.animal else list(analysed_animals())
-
-    beh = dj.create_virtual_module("alison_behav", "alison_behav")
-    rl = dj.create_virtual_module("alison_rlmodel", "alison_rlmodel")
-    st_all = read_table(table_path("stop_table", replay_content_dir))
-    require_covariate_schema(st_all, table="stop")
-
-    parts = []
-    for a in animals:
-        t = build_animal(a, beh, rl, st_all)
-        st = st_all[st_all.animal == a]
-        obs = st.set_index("stop_id")
-        # Arm / reward agreement is only meaningful where the stop table has a
-        # location to agree with. Restrict on the canonical whole-window
-        # ``at_well`` label, NOT ``in_poke``: the latter is read at the bout
-        # midpoint, so it marks bouts whose window is not wholly at one well,
-        # and those carry ``occupancy_well_arm = NaN`` by construction. Comparing
-        # against that NaN scores every such stop as a disagreement and reads
-        # as a mapping regression that is not there.
-        at_well = obs["at_well"].reindex(t["stop_id"]).eq(True).fillna(False).to_numpy()
-        cur = obs["occupancy_well_arm"].reindex(t["stop_id"]).to_numpy(dtype=float)
-        rout = obs["is_rewarded_outcome"].reindex(t["stop_id"]).to_numpy(dtype=float)
-        arm_ok = np.mean(t["chosen_arm"].to_numpy(dtype=float)[at_well] == cur[at_well])
-        # ``is_rewarded_outcome`` is frozen at the bout start, which is inside
-        # the arrival -> outcome window for about a fifth of at-well stops
-        # (observable at 80.06 % of at-well bout starts, measured 2026-09-06),
-        # so it is missing
-        # there. Score agreement only where the reference exists and report the
-        # comparable share, rather than counting "not yet known" as "wrong".
-        rew_known = at_well & np.isfinite(rout)
-        rew_ok = (
-            np.mean(
-                t["trial_reward"].to_numpy(dtype=float)[rew_known] == rout[rew_known]
-            )
-            if rew_known.any()
-            else float("nan")
-        )
-        rew_share = float(rew_known.sum()) / max(int(at_well.sum()), 1)
-        entropy_cov = t.attrs["entropy_cov"]
-        n_trial_gaps = t.attrs["n_timing_trials_without_model"]
-        n_gap_stops = t.attrs["n_stops_missing_model_trial"]
-        n_before_gap = t.attrs["n_model_trials_before_timing_gap"]
-        n_after_gap = t.attrs["n_model_trials_after_timing_gap"]
-        print(
-            f"{a:7s} mapped {len(t):6d}/{len(st):6d} stops ({100 * len(t) / len(st):.0f}%)  "
-            f"in_poke={100 * t['in_poke'].mean():.0f}%  "
-            f"at-well arm=={100 * arm_ok:.1f}%  "
-            f"at-well reward=={100 * rew_ok:.1f}% (on {100 * rew_share:.0f}% w/ known outcome)  "
-            f"[leaf/reward join exact  entropy {100 * entropy_cov:.0f}%  "
-            f"model gaps={n_trial_gaps} trials/{n_gap_stops} stops; "
-            f"masked neighbors={n_before_gap} before/{n_after_gap} after]"
-        )
-        if n_trial_gaps:
-            print(
-                "  timing-only model trials by session: "
-                f"{t.attrs['timing_trials_without_model_by_session']}"
-            )
-        # beta_reward_entropy is computed in-process from betadist_α/β (same MODEL_KEY
-        # pull as Q1..Q6), so coverage should be ~100% — anything materially below flags
-        # a partial-fit/join regression (the old 0.5 HMM-merge floor is too loose now).
-        if (
-            len(t) / len(st) < 0.90
-            or not np.isfinite(arm_ok)
-            or arm_ok < 0.95
-            or not np.isfinite(entropy_cov)
-            or entropy_cov < 0.95
-        ):
-            raise ValueError(
-                f"qvals mapping failed for {a}: coverage "
-                f"{100 * len(t) / len(st):.1f}%, at-well arm agreement "
-                f"{100 * arm_ok:.1f}%, beta entropy coverage "
-                f"{100 * entropy_cov:.1f}%; refusing to publish a partial or "
-                "misaligned scientific covariate table"
-            )
-        parts.append(t)
-    tab = pd.concat(parts, ignore_index=True)
-    print(
-        f"\ntotal mapped stops: {len(tab)}  unique: {tab.stop_id.nunique()}  cols: {tab.shape[1]}"
-    )
-
-    # Fail loudly if the per-arm value block is incomplete: model_cols filters
-    # COVARIATES by presence, so an upstream BehaviorModelResults/schema change
-    # dropping a Q{i}/p_rew_leaf{i} would silently omit a per-port column and
-    # make attach_contingency_value_block blank the whole value block downstream.
-    _validate_qvals_output(tab)
-
-    # Pooled-GLOBAL standardization of the continuous stop-level covariates (<col>_z),
-    # owned by THIS builder (prepare_data reads qvals but must not re-standardize it).
-    # Computed over the full concatenated table; reference persisted for reproducibility.
-    tab, qv_reference = attach_standardized(tab, QVALS_STANDARDIZED_COLS)
-    assert_standardized_present(tab, QVALS_STANDARDIZED_COLS)
-    tab = stamp_covariate_schema(tab, table="qvals")
-    z_cols = [f"{c}_z" for c in QVALS_STANDARDIZED_COLS if c in tab.columns]
-
-    if args.write:
-        out = write_qvals_outputs(tab, qv_reference, replay_content_dir)
-        print(f"\nwrote {len(tab)} rows ({len(z_cols)} _z cols) -> {out}")

@@ -110,6 +110,7 @@ filters) moved out of `analysis/` into `runs/`. Paths are under
 | `analysis/pfc/gpu.py` (removed: moved) | `runs/device.py` |
 | `reported/mpfc/inputs.table_hashes` (removed: moved) | `runs/staleness.py` |
 | `analysis/behavior/contrast_aggregation.load_per_sd_scale`, `load_fit_time_sd_reference` (removed: moved) | `runs/fit_provenance.py` |
+| `analysis/behavior/covariates/qvals_table.run_build_qvals_table`, `_fetch_model_df` (removed: moved) | `scripts/behavior/build_qvals_table.py`; the table steps it calls stay in `qvals_table` (`prepare_model_values`, `build_animal`, `stop_mapping_agreement`, `require_complete_mapping`, `standardize_qvals_table`) |
 
 ## Calculations moved out of scripts, 2026-11
 
