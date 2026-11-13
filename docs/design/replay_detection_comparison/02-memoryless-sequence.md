@@ -10,6 +10,11 @@ comparison between inventories lives in `analysis/detector_comparison/`
 data are results; everything else is a proposed analysis.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
+*2026-11-13: the detector now steps its 80 ms window by the published 5 ms, on a 200 Hz
+likelihood grid of its own (V10). Every simulation result, table and reported value below
+was computed at the earlier 4 ms step and predates the change; they are rerun with the
+recorded-data batch.*
+
 Inventory 6 of seven: the posterior-sequence trigger. How this cohort is compared against
 the other six is [03-inventory-comparison.md](03-inventory-comparison.md); the
 initial event-feature and selection diagnostics are in [04](04-event-features.md).
@@ -149,8 +154,9 @@ resolved.
   recomputes `lengths = boundaries(:,2) − boundaries(:,1)` for every run, merged or not,
   so the 100 ms filter (`lengths < sequence_durationThr/shiftSizeDecoding`, driver line
   96) drops runs of index length below 20: a surviving run has at least 21 windows,
-  spanning ≥ 100 ms between first and last midpoint. At our 4 ms stride that is index
-  length 25, i.e. 26 windows (V10). The *pre-merge* length convention comes from
+  spanning ≥ 100 ms between first and last midpoint. The port's 5 ms stride is the
+  reference's, so the same 20, i.e. 21 windows (V10); a 4 ms stride would need index
+  length 25, i.e. 26 windows. The *pre-merge* length convention comes from
   `seqle`, which is vendored nowhere (see the reference README); the port defines run
   length as an index difference throughout and does not depend on it.
 - **Forward-jump consequence.** Because window k's jump is to k+1, a window whose
@@ -896,8 +902,8 @@ not a reassurance.
 
 | # | Original | Ours | Why | Effect |
 |---|---|---|---|---|
-| **V10** | 5 ms step | 4 ms step (2 samples at 500 Hz) | 5 ms is 2.5 samples on our native grid | Slightly finer temporal resolution on sequence boundaries. Every bin-count threshold must be **derived from the stride**, never carried over as the original's literal constants |
-| **V11** | 80 ms window | 80 ms window (40 samples) | Exact at 500 Hz | None |
+| **V10** | 5 ms step | 5 ms step, retained, on a 200 Hz likelihood grid of the detector's own (`likelihood.likelihood_grid`; one row per step) | 5 ms is 2.5 samples of the decode's 500 Hz grid, so the likelihood cannot be summed from the decode's rows; the reference itself counts spikes in 5 ms bins. The encoding model was fitted on the 2 ms grid and the library subtracts its ground-process term once per row, so on 5 ms rows that term is multiplied by 2.5 (`encoding_bins_per_row`); the per-spike terms need nothing, a constant rate scale cancelling in each window's normalization. A grid row is missing when any decode sample it spans is | None on the step. Every bin-count threshold is still **derived from the stride**, never carried over as the original's literal constants. Until 2026-11-13 the port stepped 4 ms on the 2 ms grid |
+| **V11** | 80 ms window | 80 ms window (16 rows of 5 ms) | Exact at 200 Hz | None |
 
 ### Deliberate, for comparability
 
@@ -912,7 +918,7 @@ Place bin size (2.0 cm = their `binSize`), decoding window (80 ms), uniform spat
 prior, memoryless decoding, jump threshold (20 cm), merge
 thresholds (20 cm / 50 ms), minimum duration (100 ms), dispersion threshold (12 cm).
 
-Their application changes with track distance and the 4 ms stride. The spread cutoff
+Their application changes with track distance. The spread cutoff
 of 10 cm is an additional adapted setting (V9), not an exactly preserved criterion.
 The initial comparison reports these retained settings and their adaptations explicitly.
 Sensitivity to them is deferred to 04's cost pilot and limited robustness study. Preserve
@@ -939,7 +945,7 @@ Named for what it does; the citation lives in docstrings, not the module path.
 | module | responsibility | depends on |
 |---|---|---|
 | `config.py` | frozen dataclass of every threshold — the `Analysis_Information.mat` equivalent, one source of truth | — |
-| `likelihood.py` | prior-excluded `(n_time, n_interior_bins)` log-likelihood on the native 2 ms grid | `detector.pkl`; a `results.nc` path was designed (D7) and is not built |
+| `likelihood.py` | prior-excluded `(n_time, n_interior_bins)` log-likelihood on the detector's 5 ms grid, derived from the decode's 2 ms grid | `detector.pkl`; a `results.nc` path was designed (D7) and is not built |
 | `window_statistics.py` | pure functions: window aggregation, normalization, center / spread / jump / dispersion | numpy, bin-distance matrix |
 | `detect.py` | bin filter → sequence assembly → merge → criteria → `CandidateSequences`, retaining rejection diagnostics | the above |
 | `simulation.py` | inject a replay of known shape into a simulated recording; place it clear of movement | numpy |
@@ -987,15 +993,16 @@ uv run python scripts/detection/run_memoryless_detection.py --run-seed 20260922 
 ## Data flow, per epoch
 
 1. Load `encoding_model_[("", 0)]` from `{epoch}_detector.pkl`; compute prior-excluded
-   log-likelihood once at 2 ms via `predict_clusterless_kde_log_likelihood(is_local=False)`.
+   log-likelihood once on the 5 ms grid via `predict_clusterless_kde_log_likelihood(is_local=False)`.
 2. Restrict to interior bins **before** normalizing (V8). `predict_clusterless_kde_log_likelihood`
    already returns only `is_track_interior_` bins, and junction placeholders are
    non-interior by construction, so this is a no-op on the primary path. On the
    `results.nc` path (D7) `log_likelihood` carries every `state_bins` column with masked
    fill, so the interior mask must be applied there explicitly.
-3. Sliding 80 ms windows as a float64 cumulative sum over 40 rows, stride 2 rows;
-   normalize across real bins under a uniform prior. Validate uniform 2 ms spacing
-   and model sampling units; do not aggregate across missing samples or epoch bounds.
+3. Sliding 80 ms windows as a float64 cumulative sum over 16 rows of the 5 ms grid,
+   stride 1 row; normalize across real bins under a uniform prior. Validate uniform 2 ms
+   spacing of the decode grid and model sampling units (the ground term scaled to 5 ms
+   rows, V10); do not aggregate across missing samples or epoch bounds.
 4. Per-window center and spread (D4, V7). Then, **before any jump is computed**, blank
    the center of every window whose midpoint speed is not below 4 cm/s (the integer
    sentinel `NO_CENTER`, the port's NaN), as the reference does by decoding only
@@ -1026,10 +1033,12 @@ native speed sample between sequence endpoints, including rejected windows insid
 merged gaps, not just retained window centers. Step 9 uses an identical SWR interval
 table on both sides; calling the same overlap helper alone would not ensure parity.
 
-**Window and event timing.** A window with support rows `[k, k + 40)` is timestamped at
-the grid sample `k + 20`, half a window into its support, rather than at `time[k] +
-0.040`: on a recording's clock that sum misses the sample by up to 2.4e-7 s, and event
-bounds must be samples for the speed and SWR checks to be exact. Read speed at that
+**Window and event timing.** A window with support rows `[k, k + 16)` of the 5 ms grid is
+timestamped at the grid sample `k + 8`, half a window into its support, rather than at
+`time[k] + 0.040`: on a recording's clock that sum misses the sample by up to 2.4e-7 s.
+Every second sample of the 5 ms grid is a decode sample and the others lie halfway
+between two, as the reference's own window times (`nanmean(timeBins)`) need not be
+samples; the speed and SWR checks compare by time. Read speed at that
 sample for the step 4 gate. Event start/end are the
 first/last retained midpoint, and the duration criterion is their difference, as in
 the reference driver. Save the outer decoding support separately; it is not the
@@ -1300,8 +1309,8 @@ Carried deliberately; each must be checked against real data before results are 
    `get_data_over_time` reindexes onto the grid with a 4 ms tolerance and leaves NaN
    where there is no LFP (`observed_intervals`). The canonical event table has the same gap.
 6. **`data_over_time` sits on the decode's uniform 500 Hz grid, without gaps** — the
-   runner uses its index as the decode grid, and `validate_time_grid` refuses anything
-   else, so a violation stops the run rather than passing silently. Checked on the five
+   runner uses its index as the decode grid, and `likelihood_grid` refuses anything
+   else before deriving the detector's 5 ms grid from it, so a violation stops the run rather than passing silently. Checked on the five
    pilot epochs (2026-10-02): every grid is uniform to 1.1e-4 of a sample about its own
    rate, and that rate is 0.4-1.7 ppm fast of 500 Hz, which over an epoch drifts most
    of a sample from an exact 500 Hz grid. Uniformity is therefore judged about the
