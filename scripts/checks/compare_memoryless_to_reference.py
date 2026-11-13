@@ -70,11 +70,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     InjectedReplay,
-    immobile_intervals,
     inject_replay,
     place_field_means,
     placements,
-    without,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     aggregate_windows,
@@ -482,25 +480,8 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
     """
     recording = sweep.build_recording()
     means = place_field_means(N_NEURONS, TRACK_HEIGHT)
-    intervals = without(
-        immobile_intervals(
-            recording["time"],
-            recording["speed"],
-            CONFIG.speed_threshold_cm_per_s,
-            minimum_duration_s=1.0,
-        ),
-        recording["event_times"],
-        margin_s=sweep.PLACEMENT_MARGIN_S,
-    )
-    combinations = [
-        (path_cm, midpoint_cm, duration_s, rate_hz)
-        for path_cm in sweep.PATH_CM
-        for midpoint_cm in sweep.MIDPOINT_CM
-        for duration_s in sweep.DURATION_S
-        for rate_hz in sweep.PEAK_RATE_HZ
-        if 0.0 <= midpoint_cm - path_cm / 2
-        and midpoint_cm + path_cm / 2 <= TRACK_HEIGHT
-    ]
+    intervals = sweep.usable_intervals(recording)
+    combinations = sweep.replay_grid()
     rng = np.random.default_rng(0)
     totals = {variant: dict.fromkeys(SWEEP_TOTALS, 0) for variant in VARIANTS}
     for variant in VARIANTS:
@@ -522,10 +503,7 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
                 ),
                 sampling_frequency=SAMPLING_FREQUENCY,
             )
-            mask = (recording["time"] >= bounds[0] - sweep.DECODE_MARGIN_S) & (
-                recording["time"] <= bounds[1] + sweep.DECODE_MARGIN_S
-            )
-            window = tuple(recording[k][mask] for k in ("time", "position", "speed"))
+            window = sweep.decode_window(recording, bounds)
             key = (
                 f"path{path_cm}-mid{midpoint_cm}-dur{duration_s}"
                 f"-rate{rate_hz}-seed{seed}"
