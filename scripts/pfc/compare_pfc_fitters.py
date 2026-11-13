@@ -61,7 +61,7 @@ from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.checks._report import _cell, _invocation  # noqa: E402
+from scripts.checks._report import _invocation, _md  # noqa: E402
 
 #: Gate tolerances. Parameters and anything derived from them linearly (the
 #: modulation curves, the peak modulations, the theta statistics) are compared
@@ -462,25 +462,9 @@ def _timing_table(rows: list[dict[str, Any]]) -> pd.DataFrame:
     return table.drop(columns=["statsmodels_seconds", "jax_seconds"])
 
 
-def _md(frame: pd.DataFrame, float_format: str = "{:.3e}") -> str:
-    """One markdown table, or a line saying the frame is empty.
-
-    Written out here rather than through ``DataFrame.to_markdown`` so the audit
-    does not depend on ``tabulate``, which is not in the environment.
-    """
-    if frame.empty:
-        return "_(nothing to report)_\n"
-    columns = {
-        name: [_cell(value, float_format) for value in frame[name]]
-        for name in frame.columns
-    }
-    header = "| " + " | ".join(str(name) for name in columns) + " |"
-    rule = "| " + " | ".join("---" for _ in columns) + " |"
-    body = [
-        "| " + " | ".join(cells[i] for cells in columns.values()) + " |"
-        for i in range(len(frame))
-    ]
-    return "\n".join([header, rule, *body]) + "\n"
+#: How the audit's tables print a float, and an empty one.
+FLOAT_FORMAT = "{:.3e}"
+EMPTY_TABLE = "_(nothing to report)_"
 
 
 def build_report(
@@ -556,7 +540,7 @@ def build_report(
     else:
         # Memory in GB and a ratio read better at four significant digits than
         # in the scientific notation the difference tables want.
-        add(_md(timings, float_format="{:.4g}"))
+        add(_md(timings, "{:.4g}", EMPTY_TABLE))
 
     add("## Per session\n")
     for session in sessions:
@@ -587,7 +571,7 @@ def build_report(
 
         if comparison["diagnostics"]:
             add("Fits, per model (over all neurons):\n")
-            add(_md(pd.DataFrame(comparison["diagnostics"])))
+            add(_md(pd.DataFrame(comparison["diagnostics"]), FLOAT_FORMAT, EMPTY_TABLE))
         else:
             add(
                 "_No fit diagnostics in this pair of runs; pass "
@@ -595,7 +579,7 @@ def build_report(
             )
 
         add("Modulation time courses:\n")
-        add(_md(pd.DataFrame(comparison["modulations"])))
+        add(_md(pd.DataFrame(comparison["modulations"]), FLOAT_FORMAT, EMPTY_TABLE))
 
         statistics = pd.DataFrame(comparison["statistics"])
         worst = statistics.dropna(subset=["max_abs_diff"]).nlargest(12, "max_abs_diff")
@@ -603,7 +587,7 @@ def build_report(
             f"Statistics columns, the 12 with the largest difference of "
             f"{len(statistics)} compared:\n"
         )
-        add(_md(worst))
+        add(_md(worst, FLOAT_FORMAT, EMPTY_TABLE))
         exact = statistics[statistics["tolerance"] == "identical"]
         add(
             "Columns required to be identical: "

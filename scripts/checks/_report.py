@@ -45,15 +45,21 @@ def _cell(value: object, float_format: str) -> str:
     return str(value)
 
 
-def _md(frame: pd.DataFrame, float_format: str = "{:.4g}") -> str:
+def _md(
+    frame: pd.DataFrame, float_format: str = "{:.4g}", empty: str = "_(no rows)_"
+) -> str:
     """A markdown table, with missing values rendered as an empty cell.
 
     Cells are rendered by iterating the columns rather than with
     ``Series.map``: mapping over a nullable-integer column coerces its values
-    to float, which turns a neuron count into ``10986.0``.
+    to float, which turns a neuron count into ``10986.0``. A frame without rows
+    renders as the line ``empty``.
+
+    Written out here rather than through ``DataFrame.to_markdown`` so the
+    reports do not depend on ``tabulate``, which is not in the environment.
     """
     if frame.empty:
-        return "_(no rows)_\n"
+        return f"{empty}\n"
     columns = {
         name: [_cell(value, float_format) for value in frame[name]]
         for name in frame.columns
