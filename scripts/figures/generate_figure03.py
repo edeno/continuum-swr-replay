@@ -54,30 +54,15 @@ from matplotlib.gridspec import GridSpec
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.detection.nonlocal_events import (
     load_data_over_time,
-    validate_results_position_time_alignment,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
-    dropped_for_excluded_time,
-    read_artifact_event_drops,
     read_swr_table,
     swr_intervals,
 )
 from continuum_swr_replay.analysis.event_definition.classified_table import (
     assert_drawn_class_matches_ripples,
 )
-from continuum_swr_replay.analysis.event_definition.eligibility import (
-    artifact_drop_reasons,
-)
-from continuum_swr_replay.analysis.event_definition.immobility import (
-    build_speed_eligible_event_cohort,
-)
-from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
-    get_confident_times,
-    get_overlap_times,
-    nonlocal_state_probability,
-)
 from continuum_swr_replay.analysis.event_definition.swr_source import (
-    artifact_intervals,
     ripple_power_inputs,
     swr_epoch_id,
 )
@@ -87,12 +72,8 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     reference_medians,
 )
 from continuum_swr_replay.data_loaders import load_data
-from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.decoding.results import load_results
-from continuum_swr_replay.parameters import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    DEFAULT_NON_LOCAL_THRESHOLD,
-)
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.reported.events import EventsInputs, default_inputs
 from continuum_swr_replay.visualization.figure_panels import (
@@ -173,66 +154,59 @@ def _set_relative_time_ticks(axes, t0: float) -> None:
 
 
 def find_non_swr_example_event(
-    data, results, window_sec=1.0, *, artifacts=None, dropped=None
-):
+    events: pd.DataFrame,
+    ripple_times: pd.DataFrame,
+    nwb_file_name: str,
+    epoch_name: str,
+    window_sec: float = 1.0,
+) -> slice:
     """Find a representative non-local event NOT co-occurring with SWR.
 
-    Selects the longest event that does not overlap with any SWR of the
-    session's SWR source (``data["ripple_times"]``, which the caller sets
-    from the source). The events are re-detected from the
-    posterior, so the one analysed-time rule is applied here: an event in
-    excluded time (`artifacts`, the mask, widened by 0.3 s), or overlapping an
-    SWR or MUA event dropped for it (`dropped`), is never chosen.
+    Selects the session's longest canonical non-SWR event: the event table's
+    rows (``replay_content/event_table.parquet``) with ``is_swr`` False, whose
+    events and classes already follow the one analysed-time rule and the
+    paper's SWR source.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        The canonical event table, with the session columns, ``is_swr``,
+        ``event_start_s``, ``event_end_s`` and ``event_duration_s``.
+    ripple_times : pd.DataFrame
+        The session's SWR source intervals (``start_time``, ``end_time``),
+        the ones panel a shades.
+    nwb_file_name, epoch_name : str
+        The session.
+    window_sec : float
+        Half the width of the returned window, in seconds.
 
     Returns
     -------
     time_slice : slice
         Time window centered on the event.
+
+    Raises
+    ------
+    ValueError
+        If the session has no non-SWR event.
     """
-    non_local_prob = nonlocal_state_probability(results.acausal_state_probabilities)
-    position_info = data["position_info"]
-    speed = position_info.head_speed.to_numpy()
-    position_time = position_info.index
-    validate_results_position_time_alignment(results.time.values, position_time)
-    non_local_prob = non_local_prob.assign_coords(
-        time=position_time.to_numpy(dtype=float)
-    )
-
-    detected_non_local_times = get_confident_times(
-        non_local_prob,
-        speed,
-        position_time.to_numpy(dtype=float),
-        DEFAULT_NON_LOCAL_THRESHOLD,
-    )
-    non_local_times, _ = build_speed_eligible_event_cohort(
-        detected_non_local_times,
-        speed=speed,
-        time=position_time,
-        event_col="non_local_event",
-        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    )
-    if artifacts is not None:
-        reasons = artifact_drop_reasons(
-            non_local_times["start_time"].to_numpy(),
-            non_local_times["end_time"].to_numpy(),
-            artifacts,
-            dropped,
-        )
-        non_local_times = non_local_times.loc[pd.isna(reasons)]
-    # The session's SWR source intervals, already speed-gated (set by the caller).
-    ripple_times = data["ripple_times"]
-
-    # Find events NOT overlapping with SWR
-    _, non_swr_events = get_overlap_times(non_local_times, ripple_times)
-
+    animal, day = parse_nwb_filename(nwb_file_name)
+    session = events.loc[
+        events["animal"].eq(animal)
+        & events["session_date"].eq(day)
+        & events["epoch"].eq(epoch_name)
+    ].sort_values("event_start_s")
+    non_swr_events = session.loc[~session["is_swr"].astype(bool)]
     if len(non_swr_events) == 0:
         raise ValueError("No non-local events without SWR overlap found.")
 
     # Pick longest event (likely the clearest example)
-    best_idx = non_swr_events["duration"].idxmax()
-    event = non_swr_events.loc[best_idx]
-    # Panel a shades data["ripple_times"]; fail if the example would be drawn
-    # with an SWR span that contradicts its "non-SWR" label.
+    best = non_swr_events.loc[non_swr_events["event_duration_s"].idxmax()]
+    event = pd.Series(
+        {"start_time": best["event_start_s"], "end_time": best["event_end_s"]}
+    )
+    # Panel a shades ripple_times; fail if the example would be drawn with an
+    # SWR span that contradicts its "non-SWR" label.
     assert_drawn_class_matches_ripples({"non_swr": event}, ripple_times)
 
     center = (event.start_time + event.end_time) / 2
@@ -364,19 +338,14 @@ def generate_figure(
         data_over_time, nwb_file_name=nwb_file_name, epoch_name=epoch_name
     )
 
-    # Find example non-SWR event
-    logging.info("Selecting non-SWR example event...")
-    time_slice = find_non_swr_example_event(
-        data,
-        results,
-        artifacts=artifact_intervals(epoch_id),
-        dropped=dropped_for_excluded_time(
-            read_artifact_event_drops(decode_paths(epoch_id, data_dir).data_over_time)
-        ),
-    )
-
     logging.info("Reading the events summary's inputs for panels c and e...")
     events_panels = read_event_panels(default_inputs())
+
+    # Find example non-SWR event: the canonical event table's
+    logging.info("Selecting non-SWR example event...")
+    time_slice = find_non_swr_example_event(
+        events_panels["events"], data["ripple_times"], nwb_file_name, epoch_name
+    )
 
     # --- Create figure ---
     fig_height = PAGE_HEIGHT

@@ -35,7 +35,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-import xarray as xr
 
 from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
@@ -403,46 +402,36 @@ def test_the_spike_evidence_scan_reads_the_sources_labels(
     assert_source_labels(seen[0])
 
 
-def test_the_overlap_geometry_count_classifies_against_the_source(
-    source, saved_decode, monkeypatch, offline, tmp_path
+def test_the_overlap_geometry_count_reads_the_event_tables_classes(
+    source, offline, tmp_path
 ):
+    """The script counts the canonical events and classes, the session's rows
+    of the event table, rather than re-detecting events from the posterior."""
     script = offline("scripts.replay_models.content.quantify_swr_overlap_geometry")
-    position = pd.DataFrame({"head_speed": np.zeros(TIME.size)}, index=TIME)
-    states = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
-    results = xr.Dataset(
+    table = tmp_path / "event_table.parquet"
+    rows = pd.DataFrame(
         {
-            "acausal_state_probabilities": (
-                ("time", "states"),
-                np.zeros((TIME.size, len(states))),
-            )
-        },
-        coords={"time": TIME, "states": states},
+            "animal": ["j16", "j16", "j16"],
+            "session_date": [20210706, 20210706, 20210707],
+            "epoch": [EPOCH, EPOCH, EPOCH],
+            "non_local_event": [2, 1, 1],
+            "event_id": ["b", "a", "c"],
+            "event_start_s": [101.5, 100.1, 100.1],
+            "event_end_s": [101.6, 100.2, 100.2],
+            "event_duration_s": [0.102, 0.102, 0.102],
+            "overlap_class": ["non_swr", "swr_partial", "non_swr"],
+            "overlap_subclass": ["no_overlap", "single_swr_partial", "no_overlap"],
+            "n_swrs_overlapping": [0, 1, 0],
+        }
     )
-    monkeypatch.setattr(
-        script,
-        "load_data",
-        lambda *args, **kwargs: {
-            "position_info": position,
-            "ripple_times": pd.DataFrame(
-                [STORED_SWR], columns=["start_time", "end_time"]
-            ),
-        },
-    )
-    monkeypatch.setattr(script, "load_results", lambda *a, **k: (results, None, None))
-    seen: list = []
+    write_table(analysed_time.stamp_swr_source(rows), table)
 
-    def record(events, swrs):
-        seen.append(swrs)
-        raise _Stop
+    geom = script.quantify_session(NWB, EPOCH, event_table=table)
 
-    monkeypatch.setattr(script, "classify_swr_overlap_geometry", record)
-
-    with pytest.raises(_Stop):
-        script.quantify_session(NWB, EPOCH, data_dir=tmp_path)
-
-    np.testing.assert_allclose(
-        seen[0][["start_time", "end_time"]].to_numpy(), np.array(KEPT_SWRS)
-    )
+    assert geom["event_id"].tolist() == ["a", "b"]
+    assert geom["overlap_subclass"].tolist() == ["single_swr_partial", "no_overlap"]
+    np.testing.assert_array_equal(geom["start_time"], [100.1, 101.5])
+    assert set(geom["nwb_file_name"]) == {NWB}
 
 
 # --------------------------------------------------------------------------
@@ -844,42 +833,6 @@ def test_only_the_listed_modules_unpickle_a_decode_frame():
     }
 
     assert found - set(DECODE_FRAME_READERS) == set()
-
-
-def test_the_overlap_geometry_count_drops_the_events_the_mask_reaches(
-    source, saved_decode, monkeypatch, offline, tmp_path
-):
-    """The script re-detects non-local events from the posterior, so it applies
-    the one analysed-time rule itself: an event in excluded time [101.75,
-    102.55] (the configured mask widened by 0.3 s) is not counted."""
-    script = offline("scripts.replay_models.content.quantify_swr_overlap_geometry")
-    position = pd.DataFrame({"head_speed": np.zeros(TIME.size)}, index=TIME)
-    states = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
-    probabilities = np.zeros((TIME.size, len(states)))
-    for start, end in [(101.50, 101.60), (101.80, 101.90), (102.10, 102.20)]:
-        probabilities[(TIME >= start) & (TIME <= end), 2] = 0.95
-    results = xr.Dataset(
-        {"acausal_state_probabilities": (("time", "states"), probabilities)},
-        coords={"time": TIME, "states": states},
-    )
-    monkeypatch.setattr(
-        script, "load_data", lambda *args, **kwargs: {"position_info": position}
-    )
-    monkeypatch.setattr(script, "load_results", lambda *a, **k: (results, None, None))
-    seen: list = []
-
-    def record(events, swrs):
-        seen.append(events)
-        raise _Stop
-
-    monkeypatch.setattr(script, "classify_swr_overlap_geometry", record)
-
-    with pytest.raises(_Stop):
-        script.quantify_session(NWB, EPOCH, data_dir=tmp_path)
-
-    np.testing.assert_allclose(
-        seen[0][["start_time", "end_time"]].to_numpy(), [[101.50, 101.60]]
-    )
 
 
 def test_the_spike_evidence_baseline_lies_outside_excluded_time(source):

@@ -536,6 +536,47 @@ def test_the_figure02_cache_is_keyed_on_the_decode_files(
 
 
 # --------------------------------------------------------------------------
+# Figure 3 panel a: the example is a canonical event
+# --------------------------------------------------------------------------
+
+
+def _figure03_example_events() -> pd.DataFrame:
+    """The example session's three events and a longer one of another epoch."""
+    return pd.DataFrame(
+        {
+            "animal": "wilbur",
+            "session_date": 20210329,
+            "epoch": ["02_r1", "02_r1", "02_r1", "04_r2"],
+            "is_swr": [False, True, False, False],
+            "event_start_s": [10.0, 20.0, 30.0, 40.0],
+            "event_end_s": [10.2, 20.9, 30.3, 41.0],
+            "event_duration_s": [0.202, 0.902, 0.302, 1.002],
+        }
+    )
+
+
+def test_the_figure03_example_is_the_sessions_longest_non_swr_event(offline):
+    figure03 = offline("scripts.figures.generate_figure03")
+    ripples = pd.DataFrame({"start_time": [20.0], "end_time": [20.9]})
+
+    window = figure03.find_non_swr_example_event(
+        _figure03_example_events(), ripples, "wilbur20210329_.nwb", "02_r1"
+    )
+
+    assert window == slice(30.15 - 1.0, 30.15 + 1.0)
+
+
+def test_the_figure03_example_is_refused_when_an_swr_is_drawn_over_it(offline):
+    figure03 = offline("scripts.figures.generate_figure03")
+    ripples = pd.DataFrame({"start_time": [30.1], "end_time": [30.2]})
+
+    with pytest.raises(AssertionError):
+        figure03.find_non_swr_example_event(
+            _figure03_example_events(), ripples, "wilbur20210329_.nwb", "02_r1"
+        )
+
+
+# --------------------------------------------------------------------------
 # Figure 3 panel a: relative-time ticks (task 26c)
 # --------------------------------------------------------------------------
 
