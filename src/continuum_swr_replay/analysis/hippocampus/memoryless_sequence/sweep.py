@@ -28,6 +28,7 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
     CONFIG,
+    DECODE_BIN_STRIDE,
     N_NEURONS,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
@@ -59,7 +60,6 @@ from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD
 
 __all__ = [
-    "DECODE_BIN_STRIDE",
     "DECODE_MARGIN_S",
     "DURATION_S",
     "MATCH_TOLERANCE_CM",
@@ -84,8 +84,6 @@ __all__ = [
     "run_state_space",
     "usable_intervals",
 ]
-
-DECODE_BIN_STRIDE = 3
 
 PATH_CM = (10.0, 20.0, 30.0, 45.0, 60.0, 90.0, 130.0)
 DURATION_S = (0.04, 0.06, 0.08, 0.12, 0.20, 0.30, 0.50)

@@ -45,6 +45,9 @@ from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
 
 from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+    DECODE_BIN_STRIDE,
+)
 from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
@@ -83,10 +86,6 @@ NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 # prior: the real decodes use setting P30-B
 # (``continuum_swr_replay.decoding.transitions.nonlocal_transition_settings``).
 DEMO_DISCRETE_TRANSITION_STICKINESS = np.array([30.0, 100000.0, 30.0, 200.0])
-
-# Decode every Nth sample so the demo bin width (~2 ms) matches the real
-# pipeline; the simulator emits 1500 Hz, which starves the No-Spike evidence.
-DECODE_BIN_STRIDE = 3
 
 # Lengthen the simulator's 0.5 s no-spike event so the No-Spike state clears the
 # transition-driven edge ramps and reads at full strength in panel D.
