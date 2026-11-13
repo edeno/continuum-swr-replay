@@ -245,7 +245,7 @@ def session_window_sets(
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
         fit_mask=fit_mask,
-        basis_half_window_s=0.25,
+        basis_half_window_s=DEFAULT_BASIS_HALF_WINDOW_S,
     )
 
     control = make_matched_control_times(

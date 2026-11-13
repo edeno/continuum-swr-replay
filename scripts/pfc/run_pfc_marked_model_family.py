@@ -81,7 +81,11 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     canonical_event_input_hashes,
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
-from continuum_swr_replay.analysis.pfc.event_sets import EVENT_SETS, SWR_NO_NON_LOCAL
+from continuum_swr_replay.analysis.pfc.event_sets import (
+    DEFAULT_BASIS_HALF_WINDOW_S,
+    EVENT_SETS,
+    SWR_NO_NON_LOCAL,
+)
 from continuum_swr_replay.analysis.pfc.heldout import assign_blocked_folds
 from continuum_swr_replay.analysis.pfc.marked_glm import (
     EXTENDED_MARKED_EVENT_CLASSES,
@@ -143,11 +147,11 @@ ESTIMATOR = "joint_multimark_ridge_poisson_temporal_glm"
 INFERENCE = "descriptive_blocked_heldout_leave_one_mark_block_out"
 # 3: the per-stop baseline gains ``well_unknown`` (mixed stops).
 BUNDLE_CONTRACT_VERSION = 3
-# ``prepare_marked_session_context`` fits over lags -125..125 samples with an
-# 11-function clamped cubic B-spline basis per kernel. Both are pinned into the
-# contract here because the contract is built before the session is prepared;
+# ``prepare_marked_session_context`` fits over lags -125..125 samples
+# (``DEFAULT_BASIS_HALF_WINDOW_S``) with an 11-function clamped cubic B-spline
+# basis per kernel. Both are pinned into the contract here because the contract
+# is built before the session is prepared;
 # ``_check_prepared_window`` refuses the fit if the prepared context disagrees.
-FIT_HALF_WINDOW_S = 0.25
 N_BASIS_PER_KERNEL = 11
 #: Shuffled-mark draws per slope kernel when the follow-up set is run.
 DEFAULT_FOLLOWUP_SLOPE_PERMUTATIONS = 30
@@ -386,7 +390,7 @@ def build_fit_contract(
         "profiled_batch_feature_budget": PROFILED_BATCH_FEATURE_BUDGET,
         "min_finite_events_per_mark_per_class": int(min_marked_events),
         "sampling_frequency_hz": SAMPLING_FREQUENCY,
-        "fit_half_window_s": FIT_HALF_WINDOW_S,
+        "fit_half_window_s": DEFAULT_BASIS_HALF_WINDOW_S,
         "n_basis_per_kernel": N_BASIS_PER_KERNEL,
         "report_half_window_s": REPORT_HALF_WINDOW_S,
         "stop_cohort": STOP_COHORT,
@@ -529,10 +533,10 @@ def _check_prepared_window(spline_basis: NDArray, lags: NDArray) -> None:
     """
     half_window_s = float(np.abs(lags).max()) / SAMPLING_FREQUENCY
     n_basis = int(spline_basis.shape[1])
-    if half_window_s != FIT_HALF_WINDOW_S or n_basis != N_BASIS_PER_KERNEL:
+    if half_window_s != DEFAULT_BASIS_HALF_WINDOW_S or n_basis != N_BASIS_PER_KERNEL:
         raise RuntimeError(
             f"prepared fit window ({half_window_s} s, {n_basis} basis functions) "
-            f"does not match the pinned contract ({FIT_HALF_WINDOW_S} s, "
+            f"does not match the pinned contract ({DEFAULT_BASIS_HALF_WINDOW_S} s, "
             f"{N_BASIS_PER_KERNEL} basis functions)"
         )
 

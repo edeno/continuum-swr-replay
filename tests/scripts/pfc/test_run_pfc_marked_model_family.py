@@ -292,7 +292,7 @@ def test_fit_contract_pins_question_marks_and_no_selection_rule():
     assert contract["model_question"] == SPEC.question
     assert "no firing-rate or p-value" in contract["neuron_inclusion"]
     assert "shuffle" not in contract["inference"]
-    assert contract["fit_half_window_s"] == runner.FIT_HALF_WINDOW_S
+    assert contract["fit_half_window_s"] == runner.DEFAULT_BASIS_HALF_WINDOW_S
     assert contract["n_basis_per_kernel"] == runner.N_BASIS_PER_KERNEL
 
 

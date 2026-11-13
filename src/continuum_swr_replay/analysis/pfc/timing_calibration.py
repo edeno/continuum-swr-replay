@@ -38,7 +38,11 @@ from continuum_swr_replay.analysis.pfc.design import (
     event_basis_functions,
     symmetric_lags,
 )
-from continuum_swr_replay.analysis.pfc.modulation import in_report_window
+from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
+from continuum_swr_replay.analysis.pfc.modulation import (
+    REPORT_HALF_WINDOW_S,
+    in_report_window,
+)
 from continuum_swr_replay.analysis.pfc.timing import timing_rule_calibration
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
@@ -54,7 +58,10 @@ BOXCAR_WIDTH_S = 0.100
 ALPHA_PEAK_S = 0.030
 
 #: Fit and read half-windows, in seconds.
-WINDOWS = {"canonical": (0.25, 0.20), "wide": (1.05, 1.00)}
+WINDOWS = {
+    "canonical": (DEFAULT_BASIS_HALF_WINDOW_S, REPORT_HALF_WINDOW_S),
+    "wide": (1.05, 1.00),
+}
 #: Lags (s) the wide window's pre-event reference level is averaged over.
 REFERENCE_LAGS_S = (-1.0, -0.6)
 

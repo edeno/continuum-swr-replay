@@ -59,6 +59,7 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     canonical_event_input_hashes,
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
+from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
 from continuum_swr_replay.analysis.pfc.heldout import (
     EMPIRICAL_PVALUE_METHOD,
     MIN_USABLE_NULL_DRAWS,
@@ -111,7 +112,6 @@ SHUFFLE_POLICY = "permute_scientific_mark_among_events_within_session_and_class"
 LABEL_SHUFFLE_TAIL_METHOD = EMPIRICAL_PVALUE_METHOD
 # 3: the per-stop baseline gains ``well_unknown`` (mixed stops).
 BUNDLE_CONTRACT_VERSION = 3
-FIT_HALF_WINDOW_S = 0.25
 
 MARK_DESCRIPTIONS = {
     "current_arm_fraction": (
@@ -250,7 +250,7 @@ def build_fit_contract(
         "min_usable_mark_shuffles": int(required_usable_null_draws(n_shuffles)),
         "design_batch_size": int(design_batch_size),
         "sampling_frequency_hz": SAMPLING_FREQUENCY,
-        "fit_half_window_s": FIT_HALF_WINDOW_S,
+        "fit_half_window_s": DEFAULT_BASIS_HALF_WINDOW_S,
         "report_half_window_s": REPORT_HALF_WINDOW_S,
         "stop_cohort": STOP_COHORT,
         "brain_area": brain_area,
