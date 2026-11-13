@@ -201,13 +201,10 @@ def test_the_event_gallery_is_quiet_when_every_analysed_epoch_is_there(
 
 
 @pytest.mark.parametrize("script", [content_occupancy, spike_evidence])
-def test_a_scan_names_the_file_its_threshold_validates(script, tmp_path, monkeypatch):
+def test_a_scan_names_the_file_its_threshold_validates(script, tmp_path):
     """The file a scan reads is the one the library's
     ``DEFAULT_NON_LOCAL_THRESHOLD`` names, the threshold the read then checks
     its labels at."""
-    assert script.THRESHOLD_PERCENT == non_local_threshold_percent(
-        script.DEFAULT_NON_LOCAL_THRESHOLD
-    )
     folder = tmp_path / "decodes"
     for suffix in (
         "_environment.pkl",
@@ -218,7 +215,8 @@ def test_a_scan_names_the_file_its_threshold_validates(script, tmp_path, monkeyp
         (folder / f"{ANALYSED[0]}{suffix}").touch()
 
     assert script.find_sessions(None) == []
-    monkeypatch.setattr(script, "THRESHOLD_PERCENT", 50)
+    percent = non_local_threshold_percent(script.DEFAULT_NON_LOCAL_THRESHOLD)
+    (folder / f"{ANALYSED[0]}_{percent}_data_over_time.pkl").touch()
     assert script.find_sessions(None) == [ANALYSED[0]]
 
 

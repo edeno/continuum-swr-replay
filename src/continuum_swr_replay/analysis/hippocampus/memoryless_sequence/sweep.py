@@ -67,7 +67,6 @@ __all__ = [
     "DURATION_S",
     "MATCH_TOLERANCE_CM",
     "MIDPOINT_CM",
-    "NON_LOCAL_PROB_THRESHOLD",
     "PATH_CM",
     "PEAK_RATE_HZ",
     "PLACEMENT_MARGIN_S",
@@ -106,14 +105,6 @@ PLACEMENT_MARGIN_S = 0.25
 Enough for a window of full support plus context, and small enough that the
 pieces left after cutting out the recording's own events can still hold an
 event."""
-
-NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
-"""The project's non-local event threshold and nominal minimum, applied with a
-timestamp-span test (:func:`non_local_intervals`): non-local probability above
-0.8 over a first-to-last span of at least 15 ms, i.e. 9 samples on the sweep's
-2 ms grid. ``get_confident_times`` counts samples instead (7 on the real decode
-grid; ``docs/known_issues/nonlocal_minimum_duration_rounding.md``). The span
-test is kept so the published sweep numbers do not change."""
 
 SHUFFLE_RUN_SEED = 20260922
 """Seeds the place-cell identity shuffle; each cell's draws are keyed on the cell too."""
@@ -417,10 +408,17 @@ def non_local_intervals(
     time: np.ndarray, probability: np.ndarray
 ) -> list[tuple[int, int]]:
     """The state-space detector's events: index bounds of every stretch above
-    threshold whose first-to-last timestamp span is at least
-    ``NON_LOCAL_MINIMUM_DURATION_S`` (a span test, not get_confident_times'
-    sample count; see that constant)."""
-    above = probability > NON_LOCAL_PROB_THRESHOLD
+    the project's non-local threshold whose first-to-last timestamp span is at
+    least its nominal minimum duration.
+
+    Non-local probability above ``DEFAULT_NON_LOCAL_THRESHOLD`` (0.8) over a
+    first-to-last span of at least ``NON_LOCAL_MINIMUM_DURATION_S`` (15 ms),
+    i.e. 9 samples on the sweep's 2 ms grid. ``get_confident_times`` counts
+    samples instead (7 on the real decode grid;
+    ``docs/known_issues/nonlocal_minimum_duration_rounding.md``). The span test
+    is kept so the published sweep numbers do not change.
+    """
+    above = probability > DEFAULT_NON_LOCAL_THRESHOLD
     starts, stops = (contiguous_true_runs(above) - [0, 1]).T
     return [
         (a, b)

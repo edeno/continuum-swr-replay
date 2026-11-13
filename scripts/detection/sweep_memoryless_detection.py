@@ -55,7 +55,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep import 
     DURATION_S,
     MATCH_TOLERANCE_CM,
     MIDPOINT_CM,
-    NON_LOCAL_PROB_THRESHOLD,
     PATH_CM,
     PEAK_RATE_HZ,
     PLACEMENT_MARGIN_S,
@@ -72,7 +71,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_summari
     replay_sweep_summary,
     share,
 )
-from continuum_swr_replay.parameters import NON_LOCAL_MINIMUM_DURATION_S
+from continuum_swr_replay.parameters import (
+    DEFAULT_NON_LOCAL_THRESHOLD,
+    NON_LOCAL_MINIMUM_DURATION_S,
+)
 from continuum_swr_replay.paths import detection_comparison_dir
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
@@ -150,7 +152,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "placement_margin_s": PLACEMENT_MARGIN_S,
         "match_tolerance_cm": MATCH_TOLERANCE_CM,
         "same_place_cm": SAME_PLACE_CM,
-        "non_local_prob_threshold": NON_LOCAL_PROB_THRESHOLD,
+        "non_local_prob_threshold": DEFAULT_NON_LOCAL_THRESHOLD,
         "non_local_minimum_duration_s": NON_LOCAL_MINIMUM_DURATION_S,
         "spikes": "sorted",
         "shuffle": "place-cell identity (the reference's rateMap(ind_rand, :)); "

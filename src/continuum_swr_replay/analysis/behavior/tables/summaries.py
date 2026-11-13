@@ -53,6 +53,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from ....parameters import DEFAULT_NON_LOCAL_THRESHOLD
+
 PROBABILITY_ROW_SUM_ATOL = 1e-5
 
 # ── Posterior collapse to arms ──
@@ -275,7 +277,7 @@ def n_nonlocal_bins(
     nonlocal_prob: np.ndarray,
     event_id: np.ndarray,
     *,
-    threshold: float = 0.8,
+    threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Hard count of above-threshold timebins per event.
 
@@ -340,7 +342,7 @@ def arm_count_hard(
     event_id: np.ndarray,
     n_arms: int = 9,
     *,
-    threshold: float = 0.8,
+    threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Hard MAP count per (event, arm).
 

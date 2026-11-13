@@ -14,6 +14,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from continuum_swr_replay.intervals import contiguous_true_runs, interval_mask
+from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 
 STATES = ("Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented")
 """The decoder's states, in its own order."""
@@ -113,7 +114,7 @@ def state_bouts(
     probability: NDArray,
     regime: NDArray,
     *,
-    threshold: float = 0.8,
+    threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     min_bins: int = 5,
     max_scored_bins: int = 50,
     cap: int = 1500,
@@ -280,7 +281,7 @@ def build_windows(
     probabilities: NDArray,
     regime: NDArray,
     *,
-    threshold: float = 0.8,
+    threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     min_bins: int = 5,
     max_scored_bins: int = 50,
     cap: int = 1500,

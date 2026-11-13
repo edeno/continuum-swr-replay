@@ -16,6 +16,7 @@ import pandas as pd
 import xarray as xr
 
 from ....data_loaders.constants import TRACK_SEGMENT_TO_PATCH, TRUNK_ARMS
+from ....parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from ....tables.columns import require_columns
 from ...hippocampus.posterior_analysis import map_estimate_to_map_nodes
 from ..covariates.spatial import arm_adjacency, path_continuity
@@ -133,7 +134,7 @@ def brain_state_means(
     state_probs: dict[str, np.ndarray],
     extra_means: dict[str, np.ndarray],
     nonlocal_prob: np.ndarray | None = None,
-    non_local_threshold: float = 0.8,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> RollupResult:
     """Per-event means of state posteriors and raw/z-scored neural signals.
 
@@ -604,7 +605,7 @@ def compute_trajectory_rollups(
     place_bin_size: float,
     nonlocal_prob: np.ndarray | None = None,
     arm_posterior: np.ndarray | None = None,
-    non_local_threshold: float = 0.8,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> dict[str, np.ndarray]:
     """Orchestrate all trajectory rollups into one ``{column: per_event_array}``.
 

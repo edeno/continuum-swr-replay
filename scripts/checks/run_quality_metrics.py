@@ -36,7 +36,10 @@ from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
     compute_session_quality_summary,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
-from continuum_swr_replay.decoding.files import data_over_time_suffix
+from continuum_swr_replay.decoding.files import (
+    DEFAULT_NON_LOCAL_THRESHOLD_PERCENT,
+    data_over_time_suffix,
+)
 from continuum_swr_replay.parameters import (
     FIGURE_DIR,
     SAMPLING_FREQUENCY,
@@ -97,7 +100,7 @@ logger = logging.getLogger(__name__)
 
 def load_all_sessions(
     animal: str | None = None,
-    threshold: int = 80,
+    threshold: int = DEFAULT_NON_LOCAL_THRESHOLD_PERCENT,
 ) -> pd.DataFrame:
     """Load and concatenate the analysed epochs' data_over_time pickle files.
 
@@ -491,8 +494,9 @@ def main(argv: Sequence[str] | None = None):
     parser.add_argument(
         "--threshold",
         type=int,
-        default=80,
-        help="Non-local probability threshold (matches pickle filename, default 80)",
+        default=DEFAULT_NON_LOCAL_THRESHOLD_PERCENT,
+        help="Non-local probability threshold (matches pickle filename, "
+        f"default {DEFAULT_NON_LOCAL_THRESHOLD_PERCENT})",
     )
     parser.add_argument("--no_plots", action="store_true", help="Skip diagnostic plots")
     parser.add_argument(

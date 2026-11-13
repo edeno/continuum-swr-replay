@@ -77,7 +77,6 @@ STATE_COLORS = {
 STATE_NAMES_SHORT = ["Local", "No-Spike", "Continuous", "Fragmented"]
 STATE_COLORS_SHORT = [WONG[5], "#999999", WONG[1], WONG[6]]
 ANIMAL_POS_COLOR = "magenta"
-NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 
 # A demo value for the simulation, chosen so EM keeps the No-Spike state alive:
 # with the installed non_local_detector default stickiness
@@ -880,7 +879,7 @@ def plot_non_local_decision(
     ax,
     time,
     non_local_prob,
-    threshold=NON_LOCAL_PROB_THRESHOLD,
+    threshold=DEFAULT_NON_LOCAL_THRESHOLD,
 ):
     """Plot collapsed non-local probability and event threshold."""
     ax.plot(
@@ -1040,7 +1039,7 @@ def generate_figure(n_neurons=30, seed=0):
     non_local_prob = get_non_local_probability(results)
     non_local_intervals = get_threshold_crossing_intervals(
         time,
-        non_local_prob > NON_LOCAL_PROB_THRESHOLD,
+        non_local_prob > DEFAULT_NON_LOCAL_THRESHOLD,
     )
 
     # --- Create figure ---

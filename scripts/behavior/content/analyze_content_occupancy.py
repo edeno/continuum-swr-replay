@@ -77,7 +77,6 @@ from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
 from continuum_swr_replay.decoding.files import (  # noqa: E402
     decode_paths,
     epoch_identifier_of,
-    non_local_threshold_percent,
 )
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,
@@ -93,8 +92,6 @@ from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
 from continuum_swr_replay.tables.io import read_table, table_exists  # noqa: E402
 
 # --- Parameters ---------------------------------------------------------------
-# the data_over_time file the threshold names (``_80_``)
-THRESHOLD_PERCENT = non_local_threshold_percent(DEFAULT_NON_LOCAL_THRESHOLD)
 
 XE = np.arange(0, 401, 2)  # 2D histogram edges: content->animal (cm)
 YE = np.arange(0, 201, 2)  # content->nearest well (cm)
@@ -122,9 +119,7 @@ def find_sessions(animal: str | None) -> list[str]:
         epoch_id = epoch_identifier_of(env, "_environment.pkl")
         if animal is not None and parse_epoch_identifier(epoch_id).animal != animal:
             continue
-        if decode_paths(
-            epoch_id, processed_data_dir(), threshold_percent=THRESHOLD_PERCENT
-        ).data_over_time.exists():
+        if decode_paths(epoch_id, processed_data_dir()).data_over_time.exists():
             out.append(epoch_id)
     return out
 
@@ -139,9 +134,7 @@ def session_content_distances(
     over the non-local event timebins, or ``None`` if fewer than
     ``content_occupancy.MIN_WELLS`` wells are localizable.
     """
-    paths = decode_paths(
-        epoch_id, processed_data_dir(), threshold_percent=THRESHOLD_PERCENT
-    )
+    paths = decode_paths(epoch_id, processed_data_dir())
     # The read refuses labels that break the speed rule or the probability
     # contract.
     dot = read_dot_with_swr_source(
