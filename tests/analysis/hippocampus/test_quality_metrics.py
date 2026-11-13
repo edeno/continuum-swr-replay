@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.hippocampus.quality_metrics import (
+    compute_behavior_state_breakdown,
     compute_calibration_curve,
     compute_error_by_track_segment,
     compute_local_decoding_error,
@@ -568,6 +569,33 @@ class TestComputeNonLocalEventContext:
         )
         assert np.isnan(result["theta_mrl"].iloc[0])
         assert np.isnan(result["theta_mean_angle"].iloc[0])
+
+
+def test_behavior_state_breakdown_uses_the_strict_immobility_rule():
+    """Speeds 1, 3, 4, NaN, 5: two bins are immobile (below 4), one runs (above
+    4); the bin at 4 and the bin without a speed are neither."""
+    data = pd.DataFrame(
+        {
+            "head_speed": [1.0, 3.0, 4.0, np.nan, 5.0],
+            "Local_prob": [0.2, 0.4, 0.9, 0.9, 0.9],
+            "No-Spike_prob": [0.0, 0.2, 0.1, 0.1, 0.1],
+            "Non-Local_Continuous_prob": [0.5, 0.3, 0.0, 0.0, 0.0],
+            "Non-Local_Fragmented_prob": [0.3, 0.1, 0.0, 0.0, 0.0],
+            "animal": "a",
+            "day": 1,
+            "epoch": "02_r1",
+            "in_excluded_time": False,
+        }
+    )
+
+    row = compute_behavior_state_breakdown(data).iloc[0]
+
+    assert row["n_total_bins"] == 5
+    assert row["n_immobile_bins"] == 2
+    assert row["n_running_bins"] == 1
+    assert row["immobile_fraction"] == pytest.approx(2 / 5)
+    assert row["immobile_local_fraction"] == pytest.approx(0.3)
+    assert row["immobile_nonlocal_fraction"] == pytest.approx(0.6)
 
 
 class TestComputeLocalStateCollapseDetails:

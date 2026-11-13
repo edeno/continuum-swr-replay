@@ -491,8 +491,10 @@ def compute_behavior_state_breakdown(
     only the running side) by adding:
 
     - the overall running / immobile time split, and
-    - the decoder state fractions during **immobility**
-      (``head_speed <= speed_threshold``).
+    - the decoder state fractions during **immobility**, the project's rule
+      (:func:`~continuum_swr_replay.analysis.events.analysed_time.immobile_analysed_bins`:
+      ``head_speed < speed_threshold``). A bin at the threshold or without a
+      speed is neither running nor immobile.
 
     State fractions are expected fractions computed as the mean of the
     per-timebin state probabilities, matching the convention in
@@ -550,10 +552,11 @@ def compute_behavior_state_breakdown(
         group = group.loc[_analysed_rows(group)]
         n_total = len(group)
         running_mask = group["head_speed"] > speed_threshold
+        immobile_mask = immobile_analysed_bins(group, speed_threshold)
         n_running = int(running_mask.sum())
-        n_immobile = n_total - n_running
+        n_immobile = int(immobile_mask.sum())
 
-        immobile = group.loc[~running_mask]
+        immobile = group.loc[immobile_mask]
         if n_immobile > 0:
             imm_local = float(immobile["Local_prob"].mean())
             imm_nospike = float(immobile["No-Spike_prob"].mean())
