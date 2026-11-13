@@ -1034,7 +1034,7 @@ What the mPFC held-out null's windows look like, beside the real events.
 
 How much do Part 4's mPFC values depend on the firing-rate gate?
 
-`spikes_on_fitted_bins`, `raw_units`, `funnel`, `band_rows`, `main`
+`gate_values`, `spikes_on_fitted_bins`, `raw_units`, `funnel`, `band_rows`, `main`
 
 ### `scripts/pfc/run_pfc_marked_kernels.py`
 
@@ -1164,7 +1164,7 @@ Across-session summaries of what the per-session fits wrote.
 
 Fit a block of models per session on one frozen complete-case cohort.
 
-`predictor_union`, `block_required_columns`, `hash_unit_ids`, `freeze_session_cohort`, `fit_per_session_common_cohort`, `assert_ladder_timing`
+`predictor_union`, `block_required_columns`, `block_table_name`, `hash_unit_ids`, `freeze_session_cohort`, `fit_per_session_common_cohort`, `assert_ladder_timing`
 
 ### `src/continuum_swr_replay/analysis/behavior/content/cohort.py`
 
@@ -1249,3 +1249,9 @@ The per-bin ``is_swr``-contrast rate ladders, fit over sessions, and their audit
 The per-bin replay rate vs behavioral uncertainty and value, by population.
 
 `drop_exposure_sessions`, `fit_uncertainty_rate`, `uncertainty_cohort_records`, `join_uncertainty_qvals`, `standardize_rl_covariates`
+
+### `src/continuum_swr_replay/tables/columns.py`
+
+The one check that a table carries the columns a step reads.
+
+`require_columns`
