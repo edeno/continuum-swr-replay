@@ -44,6 +44,7 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import (
 from continuum_swr_replay.analysis.inventory_comparison.schema import SessionIdentity
 from continuum_swr_replay.intervals import (
     intersect,
+    max_step_s,
     normalize,
     sample_step,
     subtract,
@@ -92,9 +93,6 @@ EXCLUSION_DTYPES: Mapping[str, object] = MappingProxyType(
     }
 )
 
-GAP_FACTOR = 1.5
-"""A spacing more than this many median sample intervals is a gap."""
-
 
 def _joined(time: NDArray, valid: NDArray, max_gap_s: float | None) -> NDArray:
     """Whether each sample continues the run of the one before it.
@@ -114,7 +112,7 @@ def _joined(time: NDArray, valid: NDArray, max_gap_s: float | None) -> NDArray:
         # nothing can continue a run of one sample
         return np.zeros(max(time.size - 1, 0), dtype=bool)
     if max_gap_s is None:
-        max_gap_s = GAP_FACTOR * sample_step(finite)
+        max_gap_s = max_step_s(sample_step(finite))
     with np.errstate(invalid="ignore"):
         close = np.diff(time) <= max_gap_s
     # a non-finite timestamp fails the spacing test on both sides

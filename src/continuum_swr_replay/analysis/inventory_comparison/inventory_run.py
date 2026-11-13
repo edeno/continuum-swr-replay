@@ -27,7 +27,6 @@ from continuum_swr_replay.analysis.inventory_comparison.adapters import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     EXCLUSION_DTYPES,
-    GAP_FACTOR,
     OBSERVATION_DTYPES,
 )
 from continuum_swr_replay.analysis.inventory_comparison.cells import (
@@ -56,7 +55,7 @@ from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
     PAIRED_LABEL_DTYPES,
 )
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.intervals import sample_step
+from continuum_swr_replay.intervals import max_step_s, sample_step
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.io import output_path
 
@@ -123,7 +122,7 @@ nine, and each SWR-matrix population."""
 
 SAMPLE_INTERVAL_S = 0.002
 """The decode grid's step, on which the recount counts its gaps."""
-MAX_GAP_S = GAP_FACTOR * SAMPLE_INTERVAL_S
+MAX_GAP_S = max_step_s(SAMPLE_INTERVAL_S)
 """A step longer than this breaks the speed trace's runs."""
 COUNT_DTYPES: Mapping[str, object] = MappingProxyType(
     {

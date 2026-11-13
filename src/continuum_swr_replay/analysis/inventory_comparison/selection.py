@@ -102,6 +102,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
 )
 from continuum_swr_replay.intervals import (
     intersect,
+    max_step_s,
     normalize,
     subtract,
 )
@@ -445,7 +446,7 @@ def _refuse_gaps(time: NDArray, starts: NDArray, n_rows: NDArray) -> None:
     if time.size < 2:
         return
     steps = np.diff(time)
-    gap = steps > 1.5 * np.median(steps)
+    gap = steps > max_step_s(np.median(steps))
     # gaps_before[k]: gaps among the steps between rows 0 and k
     gaps_before = np.r_[0, np.cumsum(gap)]
     drawn = starts >= 0

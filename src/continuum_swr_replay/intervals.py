@@ -3,7 +3,8 @@
 Times are seconds. An interval is ``[start, end]``. Two families live here,
 with the array and DataFrame signatures their callers use, beside the overlap
 predicates, the runs of a boolean mask (:func:`contiguous_true_runs`), a time
-grid's sample step (:func:`sample_step`) and spike binning.
+grid's sample step (:func:`sample_step`) and the step that is a gap in it
+(:func:`max_step_s`), and spike binning.
 
 **Interval sets** (:func:`normalize`, :func:`union`, :func:`intersect`,
 :func:`subtract`, :func:`total_duration`, :func:`contains`) work on arrays of
@@ -66,6 +67,8 @@ __all__ = [
     "covered_seconds",
     "get_spikecount_per_time_bin",
     "as_frame",
+    "GAP_STEP_RATIO",
+    "max_step_s",
     "interval_mask",
     "intersect",
     "masked_seconds",
@@ -586,6 +589,29 @@ def sample_step(time: NDArray) -> float:
         Seconds. The median, so a gap in the grid does not move it.
     """
     return float(np.median(np.diff(time)))
+
+
+GAP_STEP_RATIO = 1.5
+"""A timestamp step over this many sample steps is a gap (``ripple_detection``'s
+rule)."""
+
+
+def max_step_s(sample_step_s: float) -> float:
+    """The longest timestamp step that is not a gap in a grid of this step.
+
+    Parameters
+    ----------
+    sample_step_s : float
+        The grid's sample step in seconds: :func:`sample_step`, the median of
+        some steps, or a nominal step.
+
+    Returns
+    -------
+    float
+        ``GAP_STEP_RATIO * sample_step_s`` seconds. A step longer than this is
+        a gap.
+    """
+    return GAP_STEP_RATIO * sample_step_s
 
 
 def min_gap_to_intervals(

@@ -116,6 +116,7 @@ from continuum_swr_replay.data_types import RippleBandInputs
 from continuum_swr_replay.intervals import (
     contiguous_true_runs,
     get_spikecount_per_time_bin,
+    max_step_s,
     overlaps_intervals,
 )
 
@@ -145,9 +146,6 @@ ZUGARO_MAXIMUM_DURATION_S = 0.150
 """Seconds: the Databank files' maximum ripple duration. Longer Zugaro events
 are dropped after merging; an event of exactly 0.150 s is kept."""
 
-_GAP_STEP_RATIO = 1.5
-"""A timestamp step over this multiple of the median step is a gap
-(``ripple_detection``'s rule)."""
 
 _SETTLING_ROUNDING_S = 0.010
 """Settling lengths are rounded up to a whole multiple of this, in seconds."""
@@ -335,7 +333,7 @@ def gap_free_stretches(time: NDArray, values: NDArray) -> NDArray[np.int64]:
                 "time must have a positive median step, so timestamps must not repeat."
             )
             raise ValueError(msg)
-        boundary[1:-1] |= steps > _GAP_STEP_RATIO * median_step
+        boundary[1:-1] |= steps > max_step_s(median_step)
     edges = np.flatnonzero(boundary)
     starts, stops = edges[:-1], edges[1:]
     keep = is_valid[starts]
@@ -821,7 +819,7 @@ def tetrode_spike_counts(
     time = np.asarray(time, dtype=float)
     steps = np.diff(time)
     median_step = np.median(steps)
-    gap_starts = np.flatnonzero(steps > _GAP_STEP_RATIO * median_step)
+    gap_starts = np.flatnonzero(steps > max_step_s(median_step))
     columns = []
     for spikes in spike_times:
         spikes = np.asarray(spikes, dtype=float)
