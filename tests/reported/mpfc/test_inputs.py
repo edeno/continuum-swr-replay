@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from continuum_swr_replay.reported.mpfc.inputs import staleness, table_hashes
+from continuum_swr_replay.reported.mpfc.inputs import staleness
+from continuum_swr_replay.runs.staleness import table_hashes
 
 
 def _sha(path: Path) -> str:

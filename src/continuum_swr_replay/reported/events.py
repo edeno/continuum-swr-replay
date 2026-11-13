@@ -53,7 +53,6 @@ medians, a mean of its epochs' means).
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -102,6 +101,7 @@ from continuum_swr_replay.reported.values import (
     value_factory,
 )
 from continuum_swr_replay.runs.io import ok_table_paths, read_manifest
+from continuum_swr_replay.runs.staleness import read_output_manifest, recorded_sha256
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 TAGS = {
@@ -194,13 +194,11 @@ def _input_staleness(
 ) -> str | None:
     """Why an output is stale for one of its inputs, or None.
 
-    ``manifest`` records the input's SHA-256 under ``name`` or ``inputs.<name>``;
-    an output recording none cannot be tied to the current input and is treated
-    as stale.
+    ``manifest`` records the input's SHA-256 under ``name`` or ``inputs.<name>``
+    (``runs.staleness.recorded_sha256``); an output recording none cannot be
+    tied to the current input and is treated as stale.
     """
-    recorded = (manifest.get(name) or manifest.get("inputs", {}).get(name) or {}).get(
-        "sha256"
-    )
+    recorded = recorded_sha256(manifest, name)
     if recorded is None:
         return f"{what} records no {adjective} SHA-256; rerun it before citing"
     if recorded != current_sha256:
@@ -236,10 +234,6 @@ def spike_evidence_staleness(
         "spike-evidence",
         "spike-evidence run",
     )
-
-
-def _manifest(folder: Path) -> dict:
-    return json.loads((folder / "manifest.json").read_text())
 
 
 # --- the decoder --------------------------------------------------------------
@@ -1686,7 +1680,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     n_epochs = len(analysed_epoch_ids())
 
     def stale(folder: Path) -> str | None:
-        return event_table_staleness(_manifest(folder), current_sha256, rel(folder))
+        return event_table_staleness(
+            read_output_manifest(folder), current_sha256, rel(folder)
+        )
 
     source = f"{rel(inputs.event_table)} (canonical event table)"
     summary.add(*event_cohort_values(events, source))
@@ -1908,7 +1904,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     )
     summary.add(
         *class_step_values_with_staleness(
-            _manifest(folder),
+            read_output_manifest(folder),
             spike_evidence_record["sha256"],
             class_stale,
             pd.read_csv(folder / "step_fits.csv"),

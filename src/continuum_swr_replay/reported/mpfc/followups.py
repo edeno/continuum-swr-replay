@@ -7,7 +7,6 @@ when its inputs are stale (:func:`marked_family_staleness`,
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -36,7 +35,10 @@ from continuum_swr_replay.reported.values import (
     rel,
     value_factory,
 )
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.staleness import (
+    marked_family_stale_counts,
+    stop_context_stale_counts,
+)
 
 #: Joint follow-up models and targets the mpfc summary quotes, by key word.
 MARKED_MODELS = {
@@ -76,90 +78,31 @@ MARKED_HELDOUT_SHARE_CLASSES = ("non_local_SWR", "non_local_no_SWR")
 def stop_context_staleness(
     results: Path, bundle_dir: Path, current: dict[str, str], n_cohort: int
 ) -> str | None:
-    """Why the stop-context fit is stale against the current inputs, or None.
-
-    The fit's ``results.provenance.json`` records the SHA-256 of every canonical
-    bundle and cached session table it read; each session table's provenance
-    records the event and stop tables it was assembled from. Any of them that
-    differs from the current file (matched by file name) makes the fit stale.
+    """Why the stop-context fit is stale against the current inputs, or None
+    (``runs.staleness.stop_context_stale_counts``).
 
     Raises
     ------
     ValueError
         If the fit does not cover the ``n_cohort`` PFC epochs.
     """
-    provenance = json.loads(results.with_name("results.provenance.json").read_text())
-    if len(provenance["bundles"]) != n_cohort:
-        raise ValueError(
-            f"{results}: fit on {len(provenance['bundles'])} sessions, not the "
-            f"{n_cohort} of the PFC cohort"
-        )
-    sessions_dir = results.parent / "sessions"
-    tables = {
-        Path(path).name: sha for path, sha in provenance["session_tables"].items()
-    }
-    records = [
-        json.loads((sessions_dir / name).with_suffix(".provenance.json").read_text())
-        for name in tables
-    ]
-
-    def differs(path: Path, sha: str) -> bool:
-        return not path.exists() or sha256_file(path) != sha
-
-    stale = {
-        "bundle_sha256": sum(
-            differs(bundle_dir / Path(path).name, sha)
-            for path, sha in provenance["bundles"].items()
-        ),
-        "session_table_sha256": sum(
-            differs(sessions_dir / name, sha) for name, sha in tables.items()
-        ),
-        **{
-            name: sum(r["input_provenance"].get(name) != sha for r in records)
-            for name, sha in current.items()
-        },
-    }
+    stale = stop_context_stale_counts(results, bundle_dir, current, n_cohort)
     return _stale_note("the stop-context fits", stale, n_cohort)
 
 
 def marked_family_staleness(
     summary_path: Path, current: dict[str, str], n_cohort: int
 ) -> str | None:
-    """Why the marked-family summary is stale, or None.
-
-    Reads every bundle sidecar (``*_marked_family.provenance.json``) beside the
-    summary, wherever it lives: each records the event and stop tables its fit
-    read. A sidecar recording other tables, or a bundle written after the
-    summary, makes the summary stale.
+    """Why the marked-family summary is stale, or None
+    (``runs.staleness.marked_family_stale_counts``).
 
     Raises
     ------
     ValueError
         If the sidecars do not cover the ``n_cohort`` PFC epochs.
     """
-    folder = summary_path.parent
-    sidecars = [
-        json.loads(path.read_text())
-        for path in sorted(folder.glob("*_marked_family.provenance.json"))
-    ]
-    sessions = {(s["nwb_file_name"], s["epoch_name"]) for s in sidecars}
-    if len(sessions) != n_cohort:
-        raise ValueError(
-            f"{folder}: marked-family bundles of {len(sessions)} sessions, not the "
-            f"{n_cohort} of the PFC cohort"
-        )
-    written = summary_path.stat().st_mtime
-    stale = {
-        **{
-            name: sum(s.get(name) != sha for s in sidecars)
-            for name, sha in current.items()
-        },
-        "bundle written after the summary": sum(
-            path.stat().st_mtime > written
-            for path in folder.glob("*_marked_family.pkl")
-        ),
-    }
-    return _stale_note("the marked-family bundles", stale, len(sidecars))
+    stale, n_sidecars = marked_family_stale_counts(summary_path, current, n_cohort)
+    return _stale_note("the marked-family bundles", stale, n_sidecars)
 
 
 # --- marked family: content, strength, ripple power --------------------------------

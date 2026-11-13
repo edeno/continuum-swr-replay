@@ -11,6 +11,8 @@ nothing from ``analysis``. Importing it, or any of its modules, loads no dask:
   commit label and run id that name it.
 - ``fit_provenance``: the sidecar beside a fitted artifact that records the
   input tables it was fit on, and the readers' check that they have not changed.
+- ``staleness``: whether a measurement or a PFC bundle was made from the current
+  inputs: a manifest's recorded digest and the count of records that differ.
 - ``cli``: run ids, the decoders' shared options, the epoch filters.
 - ``batch``: the decoders' batch loop, the per-epoch task loop, a run's
   manifest kept across a resume (``RunManifest``), per-epoch logs, the NWB file

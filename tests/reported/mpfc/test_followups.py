@@ -22,8 +22,9 @@ from continuum_swr_replay.reported.mpfc.followups import (
     stop_context_staleness,
     stop_context_values,
 )
-from continuum_swr_replay.reported.mpfc.inputs import MpfcInputs, table_hashes
+from continuum_swr_replay.reported.mpfc.inputs import MpfcInputs
 from continuum_swr_replay.reported.values import value_factory
+from continuum_swr_replay.runs.staleness import table_hashes
 
 SESSIONS = (("j1620210706_.nwb", "02_r1"), ("j1620210706_.nwb", "04_r2"))
 

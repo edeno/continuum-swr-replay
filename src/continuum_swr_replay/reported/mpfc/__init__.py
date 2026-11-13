@@ -69,7 +69,6 @@ from continuum_swr_replay.reported.mpfc.inputs import (
     default_inputs,
     read_sidecars,
     staleness,
-    table_hashes,
 )
 from continuum_swr_replay.reported.mpfc.population import (
     called_fraction_values,
@@ -92,6 +91,7 @@ from continuum_swr_replay.reported.values import (
     rel,
     value_factory,
 )
+from continuum_swr_replay.runs.staleness import table_hashes
 
 __all__ = ["default_inputs", "summarize"]
 

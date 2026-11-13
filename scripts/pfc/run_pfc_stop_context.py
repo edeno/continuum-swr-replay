@@ -79,6 +79,7 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.runs.cli import add_epoch_filters
 from continuum_swr_replay.runs.io import json_ready, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import git_commit, git_dirty
+from continuum_swr_replay.runs.staleness import table_hashes
 from continuum_swr_replay.tables.io import read_table, write_table
 
 REPO = Path(__file__).resolve().parents[2]
@@ -133,14 +134,10 @@ def selected_sessions(args: Namespace) -> list[tuple[str, str]]:
 def current_table_hashes() -> dict[str, str]:
     """The SHA-256 of the canonical event and stop tables, by the names a
     session's provenance records them under (``input_provenance``)."""
-    return {
-        "canonical_event_table_sha256": sha256_file(
-            table_path("event_table", replay_content_dir())
-        ),
-        "stop_table_sha256": sha256_file(
-            table_path("stop_table", replay_content_dir())
-        ),
-    }
+    return table_hashes(
+        table_path("event_table", replay_content_dir()),
+        table_path("stop_table", replay_content_dir()),
+    )
 
 
 def cached_is_current(provenance_path: Path, current: dict[str, str]) -> bool:

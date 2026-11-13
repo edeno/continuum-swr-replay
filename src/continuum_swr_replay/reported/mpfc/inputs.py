@@ -1,6 +1,6 @@
 """The files the mpfc summary reads, and whether the unit bundles are current:
 each bundle's provenance sidecar records the event and stop tables it was fit
-on (:func:`staleness`)."""
+on (:func:`staleness`, counted by ``runs.staleness.stale_counts``)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.staleness import stale_counts
 
 STEM = "_mPFC_modulation"
 """The canonical (at-well, sigma 3) bundle name; other cohorts and priors carry
@@ -94,21 +94,11 @@ def staleness(sidecars: list[dict[str, Any]], current: dict[str, str]) -> str | 
 
     A bundle records the SHA-256 of the canonical event table and the stop
     table it was fit on; a bundle fit on other tables describes other events.
-    ``current`` holds the current tables' (:func:`table_hashes`).
+    ``current`` holds the current tables' (``runs.staleness.table_hashes``).
     """
-    stale = {
-        name: sum(s.get(name) != sha for s in sidecars) for name, sha in current.items()
-    }
-    return _stale_note("the mPFC bundles", stale, len(sidecars))
-
-
-def table_hashes(event_table: Path, stop_table: Path) -> dict[str, str]:
-    """The SHA-256 of the current canonical event and stop tables, under the
-    names the bundles' provenance records them by."""
-    return {
-        "canonical_event_table_sha256": sha256_file(event_table),
-        "stop_table_sha256": sha256_file(stop_table),
-    }
+    return _stale_note(
+        "the mPFC bundles", stale_counts(sidecars, current), len(sidecars)
+    )
 
 
 def _stale_note(what: str, stale: dict[str, int], total: int) -> str | None:
