@@ -202,7 +202,7 @@ def test_leaf_modules_do_not_load_jax():
     )
 
 
-# The package roots that took over the old ``analysis.hippocampus``, then each
+# The package roots that took over the old hippocampus package, then each
 # of its old direct leaves that needs none of JAX, ``non_local_detector``,
 # statsmodels or dask. While the old package ``__init__`` imported its
 # submodules eagerly, every one of them loaded all four, through
