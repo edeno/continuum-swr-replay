@@ -25,9 +25,12 @@ of its threshold as equal to it, so float representation does not decide the
 outcome.
 """
 
+import sys
 from dataclasses import dataclass, fields
+from pathlib import Path
 from typing import Any
 
+import joblib
 import numpy as np
 from numpy.typing import NDArray
 
@@ -657,6 +660,43 @@ class CandidateSequences:
     def pre_merge_runs(self) -> NDArray:
         """Runs before merging; see ``SequenceAssembly.pre_merge_runs``."""
         return self.assembly.pre_merge_runs
+
+
+#: Where this package was when the stored candidate files were written (before
+#: 2026-11-13). A pickle names its classes by module path.
+_FORMER_PACKAGE = "continuum_swr_replay.analysis.hippocampus.memoryless_sequence"
+
+
+def load_candidates(path: str | Path) -> CandidateSequences:
+    """Read a run's ``{epoch_id}_memoryless_candidates.pkl``.
+
+    A file written before the package moved (``docs/history/2026-module-moves.md``)
+    names ``CandidateSequences`` and its config under the former module path;
+    those two module names are pointed at today's modules for the read. A file
+    written since needs nothing.
+
+    Parameters
+    ----------
+    path : str or Path
+        The candidates file ``detection_inputs.memoryless_output_paths`` names.
+
+    Returns
+    -------
+    CandidateSequences
+    """
+    from continuum_swr_replay.analysis.detection.memoryless_sequence import config
+
+    former = {
+        f"{_FORMER_PACKAGE}.detect": sys.modules[__name__],
+        f"{_FORMER_PACKAGE}.config": config,
+    }
+    added = [name for name in former if name not in sys.modules]
+    sys.modules.update({name: former[name] for name in added})
+    try:
+        return joblib.load(path)
+    finally:
+        for name in added:
+            del sys.modules[name]
 
 
 def detect_candidate_sequences(

@@ -498,10 +498,11 @@ The `analysis.hippocampus` package no longer re-exports names (its PEP 562 table
 gone): import each name from the module that defines it. There are no compatibility
 shims. Paths are under `src/continuum_swr_replay/`.
 
-Pickles written before the move that hold an instance of a moved class name its old
-module and no longer load: the memoryless detector's `*_memoryless_candidates.pkl`
-(`CandidateSequences`, read by `scripts/detector_comparison/run_event_features.py`)
-until `scripts/detection/run_memoryless_detection.py` is rerun.
+A pickle that holds an instance of a moved class names the class's old module. One
+kind of stored file does: the memoryless detector's `*_memoryless_candidates.pkl`
+(`CandidateSequences` and its config). Its one reader,
+`analysis/detection/memoryless_sequence/detect.py:load_candidates`, points the two
+former module names at today's modules for the read, so the stored runs still load.
 
 | Old module | New home |
 |---|---|

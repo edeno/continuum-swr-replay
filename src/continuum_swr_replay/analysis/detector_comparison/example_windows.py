@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import joblib
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -24,6 +23,7 @@ from continuum_swr_replay.analysis.detection.detection_inputs import decode_mark
 from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     CandidateSequences,
     WindowDecisions,
+    load_candidates,
     sequence_dispersion_cm,
     window_decisions,
 )
@@ -150,7 +150,7 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
     )
     environment = encoding_model["environment"]
     interior = np.asarray(environment.is_track_interior_).ravel()
-    candidates: CandidateSequences = joblib.load(
+    candidates = load_candidates(
         memoryless_dir / f"{identifier}_memoryless_candidates.pkl"
     )
     config = candidates.config

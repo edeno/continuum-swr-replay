@@ -92,7 +92,6 @@ from collections.abc import Mapping  # noqa: E402
 from pathlib import Path  # noqa: E402
 from typing import Any  # noqa: E402
 
-import joblib  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from dask.distributed import LocalCluster  # noqa: E402
@@ -109,6 +108,7 @@ from continuum_swr_replay.analysis.detection.detection_inputs import (  # noqa: 
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (  # noqa: E402
     CandidateSequences,
+    load_candidates,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (  # noqa: E402
     check_marks_match_encoding,
@@ -300,7 +300,7 @@ def _memoryless_run(
     if not available.pop():
         return None
     paths = memoryless_outputs(identifier, memoryless_dir)
-    candidates: CandidateSequences = joblib.load(paths["candidates"])
+    candidates = load_candidates(paths["candidates"])
     config = candidates.config
     if not np.array_equal(candidates.midpoint_s, window_midpoints_s(time[:-1], config)):
         raise ValueError(
