@@ -44,14 +44,14 @@ from continuum_swr_replay.analysis.behavior.choice.retrospective import (
     retrospective_alignment_by_session,
     select_event_subset,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    record_inputs,
-    write_fit_provenance,
-)
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import STOP_COHORT_RULES
 from continuum_swr_replay.analysis.shared_statistics import session_median_statistics
 from continuum_swr_replay.paths import replay_content_dir, table_path
+from continuum_swr_replay.runs.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )

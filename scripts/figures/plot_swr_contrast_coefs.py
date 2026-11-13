@@ -47,7 +47,6 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     load_per_sd_scale,
     std_factor,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import require_fresh_inputs
 from continuum_swr_replay.analysis.behavior.rate.swr_contrast_rate import home_cohort
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.paths import (
@@ -57,6 +56,7 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs.cli import fit_figure_parser
+from continuum_swr_replay.runs.fit_provenance import require_fresh_inputs
 
 
 def fit_artifact_paths() -> dict[str, Path]:

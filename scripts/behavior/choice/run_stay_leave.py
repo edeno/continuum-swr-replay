@@ -54,16 +54,16 @@ from continuum_swr_replay.analysis.behavior.choice.learning import (
     pooled_gee_role_summary,
     stop_replay_summary,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    record_inputs,
-    write_fit_provenance,
-)
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import (
     select_stop_cohort,
     stop_cohort_suffix,
 )
 from continuum_swr_replay.paths import replay_content_dir, table_path
+from continuum_swr_replay.runs.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     COVARIATE_SCHEMA_VERSION,
     require_covariate_schema,

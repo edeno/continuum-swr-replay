@@ -151,7 +151,7 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "*/decoding/results.py",
             "*/decoding/files.py",
             "*/decoding/identifiers.py",
-            "*/analysis/behavior/fit_provenance.py",
+            "*/runs/fit_provenance.py",
             "*/analysis/behavior/content/fit_outputs.py",
             "*/tables/versions.py",
             "*/tables/io.py",

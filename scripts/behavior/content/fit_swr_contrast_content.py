@@ -115,13 +115,6 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
 from continuum_swr_replay.analysis.behavior.covariate_timing import (
     assert_predictor_timing,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    git_hash as loaded_commit,
-)
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    record_inputs,
-    write_fit_provenance,
-)
 from continuum_swr_replay.analysis.behavior.fitting import poisson_estimator_name
 from continuum_swr_replay.analysis.behavior.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
@@ -139,6 +132,13 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_LADDER as PATCH_LADDER,
 )
 from continuum_swr_replay.paths import model_dir
+from continuum_swr_replay.runs.fit_provenance import (
+    git_hash as loaded_commit,
+)
+from continuum_swr_replay.runs.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
+)
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.tables.standardization import (
     save_reference,

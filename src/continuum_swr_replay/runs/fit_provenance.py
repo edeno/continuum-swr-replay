@@ -50,7 +50,7 @@ __all__ = [
     "require_fresh_inputs",
 ]
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 # One input's provenance: sha256, mtime, covariate_schema_version, hashed_at.
 InputRecord = dict[str, object]

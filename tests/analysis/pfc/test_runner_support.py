@@ -7,7 +7,6 @@ import json
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance_path
 from continuum_swr_replay.analysis.pfc.runner_support import (
     fails_convergence_gate,
     is_nonempty_file,
@@ -16,6 +15,7 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     remove_bundle,
     session_seed,
 )
+from continuum_swr_replay.runs.fit_provenance import fit_provenance_path
 
 
 class TestSessionSeed:

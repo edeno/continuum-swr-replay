@@ -43,14 +43,14 @@ from continuum_swr_replay.analysis.behavior.coefficient_statistics import (  # n
     fit_rows,
     paired_coefficient_statistics,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (  # noqa: E402
-    require_fresh_inputs,
-)
 from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
 from continuum_swr_replay.paths import figure_dir, model_dir
 from continuum_swr_replay.runs.cli import fit_figure_parser
+from continuum_swr_replay.runs.fit_provenance import (  # noqa: E402
+    require_fresh_inputs,
+)
 
 # Single source of truth: the curated covariate set is part of the MU_uncertainty
 # spec in model_specs and the populations are defined in the fitter; import them

@@ -129,7 +129,6 @@ import pandas as pd
 from distributed.deploy import Cluster
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.behavior.fit_provenance import git_hash
 from continuum_swr_replay.analysis.events.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
@@ -200,6 +199,7 @@ from continuum_swr_replay.runs.batch import (
 from continuum_swr_replay.runs.batch import run_epochs as batch_run_epochs
 from continuum_swr_replay.runs.cli import epoch_ids_matching, parse_run_id
 from continuum_swr_replay.runs.device import xla_flags
+from continuum_swr_replay.runs.fit_provenance import git_hash
 from continuum_swr_replay.runs.io import sha256_file, write_json
 from continuum_swr_replay.runs.provenance import (
     commit_label,

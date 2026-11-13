@@ -52,9 +52,6 @@ from continuum_swr_replay.analysis.behavior.coefficient_statistics import (  # n
     fit_rows,
     gated_coefficient_statistics,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (  # noqa: E402
-    require_fresh_inputs,
-)
 from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
     BIN_S,
     REWARD_HISTORY_COLUMNS,
@@ -74,6 +71,9 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs.cli import fit_figure_parser  # noqa: E402
+from continuum_swr_replay.runs.fit_provenance import (  # noqa: E402
+    require_fresh_inputs,
+)
 
 
 def all_models_path() -> Path:

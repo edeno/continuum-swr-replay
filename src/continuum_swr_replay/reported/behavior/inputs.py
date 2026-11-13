@@ -11,10 +11,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    check_fit_provenance,
-    fit_provenance_path,
-)
 from continuum_swr_replay.analysis.behavior.model_specs import (
     PER_BIN_DESIGN,
 )
@@ -26,6 +22,10 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.reported.values import (
     rel,
+)
+from continuum_swr_replay.runs.fit_provenance import (
+    check_fit_provenance,
+    fit_provenance_path,
 )
 
 

@@ -41,9 +41,6 @@ from continuum_swr_replay.analysis.behavior import (  # noqa: E402
     fit_per_bin_rate_model,
     freeze_per_bin_cohort,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (  # noqa: E402
-    require_fresh_inputs,
-)
 from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (  # noqa: E402
     attach_event_ends,
 )
@@ -68,6 +65,9 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs.cli import fit_figure_parser  # noqa: E402
+from continuum_swr_replay.runs.fit_provenance import (  # noqa: E402
+    require_fresh_inputs,
+)
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )

@@ -9,9 +9,9 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.content import session_fits
-from continuum_swr_replay.analysis.behavior.fit_provenance import check_fit_provenance
 from continuum_swr_replay.analysis.events.swr_source import SwrSourceError
 from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
+from continuum_swr_replay.runs.fit_provenance import check_fit_provenance
 from continuum_swr_replay.tables.io import write_table
 from continuum_swr_replay.tables.standardization import (
     attach_standardized,

@@ -55,16 +55,16 @@ from continuum_swr_replay.analysis.behavior.content.session_fits import (
     patch_models_for_source,
     patch_switch_models_for_source,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    record_inputs,
-    write_fit_provenance,
-)
 from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (
     fit_event_source_rate_hierarchy,
 )
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.paths import contfrag_replay_content_dir, replay_content_dir
+from continuum_swr_replay.runs.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )

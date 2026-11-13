@@ -51,10 +51,6 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 
 import numpy as np
 
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    record_inputs,
-    write_fit_provenance,
-)
 from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_NULL_DESIGN_BATCH_SIZE,
     DEFAULT_PENALTY_SIGMA,
@@ -98,6 +94,10 @@ from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import processed_data_dir, table_path
 from continuum_swr_replay.runs.batch import setup_logger
 from continuum_swr_replay.runs.cli import add_epoch_filters, filter_epoch_info
+from continuum_swr_replay.runs.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
+)
 
 # This reference is descriptive, not a selection rule. A real 430-unit A100 profile
 # projected 1,000 exact five-fold refits at about 5.2 GPU-hours per session;

@@ -28,14 +28,14 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    check_fit_provenance,
-    fit_provenance_path,
-)
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
     replay_content_dir,
     table_path,
+)
+from continuum_swr_replay.runs.fit_provenance import (
+    check_fit_provenance,
+    fit_provenance_path,
 )
 from continuum_swr_replay.tables.io import parquet_path
 

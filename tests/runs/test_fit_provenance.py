@@ -21,12 +21,13 @@ from types import ModuleType
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior import fit_provenance
 from continuum_swr_replay.analysis.behavior.content import fit_outputs
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     contrast_fit_inputs,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
+from continuum_swr_replay.paths import model_dir
+from continuum_swr_replay.runs import fit_provenance
+from continuum_swr_replay.runs.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
     git_hash,
@@ -34,10 +35,9 @@ from continuum_swr_replay.analysis.behavior.fit_provenance import (
     require_fresh_inputs,
     write_fit_provenance,
 )
-from continuum_swr_replay.paths import model_dir
 from continuum_swr_replay.tables.io import write_table
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 RATE = REPO_ROOT / "scripts" / "behavior" / "rate"
 CONTENT = REPO_ROOT / "scripts" / "behavior" / "content"
 FIGURES = REPO_ROOT / "scripts" / "figures"
@@ -219,7 +219,7 @@ def _load_copy_in(repo: Path) -> ModuleType:
     is `repo` at that moment. The copy is untracked, so it does not make the
     tree dirty.
     """
-    target = repo / "src" / "continuum_swr_replay" / "analysis" / "behavior"
+    target = repo / "src" / "continuum_swr_replay" / "runs"
     target.mkdir(parents=True)
     target = target / "fit_provenance.py"
     target.write_bytes(Path(fit_provenance.__file__).read_bytes())

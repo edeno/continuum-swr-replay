@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance_path
 from continuum_swr_replay.analysis.pfc.marked_glm import MarkedKernelResults
+from continuum_swr_replay.runs.fit_provenance import fit_provenance_path
 
 _SCRIPT = (
     Path(__file__).resolve().parents[3]

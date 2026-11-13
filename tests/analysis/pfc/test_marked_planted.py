@@ -15,7 +15,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance_path
 from continuum_swr_replay.analysis.pfc.design import event_basis_functions
 from continuum_swr_replay.analysis.pfc.heldout import assign_blocked_folds
 from continuum_swr_replay.analysis.pfc.marked_glm import (
@@ -30,6 +29,7 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     build_marked_family_ladder,
     fit_marked_family_ladder,
 )
+from continuum_swr_replay.runs.fit_provenance import fit_provenance_path
 
 SAMPLING_FREQUENCY = 500.0
 DRIVEN_CLASS = "non_local_no_SWR"

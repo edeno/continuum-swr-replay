@@ -9,14 +9,14 @@ import json
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    fit_provenance_path,
-    write_fit_provenance,
-)
 from continuum_swr_replay.analysis.behavior.model_specs import PER_BIN_DESIGN
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.reported.behavior import inputs
 from continuum_swr_replay.reported.behavior.inputs import fit_staleness
+from continuum_swr_replay.runs.fit_provenance import (
+    fit_provenance_path,
+    write_fit_provenance,
+)
 from continuum_swr_replay.tables.io import write_table
 
 

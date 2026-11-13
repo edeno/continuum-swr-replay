@@ -28,9 +28,6 @@ from continuum_swr_replay.analysis.behavior.content.fit_outputs import (
 from continuum_swr_replay.analysis.behavior.content.model_comparison import (
     run_full_hierarchy_comparison,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    require_fresh_inputs,
-)
 from continuum_swr_replay.analysis.behavior.model_specs import (
     MODEL_HIERARCHY,
 )
@@ -40,6 +37,9 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs.cli import fit_figure_parser
+from continuum_swr_replay.runs.fit_provenance import (
+    require_fresh_inputs,
+)
 from continuum_swr_replay.visualization.replay_content_plots import (
     plot_coefficient_forest,
     plot_model_hierarchy_comparison,

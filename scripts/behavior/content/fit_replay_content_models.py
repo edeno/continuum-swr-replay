@@ -119,10 +119,6 @@ from continuum_swr_replay.analysis.behavior.content_response import (
     RESPONSE_CHOICES,
     resolve_response_choice,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    record_inputs,
-    write_fit_provenance,
-)
 from continuum_swr_replay.analysis.behavior.model_specs import (
     LEAF_ONLY_N_CATEGORIES,
     MODEL_HIERARCHY,
@@ -140,6 +136,10 @@ from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
 )
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.paths import contfrag_replay_content_dir, replay_content_dir
+from continuum_swr_replay.runs.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )

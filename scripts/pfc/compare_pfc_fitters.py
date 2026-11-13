@@ -56,7 +56,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance_path
+from continuum_swr_replay.runs.fit_provenance import fit_provenance_path
 
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.

@@ -38,17 +38,17 @@ from continuum_swr_replay.analysis.behavior.content.uncertainty_content import (
     summarize_mu_coefficients,
     within_arm_horserace,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    record_inputs,
-    require_fresh_inputs,
-    write_fit_provenance,
-)
 from continuum_swr_replay.analysis.behavior.model_specs import LEAF_ONLY_N_CATEGORIES
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.paths import (
     STANDARDIZATION_REFERENCE,
     replay_content_dir,
     table_path,
+)
+from continuum_swr_replay.runs.fit_provenance import (
+    record_inputs,
+    require_fresh_inputs,
+    write_fit_provenance,
 )
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,

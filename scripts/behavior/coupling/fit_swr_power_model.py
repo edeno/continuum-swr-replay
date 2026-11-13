@@ -63,14 +63,14 @@ from continuum_swr_replay.analysis.behavior.coupling.swr_power import (
     power_cohort_records,
     power_distribution_statistics,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    record_inputs,
-    write_fit_provenance,
-)
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.analysis.hippocampus.class_or_continuum import SARLE_CUTOFF
 from continuum_swr_replay.paths import model_dir, table_path
+from continuum_swr_replay.runs.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )

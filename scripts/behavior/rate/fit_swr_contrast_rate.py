@@ -84,10 +84,6 @@ from continuum_swr_replay.analysis.behavior.covariate_timing import (  # noqa: E
 from continuum_swr_replay.analysis.behavior.covariates import (  # noqa: E402
     assert_qvals_aligned,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (  # noqa: E402
-    record_inputs,
-    write_fit_provenance,
-)
 from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
     DESCRIPTIVE_RATE_RUNGS,
 )
@@ -123,6 +119,10 @@ from continuum_swr_replay.paths import (  # noqa: E402
     model_dir,
     replay_content_dir,
     table_path,
+)
+from continuum_swr_replay.runs.fit_provenance import (  # noqa: E402
+    record_inputs,
+    write_fit_provenance,
 )
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,

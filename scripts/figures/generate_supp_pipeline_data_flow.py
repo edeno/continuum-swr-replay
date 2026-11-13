@@ -35,9 +35,6 @@ from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     gate_term_sessions,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    require_fresh_inputs,
-)
 from continuum_swr_replay.analysis.behavior.spatial_mapping import (
     map_estimate_to_arm,
 )
@@ -59,6 +56,9 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.reported.formatting import format_number
+from continuum_swr_replay.runs.fit_provenance import (
+    require_fresh_inputs,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )

@@ -51,9 +51,6 @@ from continuum_swr_replay.analysis.behavior.coefficient_statistics import (  # n
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (  # noqa: E402
     gate_term_sessions,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (  # noqa: E402
-    require_fresh_inputs,
-)
 from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
     BIN_S,
     MODEL_PER_BIN_RATE,
@@ -86,6 +83,9 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs.cli import fit_figure_parser  # noqa: E402
+from continuum_swr_replay.runs.fit_provenance import (  # noqa: E402
+    require_fresh_inputs,
+)
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )

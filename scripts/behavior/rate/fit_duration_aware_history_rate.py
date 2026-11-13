@@ -62,10 +62,6 @@ from continuum_swr_replay.analysis.behavior import (
 from continuum_swr_replay.analysis.behavior.covariate_timing import (
     assert_predictor_timing,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    record_inputs,
-    write_fit_provenance,
-)
 from continuum_swr_replay.analysis.behavior.model_specs import (
     MODEL_CROSS_HISTORY_DURATION_RATE,
     MODEL_CROSS_HISTORY_RATE,
@@ -87,6 +83,10 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
 )
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.paths import model_dir, table_path
+from continuum_swr_replay.runs.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
+)
 from continuum_swr_replay.tables.covariate_registry import require_covariate_schema
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import (

@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior import fit_provenance
+from continuum_swr_replay.runs import fit_provenance
 from continuum_swr_replay.tables.io import write_table
 
 _SPEC = importlib.util.spec_from_file_location(

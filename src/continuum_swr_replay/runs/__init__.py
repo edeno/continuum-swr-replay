@@ -7,10 +7,14 @@ nothing from ``analysis``. Importing it, or any of its modules, loads no dask:
 
 - ``io``: strict JSON, content hashes, an epoch's output set (atomic writes
   are ``tables.io.write_atomically``).
-- ``provenance``: the git checkout and environment a run ran from.
+- ``provenance``: the git checkout and environment a run ran from, and the
+  commit label and run id that name it.
+- ``fit_provenance``: the sidecar beside a fitted artifact that records the
+  input tables it was fit on, and the readers' check that they have not changed.
 - ``cli``: run ids, the decoders' shared options, the epoch filters.
-- ``batch``: the decoders' batch loop, the per-epoch task loop, per-epoch
-  logs, the NWB file release and the run folder's lock.
+- ``batch``: the decoders' batch loop, the per-epoch task loop, a run's
+  manifest kept across a resume (``RunManifest``), per-epoch logs, the NWB file
+  release and the run folder's lock.
 - ``device``: where a runner's JAX computes (``default_jax_platforms``) and the
   XLA flags of a deterministic GPU run (``xla_flags``); it imports JAX only
   when called.

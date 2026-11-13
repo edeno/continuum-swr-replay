@@ -71,13 +71,6 @@ import pandas as pd  # noqa: E402
 from dask.distributed import Client, LocalCluster  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
-from continuum_swr_replay.analysis.behavior.fit_provenance import (  # noqa: E402
-    fit_provenance_path,
-    write_fit_provenance,
-)
-from continuum_swr_replay.analysis.behavior.fit_provenance import (  # noqa: E402
-    git_hash as loaded_commit,
-)
 from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
     stop_cohort_suffix,
 )
@@ -146,6 +139,13 @@ from continuum_swr_replay.runs.batch import (  # noqa: E402
 from continuum_swr_replay.runs.cli import (  # noqa: E402
     add_epoch_filters,
     read_session_list,
+)
+from continuum_swr_replay.runs.fit_provenance import (  # noqa: E402
+    fit_provenance_path,
+    write_fit_provenance,
+)
+from continuum_swr_replay.runs.fit_provenance import (  # noqa: E402
+    git_hash as loaded_commit,
 )
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.io import write_atomically  # noqa: E402

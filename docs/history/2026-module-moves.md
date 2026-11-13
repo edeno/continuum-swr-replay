@@ -53,7 +53,7 @@ shims. Paths are under `src/continuum_swr_replay/`.
 | `analysis/replay/duration_aware_history.py` (removed: moved) | `analysis/behavior/rate/duration_aware_history.py` |
 | `analysis/replay/duration_history_simulation.py` (removed: moved) | `analysis/behavior/rate/duration_history_simulation.py` |
 | `analysis/replay/fit_outputs.py` (removed: moved) | `analysis/behavior/content/fit_outputs.py` |
-| `analysis/replay/fit_provenance.py` (removed: moved) | `analysis/behavior/fit_provenance.py` |
+| `analysis/replay/fit_provenance.py` (removed: moved) | `runs/fit_provenance.py` (by way of `analysis/behavior/`) |
 | `analysis/replay/fitting.py` (removed: moved) | `analysis/behavior/fitting.py` |
 | `analysis/replay/history_kernel_statistics.py` (removed: moved) | `analysis/behavior/rate/history_kernel_statistics.py` |
 | `analysis/replay/learning.py` (removed: moved) | `analysis/behavior/choice/learning.py` |
@@ -93,6 +93,17 @@ The sweep results the detection summary reads moved beside the summaries:
 | `docs/design/replay_detection_comparison/detection_sweep_summary.csv` (removed: moved) | `paper/reported/inputs/detection/detection_sweep_summary.csv` |
 | `docs/design/replay_detection_comparison/memoryless_comparison_recording.json` (removed: moved) | `paper/reported/inputs/detection/memoryless_comparison_recording.json` |
 | `docs/design/replay_detection_comparison/reference_check_summary.csv` (removed: moved) | `paper/reported/inputs/detection/reference_check_summary.csv` |
+
+## Run plumbing moved to runs/, 2026-11-12
+
+What a runner writes and reads about its own run (sidecars, manifests, epoch
+filters) moved out of `analysis/` into `runs/`. Paths are under
+`src/continuum_swr_replay/`.
+
+| Old home | New home |
+|---|---|
+| `analysis/behavior/fit_provenance.py` (removed: moved) | `runs/fit_provenance.py` |
+| `analysis/pfc/runner_support.filter_epoch_info`, `read_session_list` (removed: moved) | `runs/cli.py` |
 
 ## Calculations moved out of scripts, 2026-11
 

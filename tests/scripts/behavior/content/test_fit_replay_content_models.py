@@ -25,15 +25,15 @@ from continuum_swr_replay.analysis.behavior.content.cohort import (
 from continuum_swr_replay.analysis.behavior.content.session_fits import (
     LOGIT_SKIP_COLUMNS,
 )
-from continuum_swr_replay.analysis.behavior.fit_provenance import (
-    check_fit_provenance,
-    record_inputs,
-)
 from continuum_swr_replay.analysis.behavior.model_specs import (
     ModelSpec,
     default_content_model_names,
 )
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS, WELL_ARMS
+from continuum_swr_replay.runs.fit_provenance import (
+    check_fit_provenance,
+    record_inputs,
+)
 from continuum_swr_replay.tables.io import write_table
 from scripts.behavior.content import fit_replay_content_models as mod
 from tests.support._content_tables import (
