@@ -1,6 +1,6 @@
 """A session with no ``results.nc`` must not be built by default.
 
-Without a conditional posterior ``_process_session`` does not merely lose a few
+Without a conditional posterior ``build_session_tables`` does not merely lose a few
 columns: ``build_event_sequence_table`` is skipped entirely, so the per-timebin
 table is absent and with it every retrospective metric (``chosen_arm_fraction``,
 ``ends_at_next``, ``contains_path_to_next`` and the prev-arm mirrors, which are
@@ -41,4 +41,4 @@ def test_missing_posterior_is_refused_before_anything_is_loaded():
     ValueError asserted here.
     """
     with pytest.raises(ValueError, match="no results.nc"):
-        prepare_data._process_session(_session_without_posterior())
+        prepare_data.build_session_tables(_session_without_posterior())

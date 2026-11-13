@@ -357,17 +357,20 @@ def test_canonical_build_aborts_instead_of_publishing_a_partial_session_set(
         "epoch_name": "02_r1",
         "session_id": "rat20200101_02_r1_HPC",
     }
-    monkeypatch.setattr(pdm, "OUTPUT_DIR", tmp_path / "candidate")
-    monkeypatch.setattr(pdm, "find_sessions", lambda max_per_animal=None: [session])
-    monkeypatch.setattr(pdm, "load_contingency", lambda path: None)
+    # run_prepare_data points the behavioral cache at the output folder.
+    monkeypatch.setattr(pdm, "SESSION_CACHE_DIR", pdm.SESSION_CACHE_DIR)
+    monkeypatch.setattr(
+        prepare_cli, "find_sessions", lambda max_per_animal=None: [session]
+    )
+    monkeypatch.setattr(prepare_cli, "load_contingency", lambda path: None)
 
     def fail_session(*args, **kwargs):
         raise ValueError("physical-poke chain mismatch")
 
-    monkeypatch.setattr(pdm, "_process_session", fail_session)
+    monkeypatch.setattr(prepare_cli, "build_session_tables", fail_session)
 
     with pytest.raises(RuntimeError, match="No scientific tables were written"):
-        prepare_cli.main([])
+        prepare_cli.main(["--output-dir", str(tmp_path / "candidate")])
     assert not (tmp_path / "candidate").exists()
 
 
@@ -378,7 +381,7 @@ def test_cache_only_population_reuses_valid_entries_and_writes_no_tables(
     pdm.load_behavioral_context(fake_session, from_cache=False)
     assert calls["n"] == 1
 
-    pdm.populate_behavioral_context_cache([fake_session], from_cache=True)
+    prepare_cli.populate_behavioral_context_cache([fake_session], from_cache=True)
 
     assert calls["n"] == 1, "a valid versioned cache should not be re-fetched"
     assert not list(tmp_path.glob("*.parquet"))
@@ -408,7 +411,7 @@ def test_cache_only_population_fails_if_any_session_is_unavailable(monkeypatch):
             False,
         )
 
-    monkeypatch.setattr(pdm, "load_behavioral_context", one_missing)
+    monkeypatch.setattr(prepare_cli, "load_behavioral_context", one_missing)
 
     with pytest.raises(RuntimeError, match="1 of 2 session"):
-        pdm.populate_behavioral_context_cache(sessions, from_cache=True)
+        prepare_cli.populate_behavioral_context_cache(sessions, from_cache=True)

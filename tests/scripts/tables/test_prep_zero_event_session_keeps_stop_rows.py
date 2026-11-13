@@ -1,4 +1,4 @@
-"""Regression test: ``_process_session`` must not drop zero-event
+"""Regression test: the per-session table builds must not drop zero-event
 sessions before building the stop table.
 
 Both table drivers used to do::
@@ -14,7 +14,7 @@ contract explicitly includes "zero-event bouts" and the rate model
 fits ``n_selected_events`` per stop over a denominator that must include
 zero-event stops.
 
-This test extracts each driver's ``_process_session`` AST and
+This test extracts each per-session build's AST and
 verifies that the call to ``build_(_contfrag)_stop_table`` is
 *not* gated behind a ``return None`` on empty ``event_table``.
 """
@@ -81,25 +81,27 @@ def _stop_call_index_and_event_return_index(
 
 
 @pytest.mark.parametrize(
-    ("script", "stop_builder"),
+    ("script", "session_builder", "stop_builder"),
     [
         (
             "src/continuum_swr_replay/analysis/behavior/tables/prepare_data.py",
+            "build_session_tables",
             "build_stop_table",
         ),
         (
             "src/continuum_swr_replay/analysis/contfrag/prepare_data.py",
+            "build_contfrag_session_tables",
             "build_contfrag_stop_table",
         ),
     ],
 )
 def test_stop_table_built_before_any_early_return_on_empty_event_table(
-    script, stop_builder
+    script, session_builder, stop_builder
 ):
-    fn = _load_function(script, "_process_session")
+    fn = _load_function(script, session_builder)
     stop_idx, early_idx = _stop_call_index_and_event_return_index(fn, stop_builder)
     assert stop_idx is not None, (
-        f"{script}: did not find a call to {stop_builder} in _process_session"
+        f"{script}: did not find a call to {stop_builder} in {session_builder}"
     )
     if early_idx is not None:
         # If a ``return None`` on empty event_table still exists,

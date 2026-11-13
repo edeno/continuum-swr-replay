@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 """Build canonical replay-content tables from ContFrag decoding results.
 
-Command-line front end of
-:func:`continuum_swr_replay.analysis.contfrag.prepare_data.build_contfrag_tables`.
 For each session it loads the pre-saved ``*_contfrag_data_over_time.pkl``
 and ``*_contfrag_environment.pkl``, pulls ``trials`` + ``track_graph``
-from the behavioral cache or Spyglass, and calls the ContFrag table builders.
+from the behavioral cache or Spyglass, and calls the ContFrag table builders
+(:func:`continuum_swr_replay.analysis.contfrag.prepare_data.build_contfrag_session_tables`).
 
 Events are defined externally (SWR or MUA times), not by model-detected
 probability thresholding.
@@ -37,16 +36,21 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
+import time
 from collections.abc import Sequence
 from pathlib import Path
+
+import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.covariates import load_contingency
 from continuum_swr_replay.analysis.behavior.tables import (
     prepare_data as replay_prepare_data,
 )
 from continuum_swr_replay.analysis.contfrag.prepare_data import (
-    build_contfrag_tables,
-    find_sessions,
+    build_contfrag_session_tables,
+    contfrag_event_patch_table,
+    contfrag_table_basenames,
 )
 from continuum_swr_replay.paths import (
     contfrag_replay_content_dir,
@@ -54,11 +58,188 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 
+# Sibling-script import: run as a script, only this file's directory is on
+# sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.tables._table_runner import (  # noqa: E402
+    find_contfrag_sessions,
+    publish_contfrag_tables,
+)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(message)s",
     datefmt="%H:%M:%S",
 )
+
+
+def build_contfrag_tables(
+    sessions: list[dict],
+    *,
+    event_source: str,
+    brain_area: str,
+    contingency: pd.DataFrame | None,
+    from_cache: bool,
+    output_dir: Path,
+) -> dict[str, pd.DataFrame] | None:
+    """Build every session's ContFrag tables, assemble them, and publish them.
+
+    Each session goes through ``prepare_data.build_contfrag_session_tables``;
+    the per-session tables are concatenated in session order, the event-patch
+    table is projected from the whole event-arm table, and the four tables are
+    published under ``prepare_data.contfrag_table_basenames``.
+
+    Parameters
+    ----------
+    sessions : list of dict
+        From :func:`find_contfrag_sessions`, all of one brain area.
+    event_source : str
+        ``"SWR"`` or ``"MUA"``: the external detector whose events are used.
+    brain_area : str
+        The sessions' brain area, ``"HPC"``, ``"mPFC"`` or ``"OFC"``.
+    contingency : pd.DataFrame or None
+        The ``qvals_table`` (``covariates.load_contingency``) the event-arm
+        value block is joined from.
+    from_cache : bool
+        Read trials and the track graph from the behavioral cache, falling back
+        to Spyglass per session (``prepare_data.load_behavioral_context``).
+    output_dir : Path
+        Where the four tables are published.
+
+    Returns
+    -------
+    dict of str to pd.DataFrame or None
+        The published tables (:func:`publish_contfrag_tables`), or None when no
+        session produced tables or stop/event count conservation fails, in
+        which case nothing is written.
+
+    Raises
+    ------
+    RuntimeError
+        If any session failed to build; nothing is written.
+    """
+    t0 = time.time()
+    all_event_tables: list[pd.DataFrame] = []
+    all_event_arm_tables: list[pd.DataFrame] = []
+    all_stop_tables: list[pd.DataFrame] = []
+
+    skipped: list[tuple[str, str, str]] = []
+    for i, session in enumerate(sessions):
+        nwb = session["nwb_file_name"]
+        epoch = session["epoch_name"]
+
+        try:
+            result = build_contfrag_session_tables(
+                session,
+                event_source,
+                contingency=contingency,
+                from_cache=from_cache,
+            )
+        except (FileNotFoundError, OSError, ValueError) as e:
+            logging.warning("skip %s %s: %s", nwb, epoch, e)
+            skipped.append((nwb, epoch, str(e)))
+            continue
+
+        if result is None:
+            # Behavioral context / track graph unavailable. This is a failure,
+            # not a benign skip: count it toward the fail-closed gate below so a
+            # dropped session cannot leave a complete-looking table set (mirrors
+            # the Replay driver, prepare_replay_content_data.run_prepare_data).
+            reason = "behavioral context or track graph unavailable"
+            logging.warning("skip %s %s: %s", nwb, epoch, reason)
+            skipped.append((nwb, epoch, reason))
+            continue
+
+        all_event_tables.append(result["event_table"])
+        all_event_arm_tables.append(result["event_arm_table"])
+        all_stop_tables.append(result["stop_table"])
+
+        if (i + 1) % 10 == 0:
+            elapsed = time.time() - t0
+            remaining = elapsed / (i + 1) * (len(sessions) - i - 1)
+            logging.info(
+                "[%d/%d] %ds elapsed, ~%ds remaining",
+                i + 1,
+                len(sessions),
+                int(elapsed),
+                int(remaining),
+            )
+
+    if skipped:
+        logging.error(
+            "SKIPPED %d/%d session(s) — value block / tables are MISSING these:",
+            len(skipped),
+            len(sessions),
+        )
+        for nwb, epoch, reason in skipped:
+            logging.error("  skipped %s %s: %s", nwb, epoch, reason)
+        raise RuntimeError(
+            "ContFrag build is incomplete: "
+            f"{len(skipped)} of {len(sessions)} session(s) failed. "
+            "No scientific tables were written."
+        )
+
+    if not all_event_tables:
+        logging.error("no sessions produced data")
+        return None
+
+    event_table_all = pd.concat(all_event_tables, ignore_index=True)
+    event_arm_table_all = pd.concat(all_event_arm_tables, ignore_index=True)
+    stop_table_all = pd.concat(all_stop_tables, ignore_index=True)
+
+    session_cols = ["animal", "session_date", "epoch"]
+    logging.info(
+        "events: %d, event_arm rows: %d, stops: %d, sessions: %d",
+        len(event_table_all),
+        len(event_arm_table_all),
+        len(stop_table_all),
+        event_table_all.groupby(session_cols).ngroups,
+    )
+
+    # Cross-table invariant: Σ stop_table.n_selected_events == len(event_table)
+    sum_n_events = int(stop_table_all["n_selected_events"].sum())
+    if sum_n_events != len(event_table_all):
+        logging.error(
+            "cross-table drift: Σ stop_table.n_selected_events = %d, "
+            "len(event_table) = %d — refusing to write output",
+            sum_n_events,
+            len(event_table_all),
+        )
+        return None
+    logging.info(
+        "cross-table invariant OK: Σ n_selected_events == len(event_table) == %d",
+        len(event_table_all),
+    )
+
+    # Collapse to the event-patch table for the patch-level hierarchy.
+    # Built from the concatenated frames so event_id is globally unique
+    # (the ContFrag hash already folds in brain_area + event_source),
+    # which build_event_patch_table requires. Provenance is re-stamped
+    # because the helper carries the canonical session keys.
+    event_patch_table_all = contfrag_event_patch_table(
+        event_table_all,
+        event_arm_table_all,
+        event_source=event_source,
+        brain_area=brain_area,
+    )
+    logging.info(
+        "event_patch rows: %d (= 3 × %d events)",
+        len(event_patch_table_all),
+        event_table_all.groupby(session_cols)["event_id"].nunique().sum(),
+    )
+
+    # Per-brain-area filenames so HPC and mPFC prep runs don't overwrite each
+    # other. Built here from decode frames read through the SWR source.
+    tables = publish_contfrag_tables(
+        event_table_all,
+        event_arm_table_all,
+        event_patch_table_all,
+        stop_table_all,
+        output_dir=output_dir,
+        basenames=contfrag_table_basenames(event_source, brain_area),
+    )
+    logging.info("total time: %ds", int(time.time() - t0))
+    return tables
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -142,7 +323,7 @@ def configure_paths(args: argparse.Namespace) -> tuple[Path, Path]:
     """Resolve the output and replay-content roots, and set the behavioral cache.
 
     Sets ``replay_prepare_data.SESSION_CACHE_DIR``, the cache that
-    ``_process_session`` reads trials and the track graph from, to the
+    ``build_contfrag_session_tables`` reads trials and the track graph from, to the
     resolved ``--behavior-cache-dir`` when given, else to
     ``<replay_content_dir>/_session_cache``.
 
@@ -173,7 +354,9 @@ def main(argv: Sequence[str] | None = None):
     output_dir, replay_content_dir = configure_paths(args)
 
     max_per_animal = 2 if args.test else args.max_per_animal
-    sessions = find_sessions(max_per_animal=max_per_animal, brain_area=args.brain_area)
+    sessions = find_contfrag_sessions(
+        max_per_animal=max_per_animal, brain_area=args.brain_area
+    )
     if args.animal is not None:
         sessions = [
             session

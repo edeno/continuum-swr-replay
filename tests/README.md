@@ -193,8 +193,8 @@ def test_parse(filename, animal):
 Import what you test. A package module imports without Spyglass, so its
 functions are tested by a plain import, with the Spyglass-backed steps replaced
 by `monkeypatch`
-([`test_prep_event_sequence_always_written.py`](../tests/analysis/behavior/tables/test_prep_event_sequence_always_written.py)
-runs `run_prepare_data` that way).
+([`test_prep_event_sequence_always_written.py`](../tests/scripts/tables/test_prep_event_sequence_always_written.py)
+runs the replay table driver's `run_prepare_data` that way).
 
 A few older tests still parse a file with `ast` and `exec` one function into an
 isolated namespace, or inspect a function's syntax tree, instead of importing it.
@@ -205,8 +205,8 @@ They break on any restructuring of the file:
 - [`test_figure_script_fixes.py`](../tests/scripts/figures/test_figure_script_fixes.py)
   (`scripts/figures/plot_swr_contrast_coefs.py`, its plotting functions);
 - [`test_prep_zero_event_session_keeps_stop_rows.py`](../tests/scripts/tables/test_prep_zero_event_session_keeps_stop_rows.py)
-  (the syntax of `_process_session` in `analysis/behavior/tables/prepare_data.py`
-  and `analysis/contfrag/prepare_data.py`);
+  (the syntax of `build_session_tables` in `analysis/behavior/tables/prepare_data.py`
+  and `build_contfrag_session_tables` in `analysis/contfrag/prepare_data.py`);
 - [`test_contfrag_hash_safety.py`](../tests/analysis/contfrag/test_contfrag_hash_safety.py)
   (`analysis/contfrag/tables.py` and `tables/event_ids.py`, both importable now).
 

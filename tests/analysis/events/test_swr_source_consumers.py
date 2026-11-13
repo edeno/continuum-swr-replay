@@ -273,21 +273,20 @@ def test_the_replay_tables_build_on_the_sources_labels(
     monkeypatch.setattr(prepare_data, "validate_dot_event_contract", recorder(seen))
 
     with pytest.raises(_Stop):
-        prepare_data._process_session(saved_decode)
+        prepare_data.build_session_tables(saved_decode)
 
     assert_source_labels(seen[0])
 
 
 def test_the_stop_only_bootstrap_builds_on_the_sources_labels(
-    source, saved_decode, monkeypatch, tmp_path
+    source, saved_decode, monkeypatch, tmp_path, offline
 ):
-    from continuum_swr_replay.analysis.behavior.tables import prepare_data
-
+    script = offline("scripts.tables.prepare_replay_content_data")
     seen: list = []
-    monkeypatch.setattr(prepare_data, "validate_dot_event_contract", recorder(seen))
+    monkeypatch.setattr(script, "validate_dot_event_contract", recorder(seen))
 
     with pytest.raises(_Stop):
-        prepare_data.build_stop_table_scope(
+        script.build_stop_table_scope(
             [saved_decode], from_cache=True, output_dir=tmp_path / "out"
         )
 
@@ -303,7 +302,7 @@ def test_the_contfrag_tables_build_on_the_sources_labels(
     monkeypatch.setattr(prepare_data, "validate_dot_event_contract", recorder(seen))
 
     with pytest.raises(_Stop):
-        prepare_data._process_session(saved_decode, "SWR")
+        prepare_data.build_contfrag_session_tables(saved_decode, "SWR")
 
     assert_source_labels(seen[0])
 
@@ -317,7 +316,7 @@ def test_the_contfrag_covariate_refresh_builds_on_the_sources_labels(
     monkeypatch.setattr(prepare_data, "validate_dot_event_contract", recorder(seen))
 
     with pytest.raises(_Stop):
-        prepare_data._rebuild_session(
+        prepare_data.rebuild_contfrag_session_tables(
             saved_decode,
             event_source="SWR",
             contingency=pd.DataFrame(),
@@ -526,20 +525,19 @@ def _stop_frame(stamp: str | None = None) -> pd.DataFrame:
 
 
 def test_the_replay_tables_are_published_with_the_sources_stamp(
-    source, monkeypatch, tmp_path
+    source, monkeypatch, tmp_path, offline
 ):
-    from continuum_swr_replay.analysis.behavior.tables import prepare_data
-
+    script = offline("scripts.tables._table_runner")
     published: dict = {}
     monkeypatch.setattr(
-        prepare_data,
+        script,
         "publish_swr_table",
         lambda frame, path, *, table, basename: published.setdefault(
             basename, dict(frame.attrs)
         ),
     )
 
-    prepare_data._publish_canonical_tables(
+    script.publish_replay_tables(
         (
             ("stop_table", "stop", _stop_frame()),
             ("event_table", "event", _stop_frame()),
@@ -554,20 +552,19 @@ def test_the_replay_tables_are_published_with_the_sources_stamp(
 
 
 def test_the_stop_only_bootstrap_publishes_with_the_sources_stamp(
-    source, saved_decode, monkeypatch, tmp_path
+    source, saved_decode, monkeypatch, tmp_path, offline
 ):
-    from continuum_swr_replay.analysis.behavior.tables import prepare_data
-
+    script = offline("scripts.tables.prepare_replay_content_data")
     monkeypatch.setattr(
-        prepare_data,
+        script,
         "load_behavioral_context",
         lambda session, from_cache: (pd.DataFrame(), pd.DataFrame(), object(), True),
     )
     monkeypatch.setattr(
-        prepare_data, "build_stop_table", lambda *args, **kwargs: _stop_frame()
+        script, "build_stop_table", lambda *args, **kwargs: _stop_frame()
     )
 
-    prepare_data.build_stop_table_scope(
+    script.build_stop_table_scope(
         [saved_decode], from_cache=True, output_dir=tmp_path / "out"
     )
 
@@ -621,11 +618,11 @@ def test_the_stop_table_rebuild_refuses_an_event_table_from_another_source(
 
 @pytest.mark.parametrize("stale_shard", [False, True], ids=["current", "stale"])
 def test_the_stop_shard_assembly_needs_every_shard_from_the_source(
-    source, monkeypatch, tmp_path, stale_shard
+    source, monkeypatch, offline, tmp_path, stale_shard
 ):
-    from continuum_swr_replay.analysis.behavior.tables.prepare_data import (
-        assemble_replay_stop_shards,
-    )
+    assemble_replay_stop_shards = offline(
+        "scripts.tables.assemble_replay_content_shards"
+    ).assemble_replay_stop_shards
 
     shards = []
     for index, stamp in enumerate(

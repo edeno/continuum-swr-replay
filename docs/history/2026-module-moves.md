@@ -111,6 +111,10 @@ filters) moved out of `analysis/` into `runs/`. Paths are under
 | `reported/mpfc/inputs.table_hashes` (removed: moved) | `runs/staleness.py` |
 | `analysis/behavior/contrast_aggregation.load_per_sd_scale`, `load_fit_time_sd_reference` (removed: moved) | `runs/fit_provenance.py` |
 | `analysis/behavior/covariates/qvals_table.run_build_qvals_table`, `_fetch_model_df` (removed: moved) | `scripts/behavior/build_qvals_table.py`; the table steps it calls stay in `qvals_table` (`prepare_model_values`, `build_animal`, `stop_mapping_agreement`, `require_complete_mapping`, `standardize_qvals_table`) |
+| `analysis/behavior/tables/prepare_data.run_prepare_data`, `populate_behavioral_context_cache`, `build_stop_table_scope` and the session loop (removed: moved) | `scripts/tables/prepare_replay_content_data.py`; the per-session build and the corpus steps stay in `prepare_data` (`_process_session` renamed `build_session_tables`; `assemble_canonical_tables`, `standardize_event_arm`) |
+| `analysis/behavior/tables/prepare_data.assemble_replay_content_shards`, `assemble_replay_stop_shards` (removed: moved) | `scripts/tables/assemble_replay_content_shards.py` |
+| `analysis/behavior/tables/prepare_data.find_sessions`, `read_disjoint_shards`, `_publish_canonical_tables`; `analysis/contfrag/prepare_data.find_sessions`, `publish_contfrag_tables` (removed: moved) | `scripts/tables/_table_runner.py` (`find_sessions`, `read_disjoint_shards`, `publish_replay_tables`, `find_contfrag_sessions`, `publish_contfrag_tables`) |
+| `analysis/contfrag/prepare_data.build_contfrag_tables`, `assemble_contfrag_shards`, `refresh_contfrag_behavioral_covariates` (removed: moved) | `scripts/tables/prepare_contfrag_replay_content_data.py`, `assemble_contfrag_shards.py`, `refresh_contfrag_behavioral_covariates.py`; the per-session builds stay in `contfrag/prepare_data` (`_process_session` renamed `build_contfrag_session_tables`, `_rebuild_session` renamed `rebuild_contfrag_session_tables`; the event-patch projection the three drivers repeated is `contfrag_event_patch_table`) |
 
 ## Calculations moved out of scripts, 2026-11
 

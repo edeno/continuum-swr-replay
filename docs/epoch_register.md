@@ -147,8 +147,8 @@ once its decodes exist and its entry is changed to `analysed`.
 | artifact runner (`run_artifact_detection.py`) | `analysed_epochs(include_pending=..., include_sustained_noise=True)`: the analysed epochs, the pending ones with `--include-pending`, and always the `SUSTAINED_NOISE` ones, so that a new run re-tests them. `--pending-only` runs the pending ones alone. |
 | SWR runner (`run_swr_detection.py`) | `epochs_to_run(args.pending_only)`; no skip list of its own |
 | Widloski runner (`run_memoryless_detection.py`, `--all` / `--animal`) | `epochs_to_run(args.pending_only)`. An epoch it selects with no decode under `--root` is run and recorded as failed. A decode of any other epoch is left out and recorded as skipped. `--epoch-id` runs what it names. |
-| replay table builders (`prepare_data.find_sessions`, used by `prepare_replay_content_data.py`, `build_timebin_tables.py`, `regenerate_stop_table.py`) | `analysed_epochs()`; an analysed epoch with no decode stops the build |
-| ContFrag table builders (`prepare_contfrag_replay_content_data.py`, `refresh_contfrag_behavioral_covariates.py`) | `analysed_epochs()`; for HPC an analysed epoch with no decode stops the build |
+| replay table builders (`scripts/tables/_table_runner.find_sessions`, used by `prepare_replay_content_data.py`, `build_timebin_tables.py`, `regenerate_stop_table.py`) | `analysed_epochs()`; an analysed epoch with no decode stops the build |
+| ContFrag table builders (`_table_runner.find_contfrag_sessions`, used by `prepare_contfrag_replay_content_data.py`, `refresh_contfrag_behavioral_covariates.py`) | `analysed_epochs()`; for HPC an analysed epoch with no decode stops the build |
 | PFC runner (`run_pfc_analysis_bandit.py`) | `analysed_epochs()`, then the PFC-level condition below |
 | HPC raw stats (`scripts/checks/compute_hpc_raw_stats.py`) | `analysed_epochs()` |
 | decode-folder readers (see below) | `analysed_decode_files()`, from the register alone |

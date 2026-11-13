@@ -1,9 +1,9 @@
 """The table builders take their sessions from the epoch register, not the disk.
 
-``prepare_data.find_sessions`` serves ``prepare_replay_content_data.py``,
+``_table_runner.find_sessions`` serves ``prepare_replay_content_data.py``,
 ``build_timebin_tables.py`` and ``regenerate_stop_table.py``; the ContFrag
-build has its own ``find_sessions`` (``analysis.contfrag.prepare_data``), which
-the behavioral-covariate refresh also uses. Each lists the register's analysed
+build has its own, ``_table_runner.find_contfrag_sessions``, which the
+behavioral-covariate refresh also uses. Each lists the register's analysed
 epochs, and refuses to start when one of them has no decode, rather than
 building tables that silently cover fewer epochs than the register.
 
@@ -18,9 +18,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.tables import prepare_data as pdm
-from continuum_swr_replay.analysis.contfrag import prepare_data as contfrag_prepare
 from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
+from scripts.tables import _table_runner as runner
 
 
 def _analysed(*keys: tuple[str, str]):
@@ -46,14 +45,14 @@ def _decode(root: Path, identifier: str, dot_suffix: str, *, results: bool) -> N
 
 
 # --------------------------------------------------------------------------
-# prepare_data.find_sessions
+# _table_runner.find_sessions
 # --------------------------------------------------------------------------
 
 
 def test_replay_sessions_are_the_registers_analysed_epochs(tmp_path, monkeypatch):
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
-        pdm,
+        runner,
         "analysed_epochs",
         _analysed(("b20200102_.nwb", "04_r2"), ("a20200101_.nwb", "02_r1")),
     )
@@ -62,7 +61,7 @@ def test_replay_sessions_are_the_registers_analysed_epochs(tmp_path, monkeypatch
     # a decode on disk whose epoch the register does not analyse
     _decode(tmp_path, "a20200101_06_r3_HPC", "80_data_over_time.pkl", results=True)
 
-    sessions = pdm.find_sessions()
+    sessions = runner.find_sessions()
 
     assert sessions == [
         {
@@ -88,12 +87,12 @@ def test_replay_sessions_keep_the_first_of_each_animal(tmp_path, monkeypatch):
     keys = [("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")]
     keys.append(("b20200102_.nwb", "02_r1"))
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
-    monkeypatch.setattr(pdm, "analysed_epochs", _analysed(*keys))
+    monkeypatch.setattr(runner, "analysed_epochs", _analysed(*keys))
     for nwb_file_name, epoch in keys:
         identifier = f"{nwb_file_name.removesuffix('_.nwb')}_{epoch}_HPC"
         _decode(tmp_path, identifier, "80_data_over_time.pkl", results=True)
 
-    sessions = pdm.find_sessions(max_per_animal=1)
+    sessions = runner.find_sessions(max_per_animal=1)
 
     assert [s["session_id"] for s in sessions] == [
         "a20200101_02_r1_HPC",
@@ -107,24 +106,24 @@ def test_an_analysed_epoch_without_its_decode_stops_the_replay_build(
 ):
     keys = [("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")]
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
-    monkeypatch.setattr(pdm, "analysed_epochs", _analysed(*keys))
+    monkeypatch.setattr(runner, "analysed_epochs", _analysed(*keys))
     for identifier in ("a20200101_02_r1_HPC", "a20200101_04_r2_HPC"):
         _decode(tmp_path, identifier, "80_data_over_time.pkl", results=True)
     (tmp_path / f"a20200101_04_r2_HPC_{missing}").unlink()
 
     with pytest.raises(FileNotFoundError, match="a20200101_04_r2_HPC"):
-        pdm.find_sessions()
+        runner.find_sessions()
 
 
 # --------------------------------------------------------------------------
-# The ContFrag build's find_sessions
+# _table_runner.find_contfrag_sessions
 # --------------------------------------------------------------------------
 
 
 def test_contfrag_sessions_are_the_registers_analysed_epochs(tmp_path, monkeypatch):
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
-        contfrag_prepare, "analysed_epochs", _analysed(("a20200101_.nwb", "02_r1"))
+        runner, "analysed_epochs", _analysed(("a20200101_.nwb", "02_r1"))
     )
     _decode(
         tmp_path, "a20200101_02_r1_HPC_contfrag", "data_over_time.pkl", results=True
@@ -133,7 +132,7 @@ def test_contfrag_sessions_are_the_registers_analysed_epochs(tmp_path, monkeypat
         tmp_path, "a20200101_06_r3_HPC_contfrag", "data_over_time.pkl", results=True
     )
 
-    sessions = contfrag_prepare.find_sessions(brain_area="HPC")
+    sessions = runner.find_contfrag_sessions(brain_area="HPC")
 
     assert sessions == [
         {
@@ -152,7 +151,7 @@ def test_an_analysed_epoch_without_its_hpc_contfrag_decode_stops_the_build(
 ):
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
-        contfrag_prepare,
+        runner,
         "analysed_epochs",
         _analysed(("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")),
     )
@@ -161,7 +160,7 @@ def test_an_analysed_epoch_without_its_hpc_contfrag_decode_stops_the_build(
     )
 
     with pytest.raises(FileNotFoundError, match="a20200101_04_r2_HPC_contfrag"):
-        contfrag_prepare.find_sessions(brain_area="HPC")
+        runner.find_contfrag_sessions(brain_area="HPC")
 
 
 def test_a_cortical_contfrag_build_keeps_the_analysed_epochs_it_decoded(
@@ -171,7 +170,7 @@ def test_a_cortical_contfrag_build_keeps_the_analysed_epochs_it_decoded(
     decode for the area is outside that area's cohort, not missing."""
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
-        contfrag_prepare,
+        runner,
         "analysed_epochs",
         _analysed(("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")),
     )
@@ -179,7 +178,7 @@ def test_a_cortical_contfrag_build_keeps_the_analysed_epochs_it_decoded(
         tmp_path, "a20200101_04_r2_mPFC_contfrag", "data_over_time.pkl", results=True
     )
 
-    sessions = contfrag_prepare.find_sessions(brain_area="mPFC")
+    sessions = runner.find_contfrag_sessions(brain_area="mPFC")
 
     assert [(s["epoch_name"], s["brain_area"]) for s in sessions] == [("04_r2", "mPFC")]
 

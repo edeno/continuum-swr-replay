@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 import time
 from collections.abc import Sequence
 from pathlib import Path
@@ -25,7 +26,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.tables.prepare_data import find_sessions
 from continuum_swr_replay.analysis.behavior.tables.timebin_tables import (  # noqa: E402
     ONSETS_IN_EXCLUDED_BINS_ATTR,
     build_event_onset_table,
@@ -41,6 +41,11 @@ from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.data_types import SessionDataKeys  # noqa: E402
 from continuum_swr_replay.paths import replay_content_dir
 from continuum_swr_replay.tables.session_keys import n_sessions  # noqa: E402
+
+# Sibling-script import: run as a script, only this file's directory is on
+# sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.tables._table_runner import find_sessions  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"

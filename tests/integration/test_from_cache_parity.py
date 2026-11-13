@@ -2,11 +2,11 @@
 
 The unit tests in ``test_prepare_data_cache.py`` pin the cache *seam*
 (:func:`load_behavioral_context`) with fake inputs. This slow test closes the
-end-to-end gap the reviewer flagged: it runs the *whole* :func:`_process_session`
+end-to-end gap the reviewer flagged: it runs the *whole* :func:`build_session_tables`
 (all four table builders) twice for one real session — once populating the cache from
 Spyglass (``from_cache=False``), once served entirely from the cache
 (``from_cache=True``) — and asserts every output frame is identical. A future change to
-``_process_session``'s control flow (e.g. reordering the cache write relative to a
+``build_session_tables``'s control flow (e.g. reordering the cache write relative to a
 builder) that broke cache/no-cache parity would fail here.
 
 Needs materialized session inputs on disk and a reachable Spyglass (the cold pass needs
@@ -20,6 +20,8 @@ import pytest
 
 from continuum_swr_replay.analysis.behavior.covariates import load_contingency
 from continuum_swr_replay.analysis.behavior.tables import prepare_data as pdm
+from continuum_swr_replay.paths import replay_content_dir
+from scripts.tables._table_runner import find_sessions
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 
@@ -27,26 +29,26 @@ _FRAMES = ("event_table", "event_arm_table", "stop_table", "event_sequence_table
 
 
 def test_process_session_cache_parity(tmp_path, monkeypatch):
-    sessions = pdm.find_sessions(max_per_animal=1)
+    sessions = find_sessions(max_per_animal=1)
     assert sessions, "no materialized session inputs on disk"
     session = sessions[0]
 
     # Isolate the cache so the test never touches the canonical _session_cache.
     monkeypatch.setattr(pdm, "SESSION_CACHE_DIR", tmp_path)
     try:
-        cont = load_contingency(pdm.output_dir() / "qvals_table.parquet")
+        cont = load_contingency(replay_content_dir() / "qvals_table.parquet")
     except ValueError as exc:
         stale = ("legacy or mismatched covariate schema", "covariate schema version")
         if not any(reason in str(exc) for reason in stale):
             raise
         pytest.fail(f"materialized qvals requires canonical regeneration: {exc}")
 
-    cold = pdm._process_session(session, contingency=cont, from_cache=False)
+    cold = pdm.build_session_tables(session, contingency=cont, from_cache=False)
     assert cold is not None, "session could not be loaded (missing trials/track_graph)"
 
     # Cache must now exist; warm pass reads it (no Spyglass).
     assert pdm.behavioral_context_cache_path(session).exists()
-    warm = pdm._process_session(session, contingency=cont, from_cache=True)
+    warm = pdm.build_session_tables(session, contingency=cont, from_cache=True)
     assert warm is not None
 
     for key in _FRAMES:

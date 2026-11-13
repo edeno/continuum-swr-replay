@@ -27,9 +27,6 @@ from continuum_swr_replay.analysis.behavior import (  # noqa: E402
 from continuum_swr_replay.analysis.behavior.rate.per_stop_rate_model import (  # noqa: E402
     fit_per_stop_rate_model,
 )
-from continuum_swr_replay.analysis.behavior.tables.prepare_data import (  # noqa: E402
-    find_sessions,
-)
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.data_types import SessionDataKeys  # noqa: E402
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path  # noqa: E402
@@ -37,6 +34,9 @@ from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.tables._table_runner import find_sessions  # noqa: E402
 
 K = 5
 RC = REPLAY_CONTENT_DIR

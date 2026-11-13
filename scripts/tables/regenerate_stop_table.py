@@ -20,14 +20,15 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 import time
 from collections.abc import Sequence
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.behavior import build_stop_table  # noqa: E402
-from continuum_swr_replay.analysis.behavior.tables.prepare_data import find_sessions
 from continuum_swr_replay.analysis.behavior.tables.tables_stop import (  # noqa: E402
     add_nonlocal_swr_split,
 )
@@ -49,6 +50,11 @@ from continuum_swr_replay.tables.io import (
     write_table,
 )
 from continuum_swr_replay.tables.session_keys import session_key_set
+
+# Sibling-script import: run as a script, only this file's directory is on
+# sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.tables._table_runner import find_sessions  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"

@@ -22,7 +22,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.behavior.tables import prepare_data as pdm
 from continuum_swr_replay.analysis.events.cohort_selection import events_in_stops
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_canonical_events,
@@ -30,6 +29,7 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
 from continuum_swr_replay.analysis.pfc.event_sets import build_session_event_sets
+from scripts.tables._table_runner import find_sessions
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 
@@ -37,7 +37,7 @@ pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 def test_the_event_sets_are_the_shipped_tables_rows_for_that_session():
     from continuum_swr_replay.analysis.hippocampus import load_results
 
-    sessions = [s for s in pdm.find_sessions(max_per_animal=1) if s["results_file"]]
+    sessions = [s for s in find_sessions(max_per_animal=1) if s["results_file"]]
     assert sessions, "no session with decode results on disk"
     session = sessions[0]
     nwb_file_name, epoch_name = session["nwb_file_name"], session["epoch_name"]

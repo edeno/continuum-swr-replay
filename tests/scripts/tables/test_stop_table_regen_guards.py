@@ -1,6 +1,6 @@
 """Fail-closed guards on the two stop-table writers that hit the prod root.
 
-Both ``prepare_data.build_stop_table_scope`` (the ``--stop-only`` qvals
+Both ``prepare_replay_content_data.build_stop_table_scope`` (the ``--stop-only`` qvals
 bootstrap) and ``scripts/tables/regenerate_stop_table.py`` write straight to
 the canonical ``replay_content`` root, outside the staged manifest gate. These
 tests pin the two ways that can corrupt the atomic event/stop set: the
@@ -15,10 +15,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.behavior.tables.prepare_data import (
+from continuum_swr_replay.tables.io import write_table
+from scripts.tables.prepare_replay_content_data import (
     _refuse_to_clobber_complete_stop_table,
 )
-from continuum_swr_replay.tables.io import write_table
 from scripts.tables.regenerate_stop_table import _assert_matches_event_table
 
 

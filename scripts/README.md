@@ -62,6 +62,7 @@ them importable.
 - `refresh_contfrag_behavioral_covariates.py` — rebuild the ContFrag tables, reusing a preserved bundle's posterior aggregates.
 - `write_regeneration_manifest.py` — validate candidate covariate bundles and write the release manifest.
 - `convert_tables_to_parquet.py` — the one-time pickle-to-parquet migration of the tables.
+- `_table_runner.py` — not a script: the session selection, shard reading and publishing the drivers above share.
 
 ## `behavior/rate/` — event-rate models and their plots
 - `fit_per_bin_rate_models.py`, `fit_per_stop_rate_models.py` — Family B / A rate ladders ([../docs/rate_models.md](../docs/rate_models.md)).

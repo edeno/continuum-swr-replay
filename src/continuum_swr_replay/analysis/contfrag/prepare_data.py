@@ -1,22 +1,18 @@
-"""Build the ContFrag replay-content tables across sessions.
+"""The per-session ContFrag table build.
 
-Driver over the per-session builders in
-:mod:`continuum_swr_replay.analysis.contfrag.tables`: for each session it loads
-the saved ContFrag decode (``*_contfrag_data_over_time.pkl``,
-``*_contfrag_environment.pkl`` and the combined posterior of
-``*_contfrag_results.nc``), the session's trials and track graph from the
-behavioral cache that the replay build shares
-(``analysis.behavior.tables.prepare_data.load_behavioral_context``), builds the
-event, event-arm and stop tables, and publishes them with the event-patch table
-under per-(event source, brain area) basenames.
-:func:`build_contfrag_tables` is the whole run; its command-line front end is
-``scripts/tables/prepare_contfrag_replay_content_data.py``, where the outputs
-and flags are documented.
-
-Two other routes publish the same tables: :func:`assemble_contfrag_shards`
-joins per-animal builds, and :func:`refresh_contfrag_behavioral_covariates`
-rebuilds everything but the posterior aggregates, which it copies from a
-preserved bundle.
+:func:`build_contfrag_session_tables` builds one session's event, event-arm and
+stop tables with the builders in
+:mod:`continuum_swr_replay.analysis.contfrag.tables`, from the saved ContFrag
+decode (``*_contfrag_data_over_time.pkl``, ``*_contfrag_environment.pkl`` and
+the combined posterior of ``*_contfrag_results.nc``) and the session's trials
+and track graph from the behavioral cache that the replay build shares
+(``analysis.behavior.tables.prepare_data.load_behavioral_context``).
+:func:`rebuild_contfrag_session_tables` builds the same tables without the
+posterior, carrying its aggregates over from a preserved bundle, and
+:func:`contfrag_event_patch_table` projects the event-patch table from the
+joined event-arm table. The table drivers in ``scripts/tables`` (the session
+loops, the shard assembly, the covariate refresh and the publishing) call these,
+under the basenames of :func:`contfrag_table_basenames`.
 
 Events are defined externally (SWR or MUA times), not by model-detected
 probability thresholding.
@@ -24,24 +20,16 @@ probability thresholding.
 
 from __future__ import annotations
 
-import logging
 import pickle
-import time
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.behavior.covariates import load_contingency
 from continuum_swr_replay.analysis.behavior.tables import (
     prepare_data as replay_prepare_data,
 )
 from continuum_swr_replay.analysis.behavior.tables.summaries import (
     arm_fraction_from_event_total,
-)
-from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
-    validate_event_arm_table,
-    validate_event_patch_table,
 )
 from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
     build_event_patch_table,
@@ -55,35 +43,14 @@ from continuum_swr_replay.analysis.contfrag.tables import (
     build_contfrag_stop_table,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (
-    publish_swr_table,
     read_dot_with_swr_source,
-    require_swr_source,
-    stamp_swr_source,
 )
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
-from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.decoding.identifiers import (
-    CONTFRAG_SUFFIX,
-    format_epoch_identifier,
-    parse_nwb_filename,
-)
+from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.decoding.results import open_results
-from continuum_swr_replay.paths import (
-    BASENAME_TO_TABLE,
-    processed_data_dir,
-    table_path,
-)
 from continuum_swr_replay.tables.columns import require_columns
-from continuum_swr_replay.tables.covariate_registry import (
-    stamp_covariate_schema,
-)
-from continuum_swr_replay.tables.io import read_table
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
-
-LOGGER = logging.getLogger(__name__)
 
 
 def contfrag_table_basenames(event_source: str, brain_area: str) -> dict[str, str]:
@@ -103,139 +70,12 @@ def contfrag_table_basenames(event_source: str, brain_area: str) -> dict[str, st
     }
 
 
-def publish_contfrag_tables(
-    event_table: pd.DataFrame,
-    event_arm_table: pd.DataFrame,
-    event_patch_table: pd.DataFrame,
-    stop_table: pd.DataFrame,
-    *,
-    output_dir: Path,
-    basenames: dict[str, str],
-) -> dict[str, pd.DataFrame]:
-    """Stamp the four ContFrag tables and publish them to ``output_dir``.
-
-    Each table is stamped with its covariate schema and the SWR source, then
-    written through ``publish_canonical`` under its name in ``basenames``
-    (from :func:`contfrag_table_basenames`). Every ContFrag build ends here.
-
-    Returns
-    -------
-    dict of str to pd.DataFrame
-        The stamped tables, keyed ``event_table``, ``event_arm_table``,
-        ``event_patch_table`` and ``stop_table``.
-    """
-    tables = {
-        "event_table": stamp_covariate_schema(event_table, table="event"),
-        "event_arm_table": stamp_covariate_schema(event_arm_table, table="event_arm"),
-        "event_patch_table": stamp_covariate_schema(
-            event_patch_table, table="event_patch"
-        ),
-        "stop_table": stamp_covariate_schema(stop_table, table="stop"),
-    }
-    for frame in tables.values():
-        stamp_swr_source(frame)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    for name, frame in tables.items():
-        # The one write door: the source check, then publish_canonical (re-stamp
-        # idempotent, atomic).
-        path = publish_swr_table(
-            frame,
-            output_dir,
-            table=BASENAME_TO_TABLE[name],
-            basename=basenames[name],
-        )
-        logging.info("saved %s -> %s (%d rows)", name, path, len(frame))
-    return tables
-
-
-def find_sessions(
-    max_per_animal: int | None = None,
-    brain_area: str = "HPC",
-) -> list[dict]:
-    """The epoch register's analysed epochs, each with its ContFrag decode files.
-
-    One brain area at a time: ``run_decoding_contfrag.py`` writes per-area files,
-    and the saved tables would collide on event_id / stop_id across areas,
-    because the canonical hashes do not include brain_area (see
-    ``tables.event_ids.hash_event_id`` / ``hash_stop_id``).
-
-    The sessions are ``analysed_epochs()``, in ``session_id`` order within each
-    animal, the animals in order. For HPC, recorded in every analysed epoch, an
-    analysed epoch without its decode stops the build. mPFC and OFC are recorded
-    in some sessions only, so an analysed epoch with no decode for the area is
-    outside that area's cohort and is left out.
-
-    Parameters
-    ----------
-    max_per_animal : int, optional
-        Only each animal's first epochs, for a smoke run.
-    brain_area : str, optional
-        ``HPC`` (default), ``mPFC`` or ``OFC``.
-
-    Returns
-    -------
-    list of dict
-        ``nwb_file_name``, ``epoch_name``, ``brain_area``, ``dot_file``,
-        ``env_file`` and ``results_file`` per session.
-
-    Raises
-    ------
-    FileNotFoundError
-        If, for HPC, a selected epoch has no ContFrag ``data_over_time.pkl`` or
-        ``environment.pkl`` under ``paths.processed_data_dir()``.
-    """
-    by_animal: dict[str, list] = {}
-    decode_dir = processed_data_dir()
-    for nwb_file_name, epoch in analysed_epochs().index:
-        animal = parse_nwb_filename(nwb_file_name)[0]
-        session_id = format_epoch_identifier(
-            nwb_file_name, epoch, brain_area, CONTFRAG_SUFFIX
-        )
-        paths = decode_paths(session_id, decode_dir, threshold_percent=None)
-        dot_file = paths.data_over_time
-        env_file = paths.environment
-        if brain_area != "HPC" and not (dot_file.exists() and env_file.exists()):
-            continue
-        results_path = paths.results
-        by_animal.setdefault(animal, []).append(
-            {
-                "nwb_file_name": nwb_file_name,
-                "epoch_name": epoch,
-                "brain_area": brain_area,
-                "dot_file": dot_file,
-                "env_file": env_file,
-                "results_file": results_path if results_path.exists() else None,
-            }
-        )
-
-    selected = []
-    for animal in sorted(by_animal):
-        sessions = sorted(by_animal[animal], key=lambda session: session["dot_file"])
-        if max_per_animal is not None:
-            sessions = sessions[:max_per_animal]
-        selected.extend(sessions)
-
-    missing = [
-        path.name
-        for session in selected
-        for path in (session["dot_file"], session["env_file"])
-        if not path.exists()
-    ]
-    if missing:
-        raise FileNotFoundError(
-            f"{len(missing)} ContFrag decode file(s) of the epoch register's "
-            f"analysed epochs are not under {decode_dir}: "
-            f"{', '.join(missing[:10])}" + (", ..." if len(missing) > 10 else "")
-        )
-    return selected
-
-
 def _load_contfrag_posterior(results_file):
     """Load the combined ContFrag posterior from a results NetCDF."""
     return get_contfrag_posterior(open_results(results_file), state="combined")
 
 
-def _process_session(
+def build_contfrag_session_tables(
     session: dict,
     event_source: str,
     contingency: pd.DataFrame | None = None,
@@ -348,266 +188,38 @@ def _process_session(
     }
 
 
-def build_contfrag_tables(
-    sessions: list[dict],
+def contfrag_event_patch_table(
+    event_table: pd.DataFrame,
+    event_arm_table: pd.DataFrame,
     *,
     event_source: str,
     brain_area: str,
-    contingency: pd.DataFrame | None,
-    from_cache: bool,
-    output_dir: Path,
-) -> dict[str, pd.DataFrame] | None:
-    """Build every session's ContFrag tables, assemble them, and publish them.
+) -> pd.DataFrame:
+    """The event-patch table of joined ContFrag event and event-arm tables.
 
-    Each session goes through :func:`_process_session`; the per-session tables
-    are concatenated in session order, the event-patch table is projected from
-    the whole event-arm table, and the four tables are published under
-    :func:`contfrag_table_basenames`.
+    ``build_event_patch_table`` over the whole tables, so ``event_id`` is unique
+    across sessions as that builder requires (the ContFrag hash folds in
+    ``brain_area`` and ``event_source``), with the provenance columns stamped
+    again because the projection carries only the canonical session keys.
 
     Parameters
     ----------
-    sessions : list of dict
-        From :func:`find_sessions`, all of one brain area.
-    event_source : str
-        ``"SWR"`` or ``"MUA"``: the external detector whose events are used.
-    brain_area : str
-        The sessions' brain area, ``"HPC"``, ``"mPFC"`` or ``"OFC"``.
-    contingency : pd.DataFrame or None
-        The ``qvals_table`` (``covariates.load_contingency``) the event-arm
-        value block is joined from.
-    from_cache : bool
-        Read trials and the track graph from the behavioral cache, falling back
-        to Spyglass per session (``prepare_data.load_behavioral_context``).
-    output_dir : Path
-        Where the four tables are published.
-
-    Returns
-    -------
-    dict of str to pd.DataFrame or None
-        The published tables (:func:`publish_contfrag_tables`), or None when no
-        session produced tables or stop/event count conservation fails, in
-        which case nothing is written.
-
-    Raises
-    ------
-    RuntimeError
-        If any session failed to build; nothing is written.
-    """
-    t0 = time.time()
-    all_event_tables: list[pd.DataFrame] = []
-    all_event_arm_tables: list[pd.DataFrame] = []
-    all_stop_tables: list[pd.DataFrame] = []
-
-    skipped: list[tuple[str, str, str]] = []
-    for i, session in enumerate(sessions):
-        nwb = session["nwb_file_name"]
-        epoch = session["epoch_name"]
-
-        try:
-            result = _process_session(
-                session,
-                event_source,
-                contingency=contingency,
-                from_cache=from_cache,
-            )
-        except (FileNotFoundError, OSError, ValueError) as e:
-            logging.warning("skip %s %s: %s", nwb, epoch, e)
-            skipped.append((nwb, epoch, str(e)))
-            continue
-
-        if result is None:
-            # Behavioral context / track graph unavailable. This is a failure,
-            # not a benign skip: count it toward the fail-closed gate below so a
-            # dropped session cannot leave a complete-looking table set (mirrors
-            # the Replay driver, analysis/behavior/tables/prepare_data.run_prepare_data).
-            reason = "behavioral context or track graph unavailable"
-            logging.warning("skip %s %s: %s", nwb, epoch, reason)
-            skipped.append((nwb, epoch, reason))
-            continue
-
-        all_event_tables.append(result["event_table"])
-        all_event_arm_tables.append(result["event_arm_table"])
-        all_stop_tables.append(result["stop_table"])
-
-        if (i + 1) % 10 == 0:
-            elapsed = time.time() - t0
-            remaining = elapsed / (i + 1) * (len(sessions) - i - 1)
-            logging.info(
-                "[%d/%d] %ds elapsed, ~%ds remaining",
-                i + 1,
-                len(sessions),
-                int(elapsed),
-                int(remaining),
-            )
-
-    if skipped:
-        logging.error(
-            "SKIPPED %d/%d session(s) — value block / tables are MISSING these:",
-            len(skipped),
-            len(sessions),
-        )
-        for nwb, epoch, reason in skipped:
-            logging.error("  skipped %s %s: %s", nwb, epoch, reason)
-        raise RuntimeError(
-            "ContFrag build is incomplete: "
-            f"{len(skipped)} of {len(sessions)} session(s) failed. "
-            "No scientific tables were written."
-        )
-
-    if not all_event_tables:
-        logging.error("no sessions produced data")
-        return None
-
-    event_table_all = pd.concat(all_event_tables, ignore_index=True)
-    event_arm_table_all = pd.concat(all_event_arm_tables, ignore_index=True)
-    stop_table_all = pd.concat(all_stop_tables, ignore_index=True)
-
-    session_cols = ["animal", "session_date", "epoch"]
-    logging.info(
-        "events: %d, event_arm rows: %d, stops: %d, sessions: %d",
-        len(event_table_all),
-        len(event_arm_table_all),
-        len(stop_table_all),
-        event_table_all.groupby(session_cols).ngroups,
-    )
-
-    # Cross-table invariant: Σ stop_table.n_selected_events == len(event_table)
-    sum_n_events = int(stop_table_all["n_selected_events"].sum())
-    if sum_n_events != len(event_table_all):
-        logging.error(
-            "cross-table drift: Σ stop_table.n_selected_events = %d, "
-            "len(event_table) = %d — refusing to write output",
-            sum_n_events,
-            len(event_table_all),
-        )
-        return None
-    logging.info(
-        "cross-table invariant OK: Σ n_selected_events == len(event_table) == %d",
-        len(event_table_all),
-    )
-
-    # Collapse to the event-patch table for the patch-level hierarchy.
-    # Built from the concatenated frames so event_id is globally unique
-    # (the ContFrag hash already folds in brain_area + event_source),
-    # which build_event_patch_table requires. Provenance is re-stamped
-    # because the helper carries the canonical session keys.
-    event_patch_table_all = build_event_patch_table(
-        event_table_all, event_arm_table_all
-    )
-    event_patch_table_all["event_source"] = event_source
-    event_patch_table_all["brain_area"] = brain_area
-    logging.info(
-        "event_patch rows: %d (= 3 × %d events)",
-        len(event_patch_table_all),
-        event_table_all.groupby(session_cols)["event_id"].nunique().sum(),
-    )
-
-    # Per-brain-area filenames so HPC and mPFC prep runs don't overwrite each
-    # other. Built here from decode frames read through the SWR source.
-    tables = publish_contfrag_tables(
-        event_table_all,
-        event_arm_table_all,
-        event_patch_table_all,
-        stop_table_all,
-        output_dir=output_dir,
-        basenames=contfrag_table_basenames(event_source, brain_area),
-    )
-    logging.info("total time: %ds", int(time.time() - t0))
-    return tables
-
-
-def assemble_contfrag_shards(
-    shard_dirs: list[Path],
-    *,
-    output_dir: Path,
-    event_source: str,
-    brain_area: str,
-    expected_sessions: int,
-) -> dict[str, pd.DataFrame]:
-    """Join per-animal shards of the ContFrag tables into one published bundle.
-
-    The shards' event, event-arm and stop tables are concatenated in shard
-    order and the event-patch table is projected from the whole event-arm
-    table, as :func:`build_contfrag_tables` does over every session at once.
-
-    Parameters
-    ----------
-    shard_dirs : list of Path
-        The shard folders, each written by :func:`build_contfrag_tables` for
-        one animal.
-    output_dir : Path
-        Where the four tables are published.
+    event_table, event_arm_table : pd.DataFrame
+        The ContFrag tables of every session, concatenated.
     event_source : str
         ``"SWR"`` or ``"MUA"``.
     brain_area : str
         ``"HPC"``, ``"mPFC"`` or ``"OFC"``.
-    expected_sessions : int
-        The number of sessions the shards must hold together.
 
     Returns
     -------
-    dict of str to pd.DataFrame
-        The published tables (:func:`publish_contfrag_tables`).
-
-    Raises
-    ------
-    ValueError
-        If the shards overlap or miss sessions, a shard or the bundle breaks
-        stop/event count conservation, or an ``event_id`` or ``stop_id`` is
-        missing or repeats.
+    pd.DataFrame
+        One row per (event, patch).
     """
-    basenames = contfrag_table_basenames(event_source, brain_area)
-    shards = replay_prepare_data.read_disjoint_shards(
-        shard_dirs,
-        {
-            name: basenames[name]
-            for name in ("event_table", "event_arm_table", "stop_table")
-        },
-        what="ContFrag",
-        expected_sessions=expected_sessions,
-    )
-    for shard_dir, frames in zip(shard_dirs, shards, strict=True):
-        validate_event_arm_table(
-            frames["event_arm_table"], event_table=frames["event_table"]
-        )
-        if int(frames["stop_table"]["n_selected_events"].sum()) != len(
-            frames["event_table"]
-        ):
-            raise ValueError(f"{shard_dir} violates stop/event count conservation")
-
-    event_table = pd.concat(
-        [frames["event_table"] for frames in shards], ignore_index=True
-    )
-    event_arm_table = pd.concat(
-        [frames["event_arm_table"] for frames in shards], ignore_index=True
-    )
-    stop_table = pd.concat(
-        [frames["stop_table"] for frames in shards], ignore_index=True
-    )
-    if (
-        event_table["event_id"].isna().any()
-        or event_table["event_id"].duplicated().any()
-    ):
-        raise ValueError("assembled event_table requires unique nonmissing event_id")
-    if stop_table["stop_id"].isna().any() or stop_table["stop_id"].duplicated().any():
-        raise ValueError("assembled stop_table requires unique nonmissing stop_id")
-    validate_event_arm_table(event_arm_table, event_table=event_table)
-    if int(stop_table["n_selected_events"].sum()) != len(event_table):
-        raise ValueError("assembled stop/event count conservation failed")
-
     event_patch_table = build_event_patch_table(event_table, event_arm_table)
     event_patch_table["event_source"] = event_source
     event_patch_table["brain_area"] = brain_area
-    validate_event_patch_table(event_patch_table, event_table=event_table)
-
-    return publish_contfrag_tables(
-        event_table,
-        event_arm_table,
-        event_patch_table,
-        stop_table,
-        output_dir=output_dir,
-        basenames=basenames,
-    )
+    return event_patch_table
 
 
 EVENT_POSTERIOR_COLUMNS = (
@@ -618,25 +230,6 @@ EVENT_POSTERIOR_COLUMNS = (
     "posterior_hpd_arm_count_mean_coverage_95pct",
     "multimodal_fraction",
 )
-
-
-def _session_key(frame: pd.DataFrame) -> tuple[object, object, object]:
-    keys = frame.loc[:, SESSION_COLUMNS].drop_duplicates()
-    if len(keys) != 1:
-        raise ValueError(f"expected one session, found {len(keys)}")
-    return tuple(keys.iloc[0])
-
-
-def _source_session(
-    frame: pd.DataFrame, session: tuple[object, object, object]
-) -> pd.DataFrame:
-    mask = np.logical_and.reduce(
-        [
-            frame[column] == value
-            for column, value in zip(SESSION_COLUMNS, session, strict=True)
-        ]
-    )
-    return frame.loc[mask].reset_index(drop=True)
 
 
 def _copy_by_key(
@@ -670,7 +263,7 @@ def _copy_by_key(
     return output
 
 
-def _rebuild_session(
+def rebuild_contfrag_session_tables(
     descriptor: dict,
     *,
     event_source: str,
@@ -755,147 +348,3 @@ def _rebuild_session(
         table["event_source"] = event_source
         table["brain_area"] = brain_area
     return event, arm, stop
-
-
-def refresh_contfrag_behavioral_covariates(
-    *,
-    source_dir: Path,
-    output_dir: Path,
-    replay_content_dir: Path,
-    event_source: str,
-    brain_area: str,
-    expected_sessions: int,
-) -> dict[str, pd.DataFrame]:
-    """Rebuild a ContFrag bundle, carrying its posterior aggregates over.
-
-    Behavioral clocks, locations, histories, event boundaries, hard counts and
-    the qvals attachments are rebuilt from their inputs; the values that need
-    the conditional posterior (:data:`EVENT_POSTERIOR_COLUMNS` and each arm's
-    ``arm_posterior_mass``) are copied from the preserved bundle in
-    `source_dir`, matched on the event label (and candidate arm), and
-    ``arm_fraction_posterior`` is recomputed from the copied mass. This skips
-    reading every session's posterior when the decodes have not changed.
-
-    Parameters
-    ----------
-    source_dir : Path
-        The preserved bundle the posterior aggregates are copied from.
-    output_dir : Path
-        Where the rebuilt tables are published.
-    replay_content_dir : Path
-        The replay-content root: its ``qvals_table`` and its behavioral cache
-        (``_session_cache``), read with ``from_cache=True``.
-    event_source : str
-        ``"SWR"`` or ``"MUA"``.
-    brain_area : str
-        ``"HPC"``, ``"mPFC"`` or ``"OFC"``.
-    expected_sessions : int
-        The number of sessions the preserved bundle, and the rebuild, must hold.
-
-    Returns
-    -------
-    dict of str to pd.DataFrame
-        The published tables (:func:`publish_contfrag_tables`).
-
-    Raises
-    ------
-    ValueError
-        If the source bundle or the matched decodes hold other than
-        `expected_sessions` sessions, an event or candidate key does not match
-        between the rebuild and the source exactly, or a rebuilt session breaks
-        stop/event conservation or ``stop_id`` uniqueness.
-    """
-    basenames = contfrag_table_basenames(event_source, brain_area)
-    old_event_all = read_table(source_dir / basenames["event_table"])
-    old_arm_all = read_table(source_dir / basenames["event_arm_table"])
-    # The posterior aggregates are carried on event ids that hash the SWR
-    # labels, so the source bundle must come from the SWR source the rebuild
-    # reads: another source's events are other events.
-    for name, frame in (
-        ("event_table", old_event_all),
-        ("event_arm_table", old_arm_all),
-    ):
-        require_swr_source(frame, what=f"{source_dir / basenames[name]}")
-    validate_event_arm_table(old_arm_all, event_table=old_event_all)
-    contingency = load_contingency(table_path("qvals_table", replay_content_dir))
-    replay_prepare_data.SESSION_CACHE_DIR = replay_content_dir / "_session_cache"
-    source_sessions = set(
-        old_event_all.loc[:, SESSION_COLUMNS].itertuples(index=False, name=None)
-    )
-    if len(source_sessions) != expected_sessions:
-        raise ValueError(
-            f"posterior source has {len(source_sessions)} sessions; "
-            f"expected {expected_sessions}"
-        )
-    descriptors = []
-    for descriptor in find_sessions(brain_area=brain_area):
-        session = (
-            *parse_nwb_filename(descriptor["nwb_file_name"]),
-            descriptor["epoch_name"],
-        )
-        if session in source_sessions:
-            descriptors.append(descriptor)
-    if len(descriptors) != expected_sessions:
-        raise ValueError(
-            f"found {len(descriptors)} matching raw sessions; "
-            f"expected {expected_sessions}"
-        )
-
-    events: list[pd.DataFrame] = []
-    arms: list[pd.DataFrame] = []
-    stops: list[pd.DataFrame] = []
-    for index, descriptor in enumerate(descriptors, start=1):
-        session = (
-            *parse_nwb_filename(descriptor["nwb_file_name"]),
-            descriptor["epoch_name"],
-        )
-        if session not in source_sessions:
-            raise ValueError(f"posterior source is missing session {session}")
-        old_event = _source_session(old_event_all, session)
-        old_arm = _source_session(old_arm_all, session)
-        event, arm, stop = _rebuild_session(
-            descriptor,
-            event_source=event_source,
-            contingency=contingency,
-            old_event=old_event,
-            old_arm=old_arm,
-            from_cache=True,
-        )
-        if _session_key(event) != session or _session_key(stop) != session:
-            raise ValueError(f"rebuilt session identity drifted for {session}")
-        validate_event_arm_table(arm, event_table=event)
-        if int(stop["n_selected_events"].sum()) != len(event):
-            raise ValueError(f"session {session} violates stop/event conservation")
-        events.append(event)
-        arms.append(arm)
-        stops.append(stop)
-        if index % 10 == 0:
-            LOGGER.info("rebuilt %d/%d sessions", index, len(descriptors))
-
-    event_table = pd.concat(events, ignore_index=True)
-    event_arm_table = pd.concat(arms, ignore_index=True)
-    stop_table = pd.concat(stops, ignore_index=True)
-    event_patch_table = build_event_patch_table(event_table, event_arm_table)
-    event_patch_table["event_source"] = event_source
-    event_patch_table["brain_area"] = brain_area
-    validate_event_arm_table(event_arm_table, event_table=event_table)
-    validate_event_patch_table(event_patch_table, event_table=event_table)
-    # stop_id is the join key for every stop-level covariate; a null or a
-    # cross-session collision silently mis-joins. validate_event_arm_table
-    # covers event_id, but nothing checks stop_id here (the sibling reducers do).
-    if stop_table["stop_id"].isna().any():
-        raise ValueError("rebuilt stop_table contains null stop_id")
-    if stop_table["stop_id"].duplicated().any():
-        raise ValueError("rebuilt stop_table contains duplicate stop_id")
-    if int(stop_table["n_selected_events"].sum()) != len(event_table):
-        raise ValueError("rebuilt stop/event count conservation failed")
-
-    # Rebuilt from decode frames read through the SWR source, so stamped with it.
-    return publish_contfrag_tables(
-        event_table,
-        event_arm_table,
-        event_patch_table,
-        stop_table,
-        output_dir=output_dir,
-        basenames=basenames,
-    )

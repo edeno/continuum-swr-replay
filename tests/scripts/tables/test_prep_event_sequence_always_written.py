@@ -1,5 +1,5 @@
-"""``run_prepare_data`` always writes ``event_sequence_table``, even when no
-session contributed sequence rows.
+"""``prepare_replay_content_data.run_prepare_data`` always writes
+``event_sequence_table``, even when no session contributed sequence rows.
 
 The retrospective-alignment pass and ``write_regeneration_manifest.py`` read
 ``event_sequence_table`` unconditionally, so a run in which no session had a
@@ -11,6 +11,7 @@ a legitimate input.
 from __future__ import annotations
 
 import argparse
+import inspect
 
 import numpy as np
 import pandas as pd
@@ -21,6 +22,7 @@ from continuum_swr_replay.analysis.behavior.tables._tables_common import (
     _EVENT_SEQUENCE_TABLE_COLUMNS,
 )
 from continuum_swr_replay.tables.io import read_table, write_table
+from scripts.tables import prepare_replay_content_data as prepare_cli
 
 SESSION = {"animal": "test", "session_date": 20200101, "epoch": "01_r1"}
 
@@ -74,25 +76,25 @@ def published(monkeypatch, tmp_path):
     tables here could not pass.
     """
     monkeypatch.setattr(
-        prepare_data, "find_sessions", lambda max_per_animal: [{"session_id": "x"}]
+        prepare_cli, "find_sessions", lambda max_per_animal: [{"session_id": "x"}]
     )
-    monkeypatch.setattr(prepare_data, "load_contingency", lambda path: None)
+    monkeypatch.setattr(prepare_cli, "load_contingency", lambda path: None)
     monkeypatch.setattr(
-        prepare_data,
+        prepare_cli,
         "_build_all_session_tables",
         lambda sessions, contingency, *, from_cache, t0: _session_tables(),
     )
     monkeypatch.setattr(
-        prepare_data,
-        "_standardize_event_arm",
+        prepare_cli,
+        "standardize_event_arm",
         lambda table, contingency, reference_path: table,
     )
     monkeypatch.setattr(
-        prepare_data,
+        inspect.getmodule(prepare_cli.publish_replay_tables),
         "publish_swr_table",
         lambda frame, path, *, table, basename: write_table(frame, path / basename),
     )
-    monkeypatch.setattr(prepare_data, "OUTPUT_DIR", None)
+    # run_prepare_data points the behavioral cache at the output folder.
     monkeypatch.setattr(prepare_data, "SESSION_CACHE_DIR", None)
     args = argparse.Namespace(
         output_dir=tmp_path,
@@ -105,7 +107,7 @@ def published(monkeypatch, tmp_path):
         cache_only=False,
         stop_only=False,
     )
-    prepare_data.run_prepare_data(args)
+    prepare_cli.run_prepare_data(args)
     return tmp_path
 
 

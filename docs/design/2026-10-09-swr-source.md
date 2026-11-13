@@ -166,7 +166,7 @@ What the comparison shows:
 ## Who reads it
 
 - **Readers of a decode frame** go through `read_dot_with_swr_source`:
-  - the replay-content tables (`prepare_data._process_session`, and the stop-only
+  - the replay-content tables (`prepare_data.build_session_tables`, and the stop-only
     bootstrap);
   - `build_timebin_tables.py`;
   - `regenerate_stop_table.py`;

@@ -1,57 +1,35 @@
-"""Build the four canonical replay-content tables across all sessions.
+"""The per-session replay-table build and the corpus-level steps around it.
 
-Thin driver over the per-grain table builders in
+:func:`build_session_tables` builds one session's event, event-arm, stop and
+event-sequence tables from its saved decode, its conditional posterior and its
+behavioral context, through the per-grain builders in
 ``continuum_swr_replay.analysis.behavior.tables.tables_event`` / ``tables_stop`` /
-``tables_arm_patch``. :func:`run_prepare_data` is the whole run; the
-command-line front end that resolves its arguments is
-``scripts/tables/prepare_replay_content_data.py``, which is also where the
-outputs, the flags, and the ``--from-cache`` contract are documented.
+``tables_arm_patch``. :func:`assemble_canonical_tables` joins the sessions'
+tables and derives the assembly-level columns, and
+:func:`standardize_event_arm` fits the pooled leaf-arm standardization over the
+joined event-arm table. The table drivers in ``scripts/tables`` (the session
+loops, the shard assembly and the publishing) call these.
 
-Also the home of the session-scope and behavioral-cache helpers
-(:func:`find_sessions`, :func:`load_behavioral_context`,
-:func:`populate_behavioral_context_cache`, :func:`session_cache_dir`) that the
-other ``scripts/tables`` drivers share, and of the assembly of per-animal
-shards into one bundle (:func:`assemble_replay_content_shards`,
-:func:`assemble_replay_stop_shards`, and :func:`read_disjoint_shards`, which the
-ContFrag shard assembly also reads with), whose front end is
-``scripts/tables/assemble_replay_content_shards.py``.
+Also the home of the behavioral-context cache (:func:`load_behavioral_context`,
+:func:`session_cache_dir`), the per-session pickle of the Spyglass trials,
+port experiences and track graph that the replay and ContFrag builds share.
 """
 
 from __future__ import annotations
 
-import argparse
 import logging
 import pickle
-import time
-from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pyarrow.parquet as pq
-from pandas.errors import MergeError
-
-try:  # datajoint does not connect on import; guard so offline runs still work
-    from datajoint.errors import DataJointError as _DataJointError
-except ImportError:  # pragma: no cover - datajoint always present in practice
-
-    class _DataJointError(Exception):
-        """Placeholder so the skip clause is well-formed without datajoint."""
-
 
 from continuum_swr_replay.analysis.behavior.choice.retrospective import (
     compute_retrospective_metrics,
 )
-from continuum_swr_replay.analysis.behavior.covariates import (
-    assert_qvals_aligned,
-    load_contingency,
-)
+from continuum_swr_replay.analysis.behavior.covariates import assert_qvals_aligned
 from continuum_swr_replay.analysis.behavior.tables._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
-)
-from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
-    validate_event_arm_table,
-    validate_event_patch_table,
 )
 from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
     build_event_arm_table,
@@ -66,12 +44,8 @@ from continuum_swr_replay.analysis.behavior.tables.tables_stop import (
     build_stop_table,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (
-    publish_swr_table,
     read_dot_with_swr_source,
-    require_swr_source,
-    stamp_swr_source,
 )
-from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_dot_event_contract,
 )
@@ -79,69 +53,38 @@ from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     load_conditional_posterior,
 )
 from continuum_swr_replay.data_loaders.constants import WELL_ARMS, port_columns
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_loaders.trials import (
     validate_port_experience_pump_audit,
 )
 from continuum_swr_replay.data_types import SessionDataKeys
-from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
-from continuum_swr_replay.paths import (
-    BASENAME_TO_TABLE,
-    STANDARDIZATION_REFERENCE,
-    processed_data_dir,
-    replay_content_dir,
-    table_path,
-)
-from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
-from continuum_swr_replay.tables.io import (
-    read_table,
-    write_atomically,
-)
-from continuum_swr_replay.tables.session_keys import (
-    SESSION_COLUMNS,
-    present_session_columns,
-    session_key_set,
-)
+from continuum_swr_replay.paths import replay_content_dir
+from continuum_swr_replay.tables.io import write_atomically
+from continuum_swr_replay.tables.session_keys import present_session_columns
 from continuum_swr_replay.tables.standardization import (
     assert_standardized_present,
     attach_standardized,
     save_reference,
 )
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(message)s",
-    datefmt="%H:%M:%S",
+from continuum_swr_replay.tables.versions import (
+    BEHAVIORAL_CONTEXT_CACHE_VERSION,  # value centralized in versions.py
+    assert_versions_compatible,
 )
-
-OUTPUT_DIR: Path | None = None
-"""The run's output folder, set from ``--output-dir`` by :func:`run_prepare_data`;
-None means ``paths.replay_content_dir()``, resolved when read (:func:`output_dir`)."""
 
 SESSION_CACHE_DIR: Path | None = None
 """The per-session cache of the Spyglass-sourced behavioral context and track
 graph, populated on every full run and read by ``--from-cache`` to skip
-``load_data``. Set from ``--behavior-cache-dir`` by the table drivers; None means
-``<output_dir()>/_session_cache``, resolved when read (:func:`session_cache_dir`)."""
-
-
-def output_dir() -> Path:
-    """:data:`OUTPUT_DIR`, or ``paths.replay_content_dir()`` while it is unset."""
-    return replay_content_dir() if OUTPUT_DIR is None else OUTPUT_DIR
+``load_data``. Set by the table drivers (``--behavior-cache-dir``, or the
+output folder's ``_session_cache``); None means
+``paths.replay_content_dir() / "_session_cache"``, resolved when read
+(:func:`session_cache_dir`)."""
 
 
 def session_cache_dir() -> Path:
-    """:data:`SESSION_CACHE_DIR`, or ``<output_dir()>/_session_cache`` while unset."""
+    """:data:`SESSION_CACHE_DIR`, or ``<replay_content_dir()>/_session_cache`` while unset."""
     if SESSION_CACHE_DIR is None:
-        return output_dir() / "_session_cache"
+        return replay_content_dir() / "_session_cache"
     return SESSION_CACHE_DIR
 
-
-from continuum_swr_replay.tables.versions import (  # noqa: E402
-    BEHAVIORAL_CONTEXT_CACHE_VERSION,  # value centralized in versions.py
-    assert_versions_compatible,
-)
 
 PORT_EXPERIENCE_CACHE_COLUMNS = (
     "is_boundary_derived",
@@ -151,73 +94,6 @@ PORT_EXPERIENCE_CACHE_COLUMNS = (
     "final_poke_out_time",
     "n_physical_poke_bouts",
 )
-
-
-def find_sessions(max_per_animal: int | None = None) -> list[dict]:
-    """The epoch register's analysed epochs, each with its decode files.
-
-    The sessions are ``analysed_epochs()``, in ``session_id`` order within each
-    animal, the animals in order; a decode on disk whose epoch the register does
-    not analyse is not one. ``results.nc`` absence is recorded here as
-    ``results_file=None`` and acted on in :func:`_process_session`, which
-    refuses the session: without a posterior there is no
-    ``event_sequence_table`` and no retrospective metrics.
-
-    Parameters
-    ----------
-    max_per_animal : int, optional
-        Only each animal's first epochs, for a smoke run.
-
-    Returns
-    -------
-    list of dict
-        ``nwb_file_name``, ``epoch_name``, ``session_id``, ``dot_file``,
-        ``env_file`` and ``results_file`` per session.
-
-    Raises
-    ------
-    FileNotFoundError
-        If a selected epoch has no ``data_over_time.pkl`` or ``environment.pkl``
-        under ``paths.processed_data_dir()``: the tables would otherwise cover fewer
-        epochs than the register analyses.
-    """
-    by_animal: dict[str, list] = {}
-    decode_dir = processed_data_dir()
-    for nwb_file_name, epoch in analysed_epochs().index:
-        animal = parse_nwb_filename(nwb_file_name)[0]
-        session_id = swr_epoch_id(nwb_file_name, epoch)
-        paths = decode_paths(session_id, decode_dir)
-        by_animal.setdefault(animal, []).append(
-            {
-                "nwb_file_name": nwb_file_name,
-                "epoch_name": epoch,
-                "session_id": session_id,
-                "dot_file": paths.data_over_time,
-                "env_file": paths.environment,
-                "results_file": paths.results if paths.results.exists() else None,
-            }
-        )
-
-    selected = []
-    for animal in sorted(by_animal):
-        sessions = sorted(by_animal[animal], key=lambda session: session["session_id"])
-        if max_per_animal is not None:
-            sessions = sessions[:max_per_animal]
-        selected.extend(sessions)
-
-    missing = [
-        path.name
-        for session in selected
-        for path in (session["dot_file"], session["env_file"])
-        if not path.exists()
-    ]
-    if missing:
-        raise FileNotFoundError(
-            f"{len(missing)} decode file(s) of the epoch register's analysed epochs "
-            f"are not under {decode_dir}: {', '.join(missing[:10])}"
-            + (", ..." if len(missing) > 10 else "")
-        )
-    return selected
 
 
 # Written by ``load_data`` under the Comrie-aligned final-exit trial contract.
@@ -387,7 +263,7 @@ def load_behavioral_context(
     return trials, port_experiences, track_graph, False
 
 
-def _process_session(
+def build_session_tables(
     session: dict,
     contingency: pd.DataFrame | None = None,
     *,
@@ -461,7 +337,7 @@ def _process_session(
 
     # Build the stop table first — it's a function of immobility
     # bouts, not non-local events, and the documented
-    # ``stop_table`` contract (this script's own docstring; the
+    # ``stop_table`` contract (the replay driver's docstring; the
     # builder's "**including zero-event bouts**" promise) keeps
     # zero-event sessions in the dataset. Returning early on an
     # empty event_table dropped those sessions silently and broke
@@ -579,250 +455,7 @@ def _assert_value_block_matches_source(
         )
 
 
-def populate_behavioral_context_cache(
-    sessions: list[dict], *, from_cache: bool
-) -> None:
-    """Populate and validate versioned behavioral caches without building tables.
-
-    This is the safe parallelization boundary for a full regeneration: callers
-    may assign disjoint animal/session sets to independent processes because
-    every cache file has a unique session key. The scientific tables are still
-    assembled once, serially, after all expected caches exist.
-    """
-    failures: list[dict[str, str]] = []
-    for index, session in enumerate(sessions, start=1):
-        try:
-            trials, experiences, graph, hit_cache = load_behavioral_context(
-                session, from_cache=from_cache
-            )
-        except (FileNotFoundError, OSError, ValueError, _DataJointError) as exc:
-            failures.append(
-                {
-                    "nwb_file_name": session["nwb_file_name"],
-                    "epoch": session["epoch_name"],
-                    "reason": str(exc),
-                }
-            )
-            continue
-        if trials is None or experiences is None or graph is None:
-            failures.append(
-                {
-                    "nwb_file_name": session["nwb_file_name"],
-                    "epoch": session["epoch_name"],
-                    "reason": "behavioral context or track graph unavailable",
-                }
-            )
-            continue
-        logging.info(
-            "cache [%d/%d] %s %s: %s",
-            index,
-            len(sessions),
-            session["nwb_file_name"],
-            session["epoch_name"],
-            "validated existing entry" if hit_cache else "refreshed from Spyglass",
-        )
-
-    if failures:
-        raise RuntimeError(
-            "behavioral cache build is incomplete: "
-            f"{len(failures)} of {len(sessions)} session(s) failed; "
-            f"sample={failures[:10]}"
-        )
-
-
-_STOP_SPLIT_COLUMNS = frozenset({"n_nonlocal_swr_events", "n_nonlocal_non_swr_events"})
-
-
-def _refuse_to_clobber_complete_stop_table(output_dir: Path) -> None:
-    """Raise if ``output_dir`` already holds a *complete* stop table.
-
-    A complete stop table carries the SWR split columns that only the full
-    build produces. The ``--stop-only`` bootstrap produces a split-less table,
-    so overwriting a complete one would silently downgrade it.
-    """
-    target = table_path("stop_table", output_dir)
-    if not target.exists():
-        return
-    if _STOP_SPLIT_COLUMNS.issubset(pq.read_schema(target).names):
-        raise FileExistsError(
-            f"{target} is a complete stop table (has the SWR split); the "
-            "--stop-only bootstrap would overwrite it with a split-less table. "
-            "Point --output-dir at a staging directory instead."
-        )
-
-
-def build_stop_table_scope(
-    sessions: list[dict], *, from_cache: bool, output_dir: Path
-) -> pd.DataFrame:
-    """Build only the qvals-authoritative stop table for one scope.
-
-    Qvals requires current stop IDs/times, while the complete event-arm table
-    requires qvals before behavioral-model columns can be standardized. This
-    explicit bootstrap avoids publishing an all-NaN value block.
-    """
-    # Fail fast, before any session work: this bootstrap deliberately omits the
-    # SWR split (n_nonlocal_swr_events / n_nonlocal_non_swr_events), which the
-    # full build adds via add_nonlocal_swr_split once the event table exists.
-    # Writing it over a *complete* canonical stop table would downgrade that
-    # table and desynchronize it from the event/arm tables (the atomic-set
-    # invariant in CLAUDE.md), and every downstream rate fit would then KeyError
-    # on the missing split columns. Refuse rather than clobber.
-    _refuse_to_clobber_complete_stop_table(output_dir)
-
-    frames: list[pd.DataFrame] = []
-    failures: list[dict[str, str]] = []
-    for index, session in enumerate(sessions, start=1):
-        try:
-            dot = read_dot_with_swr_source(session["dot_file"])
-            validate_dot_event_contract(dot)
-            trials, experiences, graph, hit_cache = load_behavioral_context(
-                session, from_cache=from_cache
-            )
-            if trials is None or experiences is None or graph is None:
-                raise ValueError("behavioral context or track graph unavailable")
-            frames.append(build_stop_table(dot, trials, experiences, graph))
-            logging.info(
-                "stop [%d/%d] %s %s: behavioral context from %s",
-                index,
-                len(sessions),
-                session["nwb_file_name"],
-                session["epoch_name"],
-                "cache" if hit_cache else "Spyglass",
-            )
-        except (FileNotFoundError, OSError, ValueError, _DataJointError) as exc:
-            failures.append(
-                {
-                    "nwb_file_name": session["nwb_file_name"],
-                    "epoch": session["epoch_name"],
-                    "reason": str(exc),
-                }
-            )
-
-    if failures:
-        raise RuntimeError(
-            "stop-only build is incomplete: "
-            f"{len(failures)} of {len(sessions)} session(s) failed; "
-            f"sample={failures[:10]}. No stop table was written."
-        )
-    stop_table = pd.concat(frames, ignore_index=True)
-    if stop_table["stop_id"].isna().any() or stop_table["stop_id"].duplicated().any():
-        raise ValueError("stop-only build requires globally unique nonmissing stop_id")
-    observed_sessions = stop_table[list(SESSION_COLUMNS)].drop_duplicates()
-    if len(observed_sessions) != len(sessions):
-        raise ValueError(
-            f"stop-only build retained {len(observed_sessions)} of "
-            f"{len(sessions)} expected sessions"
-        )
-    _refuse_to_clobber_complete_stop_table(output_dir)  # re-check after the slow build
-    output_dir.mkdir(parents=True, exist_ok=True)
-    # Built above from decode frames read through the SWR source.
-    stamp_swr_source(stop_table)
-    path = publish_swr_table(
-        stop_table,
-        output_dir,
-        table="stop",
-        basename="stop_table",
-    )
-    logging.info("saved stop_table -> %s (%d rows)", path, len(stop_table))
-    return stop_table
-
-
-def _build_all_session_tables(
-    sessions: list[dict],
-    contingency: pd.DataFrame | None,
-    *,
-    from_cache: bool,
-    t0: float,
-) -> tuple[list, list, list, list]:
-    """Run every session through ``_process_session`` and collect its tables.
-
-    Data-gap failures (missing/corrupt input, unexpected shape) are skipped and
-    recorded; a code bug (``KeyError`` / ``AttributeError`` / ``AssertionError``)
-    propagates so a regression is not silently skipped across the run. A
-    missing required column raises ``ValueError``
-    (:func:`~continuum_swr_replay.tables.columns.require_columns`), so it is
-    recorded as a session failure rather than propagated. If any session
-    failed, raise before returning so a partial corpus is never assembled or
-    written. Returns the per-session event / event-arm / stop /
-    event-sequence table lists.
-    """
-    all_event_tables: list[pd.DataFrame] = []
-    all_event_arm_tables: list[pd.DataFrame] = []
-    all_stop_tables: list[pd.DataFrame] = []
-    all_event_sequence_tables: list[pd.DataFrame] = []
-
-    session_failures: list[dict[str, str]] = []
-    for i, session in enumerate(sessions):
-        nwb = session["nwb_file_name"]
-        epoch = session["epoch_name"]
-
-        try:
-            result = _process_session(
-                session, contingency=contingency, from_cache=from_cache
-            )
-        except MergeError:
-            # A one-to-one merge violation (duplicate event_id from the
-            # retrospective metrics) is an integrity bug, not a data gap.
-            # MergeError subclasses ValueError, so it must be re-raised here
-            # *before* the data-gap clause or it would be silently skipped.
-            raise
-        except (FileNotFoundError, OSError, ValueError, _DataJointError) as e:
-            # Skip-and-continue is only appropriate for data-gap
-            # errors (missing file, corrupt input, unexpected shape).
-            # ``KeyError`` / ``AttributeError`` / ``AssertionError``
-            # are propagated — they indicate a code bug and silent
-            # skips would hide the regression across the run. A missing
-            # required column is a ValueError: it lands here and fails the
-            # run after the loop.
-            logging.warning("skip %s %s: %s", nwb, epoch, e)
-            session_failures.append(
-                {"nwb_file_name": nwb, "epoch": epoch, "reason": str(e)}
-            )
-            continue
-
-        if result is None:
-            session_failures.append(
-                {
-                    "nwb_file_name": nwb,
-                    "epoch": epoch,
-                    "reason": "behavioral context or track graph unavailable",
-                }
-            )
-            continue
-
-        all_event_tables.append(result["event_table"])
-        all_event_arm_tables.append(result["event_arm_table"])
-        all_stop_tables.append(result["stop_table"])
-        if result["event_sequence_table"] is not None:
-            all_event_sequence_tables.append(result["event_sequence_table"])
-
-        if (i + 1) % 10 == 0:
-            elapsed = time.time() - t0
-            remaining = elapsed / (i + 1) * (len(sessions) - i - 1)
-            logging.info(
-                "[%d/%d] %ds elapsed, ~%ds remaining",
-                i + 1,
-                len(sessions),
-                int(elapsed),
-                int(remaining),
-            )
-
-    if session_failures:
-        sample = session_failures[:10]
-        raise RuntimeError(
-            "canonical replay build is incomplete: "
-            f"{len(session_failures)} of {len(sessions)} session(s) failed; "
-            f"sample={sample}. No scientific tables were written."
-        )
-    return (
-        all_event_tables,
-        all_event_arm_tables,
-        all_stop_tables,
-        all_event_sequence_tables,
-    )
-
-
-def _assemble_canonical_tables(
+def assemble_canonical_tables(
     all_event_tables: list,
     all_event_arm_tables: list,
     all_stop_tables: list,
@@ -880,7 +513,7 @@ def _assemble_canonical_tables(
     )
 
 
-def _standardize_event_arm(
+def standardize_event_arm(
     event_arm_table_all: pd.DataFrame,
     contingency: pd.DataFrame | None,
     reference_path: Path,
@@ -925,411 +558,3 @@ def _standardize_event_arm(
         [f"{c}_z" for c in EVENT_ARM_STANDARDIZED_COLS],
     )
     return event_arm_table_all
-
-
-def _publish_canonical_tables(frames: tuple, output_dir: Path) -> None:
-    """Atomically publish each (basename, table_key, frame) to `output_dir`.
-
-    ``publish_canonical`` stamps the covariate schema and writes atomically, so
-    the tables cannot land unstamped; the per-table key selects the row-key
-    contract. Every frame was built here from decode frames read through the
-    SWR source, so each is stamped with it.
-    """
-    for basename, table_key, frame in frames:
-        if frame is None:
-            logging.info("  %s: skipped (no data)", basename)
-            continue
-        stamp_swr_source(frame)
-        path = publish_swr_table(
-            frame,
-            output_dir,
-            table=table_key,
-            basename=basename,
-        )
-        logging.info("saved %s → %s (%d rows)", basename, path, len(frame))
-
-
-def run_prepare_data(args: argparse.Namespace) -> None:
-    """Resolve the scope, build every session's tables, then assemble, verify,
-    standardize, and publish the canonical replay tables.
-
-    Reads as its pipeline: resolve scope -> (early cache/stop-only exits) ->
-    load contingency -> build per session -> assemble -> cross-table gate ->
-    standardize -> publish.
-    """
-    global OUTPUT_DIR, SESSION_CACHE_DIR
-
-    OUTPUT_DIR = args.output_dir.resolve()
-    SESSION_CACHE_DIR = (
-        args.behavior_cache_dir.resolve()
-        if args.behavior_cache_dir is not None
-        else OUTPUT_DIR / "_session_cache"
-    )
-    contingency_dir = (
-        args.contingency_dir.resolve()
-        if args.contingency_dir is not None
-        else OUTPUT_DIR
-    )
-
-    max_per_animal = 2 if args.test else args.max_per_animal
-    sessions = find_sessions(max_per_animal=max_per_animal)
-    if args.animal is not None:
-        sessions = [
-            session
-            for session in sessions
-            if session["session_id"].startswith(args.animal)
-        ]
-    if not sessions:
-        raise RuntimeError("no sessions matched the requested regeneration scope")
-    logging.info(
-        "Found %d sessions (trials/track_graph source: %s)",
-        len(sessions),
-        "cache, Spyglass fallback"
-        if args.from_cache
-        else "Spyglass (refreshing cache)",
-    )
-
-    if args.cache_only:
-        if args.stop_only:
-            raise ValueError("--cache-only and --stop-only are mutually exclusive")
-        populate_behavioral_context_cache(sessions, from_cache=args.from_cache)
-        logging.info(
-            "behavioral cache population complete for %d sessions", len(sessions)
-        )
-        return
-
-    if args.stop_only:
-        build_stop_table_scope(
-            sessions, from_cache=args.from_cache, output_dir=OUTPUT_DIR
-        )
-        return
-
-    # Per-stop value artifact (per-arm nominal p(R) + per-arm model value),
-    # keyed by stop_id, from qvals_table (exact stop-start alignment).
-    # The event-arm builder maps nominal task probability / reward-belief mean
-    # per port to the corresponding candidate-arm fields. The belief mean is
-    # the fitted Beta reward belief, not the separate local leaky-Q history.
-    # Absent qvals rows leave those fields NaN.
-    contingency_path = table_path("qvals_table", contingency_dir)
-    contingency = load_contingency(contingency_path)
-
-    # Warn if the output directory still holds artifacts from the
-    # legacy pipeline — silent coexistence lets downstream scripts
-    # accidentally read stale pickles.
-    for legacy_name in ("events.pkl", "long_count.pkl", "long_binary.pkl"):
-        legacy_path = OUTPUT_DIR / legacy_name
-        if legacy_path.exists():
-            logging.warning(
-                "legacy output %s still present — delete it to avoid "
-                "stale reads downstream",
-                legacy_path,
-            )
-
-    t0 = time.time()
-    collected = _build_all_session_tables(
-        sessions, contingency, from_cache=args.from_cache, t0=t0
-    )
-    if not collected[0]:
-        logging.error("no sessions produced data")
-        return
-
-    (
-        event_table_all,
-        event_arm_table_all,
-        event_patch_table_all,
-        stop_table_all,
-        event_sequence_table_all,
-    ) = _assemble_canonical_tables(*collected)
-
-    session_cols = list(SESSION_COLUMNS)
-    logging.info(
-        "events: %d, event_arm rows: %d, stops: %d, sessions: %d",
-        len(event_table_all),
-        len(event_arm_table_all),
-        len(stop_table_all),
-        event_table_all.groupby(session_cols).ngroups,
-    )
-
-    # Cross-table invariant gate — run BEFORE saving, not after. A
-    # failed check means the concatenated frames disagree across
-    # tables; persisting them would publish an inconsistent dataset
-    # to downstream consumers. The full invariant sweep runs in
-    # tests/analysis/behavior/tables/test_replay_tables.py; this is a cheap end-to-end
-    # guard for the concat path.
-    sum_n_events = int(stop_table_all["n_selected_events"].sum())
-    if sum_n_events != len(event_table_all):
-        logging.error(
-            "cross-table drift: Σ stop_table.n_selected_events = %d, "
-            "len(event_table) = %d — refusing to write output",
-            sum_n_events,
-            len(event_table_all),
-        )
-        return
-    logging.info(
-        "cross-table invariant OK: Σ n_selected_events == len(event_table) == %d",
-        len(event_table_all),
-    )
-
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    event_arm_table_all = _standardize_event_arm(
-        event_arm_table_all, contingency, OUTPUT_DIR / STANDARDIZATION_REFERENCE
-    )
-    _publish_canonical_tables(
-        (
-            ("event_table", "event", event_table_all),
-            ("event_arm_table", "event_arm", event_arm_table_all),
-            ("event_patch_table", "event_patch", event_patch_table_all),
-            ("stop_table", "stop", stop_table_all),
-            ("event_sequence_table", "event_sequence", event_sequence_table_all),
-        ),
-        OUTPUT_DIR,
-    )
-
-    logging.info("total time: %ds", int(time.time() - t0))
-
-
-def read_disjoint_shards(
-    shard_dirs: Sequence[Path],
-    basenames: Mapping[str, str],
-    *,
-    what: str,
-    expected_sessions: int,
-) -> list[dict[str, pd.DataFrame]]:
-    """Read per-animal table shards that together make one bundle.
-
-    A full build can run as disjoint per-animal builds (``--animal``), each into
-    its own folder; the shards are then joined into one bundle. A shard's
-    sessions are those of its ``stop_table``.
-
-    Parameters
-    ----------
-    shard_dirs : sequence of Path
-        The shard folders.
-    basenames : mapping of str to str
-        Each table to read, by its name in the returned dicts, to its basename
-        in a shard folder. Must include ``"stop_table"``.
-    what : str
-        What the shards are, for the messages (``"Replay"``, ``"ContFrag"``).
-    expected_sessions : int
-        The number of sessions the shards must hold together.
-
-    Returns
-    -------
-    list of dict of str to pd.DataFrame
-        Each shard's tables, keyed as in `basenames`, in the order of
-        `shard_dirs`.
-
-    Raises
-    ------
-    ValueError
-        If there is no shard, if two shards hold a session in common, or if the
-        shards together hold other than `expected_sessions` sessions.
-    SwrSourceError
-        If a table was not built from the configured SWR source.
-    """
-    if not shard_dirs:
-        raise ValueError("at least one shard directory is required")
-    shards: list[dict[str, pd.DataFrame]] = []
-    observed_sessions: set[tuple[object, ...]] = set()
-    for shard_dir in shard_dirs:
-        frames = {
-            name: read_table(shard_dir / basename)
-            for name, basename in basenames.items()
-        }
-        # Every shard must come from the SWR source the bundle is stamped with.
-        for name, frame in frames.items():
-            require_swr_source(frame, what=f"{shard_dir / basenames[name]}")
-        shard_sessions = session_key_set(frames["stop_table"])
-        overlap = observed_sessions & shard_sessions
-        if overlap:
-            raise ValueError(
-                f"{what} shards overlap on {len(overlap)} session(s), e.g. "
-                f"{next(iter(overlap))}"
-            )
-        observed_sessions |= shard_sessions
-        shards.append(frames)
-    if len(observed_sessions) != expected_sessions:
-        raise ValueError(
-            f"assembled {what} scope has {len(observed_sessions)} sessions; "
-            f"expected {expected_sessions}"
-        )
-    return shards
-
-
-_SHARD_TABLES = (
-    "event_table",
-    "event_arm_table",
-    "stop_table",
-    "event_sequence_table",
-)
-
-
-def assemble_replay_content_shards(
-    shard_dirs: Sequence[Path],
-    *,
-    output_dir: Path,
-    contingency_dir: Path,
-    expected_sessions: int,
-) -> dict[str, pd.DataFrame]:
-    """Join per-animal shards of the replay tables into one published bundle.
-
-    The bundle is the one :func:`run_prepare_data` builds over every session at
-    once: the shards' tables are concatenated in shard order, and the
-    assembly-level columns (the non-local SWR split, the event-patch table) and
-    the leaf-arm standardization of the event-arm table are computed over the
-    whole corpus. Each shard's own ``_z`` columns, standardized over its animal
-    alone, are dropped first.
-
-    Parameters
-    ----------
-    shard_dirs : sequence of Path
-        The shard folders, each written by ``run_prepare_data`` for one animal.
-    output_dir : Path
-        Where the five tables and the standardization reference are published.
-    contingency_dir : Path
-        The folder of the ``qvals_table`` the event-arm value block must match.
-    expected_sessions : int
-        The number of sessions the shards must hold together.
-
-    Returns
-    -------
-    dict of str to pd.DataFrame
-        The published tables, keyed by basename.
-
-    Raises
-    ------
-    ValueError
-        If the shards overlap or miss sessions, a shard or the bundle breaks
-        stop/event count conservation, an ``event_id`` or ``stop_id`` repeats, an
-        ``event_sequence_table`` row repeats or names an event the bundle lacks,
-        or the value block disagrees with the ``qvals_table``.
-    """
-    shards = read_disjoint_shards(
-        shard_dirs,
-        {name: name for name in _SHARD_TABLES},
-        what="Replay",
-        expected_sessions=expected_sessions,
-    )
-    for shard_dir, frames in zip(shard_dirs, shards, strict=True):
-        validate_event_arm_table(
-            frames["event_arm_table"], event_table=frames["event_table"]
-        )
-        if int(frames["stop_table"]["n_selected_events"].sum()) != len(
-            frames["event_table"]
-        ):
-            raise ValueError(f"{shard_dir} violates stop/event count conservation")
-
-    standardized_columns = [f"{column}_z" for column in EVENT_ARM_STANDARDIZED_COLS]
-    (
-        event_table,
-        event_arm_table,
-        event_patch_table,
-        stop_table,
-        event_sequence_table,
-    ) = _assemble_canonical_tables(
-        [frames["event_table"] for frames in shards],
-        [
-            frames["event_arm_table"].drop(columns=standardized_columns, errors="raise")
-            for frames in shards
-        ],
-        [frames["stop_table"] for frames in shards],
-        [frames["event_sequence_table"] for frames in shards],
-    )
-    if event_table["event_id"].duplicated().any():
-        raise ValueError("assembled event_table contains duplicate event_id values")
-    if stop_table["stop_id"].duplicated().any():
-        raise ValueError("assembled stop_table contains duplicate stop_id values")
-    # event_sequence_table has many rows per event_id, so it needs a referential
-    # check rather than a uniqueness one: every sequence event_id must resolve to
-    # an assembled event (no orphan from a shard mismatch, the silent event_id
-    # mis-join), and no whole row may be duplicated (a shard double-count).
-    sequence_orphans = set(event_sequence_table["event_id"].unique()) - set(
-        event_table["event_id"]
-    )
-    if sequence_orphans:
-        raise ValueError(
-            f"event_sequence_table references {len(sequence_orphans)} event_id(s) "
-            "absent from the assembled event_table"
-        )
-    if event_sequence_table.duplicated().any():
-        raise ValueError(
-            "assembled event_sequence_table contains fully duplicated rows "
-            "(shard double-count)"
-        )
-    validate_event_arm_table(event_arm_table, event_table=event_table)
-    validate_event_patch_table(event_patch_table, event_table=event_table)
-    if int(stop_table["n_selected_events"].sum()) != len(event_table):
-        raise ValueError("assembled stop/event count conservation failed")
-
-    contingency = load_contingency(table_path("qvals_table", contingency_dir))
-    output_dir.mkdir(parents=True, exist_ok=True)
-    event_arm_table = _standardize_event_arm(
-        event_arm_table, contingency, output_dir / STANDARDIZATION_REFERENCE
-    )
-    tables = {
-        "event_table": event_table,
-        "event_arm_table": event_arm_table,
-        "event_patch_table": event_patch_table,
-        "stop_table": stop_table,
-        "event_sequence_table": event_sequence_table,
-    }
-    # The concatenated shards carry the shards' stamps, which would let the
-    # publish skip its checks: stamp (and so check) the bundle itself.
-    for name, frame in tables.items():
-        stamp_covariate_schema(frame, table=BASENAME_TO_TABLE[name])
-    _publish_canonical_tables(
-        tuple((name, BASENAME_TO_TABLE[name], frame) for name, frame in tables.items()),
-        output_dir,
-    )
-    return tables
-
-
-def assemble_replay_stop_shards(
-    shard_dirs: Sequence[Path], *, output_dir: Path, expected_sessions: int
-) -> pd.DataFrame:
-    """Join per-animal shards of the stop-only table and publish it.
-
-    The stop-only table (:func:`build_stop_table_scope`) is the input of the
-    qvals bootstrap; this joins the shards of a per-animal stop-only build.
-
-    Parameters
-    ----------
-    shard_dirs : sequence of Path
-        The shard folders, each holding one ``stop_table``.
-    output_dir : Path
-        Where the joined ``stop_table`` is published.
-    expected_sessions : int
-        The number of sessions the shards must hold together.
-
-    Returns
-    -------
-    pd.DataFrame
-        The published stop table.
-
-    Raises
-    ------
-    ValueError
-        If the shards overlap or miss sessions, or a ``stop_id`` is missing or
-        repeats.
-    """
-    shards = read_disjoint_shards(
-        shard_dirs,
-        {"stop_table": "stop_table"},
-        what="stop",
-        expected_sessions=expected_sessions,
-    )
-    stop_table = pd.concat(
-        [frames["stop_table"] for frames in shards], ignore_index=True
-    )
-    if stop_table["stop_id"].isna().any() or stop_table["stop_id"].duplicated().any():
-        raise ValueError("assembled stop table requires unique nonmissing stop_id")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    stamp_swr_source(stop_table)
-    path = publish_swr_table(
-        stop_table,
-        output_dir,
-        table="stop",
-        basename="stop_table",
-    )
-    logging.info("saved stop_table -> %s (%d rows)", path, len(stop_table))
-    return stop_table

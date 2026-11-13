@@ -380,7 +380,7 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
     import json
     from pathlib import Path
 
-    from continuum_swr_replay.analysis.behavior.tables import prepare_data as pdm
+    from scripts.tables._table_runner import find_sessions
 
     spec = importlib.util.spec_from_file_location(
         "run_pfc_analysis_bandit",
@@ -392,7 +392,7 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
     runner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runner)
 
-    sessions = [s for s in pdm.find_sessions(max_per_animal=1) if s["results_file"]]
+    sessions = [s for s in find_sessions(max_per_animal=1) if s["results_file"]]
     assert sessions, "no session with decode results on disk"
 
     # A session with no mPFC units writes arrays and a sidecar but never scores
