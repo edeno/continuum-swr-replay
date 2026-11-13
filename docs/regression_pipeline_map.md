@@ -104,7 +104,7 @@ Canonical per-non-local-event classification table.
 
 Shared whole-unit complete-case cohort selection.
 
-`freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`
+`sorted_unit_ids`, `freeze_common_cohort`, `stop_cohort_suffix`, `select_stop_cohort`, `select_event_cohort`, `stop_interval_mask`, `events_in_stops`
 
 ### `src/continuum_swr_replay/analysis/events/eligibility.py`
 
@@ -188,7 +188,7 @@ The HPC decode's masks, from the paper's SWR source.
 
 What the replay detection runners read from a saved HPC decode and from each other.
 
-`marks_cache_dir`, `input_paths`, `marks_cache_path`, `load_marks`, `marks_sha256`, `decode_marks`, `carey_output_paths`, `memoryless_output_paths`
+`position_span_samples`, `marks_cache_dir`, `input_paths`, `marks_cache_path`, `load_marks`, `marks_sha256`, `decode_marks`, `carey_output_paths`, `memoryless_output_paths`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/event_analysis.py`
 
@@ -272,7 +272,7 @@ Stable row identities: the ``event_id`` and ``stop_id`` hashes.
 
 The natural key for one recording session: (animal, session_date, epoch).
 
-`session_key_set`, `n_sessions`, `session_key_frame`, `subset_max_per_animal`, `present_session_columns`, `require_session_unique_ids`
+`session_key_set`, `n_sessions`, `session_key_frame`, `subset_max_per_animal`, `one_session`, `present_session_columns`, `require_session_unique_ids`
 
 ## Covariates
 
@@ -416,7 +416,7 @@ Estimators and the per-session fit machinery each runner calls.
 
 Shared fit-diagnostics helpers: convergence, separation, warning capture, flag counts.
 
-`fit_status`, `separated_terms`, `capture_fit_warnings`, `count_fit_quality_warnings`, `flagged_separated`, `fit_flag_counts`
+`fit_status`, `separated_terms`, `capture_fit_warnings`, `count_fit_quality_warnings`, `flagged_separated`, `fit_flag_counts`, `flagged_nonconverged`, `fold_flag_counts`
 
 ### `src/continuum_swr_replay/analysis/behavior/_helpers.py`
 
@@ -482,7 +482,7 @@ Per-bin conditional-intensity Poisson model for replay event onsets (Family B).
 
 Poisson rate model for replay event occurrence.
 
-`fit_per_stop_rate_model`, `cross_validate_per_stop_rate_model`, `incomplete_stops`, `fit_per_stop_rate_hierarchy`
+`fit_per_stop_rate_model`, `cross_validate_per_stop_rate_model`, `incomplete_stops`, `fit_per_stop_rate_hierarchy`, `fit_event_source_rate_hierarchy`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/ridge_history_cv.py`
 
@@ -522,7 +522,7 @@ Fit three replay-CONTENT estimators on one at-well cohort and compare them.
 
 Run the replay-content analysis suite on one event source and save fits.
 
-`fit_per_stop_rate_hierarchy`, `run_switch_aligned`, `main`
+`run_switch_aligned`, `main`
 
 ### `scripts/behavior/content/fit_replay_content_models.py`
 
@@ -1124,7 +1124,7 @@ The epoch identifier: how a decode is named, built and read back.
 
 The one reader of a decode's ``{epoch_identifier}_results.nc``.
 
-`open_results`
+`nonlocal_probability`, `open_results`
 
 ### `src/continuum_swr_replay/tables/io.py`
 
@@ -1206,7 +1206,7 @@ The per-event SWR-power model: an event's ripple power against the behavioral co
 
 Which sessions of a rung pair can be compared by an information criterion.
 
-`why_not_comparable`
+`why_not_comparable`, `pair_rung_fits`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/cross_history.py`
 

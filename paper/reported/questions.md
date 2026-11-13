@@ -2887,7 +2887,7 @@ without being called, is not listed.
 | `mpfc.called_fraction_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.best_model_fractions`, `analysis.pfc.population_statistics.bh_called_fraction`, `analysis.pfc.population_statistics.called_fraction_by_animal`, `analysis.pfc.population_statistics.called_fractions` |  |
 | `mpfc.cohort_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.cohort_count_statistics` |  |
 | `mpfc.estimator_values` | `reported/mpfc/population.py` | `analysis.pfc.heldout.empirical_pvalue_floor`, `analysis.pfc.population_statistics.fit_count_statistics` |  |
-| `mpfc.marked_family_values` | `reported/mpfc/followups.py` | none |  |
+| `mpfc.marked_family_values` | `reported/mpfc/followups.py` | `analysis.pfc.marked_family_statistics.wide_statistics` |  |
 | `mpfc.null_geometry_values` | `reported/mpfc/population.py` | `analysis.behavior.coefficient_statistics.group_range`, `analysis.pfc.population_statistics.called_without_improvement`, `analysis.pfc.population_statistics.session_value_statistics`, `analysis.pfc.population_statistics.unmatchable_event_statistics` |  |
 | `mpfc.overlap_and_effect_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.peak_modulation_statistics`, `analysis.pfc.population_statistics.replay_class_overlap_statistics`, `analysis.pfc.population_statistics.replay_split_statistics` |  |
 | `mpfc.prior_binding_values` | `reported/mpfc/population.py` | `analysis.behavior.coefficient_statistics.group_range`, `analysis.pfc.population_statistics.prior_binding_percent` |  |
