@@ -86,7 +86,7 @@ The analysed-time read point: a decode frame held to the one analysed-time rule.
 
 The artifact run folder: one cores file per epoch, and the run's manifest.
 
-`ArtifactRunError`, `EpochCores`, `cores_path`, `empty_cores`, `make_cores`, `validate_cores`, `write_cores`, `write_manifest`, `read_manifest`, `read_epoch_cores`, `epoch_artifact_intervals`
+`ArtifactRunError`, `EpochCores`, `cores_path`, `empty_cores`, `make_cores`, `validate_cores`, `write_cores`, `read_manifest`, `read_epoch_cores`, `epoch_artifact_intervals`
 
 ### `src/continuum_swr_replay/analysis/events/artifact_masks.py`
 
@@ -1072,12 +1072,6 @@ Where content-ladder fits land, and how their numbers are read.
 
 `resolve_contfrag_paths`, `canonical_output_subdir`, `canonical_output_subdirs`, `partial_ladder_subdir`, `belief_chain_output_subdir`, `scale_label`, `frame_estimator`
 
-### `src/continuum_swr_replay/analysis/behavior/fit_provenance.py`
-
-Sidecar records tying a fitted artifact to the tables it was fit on.
-
-`fit_provenance_path`, `git_hash`, `record_inputs`, `write_fit_provenance`, `check_fit_provenance`, `require_fresh_inputs`
-
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/evidence.py`
 
 Held-out evidence of every window, by tetrode half (see the package notes).
@@ -1122,9 +1116,9 @@ The epoch identifier: how a decode is named, built and read back.
 
 ### `src/continuum_swr_replay/decoding/results.py`
 
-The one reader of a decode's ``{epoch_identifier}_results.nc``.
+The one reader of a decode's ``{epoch_identifier}_results.nc``, and of the clusterless detector it saved beside it (:func:`load_saved_detector`).
 
-`nonlocal_probability`, `open_results`
+`nonlocal_probability`, `open_results`, `load_saved_detector`
 
 ### `src/continuum_swr_replay/tables/io.py`
 
