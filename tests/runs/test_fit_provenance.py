@@ -130,6 +130,21 @@ def test_sidecar_refuses_extras_that_would_overwrite_its_own_fields(fit_dir, inp
     assert not fit_provenance_path(fit_dir / "all_models.pkl").exists()
 
 
+def test_a_sidecar_is_strict_json_and_a_refused_one_leaves_the_old_one(fit_dir, inputs):
+    """Written sorted, indented and newline-ended; NaN is refused, and the
+    sidecar already there is not replaced by half a file."""
+    artifact = fit_dir / "all_models.pkl"
+    sidecar = write_fit_provenance(artifact, inputs, "poisson_glm", ["fit.py"])
+    text = sidecar.read_text()
+    assert text == json.dumps(json.loads(text), indent=2, sort_keys=True) + "\n"
+
+    with pytest.raises(ValueError):
+        write_fit_provenance(
+            artifact, inputs, "poisson_glm", ["fit.py"], extra={"x": float("nan")}
+        )
+    assert sidecar.read_text() == text
+
+
 def test_a_pkl_input_is_the_fitted_bundle_hashed_as_it_is(fit_dir):
     """An aggregate-only run reads a fitted bundle, which stays pickled."""
     bundle = fit_dir / "swr_contrast_rate.pkl"

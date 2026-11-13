@@ -37,7 +37,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import sha256_file, write_json
 from continuum_swr_replay.runs.provenance import git_commit, git_dirty
 from continuum_swr_replay.tables.io import read_attrs, resolved_table_path
 
@@ -226,7 +226,9 @@ def write_fit_provenance(
     Raises
     ------
     ValueError
-        If ``extra`` would overwrite a field the sidecar defines itself.
+        If ``extra`` would overwrite a field the sidecar defines itself, or the
+        record holds NaN or infinity: the sidecar is strict JSON, written
+        atomically (``runs.io.write_json``), so a reader never sees half of it.
     """
     artifact = Path(artifact_path)
     record = {
@@ -249,7 +251,7 @@ def write_fit_provenance(
             )
         record.update(extra)
     out = fit_provenance_path(artifact)
-    out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    write_json(out, record, indent=2, sort_keys=True, final_newline=True)
     return out
 
 
