@@ -64,6 +64,7 @@ from continuum_swr_replay.reported.values import (
     rel,
     value_factory,
 )
+from continuum_swr_replay.runs.io import read_manifest
 
 STATE_EVIDENCE_RUN = "_refresh_20261016"
 """The held-out tetrode run the detection summary reads (242 epochs, all ``ok``)."""
@@ -1055,7 +1056,7 @@ def summarize(inputs: DetectionInputs, produced_by: str) -> Summary:
     summary.add(
         *state_evidence_values(
             pd.read_csv(bouts_path),
-            json.loads(manifest_path.read_text()),
+            read_manifest(inputs.state_evidence_dir),
             f"{rel(bouts_path)} and manifest.json (scripts/detection/run_state_evidence.py; "
             "pooled by the runner's own summarize over the per-epoch records, "
             "2026-10-17)",
@@ -1066,7 +1067,7 @@ def summarize(inputs: DetectionInputs, produced_by: str) -> Summary:
         file_record(manifest_path, ROOT_DIR),
     ]
 
-    pilot_settings = json.loads(inputs.pilot_manifest.read_text())["settings"]
+    pilot_settings = read_manifest(inputs.pilot_manifest.parent)["settings"]
     summary.add(
         *pilot_stray_window_values(
             pd.read_parquet(inputs.pilot_events),
