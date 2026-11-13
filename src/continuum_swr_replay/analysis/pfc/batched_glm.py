@@ -543,6 +543,34 @@ def _sweep(
     return information.reshape(n_units, rank, rank), rhs, deviance, llf_kernel
 
 
+def _truncated_inverse_spectrum(
+    information: jnp.ndarray, rcond: float
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Eigenvectors of ``information`` and its eigenvalues' cut reciprocals.
+
+    The one truncation rule of the solve and the covariance: an eigenvalue at
+    or below ``rcond`` times the largest one's magnitude (per matrix) has a
+    reciprocal of zero.
+
+    Parameters
+    ----------
+    information : jnp.ndarray, shape (..., rank, rank)
+        Symmetric matrices.
+    rcond : float
+        Eigenvalue cutoff relative to the largest eigenvalue.
+
+    Returns
+    -------
+    eigenvectors : jnp.ndarray, shape (..., rank, rank)
+    inverse : jnp.ndarray, shape (..., rank)
+    """
+    eigenvalues, eigenvectors = jnp.linalg.eigh(information)
+    largest = jnp.max(jnp.abs(eigenvalues), axis=-1, keepdims=True)
+    keep = eigenvalues > rcond * largest
+    inverse = jnp.where(keep, 1.0 / jnp.where(keep, eigenvalues, 1.0), 0.0)
+    return eigenvectors, inverse
+
+
 @jax.jit
 def _solve(information: jnp.ndarray, rhs: jnp.ndarray, rcond: float) -> jnp.ndarray:
     """Per-unit symmetric pseudo-inverse solve of ``(H + P) c = r``.
@@ -558,23 +586,20 @@ def _solve(information: jnp.ndarray, rhs: jnp.ndarray, rcond: float) -> jnp.ndar
 
     Parameters
     ----------
-    information : jnp.ndarray, shape (n_units, rank, rank)
-        ``H``, or ``H + P`` when the fit is penalised.
-    rhs : jnp.ndarray, shape (rank, n_units)
+    information : jnp.ndarray, shape (..., n_units, rank, rank)
+        ``H``, or ``H + P`` when the fit is penalised. Leading axes (the
+        flattened ``design x fold`` batch of the held-out fits) are batch axes.
+    rhs : jnp.ndarray, shape (..., rank, n_units)
     rcond : float
         Eigenvalue cutoff relative to the largest eigenvalue.
 
     Returns
     -------
-    jnp.ndarray, shape (n_units, rank)
+    jnp.ndarray, shape (..., n_units, rank)
     """
-    eigenvalues, eigenvectors = jnp.linalg.eigh(information)
-    largest = jnp.max(jnp.abs(eigenvalues), axis=1, keepdims=True)
-    keep = eigenvalues > rcond * largest
-    inverse = jnp.where(keep, 1.0 / jnp.where(keep, eigenvalues, 1.0), 0.0)
-
-    projected = jnp.einsum("nji,nj->ni", eigenvectors, rhs.T)
-    return jnp.einsum("nij,nj->ni", eigenvectors, inverse * projected)
+    eigenvectors, inverse = _truncated_inverse_spectrum(information, rcond)
+    projected = jnp.einsum("...ji,...j->...i", eigenvectors, jnp.swapaxes(rhs, -1, -2))
+    return jnp.einsum("...ij,...j->...i", eigenvectors, inverse * projected)
 
 
 def _parameter_covariance(
@@ -606,10 +631,7 @@ def _parameter_covariance(
     -------
     NDArray, shape (n_units, n_features, n_features)
     """
-    eigenvalues, eigenvectors = jnp.linalg.eigh(information)
-    largest = jnp.max(jnp.abs(eigenvalues), axis=1, keepdims=True)
-    keep = eigenvalues > rcond * largest
-    inverse = jnp.where(keep, 1.0 / jnp.where(keep, eigenvalues, 1.0), 0.0)
+    eigenvectors, inverse = _truncated_inverse_spectrum(information, rcond)
     # ``B V`` per unit, then ``(B V) diag(1/lambda) (B V)'``.
     rotated = jnp.einsum("pr,nrk->npk", jnp.asarray(back), eigenvectors)
     return np.asarray(jnp.einsum("npk,nk,nqk->npq", rotated, inverse, rotated))
@@ -948,18 +970,6 @@ def _sweep_prediction_batch(
     return information, rhs, deviance
 
 
-def _solve_prediction_batch(
-    information: jax.Array, rhs: jax.Array, rcond: float
-) -> jax.Array:
-    """Symmetric pseudo-inverse solve over model and unit batch axes."""
-    eigenvalues, eigenvectors = jnp.linalg.eigh(information)
-    largest = jnp.max(jnp.abs(eigenvalues), axis=-1, keepdims=True)
-    keep = eigenvalues > rcond * largest
-    inverse = jnp.where(keep, 1.0 / jnp.where(keep, eigenvalues, 1.0), 0.0)
-    projected = jnp.einsum("mnji,mnj->mni", eigenvectors, rhs.transpose(0, 2, 1))
-    return jnp.einsum("mnij,mnj->mni", eigenvectors, inverse * projected)
-
-
 def _score_prediction_batch(
     designs: jax.Array,
     counts: jax.Array,
@@ -1082,9 +1092,7 @@ def _heldout_prediction_batch(
     active = ~failed
     params = jnp.where(
         active[:, :, None],
-        _solve_prediction_batch(
-            information + penalty_matrix[:, None, :, :], rhs, rcond
-        ),
+        _solve(information + penalty_matrix[:, None, :, :], rhs, rcond),
         0.0,
     )
     penalized_previous = initial_deviance
@@ -1125,7 +1133,7 @@ def _heldout_prediction_batch(
         diverged_now = diverged_now | (active_now & ~jnp.isfinite(penalized))
         next_active = active_now & ~just_converged & ~diverged_now
         previous = jnp.where(next_active, penalized, previous)
-        stepped = _solve_prediction_batch(
+        stepped = _solve(
             information_now + penalty_matrix[:, None, :, :], rhs_now, rcond
         )
         should_step = next_active & (next_iteration < maxiter)
@@ -1233,9 +1241,7 @@ def _full_fit_batch(
         start=True,
     )
     failed = jnp.isnan(initial_deviance)
-    cold = _solve_prediction_batch(
-        information + penalty_matrix[:, None, :, :], rhs, rcond
-    )
+    cold = _solve(information + penalty_matrix[:, None, :, :], rhs, rcond)
     # eta = X beta = U (S V' beta): the warm start in the basis's coordinates.
     warm_params = (
         jnp.einsum("mrp,mnp->mnr", right, initial_beta)
@@ -1288,7 +1294,7 @@ def _full_fit_batch(
         diverged_now = diverged_now | (active_now & ~jnp.isfinite(penalized))
         next_active = active_now & ~just_converged & ~diverged_now
         previous_now = jnp.where(next_active, penalized, previous_now)
-        stepped = _solve_prediction_batch(
+        stepped = _solve(
             information_now + penalty_matrix[:, None, :, :], rhs_now, rcond
         )
         should_step = next_active & (next_iteration < maxiter)
