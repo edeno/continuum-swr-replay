@@ -77,6 +77,7 @@ from continuum_swr_replay.analysis.behavior.content import content_statistics
 from continuum_swr_replay.analysis.behavior.content.estimator_comparison import (
     COEFFICIENTS_BASENAME,
 )
+from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.behavior.choice import (
@@ -256,7 +257,7 @@ def summarize(inputs: BehaviorInputs, produced_by: str) -> Summary:
     )
     content = content_contrast_values(audited, sources)
     summary.add(*pend(content, content_stale))
-    events = pd.read_parquet(
+    events = read_swr_table(
         inputs.event_table, columns=["animal", "is_swr", "n_nonlocal_bins"]
     )
     summary.add(
@@ -327,7 +328,7 @@ def summarize(inputs: BehaviorInputs, produced_by: str) -> Summary:
         stay_leave_fits += [logistic, pooled]
         bundles[stratum] = (pd.read_pickle(logistic), pd.read_pickle(pooled))
         record(logistic, pooled)
-    stops = pd.read_parquet(inputs.stop_table)
+    stops = read_swr_table(inputs.stop_table)
     summary.add(
         *pend(
             stay_leave_values(
@@ -339,7 +340,7 @@ def summarize(inputs: BehaviorInputs, produced_by: str) -> Summary:
         )
     )
     record(inputs.stop_table)
-    onsets = pd.read_parquet(
+    onsets = read_swr_table(
         inputs.onset_table, columns=["event_type", "t_since_stop_onset", "stop_id"]
     )
     summary.add(
@@ -349,7 +350,7 @@ def summarize(inputs: BehaviorInputs, produced_by: str) -> Summary:
     )
     record(inputs.onset_table)
     arm, _ = select_event_cohort(
-        pd.read_parquet(
+        read_swr_table(
             inputs.event_arm_table,
             columns=[
                 *content_statistics.TRUNK_COLUMNS,

@@ -41,6 +41,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events import analysed_time, swr_source
+from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.hippocampus.gamma_power import (
     FILTER_ORDER,
     GAMMA_BANDS,
@@ -185,7 +186,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     event_table = table_path("event_table", replay_content_dir())
     event_table_sha256 = sha256_file(event_table)
-    events = pd.read_parquet(
+    events = read_swr_table(
         event_table,
         columns=[*KEYS, "event_id", "event_start_s", "event_end_s", "is_swr"],
     )

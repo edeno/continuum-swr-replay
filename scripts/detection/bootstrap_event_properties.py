@@ -32,6 +32,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.hippocampus.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
     bootstrap_contrasts,
@@ -70,7 +71,7 @@ PROPERTIES = {
 
 
 def load_events() -> tuple[pd.DataFrame, list[Path]]:
-    events = pd.read_parquet(table_path("event_table", replay_content_dir()))
+    events = read_swr_table(table_path("event_table", replay_content_dir()))
     paths = sorted(
         (processed_data_dir() / EVENT_START_REST_THETA_DIR).glob("*.parquet")
     )

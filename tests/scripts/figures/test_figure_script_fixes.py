@@ -41,6 +41,7 @@ from continuum_swr_replay.analysis.events import (  # noqa: E402
     analysed_time,
     swr_source,
 )
+from continuum_swr_replay.tables.io import write_table  # noqa: E402
 from scripts.figures import generate_supp_pipeline_data_flow as flow  # noqa: E402
 from tests.support._swr_inventory_fixtures import (  # noqa: E402
     use_swr_source,
@@ -442,7 +443,7 @@ def test_figure02_checks_the_event_table_against_the_cached_frame_counts(
         "event_table", tmp_path / replay_content_dir().relative_to(processed_data_dir())
     )
     table.parent.mkdir(parents=True)
-    _figure02_events().to_parquet(table)
+    write_table(analysed_time.stamp_swr_source(_figure02_events()), table)
     cache = figure02._figure02_cache_path("wilbur20210329_.nwb", "02_r1", tmp_path)
     cache.parent.mkdir(parents=True)
     drawn = {}

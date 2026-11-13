@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 import scripts.detection.measure_ripple_class_structure as structure
+from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
 from continuum_swr_replay.analysis.hippocampus.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
 )
@@ -22,6 +23,7 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs.io import files_sha256, output_path
+from continuum_swr_replay.tables.io import write_table
 
 
 def _features(event_id: int, ripple_z_max: float) -> pd.DataFrame:
@@ -41,17 +43,22 @@ def _lay_out_inputs() -> None:
     failed, and ``e2`` left a features table behind holding the same event."""
     event_table = table_path("event_table", replay_content_dir())
     event_table.parent.mkdir(parents=True)
-    pd.DataFrame(
-        {
-            "event_id": pd.Series([5], dtype="uint64"),
-            "whole_event_speed_eligible": True,
-            "ripple_power_z": 1.0,
-            "is_swr": False,
-            "event_start_s": 1.0,
-            "event_end_s": 1.2,
-            "mean_abs_ahead_behind_cm": 10.0,
-        }
-    ).to_parquet(event_table)
+    write_table(
+        stamp_swr_source(
+            pd.DataFrame(
+                {
+                    "event_id": pd.Series([5], dtype="uint64"),
+                    "whole_event_speed_eligible": True,
+                    "ripple_power_z": 1.0,
+                    "is_swr": False,
+                    "event_start_s": 1.0,
+                    "event_end_s": 1.2,
+                    "mean_abs_ahead_behind_cm": 10.0,
+                }
+            )
+        ),
+        event_table,
+    )
     criterion = structure.out_dir() / "criterion"
     criterion.mkdir(parents=True)
     pd.DataFrame(

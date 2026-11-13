@@ -105,7 +105,11 @@ from continuum_swr_replay.analysis.events.swr_source import (
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.intervals import as_frame, interval_mask
 from continuum_swr_replay.tables.columns import require_columns
-from continuum_swr_replay.tables.io import SWR_SOURCE_ATTR, publish_canonical
+from continuum_swr_replay.tables.io import (
+    SWR_SOURCE_ATTR,
+    publish_canonical,
+    read_table,
+)
 from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,
     SESSION_COLUMNS_DAY,
@@ -115,6 +119,7 @@ from continuum_swr_replay.tables.session_keys import (
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "read_swr_table",
     "DECODE_EVENT_COUNT_COLUMNS",
     "DECODE_SWR_COUNT_COLUMNS",
     "IN_EXCLUDED_TIME_COLUMN",
@@ -239,6 +244,41 @@ def require_swr_source(frame: pd.DataFrame, *, what: str) -> None:
             f"{swr_source.swr_source_name()!r}; regenerate it (and its atomic "
             "set) from the current source"
         )
+
+
+def read_swr_table(
+    path: str | Path,
+    columns: list[str] | None = None,
+    filters: list[tuple[str, str, Any]] | None = None,
+) -> pd.DataFrame:
+    """Read a canonical table and refuse one built from another SWR source.
+
+    The one way to read a table of ``tables.io.SWR_SOURCE_TABLES``:
+    ``tables.io.read_table`` (which restores the stamp) followed by
+    :func:`require_swr_source`. ``pd.read_parquet`` drops the stamp, so a table
+    read with it cannot be checked.
+
+    Parameters
+    ----------
+    path : str or Path
+        The table's path (``paths.table_path``).
+    columns : list of str, optional
+        Read only these columns.
+    filters : list of (column, operator, value), optional
+        Read only the rows that pass.
+
+    Returns
+    -------
+    pd.DataFrame
+
+    Raises
+    ------
+    SwrSourceError
+        If the table's stamp is missing or names another source.
+    """
+    frame = read_table(path, columns=columns, filters=filters)
+    require_swr_source(frame, what=str(path))
+    return frame
 
 
 def publish_swr_table(

@@ -52,6 +52,7 @@ import pandas as pd  # noqa: E402
 
 from continuum_swr_replay.analysis.constants import REMOTE_CM  # noqa: E402
 from continuum_swr_replay.analysis.events import analysed_time  # noqa: E402
+from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
     swr_epoch_id_of_session,
 )
@@ -140,7 +141,7 @@ def epoch_identifier(row: pd.Series) -> str:
 
 def run_measure(args: argparse.Namespace) -> None:
     manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
-    events = pd.read_parquet(table_path("event_table", replay_content_dir()))
+    events = read_swr_table(table_path("event_table", replay_content_dir()))
     events = events.assign(epoch_id=events.apply(epoch_identifier, axis=1))
     by_epoch = dict(tuple(events.groupby("epoch_id")))
     identifiers = sorted(by_epoch)
@@ -178,7 +179,7 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
     The spike counts are read from the features tables of the epochs the event
     features run's manifest marks ``ok`` (``runs.io.ok_table_paths``)."""
     event_table = table_path("event_table", replay_content_dir())
-    events = pd.read_parquet(event_table)
+    events = read_swr_table(event_table)
     n_events = len(events)
     if not events.whole_event_speed_eligible.all():
         raise ValueError(

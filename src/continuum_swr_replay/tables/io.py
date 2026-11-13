@@ -255,7 +255,11 @@ def write_atomically(path: Path, write: Callable[[Path], object]) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def read_table(path: str | Path, columns: list[str] | None = None) -> pd.DataFrame:
+def read_table(
+    path: str | Path,
+    columns: list[str] | None = None,
+    filters: list[tuple[str, str, Any]] | None = None,
+) -> pd.DataFrame:
     """Read a canonical table from parquet, restoring its ``attrs``.
 
     Parameters
@@ -264,6 +268,8 @@ def read_table(path: str | Path, columns: list[str] | None = None) -> pd.DataFra
         Table path, ``.parquet`` or without a suffix (:func:`resolved_table_path`).
     columns : list of str, optional
         Read only these columns, without touching the rest of the file.
+    filters : list of (column, operator, value), optional
+        Read only the rows that pass, as ``pyarrow.parquet.read_table`` takes them.
 
     Returns
     -------
@@ -284,7 +290,7 @@ def read_table(path: str | Path, columns: list[str] | None = None) -> pd.DataFra
             "scripts/tables/prepare_replay_content_data.py"
         )
 
-    table = pq.read_table(parquet, columns=columns)
+    table = pq.read_table(parquet, columns=columns, filters=filters)
     frame = table.to_pandas()
 
     frame.attrs = _attrs_from_metadata(table.schema.metadata)

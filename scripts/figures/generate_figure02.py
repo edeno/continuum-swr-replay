@@ -71,7 +71,10 @@ import pandas as pd
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.events.analysed_time import swr_intervals
+from continuum_swr_replay.analysis.events.analysed_time import (
+    read_swr_table,
+    swr_intervals,
+)
 from continuum_swr_replay.analysis.events.classified_table import (
     assert_drawn_class_matches_ripples,
     build_classified_nonlocal_event_table,
@@ -502,7 +505,7 @@ def generate_figure(
     )
     logging.info(f"Reading panels b and d from {event_table}...")
     panels = event_table_panels(
-        pd.read_parquet(event_table), inputs["classified_class_counts"]
+        read_swr_table(event_table), inputs["classified_class_counts"]
     )
     class_counts = panels["class_counts"]
     logging.info(

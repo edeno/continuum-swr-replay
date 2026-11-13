@@ -59,6 +59,7 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.events.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
+    read_swr_table,
     swr_intervals,
 )
 from continuum_swr_replay.analysis.events.classified_table import (
@@ -309,7 +310,7 @@ def event_panels(
 def read_event_panels(inputs: EventsInputs) -> dict:
     """:func:`event_panels` of the files the events summary reads (``inputs``)."""
     return event_panels(
-        pd.read_parquet(inputs.event_table),
+        read_swr_table(inputs.event_table),
         pd.read_parquet(inputs.brain_state_reference),
         pd.read_csv(inputs.property_bootstrap / "intervals.csv", index_col=0),
     )

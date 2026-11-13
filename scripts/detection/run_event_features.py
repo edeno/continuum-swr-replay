@@ -76,6 +76,7 @@ Usage:
 
 import os
 
+from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.runs.threads import pin_blas_threads
 
 pin_blas_threads()
@@ -475,7 +476,7 @@ def epoch_tables(
     engagement = interval_features(traces, intervals, sample_interval_s=DECODE_SAMPLE_S)
     _require_requested(rows, engagement)
 
-    stops = pd.read_parquet(
+    stops = read_swr_table(
         stop_table,
         filters=[
             ("animal", "==", session[0]),

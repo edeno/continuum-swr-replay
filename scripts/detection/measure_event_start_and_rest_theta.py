@@ -29,6 +29,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events import analysed_time
+from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id_of_session
 from continuum_swr_replay.analysis.hippocampus.start_and_rest_theta import (
     start_and_rest_theta,
@@ -82,7 +83,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
     manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
     event_table = table_path("event_table", replay_content_dir())
-    events = pd.read_parquet(
+    events = read_swr_table(
         event_table,
         columns=["event_id", "animal", "session_date", "epoch", "non_local_event"],
     )

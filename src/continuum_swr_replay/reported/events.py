@@ -59,6 +59,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.events.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.hippocampus import event_statistics, quality_metrics
 from continuum_swr_replay.analysis.hippocampus.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
@@ -1681,7 +1682,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     """The events summary from ``inputs``."""
     summary = Summary(name="events", produced_by=produced_by)
 
-    events = pd.read_parquet(inputs.event_table)
+    events = read_swr_table(inputs.event_table)
     event_table_record = file_record(inputs.event_table, ROOT_DIR)
     current_sha256 = event_table_record["sha256"]
     # every per-epoch input must hold the epoch register's analysed epochs
