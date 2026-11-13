@@ -39,8 +39,7 @@ from .spatial import arm_dist_rank, dist_to_arm_from_well
 
 def broadcast_candidate_arms(event_table: pd.DataFrame) -> pd.DataFrame:
     """Repeat each event over the exact canonical nine-arm choice set."""
-    if "event_id" not in event_table:
-        raise ValueError("event_table is missing event_id")
+    require_columns(event_table, ["event_id"], "event_table")
     if (
         event_table["event_id"].isna().any()
         or event_table["event_id"].duplicated().any()

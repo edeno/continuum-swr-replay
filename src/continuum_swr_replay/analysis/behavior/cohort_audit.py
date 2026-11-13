@@ -21,6 +21,7 @@ from collections.abc import Container, Iterable, Iterator, Sequence
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 # Session-level informational flags (``_fit_diagnostics.fit_flag_counts``). Carried
@@ -212,9 +213,7 @@ def attach_has_qvals_row(
     ValueError
         If ``from_column`` is not a row-gated base covariate, or its NaN mask
         differs between the rows of one event (it is then not the stop's qvals
-        status).
-    KeyError
-        If ``from_column`` is absent: the flag cannot be inferred, and is not
+        status), or is absent: the flag cannot be inferred, and is not
         guessed.
     """
     if from_column in INTERACTION_FACTORS or not is_qvals_gap_column(from_column):
@@ -222,11 +221,7 @@ def attach_has_qvals_row(
             f"{from_column!r} is not a qvals-row-gated base covariate; its NaN "
             "does not say whether the stop has a qvals row"
         )
-    if from_column not in frame.columns:
-        raise KeyError(
-            f"cannot mark which stops have a qvals row: {from_column!r} is not "
-            "in the frame"
-        )
+    require_columns(frame, [from_column], "the frame to mark qvals rows on")
     has_row = frame[from_column].notna()
     mixed = has_row.groupby(frame[event_col], sort=False).nunique() > 1
     if mixed.any():
@@ -268,7 +263,7 @@ def qvals_gap_event_ids(
 
     Raises
     ------
-    KeyError
+    ValueError
         If the rung has a qvals-sourced predictor and ``frame`` lacks
         :data:`HAS_QVALS_ROW`.
     TypeError
@@ -279,11 +274,12 @@ def qvals_gap_event_ids(
     ]
     if not qvals_cols:
         return set()
-    if HAS_QVALS_ROW not in frame.columns:
-        raise KeyError(
-            f"{HAS_QVALS_ROW!r} is required to book the qvals gap for "
-            f"{qvals_cols}; carry it from the qvals join (or attach_has_qvals_row)"
-        )
+    require_columns(
+        frame,
+        [HAS_QVALS_ROW],
+        "the frame to book the qvals gap on (carry the flag from the qvals join, "
+        "or attach_has_qvals_row)",
+    )
     has_row = frame[HAS_QVALS_ROW]
     if not pd.api.types.is_bool_dtype(has_row):
         raise TypeError(f"{HAS_QVALS_ROW!r} must be boolean, got {has_row.dtype}")

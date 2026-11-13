@@ -969,19 +969,19 @@ def analysed_bins(frame: pd.DataFrame) -> NDArray[np.bool_]:
 
     Raises
     ------
-    KeyError
+    ValueError
         If the frame has no ``in_excluded_time`` column.
     TypeError
         If the column is not boolean. There is no coercion: cast to bool, a NaN
         (left by a concat with a frame read another way) would read as excluded
         and a None as analysed.
     """
-    if IN_EXCLUDED_TIME_COLUMN not in frame.columns:
-        raise KeyError(
-            f"the frame has no {IN_EXCLUDED_TIME_COLUMN!r} column: read it "
-            "through analysed_time.read_dot_with_swr_source (or "
-            "load_data_over_time), which marks excluded time"
-        )
+    require_columns(
+        frame,
+        [IN_EXCLUDED_TIME_COLUMN],
+        "the frame (read it through analysed_time.read_dot_with_swr_source or "
+        "load_data_over_time, which mark excluded time)",
+    )
     column = frame[IN_EXCLUDED_TIME_COLUMN]
     if column.dtype != bool:
         raise TypeError(
@@ -1016,7 +1016,7 @@ def immobile_analysed_bins(
 
     Raises
     ------
-    KeyError, TypeError
+    ValueError, TypeError
         As :func:`analysed_bins`.
     """
     return (frame["head_speed"].to_numpy() < speed_threshold) & analysed_bins(frame)
@@ -1055,11 +1055,11 @@ def swr_intervals(
         If `dot` was not read through the source (no ``swr_observed``), or the
         selection does not hold exactly one epoch.
     """
-    if SWR_OBSERVED_COLUMN not in dot.columns:
-        raise ValueError(
-            "swr_intervals needs a frame read through the SWR source "
-            "(read_dot_with_swr_source); this one has no swr_observed column"
-        )
+    require_columns(
+        dot,
+        [SWR_OBSERVED_COLUMN],
+        "swr_intervals's frame (read it through read_dot_with_swr_source)",
+    )
     frame = dot
     if nwb_file_name is not None or epoch_name is not None:
         if nwb_file_name is None or epoch_name is None:

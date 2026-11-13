@@ -78,7 +78,9 @@ def test_stale_canonical_table_aborts_before_fit_or_output(tmp_path, monkeypatch
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(session_fits, "fit_model_per_session", _fit_must_not_run)
 
-    with pytest.raises(ValueError, match="current-location/novelty schema"):
+    with pytest.raises(
+        ValueError, match="regenerate it with the current prepare script"
+    ):
         runner.main(["--models", "M0"])
 
     assert not (_partial_ladder_dir(input_dir, "M0")).exists()

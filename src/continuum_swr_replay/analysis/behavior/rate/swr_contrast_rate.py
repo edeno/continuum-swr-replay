@@ -516,12 +516,10 @@ def contrast_cohort_records(
     """
     total = int(len(stop))  # post-join stops
     n_sessions_in = stop.groupby(list(SESSION_COLUMNS), sort=False).ngroups
-    if len(models) and "cohort" not in models.columns:
-        raise ValueError(
-            "the fitted rows must carry a 'cohort' column; the ladder null is "
-            "fit once per cohort and would otherwise be audited twice against "
-            "the same rows"
-        )
+    if len(models):
+        # The ladder null is fit once per cohort; without the column it would
+        # be audited twice against the same rows.
+        require_columns(models, ["cohort"], "the fitted rows")
     need_by_model = {
         **{m: need for m, (_f, need) in G_SPECS.items()},
         **{m: need for m, (_f, need) in S_SPECS.items()},

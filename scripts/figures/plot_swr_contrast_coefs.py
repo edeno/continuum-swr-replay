@@ -57,6 +57,7 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.cli import fit_figure_parser
 from continuum_swr_replay.runs.fit_provenance import require_fresh_inputs
+from continuum_swr_replay.tables.columns import require_columns
 
 
 def fit_artifact_paths() -> dict[str, Path]:
@@ -154,12 +155,9 @@ def sessions(df, mod, pop, term, sd):
     if "cohort" in g.columns:
         g = g[g.cohort == home_cohort(mod)]
     c = f"coef_{term}"
-    if c not in g.columns:
-        raise KeyError(
-            f"coef column {c!r} absent from fitted pickle for {mod}/{pop} — the row "
-            f"spec references a term the fit did not produce (likely a rename). "
-            f"Row would render blank."
-        )
+    # A row spec naming a term the fit did not produce (likely a rename) would
+    # render blank.
+    require_columns(g, [c], f"the fitted pickle for {mod}/{pop}")
     # The audited aggregation's own session filter and emission gates, so the
     # figure shows exactly the sessions -- and only the terms -- the audited
     # table reports.

@@ -27,6 +27,8 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
 
+from continuum_swr_replay.tables.columns import require_columns
+
 __all__ = [
     "ESTIMATOR_CHOICES",
     "RESPONSE_CHOICES",
@@ -208,12 +210,12 @@ def validate_fraction_response(
         If the column is absent, non-numeric, out of bounds, partially defined
         within an event, or does not sum to 1.0 within ``tolerance``.
     """
-    if response_col not in frame.columns:
-        raise ValueError(
-            f"Canonical content table {table_label} has no {response_col!r} "
-            "column, so it cannot be fit on the fraction response. Regenerate "
-            "it with the current prepare script, or pass --response hard_count."
-        )
+    require_columns(
+        frame,
+        [response_col],
+        f"canonical content table {table_label} (regenerate it with the current "
+        "prepare script, or pass --response hard_count)",
+    )
     series = frame[response_col]
     if not is_numeric_dtype(series) or is_bool_dtype(series):
         raise ValueError(
@@ -316,11 +318,7 @@ def renormalize_fraction_over_candidates(
         partially defined event (some candidates NaN, some not) produces, since
         such an event has no total to divide by.
     """
-    if response_col not in frame.columns:
-        raise ValueError(
-            f"Cannot renormalize {response_col!r} over the retained candidates: "
-            f"the frame has no such column (columns are {list(frame.columns)})"
-        )
+    require_columns(frame, [response_col], "the frame to renormalize")
     series = frame[response_col]
     if not is_numeric_dtype(series) or is_bool_dtype(series):
         raise ValueError(

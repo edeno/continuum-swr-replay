@@ -12,6 +12,7 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
 from continuum_swr_replay.decoding.results import nonlocal_probability
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import (
     hash_stop_id as _hash_stop_id,
@@ -113,8 +114,7 @@ def build_stop_table(
     pd.DataFrame
         Columns: see :data:`_STOP_TABLE_COLUMNS`.
     """
-    if "animal" not in dot.columns:
-        raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
+    require_columns(dot, ["animal"], "dot (set by get_data_over_time)")
     animal, day, epoch = one_session(dot, "build_stop_table")
     animal, day, epoch = str(animal), int(day), str(epoch)
 
@@ -278,9 +278,8 @@ def add_nonlocal_swr_split(
         columns=["n_nonlocal_swr_events", "n_nonlocal_non_swr_events"],
         errors="ignore",
     ).copy()
-    total = out.get("n_selected_events")
-    if total is None:
-        raise KeyError("add_nonlocal_swr_split requires canonical 'n_selected_events'")
+    require_columns(out, ["n_selected_events"], "add_nonlocal_swr_split's stop_table")
+    total = out["n_selected_events"]
     if (
         len(event_table) == 0
         or "stop_id" not in event_table.columns

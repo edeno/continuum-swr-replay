@@ -14,6 +14,7 @@ from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
     WELL_ARMS,
 )
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.session_keys import require_session_unique_ids
 
@@ -413,11 +414,7 @@ def build_event_patch_table(
     # column is RETAINED in the output so the patch-level fitter's
     # ``--swr-subset`` filter (which gates on an ``is_swr`` column) works
     # for ``--hierarchy patch`` as it does for arm fits.
-    if "is_swr" not in event_table.columns:
-        raise ValueError(
-            "build_event_patch_table requires canonical event_table column "
-            "'is_swr'; refusing to fabricate non-SWR labels"
-        )
+    require_columns(event_table, ["is_swr"], "build_event_patch_table's event_table")
     swr_col = event_table[["event_id", "is_swr"]].copy()
     patch_eat = patch_eat.merge(
         swr_col,

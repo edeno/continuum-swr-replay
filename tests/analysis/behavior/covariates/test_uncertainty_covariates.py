@@ -640,13 +640,13 @@ def test_noncanonical_history_parameters_require_full_trials(kwargs, match):
 
 def test_missing_canonical_history_columns_requires_regeneration():
     df = _frame([{}]).drop(columns=["patch_switch_fraction_last5_completed_trips"])
-    with pytest.raises(KeyError, match="regenerate stop_table"):
+    with pytest.raises(ValueError, match=r"stop_table \(regenerate it\) lacks"):
         add_uncertainty_covariates(df)
 
 
 def test_empty_legacy_table_still_requires_canonical_schema():
     legacy = pd.DataFrame(columns=["animal", "session_date", "epoch", "stop_idx"])
-    with pytest.raises(KeyError, match="regenerate stop_table"):
+    with pytest.raises(ValueError, match=r"stop_table \(regenerate it\) lacks"):
         add_uncertainty_covariates(legacy)
 
 

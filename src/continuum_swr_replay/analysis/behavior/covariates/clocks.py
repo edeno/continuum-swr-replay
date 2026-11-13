@@ -8,6 +8,7 @@ import pandas as pd
 from continuum_swr_replay.data_loaders.trial_clocks import (
     outcome_known_times_from_task_visits,
 )
+from continuum_swr_replay.tables.columns import require_columns
 
 
 def trial_arrival_times(trials: pd.DataFrame) -> np.ndarray:
@@ -49,8 +50,7 @@ def trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
     """
     if len(trials) == 0:
         return np.array([], dtype=float)
-    if "end_time" not in trials.columns:
-        raise KeyError("trial outcome timing requires end_time")
+    require_columns(trials, ["end_time"], "trials")
 
     end = trials["end_time"].to_numpy(dtype=float)
     arrival = trial_arrival_times(trials)
@@ -81,10 +81,8 @@ def trial_outcome_times(trials: pd.DataFrame) -> np.ndarray:
     )
     expected_from_physical_clock = None
     if reward_column is not None:
-        if reward is None:
-            raise KeyError(
-                f"{reward_column} requires is_reward to identify rewarded trials"
-            )
+        # is_reward identifies the rewarded trials the reward clock applies to.
+        require_columns(trials, ["is_reward"], f"trials with {reward_column}")
         reward_on = trials[reward_column].to_numpy(dtype=float)
         rewarded = reward.astype(bool)
         if (~np.isfinite(reward_on[rewarded])).any():

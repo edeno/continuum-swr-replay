@@ -19,6 +19,7 @@ from continuum_swr_replay.analysis.events.immobility import (
     event_speeds_are_immobile,
     intervals_from_labels,
 )
+from continuum_swr_replay.tables.columns import require_columns
 
 logger = logging.getLogger(__name__)
 
@@ -90,10 +91,7 @@ def get_immobile_events(
     if method not in ["endpoints", "max"]:
         raise ValueError(f"method must be 'endpoints' or 'max', got {method}")
 
-    if event_col not in data.columns:
-        raise ValueError(f"event_col '{event_col}' not found in data")
-    if speed_col not in data.columns:
-        raise ValueError(f"speed_col '{speed_col}' not found in data")
+    require_columns(data, [event_col, speed_col], "data")
 
     def _filter_low_speed(group: pd.DataFrame) -> bool:
         """Filter events based on speed criteria."""
@@ -173,8 +171,7 @@ def get_event_start_end_times(
     if group_cols is None:
         group_cols = ["animal", "day", "epoch"]
 
-    if event_col not in data.columns:
-        raise ValueError(f"event_col '{event_col}' not found in data")
+    require_columns(data, [event_col], "data")
 
     # One session at a time: ``intervals_from_labels`` reads the bounds off
     # the frame's time index, which is one epoch's time axis.
@@ -231,7 +228,6 @@ def get_event_durations_ms(event_times: pd.DataFrame) -> pd.Series:
     Mean duration: 85.3 ms
 
     """
-    if "duration" not in event_times.columns:
-        raise ValueError("event_times must have 'duration' column")
+    require_columns(event_times, ["duration"], "event_times")
 
     return event_times["duration"] * 1000.0

@@ -28,6 +28,7 @@ from continuum_swr_replay.analysis.events.nonlocal_detection import (
     event_strict_overlap_keys,
 )
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import hash_stop_id
 from continuum_swr_replay.tables.session_keys import one_session
@@ -288,10 +289,7 @@ def build_contfrag_event_table(
         ``fragmented_prob_mean``, ``dominant_state`` (ties go to
         Continuous), ``continuous_fraction``.
     """
-    if "animal" not in dot.columns:
-        raise KeyError(
-            "dot must carry 'animal' column (set by get_contfrag_data_over_time)"
-        )
+    require_columns(dot, ["animal"], "dot (set by get_contfrag_data_over_time)")
     animal, day, epoch = one_session(dot, "build_contfrag_event_table")
     animal, day, epoch = str(animal), int(day), str(epoch)
 
@@ -741,8 +739,7 @@ def build_contfrag_stop_table(
     pd.DataFrame
         Columns: see ``_CONTFRAG_STOP_TABLE_COLUMNS``.
     """
-    if "animal" not in dot.columns:
-        raise KeyError("dot must carry 'animal' column")
+    require_columns(dot, ["animal"], "dot (set by get_contfrag_data_over_time)")
     animal, day, epoch = one_session(dot, "build_contfrag_stop_table")
     animal, day, epoch = str(animal), int(day), str(epoch)
 

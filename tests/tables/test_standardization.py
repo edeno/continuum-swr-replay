@@ -260,7 +260,10 @@ def test_materialized_z_guard_rejects_missing_raw_or_z_column():
             "n_reference_rows": 2,
         }
     }
-    with pytest.raises(ValueError, match="missing raw/standardized"):
+    with pytest.raises(
+        ValueError,
+        match=r"standardization lacks required column\(s\) \['uncertainty'\]",
+    ):
         assert_standardized_matches_reference(
             pd.DataFrame({"uncertainty_z": [0.0, 1.0]}),
             ["uncertainty"],

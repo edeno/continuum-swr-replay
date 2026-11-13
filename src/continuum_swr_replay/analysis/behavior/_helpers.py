@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
+from continuum_swr_replay.tables.columns import require_columns
 
 from .design_constants import ARM_FE_PREDICTORS
 from .spatial_mapping import well_to_arm_set
@@ -337,15 +338,8 @@ def assert_single_session_alignment(
     target_cols = target_session_cols or session_cols
     if len(target_cols) != len(session_cols):
         raise ValueError("source and target session keys must have equal arity")
-    missing_source = [column for column in session_cols if column not in source]
-    missing_target = [column for column in target_cols if column not in target]
-    if missing_source or missing_target:
-        raise KeyError(
-            f"session alignment for {source_name} requires columns "
-            f"source={session_cols}, target={target_cols}; "
-            f"missing from source={missing_source}, "
-            f"target={missing_target}"
-        )
+    require_columns(source, session_cols, f"session alignment source {source_name}")
+    require_columns(target, target_cols, f"session alignment target of {source_name}")
     if (
         source.loc[:, list(session_cols)].isna().any().any()
         or target.loc[:, list(target_cols)].isna().any().any()
@@ -398,8 +392,7 @@ def add_arm_fixed_effects(
     pd.DataFrame
         ``df`` with the dummy columns added.
     """
-    if arm_col not in df.columns:
-        raise KeyError(f"add_arm_fixed_effects: missing arm column {arm_col!r}")
+    require_columns(df, [arm_col], "add_arm_fixed_effects's frame")
     arm = df[arm_col].to_numpy()
     for k, col in enumerate(ARM_FE_PREDICTORS):
         df[col] = (arm == k).astype(np.int8)

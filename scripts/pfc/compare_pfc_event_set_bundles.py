@@ -24,6 +24,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.tables.columns import require_columns
+
 CURVES = (
     "SWR",
     "no_SWR",
@@ -53,10 +55,9 @@ def compare_session(canonical: Path, extended: Path) -> dict[str, object]:
     right = pd.read_pickle(extended)
     if len(left) != len(right):
         raise ValueError(f"{canonical.name}: {len(left)} units against {len(right)}")
+    require_columns(right, left.columns, extended.name)
     worst, worst_column = 0.0, None
     for column in left.columns:
-        if column not in right.columns:
-            raise KeyError(f"{extended.name} lacks canonical column {column!r}")
         a = pd.to_numeric(left[column], errors="coerce").to_numpy(dtype=float)
         b = pd.to_numeric(right[column], errors="coerce").to_numpy(dtype=float)
         if np.all(np.isnan(a)) and np.all(np.isnan(b)):

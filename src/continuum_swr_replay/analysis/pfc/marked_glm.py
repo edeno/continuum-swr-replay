@@ -1017,8 +1017,7 @@ def weighted_event_onset_counts(
         raise ValueError("time must be a non-empty finite one-dimensional axis")
     if axis.size > 1 and not np.all(np.diff(axis) > 0):
         raise ValueError("time must be strictly increasing")
-    if "start_time" not in events:
-        raise KeyError("events must carry start_time")
+    require_columns(events, ["start_time"], "events")
 
     onsets = pd.to_numeric(events["start_time"], errors="coerce").to_numpy(dtype=float)
     if not np.isfinite(onsets).all():
@@ -1167,8 +1166,7 @@ def event_basis_block(
     """
     weights = None
     if mark_column is not None:
-        if mark_column not in events:
-            raise KeyError(f"event mark column {mark_column!r} is missing")
+        require_columns(events, [mark_column], "events")
         weights = pd.to_numeric(events[mark_column], errors="coerce").to_numpy(
             dtype=float
         )

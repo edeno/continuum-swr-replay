@@ -107,5 +107,7 @@ def test_patch_recency_and_novelty_use_leaf_arms_only():
 def test_missing_event_swr_label_is_not_fabricated():
     event_table = _make_event_table().drop(columns="is_swr")
     event_arm_table = _make_event_arm_table(np.zeros(9))
-    with pytest.raises(ValueError, match="refusing to fabricate non-SWR labels"):
+    with pytest.raises(
+        ValueError, match=r"event_table lacks required column\(s\) \['is_swr'\]"
+    ):
         build_event_patch_table(event_table, event_arm_table)

@@ -24,6 +24,7 @@ import time
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .._fit_diagnostics import fit_flag_counts
@@ -450,12 +451,12 @@ def resolve_concentration_cols(
     if not with_event_length or base != ("is_swr",):
         return base
     column = f"{LOG_EVENT_LENGTH}_z"
-    if column not in frame.columns:
-        raise ValueError(
-            f"--concentration-length needs {column!r} on the cohort; the "
-            "assembled arm and patch frames standardize it in "
-            "contrast_aggregation.assemble_arm / assemble_patch"
-        )
+    require_columns(
+        frame,
+        [column],
+        "the cohort (--concentration-length; contrast_aggregation.assemble_arm / "
+        "assemble_patch standardize it)",
+    )
     return (*base, column)
 
 

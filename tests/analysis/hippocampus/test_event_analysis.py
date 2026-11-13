@@ -169,14 +169,18 @@ class TestGetImmobileEvents:
 
     def test_missing_event_col_raises_error(self, mock_event_data):
         """Missing event column should raise ValueError."""
-        with pytest.raises(ValueError, match="event_col.*not found"):
+        with pytest.raises(
+            ValueError, match=r"lacks required column\(s\) \['nonexistent'\]"
+        ):
             get_immobile_events(
                 mock_event_data, event_col="nonexistent", speed_threshold=4.0
             )
 
     def test_missing_speed_col_raises_error(self, mock_event_data):
         """Missing speed column should raise ValueError."""
-        with pytest.raises(ValueError, match="speed_col.*not found"):
+        with pytest.raises(
+            ValueError, match=r"lacks required column\(s\) \['nonexistent'\]"
+        ):
             get_immobile_events(
                 mock_event_data,
                 event_col="event",
@@ -340,7 +344,9 @@ class TestGetEventStartEndTimes:
 
     def test_missing_event_col_raises_error(self, labeled_events):
         """Missing event column should raise ValueError."""
-        with pytest.raises(ValueError, match="event_col.*not found"):
+        with pytest.raises(
+            ValueError, match=r"lacks required column\(s\) \['nonexistent'\]"
+        ):
             get_event_start_end_times(labeled_events, event_col="nonexistent")
 
     def test_named_time_index(self, labeled_events):

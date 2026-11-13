@@ -44,6 +44,7 @@ from typing import NamedTuple
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS
+from continuum_swr_replay.tables.columns import require_columns
 
 from .content_response import renormalize_fraction_over_candidates
 
@@ -1847,11 +1848,7 @@ def restrict_to_leaf_arms(long_df: pd.DataFrame) -> pd.DataFrame:
     ValueError
         If ``candidate_arm`` is absent.
     """
-    if "candidate_arm" not in long_df.columns:
-        raise ValueError(
-            "A leaf-only fit needs the candidate_arm column to identify the leaf "
-            f"rows; columns are {list(long_df.columns)}."
-        )
+    require_columns(long_df, ["candidate_arm"], "the leaf-only fit's frame")
     leaves = long_df["candidate_arm"] < LEAF_ONLY_N_CATEGORIES
     return long_df.loc[leaves].reset_index(drop=True)
 

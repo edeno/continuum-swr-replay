@@ -105,7 +105,10 @@ def test_fraction_within_the_tolerance_is_accepted() -> None:
 
 def test_missing_fraction_column_names_the_column_and_the_way_out() -> None:
     table = canonical_arm_table().drop(columns=["arm_fraction"])
-    with pytest.raises(ValueError, match="arm_fraction.*--response hard_count"):
+    with pytest.raises(
+        ValueError,
+        match=r"--response hard_count\) lacks required column\(s\) \['arm_fraction'\]",
+    ):
         _prepare_arm(table)
 
 
@@ -309,7 +312,7 @@ def test_swr_subset_keeps_the_events_on_its_side() -> None:
 
 
 def test_swr_subset_needs_the_is_swr_column() -> None:
-    with pytest.raises(ValueError, match="is_swr.*synthetic-arm-table"):
+    with pytest.raises(ValueError, match=r"synthetic-arm-table.*\['is_swr'\]"):
         _select(canonical_arm_table(), swr_subset="T")
 
 

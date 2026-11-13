@@ -162,7 +162,7 @@ def test_the_event_context_inherits_the_rule_from_the_labels():
 def test_a_frame_not_read_through_the_source_is_refused(name):
     frame = two_sessions().drop(columns="in_excluded_time")
 
-    with pytest.raises(KeyError, match="in_excluded_time.*read_dot_with_swr_source"):
+    with pytest.raises(ValueError, match="read_dot_with_swr_source.*in_excluded_time"):
         getattr(qm, name)(frame)
 
 

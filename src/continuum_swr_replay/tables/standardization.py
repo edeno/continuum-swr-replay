@@ -29,6 +29,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.columns import require_columns
+
 Reference = dict[str, dict[str, Any]]
 
 
@@ -276,17 +278,11 @@ def assert_standardized_matches_reference(
         Tight numerical tolerances for JSON round-trip differences only.
     """
     requested = tuple(cols)
-    missing = [
-        column
-        for source in requested
-        for column in (source, f"{source}_z")
-        if column not in df
-    ]
-    if missing:
-        raise ValueError(
-            "materialized standardization is missing raw/standardized column(s) "
-            f"{missing}"
-        )
+    require_columns(
+        df,
+        [column for source in requested for column in (source, f"{source}_z")],
+        "the materialized standardization",
+    )
     if not requested:
         return
 

@@ -29,6 +29,7 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     freeze_common_cohort,
     select_event_cohort,
 )
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from .._helpers import add_arm_fixed_effects
@@ -162,13 +163,12 @@ def prepare_canonical_fit_request(
             f"hierarchy_kind must be 'candidate_arm' or 'patch', got {hierarchy_kind!r}"
         ) from exc
 
-    missing_schema = [column for column in required_schema if column not in long_df]
-    if missing_schema:
-        raise ValueError(
-            f"Canonical {hierarchy_kind} content table {table_label} is missing "
-            "current-location/novelty schema column(s) "
-            f"{missing_schema}. Regenerate it with the current prepare script."
-        )
+    require_columns(
+        long_df,
+        required_schema,
+        f"canonical {hierarchy_kind} content table {table_label} (regenerate it "
+        "with the current prepare script)",
+    )
     response_col = resolve_response_column(hierarchy_kind, response)
     validate_canonical_table_contract(
         long_df,
@@ -318,9 +318,8 @@ def select_content_cohort(
     Raises
     ------
     ValueError
-        If a subset is asked of a table without ``is_swr``.
-    KeyError
-        If the table has no ``occupancy_state``.
+        If a subset is asked of a table without ``is_swr``, or the table has
+        no ``occupancy_state``.
     RuntimeError
         If the complete-case freeze removes every event, or every survivor has
         a zero response.
@@ -329,11 +328,9 @@ def select_content_cohort(
     # event-level on the event_arm_table and patch table. Drop whole
     # events / patch-rows where is_swr doesn't match.
     if swr_subset != "all":
-        if "is_swr" not in long_df.columns:
-            raise ValueError(
-                "--swr-subset requires canonical column 'is_swr'; not found in "
-                f"{table_label}. Regenerate the table."
-            )
+        require_columns(
+            long_df, ["is_swr"], f"{table_label} (--swr-subset; regenerate the table)"
+        )
         keep = long_df["is_swr"] if swr_subset == "T" else ~long_df["is_swr"]
         n_before_rows = len(long_df)
         long_df = long_df.loc[keep].reset_index(drop=True)

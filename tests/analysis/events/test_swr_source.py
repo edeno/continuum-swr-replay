@@ -1134,7 +1134,7 @@ class TestTheAnalysedBins:
 
     def test_a_frame_without_the_column_is_refused(self):
         with pytest.raises(
-            KeyError, match="in_excluded_time.*read_dot_with_swr_source"
+            ValueError, match="read_dot_with_swr_source.*in_excluded_time"
         ):
             analysed_time.analysed_bins(pd.DataFrame({"head_speed": [0.0]}))
 

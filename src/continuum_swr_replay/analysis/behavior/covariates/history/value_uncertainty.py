@@ -13,6 +13,7 @@ from continuum_swr_replay.analysis.behavior.design_constants import (
 from continuum_swr_replay.data_loaders.constants import (
     WELL_ARMS,
 )
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ._common import _prepare_port_experiences
@@ -148,12 +149,7 @@ def _completed_visit_context(stops: pd.DataFrame) -> pd.DataFrame:
         "patch_switch_fraction_last5_completed_trips",
         "leaky_q_value_diff",
     )
-    missing = [column for column in required if column not in stops]
-    if missing:
-        raise KeyError(
-            "visit-grain uncertainty covariates require explicit completed "
-            f"trial context columns {missing}; regenerate stop_table"
-        )
+    require_columns(stops, required, "stops (regenerate stop_table)")
     if len(stops) == 0:
         return pd.DataFrame(columns=required)
 
@@ -356,12 +352,7 @@ def _validated_stop_table(
         "patch_switch_fraction_last5_completed_trips",
         "leaky_q_value_diff",
     )
-    missing = [column for column in required if column not in stop_table]
-    if missing:
-        raise KeyError(
-            "uncertainty covariates require canonical stop-table columns "
-            f"{missing}; regenerate stop_table"
-        )
+    require_columns(stop_table, required, "stop_table (regenerate it)")
 
     out = stop_table.copy()
     expected_lag_cols = [

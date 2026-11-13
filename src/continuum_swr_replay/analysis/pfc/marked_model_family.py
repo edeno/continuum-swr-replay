@@ -1078,13 +1078,11 @@ def build_recommended_event_mark_table(
 
     Raises
     ------
-    KeyError
-        If either table lacks a required column.
     ValueError
-        If the tables are empty, disagree on the event set, timing or
-        ``is_swr``, if the arm geometry is not nine unit-summing arms per
-        event, if a leaf quantity is only partially available within an
-        event, or if a duration, time, extent or reversal count is not a
+        If either table lacks a required column, if the tables are empty,
+        disagree on the event set, timing or ``is_swr``, if the arm geometry
+        is not nine unit-summing arms per event, if a leaf quantity is only
+        partially available within an event, or if a duration, time, extent or reversal count is not a
         finite non-negative value.
     """
     arm_required = {
@@ -1123,12 +1121,8 @@ def build_recommended_event_mark_table(
         THETA_POWER,
         DECODE_ENTROPY,
     }
-    missing_arm = sorted(arm_required - set(event_arm_table))
-    missing_event = sorted(event_required - set(event_table))
-    if missing_arm or missing_event:
-        raise KeyError(
-            f"missing model-family columns: arm={missing_arm}, event={missing_event}"
-        )
+    require_columns(event_arm_table, arm_required, "event_arm_table")
+    require_columns(event_table, event_required, "event_table")
     if event_arm_table.empty or event_table.empty:
         raise ValueError("event-arm and event tables must both be non-empty")
     if event_table["event_id"].duplicated().any():
@@ -1230,8 +1224,7 @@ def build_recommended_event_mark_table(
     marks[CURRENT_X_RIPPLE] = marks[CURRENT_ARM_FRACTION] * marks[RIPPLE_POWER]
     marks[UNCERTAINTY_X_RIPPLE] = marks[CONTENT_UNCERTAINTY] * marks[RIPPLE_POWER]
     if stop_marks is not None:
-        if "stop_idx" not in marks:
-            raise KeyError("event_table needs stop_idx to join stop-level marks")
+        require_columns(marks, ["stop_idx"], "event_table (to join stop-level marks)")
         stop_idx = pd.to_numeric(marks["stop_idx"], errors="coerce")
         unknown = ~stop_idx.isin(stop_marks.index)
         if unknown.any():
@@ -1987,8 +1980,7 @@ def residualized_permutation_weights(
         ]
     )
     if stop_level:
-        if "stop_idx" not in frame:
-            raise KeyError(f"stop-level mark {mark!r} needs each event's stop_idx")
+        require_columns(frame, ["stop_idx"], f"the events of stop-level mark {mark!r}")
         unit_of_event, first = _permutation_units(
             frame["stop_idx"].to_numpy()[marked], values[marked]
         )

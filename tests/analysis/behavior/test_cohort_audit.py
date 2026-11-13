@@ -671,7 +671,7 @@ def test_qvals_gap_needs_the_row_flag_only_for_a_qvals_predictor():
 
     frame = _masked_value_frame().drop(columns="has_qvals_row")
     assert qvals_gap_event_ids(frame, ["is_current_arm"]) == set()
-    with pytest.raises(KeyError, match="has_qvals_row"):
+    with pytest.raises(ValueError, match="has_qvals_row"):
         qvals_gap_event_ids(
             frame,
             ["relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"],
@@ -709,7 +709,9 @@ def test_attach_has_qvals_row_reads_a_row_gated_base_column():
         )
     with pytest.raises(ValueError, match="row-gated"):
         attach_has_qvals_row(frame, from_column="rpe_postoutcome_z_x_is_current_arm")
-    with pytest.raises(KeyError, match="not in the frame"):
+    with pytest.raises(
+        ValueError, match=r"lacks required column\(s\) \['rpe_postoutcome'\]"
+    ):
         attach_has_qvals_row(frame, from_column="rpe_postoutcome")
     partial = frame.copy()
     partial.loc[3, "task_reward_probability_candidate_arm"] = float("nan")

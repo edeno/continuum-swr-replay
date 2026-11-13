@@ -78,7 +78,7 @@ def test_a_panel_draws_what_it_draws_without_the_excluded_rows(name):
 def test_a_panel_refuses_a_frame_not_read_through_the_source(plot):
     frame = two_sessions().drop(columns="in_excluded_time")
 
-    with pytest.raises(KeyError, match="in_excluded_time"):
+    with pytest.raises(ValueError, match="in_excluded_time"):
         _drawn(plot, frame)
 
 

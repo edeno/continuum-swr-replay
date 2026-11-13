@@ -22,6 +22,7 @@ from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
 )
 from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import (
     hash_event_id as _hash_event_id,
@@ -140,8 +141,7 @@ def _annotate_dot_for_events(
     begins partway through a bout, and per-timebin arm mapping is available.
     Returns ``(dot, session_key, mua_overlap_keys, bout_starts, bout_ends)``.
     """
-    if "animal" not in dot.columns:
-        raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
+    require_columns(dot, ["animal"], "dot (set by get_data_over_time)")
     animal, day, epoch = one_session(dot, "_annotate_dot_for_events")
     animal, day, epoch = str(animal), int(day), str(epoch)
 
@@ -799,8 +799,7 @@ def build_event_sequence_table(
     :func:`build_event_table`'s posterior-dependent columns — no
     arithmetic difference can leak between the two tables.
     """
-    if "animal" not in dot.columns:
-        raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
+    require_columns(dot, ["animal"], "dot (set by get_data_over_time)")
     animal, day, epoch = one_session(dot, "build_event_sequence_table")
     animal, day, epoch = str(animal), int(day), str(epoch)
 

@@ -57,6 +57,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.tables.columns import require_columns
 from continuum_swr_replay.tables.covariate_registry import require_covariate_schema
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import (
@@ -1072,11 +1073,7 @@ _PATCH_SD_SUPPORT_LABEL = _FIT_SUPPORT_LABEL
 
 def _leaf_arm_rows(frame: pd.DataFrame) -> pd.DataFrame:
     """The six leaf-arm rows of an arm cohort; the trunks carry structural zeros."""
-    if "candidate_arm" not in frame.columns:
-        raise KeyError(
-            "arm cohort has no 'candidate_arm' column; the per-SD unit cannot be "
-            "restricted to the leaf arms it is read on"
-        )
+    require_columns(frame, ["candidate_arm"], "the arm cohort")
     return frame[
         pd.to_numeric(frame["candidate_arm"], errors="coerce") < LEAF_ONLY_N_CATEGORIES
     ]
