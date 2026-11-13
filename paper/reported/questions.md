@@ -15,11 +15,11 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `2e9afd93423a` | yes | 32 | 0 |
-| `detection.json` | `c123684d9a61` | yes | 132 | 0 |
-| `events.json` | `c123684d9a61` | yes | 353 | 0 |
-| `behavior.json` | `c123684d9a61` | yes | 922 | 0 |
-| `mpfc.json` | `c123684d9a61` | yes | 604 | 0 |
+| `survey.json` | `3dd3c711accf` | yes | 32 | 0 |
+| `detection.json` | `3dd3c711accf` | yes | 132 | 0 |
+| `events.json` | `3dd3c711accf` | yes | 353 | 0 |
+| `behavior.json` | `3dd3c711accf` | yes | 922 | 0 |
+| `mpfc.json` | `3dd3c711accf` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -471,7 +471,7 @@ Status: computed. Figures: 3c, decoder_validation. Values: 54.
 
 Sources:
 
-- Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)
+- Processed-Data/event_gamma/reference.parquet (scripts/detection/measure_event_gamma.py)
 - Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
 - Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)
 
