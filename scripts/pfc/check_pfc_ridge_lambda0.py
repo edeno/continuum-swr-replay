@@ -53,11 +53,6 @@ from scripts.checks._report import _invocation  # noqa: E402
 PARAM_TOL = 1e-5
 DEVIANCE_TOL = 1e-6
 
-#: A coefficient past this on the log-rate scale is a rate multiplier of 5e8:
-#: the maximum-likelihood estimate does not exist, and the two solvers stop
-#: wherever their step rule runs out rather than at a common point.
-SEPARATED_LOG_RATE = 20.0
-
 #: Lags the archived fits were taken over, in samples at 500 Hz.
 FIT_LAGS = np.arange(-125, 126, 1)
 
@@ -251,8 +246,14 @@ def rebuild_session(
 
 
 def compare_session(session: str, diagnostics_dir: Path) -> pd.DataFrame:
-    """Per model, how far the unpenalised solver lands from the reference."""
+    """Per model, how far the unpenalised solver lands from the reference.
+
+    A cell past ``SEPARATED_LOG_RATE`` has no maximum-likelihood estimate, and
+    the two solvers stop wherever their step rule runs out rather than at a
+    common point, so it is not compared.
+    """
     from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
+    from continuum_swr_replay.analysis.pfc.modulation import SEPARATED_LOG_RATE
 
     reference = np.load(
         diagnostics_dir / f"{session}_mPFC_modulation.fit_diagnostics.npz"
@@ -340,6 +341,8 @@ def build_report(
 
     ``argv`` is the arguments ``main`` parsed, recorded in the command line.
     """
+    from continuum_swr_replay.analysis.pfc.modulation import SEPARATED_LOG_RATE
+
     per_session = (
         per_model.groupby("session")
         .agg(
