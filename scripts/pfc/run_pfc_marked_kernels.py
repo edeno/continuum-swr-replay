@@ -84,6 +84,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (
 from continuum_swr_replay.analysis.pfc.runner_support import (
     MAX_NONCONVERGED_UNIT_FRACTION,
     STOP_COHORT,
+    fails_convergence_gate,
     filter_epoch_info,
     is_nonempty_file,
     json_safe,
@@ -358,7 +359,7 @@ def _audit_marked_diagnostics(
             n_permutations[event_class],
         )
 
-    if n_not_converged > MAX_NONCONVERGED_UNIT_FRACTION * n_units:
+    if fails_convergence_gate(n_not_converged, n_units):
         logger.error(
             "%d of %d units (> %.0f%%) did not converge on the full-data fit; "
             "refusing to write a bundle for this session",
