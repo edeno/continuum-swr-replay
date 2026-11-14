@@ -228,9 +228,15 @@ def test_the_pilot_values_count_calls_and_those_an_outside_window_decides():
     assert {value.key: value.value for value in values} == {
         "pilot_replay_calls": 3,
         "pilot_calls_decided_by_outside_window": 1,
+        "pilot_calls_decided_by_outside_window_passing": 1,
     }
 
 
-def test_a_decided_pilot_call_that_fails_the_significance_test_is_refused():
-    with pytest.raises(ValueError, match="passed the significance test"):
-        detection.pilot_stray_window_values(_pilot(False), 12.0, "source")
+def test_a_decided_pilot_call_that_fails_the_significance_test_is_counted():
+    """The caption reports how many decided calls pass; it no longer asserts that
+    every one does (the lead's rewording, 2026-11-14), so a failing one is
+    counted, not refused."""
+    values = detection.pilot_stray_window_values(_pilot(False), 12.0, "source")
+    assert {value.key: value.value for value in values}[
+        "pilot_calls_decided_by_outside_window_passing"
+    ] == 0

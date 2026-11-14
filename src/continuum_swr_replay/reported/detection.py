@@ -22,7 +22,7 @@ summaries, of the labeled recording and of the pilot's events are computed in
   (``paper/reported/inputs/detection/memoryless_comparison_recording.json``:
   ``memoryless_sequence.recording_statistics.recording_numbers``, written by
   ``scripts/figures/generate_memoryless_comparison.py``);
-- the sliding-window detector's first real-data pilot epoch (a
+- the pilot epoch of the main memoryless run (:data:`MEMORYLESS_PILOT_RUN`, a
   ``replay_detection_comparison/memoryless`` run, from
   ``scripts/detection/run_memoryless_detection.py``), for the caption's
   stray-window note.
@@ -73,8 +73,11 @@ from continuum_swr_replay.reported.values import (
 )
 from continuum_swr_replay.runs.io import read_manifest
 
-MEMORYLESS_PILOT_RUN = "0c2548cacf2d-seed20260922"
-"""The sliding-window detector's first real-data pilot (chimi20200225_02_r1)."""
+MEMORYLESS_PILOT_RUN = "e2331f976fd1-seed20260922"
+"""The memoryless run whose pilot epoch (chimi20200225_02_r1, the epoch of the
+detector's first real-data pilot) the caption's stray-window note reads: the main
+cohort run, at the 5 ms step on its own running-only encoding model. The note
+first read the October pilot, ``0c2548cacf2d-seed20260922``."""
 
 MEMORYLESS_PILOT_EPOCH = "chimi20200225_02_r1_HPC"
 
@@ -275,19 +278,16 @@ def state_evidence_values(
 def pilot_stray_window_values(
     events: pd.DataFrame, dispersion_threshold_cm: float, source: str
 ) -> list[Value]:
-    """The caption's stray-window note on the first real-data pilot epoch.
+    """The caption's stray-window note on the pilot epoch.
 
     A replay call is decided by kept windows outside every piece when its
     dispersion clears the threshold only with them: the pieces' own
-    dispersion does not.
+    dispersion does not. The note counts the calls, those decided so, and how
+    many of those pass the significance test; it asserts nothing about the last
+    count.
     """
     make = value_factory(pilot_stray_window_values, source, TAGS["pilot"])
     stats = outside_window_call_statistics(events, dispersion_threshold_cm)
-    if stats["n_decided_passing_shuffle"] != stats["n_decided_by_outside_window"]:
-        raise ValueError(
-            "the caption says every pilot replay call decided by an outside window "
-            "passed the significance test; the pilot's events disagree"
-        )
     return [
         make(
             "pilot_replay_calls",
@@ -295,7 +295,7 @@ def pilot_stray_window_values(
             "count",
             "count",
             "sliding-window replay calls (duration and dispersion criteria) on the "
-            f"first real-data pilot epoch, {MEMORYLESS_PILOT_EPOCH}",
+            f"pilot epoch, {MEMORYLESS_PILOT_EPOCH}",
         ),
         make(
             "pilot_calls_decided_by_outside_window",
@@ -304,6 +304,13 @@ def pilot_stray_window_values(
             "count",
             "of those, calls whose dispersion clears the threshold only with kept "
             "windows outside every piece",
+        ),
+        make(
+            "pilot_calls_decided_by_outside_window_passing",
+            stats["n_decided_passing_shuffle"],
+            "count",
+            "count",
+            "of those, calls that pass the significance test",
         ),
     ]
 
