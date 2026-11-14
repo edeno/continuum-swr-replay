@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "44f00fde8532",
+ "commit": "619bfd429091",
  "code": {
-  "head": "44f00fde8532259e3e3cf4315da531c4f55c8fb3",
+  "head": "619bfd429091b6d0d4a757a5eb15729b7370d76b",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -31,44 +31,44 @@
     "code_sha256": "c87777fde9d9f26d64d3e8b83bebe7baedb9e1da1f066689afdf44128df7c6d4"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/comparison_simulation.py": {
-    "sha256": "1ef950b84a171dc93697a606b2eb7a079c9ef6514b46e62ce0c485117bb7058e",
-    "code_sha256": "c64189323ca8ae70333e1ca2f9f0fade4f4110d510a5d63ba1a7870cf8499ed9"
+    "sha256": "3e7891132a24d1dbe00fd1062329ede1b7e7e7c05206b1a65eb4e5242cd4c9e1",
+    "code_sha256": "d2ec45ba9cc521b763311c6c8d5c0121b36769624d896ae3ca40bbf76c9d97de"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/config.py": {
-    "sha256": "bc753bfb622e376098caa1626a85325b5764dd8cdb286d50cea6d7925ae08055",
-    "code_sha256": "f543aeeeb4eae0b449c1535aa04d84e862b8571321c3a3ad1f6b14969b4e5d15"
+    "sha256": "9cb02ea860ed4ed5ea892382c8be8d6ff8dc2a1fed495234e113713998829f64",
+    "code_sha256": "13b18b0de515e3d3d3564bcea6008503418f266dcca3d71da0a94a14ec20f7a0"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/detect.py": {
-    "sha256": "6af3c8480aee71fcd17ff2755b91c616378aac524f7e396ccc273e8b6ec7255b",
-    "code_sha256": "e4717a42b7f3879f235762506aa697eba90babda3bb419fd6e312b1e42373fe9"
+    "sha256": "5f3791c76f81e90168af14e998158144cf0f7f86dc4848dde9ee1cbcfa80007d",
+    "code_sha256": "362f64f4630eeda574cba563ed9fc024e9e3dfcf1b29df567c6a38ef82713da1"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/epoch.py": {
-    "sha256": "c98a0cf5df8bf644d60ecfd3d0e04dea4840836f81fc045fe61ebda3f89ec359",
-    "code_sha256": "587f418a70783fa925d8cd1e6c78bae72b5c0c8c2787c3b0f8d028f8920b8a5e"
+    "sha256": "4526af391594135dbc27d0c5bdd7ff91acfff55d5d34468271d12fa834ebbd62",
+    "code_sha256": "1abdb2363a36a925c03aef79a23436c033bea2247bd00bb05d1c346ad3ab7cc1"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/event_table.py": {
-    "sha256": "c2b51632504ebb71444316468fca081ca51c6e6f2bd2832202cc1b2e26a1059f",
+    "sha256": "866e7e17b4a01d6d539d0c0e22aad21fc27108e8903ccebea59035811166dd19",
     "code_sha256": "0f867a91c5e7403c699c7ef9278a90799621256648844493ea1cc07b375a3c4d"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/likelihood.py": {
-    "sha256": "ac85375620163f411fae862aad0659d469cb8f5da9a9b6d67f56bad976732902",
-    "code_sha256": "3b9548793940b19e629dc2a64592278110601c7300903d1be1ef7fd3c3de62c1"
+    "sha256": "186fb3401b0bbdc260ae8c477d3a51f01313b2519cd64b989cd10dc5c9a223ef",
+    "code_sha256": "f417921a0c2ea2a3eec38df11bbe61bb1e21b3071d080f96e3c088974093dc26"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/scoring.py": {
     "sha256": "79e9fef9746006cf71c934ddffcfa6d97202cbbf6889369526c6d23e9f23890a",
     "code_sha256": "abae8af6b5c0d65c5ea37982540933d62c9965dfac098868368e572f0e94db46"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/shuffle.py": {
-    "sha256": "cb946e66b20fa6aaed31727bd19d374989585b7f8af79cfb1b839dbee4333b0c",
-    "code_sha256": "665dd3bfbe64561b0cd19b86a5c8bb63d7dad49d98f85963a56e3037122bdeac"
+    "sha256": "a6b25b0d7018667e0906fa29db23592d27fa56edcee5873ed62090590fb48cd9",
+    "code_sha256": "f8cd0c094a189869c7197487c488034b921917b10f2b6db9e9c7803a81c5c2ac"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/simulation.py": {
-    "sha256": "1ec070a7f0936a95308c68d6c24cf2d6965d3e76c4796a288facc8173d6efb4a",
-    "code_sha256": "5392c53d05ca1389a49b142aff3d6f2c51e3c2051899917b23a24c9ded349998"
+    "sha256": "bfb9e2dbc0d384f9ce5c680ae36356f6982af8dc1194798665749b5915f5b111",
+    "code_sha256": "25abaa55949425fa990dfbe9d0d208266a85bbb66a30cc422603c7f2d37f3239"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep.py": {
-    "sha256": "3bcd3e387e1172a811013d6db33b60b9032914c76f81b3f7d58d662b0b30bd61",
-    "code_sha256": "daebca4c671568c29fb93f36900d8170f7b5b44f12f7a0afbcc94cf52ef4e645"
+    "sha256": "0c76cb18c54363e491d52dc4d53fa59c5675687245f656077d74a80588b8e1ef",
+    "code_sha256": "d6cd2e27471fd20e3f0219150b776a6673119dd44e7b8051c45ac814713a1245"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep_controls.py": {
     "sha256": "c000e62e746617ff58ec47f4404bb72e14019e5a95d37dbcac9882036aaa6b6b",
@@ -167,8 +167,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "5af2e39ad0830c460f209359b785dbc826d4356900a0386834684fb0ad484585",
-    "code_sha256": "6ef295a2543f51f5a56d4131d9ce20b7f96026fb31b5cde0ab356295b8f52b66"
+    "sha256": "2801002fe178496183a7104791fc1aeb5f37bd9a960989957e234b50dab94cb5",
+    "code_sha256": "195c7cb8bc81d34578065b4e4b27a4fb8b3cb4e58e10e33af238b40454e7ecfa"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -219,20 +219,20 @@
     "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
    },
    "paper/reported/inputs/detection/memoryless_comparison_recording.json": {
-    "sha256": "7d4ad5263497e07ebb529319eeef4dac87b29e5fa76dccd4973cb6eb0cb7fe09",
-    "code_sha256": "7d4ad5263497e07ebb529319eeef4dac87b29e5fa76dccd4973cb6eb0cb7fe09"
+    "sha256": "8966cd4a704cd2e9540ec0f131bb488cbd9c41645f60d0244daca8d3ed753b42",
+    "code_sha256": "8966cd4a704cd2e9540ec0f131bb488cbd9c41645f60d0244daca8d3ed753b42"
    },
    "paper/reported/inputs/detection/detection_sweep_summary.csv": {
-    "sha256": "cee111d572c1166e1cf83e33dfd4112836e547b755f49a9e327d457a12c8a342",
-    "code_sha256": "cee111d572c1166e1cf83e33dfd4112836e547b755f49a9e327d457a12c8a342"
+    "sha256": "c566feadf94ca0faca4ac8ab42bd816cf2b4c372ec05c17361ee8f9bbcba56f1",
+    "code_sha256": "c566feadf94ca0faca4ac8ab42bd816cf2b4c372ec05c17361ee8f9bbcba56f1"
    },
    "paper/reported/inputs/detection/detection_controls_summary.csv": {
-    "sha256": "2f3937682ea6b920e330d6a8946b906bbb0920d08f650bdf857f8a7a2e8909de",
-    "code_sha256": "2f3937682ea6b920e330d6a8946b906bbb0920d08f650bdf857f8a7a2e8909de"
+    "sha256": "7846192f43a46d4be87ae0900ea48219dac6e723688171cdde8e269578374dca",
+    "code_sha256": "7846192f43a46d4be87ae0900ea48219dac6e723688171cdde8e269578374dca"
    },
    "paper/reported/inputs/detection/detection_heldout_summary.csv": {
-    "sha256": "801d4ab6a8af8e561d9736bf72d0cd900710233adaa15f621601c94608a45603",
-    "code_sha256": "801d4ab6a8af8e561d9736bf72d0cd900710233adaa15f621601c94608a45603"
+    "sha256": "b78c003dc89c6d4cd40fd1950bb01ab4559783e130693c201c6a561306c54be4",
+    "code_sha256": "b78c003dc89c6d4cd40fd1950bb01ab4559783e130693c201c6a561306c54be4"
    }
   }
  },
@@ -246,28 +246,28 @@
    "sha256": "85044d43dee28ec366285a8d283b558d89bd56d3a6568543ee2afa0df9347490"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet",
-   "sha256": "28a816cb1c312b9b274e64aedb641b324d2e4a5751144ec924d86fa8d59d60f7"
+   "path": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet",
+   "sha256": "b0d748077ef24200932e10af9288fa78e54c1f79a976feab8249afa3c809d6b0"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/manifest.json",
-   "sha256": "5538d333d003c1959e73503938ae63cf48c937bd0673e742a79f43dae27c39bd"
+   "path": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/manifest.json",
+   "sha256": "5755ce0e0c40dc189380ec9435c7813769c0388e34ed7ae222531f2e4cf0263f"
   },
   {
    "path": "paper/reported/inputs/detection/memoryless_comparison_recording.json",
-   "sha256": "7d4ad5263497e07ebb529319eeef4dac87b29e5fa76dccd4973cb6eb0cb7fe09"
+   "sha256": "8966cd4a704cd2e9540ec0f131bb488cbd9c41645f60d0244daca8d3ed753b42"
   },
   {
    "path": "paper/reported/inputs/detection/detection_sweep_summary.csv",
-   "sha256": "cee111d572c1166e1cf83e33dfd4112836e547b755f49a9e327d457a12c8a342"
+   "sha256": "c566feadf94ca0faca4ac8ab42bd816cf2b4c372ec05c17361ee8f9bbcba56f1"
   },
   {
    "path": "paper/reported/inputs/detection/detection_controls_summary.csv",
-   "sha256": "2f3937682ea6b920e330d6a8946b906bbb0920d08f650bdf857f8a7a2e8909de"
+   "sha256": "7846192f43a46d4be87ae0900ea48219dac6e723688171cdde8e269578374dca"
   },
   {
    "path": "paper/reported/inputs/detection/detection_heldout_summary.csv",
-   "sha256": "801d4ab6a8af8e561d9736bf72d0cd900710233adaa15f621601c94608a45603"
+   "sha256": "b78c003dc89c6d4cd40fd1950bb01ab4559783e130693c201c6a561306c54be4"
   }
  ],
  "values": {
@@ -304,7 +304,7 @@
    "pending": null
   },
   "controls_continuing_sliding_one_per_part_longest_fraction": {
-   "value": 0.5416666666666666,
+   "value": 0.5,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -320,7 +320,7 @@
    "pending": null
   },
   "controls_continuing_sliding_spanning_shortest_fraction": {
-   "value": 0.7083333333333334,
+   "value": 0.75,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -384,7 +384,7 @@
    "pending": null
   },
   "controls_elsewhere_sliding_missing_min": {
-   "value": 0.375,
+   "value": 0.3333333333333333,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -480,7 +480,7 @@
    "pending": null
   },
   "controls_jumping_sliding_before_test_fraction": {
-   "value": 0.125,
+   "value": 0.1388888888888889,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -496,7 +496,7 @@
    "pending": null
   },
   "controls_jumping_sliding_fraction": {
-   "value": 0.0694444444444444,
+   "value": 0.0833333333333333,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -656,7 +656,7 @@
    "pending": null
   },
   "controls_placeless_fragmented_share_max": {
-   "value": 0.795127717157205,
+   "value": 0.7951277072230974,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -672,7 +672,7 @@
    "pending": null
   },
   "controls_placeless_fragmented_share_min": {
-   "value": 0.5916386330500245,
+   "value": 0.5916386429841319,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -752,7 +752,7 @@
    "pending": null
   },
   "controls_sliding_fewer_in_event_trials": {
-   "value": 15,
+   "value": 21,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -768,7 +768,7 @@
    "pending": null
   },
   "controls_sliding_more_in_event_trials": {
-   "value": 95,
+   "value": 84,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -784,7 +784,7 @@
    "pending": null
   },
   "controls_sliding_recovery_alone_fraction": {
-   "value": 0.6053240740740741,
+   "value": 0.6192129629629629,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -800,7 +800,7 @@
    "pending": null
   },
   "controls_sliding_recovery_in_event_fraction": {
-   "value": 0.7199074074074073,
+   "value": 0.7071759259259259,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -984,7 +984,7 @@
    "pending": null
   },
   "heldout_estimator_agreement_min": {
-   "value": 0.9895348837209302,
+   "value": 0.9884526558891455,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1284,7 +1284,7 @@
    "pending": null
   },
   "heldout_ours_only_informative_max": {
-   "value": 0.0734126984126984,
+   "value": 0.0738720872583044,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1300,7 +1300,7 @@
    "pending": null
   },
   "heldout_ours_only_informative_min": {
-   "value": 0.0557809330628803,
+   "value": 0.0561598785732355,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1316,7 +1316,7 @@
    "pending": null
   },
   "heldout_ours_only_support_fold_c": {
-   "value": 0.8650793650793651,
+   "value": 0.875,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1332,7 +1332,7 @@
    "pending": null
   },
   "heldout_ours_only_support_max": {
-   "value": 0.968181818181818,
+   "value": 0.9684684684684683,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1348,7 +1348,7 @@
    "pending": null
   },
   "heldout_ours_only_support_min": {
-   "value": 0.9256756756756754,
+   "value": 0.9228187919463087,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1412,7 +1412,7 @@
    "pending": null
   },
   "heldout_shared_informative_max": {
-   "value": 0.22996057818659646,
+   "value": 0.227931488801054,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1428,7 +1428,7 @@
    "pending": null
   },
   "heldout_shared_informative_min": {
-   "value": 0.1625730994152046,
+   "value": 0.16193853427895982,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1460,7 +1460,7 @@
    "pending": null
   },
   "pilot_calls_decided_by_outside_window": {
-   "value": 2,
+   "value": 1,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -1471,28 +1471,44 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)",
+   "source": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
    "function": "pilot_stray_window_values",
    "pending": null
   },
-  "pilot_replay_calls": {
-   "value": 4,
+  "pilot_calls_decided_by_outside_window_passing": {
+   "value": 0,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1_HPC",
+   "description": "of those, calls that pass the significance test",
    "questions": [
     "2a.3"
    ],
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)",
+   "source": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
+   "function": "pilot_stray_window_values",
+   "pending": null
+  },
+  "pilot_replay_calls": {
+   "value": 6,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "sliding-window replay calls (duration and dispersion criteria) on the pilot epoch, chimi20200225_02_r1_HPC",
+   "questions": [
+    "2a.3"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)",
    "function": "pilot_stray_window_values",
    "pending": null
   },
   "recording_inbound_p_jump": {
-   "value": 0.019801980198019802,
+   "value": 0.009900990099009901,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -1503,7 +1519,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
@@ -1519,12 +1535,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_outbound_draws_from_passing": {
-   "value": 3,
+   "value": 0,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -1535,12 +1551,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_outbound_duration_ratio": {
-   "value": 5.779951100244497,
+   "value": 4.364303178484103,
    "kind": "quantity",
    "style": "sig2",
    "unit": "",
@@ -1551,12 +1567,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_outbound_local_fraction": {
-   "value": 0.8055555555555556,
+   "value": 0.7488789237668162,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1567,12 +1583,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_outbound_p_jump": {
-   "value": 0.07920792079207921,
+   "value": 0.0297029702970297,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -1583,7 +1599,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
@@ -1599,7 +1615,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
@@ -1615,12 +1631,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_short_path_dispersion_cm": {
-   "value": 6.255837822237522,
+   "value": 6.263276115510958,
    "kind": "quantity",
    "style": "int",
    "unit": "cm",
@@ -1631,12 +1647,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_short_replay_duration_ratio": {
-   "value": 1.6000000000000356,
+   "value": 1.6249999999999778,
    "kind": "quantity",
    "style": "sig2",
    "unit": "",
@@ -1647,7 +1663,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
@@ -1663,7 +1679,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
@@ -1679,7 +1695,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
@@ -1695,7 +1711,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
@@ -1711,12 +1727,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_dispersion_cm": {
-   "value": 14.375550376708484,
+   "value": 16.10809563056576,
    "kind": "quantity",
    "style": "sig2",
    "unit": "cm",
@@ -1727,7 +1743,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
@@ -1743,12 +1759,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_duration_ms": {
-   "value": 396.0000000000008,
+   "value": 394.99999999999955,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -1759,12 +1775,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_local_fraction": {
-   "value": 0.9896907216494846,
+   "value": 0.987012987012987,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1775,12 +1791,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_p_jump": {
-   "value": 0.31683168316831684,
+   "value": 0.2376237623762376,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -1791,12 +1807,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_p_spread": {
-   "value": 0.40594059405940597,
+   "value": 0.3069306930693069,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -1807,12 +1823,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_pieces_dispersion_cm": {
-   "value": 0.5337834065514341,
+   "value": 0.4534974663202074,
    "kind": "quantity",
    "style": "sig2",
    "unit": "cm",
@@ -1823,7 +1839,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)",
    "function": "recording_values",
    "pending": null
   },
@@ -1886,7 +1902,7 @@
    "pending": null
   },
   "sweep_domain_sliding_before_test_fraction": {
-   "value": 0.6770833333333334,
+   "value": 0.6796875,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1902,7 +1918,7 @@
    "pending": null
   },
   "sweep_domain_sliding_fraction": {
-   "value": 0.6276041666666666,
+   "value": 0.6197916666666666,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1950,7 +1966,7 @@
    "pending": null
   },
   "sweep_failed_test_fraction": {
-   "value": 0.0375643744319903,
+   "value": 0.0371488976140138,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1966,7 +1982,7 @@
    "pending": null
   },
   "sweep_jump_half_pass_fraction": {
-   "value": 0.8740818467995802,
+   "value": 0.8777895855472901,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1982,7 +1998,7 @@
    "pending": null
   },
   "sweep_jump_half_pass_longest_fraction": {
-   "value": 0.984251968503937,
+   "value": 0.9882352941176472,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1998,7 +2014,7 @@
    "pending": null
   },
   "sweep_jump_half_pass_shortest_fraction": {
-   "value": 0.3125,
+   "value": 0.3636363636363636,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2030,7 +2046,7 @@
    "pending": null
   },
   "sweep_shortest_end_late_ms": {
-   "value": 65.29666376593468,
+   "value": 121.08958681379178,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2046,7 +2062,7 @@
    "pending": null
   },
   "sweep_shortest_reported_duration_ms": {
-   "value": 131.9999999999979,
+   "value": 184.9999999999996,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2062,7 +2078,7 @@
    "pending": null
   },
   "sweep_shortest_start_early_ms": {
-   "value": 27.783154739370985,
+   "value": 29.243245486717303,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2078,7 +2094,7 @@
    "pending": null
   },
   "sweep_sliding_before_test_fraction": {
-   "value": 0.2100970017636684,
+   "value": 0.2074514991181658,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2094,7 +2110,7 @@
    "pending": null
   },
   "sweep_sliding_end_late_max_ms": {
-   "value": 65.29666376593468,
+   "value": 121.08958681379178,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2110,7 +2126,7 @@
    "pending": null
   },
   "sweep_sliding_end_late_min_ms": {
-   "value": 21.233180588211557,
+   "value": 20.89702556946804,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2126,7 +2142,7 @@
    "pending": null
   },
   "sweep_sliding_end_late_upper_quartile_max_ms": {
-   "value": 231.4627562891438,
+   "value": 226.3937886114053,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2142,7 +2158,7 @@
    "pending": null
   },
   "sweep_sliding_fraction": {
-   "value": 0.1816578483245149,
+   "value": 0.179673721340388,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2158,7 +2174,7 @@
    "pending": null
   },
   "sweep_sliding_not_the_replay_fraction": {
-   "value": 0.2302100161550888,
+   "value": 0.2079124579124579,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2174,7 +2190,7 @@
    "pending": null
   },
   "sweep_sliding_only_before_test_replays": {
-   "value": 5,
+   "value": 4,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2190,7 +2206,7 @@
    "pending": null
   },
   "sweep_sliding_only_replays": {
-   "value": 0,
+   "value": 1,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2206,7 +2222,7 @@
    "pending": null
   },
   "sweep_sliding_spread_only_fraction": {
-   "value": 0.2028218694885361,
+   "value": 0.2001763668430335,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2222,7 +2238,7 @@
    "pending": null
   },
   "sweep_sliding_start_early_max_ms": {
-   "value": 27.783154739370985,
+   "value": 29.243245486717303,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2238,7 +2254,7 @@
    "pending": null
   },
   "sweep_sliding_start_early_min_ms": {
-   "value": 18.04877062630439,
+   "value": 18.02372760418081,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2254,7 +2270,7 @@
    "pending": null
   },
   "sweep_spread_half_pass_fraction": {
-   "value": 0.9653725078698846,
+   "value": 0.9649309245483528,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2270,7 +2286,7 @@
    "pending": null
   },
   "sweep_state_space_edge_error_max_ms": {
-   "value": 5.2984727396205855,
+   "value": 5.520116029451572,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2302,7 +2318,7 @@
    "pending": null
   },
   "sweep_state_space_only_fraction": {
-   "value": 0.7277336860670194,
+   "value": 0.7299382716049383,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",

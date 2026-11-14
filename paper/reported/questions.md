@@ -15,11 +15,11 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `44f00fde8532` | yes | 32 | 0 |
-| `detection.json` | `44f00fde8532` | yes | 132 | 0 |
-| `events.json` | `44f00fde8532` | yes | 353 | 0 |
-| `behavior.json` | `44f00fde8532` | yes | 922 | 0 |
-| `mpfc.json` | `44f00fde8532` | yes | 604 | 0 |
+| `survey.json` | `619bfd429091` | yes | 32 | 0 |
+| `detection.json` | `619bfd429091` | yes | 133 | 0 |
+| `events.json` | `619bfd429091` | yes | 353 | 0 |
+| `behavior.json` | `619bfd429091` | yes | 922 | 0 |
+| `mpfc.json` | `619bfd429091` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -77,25 +77,25 @@ Sources:
 - paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)
 - paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)
 - paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
-- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)
+- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\DetectionControlsContinuingOursOnePerPartLongestFraction` | 79 |  | the same for our detector | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsContinuingOursSpanningShortestFraction` | 88 |  | the same for our detector | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsContinuingSlidingOnePerPartLongestFraction` | 54 |  | continuing chains at the longest gap: share of trials the sliding window reports as one event per part | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsContinuingSlidingSpanningShortestFraction` | 71 |  | continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsContinuingSlidingOnePerPartLongestFraction` | 50 |  | continuing chains at the longest gap: share of trials the sliding window reports as one event per part | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsContinuingSlidingSpanningShortestFraction` | 75 |  | continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsElsewhereOursOnePerPartLongestFraction` | 83 |  | the same at the longest gap | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsElsewhereOursOnePerPartShortestFraction` | 17 |  | chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsElsewhereSlidingMissingMax` | 58 |  | highest such share | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsElsewhereSlidingMissingMin` | 38 |  | chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsElsewhereSlidingMissingMin` | 33 |  | chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsJumpOursSpanningMax` | 85 |  | highest such share | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsJumpOursSpanningMin` | 73 |  | lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts) | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsJumpSlidingSpanningMax` | 79 |  | highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsJumpingContinuousFraction` | 50 |  | share of jumping bursts our continuous state alone covers | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsJumpingNonlocalFraction` | 97 |  | share of jumping bursts our detector's non-local events cover | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsJumpingSlidingBeforeTestFraction` | 13 |  | the same before its significance test | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsJumpingSlidingFraction` | 7 |  | share of jumping bursts the sliding window reports under the published definition | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsJumpingSlidingBeforeTestFraction` | 14 |  | the same before its significance test | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsJumpingSlidingFraction` | 8 |  | share of jumping bursts the sliding window reports under the published definition | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsMultipartTrials` | 432 |  | two-part trials over every jump and chain condition | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsNoReplayMinutes` | 1.7 | min | minutes of simulated immobility with no replay; no output reported any event there | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsNoReplayRateBound` | 1.8 | events per minute | 95 % upper bound on the false event rate with none observed (the rule of three over those minutes) | `detection.controls_values` | memoryless_comparison |
@@ -111,30 +111,30 @@ Sources:
 | `\DetectionControlsPlacelessNonlocalLowestRateFraction` | 75 |  | share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsPlacelessSlidingBeforeTestFraction` | 15 |  | the same before its significance test | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsPlacelessSlidingFraction` | 8 |  | share of place-less bursts the sliding window reports under the published definition | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsSlidingFewerInEventTrials` | 15 |  | trials in which the sliding window recovers fewer parts inside the event than alone | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsSlidingMoreInEventTrials` | 95 |  | trials in which it recovers more inside the event than alone | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsSlidingRecoveryAloneFraction` | 61 |  | the same with each part decoded alone | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsSlidingRecoveryInEventFraction` | 72 |  | share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsSlidingFewerInEventTrials` | 21 |  | trials in which the sliding window recovers fewer parts inside the event than alone | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsSlidingMoreInEventTrials` | 84 |  | trials in which it recovers more inside the event than alone | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsSlidingRecoveryAloneFraction` | 62 |  | the same with each part decoded alone | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsSlidingRecoveryInEventFraction` | 71 |  | share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels | `detection.controls_values` | memoryless_comparison |
 | `\DetectionHeldoutEstimatorAgreementMin` | 99 |  | lowest share over folds of the events informative under both content estimates on which they agree | `detection.heldout_values` | memoryless_comparison |
 | `\DetectionHeldoutJumpingSupportMax` | 63 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
 | `\DetectionHeldoutJumpingSupportMin` | 57 |  | jumping bursts: lower of folds A and B's share with held-out support | `detection.heldout_values` | memoryless_comparison |
 | `\DetectionHeldoutOursOnlyInformativeMax` | 7 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
 | `\DetectionHeldoutOursOnlyInformativeMin` | 6 |  | replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutOursOnlySupportFoldC` | 87 |  | the same share in fold C | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutOursOnlySupportFoldC` | 88 |  | the same share in fold C | `detection.heldout_values` | memoryless_comparison |
 | `\DetectionHeldoutOursOnlySupportMax` | 97 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutOursOnlySupportMin` | 93 |  | replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutOursOnlySupportMin` | 92 |  | replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support | `detection.heldout_values` | memoryless_comparison |
 | `\DetectionHeldoutPlacelessInformativeEvents` | 19 |  | informative place-less burst events over the three folds (none has held-out support) | `detection.heldout_values` | memoryless_comparison |
 | `\DetectionHeldoutPlacelessLooseEvents` | 75 |  | place-less burst events informative at that floor | `detection.heldout_values` | memoryless_comparison |
 | `\DetectionHeldoutPlacelessLooseSupportedEvents` | 4 |  | place-less burst events with held-out support at a floor of 2 expected spikes | `detection.heldout_values` | memoryless_comparison |
 | `\DetectionHeldoutSharedInformativeMax` | 23 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
 | `\DetectionHeldoutSharedInformativeMin` | 16 |  | shared replays: lower of folds A and B's share the evaluation cells can judge at all | `detection.heldout_values` | memoryless_comparison |
 | `\DetectionHeldoutSharedSupport` | 100 |  | replays both detectors reported: share with held-out support, the same in every fold | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionRecordingInboundPJump` | 0.020 |  | significance test of the inbound replay: jump half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingInboundPJump` | 0.0099 |  | significance test of the inbound replay: jump half | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingInboundPSpread` | 0.0099 |  | significance test of the inbound replay: spread half | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingOutboundDrawsFromPassing` | 3 |  | how many more shuffle draws below the observed value than a pass allows | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingOutboundDurationRatio` | 5.8 |  | the sliding window's reported duration of the continuous outbound replay over its true duration | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingOutboundLocalFraction` | 81 |  | share of that reported event's kept windows decoding the animal's own place (within 15 cm) | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingOutboundPJump` | 0.079 |  | significance test of the outbound replay: jump half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingOutboundDrawsFromPassing` | 0 |  | how many more shuffle draws below the observed value than a pass allows | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingOutboundDurationRatio` | 4.4 |  | the sliding window's reported duration of the continuous outbound replay over its true duration | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingOutboundLocalFraction` | 75 |  | share of that reported event's kept windows decoding the animal's own place (within 15 cm) | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingOutboundPJump` | 0.030 |  | significance test of the outbound replay: jump half | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingOutboundPSpread` | 0.0099 |  | significance test of the outbound replay: spread half | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingRemoteStationaryDispersionCm` | 0 | cm | largest dispersion of a candidate over the remote stationary event | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingShortPathDispersionCm` | 6 | cm | largest dispersion of a sliding-window candidate over the 30 cm replay | `detection.recording_values` | memoryless_comparison |
@@ -143,39 +143,39 @@ Sources:
 | `\DetectionRecordingShortReplayPJump` | 0.030 |  | significance test of the 80 ms replay: jump half | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingShortReplayPSpread` | 0.0099 |  | significance test of the 80 ms replay: spread half | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingStateSpaceBoundErrorMs` | 42 | ms | largest error in either bound of the state-space detector's reports of the four zoomed events | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowDispersionCm` | 14 | cm | its dispersion with the window outside every piece | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowDispersionCm` | 16 | cm | its dispersion with the window outside every piece | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingStrayWindowDistanceCm` | 149 | cm | distance from the animal of the far cell whose two spikes fill the stray window | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowDurationMs` | 396 | ms | the stray-window event's reported duration | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowDurationMs` | 395 | ms | the stray-window event's reported duration | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingStrayWindowLocalFraction` | 99 |  | share of the stray-window event's kept windows decoding within 15 cm of the animal | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowPJump` | 0.32 |  | significance test of the stray-window event: jump half | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowPSpread` | 0.41 |  | significance test of the stray-window event: spread half | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowPiecesDispersionCm` | 0.53 | cm | its dispersion without that window | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowPJump` | 0.24 |  | significance test of the stray-window event: jump half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowPSpread` | 0.31 |  | significance test of the stray-window event: spread half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowPiecesDispersionCm` | 0.45 | cm | its dispersion without that window | `detection.recording_values` | memoryless_comparison |
 | `\DetectionSweepDomainFraction` | 25 |  | share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms) | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepDomainSlidingBeforeTestFraction` | 68 |  | on the shared target, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepDomainSlidingFraction` | 63 |  | on the shared target, share the sliding-window detector reports after its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainSlidingFraction` | 62 |  | on the shared target, share the sliding-window detector reports after its significance test | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepDomainStateSpaceFraction` | 99 |  | on the shared target, share the state-space detector reports under its own acceptance criteria | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepDomainStateSpacePublishedFraction` | 68 |  | on the shared target, share the state-space detector reports held to the published duration and dispersion criteria | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepFailedTestFraction` | 4 |  | share the sliding-window detector reported and then failed on its significance test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepJumpHalfPassFraction` | 87 |  | of the replays the sliding window reported before its test, share passing the test's jump half | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepJumpHalfPassLongestFraction` | 98 |  | share of the longest (500 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepJumpHalfPassShortestFraction` | 31 |  | share of the shortest (40 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassFraction` | 88 |  | of the replays the sliding window reported before its test, share passing the test's jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassLongestFraction` | 99 |  | share of the longest (500 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassShortestFraction` | 36 |  | share of the shortest (40 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepReplays` | 4,536 |  | replays swept (grid cells) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepShortestEndLateMs` | 65 | ms | median amount the sliding window ends the shortest (40 ms) replays late | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepShortestReportedDurationMs` | 132 | ms | median duration the sliding window reports for the shortest (40 ms) replays | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepShortestStartEarlyMs` | 28 | ms | median amount the sliding window starts the shortest (40 ms) replays early | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestEndLateMs` | 121 | ms | median amount the sliding window ends the shortest (40 ms) replays late | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestReportedDurationMs` | 185 | ms | median duration the sliding window reports for the shortest (40 ms) replays | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestStartEarlyMs` | 29 | ms | median amount the sliding window starts the shortest (40 ms) replays early | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingBeforeTestFraction` | 21 |  | over the whole grid, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingEndLateMaxMs` | 65 | ms | largest median amount the sliding window ends late, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingEndLateMaxMs` | 121 | ms | largest median amount the sliding window ends late, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingEndLateMinMs` | 21 | ms | smallest median amount the sliding window ends late, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingEndLateUpperQuartileMaxMs` | 231 | ms | largest upper quartile of the sliding window's end error, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingEndLateUpperQuartileMaxMs` | 226 | ms | largest upper quartile of the sliding window's end error, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingFraction` | 18 |  | over the whole grid, share the sliding-window detector reports under its own criteria, significance test included | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingNotTheReplayFraction` | 23 |  | share of the sliding-window detector's accepted events that are not the replay put in | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingOnlyBeforeTestReplays` | 5 |  | the same, counting the sliding window's reports before its test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingOnlyReplays` | 0 |  | swept replays the sliding-window detector reported and the state-space detector did not | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingNotTheReplayFraction` | 21 |  | share of the sliding-window detector's accepted events that are not the replay put in | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingOnlyBeforeTestReplays` | 4 |  | the same, counting the sliding window's reports before its test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingOnlyReplays` | 1 |  | swept replays the sliding-window detector reported and the state-space detector did not | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingSpreadOnlyFraction` | 20 |  | over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingStartEarlyMaxMs` | 28 | ms | largest median amount the sliding window starts early, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingStartEarlyMaxMs` | 29 | ms | largest median amount the sliding window starts early, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingStartEarlyMinMs` | 18 | ms | smallest median amount the sliding window starts early, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSpreadHalfPassFraction` | 97 |  | of the replays the sliding window reported before its test, share passing the test's spread half | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepStateSpaceEdgeErrorMaxMs` | 5 | ms | largest absolute median start or end error of the state-space detector over true durations (40 to 500 ms), replays both detectors reported | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSpreadHalfPassFraction` | 96 |  | of the replays the sliding window reported before its test, share passing the test's spread half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepStateSpaceEdgeErrorMaxMs` | 6 | ms | largest absolute median start or end error of the state-space detector over true durations (40 to 500 ms), replays both detectors reported | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepStateSpaceFraction` | 91 |  | over the whole grid, share the state-space detector reports under its own criteria | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepStateSpaceOnlyFraction` | 73 |  | share of the swept replays reported by the state-space detector and not by the sliding-window detector | `detection.sweep_values` | memoryless_comparison |
 
@@ -210,16 +210,17 @@ Status: not computed; no script (held-out model selection). Values: 0.
 
 ### 2a.3. On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?
 
-Status: computed. Figures: 2, memoryless_comparison. Values: 2.
+Status: computed. Figures: 2, memoryless_comparison. Values: 3.
 
 Sources:
 
-- Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)
+- Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\DetectionPilotCallsDecidedByOutsideWindow` | 2 |  | of those, calls whose dispersion clears the threshold only with kept windows outside every piece | `detection.pilot_stray_window_values` | memoryless_comparison |
-| `\DetectionPilotReplayCalls` | 4 |  | sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1_HPC | `detection.pilot_stray_window_values` | memoryless_comparison |
+| `\DetectionPilotCallsDecidedByOutsideWindow` | 1 |  | of those, calls whose dispersion clears the threshold only with kept windows outside every piece | `detection.pilot_stray_window_values` | memoryless_comparison |
+| `\DetectionPilotCallsDecidedByOutsideWindowPassing` | 0 |  | of those, calls that pass the significance test | `detection.pilot_stray_window_values` | memoryless_comparison |
+| `\DetectionPilotReplayCalls` | 6 |  | sliding-window replay calls (duration and dispersion criteria) on the pilot epoch, chimi20200225_02_r1_HPC | `detection.pilot_stray_window_values` | memoryless_comparison |
 
 ### 2a.4. How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?
 
@@ -265,7 +266,7 @@ Status: computed. Figures: 2, 2b. Values: 33.
 Sources:
 
 - Processed-Data/replay_content/event_table.parquet (canonical event table)
-- event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)
+- event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -285,7 +286,7 @@ Sources:
 | `\EventsNonlocalEventsOutsideTrigger` | 19,221 |  | non-local events no SWR definition and no MUA event overlaps (cell sequence_matched_by_no_trigger) | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideTriggerFraction` | 25 % |  | share of the non-local events with a known membership that no SWR definition and no MUA event overlaps | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideTriggerPerHour` | 480 | per h | non-local events no SWR definition and no MUA event overlaps, per hour of analysed immobility | `events.left_out_values` | 2 |
-| `\EventsNonlocalEventsOutsideWidloski` | 71,498 |  | non-local events no Widloski event overlaps (detector comparison memberships) | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideWidloski` | 70,924 |  | non-local events no Widloski event overlaps (detector comparison memberships) | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideWidloskiFraction` | 94 % |  | share of the non-local events with a known membership that no Widloski event overlaps | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideWidloskiPerHour` | 1800 | per h | non-local events no Widloski event overlaps, per hour of analysed immobility | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsSwrContained` | 16,037 |  | events lying inside an SWR (overlap_class swr_contained) | `events.event_cohort_values` | 2b |
@@ -296,8 +297,8 @@ Sources:
 | `\EventsNonlocalTimeOutsideSwrS` | 2004 | s | seconds of non-local event time that the five SWR definitions together do not cover | `events.left_out_values` | 2 |
 | `\EventsNonlocalTimeOutsideTriggerFraction` | 28 % |  | share of non-local event time that the five SWR definitions and MUA together do not cover | `events.left_out_values` | 2 |
 | `\EventsNonlocalTimeOutsideTriggerS` | 1821 | s | seconds of non-local event time that the five SWR definitions and MUA together do not cover | `events.left_out_values` | 2 |
-| `\EventsNonlocalTimeOutsideWidloskiFraction` | 93 % |  | share of non-local event time that the Widloski detector's events do not cover | `events.left_out_values` | 2 |
-| `\EventsNonlocalTimeOutsideWidloskiS` | 6098 | s | seconds of non-local event time that the Widloski detector's events do not cover | `events.left_out_values` | 2 |
+| `\EventsNonlocalTimeOutsideWidloskiFraction` | 91 % |  | share of non-local event time that the Widloski detector's events do not cover | `events.left_out_values` | 2 |
+| `\EventsNonlocalTimeOutsideWidloskiS` | 6004 | s | seconds of non-local event time that the Widloski detector's events do not cover | `events.left_out_values` | 2 |
 | `\EventsNonlocalTimeS` | 6562 | s | seconds of non-local event time (compared events), summed over epochs | `events.left_out_values` | 2 |
 | `\EventsRestHours` | 40 | h | hours of analysed immobility the non-local detector observed (exposure), summed over epochs | `events.left_out_values` | 2 |
 | `\EventsSwrContainedFraction` | 21 % |  | share of immobile non-local events lying inside an SWR, pooled over animals | `events.event_cohort_values` | 2b |
@@ -309,7 +310,7 @@ Status: computed. Figures: 2. Values: 98.
 
 Sources:
 
-- event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)
+- event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -363,29 +364,29 @@ Sources:
 | `\EventsMuaOverlapNoSpikeShareMedian` | 0 % |  | median over mua events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | `events.other_detector_values` |  |
 | `\EventsMuaOverlapNonlocalShareMedian` | 81 % |  | median over mua events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
 | `\EventsMuaOverlapUncertainShareMedian` | 13 % |  | median over mua events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
-| `\EventsWidloskiCriteriaEvents` | 4,388 |  | memoryless_criteria events compared with the non-local detector | `events.other_detector_values` |  |
-| `\EventsWidloskiCriteriaNoNonlocalFraction` | 4 % |  | share of memoryless_criteria events that overlap no non-local event | `events.other_detector_values` |  |
-| `\EventsWidloskiCriteriaNoNonlocalMixedFraction` | 48 % |  | of memoryless_criteria events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
-| `\EventsWidloskiCriteriaNoNonlocalMostlyLocalFraction` | 51 % |  | of memoryless_criteria events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
-| `\EventsWidloskiCriteriaNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of memoryless_criteria events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` |  |
-| `\EventsWidloskiCriteriaOverlapAllNonlocalFraction` | 11 % |  | share of memoryless_criteria events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` |  |
-| `\EventsWidloskiCriteriaOverlapAnyLocalFraction` | 58 % |  | share of memoryless_criteria events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` |  |
-| `\EventsWidloskiCriteriaOverlapAnyNoSpikeFraction` | 27 % |  | share of memoryless_criteria events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` |  |
-| `\EventsWidloskiCriteriaOverlapLocalShareMedian` | 5 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaEvents` | 5,056 |  | memoryless_criteria events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaNoNonlocalFraction` | 5 % |  | share of memoryless_criteria events that overlap no non-local event | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaNoNonlocalMixedFraction` | 36 % |  | of memoryless_criteria events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaNoNonlocalMostlyLocalFraction` | 64 % |  | of memoryless_criteria events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaNoNonlocalMostlyNoSpikeFraction` | 0 % |  | of memoryless_criteria events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapAllNonlocalFraction` | 13 % |  | share of memoryless_criteria events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapAnyLocalFraction` | 54 % |  | share of memoryless_criteria events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapAnyNoSpikeFraction` | 25 % |  | share of memoryless_criteria events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapLocalShareMedian` | 2 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` |  |
 | `\EventsWidloskiCriteriaOverlapNoSpikeShareMedian` | 0 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | `events.other_detector_values` |  |
-| `\EventsWidloskiCriteriaOverlapNonlocalShareMedian` | 80 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapNonlocalShareMedian` | 82 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
 | `\EventsWidloskiCriteriaOverlapUncertainShareMedian` | 8 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
-| `\EventsWidloskiEvents` | 4,092 |  | memoryless events compared with the non-local detector | `events.other_detector_values` |  |
-| `\EventsWidloskiNoNonlocalFraction` | 3 % |  | share of memoryless events that overlap no non-local event | `events.other_detector_values` |  |
-| `\EventsWidloskiNoNonlocalMixedFraction` | 49 % |  | of memoryless events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
-| `\EventsWidloskiNoNonlocalMostlyLocalFraction` | 51 % |  | of memoryless events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsWidloskiEvents` | 4,662 |  | memoryless events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsWidloskiNoNonlocalFraction` | 4 % |  | share of memoryless events that overlap no non-local event | `events.other_detector_values` |  |
+| `\EventsWidloskiNoNonlocalMixedFraction` | 37 % |  | of memoryless events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
+| `\EventsWidloskiNoNonlocalMostlyLocalFraction` | 63 % |  | of memoryless events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
 | `\EventsWidloskiNoNonlocalMostlyNoSpikeFraction` | 0 % |  | of memoryless events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` |  |
-| `\EventsWidloskiOverlapAllNonlocalFraction` | 10 % |  | share of memoryless events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` |  |
-| `\EventsWidloskiOverlapAnyLocalFraction` | 59 % |  | share of memoryless events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` |  |
-| `\EventsWidloskiOverlapAnyNoSpikeFraction` | 28 % |  | share of memoryless events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` |  |
-| `\EventsWidloskiOverlapLocalShareMedian` | 6 % |  | median over memoryless events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapAllNonlocalFraction` | 12 % |  | share of memoryless events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapAnyLocalFraction` | 56 % |  | share of memoryless events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapAnyNoSpikeFraction` | 26 % |  | share of memoryless events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapLocalShareMedian` | 3 % |  | median over memoryless events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` |  |
 | `\EventsWidloskiOverlapNoSpikeShareMedian` | 0 % |  | median over memoryless events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | `events.other_detector_values` |  |
-| `\EventsWidloskiOverlapNonlocalShareMedian` | 79 % |  | median over memoryless events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapNonlocalShareMedian` | 81 % |  | median over memoryless events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
 | `\EventsWidloskiOverlapUncertainShareMedian` | 8 % |  | median over memoryless events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
 | `\EventsYuEvents` | 125,423 |  | yu events compared with the non-local detector | `events.other_detector_values` |  |
 | `\EventsYuNoNonlocalFraction` | 56 % |  | share of yu events that overlap no non-local event | `events.other_detector_values` |  |
@@ -2809,7 +2810,7 @@ Unlettered: `\EventsCalibrationErrorBinEight`, `\EventsCalibrationErrorBinFive`,
 
 Script: `scripts/figures/generate_memoryless_comparison.py`. Questions: 1.1, 2a.3.
 
-Unlettered: `\DetectionControlsContinuingOursOnePerPartLongestFraction`, `\DetectionControlsContinuingOursSpanningShortestFraction`, `\DetectionControlsContinuingSlidingOnePerPartLongestFraction`, `\DetectionControlsContinuingSlidingSpanningShortestFraction`, `\DetectionControlsElsewhereOursOnePerPartLongestFraction`, `\DetectionControlsElsewhereOursOnePerPartShortestFraction`, `\DetectionControlsElsewhereSlidingMissingMax`, `\DetectionControlsElsewhereSlidingMissingMin`, `\DetectionControlsJumpOursSpanningMax`, `\DetectionControlsJumpOursSpanningMin`, `\DetectionControlsJumpSlidingSpanningMax`, `\DetectionControlsJumpingContinuousFraction`, `\DetectionControlsJumpingNonlocalFraction`, `\DetectionControlsJumpingSlidingBeforeTestFraction`, `\DetectionControlsJumpingSlidingFraction`, `\DetectionControlsMultipartTrials`, `\DetectionControlsNoReplayMinutes`, `\DetectionControlsNoReplayRateBound`, `\DetectionControlsNoReplayRecordings`, `\DetectionControlsOursFewerInEventTrials`, `\DetectionControlsOursMoreInEventTrials`, `\DetectionControlsOursRecoveryAloneFraction`, `\DetectionControlsOursRecoveryInEventFraction`, `\DetectionControlsPlacelessContinuousFraction`, `\DetectionControlsPlacelessFragmentedShareMax`, `\DetectionControlsPlacelessFragmentedShareMin`, `\DetectionControlsPlacelessNonlocalFraction`, `\DetectionControlsPlacelessNonlocalLowestRateFraction`, `\DetectionControlsPlacelessSlidingBeforeTestFraction`, `\DetectionControlsPlacelessSlidingFraction`, `\DetectionControlsSlidingFewerInEventTrials`, `\DetectionControlsSlidingMoreInEventTrials`, `\DetectionControlsSlidingRecoveryAloneFraction`, `\DetectionControlsSlidingRecoveryInEventFraction`, `\DetectionHeldoutEstimatorAgreementMin`, `\DetectionHeldoutJumpingSupportMax`, `\DetectionHeldoutJumpingSupportMin`, `\DetectionHeldoutOursOnlyInformativeMax`, `\DetectionHeldoutOursOnlyInformativeMin`, `\DetectionHeldoutOursOnlySupportFoldC`, `\DetectionHeldoutOursOnlySupportMax`, `\DetectionHeldoutOursOnlySupportMin`, `\DetectionHeldoutPlacelessInformativeEvents`, `\DetectionHeldoutPlacelessLooseEvents`, `\DetectionHeldoutPlacelessLooseSupportedEvents`, `\DetectionHeldoutSharedInformativeMax`, `\DetectionHeldoutSharedInformativeMin`, `\DetectionHeldoutSharedSupport`, `\DetectionPilotCallsDecidedByOutsideWindow`, `\DetectionPilotReplayCalls`, `\DetectionRecordingInboundPJump`, `\DetectionRecordingInboundPSpread`, `\DetectionRecordingOutboundDrawsFromPassing`, `\DetectionRecordingOutboundDurationRatio`, `\DetectionRecordingOutboundLocalFraction`, `\DetectionRecordingOutboundPJump`, `\DetectionRecordingOutboundPSpread`, `\DetectionRecordingRemoteStationaryDispersionCm`, `\DetectionRecordingShortPathDispersionCm`, `\DetectionRecordingShortReplayDurationRatio`, `\DetectionRecordingShortReplayLocalFraction`, `\DetectionRecordingShortReplayPJump`, `\DetectionRecordingShortReplayPSpread`, `\DetectionRecordingStateSpaceBoundErrorMs`, `\DetectionRecordingStrayWindowDispersionCm`, `\DetectionRecordingStrayWindowDistanceCm`, `\DetectionRecordingStrayWindowDurationMs`, `\DetectionRecordingStrayWindowLocalFraction`, `\DetectionRecordingStrayWindowPJump`, `\DetectionRecordingStrayWindowPSpread`, `\DetectionRecordingStrayWindowPiecesDispersionCm`, `\DetectionSweepDomainFraction`, `\DetectionSweepDomainSlidingBeforeTestFraction`, `\DetectionSweepDomainSlidingFraction`, `\DetectionSweepDomainStateSpaceFraction`, `\DetectionSweepDomainStateSpacePublishedFraction`, `\DetectionSweepFailedTestFraction`, `\DetectionSweepJumpHalfPassFraction`, `\DetectionSweepJumpHalfPassLongestFraction`, `\DetectionSweepJumpHalfPassShortestFraction`, `\DetectionSweepReplays`, `\DetectionSweepShortestEndLateMs`, `\DetectionSweepShortestReportedDurationMs`, `\DetectionSweepShortestStartEarlyMs`, `\DetectionSweepSlidingBeforeTestFraction`, `\DetectionSweepSlidingEndLateMaxMs`, `\DetectionSweepSlidingEndLateMinMs`, `\DetectionSweepSlidingEndLateUpperQuartileMaxMs`, `\DetectionSweepSlidingFraction`, `\DetectionSweepSlidingNotTheReplayFraction`, `\DetectionSweepSlidingOnlyBeforeTestReplays`, `\DetectionSweepSlidingOnlyReplays`, `\DetectionSweepSlidingSpreadOnlyFraction`, `\DetectionSweepSlidingStartEarlyMaxMs`, `\DetectionSweepSlidingStartEarlyMinMs`, `\DetectionSweepSpreadHalfPassFraction`, `\DetectionSweepStateSpaceEdgeErrorMaxMs`, `\DetectionSweepStateSpaceFraction`, `\DetectionSweepStateSpaceOnlyFraction`
+Unlettered: `\DetectionControlsContinuingOursOnePerPartLongestFraction`, `\DetectionControlsContinuingOursSpanningShortestFraction`, `\DetectionControlsContinuingSlidingOnePerPartLongestFraction`, `\DetectionControlsContinuingSlidingSpanningShortestFraction`, `\DetectionControlsElsewhereOursOnePerPartLongestFraction`, `\DetectionControlsElsewhereOursOnePerPartShortestFraction`, `\DetectionControlsElsewhereSlidingMissingMax`, `\DetectionControlsElsewhereSlidingMissingMin`, `\DetectionControlsJumpOursSpanningMax`, `\DetectionControlsJumpOursSpanningMin`, `\DetectionControlsJumpSlidingSpanningMax`, `\DetectionControlsJumpingContinuousFraction`, `\DetectionControlsJumpingNonlocalFraction`, `\DetectionControlsJumpingSlidingBeforeTestFraction`, `\DetectionControlsJumpingSlidingFraction`, `\DetectionControlsMultipartTrials`, `\DetectionControlsNoReplayMinutes`, `\DetectionControlsNoReplayRateBound`, `\DetectionControlsNoReplayRecordings`, `\DetectionControlsOursFewerInEventTrials`, `\DetectionControlsOursMoreInEventTrials`, `\DetectionControlsOursRecoveryAloneFraction`, `\DetectionControlsOursRecoveryInEventFraction`, `\DetectionControlsPlacelessContinuousFraction`, `\DetectionControlsPlacelessFragmentedShareMax`, `\DetectionControlsPlacelessFragmentedShareMin`, `\DetectionControlsPlacelessNonlocalFraction`, `\DetectionControlsPlacelessNonlocalLowestRateFraction`, `\DetectionControlsPlacelessSlidingBeforeTestFraction`, `\DetectionControlsPlacelessSlidingFraction`, `\DetectionControlsSlidingFewerInEventTrials`, `\DetectionControlsSlidingMoreInEventTrials`, `\DetectionControlsSlidingRecoveryAloneFraction`, `\DetectionControlsSlidingRecoveryInEventFraction`, `\DetectionHeldoutEstimatorAgreementMin`, `\DetectionHeldoutJumpingSupportMax`, `\DetectionHeldoutJumpingSupportMin`, `\DetectionHeldoutOursOnlyInformativeMax`, `\DetectionHeldoutOursOnlyInformativeMin`, `\DetectionHeldoutOursOnlySupportFoldC`, `\DetectionHeldoutOursOnlySupportMax`, `\DetectionHeldoutOursOnlySupportMin`, `\DetectionHeldoutPlacelessInformativeEvents`, `\DetectionHeldoutPlacelessLooseEvents`, `\DetectionHeldoutPlacelessLooseSupportedEvents`, `\DetectionHeldoutSharedInformativeMax`, `\DetectionHeldoutSharedInformativeMin`, `\DetectionHeldoutSharedSupport`, `\DetectionPilotCallsDecidedByOutsideWindowPassing`, `\DetectionPilotCallsDecidedByOutsideWindow`, `\DetectionPilotReplayCalls`, `\DetectionRecordingInboundPJump`, `\DetectionRecordingInboundPSpread`, `\DetectionRecordingOutboundDrawsFromPassing`, `\DetectionRecordingOutboundDurationRatio`, `\DetectionRecordingOutboundLocalFraction`, `\DetectionRecordingOutboundPJump`, `\DetectionRecordingOutboundPSpread`, `\DetectionRecordingRemoteStationaryDispersionCm`, `\DetectionRecordingShortPathDispersionCm`, `\DetectionRecordingShortReplayDurationRatio`, `\DetectionRecordingShortReplayLocalFraction`, `\DetectionRecordingShortReplayPJump`, `\DetectionRecordingShortReplayPSpread`, `\DetectionRecordingStateSpaceBoundErrorMs`, `\DetectionRecordingStrayWindowDispersionCm`, `\DetectionRecordingStrayWindowDistanceCm`, `\DetectionRecordingStrayWindowDurationMs`, `\DetectionRecordingStrayWindowLocalFraction`, `\DetectionRecordingStrayWindowPJump`, `\DetectionRecordingStrayWindowPSpread`, `\DetectionRecordingStrayWindowPiecesDispersionCm`, `\DetectionSweepDomainFraction`, `\DetectionSweepDomainSlidingBeforeTestFraction`, `\DetectionSweepDomainSlidingFraction`, `\DetectionSweepDomainStateSpaceFraction`, `\DetectionSweepDomainStateSpacePublishedFraction`, `\DetectionSweepFailedTestFraction`, `\DetectionSweepJumpHalfPassFraction`, `\DetectionSweepJumpHalfPassLongestFraction`, `\DetectionSweepJumpHalfPassShortestFraction`, `\DetectionSweepReplays`, `\DetectionSweepShortestEndLateMs`, `\DetectionSweepShortestReportedDurationMs`, `\DetectionSweepShortestStartEarlyMs`, `\DetectionSweepSlidingBeforeTestFraction`, `\DetectionSweepSlidingEndLateMaxMs`, `\DetectionSweepSlidingEndLateMinMs`, `\DetectionSweepSlidingEndLateUpperQuartileMaxMs`, `\DetectionSweepSlidingFraction`, `\DetectionSweepSlidingNotTheReplayFraction`, `\DetectionSweepSlidingOnlyBeforeTestReplays`, `\DetectionSweepSlidingOnlyReplays`, `\DetectionSweepSlidingSpreadOnlyFraction`, `\DetectionSweepSlidingStartEarlyMaxMs`, `\DetectionSweepSlidingStartEarlyMinMs`, `\DetectionSweepSpreadHalfPassFraction`, `\DetectionSweepStateSpaceEdgeErrorMaxMs`, `\DetectionSweepStateSpaceFraction`, `\DetectionSweepStateSpaceOnlyFraction`
 
 ### Figure content_estimators: Content models under three estimators
 

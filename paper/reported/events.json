@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "44f00fde8532",
+ "commit": "619bfd429091",
  "code": {
-  "head": "44f00fde8532259e3e3cf4315da531c4f55c8fb3",
+  "head": "619bfd429091b6d0d4a757a5eb15729b7370d76b",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -51,28 +51,28 @@
     "code_sha256": "c87777fde9d9f26d64d3e8b83bebe7baedb9e1da1f066689afdf44128df7c6d4"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/config.py": {
-    "sha256": "bc753bfb622e376098caa1626a85325b5764dd8cdb286d50cea6d7925ae08055",
-    "code_sha256": "f543aeeeb4eae0b449c1535aa04d84e862b8571321c3a3ad1f6b14969b4e5d15"
+    "sha256": "9cb02ea860ed4ed5ea892382c8be8d6ff8dc2a1fed495234e113713998829f64",
+    "code_sha256": "13b18b0de515e3d3d3564bcea6008503418f266dcca3d71da0a94a14ec20f7a0"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/detect.py": {
-    "sha256": "6af3c8480aee71fcd17ff2755b91c616378aac524f7e396ccc273e8b6ec7255b",
-    "code_sha256": "e4717a42b7f3879f235762506aa697eba90babda3bb419fd6e312b1e42373fe9"
+    "sha256": "5f3791c76f81e90168af14e998158144cf0f7f86dc4848dde9ee1cbcfa80007d",
+    "code_sha256": "362f64f4630eeda574cba563ed9fc024e9e3dfcf1b29df567c6a38ef82713da1"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/epoch.py": {
-    "sha256": "c98a0cf5df8bf644d60ecfd3d0e04dea4840836f81fc045fe61ebda3f89ec359",
-    "code_sha256": "587f418a70783fa925d8cd1e6c78bae72b5c0c8c2787c3b0f8d028f8920b8a5e"
+    "sha256": "4526af391594135dbc27d0c5bdd7ff91acfff55d5d34468271d12fa834ebbd62",
+    "code_sha256": "1abdb2363a36a925c03aef79a23436c033bea2247bd00bb05d1c346ad3ab7cc1"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/event_table.py": {
-    "sha256": "c2b51632504ebb71444316468fca081ca51c6e6f2bd2832202cc1b2e26a1059f",
+    "sha256": "866e7e17b4a01d6d539d0c0e22aad21fc27108e8903ccebea59035811166dd19",
     "code_sha256": "0f867a91c5e7403c699c7ef9278a90799621256648844493ea1cc07b375a3c4d"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/likelihood.py": {
-    "sha256": "ac85375620163f411fae862aad0659d469cb8f5da9a9b6d67f56bad976732902",
-    "code_sha256": "3b9548793940b19e629dc2a64592278110601c7300903d1be1ef7fd3c3de62c1"
+    "sha256": "186fb3401b0bbdc260ae8c477d3a51f01313b2519cd64b989cd10dc5c9a223ef",
+    "code_sha256": "f417921a0c2ea2a3eec38df11bbe61bb1e21b3071d080f96e3c088974093dc26"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/shuffle.py": {
-    "sha256": "cb946e66b20fa6aaed31727bd19d374989585b7f8af79cfb1b839dbee4333b0c",
-    "code_sha256": "665dd3bfbe64561b0cd19b86a5c8bb63d7dad49d98f85963a56e3037122bdeac"
+    "sha256": "a6b25b0d7018667e0906fa29db23592d27fa56edcee5873ed62090590fb48cd9",
+    "code_sha256": "f8cd0c094a189869c7197487c488034b921917b10f2b6db9e9c7803a81c5c2ac"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/window_statistics.py": {
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
@@ -111,8 +111,8 @@
     "code_sha256": "dc7821c92076976305c094db009c7a31c39c4e5f6a02c32020d6eb57bd03d5cc"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/feature_run.py": {
-    "sha256": "926472a38701ae55a3f2bc89ce3f51102b13a88820bfbb0bd2a9410aafcf1eb2",
-    "code_sha256": "6e85563ea2dbca9fa519e873c1c945320e4e4dce8f898d88e04d7fc1068600de"
+    "sha256": "fc22a08b465531105283c15c119c9364be5d05a748fc4c73f664090f5077ee56",
+    "code_sha256": "9169bf69f1bdfd79482b64f4e5857b9f2e94acd4677dfa9ac211be1c308ca61b"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/features.py": {
     "sha256": "cdadbf6e7e4fc0b5c890b46ef54cef7675662daa60cb7c45972be79d455196e7",
@@ -315,8 +315,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "14ad20d9c0c146268eefbd4a225da9850212eb4eaafbca5078d11e0f8fc95ca8",
-    "code_sha256": "f75ee9ccfee8a95dcac61bda04aed033c803794824524ad7d2e0b1a9cbfa4312"
+    "sha256": "7bfd7fdff8ab229a2723b34ffee8f68590ac066f660c0bb10356919f626048d3",
+    "code_sha256": "db3722022e992cfd99112f1231f5a7ad7c3fc46ff84005b23ef1fe169c3df40b"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -412,42 +412,42 @@
    "sha256": "4c7fabece8e648c85f0da19f623c16b798414bf38073098deb925fddb0332d50"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_features.parquet",
+   "path": "Processed-Data/replay_detection_comparison/event_features/e2331f976fd1/*_features.parquet",
    "n_files": 242,
-   "sha256": "7045d747c109d3af1485cc0455f981c717e3c6e365b41bb5a14242e19cab5561"
+   "sha256": "e51bb4ab78e0a565970dcde8d0d2993fe285009c1364b9c623620254fc5553cb"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/manifest.json",
-   "sha256": "aeb729fde5b6d3c8dbd7c586a679fefb31d0b431b8ec2d42f9550c0b337fa6b9"
+   "path": "Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/manifest.json",
+   "sha256": "10166120f5cc153033a6b2431d9606aa38c48c4129b7dca1337fd0ce1334947a"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/*_observations.parquet",
+   "path": "Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/*_observations.parquet",
    "n_files": 242,
-   "sha256": "8227eb344b7b821cb76142cbdb9b89c2550ea413040a7f6fdf84ba7d727d04d1"
+   "sha256": "aeaa31d7ce083bb75be205eeedbc8fe9a0b6a3bce15c2c02b16597ee8d7762c0"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/*_counts.parquet",
+   "path": "Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/*_counts.parquet",
    "n_files": 242,
-   "sha256": "e350556746dc8a6bdd410e287a0131a15b0619f80fd1a4af92ecf66d2580c185"
+   "sha256": "f21b01c8b138dc9d40704edbfd524ef987114d2a0c4f2d6e5269ae17444eb604"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/*_cells.parquet",
+   "path": "Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/*_cells.parquet",
    "n_files": 242,
-   "sha256": "9dd3243e8c2e4b3247f1d06a89591b7aba5b8da47142599f66dc933ec2515dc2"
+   "sha256": "b9d8115aa450315d1ce3e803531710621b58f88a30f4894c3c5b52b449a7341b"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_state_shares.parquet",
+   "path": "Processed-Data/replay_detection_comparison/event_features/e2331f976fd1/*_state_shares.parquet",
    "n_files": 242,
-   "sha256": "715bc3b57216c0aa77016de5de5727bb9143d3c0f6fbea21c7c3f20bd86d9810"
+   "sha256": "85027fcb6c506a8af9dd290d00701a595387e24a5518eda801439c881e3c9b18"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_pair_membership.parquet",
+   "path": "Processed-Data/replay_detection_comparison/event_features/e2331f976fd1/*_pair_membership.parquet",
    "n_files": 242,
-   "sha256": "2040d219e96588591df50444ad8d8bfaee94190a750db062037f5bee7a2948de"
+   "sha256": "011cb930c1aff0b166668e077594113c4d499e6a63f43e780c8acd59a64d368a"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/directional_by_animal.csv",
-   "sha256": "19a36645f549d0fba071e773ba57f874df53e339b643d99dfd311d14f3094d6d"
+   "path": "Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/report/directional_by_animal.csv",
+   "sha256": "94298e8efcf440db68ebd7d553818d8b965f8a2851440f50a688afc7d3611364"
   },
   {
    "path": "Processed-Data/event_spike_evidence/chimi20200212_02_r1_HPC/event_spike_evidence_metrics.parquet",
@@ -936,7 +936,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -950,7 +950,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -964,7 +964,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -978,7 +978,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -992,7 +992,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1006,7 +1006,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1020,7 +1020,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1034,7 +1034,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1048,7 +1048,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1062,7 +1062,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1076,7 +1076,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1090,7 +1090,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1842,7 +1842,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1856,7 +1856,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1870,7 +1870,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1884,7 +1884,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1898,7 +1898,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1912,7 +1912,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1926,7 +1926,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1940,7 +1940,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1954,7 +1954,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1968,7 +1968,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1982,7 +1982,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -1996,7 +1996,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2012,7 +2012,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2028,7 +2028,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2044,7 +2044,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2060,7 +2060,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2076,7 +2076,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2092,7 +2092,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2108,7 +2108,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2124,7 +2124,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2140,7 +2140,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2156,7 +2156,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2172,7 +2172,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2188,7 +2188,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2204,7 +2204,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2220,7 +2220,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2236,7 +2236,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -2434,7 +2434,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2476,7 +2476,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2490,7 +2490,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2504,7 +2504,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2518,7 +2518,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2532,7 +2532,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2546,7 +2546,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2560,7 +2560,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2574,7 +2574,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2588,7 +2588,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2602,7 +2602,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -2616,7 +2616,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -3201,7 +3201,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3217,7 +3217,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3233,7 +3233,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3249,7 +3249,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3265,7 +3265,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3281,12 +3281,12 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
   "nonlocal_events_outside_widloski": {
-   "value": 71498,
+   "value": 70924,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3297,12 +3297,12 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
   "nonlocal_events_outside_widloski_fraction": {
-   "value": 0.9449407908648763,
+   "value": 0.9373546204271516,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -3313,12 +3313,12 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
   "nonlocal_events_outside_widloski_per_hour": {
-   "value": 1777.666040573218,
+   "value": 1763.3945881229533,
    "kind": "quantity",
    "style": "sig2",
    "unit": "per h",
@@ -3329,7 +3329,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3377,7 +3377,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3393,7 +3393,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3409,7 +3409,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3425,7 +3425,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3441,7 +3441,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3457,12 +3457,12 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
   "nonlocal_time_outside_widloski_fraction": {
-   "value": 0.929279282335591,
+   "value": 0.9149197202044863,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -3473,12 +3473,12 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
   "nonlocal_time_outside_widloski_s": {
-   "value": 6097.961916208267,
+   "value": 6003.733986377716,
    "kind": "quantity",
    "style": "int",
    "unit": "s",
@@ -3489,7 +3489,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3505,7 +3505,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -3778,7 +3778,7 @@
    "figures": [
     "2"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and inventory comparison run afeb897d850f (its observations, counts and cells, pooled by animal)",
+   "source": "event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)",
    "function": "left_out_values",
    "pending": null
   },
@@ -5185,7 +5185,7 @@
    "pending": null
   },
   "widloski_criteria_events": {
-   "value": 4388,
+   "value": 5056,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -5194,12 +5194,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_criteria_no_nonlocal_fraction": {
-   "value": 0.03691886964448496,
+   "value": 0.04707278481012658,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5208,12 +5208,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_criteria_no_nonlocal_mixed_fraction": {
-   "value": 0.48148148148148145,
+   "value": 0.36134453781512604,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5222,12 +5222,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_criteria_no_nonlocal_mostly_local_fraction": {
-   "value": 0.5123456790123457,
+   "value": 0.6386554621848739,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5236,12 +5236,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_criteria_no_nonlocal_mostly_no_spike_fraction": {
-   "value": 0.006172839506172839,
+   "value": 0.0,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5250,12 +5250,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_criteria_overlap_all_nonlocal_fraction": {
-   "value": 0.10837671557027923,
+   "value": 0.1311747613117476,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5264,12 +5264,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_criteria_overlap_any_local_fraction": {
-   "value": 0.5832938949361098,
+   "value": 0.5404732254047323,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5278,12 +5278,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_criteria_overlap_any_no_spike_fraction": {
-   "value": 0.27449124467581637,
+   "value": 0.25051888750518886,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5292,12 +5292,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_criteria_overlap_local_share_median": {
-   "value": 0.05194805194805195,
+   "value": 0.024096385542168676,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5306,7 +5306,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5320,12 +5320,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_criteria_overlap_nonlocal_share_median": {
-   "value": 0.7950262588816805,
+   "value": 0.821917808219178,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5334,12 +5334,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_criteria_overlap_uncertain_share_median": {
-   "value": 0.08433734939759036,
+   "value": 0.07936507936507936,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5348,12 +5348,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_events": {
-   "value": 4092,
+   "value": 4662,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -5362,12 +5362,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_no_nonlocal_fraction": {
-   "value": 0.03372434017595308,
+   "value": 0.04332904332904333,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5376,12 +5376,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_no_nonlocal_mixed_fraction": {
-   "value": 0.4927536231884058,
+   "value": 0.36633663366336633,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5390,12 +5390,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_no_nonlocal_mostly_local_fraction": {
-   "value": 0.5072463768115942,
+   "value": 0.6336633663366337,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5404,7 +5404,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5418,12 +5418,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_overlap_all_nonlocal_fraction": {
-   "value": 0.09661102680829539,
+   "value": 0.11591928251121077,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5432,12 +5432,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_overlap_any_local_fraction": {
-   "value": 0.5940819423368741,
+   "value": 0.5551569506726457,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5446,12 +5446,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_overlap_any_no_spike_fraction": {
-   "value": 0.2830045523520486,
+   "value": 0.2623318385650224,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5460,12 +5460,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_overlap_local_share_median": {
-   "value": 0.056338028169014086,
+   "value": 0.030303030303030304,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5474,7 +5474,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5488,12 +5488,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_overlap_nonlocal_share_median": {
-   "value": 0.7866666666666666,
+   "value": 0.8141592920353983,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5502,12 +5502,12 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
   "widloski_overlap_uncertain_share_median": {
-   "value": 0.0847457627118644,
+   "value": 0.08196721311475409,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -5516,7 +5516,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5530,7 +5530,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5544,7 +5544,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5558,7 +5558,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5572,7 +5572,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5586,7 +5586,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5600,7 +5600,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5614,7 +5614,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5628,7 +5628,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5642,7 +5642,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5656,7 +5656,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5670,7 +5670,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5684,7 +5684,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5698,7 +5698,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5712,7 +5712,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5726,7 +5726,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5740,7 +5740,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5754,7 +5754,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5768,7 +5768,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5782,7 +5782,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5796,7 +5796,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5810,7 +5810,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5824,7 +5824,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5838,7 +5838,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   },
@@ -5852,7 +5852,7 @@
     "2b.3"
    ],
    "figures": [],
-   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
    "pending": null
   }

@@ -59,7 +59,7 @@ Poisson log-likelihood of the evaluation spikes under a discovery content poster
 spike and silence terms apart, against the animal's own position and permuted
 evaluation fields, with a coverage floor. It is implemented as
 `detector_comparison.heldout` and can be applied to recorded tetrodes unchanged. On the
-simulation it supports <!--v:detection.heldout_ours_only_support_fold_c-->87<!--/v-->–<!--v:detection.heldout_ours_only_support_max-->97<!--/v-->%
+simulation it supports <!--v:detection.heldout_ours_only_support_fold_c-->88<!--/v-->–<!--v:detection.heldout_ours_only_support_max-->97<!--/v-->%
 of the informative true replays only our detector reported and none of
 <!--v:detection.heldout_placeless_informative_events-->19<!--/v--> informative place-less bursts
 (<!--v:detection.heldout_placeless_loose_supported_events-->4<!--/v--> of <!--v:detection.heldout_placeless_loose_events-->75<!--/v-->

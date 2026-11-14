@@ -3633,3 +3633,36 @@ marker, and the computed value now there. Newest last.
 | `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_dm_high` | +0.34 | +0.92 |
 | `docs/design/content_estimator_comparison.md` | `behavior.est_breadth_dm_low` | +1.5 | +1.3 |
 | `docs/design/content_estimator_comparison.md` | `behavior.est_breadth_dm_high` | +2.1 | +2.2 |
+
+## 2026-11-14
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.recording_outbound_duration_ratio` | 5.8 | 4.4 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_jump_half_pass_shortest_fraction` | 31 | 36 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_jump_half_pass_longest_fraction` | 98 | 99 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_spread_half_pass_fraction` | 97 | 96 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_jump_half_pass_fraction` | 87 | 88 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_not_the_replay_fraction` | 23 | 21 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_only_replays` | 0 | 1 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_only_before_test_replays` | 5 | 4 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_domain_sliding_fraction` | 63 | 62 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_not_the_replay_fraction` | 23 | 21 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_shortest_start_early_ms` | 28 | 29 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_shortest_end_late_ms` | 65 | 121 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_end_late_upper_quartile_max_ms` | 231 | 226 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_state_space_edge_error_max_ms` | 5 | 6 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_jumping_sliding_fraction` | 7 | 8 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_jumping_sliding_before_test_fraction` | 13 | 14 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_elsewhere_sliding_missing_min` | 38 | 33 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_sliding_recovery_in_event_fraction` | 72 | 71 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_sliding_recovery_alone_fraction` | 61 | 62 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_sliding_fewer_in_event_trials` | 15 | 21 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_sliding_more_in_event_trials` | 95 | 84 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.heldout_ours_only_support_min` | 93 | 92 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.heldout_ours_only_support_fold_c` | 87 | 88 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.recording_outbound_duration_ratio` | 5.8 | 4.4 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.pilot_calls_decided_by_outside_window` | 2 | 1 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.pilot_replay_calls` | 4 | 6 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.pilot_calls_decided_by_outside_window_passing` | 2 | 0 |
+| `docs/design/replay_detection_comparison/05-validation.md` | `detection.heldout_ours_only_support_fold_c` | 87 | 88 |
