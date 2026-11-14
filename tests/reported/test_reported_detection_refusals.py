@@ -149,7 +149,7 @@ SHARED_REPLAYS = {
 
 
 # the informative shared replays of each fold; all have held-out support
-@pytest.mark.parametrize(("fold", "n_events"), [("A", 139), ("B", 175), ("C", 25)])
+@pytest.mark.parametrize(("fold", "n_events"), [("A", 137), ("B", 173), ("C", 23)])
 def test_shared_replays_whose_support_differs_between_folds_are_refused(
     heldout, fold, n_events
 ):
@@ -185,10 +185,10 @@ def test_a_fold_with_no_informative_shared_replay_is_refused(heldout):
 
 @pytest.mark.parametrize("estimator", ["state_space", "sliding_window"])
 def test_a_placeless_burst_with_heldout_support_is_refused(heldout, estimator):
-    # 1 of fold A's 11 informative place-less events
+    # 1 of fold A's 10 informative place-less events
     changed = _with_value(
         heldout,
-        1 / 11,
+        1 / 10,
         summary="by_class",
         measure="support_rate",
         fold="A",
