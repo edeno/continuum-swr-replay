@@ -1,15 +1,20 @@
 # Replay detection method comparison — overview
 
-*Design spec, cross-cutting. Status (2026-10-18): approved; the Yu detector exists in the
+*Design spec, cross-cutting. Status (2026-11-14): approved; the Yu detector exists in the
 `ripple_detection` package, and the memoryless sequence detector, its shuffle, its event
 table and a per-epoch runner are implemented and tested in this project, and the detector
-ran on all 242 analysed epochs (run `d0964cc76ed2-seed20260922`); its two remaining pilot
+ran on all 242 analysed epochs (run `e2331f976fd1-seed20260922`, 2026-11-14: the 5 ms step
+and its own running-only encoding model; the shared-encoding control is
+`e2331f976fd1-seed20260922-decoderencoding`, and the earlier 4 ms run on the decoder's
+model `d0964cc76ed2-seed20260922`); its two remaining pilot
 checks (null validation, two sensitivities) were dropped by the lead on 2026-10-28, so the
 port stays a documented adaptation whose clusterless null was not separately validated; the inventory comparison's
 accounting is implemented and tested on synthetic inventories, and its per-detector
 adapters, per-epoch runner, report and examples are built and tested on simulated epochs,
-and the comparison ran on all 242 analysed epochs (run `afeb897d850f`); the event
-features are built, their smoke ran and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run ran on all 242 epochs (run `30cf1cc432e9`, all `ok`), and `scripts/detector_comparison/add_state_shares.py` added each event's decoder-state shares to it. The Kay, Karlsson, Yu and Zugaro SWR inventories are
+and the comparison ran on all 242 analysed epochs (run `e2331f976fd1`, on the memoryless
+run above; the control's comparison is `e2331f976fd1-decoderencoding`, and the earlier
+run `afeb897d850f`); the event
+features are built, their smoke ran and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run ran on all 242 epochs (run `e2331f976fd1`, on the comparison above, all `ok`; the earlier run `30cf1cc432e9`), and `scripts/detector_comparison/add_state_shares.py` added each event's decoder-state shares to it. The Kay, Karlsson, Yu and Zugaro SWR inventories are
 computed directly from the package, on shared CA1 inputs, by
 `scripts/detection/run_swr_detection.py`, which ran on every epoch in the full pipeline
 refresh (R3, then R10, run `056eee0dcb5a`); Spyglass integration is the
@@ -27,7 +32,7 @@ register invites the cross-method blending this design forbids.
 | spec | scope | status |
 |---|---|---|
 | [01-yu-swr-detector.md](01-yu-swr-detector.md) | SWR detector with a noise-percentile threshold (Yu et al. 2017) | package side implemented; direct project inventory produced by `scripts/detection/run_swr_detection.py`, run on every epoch in R3 and R10 (run `056eee0dcb5a`); Spyglass integration last |
-| [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | implemented and tested, shuffle and event table included; ran on all 242 analysed epochs (`d0964cc76ed2-seed20260922`); the pilot checks (null validation, two sensitivities) were dropped by the lead on 2026-10-28 |
+| [02-memoryless-sequence.md](02-memoryless-sequence.md) | Memoryless sliding-window sequence detector (Widloski & Foster 2025) | implemented and tested, shuffle and event table included; ran on all 242 analysed epochs (`e2331f976fd1-seed20260922`; control `e2331f976fd1-seed20260922-decoderencoding`); the pilot checks (null validation, two sensitivities) were dropped by the lead on 2026-10-28 |
 | [03-inventory-comparison.md](03-inventory-comparison.md) | Nine inventories (eight detectors) → common schema → N-way overlap accounting | accounting, adapters, per-epoch runner, report and examples implemented and tested on synthetic or simulated epochs; ran on all 242 analysed epochs (run `afeb897d850f`), with its report and examples |
 | [04-event-features.md](04-event-features.md) | Symmetric event characterization and selection diagnostics; threshold robustness as a later follow-up | initial scope agreed; the initial report is implemented (features, evidence, selection, populations, runner, report, examples); the smoke ran (`68f51dabdb3c`) and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run ran on all 242 epochs (run `30cf1cc432e9`, all `ok`), and `scripts/detector_comparison/add_state_shares.py` added each event's decoder-state shares to it |
 | [05-validation.md](05-validation.md) | Simulation and held-out-tetrode validation: what a performance claim would need | parked |
@@ -71,7 +76,8 @@ No method is designated the reference detector against which others are judged.
 
 | | harmonized | left to each method |
 |---|---|---|
-| **Substrate** — same recordings, epochs, speed-eligible population, and the fitted encoding model where a method needs one | ✅ | |
+| **Substrate** — same recordings, epochs and speed-eligible population | ✅ | |
+| **Encoding model** — each decoding-based method's own published one in the main comparison; one shared model in the control (X5) | | ✅ |
 | **Method internals** — thresholds, noise models, summary statistics, event assembly, scoring rules | | ✅ |
 
 The speed/immobility rule is shared eligibility: every method's candidates are qualified
@@ -140,7 +146,7 @@ The comparison runner reads the memoryless one under two cohorts, `published` an
 | 3 | SWR, noise-percentile threshold | LFP | `Yu_ripple_detector` (Yu et al. 2017) | in package; computed directly by `scripts/detection/run_swr_detection.py` (R3, then R10, run `056eee0dcb5a`) — [01](01-yu-swr-detector.md) |
 | 4 | MUA high-synchrony events | population rate | `multiunit_HSE_detector` | exists (`MUA_event`) |
 | 5 | Posterior threshold | decoding | our state-space non-local detection | exists (`non_local_event`) |
-| 6 | Posterior sequence | decoding | Widloski & Foster 2025 | implemented (`memoryless_sequence/`, `scripts/detection/run_memoryless_detection.py`); ran on all 242 analysed epochs (`d0964cc76ed2-seed20260922`); the pilot checks (null validation, two sensitivities) were dropped by the lead on 2026-10-28 — [02](02-memoryless-sequence.md) |
+| 6 | Posterior sequence | decoding | Widloski & Foster 2025 | implemented (`memoryless_sequence/`, `scripts/detection/run_memoryless_detection.py`); ran on all 242 analysed epochs (`e2331f976fd1-seed20260922`; control `e2331f976fd1-seed20260922-decoderencoding`); the pilot checks (null validation, two sensitivities) were dropped by the lead on 2026-10-28 — [02](02-memoryless-sequence.md) |
 | 7 | SWR, one channel, two thresholds | LFP | `Zugaro_ripple_detector` (the `FindRipples` lineage: Hirase and Zugaro, FMAToolbox; Csicsvari et al. 1999 as ancestor) | in package; computed directly by `scripts/detection/run_swr_detection.py` on one CA1 channel per epoch (R3, then R10, run `056eee0dcb5a`) — see below |
 | 8 | Ripple power and multiunit activity jointly | joint LFP × rate | `Carey_candidate_detector` (Carey, Tanaka & van der Meer 2019; vandermeerlab `GenCandidateEvents`) | in package (PR #17; `normalization_mask` since `9766fd4`, pinned from `e1decf2`); decided 2026-10-17; runner `scripts/detection/run_carey_detection.py` built and tested, and run on all 242 epochs (run `fa6537e48bcf`) — see below |
 

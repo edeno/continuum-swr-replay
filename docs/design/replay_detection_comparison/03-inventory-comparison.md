@@ -203,10 +203,11 @@ rule; it does not establish which label is correct.
 Keep a separate table of paired label agreement. A matched pair's two events can carry
 different SWR labels purely because their bounds differ.
 
-## Deferred eligibility and encoding controls
+## Eligibility and encoding controls
 
-Neither is an initial deliverable. Reopen a control when a particular disagreement
-requires it, label the analysis as secondary, and retain the primary cohorts and results.
+The shared-encoding control (2) has been run; the others are deferred. Reopen a deferred
+control when a particular disagreement requires it, label the analysis as secondary, and
+retain the primary cohorts and results.
 
 1. **Native speed gates** (overview X4). Re-run each method under its own published
    gate — Widloski's per-bin < 5 cm/s, ours whole-event < 4 cm/s, Yu's < 4 cm/s — and
@@ -217,7 +218,9 @@ requires it, label the analysis as secondary, and retain the primary cohorts and
    control re-runs the memoryless detector on the decoder's encoding model
    (`--encoding decoder`), so that both read one model; a difference that remains is one
    of temporal inference and event selection, and one that goes away was the encoding
-   model's.
+   model's. Run 2026-11-14: the memoryless runs `e2331f976fd1-seed20260922` (main) and
+   `e2331f976fd1-seed20260922-decoderencoding` (control), compared under the inventory
+   comparison runs `e2331f976fd1` and `e2331f976fd1-decoderencoding`.
 3. **Reference-channel ripple power** (deferred). The vandermeerlab workflow thresholds
    the z-scored difference between the ripple channel's ripple-band power and a control
    channel's, and the consensus statement (Liu et al. 2022) recommends difference or

@@ -73,7 +73,7 @@ the comparison of one epoch is ``detector_comparison.epoch_comparison``'s.
 
 Usage:
     python scripts/detector_comparison/run_inventory_comparison.py --carey-run-id <run id> \\
-        --memoryless-run-id d0964cc76ed2-seed20260922 \\
+        --memoryless-run-id e2331f976fd1-seed20260922 \\
         --epoch-id chimi20200225_02_r1_HPC
 """
 
