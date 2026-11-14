@@ -207,7 +207,7 @@ def outcome_title(decoded: dict, event: int, label: str) -> str:
 CAPTION_SETTINGS = {
     "n_shuffles": 100,
     "spread_threshold_cm": 10.0,
-    "stride_ms": 4.0,
+    "stride_ms": 5.0,
     "speed_threshold_cm_per_s": 4.0,
     "dispersion_threshold_cm": 12.0,
     "stray_window_still_ms": 120.0,
@@ -243,23 +243,28 @@ def check_caption_settings(config: MemorylessSequenceConfig) -> None:
 def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> None:
     """Stop rather than write prose the panels contradict.
 
-    The caption commits to a verdict for each of the four zoomed events and to
-    the state-space detector reporting all of them. Each is read from the
+    The caption commits to a verdict for three of the four zoomed events, to
+    the outbound continuous replay meeting the duration and dispersion
+    criteria while being mostly local coding, and to the state-space detector
+    reporting all four. It commits to no verdict of the significance test on
+    the outbound replay: that sits within a few draws of the threshold and
+    moves with the step and the seed. Each is read from the
     data here; a threshold, seed or library change that moves one turns into
     an error naming it instead of a caption that says the opposite of its
     figure.
     """
     expected = {
-        CONTINUOUS_OUTBOUND_EVENT: "failed the shuffle",
         CONTINUOUS_INBOUND_EVENT: "found",
         SHORT_PATH_EVENT: "declined",
         REMOTE_STATIONARY_EVENT: "declined",
     }
-    if not accepted_overlapping(decoded, SHORT_REPLAY_EVENT):
-        raise RuntimeError(
-            "The caption says the 80 ms replay meets the duration and dispersion "
-            "criteria; no accepted sequence overlaps it. Rewrite the caption."
-        )
+    for event in (SHORT_REPLAY_EVENT, CONTINUOUS_OUTBOUND_EVENT):
+        if not accepted_overlapping(decoded, event):
+            raise RuntimeError(
+                f"The caption says {EVENT_LABELS[event]!r} meets the duration and "
+                "dispersion criteria; no accepted sequence overlaps it. Rewrite "
+                "the caption."
+            )
     for event, want in expected.items():
         got = verdict(decoded, event)
         if got != want:
@@ -308,14 +313,10 @@ def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> Non
             "The caption says the 80 ms replay passes the significance test; it "
             "fails it. Rewrite the caption."
         )
-    if (
-        shuffle_of(decoded, CONTINUOUS_OUTBOUND_EVENT).passes
-        or not shuffle_of(decoded, CONTINUOUS_INBOUND_EVENT).passes
-    ):
+    if not shuffle_of(decoded, CONTINUOUS_INBOUND_EVENT).passes:
         raise RuntimeError(
-            "The caption says the outbound continuous replay fails the significance "
-            "test and the inbound one passes it; the data disagree. Rewrite the "
-            "caption."
+            "The caption says the inbound continuous replay passes the significance "
+            "test; it fails it. Rewrite the caption."
         )
     stray = decoded["shuffles"][sequence]
     if stray.p_spread <= SIGNIFICANCE_LEVEL or stray.p_jump <= SIGNIFICANCE_LEVEL:

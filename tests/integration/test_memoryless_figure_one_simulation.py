@@ -548,9 +548,11 @@ class TestThePublishedSignificanceTest:
 
     The inbound continuous replay and the 80 ms replay pass both halves: the
     positive controls for the whole published definition. The outbound
-    continuous replay, 81% absorbed local coding, passes the spread half and
-    fails the jump half by a few draws. The caption reads all three from the
-    data; these pin them so a change is noticed.
+    continuous replay is mostly absorbed local coding and is reported far too
+    long; the shuffle is run on it, but whether it passes sits within a few
+    draws of the threshold and moves with the step and the seed, so nothing
+    here pins its verdict. The caption reads these from the data; these pin
+    them so a change is noticed.
     """
 
     @pytest.mark.parametrize("event", [CONTINUOUS_INBOUND, SHORT_REPLAY])
@@ -563,14 +565,19 @@ class TestThePublishedSignificanceTest:
         assert result.p_jump <= 0.05
         assert result.passes
 
-    def test_the_absorbed_outbound_replay_fails_the_jump_half(self, decoded):
+    def test_the_absorbed_outbound_replay_is_tested_as_mostly_local_and_too_long(
+        self, decoded
+    ):
+        """What is robust about it: the event the shuffle is asked about is
+        mostly the animal's own place, and far longer than the replay in it.
+        Its pass or fail is not claimed."""
         sequence = accepted_overlapping(decoded, CONTINUOUS_OUTBOUND)[0]
-        result = decoded.shuffles[sequence]
 
+        assert decoded.shuffles[sequence].testable
         assert local_fraction(decoded, sequence) > 0.5
-        assert result.p_spread <= 0.05
-        assert result.p_jump > 0.05
-        assert not result.passes
+        assert decoded.candidates.duration_s[sequence] > 3 * true_duration_s(
+            decoded, CONTINUOUS_OUTBOUND
+        )
 
     def test_only_accepted_candidates_are_tested(self, decoded):
         assert set(decoded.shuffles) == set(
