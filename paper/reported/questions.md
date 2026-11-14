@@ -16,8 +16,8 @@ it calls.
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
 | `survey.json` | `619bfd429091` | yes | 32 | 0 |
-| `detection.json` | `619bfd429091` | yes | 133 | 0 |
-| `events.json` | `619bfd429091` | yes | 353 | 0 |
+| `detection.json` | `bc79762d046f` | yes | 133 | 0 |
+| `events.json` | `bc79762d046f` | yes | 353 | 0 |
 | `behavior.json` | `619bfd429091` | yes | 922 | 0 |
 | `mpfc.json` | `619bfd429091` | yes | 604 | 0 |
 
