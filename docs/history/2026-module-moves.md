@@ -500,9 +500,13 @@ shims. Paths are under `src/continuum_swr_replay/`.
 
 A pickle that holds an instance of a moved class names the class's old module. One
 kind of stored file does: the memoryless detector's `*_memoryless_candidates.pkl`
-(`CandidateSequences` and its config). Its one reader,
-`analysis/detection/memoryless_sequence/detect.py:load_candidates`, points the two
-former module names at today's modules for the read, so the stored runs still load.
+(`CandidateSequences` and its config). Its reader,
+`analysis/detection/memoryless_sequence/detect.py:load_candidates`, pointed the two
+former module names at today's modules for the read until the memoryless rerun of
+2026-11-14 (runs `e2331f976fd1-seed20260922` and its `-decoderencoding` control, written
+under today's path), which the comparison and features runs now read; the shim was then
+removed. The runs written before 2026-11-13 (`d0964cc76ed2-seed20260922` and older) keep
+their candidate files under the former path, and nothing supported reads those files.
 
 `nonlocal_probability` moved from `decoding/results.py` to
 `analysis/event_definition/nonlocal_event_rule.py`, beside the new
