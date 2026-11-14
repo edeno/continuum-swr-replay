@@ -13,16 +13,20 @@ a place while keeping every marginal distribution, and therefore the occupancy,
 the mean rates and the ground-process intensity, exactly as they were. The
 event's own spikes and marks are never touched.
 
-Two implementation facts keep this exact and cheap. Pairing marks ``M`` with
-positions ``X[pi]`` produces the same set of pairs as pairing ``M[pi^-1]`` with
-``X``, and the joint mark intensity is a sum over pairs, so the code permutes
-the small mark array rather than the ``(n_encoding, n_bins)`` position kernel.
-And the per-spike joint mark intensity is the library's own
-``block_estimate_log_joint_mark_intensity``, with spikes assigned to rows by
-the library's own ``get_spike_time_bin_ind`` on the full epoch grid, the
-detector's (``likelihood.likelihood_grid``), with the ground-process term
-scaled to its rows as the epoch decode scales it, so the unshuffled re-decode
-is the epoch decode restricted to the candidate's rows.
+Two implementation facts keep this exact and cheap. The joint mark intensity
+of a decoding spike is a sum over encoding pairs, ``sum_i K_mark(m, M_i)
+K_pos(x, X_i)``, and a draw changes only which position goes with which mark.
+So the mark kernel against the event's spikes is computed once per electrode,
+and each draw permutes the rows of the ``(n_encoding, n_bins)`` position kernel
+before one matrix product, all draws in one compiled call on the device
+(:func:`_log_joint_mark_intensity_draws`). Its normalization by occupancy and
+mean rate, its log floor and its clip are the library's
+``estimate_log_joint_mark_intensity`` and ``block_estimate_log_joint_mark_intensity``,
+step by step; tests pin it to the library run on permuted positions. And
+spikes are assigned to rows by the library's own ``get_spike_time_bin_ind`` on
+the full epoch grid, the detector's (``likelihood.likelihood_grid``), with the
+ground-process term scaled to its rows as the epoch decode scales it, so the
+unshuffled re-decode is the epoch decode restricted to the candidate's rows.
 
 The candidate's windows are re-decoded as they stand, merged gaps included,
 without redetecting anything or reapplying the spread and jump gates. The
@@ -69,10 +73,12 @@ which is the term for the spikes that did not arrive, does not change.
 data, decoded clusterless, uses the encoding-pair shuffle.
 """
 
+import functools
 import hashlib
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -578,6 +584,171 @@ def _electrode_waveform_std(waveform_std: object, n_features: int) -> NDArray:
     return np.full(n_features, float(std)) if std.ndim == 0 else std
 
 
+_PERMUTATION_THREADS = 8
+"""Threads drawing one electrode's permutations. Each draw's permutation is its
+own seeded generator's, so the threads change nothing but the wall time."""
+
+_MIN_SPIKE_BUCKET = 16
+"""The fewest decoding spikes a block is padded to. Blocks are padded to a
+power of two so that the compiled shapes, and so the compilations, are few."""
+
+
+def _spike_bucket(n_spikes: int, block_size: int) -> int:
+    """The padded length of a block of ``n_spikes`` decoding spikes."""
+    return min(
+        block_size, max(_MIN_SPIKE_BUCKET, 1 << max(n_spikes - 1, 0).bit_length())
+    )
+
+
+@functools.cache
+def _draws_kernel() -> Callable[..., Any]:
+    """The jitted per-block computation of :func:`_log_joint_mark_intensity_draws`.
+
+    Built on first use, so that importing this module does not import JAX.
+    """
+    import jax
+    import jax.numpy as jnp
+    from non_local_detector.likelihoods.clusterless_kde import kde_distance
+    from non_local_detector.likelihoods.common import LOG_EPS, safe_log
+
+    @jax.jit
+    def kernel(
+        decoding_marks,
+        encoding_marks,
+        waveform_std,
+        occupancy,
+        mean_rate,
+        position_distance,
+        permutations,
+    ):
+        # the library's estimate_log_joint_mark_intensity, step by step, with
+        # the mark kernel computed once and only the positions' rows permuted
+        mark_distance = kde_distance(decoding_marks, encoding_marks, waveform_std)
+        n_encoding = encoding_marks.shape[0]
+        occupied = occupancy > 0.0
+        safe_occupancy = jnp.where(occupied, occupancy, 1.0)
+
+        def one_draw(permutation):
+            if n_encoding > 0:
+                marginal = mark_distance.T @ position_distance[permutation] / n_encoding
+            else:
+                marginal = jnp.zeros((decoding_marks.shape[0], occupancy.shape[0]))
+            log_intensity = safe_log(
+                mean_rate * jnp.where(occupied, marginal / safe_occupancy, 0.0)
+            )
+            return jnp.clip(log_intensity, min=LOG_EPS, max=None)
+
+        # one draw at a time (a scan), so that a draw's arithmetic, and so its
+        # rounding, is the same however many draws there are
+        return jax.lax.map(one_draw, permutations)
+
+    return kernel
+
+
+def _log_joint_mark_intensity_draws(
+    decoding_marks: NDArray,
+    encoding_marks: NDArray,
+    waveform_std: NDArray,
+    occupancy: NDArray,
+    mean_rate: float,
+    position_distance: Any,
+    permutations: NDArray,
+    block_size: int,
+) -> list[Any]:
+    """One electrode's per-spike log joint mark intensity under every draw.
+
+    The library's ``block_estimate_log_joint_mark_intensity`` with encoding
+    spike ``i`` given the position of encoding spike ``permutations[d, i]`` in
+    draw ``d``: the joint intensity sums ``K_mark(m, M_i) K_pos(x, X_pi(i))``
+    over pairs, so the mark kernel is computed once and each draw permutes the
+    rows of the position kernel before one matrix product. The occupancy and
+    mean-rate normalization, the log floor and the clip are the library's.
+
+    Parameters
+    ----------
+    decoding_marks : ndarray, shape (n_spikes, n_features)
+    encoding_marks : ndarray, shape (n_encoding, n_features)
+    waveform_std : ndarray, shape (n_features,)
+    occupancy : ndarray, shape (n_bins,)
+    mean_rate : float
+    position_distance : array, shape (n_encoding, n_bins)
+    permutations : ndarray of int, shape (n_draws, n_encoding)
+    block_size : int
+        Decoding spikes per block, as the library blocks them.
+
+    Returns
+    -------
+    blocks : list of device arrays, shape (n_draws, n_padded, n_bins)
+        In spike order. Every block but the last holds ``block_size`` spikes;
+        the last is padded to a power of two, so the rows past ``n_spikes``,
+        all blocks concatenated, are padding.
+
+    """
+    n_spikes = decoding_marks.shape[0]
+    kernel = _draws_kernel()
+    blocks = []
+    for start in range(0, n_spikes, block_size):
+        block = decoding_marks[start : start + block_size]
+        padded = np.zeros(
+            (_spike_bucket(block.shape[0], block_size), block.shape[1]),
+            dtype=np.float32,
+        )
+        padded[: block.shape[0]] = block
+        blocks.append(
+            kernel(
+                padded,
+                encoding_marks,
+                waveform_std,
+                occupancy,
+                mean_rate,
+                position_distance,
+                permutations,
+            )
+        )
+    return blocks
+
+
+def _draw_permutations(
+    threads: ThreadPoolExecutor,
+    permutation_for: Callable[[int, int, int], NDArray | None],
+    n_draws: int,
+    electrode: int,
+    n_encoding: int,
+) -> NDArray:
+    """Every draw's permutation of one electrode, shape ``(n_draws, n_encoding)``.
+
+    None from ``permutation_for`` is the identity. The draws are drawn on
+    ``threads``: numpy's generators release the GIL while they shuffle.
+    """
+
+    permutations = np.empty((n_draws, n_encoding), dtype=np.int32)
+
+    def one(draw: int) -> None:
+        permutation = permutation_for(draw, electrode, n_encoding)
+        permutations[draw] = (
+            np.arange(n_encoding) if permutation is None else permutation
+        )
+
+    for _ in threads.map(one, range(n_draws)):
+        pass
+    return permutations
+
+
+def _add_spike_intensities(
+    rows: NDArray, spike_rows: NDArray, blocks: list[Any]
+) -> None:
+    """Add one electrode's per-spike intensities to the rows they fall in.
+
+    ``rows`` is ``(n_draws, n_rows, n_bins)``, float64, summed in place in
+    spike order as ``np.add.at`` sums; ``blocks`` are as
+    :func:`_log_joint_mark_intensity_draws` returns them.
+    """
+    per_spike = np.concatenate(
+        [np.asarray(block, dtype=np.float64) for block in blocks], axis=1
+    )[:, : spike_rows.size]
+    np.add.at(rows, (slice(None), spike_rows), per_spike)
+
+
 def _decode_draws(
     first_window: int,
     last_window: int,
@@ -593,8 +764,9 @@ def _decode_draws(
 
     ``permutation_for(draw, electrode, n_encoding)`` returns the permutation
     of that electrode's encoding positions for that draw, or None for the
-    observed pairing. Electrodes are the outer loop so that only one
-    electrode's position kernel is held at a time.
+    observed pairing. Each electrode's draws are dispatched to the device
+    before the next electrode's permutations are drawn, and read back after
+    them, so the host and the device work at once.
 
     Returns
     -------
@@ -602,10 +774,7 @@ def _decode_draws(
     unchanged_pairs : ndarray of bool, shape (n_windows,)
         Which consecutive windows hold the same spikes; see :func:`_unchanged_pairs`.
     """
-    from non_local_detector.likelihoods.clusterless_kde import (
-        block_estimate_log_joint_mark_intensity,
-        kde_distance,
-    )
+    from non_local_detector.likelihoods.clusterless_kde import kde_distance
     from non_local_detector.likelihoods.common import get_spike_time_bin_ind
 
     time, row_start, row_stop = _candidate_rows(first_window, last_window, time, config)
@@ -627,52 +796,61 @@ def _decode_draws(
     ) * encoding_bins_per_row(config)
     rows = np.broadcast_to(-ground, (n_draws, row_stop - row_start, ground.size)).copy()
     candidate_rows = []
+    block_size = int(encoding_model.get("block_size", _LIBRARY_BLOCK_SIZE))
+    pending = []
 
-    for electrode in range(n_electrodes):
-        times = np.asarray(spike_times[electrode], dtype=np.float64)
-        # the library keeps spikes on the closed grid, then bins them
-        in_bounds = (times >= time[0]) & (times <= time[-1])
-        spike_rows = get_spike_time_bin_ind(times[in_bounds], time)
-        in_candidate = (spike_rows >= row_start) & (spike_rows < row_stop)
-        if not in_candidate.any():
-            continue
-        spike_rows = spike_rows[in_candidate] - row_start
-        candidate_rows.append(spike_rows)
-        decoding_marks = np.asarray(spike_waveform_features[electrode])[in_bounds][
-            in_candidate
-        ]
-        encoding_marks = np.asarray(
-            encoding_model["encoding_spike_waveform_features"][electrode]
-        )
-        n_encoding = encoding_marks.shape[0]
-        position_distance = kde_distance(
-            bin_centers,
-            encoding_positions[electrode],
-            std=encoding_model["position_std"],
-        )
-        waveform_std = _electrode_waveform_std(
-            encoding_model["waveform_std"], encoding_marks.shape[1]
-        )
-        for draw in range(n_draws):
-            permutation = permutation_for(draw, electrode, n_encoding)
-            if permutation is None:
-                marks = encoding_marks
-            else:
-                # positions X[pi] against marks M are the pairs M[pi^-1] against X
-                marks = encoding_marks[np.argsort(permutation)]
-            per_spike = np.asarray(
-                block_estimate_log_joint_mark_intensity(
-                    decoding_marks,
-                    cast(Any, marks),
-                    cast(Any, waveform_std),
-                    encoding_model["occupancy"],
-                    encoding_model["mean_rates"][electrode],
-                    position_distance,
-                    encoding_model.get("block_size", _LIBRARY_BLOCK_SIZE),
-                ),
-                dtype=np.float64,
+    with ThreadPoolExecutor(_PERMUTATION_THREADS) as threads:
+        for electrode in range(n_electrodes):
+            times = np.asarray(spike_times[electrode], dtype=np.float64)
+            # the library keeps spikes on the closed grid, then bins them
+            in_bounds = (times >= time[0]) & (times <= time[-1])
+            spike_rows = get_spike_time_bin_ind(times[in_bounds], time)
+            in_candidate = (spike_rows >= row_start) & (spike_rows < row_stop)
+            if not in_candidate.any():
+                continue
+            spike_rows = spike_rows[in_candidate] - row_start
+            candidate_rows.append(spike_rows)
+            decoding_marks = np.asarray(spike_waveform_features[electrode])[in_bounds][
+                in_candidate
+            ]
+            encoding_marks = np.asarray(
+                encoding_model["encoding_spike_waveform_features"][electrode]
             )
-            np.add.at(rows[draw], spike_rows, per_spike)
+            n_encoding = encoding_marks.shape[0]
+            position_distance = kde_distance(
+                bin_centers,
+                encoding_positions[electrode],
+                std=encoding_model["position_std"],
+            )
+            waveform_std = _electrode_waveform_std(
+                encoding_model["waveform_std"], encoding_marks.shape[1]
+            )
+            permutations = _draw_permutations(
+                threads, permutation_for, n_draws, electrode, n_encoding
+            )
+            # the previous electrode's draws were computed on the device while
+            # the host drew this one's permutations; read them back before
+            # dispatching this one, so the device holds one electrode's results
+            if pending:
+                _add_spike_intensities(rows, *pending.pop())
+            pending.append(
+                (
+                    spike_rows,
+                    _log_joint_mark_intensity_draws(
+                        decoding_marks,
+                        encoding_marks,
+                        waveform_std,
+                        np.asarray(encoding_model["occupancy"]),
+                        float(encoding_model["mean_rates"][electrode]),
+                        position_distance,
+                        permutations,
+                        block_size,
+                    ),
+                )
+            )
+
+    if pending:
+        _add_spike_intensities(rows, *pending.pop())
 
     windows = np.stack(
         [

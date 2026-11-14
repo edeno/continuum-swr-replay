@@ -508,6 +508,162 @@ class TestShuffledLikelihood:
             )
 
 
+def library_per_draw_intensity(
+    decoding_marks,
+    encoding_marks,
+    waveform_std,
+    occupancy,
+    mean_rate,
+    positions,
+    position_std,
+    bin_centers,
+    permutation,
+    block_size,
+):
+    """The per-draw path the batched one replaced: one library call per draw,
+    with the marks permuted by the inverse of the positions' permutation."""
+    from non_local_detector.likelihoods.clusterless_kde import (
+        block_estimate_log_joint_mark_intensity,
+        kde_distance,
+    )
+
+    return np.asarray(
+        block_estimate_log_joint_mark_intensity(
+            decoding_marks,
+            encoding_marks[np.argsort(permutation)],
+            waveform_std,
+            occupancy,
+            mean_rate,
+            kde_distance(bin_centers, positions, std=position_std),
+            block_size,
+        )
+    )
+
+
+class TestBatchedDraws:
+    """All draws of an electrode in one device call, against one library call
+    per draw. Float32 throughout, as the library computes; the sums run in a
+    different order, so they agree to float32 rounding, not to the bit."""
+
+    @pytest.mark.parametrize(
+        ("n_spikes", "n_encoding", "block_size"),
+        [(21, 300, 8), (5, 300, 100), (40, 0, 16)],
+        ids=["three blocks, last padded", "one short block", "no encoding spikes"],
+    )
+    def test_every_draw_equals_the_library_call(self, n_spikes, n_encoding, block_size):
+        from non_local_detector.likelihoods.clusterless_kde import kde_distance
+
+        from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
+            _log_joint_mark_intensity_draws,
+        )
+
+        rng = np.random.default_rng(3)
+        bin_centers = np.arange(0.0, 100.0, 4.0)[:, None]
+        occupancy = rng.uniform(0.0, 0.05, bin_centers.shape[0])
+        occupancy[[0, 7]] = 0.0  # unvisited bins take the library's zero branch
+        positions = rng.uniform(0.0, 100.0, (n_encoding, 1))
+        encoding_marks = rng.normal(100.0, 30.0, (n_encoding, 4))
+        decoding_marks = rng.normal(100.0, 30.0, (n_spikes, 4))
+        waveform_std = np.full(4, 24.0)
+        position_std = np.array([8.0])
+        permutations = np.stack(
+            [np.arange(n_encoding)] + [rng.permutation(n_encoding) for _ in range(6)]
+        ).astype(np.int32)
+
+        blocks = _log_joint_mark_intensity_draws(
+            decoding_marks,
+            encoding_marks,
+            waveform_std,
+            occupancy,
+            3.5,
+            kde_distance(bin_centers, positions, std=position_std),
+            permutations,
+            block_size,
+        )
+        batched = np.concatenate([np.asarray(b) for b in blocks], axis=1)[:, :n_spikes]
+
+        for draw, permutation in enumerate(permutations):
+            expected = library_per_draw_intensity(
+                decoding_marks,
+                encoding_marks,
+                waveform_std,
+                occupancy,
+                3.5,
+                positions,
+                position_std,
+                bin_centers,
+                permutation,
+                block_size,
+            )
+            np.testing.assert_allclose(batched[draw], expected, rtol=1e-5, atol=1e-5)
+
+    def test_the_draws_equal_a_library_decode_per_draw(self, tetrode):
+        """The whole shuffle against a library epoch decode of each draw's
+        permuted positions, to the same statistics."""
+        first, last = TestShuffleCandidate.WINDOWS
+        result = shuffle_candidate(
+            first,
+            last,
+            tetrode.time,
+            tetrode.spike_times,
+            tetrode.spike_waveform_features,
+            tetrode.encoding_model,
+            tetrode.bin_distance_cm,
+            CONFIG,
+            seed=SEED,
+            n_shuffles=MINIMUM_N_SHUFFLES,
+        )
+        unchanged = unchanged_window_pairs(
+            first, last, tetrode.time, tetrode.spike_times, CONFIG
+        )
+        for draw in range(MINIMUM_N_SHUFFLES + 1):
+            model = copy.copy(tetrode.encoding_model)
+            if draw:
+                model["encoding_positions"] = [
+                    np.asarray(positions)[
+                        encoding_permutation(
+                            SEED,
+                            candidate=first,
+                            draw=draw,
+                            electrode=electrode,
+                            n=np.asarray(positions).shape[0],
+                        )
+                    ]
+                    for electrode, positions in enumerate(
+                        tetrode.encoding_model["encoding_positions"]
+                    )
+                ]
+            library = clusterless_epoch_log_likelihood(
+                tetrode.time,
+                tetrode.linear_position,
+                tetrode.spike_times,
+                tetrode.spike_waveform_features,
+                model,
+                CONFIG,
+            )
+            spread, jump = shuffle_statistics(
+                normalize_windows(
+                    aggregate_windows(
+                        library.log_likelihood,
+                        CONFIG.window_n_samples,
+                        CONFIG.stride_n_samples,
+                    )[first : last + 1]
+                ),
+                tetrode.bin_distance_cm,
+                unchanged,
+            )
+            if draw == 0:
+                observed = (result.observed_spread_cm, result.observed_jump_cm)
+            else:
+                observed = (
+                    result.null_spread_cm[draw - 1],
+                    result.null_jump_cm[draw - 1],
+                )
+
+            assert observed[0] == pytest.approx(spread, rel=1e-5)
+            assert observed[1] == pytest.approx(jump, rel=1e-5)
+
+
 class TestShuffleCandidate:
     WINDOWS = MOVING_WINDOWS
 

@@ -260,14 +260,19 @@ required to implement this adaptation.
 replay criteria, as the reference tests every duration- and dispersion-accepted event;
 this project's whole-event immobility rule is a column (`whole_event_speed_eligible`) to
 filter on afterwards, so the published cohort and this project's are both readable from
-one table. It permutes the encoding marks by the inverse
-permutation rather than the positions: pairing `M` with `X[pi]` and `M[pi^-1]` with `X`
-give the same set of pairs, and the joint mark intensity is a sum over pairs, so this is
-exact and avoids permuting the `(n_encoding, n_bins)` position kernel. The per-spike
-joint mark intensity is the library's own `block_estimate_log_joint_mark_intensity`, and
-spikes are binned by its own `get_spike_time_bin_ind` on the full epoch grid, so the
-unshuffled re-decode is the epoch decode restricted to the candidate's rows; tests pin
-both facts against the library. Seeds come from the run seed, the epoch identifier, the
+one table. A draw gives encoding spike `i` the position of spike `pi(i)`. The joint mark
+intensity of a decoding spike is a sum over encoding pairs, `sum_i K_mark(m, M_i)
+K_pos(x, X_pi(i))`, so per electrode the mark kernel against the candidate's spikes is
+computed once and each draw permutes the rows of the `(n_encoding, n_bins)` position
+kernel before one matrix product, all of an electrode's draws in one compiled call on the
+device. The occupancy and mean-rate normalization, the log floor and the clip are the
+library's `estimate_log_joint_mark_intensity`, step by step, and spikes are binned by its
+own `get_spike_time_bin_ind` on the full epoch grid, so the unshuffled re-decode is the
+epoch decode restricted to the candidate's rows; tests pin both facts against the
+library, and pin the batched draws to one library call per draw within float32 rounding.
+Until 2026-11-13 the code made that library call per draw and electrode, with the marks
+permuted by the inverse permutation; the draws are the same permutations, and the
+batched form is the same arithmetic in another summation order. Seeds come from the run seed, the epoch identifier, the
 candidate's first window, the draw and the electrode, so draw `k` does not depend on how
 many draws there are. The reference passes at `p <= 0.05` and the paper says `p < 0.05`;
 at 100 draws the p-values are multiples of 1/101 and the two agree, and the port tests
