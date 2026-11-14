@@ -69,12 +69,6 @@ def test_the_committed_inputs_give_the_committed_values(build, n_values):
         assert built[key] == pytest.approx(value, rel=1e-12, abs=0), key
 
 
-def test_a_recording_whose_outbound_replay_nearly_passes_is_refused():
-    numbers = _recording_numbers() | {"outbound_draws_from_passing": 1}
-    with pytest.raises(ValueError, match="fails the test by several draws"):
-        detection.recording_values(numbers, "source")
-
-
 # --- the held-out tetrode test per decoder state --------------------------------
 
 

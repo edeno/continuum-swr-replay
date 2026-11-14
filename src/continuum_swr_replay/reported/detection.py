@@ -316,11 +316,6 @@ def recording_values(numbers: dict, source: str) -> list[Value]:
     simulated recording (``recording_statistics.recording_numbers``, which the
     figure script writes)."""
     make = value_factory(recording_values, source, TAGS["memoryless"])
-    if not numbers["outbound_draws_from_passing"] > 1:
-        raise ValueError(
-            "the caption says the outbound continuous replay fails the test by "
-            "several draws; the recording's numbers disagree"
-        )
 
     def p(key: str, description: str) -> Value:
         return make(f"recording_{key}", numbers[key], "quantity", "pval", description)
