@@ -59,6 +59,7 @@ from typing import Any
 
 import dask
 import dask.distributed
+import non_local_detector.environment
 import numpy as np
 import pandas as pd
 import pytest
@@ -74,6 +75,7 @@ from continuum_swr_replay.analysis.event_definition.immobility import (
     EventDefinitionError,
 )
 from continuum_swr_replay.decoding import files as decoding_files
+from continuum_swr_replay.decoding import fit
 from continuum_swr_replay.decoding import results as hpc_loading
 from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV, processed_data_dir
 from continuum_swr_replay.runs import batch, cli, provenance
@@ -1358,10 +1360,10 @@ def test_perform_decoding_passes_is_missing_to_the_decoder(decoders, monkeypatch
             calls.append(kwargs)
             return "results"
 
+    monkeypatch.setattr(fit, "create_detector", lambda *args, **kwargs: Detector())
     monkeypatch.setattr(
-        decoders.flow, "create_detector", lambda *args, **kwargs: Detector()
+        non_local_detector.environment, "Environment", lambda **kwargs: "environment"
     )
-    monkeypatch.setattr(decoders.flow, "Environment", lambda **kwargs: "environment")
     is_training = np.array([True, False, True])
     is_missing = np.array([False, True, False])
 
@@ -1401,10 +1403,10 @@ def test_only_a_nonlocal_hpc_decode_keeps_its_log_likelihood(
             calls.append(kwargs)
             return "results"
 
+    monkeypatch.setattr(fit, "create_detector", lambda *args, **kwargs: Detector())
     monkeypatch.setattr(
-        decoders.flow, "create_detector", lambda *args, **kwargs: Detector()
+        non_local_detector.environment, "Environment", lambda **kwargs: "environment"
     )
-    monkeypatch.setattr(decoders.flow, "Environment", lambda **kwargs: "environment")
 
     decoders.flow.perform_decoding(
         module.RUNNER,

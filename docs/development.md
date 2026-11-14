@@ -86,7 +86,7 @@ src/continuum_swr_replay/
 │   ├── constants.py       #   analysis constants and defaults
 │   ├── literature_survey.py #  the replay-study survey's modes, ranges and method shares
 │   └── shared_statistics.py #  statistics that know nothing of the task
-├── decoding/              # decode configs and detector classes, transitions, identifiers and file names, the results.nc reader and load_results
+├── decoding/              # decode configs and detector classes, transitions, the fit (fit.py), identifiers and file names, the results.nc reader and load_results, a saved decode's encoding model (encoding_model.py)
 ├── runs/                  # run infrastructure: provenance, CLI, batch loops, BLAS thread pin (threads), JAX device choice (device)
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, atomic writes, parity
 ├── visualization/         # Plotting utilities; palettes.py holds COLORS, figure_utilities.py the publication-figure helpers

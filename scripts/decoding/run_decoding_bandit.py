@@ -55,6 +55,7 @@ from continuum_swr_replay.decoding.config import (
     NonLocalDecodingConfig,
     nonlocal_detector_classes,
 )
+from continuum_swr_replay.decoding.fit import DecodeRunner
 from continuum_swr_replay.decoding.identifiers import (
     DEFAULT_SWR_DEFINITION,
     DEFAULT_TRAINING_TYPE,
@@ -123,7 +124,7 @@ def generate_figurl(
     results.attrs["figurl"] = url
 
 
-RUNNER = _decode_runner.DecodeRunner(
+RUNNER = DecodeRunner(
     detector_classes=nonlocal_detector_classes(),
     config_class=NonLocalDecodingConfig,
     detector_kwargs=nonlocal_detector_kwargs,

@@ -504,7 +504,7 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 The flow both decode runners share, and the record of what differs.
 
-`DecodeRunner`, `algorithm_params`, `create_detector`, `perform_decoding`, `save_results_and_model`, `organize_results`, `run_decode`, `parse_decode_args`
+`save_results_and_model`, `organize_results`, `run_decode`, `parse_decode_args`
 
 ### `scripts/decoding/measure_decoder_quality.py`
 
@@ -1255,6 +1255,18 @@ The per-bin ``is_swr``-contrast rate ladders, fit over sessions, and their audit
 The per-bin replay rate vs behavioral uncertainty and value, by population.
 
 `drop_exposure_sessions`, `fit_uncertainty_rate`, `uncertainty_cohort_records`, `join_uncertainty_qvals`, `standardize_rl_covariates`
+
+### `src/continuum_swr_replay/decoding/encoding_model.py`
+
+A saved decode's fitted clusterless encoding model, read back for reuse.
+
+`load_clusterless_encoding_model`, `clusterless_encoding_model`, `check_marks_match_encoding`, `interior_bin_distances_cm`
+
+### `src/continuum_swr_replay/decoding/fit.py`
+
+The decode fit: a runner's record, its detector, the fit and the files it writes.
+
+`DecodeRunner`, `algorithm_params`, `create_detector`, `perform_decoding`
 
 ### `src/continuum_swr_replay/tables/columns.py`
 

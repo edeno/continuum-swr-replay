@@ -625,3 +625,18 @@ in `produced_by`.
 | `scripts/detection/run_state_evidence.py` (removed: moved) | `scripts/event_evidence/run_state_evidence.py` |
 | `scripts/detection/split_state_evidence_by_swr.py` (removed: moved) | `scripts/event_evidence/split_state_evidence_by_swr.py` |
 | `scripts/detection/sweep_memoryless_heldout.py` (removed: moved) | `scripts/detector_comparison/sweep_memoryless_heldout.py` |
+
+## Decoding, 2026-11-14
+
+Two moves into `decoding/`, neither changing behavior.
+
+| Old place | New place |
+|---|---|
+| `scripts/decoding/_decode_runner.py`: `DecodeRunner`, `algorithm_params`, `create_detector`, `perform_decoding` | `decoding/fit.py` |
+| `analysis/detection/memoryless_sequence/likelihood.py`: `CLUSTERLESS_LIKELIHOOD_KEYS`, `load_clusterless_encoding_model`, `clusterless_encoding_model`, `check_marks_match_encoding`, `interior_bin_distances_cm` | `decoding/encoding_model.py` |
+
+`run_decode`, `organize_results`, `save_results_and_model` and `parse_decode_args` stay in
+`scripts/decoding/_decode_runner.py`: they read `analysis.event_definition` (the HPC
+decode's masks and SWR source) and `tables` (atomic writes), which `decoding/` may not
+import. The memoryless detector's grid, windows and likelihood stay in its
+`likelihood.py`.

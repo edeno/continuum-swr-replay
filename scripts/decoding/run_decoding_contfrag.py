@@ -46,6 +46,7 @@ from continuum_swr_replay.decoding.config import (
     DecodingConfig,
     contfrag_classifier_classes,
 )
+from continuum_swr_replay.decoding.fit import DecodeRunner
 from continuum_swr_replay.decoding.identifiers import (
     CONTFRAG_SUFFIX,
     DEFAULT_SWR_DEFINITION,
@@ -73,7 +74,7 @@ def contfrag_detector_kwargs(config: DecodingConfig) -> dict[str, Any]:
     return contfrag_transition_settings()
 
 
-RUNNER = _decode_runner.DecodeRunner(
+RUNNER = DecodeRunner(
     detector_classes=contfrag_classifier_classes(),
     config_class=DecodingConfig,
     detector_kwargs=contfrag_detector_kwargs,

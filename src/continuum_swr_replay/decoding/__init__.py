@@ -17,4 +17,10 @@ source, so they live above it, in ``analysis.event_definition.decode_masks``.
 - ``results``: the one ``results.nc`` reader, and an epoch's saved decode
   read back whole: its results, fitted detector and environment
   (``load_results``).
+- ``fit``: a decode runner's record (``DecodeRunner``), its detector and the fit
+  on one epoch's spikes and position (``perform_decoding``).
+- ``encoding_model``: a saved decode's fitted clusterless encoding model read
+  back for the steps that score spikes against it again, the check that
+  reloaded marks are the ones it was fitted on, and the track-graph distance
+  between its place bins.
 """
