@@ -206,3 +206,33 @@ def test_a_run_made_with_other_settings_is_refused(tmp_path):
     path.write_text(json.dumps({"epochs": {}}))
     with pytest.raises(SystemExit, match="other settings"):
         batch.RunManifest.resume(path, _HEADER)
+
+
+class _Unclosable:
+    """A cluster whose shutdown times out, as a worker holding a GPU's can."""
+
+    def __init__(self, cluster):
+        self.cluster = cluster
+
+    def __getattr__(self, name):
+        return getattr(self.cluster, name)
+
+    def close(self, *args, **kwargs):
+        self.cluster.close(*args, **kwargs)
+        raise TimeoutError("simulated: a worker outlasted the shutdown timeout")
+
+
+def test_a_cluster_that_will_not_shut_down_does_not_fail_the_run(tmp_path, caplog):
+    """Every record is yielded before the cluster closes, so a shutdown timeout
+    is logged and the run ends normally (it used to exit 1 after 242 of 242)."""
+    make = _cluster(tmp_path)
+    with dask.config.set({"temporary-directory": str(tmp_path / "dask-temporary")}):
+        with caplog.at_level("WARNING", logger=batch.__name__):
+            records = dict(
+                batch.run_epochs(
+                    {"a_HPC": ("lives",)}, _task_key, lambda: _Unclosable(make())
+                )
+            )
+
+    assert records["a_HPC"]["status"] == "ok"
+    assert "did not shut down cleanly" in caplog.text

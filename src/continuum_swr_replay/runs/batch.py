@@ -407,21 +407,43 @@ def run_epochs(
         return
     from dask.distributed import Client, as_completed
 
-    with cluster_factory() as cluster, Client(cluster) as client:
-        futures = {
-            client.submit(
-                task,
-                *arguments,
-                key=epoch_id if key_prefix is None else f"{key_prefix}-{epoch_id}",
-            ): epoch_id
-            for epoch_id, arguments in epochs.items()
-        }
-        for future in as_completed(futures):
-            try:
-                record = future.result()
-            except Exception as error:  # noqa: BLE001 - the task could not return
-                record = lost(error)
-            yield futures[future], record
+    cluster = cluster_factory()
+    try:
+        with Client(cluster) as client:
+            futures = {
+                client.submit(
+                    task,
+                    *arguments,
+                    key=epoch_id if key_prefix is None else f"{key_prefix}-{epoch_id}",
+                ): epoch_id
+                for epoch_id, arguments in epochs.items()
+            }
+            for future in as_completed(futures):
+                try:
+                    record = future.result()
+                except Exception as error:  # noqa: BLE001 - the task could not return
+                    record = lost(error)
+                yield futures[future], record
+    finally:
+        close_cluster(cluster)
+
+
+def close_cluster(cluster: Any) -> None:
+    """Close a cluster; a worker that will not stop in time is a warning.
+
+    A worker holding a GPU can outlast the nanny's shutdown timeout, and
+    ``cluster.close`` then raises ``TimeoutError``. Every record has been
+    yielded by then, so the run's outcome is the records', not the shutdown's:
+    the error is logged and the workers end with this process.
+    """
+    try:
+        cluster.close()
+    except (TimeoutError, OSError) as error:
+        logging.getLogger(__name__).warning(
+            "the dask cluster did not shut down cleanly (%r); its workers end "
+            "with this process",
+            error,
+        )
 
 
 def run_epoch_logged(
