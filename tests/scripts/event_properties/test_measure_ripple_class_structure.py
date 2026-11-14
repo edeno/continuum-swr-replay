@@ -10,7 +10,7 @@ import pytest
 
 import scripts.event_properties.measure_ripple_class_structure as structure
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (
-    EVENT_FEATURES_RUN,
+    STATE_SPACE_FEATURES_RUN,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
     stamp_swr_source,
@@ -74,7 +74,7 @@ def _lay_out_inputs() -> None:
             "rows_hold_swr": False,
         }
     ).to_parquet(criterion / "e1.parquet")
-    run = event_features_root() / EVENT_FEATURES_RUN
+    run = event_features_root() / STATE_SPACE_FEATURES_RUN
     run.mkdir(parents=True)
     epochs = {"e1": {"status": "ok"}, "e2": {"status": "failed"}}
     (run / "manifest.json").write_text(json.dumps({"epochs": epochs}))
@@ -98,12 +98,12 @@ def test_load_events_reads_the_features_of_the_ok_epochs_only(processed_data_roo
 
     events, record = structure.load_events()
 
-    run = event_features_root() / EVENT_FEATURES_RUN
+    run = event_features_root() / STATE_SPACE_FEATURES_RUN
     assert events["features_z_max"].tolist() == [2.0]
     assert events["n_spikes"].tolist() == [7]
     assert events["dll_per_spike"].tolist() == [0.3]
     assert record["inputs"]["event_features_run"] == {
-        "run": EVENT_FEATURES_RUN,
+        "run": STATE_SPACE_FEATURES_RUN,
         "n_files": 1,
         "sha256": files_sha256([output_path("e1", run, "features")]),
     }
@@ -111,7 +111,7 @@ def test_load_events_reads_the_features_of_the_ok_epochs_only(processed_data_roo
 
 
 def test_measure_refuses_a_features_run_without_an_epochs_record(processed_data_root):
-    run = event_features_root() / EVENT_FEATURES_RUN
+    run = event_features_root() / STATE_SPACE_FEATURES_RUN
     run.mkdir(parents=True)
     (run / "manifest.json").write_text(json.dumps({"settings": {}}))
 

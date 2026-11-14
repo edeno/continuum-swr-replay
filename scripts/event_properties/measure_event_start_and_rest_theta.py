@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (
-    EVENT_FEATURES_RUN,
+    STATE_SPACE_FEATURES_RUN,
 )
 from continuum_swr_replay.analysis.event_definition import analysed_time
 from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
@@ -83,7 +83,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--n-windows", type=int, default=10)
     parser.add_argument("--epochs", nargs="*")
     args = parser.parse_args(argv)
-    manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
+    manifest = read_manifest(event_features_root() / STATE_SPACE_FEATURES_RUN)
     event_table = table_path("event_table", replay_content_dir())
     events = read_swr_table(
         event_table,
@@ -127,7 +127,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             {
                 "produced_by": produced_by(__file__),
                 "commit": described_commit(),
-                "event_features_run": EVENT_FEATURES_RUN,
+                "event_features_run": STATE_SPACE_FEATURES_RUN,
                 "event_table": {
                     "path": str(event_table),
                     "sha256": sha256_file(event_table),

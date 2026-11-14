@@ -55,7 +55,7 @@ from continuum_swr_replay.analysis.detector_comparison import (  # noqa: E402
     inventory_run,
 )
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (  # noqa: E402
-    EVENT_FEATURES_RUN,
+    STATE_SPACE_FEATURES_RUN,
 )
 from continuum_swr_replay.analysis.detector_comparison.features import (  # noqa: E402
     _grid_rows,
@@ -140,7 +140,7 @@ def epoch_identifier(row: pd.Series) -> str:
 
 
 def run_measure(args: argparse.Namespace) -> None:
-    manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
+    manifest = read_manifest(event_features_root() / STATE_SPACE_FEATURES_RUN)
     events = read_swr_table(table_path("event_table", replay_content_dir()))
     events = events.assign(epoch_id=events.apply(epoch_identifier, axis=1))
     by_epoch = dict(tuple(events.groupby("epoch_id")))
@@ -188,7 +188,7 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
 
     criterion_paths = sorted((out_dir() / "criterion").glob("*.parquet"))
     criterion = pd.concat(map(pd.read_parquet, criterion_paths), ignore_index=True)
-    run = event_features_root() / EVENT_FEATURES_RUN
+    run = event_features_root() / STATE_SPACE_FEATURES_RUN
     feature_paths = ok_table_paths(run, "features")
     features = pd.concat(
         (
@@ -258,7 +258,7 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
     inputs = {
         "event_table": {"path": str(event_table), "sha256": sha256_file(event_table)},
         "event_features_run": {
-            "run": EVENT_FEATURES_RUN,
+            "run": STATE_SPACE_FEATURES_RUN,
             "n_files": len(feature_paths),
             "sha256": files_sha256(feature_paths),
         },

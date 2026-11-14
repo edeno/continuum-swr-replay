@@ -7,7 +7,8 @@ and its example figures read; and the inventory comparison's and the memoryless
 run's tables those two read beside a run, for the epochs its manifest marks
 ``ok`` (:func:`read_inputs`). The run's manifest and its ``ok`` epochs are read
 by ``runs.io`` (``read_manifest``, ``ok_epochs``, ``ok_table_paths``). The run
-the events summary reads is :data:`EVENT_FEATURES_RUN`.
+the events summary reads is :data:`EVENT_FEATURES_RUN`; the run the derived
+measures read is :data:`STATE_SPACE_FEATURES_RUN`.
 Design: ``docs/design/replay_detection_comparison/04-event-features.md``.
 """
 
@@ -40,17 +41,28 @@ __all__ = [
     "CANDIDATE_COLUMNS",
     "EVENT_FEATURES_RUN",
     "FEATURE_DTYPES",
+    "STATE_SPACE_FEATURES_RUN",
     "MS_DTYPES",
     "TABLE_DTYPES",
     "output_paths",
     "read_inputs",
 ]
 
-EVENT_FEATURES_RUN = "30cf1cc432e9"
-"""The event features run the events summary reads (242 epochs, all ``ok``),
-and the run the scripts that measure the summary's derived inputs from it read
-(``scripts/event_properties/measure_event_start_and_rest_theta.py``,
-``scripts/event_properties/measure_ripple_class_structure.py``)."""
+EVENT_FEATURES_RUN = "e2331f976fd1"
+"""The event features run the events summary reads (242 epochs, all ``ok``), on
+the inventory comparison run ``e2331f976fd1`` and the memoryless run
+``e2331f976fd1-seed20260922`` (the 5 ms step, its own running-only encoding
+model)."""
+
+STATE_SPACE_FEATURES_RUN = "30cf1cc432e9"
+"""The event features run the scripts that measure the events summary's derived
+inputs read (``scripts/event_properties/measure_event_start_and_rest_theta.py``,
+``scripts/event_properties/measure_ripple_class_structure.py``): each epoch's
+decode sha256 and the ``state_space`` rows' ripple power and spike counts, none
+of which depend on the memoryless run. It is the run before
+:data:`EVENT_FEATURES_RUN`; in all 242 epochs the two record the same decode
+sha256 and the same ``state_space`` rows of those columns (checked 2026-11-14),
+so the derived measures were not remeasured after the memoryless rerun."""
 
 MS_DTYPES: Mapping[str, object] = MappingProxyType(
     {

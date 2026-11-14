@@ -22,7 +22,7 @@ epochs already ``ok`` unless ``--overwrite`` is given.
 Usage::
 
     uv run python scripts/detector_comparison/add_state_shares.py \\
-        --event-features-run 30cf1cc432e9 --n-workers 8
+        --event-features-run e2331f976fd1 --n-workers 8
 """
 
 from __future__ import annotations

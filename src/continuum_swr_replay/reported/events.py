@@ -63,6 +63,7 @@ from continuum_swr_replay.analysis.decode_quality import quality_metrics
 from continuum_swr_replay.analysis.detector_comparison import nonlocal_comparison
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (
     EVENT_FEATURES_RUN,
+    STATE_SPACE_FEATURES_RUN,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
@@ -1902,8 +1903,8 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     names = ("distribution.csv", "step_fits.csv", "manifest.json")
     source = (
         f"{rel(folder)} (scripts/event_properties/measure_ripple_class_structure.py: the "
-        f"event table, event features run {EVENT_FEATURES_RUN}, the decode frames and "
-        "the spike-evidence run)"
+        f"event table, event features run {STATE_SPACE_FEATURES_RUN}, the decode frames "
+        "and the spike-evidence run)"
     )
     class_stale = stale(folder)
     summary.add(
