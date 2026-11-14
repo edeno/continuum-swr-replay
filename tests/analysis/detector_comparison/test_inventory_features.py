@@ -15,7 +15,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    interior_bin_distances_cm,
     window_midpoints_s,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
@@ -51,6 +50,7 @@ from continuum_swr_replay.analysis.detector_comparison.schema import (
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     get_confident_times,
 )
+from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 
 SAMPLE_INTERVAL_S = 0.002
 TIME = 100.0 + SAMPLE_INTERVAL_S * np.arange(1000)

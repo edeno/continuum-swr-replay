@@ -19,9 +19,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
 from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     detect_candidate_sequences,
 )
-from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    interior_bin_distances_cm,
-)
+from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 
 ARM_CM = 60.0
 GAP_CM = 20.0

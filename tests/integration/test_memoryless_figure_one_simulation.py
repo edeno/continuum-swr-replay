@@ -44,8 +44,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    ENCODING_KEY,
-    interior_bin_distances_cm,
     likelihood_grid,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
@@ -66,6 +64,8 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
     aggregate_windows,
     normalize_windows,
 )
+from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
+from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD
 
 pytestmark = pytest.mark.integration

@@ -25,9 +25,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.encoding import
     running_encoding_model,
     running_training_mask,
 )
-from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    load_clusterless_encoding_model,
-)
+from continuum_swr_replay.decoding.encoding_model import load_clusterless_encoding_model
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 

@@ -111,9 +111,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     load_candidates,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (  # noqa: E402
-    check_marks_match_encoding,
     decoded_windows,
-    interior_bin_distances_cm,
 )
 from continuum_swr_replay.analysis.detector_comparison import (  # noqa: E402
     inventory_run,
@@ -173,6 +171,10 @@ from continuum_swr_replay.analysis.event_definition import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (  # noqa: E402
     encoding_inputs,
+)
+from continuum_swr_replay.decoding.encoding_model import (  # noqa: E402
+    check_marks_match_encoding,
+    interior_bin_distances_cm,
 )
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,

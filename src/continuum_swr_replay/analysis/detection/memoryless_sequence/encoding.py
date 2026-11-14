@@ -26,12 +26,12 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    check_marks_match_encoding,
-    clusterless_encoding_model,
-)
 from continuum_swr_replay.analysis.event_definition.decode_masks import (
     hpc_decode_masks,
+)
+from continuum_swr_replay.decoding.encoding_model import (
+    check_marks_match_encoding,
+    clusterless_encoding_model,
 )
 from continuum_swr_replay.decoding.identifiers import EpochKey
 from continuum_swr_replay.decoding.results import load_saved_detector
@@ -176,7 +176,7 @@ def running_encoding_model(
     Returns
     -------
     encoding_model : dict
-        As :func:`~.likelihood.clusterless_encoding_model` returns it.
+        As ``decoding.encoding_model.clusterless_encoding_model`` returns it.
     record : dict
         The training seconds and bins, before and after the speed gate.
 

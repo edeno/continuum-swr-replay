@@ -42,8 +42,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.encoding import
     PAPER,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    ENCODING_KEY,
-    clusterless_encoding_model,
     likelihood_grid,
 )
 from continuum_swr_replay.analysis.event_definition import swr_source
@@ -51,7 +49,9 @@ from continuum_swr_replay.analysis.event_definition.eligibility import (
     artifact_drop_reasons,
 )
 from continuum_swr_replay.data_loaders import spikes
+from continuum_swr_replay.decoding.encoding_model import clusterless_encoding_model
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
+from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV, swr_inventory_root
 from continuum_swr_replay.runs import batch

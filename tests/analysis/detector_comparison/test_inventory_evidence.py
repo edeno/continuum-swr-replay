@@ -22,7 +22,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     clusterless_epoch_log_likelihood,
-    interior_bin_distances_cm,
 )
 from continuum_swr_replay.analysis.detection.swr_detectors import (
     tetrode_spike_counts,
@@ -42,6 +41,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
     encoding_inputs,
     nearest_interior_bins,
 )
+from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 from tests.support._memoryless_clusterless_epoch import (
     BOUNDARY_SAMPLES,
     SAMPLING_FREQUENCY,

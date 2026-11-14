@@ -20,16 +20,12 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    CLUSTERLESS_LIKELIHOOD_KEYS,
     EpochLikelihood,
     _drop_the_unreachable_row,
-    check_marks_match_encoding,
     clusterless_epoch_log_likelihood,
     decoded_windows,
     encoding_bins_per_row,
-    interior_bin_distances_cm,
     likelihood_grid,
-    load_clusterless_encoding_model,
     missing_likelihood_rows,
     sorted_spikes_epoch_log_likelihood,
     validate_time_grid,
@@ -40,6 +36,12 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
     aggregate_windows,
     normalize_windows,
     windows_holding,
+)
+from continuum_swr_replay.decoding.encoding_model import (
+    CLUSTERLESS_LIKELIHOOD_KEYS,
+    check_marks_match_encoding,
+    interior_bin_distances_cm,
+    load_clusterless_encoding_model,
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from tests.support._memoryless_clusterless_epoch import (

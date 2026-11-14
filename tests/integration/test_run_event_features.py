@@ -52,9 +52,6 @@ from continuum_swr_replay.analysis.detection.detection_inputs import (
 from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     MemorylessSequenceConfig,
 )
-from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    ENCODING_KEY,
-)
 from continuum_swr_replay.analysis.detector_comparison import (
     feature_run,
     inventory_run,
@@ -83,6 +80,7 @@ from continuum_swr_replay.analysis.detector_comparison.selection import (
 )
 from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
+from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.parameters import (
     DECODE_SAMPLE_S,
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,

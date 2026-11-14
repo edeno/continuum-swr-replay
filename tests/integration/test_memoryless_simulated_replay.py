@@ -42,7 +42,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table imp
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     clusterless_epoch_log_likelihood,
-    interior_bin_distances_cm,
     likelihood_grid,
     window_midpoints_s,
 )
@@ -53,6 +52,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
     aggregate_windows,
     normalize_windows,
 )
+from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 
 SAMPLING_FREQUENCY = 1000
 TRACK_HEIGHT_CM = 175

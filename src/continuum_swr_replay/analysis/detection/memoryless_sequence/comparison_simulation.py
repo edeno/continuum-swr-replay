@@ -27,7 +27,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     detect_candidate_sequences,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    interior_bin_distances_cm,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
     with_reference_rate_floor,
@@ -48,6 +47,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
     aggregate_windows,
     normalize_windows,
 )
+from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD
 

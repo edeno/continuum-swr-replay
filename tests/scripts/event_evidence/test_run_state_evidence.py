@@ -30,9 +30,6 @@ from non_local_detector.likelihoods.clusterless_kde import (
 )
 from track_linearization import get_linearized_position
 
-from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    CLUSTERLESS_LIKELIHOOD_KEYS,
-)
 from continuum_swr_replay.analysis.event_definition import analysed_time
 from continuum_swr_replay.analysis.event_definition.artifact_masks import (
     artifact_intervals,
@@ -46,6 +43,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     interior_bin_mask,
     nearest_interior_bins,
 )
+from continuum_swr_replay.decoding.encoding_model import CLUSTERLESS_LIKELIHOOD_KEYS
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.runs import batch

@@ -13,9 +13,7 @@ from typing import Any, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    CLUSTERLESS_LIKELIHOOD_KEYS,
-)
+from continuum_swr_replay.decoding.encoding_model import CLUSTERLESS_LIKELIHOOD_KEYS
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.results import ENCODING_KEY, load_saved_detector
 from continuum_swr_replay.intervals import sample_step

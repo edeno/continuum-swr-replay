@@ -38,7 +38,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table imp
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     clusterless_epoch_log_likelihood,
-    interior_bin_distances_cm,
     likelihood_grid,
     missing_likelihood_rows,
     window_midpoints_s,
@@ -53,6 +52,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
     normalize_windows,
     windows_holding,
 )
+from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 from continuum_swr_replay.intervals import contiguous_true_runs
 
 __all__ = ["EpochDetection", "observation_table", "run_epoch"]

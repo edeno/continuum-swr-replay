@@ -35,7 +35,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.encoding import
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     decoded_windows,
-    interior_bin_distances_cm,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     candidate_window_log_likelihood,
@@ -49,6 +48,7 @@ from continuum_swr_replay.analysis.event_definition import (
     swr_source,
 )
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
+from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import (
     nwb_file_name,

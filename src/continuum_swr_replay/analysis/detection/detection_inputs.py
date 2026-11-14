@@ -32,10 +32,8 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    load_clusterless_encoding_model,
-)
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
+from continuum_swr_replay.decoding.encoding_model import load_clusterless_encoding_model
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import EpochKey, parse_epoch_identifier
 from continuum_swr_replay.paths import memoryless_root, processed_data_dir

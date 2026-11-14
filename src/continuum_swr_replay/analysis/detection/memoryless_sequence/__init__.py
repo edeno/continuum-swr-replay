@@ -11,7 +11,8 @@ sequences are assembled afterwards from continuity criteria.
 The pipeline, in order: an ``EpochLikelihood`` from one of the
 ``*_epoch_log_likelihood`` functions; ``aggregate_windows`` and
 ``normalize_windows`` to get one posterior per window; ``window_midpoints_s``
-to timestamp them; ``interior_bin_distances_cm`` for the track geometry; and
+to timestamp them; ``decoding.encoding_model.interior_bin_distances_cm`` for
+the track geometry; and
 ``detect_candidate_sequences`` for everything downstream of decoding. Then
 ``shuffle_eligible`` picks the candidates to test, ``shuffle_candidate`` tests
 each against encoding-pair shuffles, and ``build_memoryless_event_table``
@@ -40,8 +41,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table imp
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     EpochLikelihood,
     clusterless_epoch_log_likelihood,
-    interior_bin_distances_cm,
-    load_clusterless_encoding_model,
     sorted_spikes_epoch_log_likelihood,
     window_midpoints_s,
 )
@@ -70,8 +69,6 @@ __all__ = [
     "build_shuffle_draw_table",
     "clusterless_epoch_log_likelihood",
     "detect_candidate_sequences",
-    "interior_bin_distances_cm",
-    "load_clusterless_encoding_model",
     "normalize_windows",
     "run_epoch",
     "shuffle_candidate",

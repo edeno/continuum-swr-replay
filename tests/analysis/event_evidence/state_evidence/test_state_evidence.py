@@ -21,9 +21,6 @@ from non_local_detector.likelihoods.clusterless_kde import (
 from scipy.stats import t as student_t
 from scipy.stats import ttest_1samp
 
-from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    CLUSTERLESS_LIKELIHOOD_KEYS,
-)
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     CALIBRATION_METRICS,
     ENCODING_LABELS,
@@ -68,6 +65,7 @@ from continuum_swr_replay.analysis.shared_statistics import (
     nested_bootstrap_draws,
     nested_codes,
 )
+from continuum_swr_replay.decoding.encoding_model import CLUSTERLESS_LIKELIHOOD_KEYS
 from tests.support._memoryless_clusterless_epoch import build_simulated_epoch
 
 BIN_CM = 2.0

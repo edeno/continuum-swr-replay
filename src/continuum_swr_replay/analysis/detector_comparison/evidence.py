@@ -36,7 +36,6 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
     _drop_the_unreachable_row,
-    interior_bin_distances_cm,
 )
 from continuum_swr_replay.analysis.detector_comparison.features import (
     RowTraces,
@@ -48,6 +47,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
     nearest_interior_bins,
     subnormal_occupancy_bin_mask,
 )
+from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 from continuum_swr_replay.intervals import contiguous_true_runs
 
 __all__ = [

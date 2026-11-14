@@ -81,9 +81,6 @@ from continuum_swr_replay.analysis.detection.detection_inputs import (
     marks_sha256,
     position_span_samples,
 )
-from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    check_marks_match_encoding,
-)
 from continuum_swr_replay.analysis.detection.swr_detectors import (
     CAREY_SETTINGS,
     carey_observed_stretches,
@@ -104,6 +101,7 @@ from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.data_loaders.position import (
     get_epoch_position_info,
 )
+from continuum_swr_replay.decoding.encoding_model import check_marks_match_encoding
 from continuum_swr_replay.intervals import (
     interval_mask,
     masked_seconds,
