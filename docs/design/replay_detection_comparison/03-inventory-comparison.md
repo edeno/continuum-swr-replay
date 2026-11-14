@@ -211,10 +211,13 @@ requires it, label the analysis as secondary, and retain the primary cohorts and
 1. **Native speed gates** (overview X4). Re-run each method under its own published
    gate — Widloski's per-bin < 5 cm/s, ours whole-event < 4 cm/s, Yu's < 4 cm/s — and
    report how much of each cohort difference the gate accounts for.
-2. **Running-only encoding** (overview X5). Refit the clusterless encoding model on
-   running periods only and re-run **both** decoding-based methods on it. Applied to both
-   or neither; applying it to one would make the encoding model a free variable
-   distinguishing them.
+2. **Shared encoding** (overview X5). The main comparison runs each method as
+   published: the memoryless detector on its own running-only encoding model
+   (`--encoding paper`, the default) and the state-space detector on the decoder's. The
+   control re-runs the memoryless detector on the decoder's encoding model
+   (`--encoding decoder`), so that both read one model; a difference that remains is one
+   of temporal inference and event selection, and one that goes away was the encoding
+   model's.
 3. **Reference-channel ripple power** (deferred). The vandermeerlab workflow thresholds
    the z-scored difference between the ripple channel's ripple-band power and a control
    channel's, and the consensus statement (Liu et al. 2022) recommends difference or
