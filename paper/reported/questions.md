@@ -15,11 +15,11 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `619bfd429091` | yes | 32 | 0 |
-| `detection.json` | `bc79762d046f` | yes | 133 | 0 |
-| `events.json` | `bc79762d046f` | yes | 353 | 0 |
-| `behavior.json` | `619bfd429091` | yes | 922 | 0 |
-| `mpfc.json` | `619bfd429091` | yes | 604 | 0 |
+| `survey.json` | `7f3688443d68` | yes | 32 | 0 |
+| `detection.json` | `7f3688443d68` | yes | 133 | 0 |
+| `events.json` | `7f3688443d68` | yes | 353 | 0 |
+| `behavior.json` | `7f3688443d68` | yes | 922 | 0 |
+| `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -204,13 +204,9 @@ Sources:
 | `\EventsDecodingErrorMedianCm` | 3.0 | cm | median over sessions of each session's median Local-state decoding error (the track-graph distance from the decoded to the actual position, over time bins with Local probability above 0.5 outside excluded time), sessions pooled | `events.decoding_error_values` | 2e |
 | `\EventsDecodingErrorSessions` | 242 |  | sessions with a Local-state decoding error | `events.decoding_error_values` | 2e |
 
-### 2a.2. Do held-out likelihood and event-label stability favor the four-state model over the Continuous–Fragmented and reduced models?
-
-Status: not computed; no script (held-out model selection). Values: 0.
-
 ### 2a.3. On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?
 
-Status: computed. Figures: 2, memoryless_comparison. Values: 3.
+Status: computed. Figures: memoryless_comparison. Values: 3.
 
 Sources:
 
@@ -221,10 +217,6 @@ Sources:
 | `\DetectionPilotCallsDecidedByOutsideWindow` | 1 |  | of those, calls whose dispersion clears the threshold only with kept windows outside every piece | `detection.pilot_stray_window_values` | memoryless_comparison |
 | `\DetectionPilotCallsDecidedByOutsideWindowPassing` | 0 |  | of those, calls that pass the significance test | `detection.pilot_stray_window_values` | memoryless_comparison |
 | `\DetectionPilotReplayCalls` | 6 |  | sliding-window replay calls (duration and dispersion criteria) on the pilot epoch, chimi20200225_02_r1_HPC | `detection.pilot_stray_window_values` | memoryless_comparison |
-
-### 2a.4. How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?
-
-Status: not computed; no script (the false-positive rate on real data). Values: 0.
 
 ### 2a.5. How do the non-SWR fraction and the close/remote split change across the non-local and SWR-z thresholds?
 
@@ -250,6 +242,60 @@ Sources:
 | `\EventsStateFractionMovingFragmented` | 0.2 % |  | median over sessions of each session's mean Non-Local_Fragmented_prob over its bins faster than 4 cm/s outside excluded time, sessions pooled | `events.state_fraction_values` | decoder_validation |
 | `\EventsStateFractionMovingLocal` | 78.2 % |  | median over sessions of each session's mean Local_prob over its bins faster than 4 cm/s outside excluded time, sessions pooled | `events.state_fraction_values` | decoder_validation |
 | `\EventsStateFractionMovingNoSpike` | 1.7 % |  | median over sessions of each session's mean No-Spike_prob over its bins faster than 4 cm/s outside excluded time, sessions pooled | `events.state_fraction_values` | decoder_validation |
+
+### 2a.7. Do held-out spikes support what each decoder state claims: the animal's position in Local, a remote position in the Non-Local states, silence in No-Spike?
+
+Status: computed. Values: 33.
+
+*Note:* The held-out tetrode test on confident state bouts. It validates the model's states; whether the events are supported is question 2c.3.
+
+Sources:
+
+- Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)
+
+| Macro | Value | Unit | What it is | Builder function | Figures |
+|---|---|---|---|---|---|
+| `\DetectionHeldoutContinuousImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of Non-Local Continuous bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileCiHigh` | 8.1 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileCiLow` | 4.1 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileEpochs` | 242 |  | epochs with Non-Local Continuous bouts, immobile scored | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileEpochsPositive` | 239 |  | epochs whose median held-out evidence of Non-Local Continuous bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileEstimate` | 6.1 | nats per window | held-out evidence of Non-Local Continuous bouts, immobile, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningAnimalsPositive` | 0 |  | animals whose mean held-out evidence of Non-Local Continuous bouts, running is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningCiHigh` | −0.47 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningCiLow` | −1.9 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningEpochs` | 242 |  | epochs with Non-Local Continuous bouts, running scored | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningEpochsPositive` | 23 |  | epochs whose median held-out evidence of Non-Local Continuous bouts, running is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningEstimate` | −1.2 | nats per window | held-out evidence of Non-Local Continuous bouts, running, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedAnimalsPositive` | 3 |  | animals whose mean held-out evidence of Non-Local Fragmented bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedCiHigh` | 0.83 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedCiLow` | −0.59 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedEpochs` | 242 |  | epochs with Non-Local Fragmented bouts, immobile scored | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedEpochsPositive` | 117 |  | epochs whose median held-out evidence of Non-Local Fragmented bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedEstimate` | 0.12 | nats per window | held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of Local bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileCiHigh` | 4.4 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileCiLow` | 1.1 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileEpochs` | 242 |  | epochs with Local bouts, immobile scored | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileEpochsPositive` | 242 |  | epochs whose median held-out evidence of Local bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileEstimate` | 2.8 | nats per window | held-out evidence of Local bouts, immobile, the animal's position against a mismatched one: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of No-Spike bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileCiHigh` | 9.7 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileCiLow` | 5.7 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileEpochs` | 241 |  | epochs with No-Spike bouts, immobile scored | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileEpochsPositive` | 241 |  | epochs whose median held-out evidence of No-Spike bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileEstimate` | 7.7 | nats per window | held-out evidence of No-Spike bouts, immobile, silence against local coding: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
+| `\DetectionStateEvidenceAnimals` | 5 |  | animals in the held-out tetrode run | `detection.state_evidence_values` |  |
+| `\DetectionStateEvidenceEpochs` | 242 |  | epochs the held-out tetrode run lists | `detection.state_evidence_values` |  |
+| `\DetectionStateEvidenceEpochsOk` | 242 |  | of those, epochs that passed every check of the run (status ok) | `detection.state_evidence_values` |  |
+
+### 2a.2. Do held-out likelihood and event-label stability favor the four-state model over the Continuous–Fragmented and reduced models?
+
+Status: dropped; not needed: the paper does not claim the four-state model is better than a reduced one. Values: 0.
+
+### 2a.4. How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?
+
+Status: dropped; wrongly framed as a false-positive rate: shuffles, thinned spikes and quiet windows are not known negatives; the held-out state test (question 2a.7) and the matched windows of question 2c.3 take its place. Values: 0.
 
 ## Part 2: it finds events that other methods do not
 
@@ -454,158 +500,29 @@ Sources:
 | `\EventsStepEvidenceCriterionShareMedian` | +0.20 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | `events.class_step_evidence_values` |  |
 | `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | `events.class_step_values` |  |
 
-### 2b.6. Does the detector target the represented content rather than an LFP proxy?
-
-Status: no numbers; framing (a candidate claim). Values: 0.
-
-*Note:* Wording written by the assistant from the retired claims table; check it.
-
 ### 2b.7. Are non-SWR events something other than sub-threshold SWRs?
 
 Status: dropped; contradicted by the ripple-power bump at non-local onset; reframed as question 2b.5. Values: 0.
 
+### 2b.6. Does the detector target the represented content rather than an LFP proxy?
+
+Status: dropped; framing with no values: the introduction's argument, not a measurement. Values: 0.
+
 ## Part 2: the events are real
-
-### 2c.1. How do theta z-score and speed compare across SWR events, non-SWR events and running?
-
-Status: computed. Figures: 3c, decoder_validation. Values: 54.
-
-Sources:
-
-- Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)
-- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
-- Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)
-
-| Macro | Value | Unit | What it is | Builder function | Figures |
-|---|---|---|---|---|---|
-| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
-| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
-| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
-| `\EventsFastGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
-| `\EventsFastGammaDbAnimalsAboveRestNonSwr` | 5 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
-| `\EventsFastGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
-| `\EventsFastGammaDbMedianNonSwr` | +0.52 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
-| `\EventsFastGammaDbMedianSwr` | +1.1 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
-| `\EventsFastGammaMedianNonSwr` | −0.21 | z | median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean) | `events.gamma_z_values` |  |
-| `\EventsFastGammaMedianSwr` | 0.11 | z | median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.gamma_z_values` |  |
-| `\EventsFastGammaRestReference` | −0.43 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest | `events.gamma_z_values` |  |
-| `\EventsFastGammaRunningReference` | −0.14 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running | `events.gamma_z_values` |  |
-| `\EventsMuaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsMuaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsMuaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
-| `\EventsMuaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
-| `\EventsMuaMedianNonSwr` | 0.79 | z | median z-scored MUA rate of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
-| `\EventsMuaMedianSwr` | 2.37 | z | median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
-| `\EventsMuaRestReference` | −0.84 | z | median over epochs of the epoch's median z-scored MUA rate in quiet rest | `events.brain_state_values` |  |
-| `\EventsMuaRunningReference` | 0.56 | z | median over epochs of the epoch's median z-scored MUA rate while running | `events.brain_state_values` |  |
-| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 3c |
-| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 3c |
-| `\EventsRippleAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` | 3c |
-| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` | 3c |
-| `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3c |
-| `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3c |
-| `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3c |
-| `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3c |
-| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
-| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
-| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
-| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
-| `\EventsSlowGammaDbAnimalsAboveRestNonSwr` | 3 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
-| `\EventsSlowGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
-| `\EventsSlowGammaDbMedianNonSwr` | +0.36 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
-| `\EventsSlowGammaDbMedianSwr` | +1.6 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
-| `\EventsSlowGammaMedianNonSwr` | −0.10 | z | median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean) | `events.gamma_z_values` |  |
-| `\EventsSlowGammaMedianSwr` | 0.36 | z | median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.gamma_z_values` |  |
-| `\EventsSlowGammaRestReference` | −0.28 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest | `events.gamma_z_values` |  |
-| `\EventsSlowGammaRunningReference` | −0.30 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running | `events.gamma_z_values` |  |
-| `\EventsThetaAnimalsAboveRestNonSwr` | 1 |  | animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsThetaAnimalsAboveRestSwr` | 1 |  | animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsThetaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
-| `\EventsThetaAnimalsBelowRunningSwr` | 5 |  | animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
-| `\EventsThetaLikeAnimalsAboveRestMatchedNonSwr` | 2 |  | animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share | `events.rest_theta_values` |  |
-| `\EventsThetaLikeAnimalsAboveRestMatchedSwr` | 1 |  | animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share | `events.rest_theta_values` |  |
-| `\EventsThetaLikeFractionNonSwr` | 13 % |  | share of immobile non-SWR non-local events whose theta power reaches their epoch's median running level | `events.brain_state_values` |  |
-| `\EventsThetaLikeFractionRestMatchedNonSwr` | 12 % |  | share of quiet-rest windows, matched in duration to the non-SWR events, whose theta reaches the epoch's median running theta | `events.rest_theta_values` |  |
-| `\EventsThetaLikeFractionRestMatchedSwr` | 12 % |  | share of quiet-rest windows, matched in duration to the SWR-overlapping events, whose theta reaches the epoch's median running theta | `events.rest_theta_values` |  |
-| `\EventsThetaLikeFractionSwr` | 11 % |  | share of immobile SWR-overlapping non-local events whose theta power reaches their epoch's median running level | `events.brain_state_values` |  |
-| `\EventsThetaMedianNonSwr` | −0.62 | z | median z-scored theta power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
-| `\EventsThetaMedianSwr` | −0.70 | z | median z-scored theta power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
-| `\EventsThetaRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored theta power in quiet rest | `events.brain_state_values` |  |
-| `\EventsThetaRunningReference` | 0.42 | z | median over epochs of the epoch's median z-scored theta power while running | `events.brain_state_values` |  |
-
-### 2c.2. How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?
-
-Status: computed. Figures: 2. Values: 14.
-
-Sources:
-
-- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
-
-| Macro | Value | Unit | What it is | Builder function | Figures |
-|---|---|---|---|---|---|
-| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` | 2 |
-| `\EventsBaselineSpikesMedian` | 11 | spikes | median spike count of matched quiet windows | `events.spike_evidence_values` | 2 |
-| `\EventsBaselineTetrodesMedian` | 6 | tetrodes | median number of tetrodes with a spike in matched quiet windows | `events.spike_evidence_values` | 2 |
-| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | `events.spike_evidence_values` | 2 |
-| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrCloseSpikesMedian` | 44 | spikes | median spike count of nonSWR-close events | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrCloseTetrodesMedian` | 12 | tetrodes | median number of tetrodes with a spike in nonSWR-close events | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteSpikesMedian` | 36 | spikes | median spike count of nonSWR-remote events | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteTetrodesMedian` | 11 | tetrodes | median number of tetrodes with a spike in nonSWR-remote events | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteSpikesMedian` | 118 | spikes | median spike count of SWR-remote events | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteTetrodesMedian` | 15 | tetrodes | median number of tetrodes with a spike in SWR-remote events | `events.spike_evidence_values` | 2 |
 
 ### 2c.3. Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?
 
-Status: computed. Figures: 2. Values: 65.
+Status: computed. Figures: 2. Values: 29.
 
 *Note:* The held-out test split by SWR (the heldout_* values) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.
 
 Sources:
 
-- Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)
 - Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv
 - Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
-- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\DetectionHeldoutContinuousImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of Non-Local Continuous bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousImmobileCiHigh` | 8.1 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousImmobileCiLow` | 4.1 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousImmobileEpochs` | 242 |  | epochs with Non-Local Continuous bouts, immobile scored | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousImmobileEpochsPositive` | 239 |  | epochs whose median held-out evidence of Non-Local Continuous bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousImmobileEstimate` | 6.1 | nats per window | held-out evidence of Non-Local Continuous bouts, immobile, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousRunningAnimalsPositive` | 0 |  | animals whose mean held-out evidence of Non-Local Continuous bouts, running is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousRunningCiHigh` | −0.47 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousRunningCiLow` | −1.9 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousRunningEpochs` | 242 |  | epochs with Non-Local Continuous bouts, running scored | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousRunningEpochsPositive` | 23 |  | epochs whose median held-out evidence of Non-Local Continuous bouts, running is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutContinuousRunningEstimate` | −1.2 | nats per window | held-out evidence of Non-Local Continuous bouts, running, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutFragmentedImmobileMismatchedAnimalsPositive` | 3 |  | animals whose mean held-out evidence of Non-Local Fragmented bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutFragmentedImmobileMismatchedCiHigh` | 0.83 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutFragmentedImmobileMismatchedCiLow` | −0.59 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutFragmentedImmobileMismatchedEpochs` | 242 |  | epochs with Non-Local Fragmented bouts, immobile scored | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutFragmentedImmobileMismatchedEpochsPositive` | 117 |  | epochs whose median held-out evidence of Non-Local Fragmented bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutFragmentedImmobileMismatchedEstimate` | 0.12 | nats per window | held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutLocalImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of Local bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutLocalImmobileCiHigh` | 4.4 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutLocalImmobileCiLow` | 1.1 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutLocalImmobileEpochs` | 242 |  | epochs with Local bouts, immobile scored | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutLocalImmobileEpochsPositive` | 242 |  | epochs whose median held-out evidence of Local bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutLocalImmobileEstimate` | 2.8 | nats per window | held-out evidence of Local bouts, immobile, the animal's position against a mismatched one: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutNoSpikeImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of No-Spike bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutNoSpikeImmobileCiHigh` | 9.7 | nats per window | upper bound of that interval | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutNoSpikeImmobileCiLow` | 5.7 | nats per window | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutNoSpikeImmobileEpochs` | 241 |  | epochs with No-Spike bouts, immobile scored | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutNoSpikeImmobileEpochsPositive` | 241 |  | epochs whose median held-out evidence of No-Spike bouts, immobile is above zero | `detection.state_evidence_values` |  |
-| `\DetectionHeldoutNoSpikeImmobileEstimate` | 7.7 | nats per window | held-out evidence of No-Spike bouts, immobile, silence against local coding: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
-| `\DetectionStateEvidenceAnimals` | 5 |  | animals in the held-out tetrode run | `detection.state_evidence_values` |  |
-| `\DetectionStateEvidenceEpochs` | 242 |  | epochs the held-out tetrode run lists | `detection.state_evidence_values` |  |
-| `\DetectionStateEvidenceEpochsOk` | 242 |  | of those, epochs that passed every check of the run (status ok) | `detection.state_evidence_values` |  |
 | `\EventsBaselineDllPerSpikeMedian` | 0.00 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows | `events.spike_evidence_values` | 2 |
 | `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` | 2 |
 | `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | `events.spike_evidence_values` | 2 |
@@ -630,9 +547,6 @@ Sources:
 | `\EventsNonSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteEpochsScored` | 242 |  | epochs with a scored nonSWR-remote event | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
-| `\EventsStepEvidenceCriterionAnimals` | 3 |  | animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error | `events.class_step_evidence_values` |  |
-| `\EventsStepEvidenceCriterionAnimalsSameSign` | 5 |  | animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval | `events.class_step_evidence_values` |  |
-| `\EventsStepEvidenceCriterionShareMedian` | +0.20 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | `events.class_step_evidence_values` |  |
 | `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteDllPerSpikeMedian` | 1.18 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
@@ -654,81 +568,25 @@ Sources:
 | `\EventsNonSwrRemoteGpiDistanceMedianCm` | 97 | cm | median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak | `events.spike_evidence_values` |  |
 | `\EventsSwrRemoteGpiDistanceMedianCm` | 82 | cm | median track distance from the MAP of SWR-remote events to the ground-process intensity peak | `events.spike_evidence_values` |  |
 
-### 2c.5. What spike evidence do matched immobile non-event windows have?
-
-Status: computed. Figures: 2. Values: 7.
-
-Sources:
-
-- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
-
-| Macro | Value | Unit | What it is | Builder function | Figures |
-|---|---|---|---|---|---|
-| `\EventsBaselineDllPerSpikeMedian` | 0.00 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows | `events.spike_evidence_values` | 2 |
-| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` | 2 |
-| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | `events.spike_evidence_values` | 2 |
-| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` | 2 |
-
 ### 2c.6. Are close events produced by the extent of place fields?
 
 Status: not computed; needs a re-decode with a wider Local kernel (a GPU subset). Values: 0.
 
-### 2c.7. Do remote events pass the spike-support tests (questions 2c.2, 2c.3)?
-
-Status: computed. Figures: 2. Values: 16.
-
-Sources:
-
-- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
-
-| Macro | Value | Unit | What it is | Builder function | Figures |
-|---|---|---|---|---|---|
-| `\EventsNonSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteDllPerSpikeMedian` | 0.71 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteEpochsScored` | 242 |  | epochs with a scored nonSWR-remote event | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteGpiDistanceMedianCm` | 97 | cm | median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak | `events.spike_evidence_values` |  |
-| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteSpikesMedian` | 36 | spikes | median spike count of nonSWR-remote events | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteTetrodesMedian` | 11 | tetrodes | median number of tetrodes with a spike in nonSWR-remote events | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteDllPerSpikeMedian` | 1.18 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteEpochsScored` | 242 |  | epochs with a scored SWR-remote event | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteGpiDistanceMedianCm` | 82 | cm | median track distance from the MAP of SWR-remote events to the ground-process intensity peak | `events.spike_evidence_values` |  |
-| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteSpikesMedian` | 118 | spikes | median spike count of SWR-remote events | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteTetrodesMedian` | 15 | tetrodes | median number of tetrodes with a spike in SWR-remote events | `events.spike_evidence_values` | 2 |
-
-### 2c.8. How is the decoded distance from the animal distributed, by SWR status?
-
-Status: computed. Figures: 2. Values: 12.
-
-Sources:
-
-- Processed-Data/content_occupancy/content_occupancy_per_session.csv
-
-| Macro | Value | Unit | What it is | Builder function | Figures |
-|---|---|---|---|---|---|
-| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's sessions of the session's share | `events.content_occupancy_values` | 2 |
-| `\EventsNonSwrContentAtWellFraction` | 58 % |  | share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
-| `\EventsNonSwrContentNearOffFraction` | 1 % |  | share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
-| `\EventsNonSwrContentOwnWellFraction` | 13 % |  | share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
-| `\EventsNonSwrContentRemotePathFraction` | 41 % |  | share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
-| `\EventsNonSwrContentRemoteWellFraction` | 45 % |  | share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
-| `\EventsOccupancyEpochs` | 242 |  | epochs in the content-occupancy table | `events.content_occupancy_values` | 2 |
-| `\EventsSwrContentAtWellFraction` | 26 % |  | share of SWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
-| `\EventsSwrContentNearOffFraction` | 0 % |  | share of SWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
-| `\EventsSwrContentOwnWellFraction` | 5 % |  | share of SWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
-| `\EventsSwrContentRemotePathFraction` | 73 % |  | share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
-| `\EventsSwrContentRemoteWellFraction` | 21 % |  | share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
-
 ### 2c.9. Do tetrode holdout and interneuron exclusion, as main-text controls, show the events are real?
 
 Status: dropped; folded into the likelihood test (question 2c.3). Values: 0.
+
+### 2c.5. What spike evidence do matched immobile non-event windows have?
+
+Status: dropped; folded into question 2c.3, as its negative control. Values: 0.
+
+### 2c.7. Do remote events pass the spike-support tests?
+
+Status: dropped; folded into question 2c.3, whose values are given for close and remote events. Values: 0.
+
+### 2c.8. How is the decoded distance from the animal distributed, by SWR status?
+
+Status: dropped; its values are the content's location classes, which answer question 2d.1. Values: 0.
 
 ## Part 2: what the events are like
 
@@ -909,6 +767,102 @@ Sources:
 | `\EventsDurationMedianNonSwr` | 48 | ms | median event duration of immobile non-SWR non-local events | `events.property_values` |  |
 | `\EventsDurationMedianSwr` | 94 | ms | median event duration of immobile SWR-overlapping non-local events | `events.property_values` |  |
 | `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | `events.class_step_values` |  |
+
+### 2d.8. How do theta z-score and speed compare across SWR events, non-SWR events and running?
+
+Status: computed. Figures: 3c, decoder_validation. Values: 54.
+
+*Note:* Was question 2c.1: the state the events occur in, not evidence that their content is real.
+
+Sources:
+
+- Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)
+
+| Macro | Value | Unit | What it is | Builder function | Figures |
+|---|---|---|---|---|---|
+| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
+| `\EventsFastGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
+| `\EventsFastGammaDbAnimalsAboveRestNonSwr` | 5 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
+| `\EventsFastGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
+| `\EventsFastGammaDbMedianNonSwr` | +0.52 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
+| `\EventsFastGammaDbMedianSwr` | +1.1 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
+| `\EventsFastGammaMedianNonSwr` | −0.21 | z | median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean) | `events.gamma_z_values` |  |
+| `\EventsFastGammaMedianSwr` | 0.11 | z | median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.gamma_z_values` |  |
+| `\EventsFastGammaRestReference` | −0.43 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest | `events.gamma_z_values` |  |
+| `\EventsFastGammaRunningReference` | −0.14 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running | `events.gamma_z_values` |  |
+| `\EventsMuaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
+| `\EventsMuaMedianNonSwr` | 0.79 | z | median z-scored MUA rate of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsMuaMedianSwr` | 2.37 | z | median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsMuaRestReference` | −0.84 | z | median over epochs of the epoch's median z-scored MUA rate in quiet rest | `events.brain_state_values` |  |
+| `\EventsMuaRunningReference` | 0.56 | z | median over epochs of the epoch's median z-scored MUA rate while running | `events.brain_state_values` |  |
+| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` | 3c |
+| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` | 3c |
+| `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3c |
+| `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3c |
+| `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3c |
+| `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3c |
+| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
+| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` |  |
+| `\EventsSlowGammaDbAnimalsAboveRestNonSwr` | 3 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
+| `\EventsSlowGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
+| `\EventsSlowGammaDbMedianNonSwr` | +0.36 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
+| `\EventsSlowGammaDbMedianSwr` | +1.6 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
+| `\EventsSlowGammaMedianNonSwr` | −0.10 | z | median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean) | `events.gamma_z_values` |  |
+| `\EventsSlowGammaMedianSwr` | 0.36 | z | median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.gamma_z_values` |  |
+| `\EventsSlowGammaRestReference` | −0.28 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest | `events.gamma_z_values` |  |
+| `\EventsSlowGammaRunningReference` | −0.30 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running | `events.gamma_z_values` |  |
+| `\EventsThetaAnimalsAboveRestNonSwr` | 1 |  | animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsAboveRestSwr` | 1 |  | animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsBelowRunningSwr` | 5 |  | animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` |  |
+| `\EventsThetaLikeAnimalsAboveRestMatchedNonSwr` | 2 |  | animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share | `events.rest_theta_values` |  |
+| `\EventsThetaLikeAnimalsAboveRestMatchedSwr` | 1 |  | animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share | `events.rest_theta_values` |  |
+| `\EventsThetaLikeFractionNonSwr` | 13 % |  | share of immobile non-SWR non-local events whose theta power reaches their epoch's median running level | `events.brain_state_values` |  |
+| `\EventsThetaLikeFractionRestMatchedNonSwr` | 12 % |  | share of quiet-rest windows, matched in duration to the non-SWR events, whose theta reaches the epoch's median running theta | `events.rest_theta_values` |  |
+| `\EventsThetaLikeFractionRestMatchedSwr` | 12 % |  | share of quiet-rest windows, matched in duration to the SWR-overlapping events, whose theta reaches the epoch's median running theta | `events.rest_theta_values` |  |
+| `\EventsThetaLikeFractionSwr` | 11 % |  | share of immobile SWR-overlapping non-local events whose theta power reaches their epoch's median running level | `events.brain_state_values` |  |
+| `\EventsThetaMedianNonSwr` | −0.62 | z | median z-scored theta power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsThetaMedianSwr` | −0.70 | z | median z-scored theta power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsThetaRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored theta power in quiet rest | `events.brain_state_values` |  |
+| `\EventsThetaRunningReference` | 0.42 | z | median over epochs of the epoch's median z-scored theta power while running | `events.brain_state_values` |  |
+
+### 2d.9. How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?
+
+Status: computed. Figures: 2. Values: 14.
+
+*Note:* Was question 2c.2: events are detected from spiking, so more spikes than a quiet window is not evidence of spatial content.
+
+Sources:
+
+- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
+
+| Macro | Value | Unit | What it is | Builder function | Figures |
+|---|---|---|---|---|---|
+| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` | 2 |
+| `\EventsBaselineSpikesMedian` | 11 | spikes | median spike count of matched quiet windows | `events.spike_evidence_values` | 2 |
+| `\EventsBaselineTetrodesMedian` | 6 | tetrodes | median number of tetrodes with a spike in matched quiet windows | `events.spike_evidence_values` | 2 |
+| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | `events.spike_evidence_values` | 2 |
+| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseSpikesMedian` | 44 | spikes | median spike count of nonSWR-close events | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseTetrodesMedian` | 12 | tetrodes | median number of tetrodes with a spike in nonSWR-close events | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteSpikesMedian` | 36 | spikes | median spike count of nonSWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteTetrodesMedian` | 11 | tetrodes | median number of tetrodes with a spike in nonSWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteSpikesMedian` | 118 | spikes | median spike count of SWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteTetrodesMedian` | 15 | tetrodes | median number of tetrodes with a spike in SWR-remote events | `events.spike_evidence_values` | 2 |
 
 ### 2d.7. Are non-SWR events a different kind of event, with a different function?
 
@@ -2772,7 +2726,7 @@ Script: `scripts/figures/generate_figure01.py`. Questions: 1.1.
 
 ### Figure 2: Non-local events and SWRs
 
-Script: `scripts/figures/generate_figure02.py`. Questions: 2a.1, 2a.3, 2b.1, 2b.2, 2b.3, 2b.4, 2c.2, 2c.3, 2c.5, 2c.7, 2c.8, 2d.1.
+Script: `scripts/figures/generate_figure02.py`. Questions: 2a.1, 2b.1, 2b.2, 2b.3, 2b.4, 2c.3, 2d.1, 2d.9.
 
 Unlettered: `\EventsAnimalsNonSwrMoreAtWell`, `\EventsBaselineDllPerSpikeMedian`, `\EventsBaselineScored`, `\EventsBaselineSpikesMedian`, `\EventsBaselineTetrodesMedian`, `\EventsEvidenceAnimals`, `\EventsEvidenceEpochs`, `\EventsHeldoutNonSwrAnimalsPositive`, `\EventsHeldoutNonSwrAnimals`, `\EventsHeldoutNonSwrPerSpikeCiHigh`, `\EventsHeldoutNonSwrPerSpikeCiLow`, `\EventsHeldoutNonSwrPerSpike`, `\EventsHeldoutSwrAnimalsPositive`, `\EventsHeldoutSwrAnimals`, `\EventsHeldoutSwrPerSpikeCiHigh`, `\EventsHeldoutSwrPerSpikeCiLow`, `\EventsHeldoutSwrPerSpike`, `\EventsKayEvents`, `\EventsKayNoNonlocalFractionAnimalMax`, `\EventsKayNoNonlocalFractionAnimalMin`, `\EventsKayNoNonlocalFraction`, `\EventsKayNoNonlocalMixedFraction`, `\EventsKayNoNonlocalMostlyLocalFraction`, `\EventsKayNoNonlocalMostlyNoSpikeFraction`, `\EventsKayOverlapAllNonlocalFraction`, `\EventsKayOverlapAnyLocalFraction`, `\EventsKayOverlapAnyNoSpikeFraction`, `\EventsKayOverlapLocalShareMedian`, `\EventsKayOverlapNoSpikeShareMedian`, `\EventsKayOverlapNonlocalShareMedian`, `\EventsKayOverlapUncertainShareMedian`, `\EventsKayTimeS`, `\EventsNonSwrCloseAnimalsAboveBaseline`, `\EventsNonSwrCloseDllPerSpikeMedian`, `\EventsNonSwrCloseEpochsAboveBaseline`, `\EventsNonSwrCloseEpochsScored`, `\EventsNonSwrCloseScored`, `\EventsNonSwrCloseSpikesMedian`, `\EventsNonSwrCloseTetrodesMedian`, `\EventsNonSwrContentAtWellFraction`, `\EventsNonSwrContentNearOffFraction`, `\EventsNonSwrContentOwnWellFraction`, `\EventsNonSwrContentRemotePathFraction`, `\EventsNonSwrContentRemoteWellFraction`, `\EventsNonSwrRemoteAnimalsAboveBaseline`, `\EventsNonSwrRemoteDllPerSpikeMedian`, `\EventsNonSwrRemoteEpochsAboveBaseline`, `\EventsNonSwrRemoteEpochsScored`, `\EventsNonSwrRemoteScored`, `\EventsNonSwrRemoteSpikesMedian`, `\EventsNonSwrRemoteTetrodesMedian`, `\EventsNonlocalEventsOutsideKayFraction`, `\EventsNonlocalEventsOutsideKayPerHour`, `\EventsNonlocalEventsOutsideKay`, `\EventsNonlocalEventsOutsideTriggerFraction`, `\EventsNonlocalEventsOutsideTriggerPerHour`, `\EventsNonlocalEventsOutsideTrigger`, `\EventsNonlocalEventsOutsideWidloskiFraction`, `\EventsNonlocalEventsOutsideWidloskiPerHour`, `\EventsNonlocalEventsOutsideWidloski`, `\EventsNonlocalTimeOutsideKayFraction`, `\EventsNonlocalTimeOutsideKayS`, `\EventsNonlocalTimeOutsideSwrFraction`, `\EventsNonlocalTimeOutsideSwrS`, `\EventsNonlocalTimeOutsideTriggerFraction`, `\EventsNonlocalTimeOutsideTriggerS`, `\EventsNonlocalTimeOutsideWidloskiFraction`, `\EventsNonlocalTimeOutsideWidloskiS`, `\EventsNonlocalTimeS`, `\EventsOccupancyEpochs`, `\EventsRestHours`, `\EventsSwrContentAtWellFraction`, `\EventsSwrContentNearOffFraction`, `\EventsSwrContentOwnWellFraction`, `\EventsSwrContentRemotePathFraction`, `\EventsSwrContentRemoteWellFraction`, `\EventsSwrRemoteAnimalsAboveBaseline`, `\EventsSwrRemoteDllPerSpikeMedian`, `\EventsSwrRemoteEpochsAboveBaseline`, `\EventsSwrRemoteEpochsScored`, `\EventsSwrRemoteScored`, `\EventsSwrRemoteSpikesMedian`, `\EventsSwrRemoteTetrodesMedian`
 
@@ -2784,7 +2738,7 @@ Panel e: `\EventsDecodingErrorMedianCm`, `\EventsDecodingErrorSessions`
 
 ### Figure 3: Non-local events outside SWRs
 
-Script: `scripts/figures/generate_figure03.py`. Questions: 2b.5, 2c.1, 2d.1, 2d.2, 2d.3, 2d.4.
+Script: `scripts/figures/generate_figure03.py`. Questions: 2b.5, 2d.1, 2d.2, 2d.3, 2d.4, 2d.8.
 
 Unlettered: `\EventsArmsAnimalsInDirection`, `\EventsArmsDifferenceHigh`, `\EventsArmsDifferenceLow`, `\EventsArmsMatchedDifferenceHigh`, `\EventsArmsMatchedDifferenceLow`, `\EventsArmsMatchedDifference`, `\EventsArmsMedianNonSwr`, `\EventsArmsMedianSwr`, `\EventsExtentAnimalsInDirection`, `\EventsExtentDifferenceHigh`, `\EventsExtentDifferenceLow`, `\EventsExtentMatchedDifferenceHigh`, `\EventsExtentMatchedDifferenceLow`, `\EventsExtentMatchedDifference`, `\EventsExtentMedianNonSwr`, `\EventsExtentMedianSwr`, `\EventsMaxStepAnimalsInDirection`, `\EventsMaxStepDifferenceHigh`, `\EventsMaxStepDifferenceLow`, `\EventsMaxStepMatchedDifferenceHigh`, `\EventsMaxStepMatchedDifferenceLow`, `\EventsMaxStepMatchedDifference`, `\EventsMaxStepMedianNonSwr`, `\EventsMaxStepMedianSwr`, `\EventsPauseAnimalsInDirection`, `\EventsPauseDifferenceHigh`, `\EventsPauseDifferenceLow`, `\EventsPauseMatchedDifferenceHigh`, `\EventsPauseMatchedDifferenceLow`, `\EventsPauseMatchedDifference`, `\EventsPauseMedianNonSwr`, `\EventsPauseMedianSwr`, `\EventsReversalsAnimalsInDirection`, `\EventsReversalsDifferenceHigh`, `\EventsReversalsDifferenceLow`, `\EventsReversalsMatchedDifferenceHigh`, `\EventsReversalsMatchedDifferenceLow`, `\EventsReversalsMatchedDifference`, `\EventsReversalsMedianNonSwr`, `\EventsReversalsMedianSwr`, `\EventsStartDistanceAnimalsInDirection`, `\EventsStartDistanceDifferenceHigh`, `\EventsStartDistanceDifferenceLow`, `\EventsStartDistanceMatchedDifferenceHigh`, `\EventsStartDistanceMatchedDifferenceLow`, `\EventsStartDistanceMatchedDifference`, `\EventsStartDistanceMedianNonSwr`, `\EventsStartDistanceMedianSwr`
 
@@ -2802,7 +2756,7 @@ Panel d: `\MpfcBestModelConstantFraction`, `\MpfcBestModelJointFraction`, `\Mpfc
 
 ### Figure decoder_validation: Decoder validation
 
-Script: `scripts/figures/generate_supp_decoder_validation.py`. Questions: 2a.1, 2a.6, 2c.1.
+Script: `scripts/figures/generate_supp_decoder_validation.py`. Questions: 2a.1, 2a.6, 2d.8.
 
 Unlettered: `\EventsCalibrationErrorBinEight`, `\EventsCalibrationErrorBinFive`, `\EventsCalibrationErrorBinFour`, `\EventsCalibrationErrorBinNine`, `\EventsCalibrationErrorBinOne`, `\EventsCalibrationErrorBinSeven`, `\EventsCalibrationErrorBinSix`, `\EventsCalibrationErrorBinTen`, `\EventsCalibrationErrorBinThree`, `\EventsCalibrationErrorBinTwo`, `\EventsStateFractionImmobileContinuous`, `\EventsStateFractionImmobileFragmented`, `\EventsStateFractionImmobileLocal`, `\EventsStateFractionImmobileNoSpike`, `\EventsStateFractionMovingContinuous`, `\EventsStateFractionMovingFragmented`, `\EventsStateFractionMovingLocal`, `\EventsStateFractionMovingNoSpike`
 

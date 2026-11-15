@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "bc79762d046f",
+ "commit": "7f3688443d68",
  "code": {
-  "head": "bc79762d046f4c5300d564ecc36913d3a7e48834",
+  "head": "7f3688443d68060cbf9029c8e00099b076a0433d",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -319,8 +319,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "7bfd7fdff8ab229a2723b34ffee8f68590ac066f660c0bb10356919f626048d3",
-    "code_sha256": "db3722022e992cfd99112f1231f5a7ad7c3fc46ff84005b23ef1fe169c3df40b"
+    "sha256": "6ae386d0425cacedd5965e77b8b900956fddf0323f4010878d904b3810d6e2ec",
+    "code_sha256": "3affe45ed47dc2713351877e25ad7db5467caaa54c2bef335e39c1d67b67afcc"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -535,8 +535,7 @@
    "unit": "",
    "description": "animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's sessions of the session's share",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -696,8 +695,7 @@
    "unit": "nats per spike",
    "description": "median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows",
    "questions": [
-    "2c.3",
-    "2c.5"
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -727,9 +725,8 @@
    "unit": "",
    "description": "matched quiet windows scored",
    "questions": [
-    "2c.2",
-    "2c.3",
-    "2c.5"
+    "2d.9",
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -745,7 +742,7 @@
    "unit": "spikes",
    "description": "median spike count of matched quiet windows",
    "questions": [
-    "2c.2"
+    "2d.9"
    ],
    "figures": [
     "2"
@@ -761,7 +758,7 @@
    "unit": "tetrodes",
    "description": "median number of tetrodes with a spike in matched quiet windows",
    "questions": [
-    "2c.2"
+    "2d.9"
    ],
    "figures": [
     "2"
@@ -1239,9 +1236,8 @@
    "unit": "",
    "description": "animals in the spike-evidence run",
    "questions": [
-    "2c.2",
-    "2c.3",
-    "2c.5"
+    "2d.9",
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -1257,9 +1253,8 @@
    "unit": "",
    "description": "epochs in the spike-evidence run",
    "questions": [
-    "2c.2",
-    "2c.3",
-    "2c.5"
+    "2d.9",
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -1403,7 +1398,7 @@
    "unit": "",
    "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -1417,7 +1412,7 @@
    "unit": "",
    "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -1431,7 +1426,7 @@
    "unit": "",
    "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -1445,7 +1440,7 @@
    "unit": "",
    "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -1459,7 +1454,7 @@
    "unit": "",
    "description": "animals whose median over epochs of that change (non-SWR events) is above 0 dB",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
@@ -1473,7 +1468,7 @@
    "unit": "",
    "description": "animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
@@ -1487,7 +1482,7 @@
    "unit": "dB",
    "description": "median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
@@ -1501,7 +1496,7 @@
    "unit": "dB",
    "description": "median over epochs of the change in fast-gamma power (65-100 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
@@ -1515,7 +1510,7 @@
    "unit": "z",
    "description": "median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean)",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -1529,7 +1524,7 @@
    "unit": "z",
    "description": "median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean)",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -1543,7 +1538,7 @@
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -1557,7 +1552,7 @@
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -2379,7 +2374,7 @@
    "unit": "",
    "description": "animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -2393,7 +2388,7 @@
    "unit": "",
    "description": "animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -2407,7 +2402,7 @@
    "unit": "",
    "description": "animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -2421,7 +2416,7 @@
    "unit": "",
    "description": "animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -2449,7 +2444,7 @@
    "unit": "z",
    "description": "median z-scored MUA rate of immobile non-SWR non-local events (event mean)",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -2463,7 +2458,7 @@
    "unit": "z",
    "description": "median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean)",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -2631,7 +2626,7 @@
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored MUA rate in quiet rest",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -2645,7 +2640,7 @@
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored MUA rate while running",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -2849,9 +2844,8 @@
    "unit": "",
    "description": "nonSWR-close events scored",
    "questions": [
-    "2c.2",
-    "2c.3",
-    "2c.5"
+    "2d.9",
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -2867,7 +2861,7 @@
    "unit": "spikes",
    "description": "median spike count of nonSWR-close events",
    "questions": [
-    "2c.2"
+    "2d.9"
    ],
    "figures": [
     "2"
@@ -2883,7 +2877,7 @@
    "unit": "tetrodes",
    "description": "median number of tetrodes with a spike in nonSWR-close events",
    "questions": [
-    "2c.2"
+    "2d.9"
    ],
    "figures": [
     "2"
@@ -2899,8 +2893,7 @@
    "unit": "",
    "description": "share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -2916,8 +2909,7 @@
    "unit": "",
    "description": "share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -2933,8 +2925,7 @@
    "unit": "",
    "description": "share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -2950,8 +2941,7 @@
    "unit": "",
    "description": "share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -2967,8 +2957,7 @@
    "unit": "",
    "description": "share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -3032,8 +3021,7 @@
    "unit": "",
    "description": "animals whose median nonSWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median",
    "questions": [
-    "2c.3",
-    "2c.7"
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -3049,8 +3037,7 @@
    "unit": "nats per spike",
    "description": "median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events",
    "questions": [
-    "2c.3",
-    "2c.7"
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -3066,8 +3053,7 @@
    "unit": "",
    "description": "epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike",
    "questions": [
-    "2c.3",
-    "2c.7"
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -3083,8 +3069,7 @@
    "unit": "",
    "description": "epochs with a scored nonSWR-remote event",
    "questions": [
-    "2c.3",
-    "2c.7"
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -3100,8 +3085,7 @@
    "unit": "cm",
    "description": "median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak",
    "questions": [
-    "2c.4",
-    "2c.7"
+    "2c.4"
    ],
    "figures": [],
    "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
@@ -3115,10 +3099,8 @@
    "unit": "",
    "description": "nonSWR-remote events scored",
    "questions": [
-    "2c.2",
-    "2c.3",
-    "2c.5",
-    "2c.7"
+    "2d.9",
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -3134,8 +3116,7 @@
    "unit": "spikes",
    "description": "median spike count of nonSWR-remote events",
    "questions": [
-    "2c.2",
-    "2c.7"
+    "2d.9"
    ],
    "figures": [
     "2"
@@ -3151,8 +3132,7 @@
    "unit": "tetrodes",
    "description": "median number of tetrodes with a spike in nonSWR-remote events",
    "questions": [
-    "2c.2",
-    "2c.7"
+    "2d.9"
    ],
    "figures": [
     "2"
@@ -3520,8 +3500,7 @@
    "unit": "",
    "description": "epochs in the content-occupancy table",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -3921,7 +3900,7 @@
    "unit": "",
    "description": "animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
-    "2c.1",
+    "2d.8",
     "2b.5"
    ],
    "figures": [
@@ -3938,7 +3917,7 @@
    "unit": "",
    "description": "animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
-    "2c.1",
+    "2d.8",
     "2b.5"
    ],
    "figures": [
@@ -3955,7 +3934,7 @@
    "unit": "",
    "description": "animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
-    "2c.1",
+    "2d.8",
     "2b.5"
    ],
    "figures": [
@@ -3972,7 +3951,7 @@
    "unit": "",
    "description": "animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
-    "2c.1",
+    "2d.8",
     "2b.5"
    ],
    "figures": [
@@ -3989,7 +3968,7 @@
    "unit": "z",
    "description": "median z-scored ripple power of immobile non-SWR non-local events (event mean)",
    "questions": [
-    "2c.1",
+    "2d.8",
     "2b.5"
    ],
    "figures": [
@@ -4006,7 +3985,7 @@
    "unit": "z",
    "description": "median z-scored ripple power of immobile SWR-overlapping non-local events (event mean)",
    "questions": [
-    "2c.1",
+    "2d.8",
     "2b.5"
    ],
    "figures": [
@@ -4065,7 +4044,7 @@
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored ripple power in quiet rest",
    "questions": [
-    "2c.1",
+    "2d.8",
     "2b.5"
    ],
    "figures": [
@@ -4082,7 +4061,7 @@
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored ripple power while running",
    "questions": [
-    "2c.1",
+    "2d.8",
     "2b.5"
    ],
    "figures": [
@@ -4099,7 +4078,7 @@
    "unit": "",
    "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -4113,7 +4092,7 @@
    "unit": "",
    "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -4127,7 +4106,7 @@
    "unit": "",
    "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -4141,7 +4120,7 @@
    "unit": "",
    "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -4155,7 +4134,7 @@
    "unit": "",
    "description": "animals whose median over epochs of that change (non-SWR events) is above 0 dB",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
@@ -4169,7 +4148,7 @@
    "unit": "",
    "description": "animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
@@ -4183,7 +4162,7 @@
    "unit": "dB",
    "description": "median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
@@ -4197,7 +4176,7 @@
    "unit": "dB",
    "description": "median over epochs of the change in slow-gamma power (25-55 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
@@ -4211,7 +4190,7 @@
    "unit": "z",
    "description": "median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean)",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -4225,7 +4204,7 @@
    "unit": "z",
    "description": "median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean)",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -4239,7 +4218,7 @@
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -4253,7 +4232,7 @@
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -4667,8 +4646,7 @@
    "unit": "",
    "description": "animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error",
    "questions": [
-    "2b.5",
-    "2c.3"
+    "2b.5"
    ],
    "figures": [],
    "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
@@ -4682,8 +4660,7 @@
    "unit": "",
    "description": "animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval",
    "questions": [
-    "2b.5",
-    "2c.3"
+    "2b.5"
    ],
    "figures": [],
    "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
@@ -4697,8 +4674,7 @@
    "unit": "",
    "description": "median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference",
    "questions": [
-    "2b.5",
-    "2c.3"
+    "2b.5"
    ],
    "figures": [],
    "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
@@ -4746,8 +4722,7 @@
    "unit": "",
    "description": "share of SWR non-local time bins whose content is at well, weighted by time bins over sessions",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -4763,8 +4738,7 @@
    "unit": "",
    "description": "share of SWR non-local time bins whose content is near off, weighted by time bins over sessions",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -4780,8 +4754,7 @@
    "unit": "",
    "description": "share of SWR non-local time bins whose content is own well, weighted by time bins over sessions",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -4797,8 +4770,7 @@
    "unit": "",
    "description": "share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -4814,8 +4786,7 @@
    "unit": "",
    "description": "share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions",
    "questions": [
-    "2d.1",
-    "2c.8"
+    "2d.1"
    ],
    "figures": [
     "2"
@@ -4863,8 +4834,7 @@
    "unit": "",
    "description": "animals whose median SWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median",
    "questions": [
-    "2c.3",
-    "2c.7"
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -4880,8 +4850,7 @@
    "unit": "nats per spike",
    "description": "median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events",
    "questions": [
-    "2c.3",
-    "2c.7"
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -4897,8 +4866,7 @@
    "unit": "",
    "description": "epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike",
    "questions": [
-    "2c.3",
-    "2c.7"
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -4914,8 +4882,7 @@
    "unit": "",
    "description": "epochs with a scored SWR-remote event",
    "questions": [
-    "2c.3",
-    "2c.7"
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -4931,8 +4898,7 @@
    "unit": "cm",
    "description": "median track distance from the MAP of SWR-remote events to the ground-process intensity peak",
    "questions": [
-    "2c.4",
-    "2c.7"
+    "2c.4"
    ],
    "figures": [],
    "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
@@ -4946,10 +4912,8 @@
    "unit": "",
    "description": "SWR-remote events scored",
    "questions": [
-    "2c.2",
-    "2c.3",
-    "2c.5",
-    "2c.7"
+    "2d.9",
+    "2c.3"
    ],
    "figures": [
     "2"
@@ -4965,8 +4929,7 @@
    "unit": "spikes",
    "description": "median spike count of SWR-remote events",
    "questions": [
-    "2c.2",
-    "2c.7"
+    "2d.9"
    ],
    "figures": [
     "2"
@@ -4982,8 +4945,7 @@
    "unit": "tetrodes",
    "description": "median number of tetrodes with a spike in SWR-remote events",
    "questions": [
-    "2c.2",
-    "2c.7"
+    "2d.9"
    ],
    "figures": [
     "2"
@@ -4999,7 +4961,7 @@
    "unit": "",
    "description": "animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -5013,7 +4975,7 @@
    "unit": "",
    "description": "animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -5027,7 +4989,7 @@
    "unit": "",
    "description": "animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -5041,7 +5003,7 @@
    "unit": "",
    "description": "animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -5055,7 +5017,7 @@
    "unit": "",
    "description": "animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
@@ -5069,7 +5031,7 @@
    "unit": "",
    "description": "animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows, each the mean over the animal's epochs of the epoch's share",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
@@ -5083,7 +5045,7 @@
    "unit": "",
    "description": "share of immobile non-SWR non-local events whose theta power reaches their epoch's median running level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -5097,7 +5059,7 @@
    "unit": "",
    "description": "share of quiet-rest windows, matched in duration to the non-SWR events, whose theta reaches the epoch's median running theta",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
@@ -5111,7 +5073,7 @@
    "unit": "",
    "description": "share of quiet-rest windows, matched in duration to the SWR-overlapping events, whose theta reaches the epoch's median running theta",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
@@ -5125,7 +5087,7 @@
    "unit": "",
    "description": "share of immobile SWR-overlapping non-local events whose theta power reaches their epoch's median running level",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -5139,7 +5101,7 @@
    "unit": "z",
    "description": "median z-scored theta power of immobile non-SWR non-local events (event mean)",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -5153,7 +5115,7 @@
    "unit": "z",
    "description": "median z-scored theta power of immobile SWR-overlapping non-local events (event mean)",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -5167,7 +5129,7 @@
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored theta power in quiet rest",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
@@ -5181,7 +5143,7 @@
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored theta power while running",
    "questions": [
-    "2c.1"
+    "2d.8"
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
