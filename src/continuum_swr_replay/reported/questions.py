@@ -189,21 +189,9 @@ QUESTIONS: tuple[Question, ...] = (
         figures=("2e", "decoder_validation"),
     ),
     Question(
-        "2a.2",
-        "Do held-out likelihood and event-label stability favor the four-state model over the Continuous–Fragmented and reduced models?",
-        status="not computed",
-        reason="no script (held-out model selection)",
-    ),
-    Question(
         "2a.3",
         "On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?",
-        figures=("2", "memoryless_comparison"),
-    ),
-    Question(
-        "2a.4",
-        "How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?",
-        status="not computed",
-        reason="no script (the false-positive rate on real data)",
+        figures=("memoryless_comparison",),
     ),
     Question(
         "2a.5",
@@ -216,6 +204,11 @@ QUESTIONS: tuple[Question, ...] = (
         "How does the decoder divide time among its four states while the animal moves and while it is still?",
         figures=("decoder_validation",),
         note="Added with the decoder-validation figure's state-fraction values; check its wording and place.",
+    ),
+    Question(
+        "2a.7",
+        "Do held-out spikes support what each decoder state claims: the animal's position in Local, a remote position in the Non-Local states, silence in No-Spike?",
+        note="The held-out tetrode test on confident state bouts. It validates the model's states; whether the events are supported is question 2c.3.",
     ),
     Question(
         "2b.1",
@@ -246,23 +239,6 @@ QUESTIONS: tuple[Question, ...] = (
         figures=("3b", "3c"),
     ),
     Question(
-        "2b.6",
-        "Does the detector target the represented content rather than an LFP proxy?",
-        status="no numbers",
-        reason="framing (a candidate claim)",
-        note="Wording written by the assistant from the retired claims table; check it.",
-    ),
-    Question(
-        "2c.1",
-        "How do theta z-score and speed compare across SWR events, non-SWR events and running?",
-        figures=("3c", "decoder_validation"),
-    ),
-    Question(
-        "2c.2",
-        "How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?",
-        figures=("2",),
-    ),
-    Question(
         "2c.3",
         "Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?",
         figures=("2",),
@@ -273,25 +249,10 @@ QUESTIONS: tuple[Question, ...] = (
         "Where do event MAPs sit relative to the GPI peak, against matched quiet windows?",
     ),
     Question(
-        "2c.5",
-        "What spike evidence do matched immobile non-event windows have?",
-        figures=("2",),
-    ),
-    Question(
         "2c.6",
         "Are close events produced by the extent of place fields?",
         status="not computed",
         reason="needs a re-decode with a wider Local kernel (a GPU subset)",
-    ),
-    Question(
-        "2c.7",
-        "Do remote events pass the spike-support tests (questions 2c.2, 2c.3)?",
-        figures=("2",),
-    ),
-    Question(
-        "2c.8",
-        "How is the decoded distance from the animal distributed, by SWR status?",
-        figures=("2",),
     ),
     Question(
         "2d.1",
@@ -320,6 +281,18 @@ QUESTIONS: tuple[Question, ...] = (
         "How concentrated is the posterior (peak, HPD coverage, multimodality), SWR against non-SWR?",
     ),
     Question("2d.6", "How does event duration differ between SWR and non-SWR events?"),
+    Question(
+        "2d.8",
+        "How do theta z-score and speed compare across SWR events, non-SWR events and running?",
+        figures=("3c", "decoder_validation"),
+        note="Was question 2c.1: the state the events occur in, not evidence that their content is real.",
+    ),
+    Question(
+        "2d.9",
+        "How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?",
+        figures=("2",),
+        note="Was question 2c.2: events are detected from spiking, so more spikes than a quiet window is not evidence of spatial content.",
+    ),
     Question(
         "3.1",
         "Which arms does content over-represent, and does that differ between SWR and non-SWR events once each kind's arm baseline is accounted for?",
@@ -395,6 +368,42 @@ QUESTIONS: tuple[Question, ...] = (
         "Do tetrode holdout and interneuron exclusion, as main-text controls, show the events are real?",
         status="dropped",
         reason="folded into the likelihood test (question 2c.3)",
+    ),
+    Question(
+        "2a.2",
+        "Do held-out likelihood and event-label stability favor the four-state model over the Continuous–Fragmented and reduced models?",
+        status="dropped",
+        reason="not needed: the paper does not claim the four-state model is better than a reduced one",
+    ),
+    Question(
+        "2a.4",
+        "How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?",
+        status="dropped",
+        reason="wrongly framed as a false-positive rate: shuffles, thinned spikes and quiet windows are not known negatives; the held-out state test (question 2a.7) and the matched windows of question 2c.3 take its place",
+    ),
+    Question(
+        "2b.6",
+        "Does the detector target the represented content rather than an LFP proxy?",
+        status="dropped",
+        reason="framing with no values: the introduction's argument, not a measurement",
+    ),
+    Question(
+        "2c.5",
+        "What spike evidence do matched immobile non-event windows have?",
+        status="dropped",
+        reason="folded into question 2c.3, as its negative control",
+    ),
+    Question(
+        "2c.7",
+        "Do remote events pass the spike-support tests?",
+        status="dropped",
+        reason="folded into question 2c.3, whose values are given for close and remote events",
+    ),
+    Question(
+        "2c.8",
+        "How is the decoded distance from the animal distributed, by SWR status?",
+        status="dropped",
+        reason="its values are the content's location classes, which answer question 2d.1",
     ),
 )
 """Every question, in the outline's order within each section; the dropped

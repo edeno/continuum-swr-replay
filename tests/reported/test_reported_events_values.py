@@ -402,14 +402,12 @@ def test_spike_evidence_values_name_each_group_and_each_count():
         "non_swr_close_epochs_scored": 1,
         "non_swr_close_animals_above_baseline": 0,
     }
-    # the remote groups' values, and no other, also answer the remote question
-    with_remote_question = {key for key, v in values.items() if "2c.7" in v.questions}
-    assert with_remote_question == {
-        key for key in values if key.startswith(("swr_remote_", "non_swr_remote_"))
-    }
-    assert values["baseline_dll_per_spike_median"].questions == ("2c.3", "2c.5")
+    # the quiet windows are question 2c.3's negative control; close and remote
+    # events answer it alike
+    assert values["baseline_dll_per_spike_median"].questions == ("2c.3",)
     assert values["non_swr_close_dll_per_spike_median"].questions == ("2c.3",)
-    assert values["non_swr_close_spikes_median"].questions == ("2c.2",)
+    assert values["non_swr_remote_dll_per_spike_median"].questions == ("2c.3",)
+    assert values["non_swr_close_spikes_median"].questions == ("2d.9",)
     assert values["non_swr_close_gpi_distance_median_cm"].questions == ("2c.4",)
 
 

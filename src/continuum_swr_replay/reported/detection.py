@@ -84,7 +84,7 @@ MEMORYLESS_PILOT_EPOCH = "chimi20200225_02_r1_HPC"
 SWEEP_DIR = Path("paper/reported/inputs/detection")
 
 TAGS = {
-    "state_evidence": Tags(("2c.3",)),
+    "state_evidence": Tags(("2a.7",)),
     "memoryless": Tags(("1.1",), ("memoryless_comparison",)),
     "pilot": Tags(("2a.3",), ("memoryless_comparison",)),
 }

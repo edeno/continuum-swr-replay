@@ -12,18 +12,15 @@ from __future__ import annotations
 
 import ast
 import importlib
-import itertools
 import re
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from continuum_swr_replay.reported import (
     behavior,
     emit,
-    events,
     values,
 )
 from continuum_swr_replay.reported.behavior import content
@@ -310,25 +307,6 @@ def test_the_content_values_find_their_tags_by_key_word():
         == behavior.TAGS["content_reward_value"]
     )
     assert content._content_tags("no_such_word") == behavior.TAGS["anchoring"]
-
-
-def test_the_remote_groups_spike_evidence_also_answers_question_2c_7():
-    rng = np.random.default_rng(0)
-    groups = ["baseline", "SWR-remote", "nonSWR-remote", "nonSWR-close"]
-    rows = list(itertools.product(["a", "b"], ["e1", "e2"], groups, range(3)))
-    metrics = pd.DataFrame(rows, columns=["animal", "epoch", "group", "i"]).assign(
-        epoch_id=lambda d: d["animal"] + d["epoch"],
-        n_spikes=lambda d: rng.integers(1, 50, len(d)),
-        n_tetrodes=lambda d: rng.integers(1, 10, len(d)),
-        dll_per_spike=lambda d: rng.normal(size=len(d)),
-        dist_to_gpi_peak=lambda d: rng.uniform(0, 100, len(d)),
-    )
-    by_key = {v.key: v for v in events.spike_evidence_values(metrics, "s")}
-    close = [k for k in by_key if k.startswith("non_swr_close_")]
-    remote = [k for k in by_key if k.startswith(("swr_remote_", "non_swr_remote_"))]
-    assert close and len(remote) == 2 * len(close)
-    for key, value in by_key.items():
-        assert ("2c.7" in value.questions) == (key in remote), key
 
 
 # --- the committed summaries -------------------------------------------------------

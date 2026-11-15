@@ -124,18 +124,16 @@ TAGS = {
     "other_detectors_main": Tags(("2b.3",), ("2",)),
     "other_detectors": Tags(("2b.3",)),
     "boundaries": Tags(("2b.4",), ("2d",)),
-    "ripple": Tags(("2c.1", "2b.5"), ("3c",)),
-    "brain_state": Tags(("2c.1",)),
+    "ripple": Tags(("2d.8", "2b.5"), ("3c",)),
+    "brain_state": Tags(("2d.8",)),
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
-    "class_step_evidence": Tags(("2b.5", "2c.3")),
-    "spike": Tags(("2c.2", "2c.3", "2c.5"), ("2",)),
-    "spike_count": Tags(("2c.2",), ("2",)),
+    "class_step_evidence": Tags(("2b.5",)),
+    "spike": Tags(("2d.9", "2c.3"), ("2",)),
+    "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
-    "spike_evidence_baseline": Tags(("2c.3", "2c.5"), ("2",)),
     "spike_gpi": Tags(("2c.4",)),
-    "spike_remote": Tags(("2c.7",)),
-    "content_occupancy": Tags(("2d.1", "2c.8"), ("2",)),
+    "content_occupancy": Tags(("2d.1",), ("2",)),
     "duration": Tags(("2d.6",)),
     "extent": Tags(("2d.3",), ("3",)),
     "speed": Tags(("2d.2",), ("3e",)),
@@ -143,9 +141,7 @@ TAGS = {
     "stillness": Tags(("2d.4",), ("3",)),
     "location": Tags(("2d.1",), ("3",)),
 }
-"""Each group of values: the questions it answers and the figures that show it. The
-remote events' spike-support values also answer question 2c.7: their tags are a
-spike group's joined with ``spike_remote``."""
+"""Each group of values: the questions it answers and the figures that show it."""
 
 #: The other detectors of question 2b.3, by the word their keys use. Kay is the main
 #: figure's; the rest go to the supplement.
@@ -764,7 +760,7 @@ _SIGNAL_LABELS = {
 def brain_state_values(
     events: pd.DataFrame, reference: pd.DataFrame, source: str
 ) -> list[Value]:
-    """Questions 2c.1 and 2b.5: theta, ripple power and MUA during events, against
+    """Questions 2d.8 and 2b.5: theta, ripple power and MUA during events, against
     running and quiet rest.
 
     Each event's value is its mean over its bins of the epoch's z-scored signal
@@ -787,7 +783,7 @@ def brain_state_values(
 def gamma_z_values(
     events: pd.DataFrame, reference: pd.DataFrame, source: str
 ) -> list[Value]:
-    """Question 2c.1: slow and fast gamma during events, against running and quiet
+    """Question 2d.8: slow and fast gamma during events, against running and quiet
     rest.
 
     As :func:`brain_state_values`, on the gamma pass's ``slow_gamma_z`` and
@@ -878,7 +874,7 @@ def _signal_values(
 
 
 def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.1: slow and fast gamma during events, as a change in band power
+    """Question 2d.8: slow and fast gamma during events, as a change in band power
     against the same epoch's quiet rest, in dB.
 
     For each epoch and class: ``10 log10(mean band power over the class's event
@@ -959,19 +955,12 @@ def spike_evidence_metrics(per_epoch_dir: Path, n_epochs: int) -> pd.DataFrame:
     return pd.concat(tables, ignore_index=True)
 
 
-def _remote_too(tags: Tags, word: str) -> Tags:
-    """``tags``, joined with ``spike_remote`` when ``word`` names a remote group:
-    the remote groups' values also answer question 2c.7."""
-    return tags | TAGS["spike_remote"] if word.endswith("remote") else tags
-
-
 def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
-    """Questions 2c.2, 2c.3, 2c.4 and 2c.5: each event group's spike evidence against matched
-    quiet windows (``baseline``). Event-level medians, pooled over epochs; the
-    run scores every event and every quiet window with at least one spike (no cap;
-    the evidence is per spike, so a quiet window without spikes has none). The
-    remote groups' values
-    also answer question 2c.7, whether remote events pass these tests."""
+    """Questions 2c.3, 2c.4 and 2d.9: each event group's spike evidence against matched
+    quiet windows (``baseline``), the negative control. Event-level medians, pooled
+    over epochs; the run scores every event and every quiet window with at least one
+    spike (no cap; the evidence is per spike, so a quiet window without spikes has
+    none)."""
     make = value_factory(spike_evidence_values, source, TAGS["spike"])
     values = [
         make(
@@ -987,10 +976,6 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     for word, group in groups.items():
         stats = statistics.loc[group]
         label = "matched quiet windows" if word == "baseline" else f"{group} events"
-        scored_tags = _remote_too(TAGS["spike"], word)
-        count_tags = _remote_too(TAGS["spike_count"], word)
-        evidence_tags = _remote_too(TAGS["spike_evidence"], word)
-        gpi_tags = _remote_too(TAGS["spike_gpi"], word)
         values += [
             make(
                 f"{word}_scored",
@@ -998,7 +983,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{label} scored",
-                tags=scored_tags,
+                tags=TAGS["spike"],
             ),
             make(
                 f"{word}_spikes_median",
@@ -1007,7 +992,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median spike count of {label}",
                 "spikes",
-                tags=count_tags,
+                tags=TAGS["spike_count"],
             ),
             make(
                 f"{word}_tetrodes_median",
@@ -1016,7 +1001,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median number of tetrodes with a spike in {label}",
                 "tetrodes",
-                tags=count_tags,
+                tags=TAGS["spike_count"],
             ),
             make(
                 f"{word}_dll_per_spike_median",
@@ -1026,9 +1011,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 f"median log-likelihood ratio per spike, decoded location against the "
                 f"animal's, of {label}",
                 "nats per spike",
-                tags=TAGS["spike_evidence_baseline"]
-                if word == "baseline"
-                else evidence_tags,
+                tags=TAGS["spike_evidence"],
             ),
             make(
                 f"{word}_gpi_distance_median_cm",
@@ -1038,7 +1021,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 f"median track distance from the MAP of {label} to the ground-process "
                 "intensity peak",
                 "cm",
-                tags=gpi_tags,
+                tags=TAGS["spike_gpi"],
             ),
         ]
         if word == "baseline":
@@ -1051,7 +1034,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 f"epochs whose median {group} event scores above the epoch's median quiet "
                 "window, per spike",
-                tags=evidence_tags,
+                tags=TAGS["spike_evidence"],
             ),
             make(
                 f"{word}_epochs_scored",
@@ -1059,7 +1042,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"epochs with a scored {group} event",
-                tags=evidence_tags,
+                tags=TAGS["spike_evidence"],
             ),
             make(
                 f"{word}_animals_above_baseline",
@@ -1069,7 +1052,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 f"animals whose median {group} event scores above their median quiet "
                 "window, per spike, each the median over the animal's epochs of the "
                 "epoch's median",
-                tags=evidence_tags,
+                tags=TAGS["spike_evidence"],
             ),
         ]
     values.append(
@@ -1254,7 +1237,7 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
 
 
 def class_step_evidence_values(steps: pd.DataFrame, source: str) -> list[Value]:
-    """Questions 2b.5 and 2c.3, test 2 (:func:`class_step_values`) for spike
+    """Question 2b.5, test 2 (:func:`class_step_values`) for spike
     evidence per spike: the one property of the step test read from the
     spike-evidence run, so these values are stale when that run has changed
     since the step fits were made (:func:`spike_evidence_staleness`)."""
@@ -1591,7 +1574,7 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
 
 
 def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.1: the theta-like share of events against duration-matched quiet rest.
+    """Question 2d.8: the theta-like share of events against duration-matched quiet rest.
 
     For each event, ten windows of quiet rest (below 4 cm/s, in no non-local,
     SWR or MUA event, outside excluded time) with as many bins as the event,
