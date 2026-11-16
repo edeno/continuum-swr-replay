@@ -24,7 +24,6 @@ chooses what to show of it and draws it.
 
 Usage:
     python scripts/figures/generate_figure01.py
-    python scripts/figures/generate_figure01.py --n-neurons 40 --seed 42
     python scripts/figures/generate_figure01.py --output-dir paper/figures/figure01
 """
 
@@ -67,18 +66,23 @@ warnings.filterwarnings("ignore")
 # ---------------------------------------------------------------------------
 # Colors — colorblind-friendly, consistent across the figure
 # ---------------------------------------------------------------------------
-STATE_NAMES_SHORT = ["Local", "No-Spike", "Continuous", "Fragmented"]
-STATE_COLORS_SHORT = [WONG[5], "#999999", WONG[1], WONG[6]]
-LOCAL_COLOR, NO_SPIKE_COLOR, CONTINUOUS_COLOR, FRAGMENTED_COLOR = STATE_COLORS_SHORT
-# The detector's name for each state -> the name and colour the figure gives it.
-STATE_STYLE = dict(
-    zip(
-        ("Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"),
-        zip(STATE_NAMES_SHORT, STATE_COLORS_SHORT, strict=True),
-        strict=True,
-    )
-)
+# Keyed by the figure's name for each state: the detector's name without its
+# "Non-Local " prefix.
+STATE_COLORS = {
+    "Local": WONG[5],
+    "No-Spike": "#999999",
+    "Continuous": WONG[1],
+    "Fragmented": WONG[6],
+}
+LOCAL_COLOR, NO_SPIKE_COLOR, CONTINUOUS_COLOR, FRAGMENTED_COLOR = STATE_COLORS.values()
 NON_LOCAL_COLOR = COLORS["Non-Local"]
+NON_LOCAL_SHADE_ALPHA = 0.13
+# The shading of a non-local event in panels d and e.
+NON_LOCAL_SHADE = {
+    "color": NON_LOCAL_COLOR,
+    "alpha": NON_LOCAL_SHADE_ALPHA,
+    "linewidth": 0,
+}
 ANIMAL_POS_COLOR = "magenta"
 
 # Cell Press asks for text of about 6-8 pt at print size.
@@ -92,6 +96,8 @@ LOCAL_EXAMPLE_LEAD_S = (1.25, 0.85)
 # Panel d's flags for the Local example and the first pattern are about 1 s
 # apart, so each is moved this far away from the other.
 EXAMPLE_FLAG_SPREAD_S = 0.4
+# Panel d's threshold label starts this long after the first non-local event.
+THRESHOLD_LABEL_LAG_S = 1.2
 
 # Inches. ``save_figure`` crops to the drawing and adds 0.1 in on each side, so
 # these save at about 17.3 x 19.9 cm: within Cell Press's 17.4 cm full width and
@@ -106,9 +112,15 @@ POSITION_MARGIN_CM = 8.0
 STATE_DIAGRAM_HEIGHT = 1.14
 
 
-def _hide_top_right(ax: Axes) -> None:
-    for side in ("top", "right"):
-        ax.spines[side].set_visible(False)
+def _colored_yticks(
+    ax: Axes, ticks: Sequence[float], labels: Sequence[str], colors: Sequence[str]
+) -> None:
+    """Label the y axis with names in their own colours, without tick marks."""
+    ax.set_yticks(ticks)
+    ax.set_yticklabels(labels, fontsize=SMALL_SIZE)
+    ax.tick_params(axis="y", length=0, pad=2)
+    for label, color in zip(ax.get_yticklabels(), colors, strict=True):
+        label.set_color(color)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -140,7 +152,7 @@ def plot_state_diagram(ax: Axes) -> None:
     radius = 0.19  # wide enough for "Continuous" and "Fragmented" at 6 pt
 
     for facecolor, edgecolor, alpha in (
-        (NON_LOCAL_COLOR, "none", 0.13),
+        (NON_LOCAL_COLOR, "none", NON_LOCAL_SHADE_ALPHA),
         ("none", NON_LOCAL_COLOR, 1.0),
     ):
         ax.add_patch(
@@ -184,14 +196,12 @@ def plot_state_diagram(ax: Axes) -> None:
                 )
             )
 
-    for (name, (cx, cy)), color in zip(
-        centers.items(), STATE_COLORS_SHORT, strict=True
-    ):
+    for name, (cx, cy) in centers.items():
         ax.add_patch(
             mpatches.Circle(
                 (cx, cy),
                 radius,
-                facecolor=color,
+                facecolor=STATE_COLORS[name],
                 edgecolor="black",
                 linewidth=0.7,
                 zorder=5,
@@ -278,8 +288,7 @@ def plot_spike_scoring(fig: Figure, slot: SubplotSpec) -> None:
         ax.set_ylim(0, 1.12)
         ax.set_xticks([])
         ax.set_yticks([])
-        for side in ("top", "right", "left"):
-            ax.spines[side].set_visible(False)
+        ax.spines["left"].set_visible(False)
         ax.set_title(
             title, fontsize=SMALL_SIZE, fontweight="bold", pad=3, linespacing=0.95
         )
@@ -323,15 +332,12 @@ def plot_spike_scoring(fig: Figure, slot: SubplotSpec) -> None:
             spine.set_visible(False)
         ax_allowed.set_xlabel("Position", fontsize=SMALL_SIZE, labelpad=1)
         if col == 0:
-            ax_allowed.set_yticks([0.59, -0.41])
-            ax_allowed.set_yticklabels(["Local", "Non-local"], fontsize=SMALL_SIZE)
-            ax_allowed.tick_params(axis="y", length=0, pad=2)
-            for label, color in zip(
-                ax_allowed.get_yticklabels(),
+            _colored_yticks(
+                ax_allowed,
+                [0.59, -0.41],
+                ["Local", "Non-local"],
                 (LOCAL_COLOR, NON_LOCAL_COLOR),
-                strict=True,
-            ):
-                label.set_color(color)
+            )
             ax_allowed.text(
                 0.0,
                 1.12,
@@ -361,22 +367,18 @@ def plot_spike_scoring(fig: Figure, slot: SubplotSpec) -> None:
         ax_evidence.set_xticks([0, 1])
         ax_evidence.tick_params(axis="x", labelsize=SMALL_SIZE, length=2, pad=1)
         ax_evidence.set_yticks([])
-        _hide_top_right(ax_evidence)
         ax_evidence.spines["bottom"].set_bounds(0, 1)
         if col == 1:
             ax_evidence.set_xlabel(
                 "Relative evidence for each state", fontsize=SMALL_SIZE, labelpad=1
             )
         if col == 0:
-            ax_evidence.set_yticks([2, 1, 0])
-            ax_evidence.set_yticklabels(
-                ["Local", "Non-local", "No-Spike"], fontsize=SMALL_SIZE
+            _colored_yticks(
+                ax_evidence,
+                [2, 1, 0],
+                ["Local", "Non-local", "No-Spike"],
+                evidence_colors,
             )
-            ax_evidence.tick_params(axis="y", length=0, pad=2)
-            for label, color in zip(
-                ax_evidence.get_yticklabels(), evidence_colors, strict=True
-            ):
-                label.set_color(color)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -573,8 +575,7 @@ def posterior_color_limit(sim: DecodedSimulation) -> float:
     in_event = np.zeros(sim.time.size, dtype=bool)
     for start, end in sim.non_local_events:
         in_event |= (sim.time >= start) & (sim.time <= end)
-    values = sim.non_local_posterior[in_event] if in_event.any() else sim.posterior
-    return float(np.percentile(values, 99))
+    return float(np.percentile(sim.non_local_posterior[in_event], 99))
 
 
 def _next_time_at_track_start(sim: DecodedSimulation, after: float) -> float:
@@ -715,7 +716,7 @@ def plot_simulated_run(
     )
 
     for start, end in sim.non_local_events:
-        ax_non_local.axvspan(start, end, color=NON_LOCAL_COLOR, alpha=0.13, linewidth=0)
+        ax_non_local.axvspan(start, end, **NON_LOCAL_SHADE)
     ax_non_local.plot(
         sim.time, sim.non_local_probability, color=NON_LOCAL_COLOR, linewidth=1.0
     )
@@ -723,7 +724,7 @@ def plot_simulated_run(
         DEFAULT_NON_LOCAL_THRESHOLD, color="#999999", linestyle="--", linewidth=0.6
     )
     ax_non_local.text(
-        sim.non_local_events[0][1] + 1.2,  # just after the first event
+        sim.non_local_events[0][1] + THRESHOLD_LABEL_LAG_S,
         DEFAULT_NON_LOCAL_THRESHOLD - 0.06,
         f"event threshold, {DEFAULT_NON_LOCAL_THRESHOLD:g}",
         fontsize=SMALL_SIZE,
@@ -788,7 +789,6 @@ def plot_simulated_run(
     for ax in axes:
         ax.set_xlim(sim.time[0], overview_end)
         ax.tick_params(labelsize=SMALL_SIZE, length=2)
-        _hide_top_right(ax)
     for ax in axes[:-1]:
         ax.tick_params(labelbottom=False)
 
@@ -805,7 +805,7 @@ def plot_examples(
     Each column is one example on its own millisecond axis, with zero at the
     start of the simulated pattern (the start of the window for Local). A bar
     above the raster marks when the simulated pattern occurs; shading marks the
-    non-local events (``detect_non_local_events``).
+    non-local events (``sim.non_local_events``).
     """
     gs = slot.subgridspec(
         3, len(examples), height_ratios=[1.0, 1.0, 0.75], hspace=0.14, wspace=0.2
@@ -813,9 +813,13 @@ def plot_examples(
     n_neurons = len(sim.sorted_spikes)
     for k, example in enumerate(examples):
         start, end = example.window
-        origin = example.origin
+
+        def to_ms(time_s, origin: float = example.origin):
+            """Seconds of the run to the column's milliseconds."""
+            return (time_s - origin) * 1e3
+
         rows = slice(*np.searchsorted(sim.time, [start, end]))
-        time_ms = (sim.time[rows] - origin) * 1e3
+        time_ms = to_ms(sim.time[rows])
         ax_raster = fig.add_subplot(gs[0, k])
         ax_posterior = fig.add_subplot(gs[1, k], sharex=ax_raster)
         ax_states = fig.add_subplot(gs[2, k], sharex=ax_raster)
@@ -823,7 +827,7 @@ def plot_examples(
 
         ax_raster.eventplot(
             [
-                (spikes[(spikes >= start) & (spikes <= end)] - origin) * 1e3
+                to_ms(spikes[(spikes >= start) & (spikes <= end)])
                 for spikes in sim.sorted_spikes
             ],
             lineoffsets=np.arange(1, n_neurons + 1),
@@ -835,7 +839,7 @@ def plot_examples(
         ax_raster.set_yticks([1, n_neurons])
         if example.pattern is not None:
             ax_raster.plot(
-                [0, (example.pattern[1] - origin) * 1e3],
+                [0, to_ms(example.pattern[1])],
                 [1.05, 1.05],
                 color=example.color,
                 linewidth=1.5,
@@ -883,11 +887,11 @@ def plot_examples(
         )
 
         for i, state in enumerate(sim.state_names):
-            name, color = STATE_STYLE[state]
+            name = state.removeprefix("Non-Local ")
             ax_states.plot(
                 time_ms,
                 sim.state_probabilities[rows, i],
-                color=color,
+                color=STATE_COLORS[name],
                 linewidth=1.0,
                 label=name,
             )
@@ -899,17 +903,11 @@ def plot_examples(
             if nl_end > start and nl_start < end:
                 for ax in axes:
                     ax.axvspan(
-                        (nl_start - origin) * 1e3,
-                        (nl_end - origin) * 1e3,
-                        color=NON_LOCAL_COLOR,
-                        alpha=0.13,
-                        linewidth=0,
-                        zorder=0,
+                        to_ms(nl_start), to_ms(nl_end), **NON_LOCAL_SHADE, zorder=0
                     )
         for ax in axes:
-            ax.set_xlim((start - origin) * 1e3, (end - origin) * 1e3)
+            ax.set_xlim(to_ms(start), to_ms(end))
             ax.tick_params(labelsize=SMALL_SIZE, length=2)
-            _hide_top_right(ax)
             if k > 0:
                 ax.tick_params(labelleft=False)
         ax_raster.tick_params(labelbottom=False)
@@ -959,24 +957,18 @@ def _shift_vertically(axes: Sequence[Axes], dy: float) -> None:
         ax.set_position([box.x0, box.y0 + dy, box.width, box.height])
 
 
-def generate_figure(n_neurons: int = 30, seed: int = 0) -> Figure:
+def generate_figure() -> Figure:
     """Generate complete Figure 1.
 
-    Parameters
-    ----------
-    n_neurons : int
-        Number of neurons to simulate.
-    seed : int
-        Seed of ``make_simulated_data``'s random generator. The default, 0, is
-        the simulator's own default, which the figure has always been drawn
-        with.
+    The labels of panels d and e are placed for the default simulated run
+    (``simulate_and_decode()``), so the run is not an option.
 
     Returns
     -------
     fig : matplotlib.figure.Figure
     """
-    print(f"Simulating {n_neurons} neurons and decoding (EM)...")
-    sim = simulate_and_decode(n_neurons=n_neurons, seed=seed)
+    print("Simulating and decoding (EM)...")
+    sim = simulate_and_decode()
     examples = choose_examples(sim)
     posterior_vmax = posterior_color_limit(sim)
 
@@ -1066,20 +1058,13 @@ def main(argv: Sequence[str] | None = None) -> None:
         type=Path,
         default=Path("paper/figures/figure01"),
     )
-    parser.add_argument("--n-neurons", type=int, default=30)
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=0,
-        help="Seed of the simulated data's random generator (default 0).",
-    )
     parser.add_argument("--dpi", type=int, default=450)
     parser.add_argument("--show", action="store_true")
 
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    fig = generate_figure(n_neurons=args.n_neurons, seed=args.seed)
+    fig = generate_figure()
 
     print(f"Saving to {args.output_dir}...")
     save_figure(fig, "figure01", base_dir=args.output_dir, dpi=args.dpi)

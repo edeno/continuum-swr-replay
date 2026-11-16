@@ -59,6 +59,9 @@ from continuum_swr_replay.tables.columns import require_columns
 # the total duration of its SWR coverage.
 INTERVAL_TOLERANCE_SEC = 1e-6
 
+NON_LOCAL_STATES = ("Non-Local Continuous", "Non-Local Fragmented")
+"""The decoder states whose probabilities sum to the non-local probability."""
+
 
 def nonlocal_probability(frame: pd.DataFrame) -> pd.Series:
     """Each row's non-local probability: Non-Local Continuous plus Fragmented.
@@ -96,9 +99,10 @@ def nonlocal_state_probability(
     xr.DataArray, shape (n_time,)
         NaN where either state's probability is NaN.
     """
+    continuous, fragmented = NON_LOCAL_STATES
     return acausal_state_probabilities.sel(
-        states="Non-Local Continuous"
-    ) + acausal_state_probabilities.sel(states="Non-Local Fragmented")
+        states=continuous
+    ) + acausal_state_probabilities.sel(states=fragmented)
 
 
 def get_confident_times(

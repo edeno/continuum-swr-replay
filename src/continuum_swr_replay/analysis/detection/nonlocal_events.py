@@ -614,9 +614,6 @@ def get_data_over_time(
     head_speed = data["position_info"].head_speed.to_numpy()
 
     non_local_prob = nonlocal_state_probability(results.acausal_state_probabilities)
-    non_local_prob = non_local_prob.assign_coords(
-        time=position_time.to_numpy(dtype=float)
-    )
 
     posterior = get_conditional_non_local_posterior(results)
 

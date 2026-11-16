@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.detection import simulated_run
 from continuum_swr_replay.analysis.detection.simulated_run import (
     PATTERNS,
     REMOTE_SPIKE_INTERVAL_S,
@@ -15,6 +14,9 @@ from continuum_swr_replay.analysis.detection.simulated_run import (
     DecodedSimulation,
     simulate_and_decode,
     splice_remote_stationary,
+)
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    NON_LOCAL_STATES,
 )
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
@@ -70,7 +72,7 @@ class TestSimulatedRun:
         assert sim.state_probabilities.shape == (n_time, len(sim.state_names))
         assert sim.posterior.shape == (n_time, sim.position_bins.size)
         assert sim.non_local_posterior.shape == sim.posterior.shape
-        # 1500 Hz striden to the 500 Hz decode grid
+        # 1500 Hz strided to the 500 Hz decode grid
         np.testing.assert_allclose(np.diff(sim.time), 0.002, atol=1e-9)
         np.testing.assert_allclose(sim.state_probabilities.sum(axis=1), 1, atol=1e-4)
 
@@ -128,9 +130,7 @@ class TestSimulatedRun:
             assert end < silence[0] or start > silence[1]
 
     def test_non_local_probability_is_the_two_non_local_states(self, sim):
-        columns = [
-            sim.state_names.index(name) for name in simulated_run.NON_LOCAL_STATES
-        ]
+        columns = [sim.state_names.index(name) for name in NON_LOCAL_STATES]
         np.testing.assert_allclose(
             sim.non_local_probability,
             sim.state_probabilities[:, columns].sum(axis=1),

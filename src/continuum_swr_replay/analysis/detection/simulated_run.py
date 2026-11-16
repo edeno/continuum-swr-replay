@@ -31,22 +31,26 @@ import numpy as np
 from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.environment import Environment
 from non_local_detector.simulate.sorted_spikes_simulation import (
+    SAMPLING_FREQUENCY as SIMULATION_SAMPLING_FREQUENCY,
+)
+from non_local_detector.simulate.sorted_spikes_simulation import (
     TRACK_HEIGHT,
     make_simulated_data,
 )
 
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    NON_LOCAL_STATES,
     detect_nonlocal_events,
     nonlocal_state_probability,
 )
 from continuum_swr_replay.decoding.config import NonLocalDecodingConfig
 from continuum_swr_replay.decoding.fit import algorithm_params
+from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.decoding.transitions import nonlocal_detector_kwargs
-from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
+from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D, SAMPLING_FREQUENCY
 
 __all__ = [
     "DECODE_BIN_STRIDE",
-    "NON_LOCAL_STATES",
     "PATTERNS",
     "REMOTE_SPIKE_INTERVAL_S",
     "REMOTE_STATIONARY_CM",
@@ -58,8 +62,16 @@ __all__ = [
     "splice_remote_stationary",
 ]
 
-DECODE_BIN_STRIDE = 3
-"""Figure 1 strides the 1500 Hz simulation to the project's 500 Hz decode grid."""
+DECODE_BIN_STRIDE, _remainder = divmod(
+    SIMULATION_SAMPLING_FREQUENCY, SAMPLING_FREQUENCY
+)
+"""Figure 1 strides the 1500 Hz simulation to the project's 500 Hz decode grid,
+the grid the detector's transitions are built for."""
+if _remainder:
+    raise ValueError(
+        f"the simulation's {SIMULATION_SAMPLING_FREQUENCY} Hz is not a whole "
+        f"multiple of the decode's {SAMPLING_FREQUENCY} Hz"
+    )
 
 REMOTE_STATIONARY_CM = 42.5
 """The place a remote stationary event holds, far from the animal's 170 cm."""
@@ -71,8 +83,6 @@ REMOTE_SPIKE_INTERVAL_S = 0.012
 SILENCE_DURATION_S = 0.75
 """The simulator's silence lasts 0.5 s; lengthened so that the No-Spike state
 clears the ramps the transitions put at its edges and reads at full strength."""
-
-NON_LOCAL_STATES = ("Non-Local Continuous", "Non-Local Fragmented")
 
 # Rows of ``make_simulated_data``'s ``event_times``. The simulator puts one event
 # in each pause, in this order; its fifth, "local" event has zero duration.
@@ -206,15 +216,16 @@ def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation
         is_event,
         _place_fields,
     ) = make_simulated_data(n_neurons=n_neurons, seed=seed)
-    event_times = np.array(event_times, dtype=float)
+    # (n_events, 2) -> one (start, end) per simulated event, in s
+    event_times = [tuple(float(t) for t in row) for row in event_times]
     place_field_means = np.linspace(0, float(TRACK_HEIGHT), n_neurons)
 
     # The outbound sweep starts at the animal; the inbound sweep ends there. The
     # inbound sweep is moved into the outbound sweep's pause (the animal sits at
     # the same end of the track in both), and a remote place held still takes
     # the pause it leaves: the splice clears that pause's spikes with its span.
-    outbound = tuple(float(t) for t in event_times[_OUTBOUND_SWEEP_ROW])
-    inbound = tuple(float(t) for t in event_times[_INBOUND_SWEEP_ROW])
+    outbound = event_times[_OUTBOUND_SWEEP_ROW]
+    inbound = event_times[_INBOUND_SWEEP_ROW]
     sweep = (outbound[0], outbound[0] + (inbound[1] - inbound[0]))
     cleared_until = max(outbound[1], sweep[1])
     spike_times = [
@@ -239,7 +250,7 @@ def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation
             "outlasts the remote stationary event that replaces it"
         )
 
-    silence_start = float(event_times[_SILENCE_ROW, 0])
+    silence_start = event_times[_SILENCE_ROW][0]
     silence = (silence_start, silence_start + SILENCE_DURATION_S)
     spike_times = [
         cell[(cell < silence[0]) | (cell > silence[1])] for cell in spike_times
@@ -247,7 +258,7 @@ def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation
 
     patterns = {
         "sweep": sweep,
-        "fragmented": tuple(float(t) for t in event_times[_FRAGMENTED_ROW]),
+        "fragmented": event_times[_FRAGMENTED_ROW],
         "stationary": stationary,
         "silence": silence,
     }
@@ -279,7 +290,7 @@ def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation
     on_grid = ("time", "position")
 
     # cells in the order of their fitted place-field peaks, for the rasters
-    encoding_model = next(iter(detector.encoding_model_.values()))
+    encoding_model = detector.encoding_model_[ENCODING_KEY]
     order = np.argsort(np.argmax(np.asarray(encoding_model["place_fields"]), axis=1))
 
     return DecodedSimulation(
