@@ -114,6 +114,8 @@ FIGURE_WIDTH = 6.9
 FIGURE_HEIGHT = 7.8
 # The data axes of panels d and e, in figure fractions.
 DATA_LEFT, DATA_RIGHT = 0.095, 0.985
+# Space shown beyond each end of the track in the decoded-position plots.
+POSITION_MARGIN_CM = 8.0
 # A state diagram spans 1 unit across and this many up (see ``plot_state_diagram``).
 STATE_DIAGRAM_HEIGHT = 1.14
 
@@ -799,6 +801,12 @@ def _plot_posterior(
     )
     if dashes:
         line.set_dashes(dashes)
+    # Room beyond the track's ends: the animal pauses at an end, and its position
+    # would otherwise lie on the edge of the axes and be clipped.
+    ax.set_ylim(
+        sim.position_bins[0] - POSITION_MARGIN_CM,
+        sim.position_bins[-1] + POSITION_MARGIN_CM,
+    )
 
 
 def plot_simulated_run(
@@ -855,7 +863,6 @@ def plot_simulated_run(
         ax_posterior, sim, slice(None), sim.time, linewidth=0.6, dashes=(2.5, 3.5)
     )
     ax_posterior.set_ylabel("Decoded\nposition (cm)", fontsize=LABEL_SIZE, labelpad=3)
-    ax_posterior.set_ylim(sim.position_bins.min(), sim.position_bins.max())
     # Labeled where the animal first turns at the track's start: the space above
     # that turn is empty.
     ax_posterior.text(
@@ -1030,7 +1037,6 @@ def plot_examples(
         )
 
         _plot_posterior(ax_posterior, sim, rows, time_ms, linewidth=0.8)
-        ax_posterior.set_ylim(sim.position_bins.min(), sim.position_bins.max() + 4)
 
         for i, (name, color) in enumerate(
             zip(STATE_NAMES_SHORT, STATE_COLORS_SHORT, strict=True)
