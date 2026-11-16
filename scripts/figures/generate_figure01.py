@@ -448,8 +448,8 @@ def plot_position_transitions(fig: Figure, slot: SubplotSpec) -> None:
     cells = [
         ("Local", LOCAL_COLOR, at_animal, "at the animal"),
         ("No-Spike", NO_SPIKE_COLOR, None, "no position"),
-        ("Continuous", CONTINUOUS_COLOR, random_walk, "nearby"),
-        ("Fragmented", FRAGMENTED_COLOR, uniform, "anywhere"),
+        ("Continuous", CONTINUOUS_COLOR, random_walk, "move nearby"),
+        ("Fragmented", FRAGMENTED_COLOR, uniform, "move anywhere"),
     ]
     vmax = max(t.max() for _, _, t, _ in cells if t is not None)
     image = None
