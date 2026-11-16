@@ -13,6 +13,10 @@ lives here, and only here:
   ``docs/design/2026-10-04-decoder-transition-prior.md``.
 - :func:`contfrag_transition_settings`: the ContFrag 2-state classifier, at the
   values it has always decoded with, made explicit.
+- :func:`nonlocal_detector_kwargs`: everything a NonLocal detector is built with
+  beyond its environment and its likelihood parameters: those transitions and
+  the Local state's kernel. The decode runner and Figure 1's simulated run
+  (``analysis.detection.simulated_run``) both build their detector from it.
 
 The NonLocal detector's states, in the library's order: 0 Local, 1 No-Spike,
 2 Non-Local Continuous, 3 Non-Local Fragmented.
@@ -31,6 +35,7 @@ from non_local_detector.discrete_state_transitions import (
     DiscreteStationaryDiagonal,
 )
 
+from continuum_swr_replay.decoding.config import NonLocalDecodingConfig
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 LOCAL_DWELL_S: Final[float] = 3.0
@@ -167,6 +172,19 @@ def nonlocal_transition_settings(
         ),
         "discrete_transition_prior_weight": 0.0,
         "frozen_discrete_transition_rows": (1,),
+    }
+
+
+def nonlocal_detector_kwargs(config: NonLocalDecodingConfig) -> dict[str, Any]:
+    """The NonLocal detector's arguments beyond its environment and params.
+
+    The discrete transitions come from :func:`nonlocal_transition_settings`
+    (setting P30-B, decision R10), never from the library's defaults; the Local
+    state's ``local_position_std`` is a detector-level argument.
+    """
+    return {
+        **nonlocal_transition_settings(SAMPLING_FREQUENCY),
+        "local_position_std": config.local_position_std,
     }
 
 

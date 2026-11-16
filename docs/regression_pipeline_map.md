@@ -516,7 +516,7 @@ Measure each analysed epoch's decoder quality: Local-state error, state fraction
 
 Main script for running continuum neural decoding on spatial bandit task data.
 
-`nonlocal_detector_kwargs`, `generate_figurl`, `run_decode`, `main`
+`generate_figurl`, `run_decode`, `main`
 
 ### `scripts/decoding/run_decoding_contfrag.py`
 

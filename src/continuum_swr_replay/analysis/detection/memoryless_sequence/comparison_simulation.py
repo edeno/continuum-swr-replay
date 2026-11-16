@@ -15,10 +15,11 @@ It is not the recording or the decode of Figure 1
 ``make_simulated_data`` and share the decode grid (``DECODE_BIN_STRIDE``) and
 the remote stationary event (``splice_remote_stationary``), which are defined
 there. Figure 1 has 30 cells, puts the remote stationary event in place of the
-first sweep, lengthens the silence, and estimates the place fields and the
-transitions by EM under a demo transition prior; this simulation has
-:data:`N_NEURONS` cells, keeps both sweeps, adds its events in other pauses and
-fits the detector once, with the library's default transitions.
+second sweep, moves that sweep into the first pause, lengthens the silence, and
+estimates the place fields and the transitions by EM with the real decodes'
+settings; this simulation has :data:`N_NEURONS` cells, keeps both sweeps, adds
+its events in other pauses and fits the detector once, with the library's
+default transitions.
 """
 
 import numpy as np

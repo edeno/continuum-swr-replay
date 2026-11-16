@@ -648,9 +648,13 @@ one function. The comparison simulation's results are unchanged.
 
 | Old place | New place |
 |---|---|
-| `scripts/figures/generate_figure01.py`: `make_example_detector`, `DEMO_DISCRETE_TRANSITION_STICKINESS`, the simulation and decode inside `generate_figure` | `analysis/detection/simulated_run.py` (`simulate_and_decode`, `DecodedSimulation`) |
+| `scripts/figures/generate_figure01.py`: `make_example_detector`, the simulation and decode inside `generate_figure` | `analysis/detection/simulated_run.py` (`simulate_and_decode`, `DecodedSimulation`) |
 | `analysis/detection/memoryless_sequence/comparison_simulation.py`: `DECODE_BIN_STRIDE`, `REMOTE_STATIONARY_CM`, `REMOTE_STATIONARY_S`, `splice_remote_stationary` | `analysis/detection/simulated_run.py`; `comparison_simulation` still exports them |
 | `analysis/detection/nonlocal_events.py`: `get_confident_times` followed by `build_speed_eligible_event_cohort`, written out in the detector | `analysis/event_definition/nonlocal_event_rule.py`: `detect_nonlocal_events` |
 
+| `scripts/decoding/run_decoding_bandit.py`: `nonlocal_detector_kwargs` | `decoding/transitions.py` |
+
 Figure 1's recording also changed: the sweep that ends at the animal is in the first pause, and
-a remote place held still is in the third (it was two sweeps).
+a remote place held still is in the third (it was two sweeps). Its detector is now built from
+the real decodes' settings (`nonlocal_detector_kwargs`, `NonLocalDecodingConfig`), where it had a
+demo transition setting of its own.

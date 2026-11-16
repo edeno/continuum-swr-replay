@@ -42,7 +42,6 @@ import warnings
 from argparse import ArgumentParser
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 import xarray as xr
@@ -61,10 +60,9 @@ from continuum_swr_replay.decoding.identifiers import (
     DEFAULT_TRAINING_TYPE,
 )
 from continuum_swr_replay.decoding.results import load_results
-from continuum_swr_replay.decoding.transitions import nonlocal_transition_settings
+from continuum_swr_replay.decoding.transitions import nonlocal_detector_kwargs
 from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD,
-    SAMPLING_FREQUENCY,
 )
 from continuum_swr_replay.runs.batch import run_batch
 from continuum_swr_replay.runs.cli import add_common_args
@@ -78,19 +76,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.decoding import _decode_runner  # noqa: E402
 
 warnings.filterwarnings("ignore")
-
-
-def nonlocal_detector_kwargs(config: NonLocalDecodingConfig) -> dict[str, Any]:
-    """The NonLocal detector's arguments beyond its environment and params.
-
-    The discrete transitions come from ``nonlocal_transition_settings`` (setting
-    P30-B, decision R10), never from the library's defaults; the Local state's
-    ``local_position_std`` is a detector-level argument.
-    """
-    return {
-        **nonlocal_transition_settings(SAMPLING_FREQUENCY),
-        "local_position_std": config.local_position_std,
-    }
 
 
 def generate_figurl(

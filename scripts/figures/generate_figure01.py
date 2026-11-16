@@ -120,9 +120,8 @@ def plot_state_diagram(ax: Axes) -> None:
     """Draw the four states, the non-local group and the transitions.
 
     Every pair of states is joined by a two-way arrow and every state has a
-    self-loop. No probability is written: the transitions are learned from the
-    data, and the simulation's starting values are a demo setting
-    (``DEMO_DISCRETE_TRANSITION_STICKINESS``).
+    self-loop. No probability is written: the transitions are learned from each
+    recording, under the prior of ``decoding.transitions``.
 
     The data limits span 1 across and ``STATE_DIAGRAM_HEIGHT`` up with an equal
     aspect, so an axes of that shape is filled exactly.

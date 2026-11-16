@@ -4,8 +4,14 @@ Figure 1 (``scripts/figures/generate_figure01.py``) shows the model at work on a
 recording whose spiking is known: an animal runs back and forth on a linear
 track, pausing at the far end, and during four of those pauses the spikes follow
 a pattern the simulation puts there (:data:`PATTERNS`). :func:`simulate_and_decode`
-builds that recording, decodes it and finds its non-local events by the rule the
-analyses use (``event_definition.nonlocal_event_rule.detect_nonlocal_events``).
+builds that recording and treats it as the analyses treat a real one: the
+detector is built from the real decodes' settings (:func:`make_example_detector`),
+fitted by the same call (``estimate_parameters``), and its non-local events are
+found by the same rule
+(``event_definition.nonlocal_event_rule.detect_nonlocal_events``). What a real
+HPC decode has and this does not: spike waveform features (the simulated cells
+are sorted, so the detector is the sorted-spikes one the mPFC and OFC decodes
+use), a track graph, and an artifact mask.
 
 The recording is ``non_local_detector``'s ``make_simulated_data`` with three
 changes. Its first sweep, which starts at the animal, is removed, and its second
@@ -23,6 +29,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from non_local_detector import NonLocalSortedSpikesDetector
+from non_local_detector.environment import Environment
 from non_local_detector.simulate.sorted_spikes_simulation import (
     TRACK_HEIGHT,
     make_simulated_data,
@@ -32,11 +39,13 @@ from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     detect_nonlocal_events,
     nonlocal_state_probability,
 )
-from continuum_swr_replay.parameters import LOCAL_POSITION_STD
+from continuum_swr_replay.decoding.config import NonLocalDecodingConfig
+from continuum_swr_replay.decoding.fit import algorithm_params
+from continuum_swr_replay.decoding.transitions import nonlocal_detector_kwargs
+from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
 
 __all__ = [
     "DECODE_BIN_STRIDE",
-    "DEMO_DISCRETE_TRANSITION_STICKINESS",
     "NON_LOCAL_STATES",
     "PATTERNS",
     "REMOTE_SPIKE_INTERVAL_S",
@@ -62,13 +71,6 @@ REMOTE_SPIKE_INTERVAL_S = 0.012
 SILENCE_DURATION_S = 0.75
 """The simulator's silence lasts 0.5 s; lengthened so that the No-Spike state
 clears the ramps the transitions put at its edges and reads at full strength."""
-
-DEMO_DISCRETE_TRANSITION_STICKINESS = np.array([30.0, 100000.0, 30.0, 200.0])
-"""A demo value, chosen so that EM keeps the No-Spike state alive: with the
-installed ``non_local_detector`` default, ``[1e5, 1e5, 300, 300]``, EM prunes
-Local -> No-Spike to about 0 on the simulated data and the No-Spike state
-disappears. It is NOT the real decodes' prior: those use setting P30-B
-(``continuum_swr_replay.decoding.transitions.nonlocal_transition_settings``)."""
 
 NON_LOCAL_STATES = ("Non-Local Continuous", "Non-Local Fragmented")
 
@@ -131,23 +133,25 @@ def splice_remote_stationary(
 
 
 def make_example_detector() -> NonLocalSortedSpikesDetector:
-    """The unfitted detector Figure 1 fits.
+    """The unfitted detector of Figure 1, built as a real decode's is.
+
+    The likelihood parameters, the discrete transitions (setting P30-B) and the
+    Local kernel are the real decodes': ``decoding.config.NonLocalDecodingConfig``
+    and ``decoding.transitions.nonlocal_detector_kwargs``, put together as
+    ``decoding.fit.create_detector`` puts them together. The place bins are the
+    real decodes' size; the simulated track is a line, so there is no track
+    graph.
 
     Returns
     -------
     NonLocalSortedSpikesDetector
-        Sorted-spikes KDE likelihood, ``LOCAL_POSITION_STD`` Local kernel, the
-        library's default initial discrete transition matrix and
-        :data:`DEMO_DISCRETE_TRANSITION_STICKINESS`.
+        The detector class the mPFC and OFC decodes use.
     """
+    config = NonLocalDecodingConfig()
     return NonLocalSortedSpikesDetector(
-        sorted_spikes_algorithm="sorted_spikes_kde",
-        sorted_spikes_algorithm_params={
-            "position_std": 6.0,
-            "block_size": int(2**8),
-        },
-        local_position_std=LOCAL_POSITION_STD,
-        discrete_transition_stickiness=DEMO_DISCRETE_TRANSITION_STICKINESS,
+        environments=Environment(place_bin_size=PLACE_BIN_SIZE_1D),
+        **algorithm_params(config, "sorted_spikes"),
+        **nonlocal_detector_kwargs(config),
     )
 
 
@@ -177,8 +181,9 @@ def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation
     """Simulate the run of Figure 1, decode it and find its non-local events.
 
     The encoding model and the transitions are estimated by EM
-    (``estimate_parameters``) on the time outside the patterns: spikes inside a
-    pattern do not shape the place fields.
+    (``estimate_parameters``, as in ``decoding.fit.perform_decoding``) on the
+    time outside the patterns: spikes inside a pattern do not shape the place
+    fields, as a real decode's training mask keeps ripple times out.
 
     Parameters
     ----------
