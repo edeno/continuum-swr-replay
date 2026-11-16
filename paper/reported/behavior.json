@@ -3,9 +3,9 @@
  "summary": "behavior",
  "title": "the events and the task: event rate and represented content",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "7f3688443d68",
+ "commit": "860f344c8fb1",
  "code": {
-  "head": "7f3688443d68060cbf9029c8e00099b076a0433d",
+  "head": "860f344c8fb11bddd9556ad0506b2d778c815aae",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -135,8 +135,8 @@
     "code_sha256": "35ba5dcd3a19acacfb58ab22b22fd61299cd44fc0071d0d99f8e30e27f930744"
    },
    "src/continuum_swr_replay/analysis/event_definition/nonlocal_event_rule.py": {
-    "sha256": "7389416c496eb2bc47493d373ebe1feb859966d0519fe4d8ff5620912ccd1857",
-    "code_sha256": "151fae58d711fbdada380efac10bb55d920e2a2cb9f380b60e22363481c775dd"
+    "sha256": "0985896da37ed06963d55bf3d1111d3814c11edafd53feb99875c6230bd01f2b",
+    "code_sha256": "34a809431a07c259846688dc1d0e9f9c4e0d100fe91d0042632523c3a7dd3820"
    },
    "src/continuum_swr_replay/analysis/event_definition/swr_source.py": {
     "sha256": "3a7bf9c9470c4734f876e01eda1ae04305684939318ac7412ab3d47e3d3f0f23",

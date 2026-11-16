@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "7f3688443d68",
+ "commit": "860f344c8fb1",
  "code": {
-  "head": "7f3688443d68060cbf9029c8e00099b076a0433d",
+  "head": "860f344c8fb11bddd9556ad0506b2d778c815aae",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -31,8 +31,8 @@
     "code_sha256": "d13e698505baf703f76df758efb47db9b104ff5368c6e52f34734430c8313d56"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/comparison_simulation.py": {
-    "sha256": "9afc8efedd3360150ea0c09f57d7219744edd98524b8988194edafdb13b1e5bb",
-    "code_sha256": "41cf459c2a795d30e1621348f584d8265ff1431f1f6dd6cd8650dcade0b7483a"
+    "sha256": "7bf8827ce16954e483848759b9daa8c7d83fd50450e23e9e2b01f4223c19f3ff",
+    "code_sha256": "0e6e38fa775a84a2e2ef834c88c74c043a829b3b7d529f3e24e9587afbf0513c"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/config.py": {
     "sha256": "9cb02ea860ed4ed5ea892382c8be8d6ff8dc2a1fed495234e113713998829f64",
@@ -82,6 +82,10 @@
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
     "code_sha256": "4c5ce7aefdaec2986c15bb844ac865127194b243b527466266a091689a0546ea"
    },
+   "src/continuum_swr_replay/analysis/detection/simulated_run.py": {
+    "sha256": "4e2a0fc90648b0be810df612cb4bc917d2866de194e233da18fe8c10a180cb51",
+    "code_sha256": "3c7faa38f5eebcf84a0f1dda490bf2b16abb523e0c71a4117367140f7a0518f6"
+   },
    "src/continuum_swr_replay/analysis/detector_comparison/__init__.py": {
     "sha256": "e48de542300d0417f2fb98d15d34c8713efd5261deef06696cfdf7106edf3596",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
@@ -111,8 +115,8 @@
     "code_sha256": "35ba5dcd3a19acacfb58ab22b22fd61299cd44fc0071d0d99f8e30e27f930744"
    },
    "src/continuum_swr_replay/analysis/event_definition/nonlocal_event_rule.py": {
-    "sha256": "7389416c496eb2bc47493d373ebe1feb859966d0519fe4d8ff5620912ccd1857",
-    "code_sha256": "151fae58d711fbdada380efac10bb55d920e2a2cb9f380b60e22363481c775dd"
+    "sha256": "0985896da37ed06963d55bf3d1111d3814c11edafd53feb99875c6230bd01f2b",
+    "code_sha256": "34a809431a07c259846688dc1d0e9f9c4e0d100fe91d0042632523c3a7dd3820"
    },
    "src/continuum_swr_replay/columns.py": {
     "sha256": "ce2b6258d178bf3faf8a65a7fcb140a40ccbb39206df076afe186d5e21b00ae8",
@@ -134,9 +138,17 @@
     "sha256": "99a49886dd7ecc6702b0de2a890273a0ba6fbca9b09491ea5f920ebadb25c4b2",
     "code_sha256": "035bb37a4bdffc4ec1e2fcafc634998781f85f23284f63655ae73f5aef16210d"
    },
+   "src/continuum_swr_replay/data_types.py": {
+    "sha256": "b82e201d7c5c74970f5faae6a3322e573dc9ae1e828788ccb89046c120216f32",
+    "code_sha256": "32db5b6d7aba44b2f9e823467ca2cd471382287b95e21a11928d5325fc82a42d"
+   },
    "src/continuum_swr_replay/decoding/__init__.py": {
     "sha256": "f3fe42f340a57ef8dd3fadbf368072fa747f3f8ac01395d63c1d5d08bf48eb6d",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/decoding/config.py": {
+    "sha256": "ec84fa993c5d10cb68aeadbe02d8cd50cd6de467bdce1bc5b3fb27477903df47",
+    "code_sha256": "07f683849f9532535bbf20cfcabf96d2277843701acee2a59f6599ddd0b2162e"
    },
    "src/continuum_swr_replay/decoding/encoding_model.py": {
     "sha256": "65e904e3bc972ed6b21b5c1d17bb8037107670b640f1715ce9d652538ec57614",
@@ -146,6 +158,10 @@
     "sha256": "c9fa717de83ad832babc30d2ab09a50af33e7cc47800376ebef7e1fdb2b9672c",
     "code_sha256": "42b43912795dbeec5fa1aeef1b0f8526ae3e4d16ef068519ee8fe9e65fc68d07"
    },
+   "src/continuum_swr_replay/decoding/fit.py": {
+    "sha256": "1d6a970ecdde7a1d596f310e80c107114e1d6ee51cfb174ee3d391a8e10b9030",
+    "code_sha256": "b210ffb0bd8d2b3bbf0d8ae86e2f8d96776fe5c6c7a81a8ea67df97d008a4993"
+   },
    "src/continuum_swr_replay/decoding/identifiers.py": {
     "sha256": "84db19f5b6d850321c26737048814bcae19377dd41ede3edc360459fa16a4bba",
     "code_sha256": "821ef37d3e6e4a610d54da4c711e27ea6099ba3ecf8e2cab11f270161893c8e9"
@@ -153,6 +169,10 @@
    "src/continuum_swr_replay/decoding/results.py": {
     "sha256": "7acd1bc01fd794b8df16bdc241434bffb199a2393957057e06b92121d6a35c64",
     "code_sha256": "85b2a3aeba9a9b958c2d610fdff4f3f12ac0e907d5716ddd53426289809a2d53"
+   },
+   "src/continuum_swr_replay/decoding/transitions.py": {
+    "sha256": "c5206003cc564e3782566ad9a7212d0ff3094db0f13870de674b48724067f32a",
+    "code_sha256": "3d66cc898ddc30477866a00d1618776e61008b281f33d1520365cfe40122ca73"
    },
    "src/continuum_swr_replay/intervals.py": {
     "sha256": "12c585e2b0cf731898d27a6539e58ce5418402d5394642fa666496700aa58d63",
