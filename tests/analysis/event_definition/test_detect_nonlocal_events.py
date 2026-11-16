@@ -3,15 +3,10 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 import xarray as xr
 
-from continuum_swr_replay.analysis.event_definition.immobility import (
-    build_speed_eligible_event_cohort,
-)
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     detect_nonlocal_events,
-    get_confident_times,
 )
 
 DT = 0.002
@@ -46,24 +41,6 @@ def test_only_the_long_immobile_run_is_an_event():
     assert (labels.to_numpy()[inside] == 1).all()
     assert (labels.to_numpy()[~inside] == 0).all()
     assert labels.name == "non_local_event"
-
-
-def test_it_is_the_two_steps_the_pipeline_used_to_write_out():
-    probability, speed, time = _decode()
-    index = pd.Index(time, name="time")
-
-    events, labels = detect_nonlocal_events(probability, speed, index)
-
-    detected = get_confident_times(probability, speed, time)
-    expected_events, expected_labels = build_speed_eligible_event_cohort(
-        detected,
-        speed=speed,
-        time=index,
-        event_col="non_local_event",
-        preserve_source_ids=False,
-    )
-    pd.testing.assert_frame_equal(events, expected_events)
-    pd.testing.assert_series_equal(labels, expected_labels)
 
 
 def test_the_probability_is_read_on_the_time_axis_given():

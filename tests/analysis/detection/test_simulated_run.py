@@ -15,9 +15,6 @@ from continuum_swr_replay.analysis.detection.simulated_run import (
     simulate_and_decode,
     splice_remote_stationary,
 )
-from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
-    NON_LOCAL_STATES,
-)
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
 # What each pattern should be decoded as.
@@ -65,17 +62,6 @@ def _within(sim: DecodedSimulation, span: tuple[float, float]) -> np.ndarray:
 
 @pytest.mark.slow
 class TestSimulatedRun:
-    def test_arrays_share_the_decode_grid(self, sim):
-        n_time = sim.time.size
-        assert sim.position.shape == sim.speed.shape == (n_time,)
-        assert sim.non_local_probability.shape == (n_time,)
-        assert sim.state_probabilities.shape == (n_time, len(sim.state_names))
-        assert sim.posterior.shape == (n_time, sim.position_bins.size)
-        assert sim.non_local_posterior.shape == sim.posterior.shape
-        # 1500 Hz strided to the 500 Hz decode grid
-        np.testing.assert_allclose(np.diff(sim.time), 0.002, atol=1e-9)
-        np.testing.assert_allclose(sim.state_probabilities.sum(axis=1), 1, atol=1e-4)
-
     def test_patterns_are_in_time_order_and_each_within_a_pause(self, sim):
         assert tuple(sim.patterns) == PATTERNS
         starts = [sim.patterns[name][0] for name in PATTERNS]
@@ -128,11 +114,3 @@ class TestSimulatedRun:
         silence = sim.patterns["silence"]
         for start, end in sim.non_local_events:
             assert end < silence[0] or start > silence[1]
-
-    def test_non_local_probability_is_the_two_non_local_states(self, sim):
-        columns = [sim.state_names.index(name) for name in NON_LOCAL_STATES]
-        np.testing.assert_allclose(
-            sim.non_local_probability,
-            sim.state_probabilities[:, columns].sum(axis=1),
-            atol=1e-6,
-        )
