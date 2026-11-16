@@ -1,14 +1,24 @@
-"""The Figure 1 simulation with the memoryless comparison's added events, decoded.
+"""The memoryless comparison's simulation: a simulated run with added events, decoded.
 
 The supplemental memoryless comparison figure
 (``scripts/figures/generate_memoryless_comparison.py``) and the reference check
 (``scripts/checks/compare_memoryless_to_reference.py``) read one simulation
-(:func:`simulate_and_decode`): the package's Figure 1 simulation with a remote
-stationary event, a short path, a short replay and a stray window added
-(their rows of ``event_times`` are :data:`SHORT_PATH_EVENT` and the other
+(:func:`simulate_and_decode`): ``non_local_detector``'s ``make_simulated_data``
+with a remote stationary event, a short path, a short replay and a stray window
+added (their rows of ``event_times`` are :data:`SHORT_PATH_EVENT` and the other
 ``*_EVENT`` constants), decoded window by window under a uniform prior and by
 the switching state-space model fitted on the same non-event data. The figure's
 numbers are those of :data:`N_NEURONS` cells decoded under :data:`CONFIG`.
+
+It is not the recording or the decode of Figure 1
+(``analysis.detection.simulated_run``), though both start from
+``make_simulated_data`` and share the decode grid (``DECODE_BIN_STRIDE``) and
+the remote stationary event (``splice_remote_stationary``), which are defined
+there. Figure 1 has 30 cells, puts the remote stationary event in place of the
+first sweep, lengthens the silence, and estimates the place fields and the
+transitions by EM under a demo transition prior; this simulation has
+:data:`N_NEURONS` cells, keeps both sweeps, adds its events in other pauses and
+fits the detector once, with the library's default transitions.
 """
 
 import numpy as np
@@ -47,6 +57,12 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
     aggregate_windows,
     normalize_windows,
 )
+from continuum_swr_replay.analysis.detection.simulated_run import (
+    DECODE_BIN_STRIDE,
+    REMOTE_STATIONARY_CM,
+    REMOTE_STATIONARY_S,
+    splice_remote_stationary,
+)
 from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.parameters import LOCAL_POSITION_STD
@@ -76,9 +92,6 @@ __all__ = [
 
 TRACK_HEIGHT_CM = float(TRACK_HEIGHT)
 """The simulation package's own track length, read rather than restated."""
-
-DECODE_BIN_STRIDE = 3
-"""Figure 1 strides the 1500 Hz simulation to the project's 500 Hz decode grid."""
 
 N_NEURONS = 25
 """Cells in the simulation the figure and its recorded numbers are made from,
@@ -119,13 +132,6 @@ events are added."""
 SHUFFLE_RUN_SEED = 20260922
 """Seeds the place-cell identity shuffle, as in the sweep."""
 
-REMOTE_STATIONARY_CM = 42.5
-"""The place a remote stationary event holds, far from the animal's 170 cm."""
-
-REMOTE_STATIONARY_S = 0.300
-REMOTE_SPIKE_INTERVAL_S = 0.012
-"""One neuron firing at ~83 Hz, matching the other events' spike density."""
-
 STRAY_WINDOW_AT_S = 31.40
 """Where the hand-placed stray-window event begins: in the stillness before the
 inbound replay, among candidates of local coding that no caption claim reads.
@@ -145,36 +151,8 @@ STRAY_WINDOW_PLACEMENT_MARGIN_S = 0.4
 """How far the event's cleared span must sit from every other event."""
 
 
-def splice_remote_stationary(
-    spike_times: list[np.ndarray],
-    place_field_means: np.ndarray,
-    start_s: float,
-) -> tuple[list[np.ndarray], tuple[float, float]]:
-    """Add a non-local representation that is held still rather than travelled.
-
-    The package simulates travelling replay, a stationary local event and
-    silence, but not a remote place held still. That case separates two things
-    the detector does for different reasons: it absorbs a stationary
-    representation when the representation is the animal's own place, and it
-    declines a stationary representation when it is somewhere else. Only the
-    second is the method behaving as designed.
-    """
-    end_s = start_s + REMOTE_STATIONARY_S
-    neuron = int(np.argmin(np.abs(place_field_means - REMOTE_STATIONARY_CM)))
-    spliced = [
-        neuron_times[(neuron_times < start_s) | (neuron_times > end_s)]
-        for neuron_times in spike_times
-    ]
-    spliced[neuron] = np.sort(
-        np.concatenate(
-            [spliced[neuron], np.arange(start_s, end_s, REMOTE_SPIKE_INTERVAL_S)]
-        )
-    )
-    return spliced, (start_s, end_s)
-
-
 def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dict:
-    """Decode the Figure 1 simulation window by window under a uniform prior."""
+    """Decode the comparison's simulated run window by window under a uniform prior."""
     (
         speed,
         position,

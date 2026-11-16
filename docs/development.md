@@ -77,7 +77,7 @@ src/continuum_swr_replay/
 │   ├── replay_models/     #   the Part 3 models: rate/, content/, coupling/, choice/, and the shared model ladders, fitters and fit statistics
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
 │   ├── event_definition/  #   the rule: analysed time, immobility, the non-local event rule, the SWR source, decode masks, classified event table, cohorts
-│   ├── detection/         #   the detectors: SWR, Carey, artifacts, memoryless sequence, R-T, the non-local detector on a decode
+│   ├── detection/         #   the detectors: SWR, Carey, artifacts, memoryless sequence, R-T, the non-local detector on a decode, Figure 1's simulated run
 │   ├── detector_comparison/ # the inventories compared on the same recordings
 │   ├── decode_quality/    #   is the decode trustworthy: decoding error, state fractions, calibration, posterior summaries
 │   ├── event_evidence/    #   are the events real: held-out spike evidence

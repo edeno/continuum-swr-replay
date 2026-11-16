@@ -155,8 +155,8 @@ from continuum_swr_replay.analysis.event_definition.immobility import (
     build_speed_eligible_event_cohort,
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    detect_nonlocal_events,
     event_strict_overlap_keys,
-    get_confident_times,
     get_overlap_times,
     nonlocal_probability,
     nonlocal_state_probability,
@@ -620,18 +620,8 @@ def get_data_over_time(
 
     posterior = get_conditional_non_local_posterior(results)
 
-    detected_non_local_times = get_confident_times(
-        non_local_prob,
-        head_speed,
-        position_time.to_numpy(dtype=float),
-        non_local_threshold,
-    )
-    non_local_times, non_local_labels = build_speed_eligible_event_cohort(
-        detected_non_local_times,
-        speed=head_speed,
-        time=position_time,
-        event_col="non_local_event",
-        preserve_source_ids=False,
+    non_local_times, non_local_labels = detect_nonlocal_events(
+        non_local_prob, head_speed, position_time, non_local_threshold
     )
     swr_times, swr_labels = build_speed_eligible_event_cohort(
         data["ripple_times"],

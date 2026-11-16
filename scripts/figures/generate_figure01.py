@@ -18,8 +18,9 @@ positions move -> what the model reports over a run -> what each state looks
 like inside an event.
 
 Panels a-c are schematics drawn from illustrative curves, not from a fit. Panels
-d and e are one simulation (``make_simulated_data``) decoded by the detector of
-``make_example_detector``.
+d and e are one simulated run and its decode,
+``analysis.detection.simulated_run.simulate_and_decode``; this script only
+chooses what to show of it and draws it.
 
 Usage:
     python scripts/figures/generate_figure01.py
@@ -39,30 +40,20 @@ os.environ["JAX_PLATFORMS"] = "cpu"
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
-import xarray as xr
 from matplotlib.axes import Axes
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.figure import Figure
 from matplotlib.gridspec import SubplotSpec
 from matplotlib.offsetbox import AnchoredOffsetbox, HPacker, TextArea
 from matplotlib.transforms import Bbox
-from non_local_detector import NonLocalSortedSpikesDetector
-from non_local_detector.simulate.sorted_spikes_simulation import make_simulated_data
 
-from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
-    DECODE_BIN_STRIDE,
-)
-from continuum_swr_replay.analysis.event_definition.immobility import (
-    build_speed_eligible_event_cohort,
-)
-from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
-    get_confident_times,
-    nonlocal_state_probability,
+from continuum_swr_replay.analysis.detection.simulated_run import (
+    DecodedSimulation,
+    simulate_and_decode,
 )
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
-    LOCAL_POSITION_STD,
 )
 from continuum_swr_replay.visualization.figure_utilities import (
     WONG,
@@ -79,6 +70,14 @@ warnings.filterwarnings("ignore")
 STATE_NAMES_SHORT = ["Local", "No-Spike", "Continuous", "Fragmented"]
 STATE_COLORS_SHORT = [WONG[5], "#999999", WONG[1], WONG[6]]
 LOCAL_COLOR, NO_SPIKE_COLOR, CONTINUOUS_COLOR, FRAGMENTED_COLOR = STATE_COLORS_SHORT
+# The detector's name for each state -> the name and colour the figure gives it.
+STATE_STYLE = dict(
+    zip(
+        ("Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"),
+        zip(STATE_NAMES_SHORT, STATE_COLORS_SHORT, strict=True),
+        strict=True,
+    )
+)
 NON_LOCAL_COLOR = COLORS["Non-Local"]
 ANIMAL_POS_COLOR = "magenta"
 
@@ -87,24 +86,11 @@ LABEL_SIZE = 7
 SMALL_SIZE = 6
 PANEL_LETTER_SIZE = 8
 
-# A demo value for the simulation, chosen so EM keeps the No-Spike state alive:
-# with the installed non_local_detector default stickiness
-# [1e5, 1e5, 300, 300], EM prunes Local->No-Spike to ~0 on the simulated data
-# and the No-Spike state disappears from the simulated panels. It is NOT the
-# real decode's prior: the real decodes use setting P30-B
-# (``continuum_swr_replay.decoding.transitions.nonlocal_transition_settings``).
-# Panel a therefore draws the transitions without their probabilities.
-DEMO_DISCRETE_TRANSITION_STICKINESS = np.array([30.0, 100000.0, 30.0, 200.0])
-
-# Lengthen the simulator's 0.5 s no-spike event so the No-Spike state clears the
-# transition-driven edge ramps and reads at full strength.
-NO_SPIKE_EVENT_LEN = 0.75
-
-# Panel e's Local example is taken from the pause that holds the first sweep: it
-# starts and ends this long before the sweep does.
+# Panel e's Local example is taken from the pause that holds the first pattern:
+# it starts and ends this long before the pattern does.
 LOCAL_EXAMPLE_LEAD_S = (1.25, 0.85)
-# Panel d's flags for the Local example and the first sweep are about 1 s apart,
-# so each is moved this far away from the other.
+# Panel d's flags for the Local example and the first pattern are about 1 s
+# apart, so each is moved this far away from the other.
 EXAMPLE_FLAG_SPREAD_S = 0.4
 
 # Inches. ``save_figure`` crops to the drawing and adds 0.1 in on each side, so
@@ -118,27 +104,6 @@ DATA_LEFT, DATA_RIGHT = 0.095, 0.985
 POSITION_MARGIN_CM = 8.0
 # A state diagram spans 1 unit across and this many up (see ``plot_state_diagram``).
 STATE_DIAGRAM_HEIGHT = 1.14
-
-
-def make_example_detector() -> NonLocalSortedSpikesDetector:
-    """The unfitted detector the simulated panels fit.
-
-    Returns
-    -------
-    NonLocalSortedSpikesDetector
-        Sorted-spikes KDE likelihood, ``LOCAL_POSITION_STD`` Local kernel, the
-        library's default initial discrete transition matrix and
-        ``DEMO_DISCRETE_TRANSITION_STICKINESS``.
-    """
-    return NonLocalSortedSpikesDetector(
-        sorted_spikes_algorithm="sorted_spikes_kde",
-        sorted_spikes_algorithm_params={
-            "position_std": 6.0,
-            "block_size": int(2**8),
-        },
-        local_position_std=LOCAL_POSITION_STD,
-        discrete_transition_stickiness=DEMO_DISCRETE_TRANSITION_STICKINESS,
-    )
 
 
 def _hide_top_right(ax: Axes) -> None:
@@ -539,223 +504,86 @@ class Example:
         return float(np.mean(self.pattern if self.pattern is not None else self.window))
 
 
-@dataclass(frozen=True)
-class DecodedSimulation:
-    """The simulation and what the detector decoded from it."""
+def choose_examples(sim: DecodedSimulation) -> list[Example]:
+    """Panel e's columns, in time order: one per pattern, after a Local window.
 
-    time: np.ndarray  # (n_time,), s
-    position: np.ndarray  # (n_time,), cm
-    speed: np.ndarray  # (n_time,), cm/s
-    sorted_spikes: list[np.ndarray]  # one array of spike times (s) per neuron
-    state_probabilities: np.ndarray  # (n_time, 4), in STATE_NAMES_SHORT order
-    posterior: np.ndarray  # (n_time, n_position), summed over the states
-    posterior_vmax: float  # top of the posterior's colour scale
-    position_bins: np.ndarray  # (n_position,), cm
-    non_local_probability: np.ndarray  # (n_time,)
-    event_times: np.ndarray  # (n_events, 2), s; the simulator's inserted patterns
-    non_local_events: list[tuple[float, float]]  # s; by the project's event rule
-
-    def next_time_at_track_start(self, after: float) -> float:
-        """Middle of the animal's first visit to the track's start after ``after``, in s."""
-        at_start = (self.time > after) & (self.position <= self.position.min() + 1.0)
-        first = int(np.flatnonzero(at_start)[0])
-        last = first + int(np.argmin(at_start[first:]))  # the visit's end
-        return float(self.time[(first + last) // 2])
-
-    def examples(self) -> list[Example]:
-        """Panel e's columns, in time order.
-
-        One Local window and the simulator's four inserted patterns: a sweep, a
-        scatter of positions, a second sweep and a silence. The simulator's
-        fifth, "local" event has zero duration and is not shown.
-        """
-
-        def around(pattern: tuple[float, float]) -> tuple[float, float]:
-            pad = 0.6 * (pattern[1] - pattern[0]) + 0.03
-            return (pattern[0] - pad, pattern[1] + pad)
-
-        sweep_1, scatter, sweep_2, silence = (
-            (float(start), float(end)) for start, end in self.event_times[:4]
-        )
-        local_window = (
-            sweep_1[0] - LOCAL_EXAMPLE_LEAD_S[0],
-            sweep_1[0] - LOCAL_EXAMPLE_LEAD_S[1],
-        )
-        in_window = (self.time >= local_window[0]) & (self.time <= local_window[1])
-        if not (self.speed[in_window] < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC).all():
-            raise ValueError(
-                f"the Local example window {local_window} s is not within a pause: "
-                "the simulated behavior has changed"
-            )
-        sweeping = "spikes sweep\nalong the track"
-        return [
-            Example(
-                "Local",
-                "spikes at the\nanimal's position",
-                LOCAL_COLOR,
-                None,
-                local_window,
-                flag_shift=-EXAMPLE_FLAG_SPREAD_S,
-            ),
-            Example(
-                "Continuous",
-                sweeping,
-                CONTINUOUS_COLOR,
-                sweep_1,
-                around(sweep_1),
-                flag_shift=EXAMPLE_FLAG_SPREAD_S,
-            ),
-            Example(
-                "Fragmented",
-                "spikes at\nscattered positions",
-                FRAGMENTED_COLOR,
-                scatter,
-                around(scatter),
-            ),
-            Example("Continuous", sweeping, CONTINUOUS_COLOR, sweep_2, around(sweep_2)),
-            Example(
-                "No-Spike", "no spikes\n", NO_SPIKE_COLOR, silence, around(silence)
-            ),
-        ]
-
-
-def detect_non_local_events(
-    non_local_probability: xr.DataArray, speed: np.ndarray, time: np.ndarray
-) -> list[tuple[float, float]]:
-    """The non-local events of a decode, by the rule the analyses use.
-
-    The two steps of ``analysis/detection/nonlocal_events.py``: runs of
-    non-local probability above ``DEFAULT_NON_LOCAL_THRESHOLD`` that last
-    ``NON_LOCAL_MINIMUM_DURATION_S`` (``get_confident_times``), kept only when
-    the animal is immobile for the whole event
-    (``build_speed_eligible_event_cohort``).
-
-    Parameters
-    ----------
-    non_local_probability : xr.DataArray, shape (n_time,)
-        P(Non-Local Continuous) + P(Non-Local Fragmented).
-    speed : np.ndarray, shape (n_time,)
-        The animal's speed, in cm/s.
-    time : np.ndarray, shape (n_time,)
-        The decode's time bins, in s.
-
-    Returns
-    -------
-    list of (start, end)
-        Each event's first and last time bin, in s.
+    The Local window is taken from the pause that holds the first pattern, before
+    that pattern starts. The two Continuous examples differ in what the spikes
+    represent: a sweep along the track, and a remote place held still.
     """
-    detected = get_confident_times(
-        non_local_probability.assign_coords(time=time), speed, time
+
+    def around(pattern: tuple[float, float]) -> tuple[float, float]:
+        pad = 0.6 * (pattern[1] - pattern[0]) + 0.03
+        return (pattern[0] - pad, pattern[1] + pad)
+
+    sweep, scatter, stationary, silence = (
+        sim.patterns[name] for name in ("sweep", "fragmented", "stationary", "silence")
     )
-    events, _ = build_speed_eligible_event_cohort(
-        detected,
-        speed=speed,
-        time=time,
-        event_col="non_local_event",
-        preserve_source_ids=False,
+    local_window = (
+        sweep[0] - LOCAL_EXAMPLE_LEAD_S[0],
+        sweep[0] - LOCAL_EXAMPLE_LEAD_S[1],
     )
-    return list(
-        zip(events["start_time"].tolist(), events["end_time"].tolist(), strict=True)
-    )
+    in_window = (sim.time >= local_window[0]) & (sim.time <= local_window[1])
+    if not (sim.speed[in_window] < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC).all():
+        raise ValueError(
+            f"the Local example window {local_window} s is not within a pause: "
+            "the simulated behavior has changed"
+        )
+    return [
+        Example(
+            "Local",
+            "spikes at the\nanimal's position",
+            LOCAL_COLOR,
+            None,
+            local_window,
+            flag_shift=-EXAMPLE_FLAG_SPREAD_S,
+        ),
+        Example(
+            "Continuous",
+            "spikes sweep\nalong the track",
+            CONTINUOUS_COLOR,
+            sweep,
+            around(sweep),
+            flag_shift=EXAMPLE_FLAG_SPREAD_S,
+        ),
+        Example(
+            "Fragmented",
+            "spikes at\nscattered positions",
+            FRAGMENTED_COLOR,
+            scatter,
+            around(scatter),
+        ),
+        Example(
+            "Continuous",
+            "spikes stay at\nanother position",
+            CONTINUOUS_COLOR,
+            stationary,
+            around(stationary),
+        ),
+        Example("No-Spike", "no spikes\n", NO_SPIKE_COLOR, silence, around(silence)),
+    ]
 
 
-def sort_neurons_by_place_field(
-    spike_times: list[np.ndarray], detector: NonLocalSortedSpikesDetector
-) -> list[np.ndarray]:
-    """Order the neurons' spike times by place-field peak, for the rasters."""
-    key = list(detector.encoding_model_.keys())[0]
-    place_fields = np.asarray(detector.encoding_model_[key]["place_fields"])
-    return [spike_times[i] for i in np.argsort(np.argmax(place_fields, axis=1))]
+def posterior_color_limit(sim: DecodedSimulation) -> float:
+    """Top of the decoded-position colour scale.
 
-
-def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation:
-    """Simulate a run with inserted spiking patterns and decode it.
-
-    Parameters
-    ----------
-    n_neurons : int
-        Number of neurons to simulate.
-    seed : int
-        Seed of ``make_simulated_data``'s random generator.
-
-    Returns
-    -------
-    DecodedSimulation
+    Set by the non-local posterior inside the non-local events (its 99th
+    percentile). Local's posterior is more concentrated and would set a scale on
+    which a non-local event is faint; on this scale Local saturates.
     """
-    print(f"Simulating {n_neurons} neurons...")
-    (
-        speed,
-        position,
-        spike_times,
-        time,
-        event_times,
-        _sampling_frequency,
-        is_event,
-        _place_fields,
-    ) = make_simulated_data(n_neurons=n_neurons, seed=seed)
-    event_times = np.array(event_times, dtype=float)
+    in_event = np.zeros(sim.time.size, dtype=bool)
+    for start, end in sim.non_local_events:
+        in_event |= (sim.time >= start) & (sim.time <= end)
+    values = sim.non_local_posterior[in_event] if in_event.any() else sim.posterior
+    return float(np.percentile(values, 99))
 
-    # Extend the no-spike event (event index 3) to NO_SPIKE_EVENT_LEN by removing
-    # spikes over the longer window and holding it out of training.
-    ns_start = event_times[3, 0]
-    ns_end = ns_start + NO_SPIKE_EVENT_LEN
-    spike_times = [st[(st < ns_start) | (st > ns_end)] for st in spike_times]
-    event_times[3, 1] = ns_end
-    is_event = is_event | ((time >= ns_start) & (time <= ns_end))
 
-    # Stride the decode/behavior grids to ~2 ms; spike_times stay full-resolution.
-    time = time[::DECODE_BIN_STRIDE]
-    position = position[::DECODE_BIN_STRIDE]
-    speed = speed[::DECODE_BIN_STRIDE]
-    is_event = is_event[::DECODE_BIN_STRIDE]
-
-    print("Fitting detector and estimating parameters (EM)...")
-    detector = make_example_detector()
-    results = detector.estimate_parameters(
-        position_time=time,
-        position=position,
-        spike_times=spike_times,
-        time=time,
-        is_training=~is_event,
-    )
-    time = np.asarray(time)
-    speed = np.asarray(speed).squeeze()
-    non_local_probability = nonlocal_state_probability(
-        results.acausal_state_probabilities
-    ).squeeze()
-    non_local_events = detect_non_local_events(non_local_probability, speed, time)
-
-    # Every state that has a position (No-Spike has none, so its bins are NaN).
-    by_state = results["acausal_posterior"].unstack("state_bins")
-    posterior = np.asarray(by_state.sum("state").transpose("time", "position").values)
-
-    # The colour scale is set by the non-local posterior inside the non-local
-    # events. Local's posterior is more concentrated and would set a scale on
-    # which a non-local event is faint; on this scale Local saturates.
-    non_local_posterior = np.asarray(
-        by_state.sel(state=["Non-Local Continuous", "Non-Local Fragmented"])
-        .sum("state")
-        .transpose("time", "position")
-        .values
-    )
-    in_event = np.zeros(time.size, dtype=bool)
-    for start, end in non_local_events:
-        in_event |= (time >= start) & (time <= end)
-    scale_from = non_local_posterior[in_event] if in_event.any() else posterior
-
-    return DecodedSimulation(
-        time=time,
-        position=np.asarray(position).squeeze(),
-        speed=speed,
-        sorted_spikes=sort_neurons_by_place_field(spike_times, detector),
-        state_probabilities=np.asarray(results["acausal_state_probabilities"].values),
-        posterior=posterior,
-        posterior_vmax=float(np.percentile(scale_from, 99)),
-        position_bins=np.asarray(by_state.coords["position"].values),
-        non_local_probability=np.asarray(non_local_probability.values),
-        event_times=event_times,
-        non_local_events=non_local_events,
-    )
+def _next_time_at_track_start(sim: DecodedSimulation, after: float) -> float:
+    """Middle of the animal's first visit to the track's start after ``after``, in s."""
+    at_start = (sim.time > after) & (sim.position <= sim.position.min() + 1.0)
+    first = int(np.flatnonzero(at_start)[0])
+    last = first + int(np.argmin(at_start[first:]))  # the visit's end
+    return float(sim.time[(first + last) // 2])
 
 
 def _example_badge(color: str) -> dict:
@@ -768,6 +596,7 @@ def _plot_posterior(
     rows: slice,
     time: np.ndarray,
     *,
+    vmax: float,
     linewidth: float,
     dashes: tuple[float, float] | None = None,
 ) -> None:
@@ -792,7 +621,7 @@ def _plot_posterior(
         ),
         cmap="bone_r",
         vmin=0,
-        vmax=sim.posterior_vmax,
+        vmax=vmax,
         interpolation="antialiased",
         rasterized=True,
     )
@@ -810,7 +639,11 @@ def _plot_posterior(
 
 
 def plot_simulated_run(
-    fig: Figure, slot: SubplotSpec, sim: DecodedSimulation, examples: list[Example]
+    fig: Figure,
+    slot: SubplotSpec,
+    sim: DecodedSimulation,
+    examples: list[Example],
+    posterior_vmax: float,
 ) -> None:
     """Panel d: raster, decoded position, non-local probability and speed.
 
@@ -860,13 +693,19 @@ def plot_simulated_run(
         )
 
     _plot_posterior(
-        ax_posterior, sim, slice(None), sim.time, linewidth=0.6, dashes=(2.5, 3.5)
+        ax_posterior,
+        sim,
+        slice(None),
+        sim.time,
+        vmax=posterior_vmax,
+        linewidth=0.6,
+        dashes=(2.5, 3.5),
     )
     ax_posterior.set_ylabel("Decoded\nposition (cm)", fontsize=LABEL_SIZE, labelpad=3)
     # Labeled where the animal first turns at the track's start: the space above
     # that turn is empty.
     ax_posterior.text(
-        sim.next_time_at_track_start(examples[1].window[1]),
+        _next_time_at_track_start(sim, examples[1].window[1]),
         0.62 * sim.position_bins.max(),
         "animal's\nposition",
         fontsize=SMALL_SIZE,
@@ -945,7 +784,7 @@ def plot_simulated_run(
 
     # The run is shown until the animal is back at the track's start after the
     # last example; the pauses after that hold no example.
-    overview_end = sim.next_time_at_track_start(examples[-1].window[1])
+    overview_end = _next_time_at_track_start(sim, examples[-1].window[1])
     axes = (ax_raster, ax_posterior, ax_non_local, ax_speed)
     for ax in axes:
         ax.set_xlim(sim.time[0], overview_end)
@@ -956,7 +795,11 @@ def plot_simulated_run(
 
 
 def plot_examples(
-    fig: Figure, slot: SubplotSpec, sim: DecodedSimulation, examples: list[Example]
+    fig: Figure,
+    slot: SubplotSpec,
+    sim: DecodedSimulation,
+    examples: list[Example],
+    posterior_vmax: float,
 ) -> None:
     """Panel e: raster, decoded position and state probabilities per example.
 
@@ -966,7 +809,7 @@ def plot_examples(
     non-local events (``detect_non_local_events``).
     """
     gs = slot.subgridspec(
-        3, len(examples), height_ratios=[1.0, 1.0, 0.75], hspace=0.14, wspace=0.12
+        3, len(examples), height_ratios=[1.0, 1.0, 0.75], hspace=0.14, wspace=0.2
     )
     n_neurons = len(sim.sorted_spikes)
     for k, example in enumerate(examples):
@@ -1036,11 +879,12 @@ def plot_examples(
             bbox=_example_badge(example.color),
         )
 
-        _plot_posterior(ax_posterior, sim, rows, time_ms, linewidth=0.8)
+        _plot_posterior(
+            ax_posterior, sim, rows, time_ms, vmax=posterior_vmax, linewidth=0.8
+        )
 
-        for i, (name, color) in enumerate(
-            zip(STATE_NAMES_SHORT, STATE_COLORS_SHORT, strict=True)
-        ):
+        for i, state in enumerate(sim.state_names):
+            name, color = STATE_STYLE[state]
             ax_states.plot(
                 time_ms,
                 sim.state_probabilities[rows, i],
@@ -1132,8 +976,10 @@ def generate_figure(n_neurons: int = 30, seed: int = 0) -> Figure:
     -------
     fig : matplotlib.figure.Figure
     """
+    print(f"Simulating {n_neurons} neurons and decoding (EM)...")
     sim = simulate_and_decode(n_neurons=n_neurons, seed=seed)
-    examples = sim.examples()
+    examples = choose_examples(sim)
+    posterior_vmax = posterior_color_limit(sim)
 
     set_figure_defaults(context="paper")
     # The rows are placed by hand below, from what each one draws, so the
@@ -1159,8 +1005,12 @@ def generate_figure(n_neurons: int = 30, seed: int = 0) -> Figure:
     )
     axes_b = _axes_added(fig, lambda: plot_spike_scoring(fig, gs_bc[0]))
     axes_c = _axes_added(fig, lambda: plot_position_transitions(fig, gs_bc[1]))
-    axes_d = _axes_added(fig, lambda: plot_simulated_run(fig, gs_d[0], sim, examples))
-    axes_e = _axes_added(fig, lambda: plot_examples(fig, gs_e[0], sim, examples))
+    axes_d = _axes_added(
+        fig, lambda: plot_simulated_run(fig, gs_d[0], sim, examples, posterior_vmax)
+    )
+    axes_e = _axes_added(
+        fig, lambda: plot_examples(fig, gs_e[0], sim, examples, posterior_vmax)
+    )
     fig.align_ylabels([*axes_d, *axes_e[:3]])
     fig.draw_without_rendering()
 

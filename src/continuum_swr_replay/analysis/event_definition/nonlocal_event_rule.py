@@ -1,9 +1,11 @@
 """The non-local event rule and the SWR-overlap classification of those events.
 
 ``get_confident_times`` finds the intervals where a decoded state's probability
-stays above a threshold (the non-local events); the rest of the module
-classifies how each event overlaps the SWRs. It detects no ripples itself. The
-detector that applies the rule to a decode is ``detection.nonlocal_events``.
+stays above a threshold, and ``detect_nonlocal_events`` is the whole rule: those
+intervals, kept only when the animal is immobile throughout. The rest of the
+module classifies how each event overlaps the SWRs. It detects no ripples
+itself. The detector that applies the rule to a decode is
+``detection.nonlocal_events``.
 
 Examples
 --------
@@ -42,6 +44,7 @@ import xarray as xr
 from ripple_detection.core import segment_boolean_series
 
 from continuum_swr_replay.analysis.event_definition.immobility import (
+    build_speed_eligible_event_cohort,
     intervals_from_labels,
 )
 from continuum_swr_replay.intervals import total_duration
@@ -192,6 +195,60 @@ def get_confident_times(
             "animal_max_speed_cm_s": max_speed,
         },
         index=index,
+    )
+
+
+def detect_nonlocal_events(
+    non_local_probability: xr.DataArray,
+    speed: np.ndarray,
+    time: pd.Index | np.ndarray,
+    prob_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """The non-local events of a decode: the whole rule, in one place.
+
+    An event is a run of non-local probability above ``prob_threshold`` that
+    lasts ``NON_LOCAL_MINIMUM_DURATION_S`` (:func:`get_confident_times`) during
+    which the animal is immobile throughout: every sampled speed finite and below
+    the immobility threshold (``immobility.build_speed_eligible_event_cohort``).
+    A run is kept or dropped whole, never clipped.
+
+    Parameters
+    ----------
+    non_local_probability : xr.DataArray, shape (n_time,)
+        P(Non-Local Continuous) + P(Non-Local Fragmented)
+        (:func:`nonlocal_state_probability`), one value per row of ``time``.
+    speed : np.ndarray, shape (n_time,)
+        The animal's speed at each row of ``time``, in cm/s.
+    time : pd.Index or np.ndarray, shape (n_time,)
+        The time of each row, in seconds. The probability is read on this axis,
+        whatever its own ``time`` coordinate holds, and the events are labeled
+        on it.
+    prob_threshold : float, optional
+        The probability an event stays strictly above, by default
+        ``DEFAULT_NON_LOCAL_THRESHOLD``.
+
+    Returns
+    -------
+    events : pd.DataFrame
+        One row per event: ``non_local_event`` (its label), ``start_time`` and
+        ``end_time`` (its first and last sample) and ``duration``.
+    labels : pd.Series, shape (n_time,)
+        The event label of each row of ``time``, 0 outside events, named
+        ``non_local_event``.
+    """
+    time_s = np.asarray(time, dtype=float)
+    detected = get_confident_times(
+        non_local_probability.assign_coords(time=time_s),
+        speed,
+        time_s,
+        prob_threshold,
+    )
+    return build_speed_eligible_event_cohort(
+        detected,
+        speed=speed,
+        time=time,
+        event_col="non_local_event",
+        preserve_source_ids=False,
     )
 
 

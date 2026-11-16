@@ -640,3 +640,17 @@ Two moves into `decoding/`, neither changing behavior.
 decode's masks and SWR source) and `tables` (atomic writes), which `decoding/` may not
 import. The memoryless detector's grid, windows and likelihood stay in its
 `likelihood.py`.
+
+## Figure 1's simulation, 2026-11-16
+
+Figure 1's simulation and decode moved out of its script, and the non-local event rule became
+one function. The comparison simulation's results are unchanged.
+
+| Old place | New place |
+|---|---|
+| `scripts/figures/generate_figure01.py`: `make_example_detector`, `DEMO_DISCRETE_TRANSITION_STICKINESS`, the simulation and decode inside `generate_figure` | `analysis/detection/simulated_run.py` (`simulate_and_decode`, `DecodedSimulation`) |
+| `analysis/detection/memoryless_sequence/comparison_simulation.py`: `DECODE_BIN_STRIDE`, `REMOTE_STATIONARY_CM`, `REMOTE_STATIONARY_S`, `splice_remote_stationary` | `analysis/detection/simulated_run.py`; `comparison_simulation` still exports them |
+| `analysis/detection/nonlocal_events.py`: `get_confident_times` followed by `build_speed_eligible_event_cohort`, written out in the detector | `analysis/event_definition/nonlocal_event_rule.py`: `detect_nonlocal_events` |
+
+Figure 1's recording also changed: the sweep that ends at the animal is in the first pause, and
+a remote place held still is in the third (it was two sweeps).
