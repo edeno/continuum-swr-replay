@@ -94,7 +94,7 @@ FIGURES: dict[str, Figure] = {
     "1": Figure(
         "The switching state-space model",
         "scripts/figures/generate_figure01.py",
-        "abcd",
+        "abcde",
     ),
     "2": Figure(
         "Non-local events and SWRs", "scripts/figures/generate_figure02.py", "abcde"
