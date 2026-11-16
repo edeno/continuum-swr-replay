@@ -63,10 +63,8 @@ from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
     LOCAL_POSITION_STD,
-    NON_LOCAL_MINIMUM_DURATION_S,
 )
 from continuum_swr_replay.visualization.figure_utilities import (
-    TWO_COLUMN,
     WONG,
     save_figure,
     set_figure_defaults,
@@ -84,10 +82,10 @@ LOCAL_COLOR, NO_SPIKE_COLOR, CONTINUOUS_COLOR, FRAGMENTED_COLOR = STATE_COLORS_S
 NON_LOCAL_COLOR = COLORS["Non-Local"]
 ANIMAL_POS_COLOR = "magenta"
 
+# Cell Press asks for text of about 6-8 pt at print size.
 LABEL_SIZE = 7
 SMALL_SIZE = 6
-TICK_SIZE = 5.5
-PANEL_LETTER_SIZE = 9
+PANEL_LETTER_SIZE = 8
 
 # A demo value for the simulation, chosen so EM keeps the No-Spike state alive:
 # with the installed non_local_detector default stickiness
@@ -109,7 +107,10 @@ LOCAL_EXAMPLE_LEAD_S = (1.25, 0.85)
 # so each is moved this far away from the other.
 EXAMPLE_FLAG_SPREAD_S = 0.4
 
-FIGURE_HEIGHT = 8.3  # inches
+# Inches. ``save_figure`` crops to the drawing and adds 0.1 in on each side, so
+# this width saves at about 17.3 cm, within Cell Press's 17.4 cm full width.
+FIGURE_WIDTH = 6.9
+FIGURE_HEIGHT = 8.3
 # The data axes of panels d and e, in figure fractions.
 DATA_LEFT, DATA_RIGHT = 0.095, 0.985
 # A state diagram spans 1 unit across and this many up (see ``plot_state_diagram``).
@@ -234,7 +235,7 @@ def plot_state_diagram(ax: Axes) -> None:
             cy,
             name,
             color="white",
-            fontsize=5.0,
+            fontsize=SMALL_SIZE,
             fontweight="bold",
             ha="center",
             va="center",
@@ -368,7 +369,7 @@ def plot_spike_scoring(fig: Figure, slot: SubplotSpec) -> None:
                 0.0,
                 1.12,
                 "Positions each state allows",
-                fontsize=TICK_SIZE,
+                fontsize=SMALL_SIZE,
                 color="#555555",
                 ha="left",
                 va="bottom",
@@ -382,7 +383,7 @@ def plot_spike_scoring(fig: Figure, slot: SubplotSpec) -> None:
             evidence[favored] + 0.03,
             2 - favored,
             "favored",
-            fontsize=TICK_SIZE,
+            fontsize=SMALL_SIZE,
             va="center",
             ha="left",
             color=evidence_colors[favored],
@@ -391,7 +392,7 @@ def plot_spike_scoring(fig: Figure, slot: SubplotSpec) -> None:
         ax_evidence.set_xlim(0, 1.45)
         ax_evidence.set_ylim(-0.6, 2.6)
         ax_evidence.set_xticks([0, 1])
-        ax_evidence.tick_params(axis="x", labelsize=TICK_SIZE, length=2, pad=1)
+        ax_evidence.tick_params(axis="x", labelsize=SMALL_SIZE, length=2, pad=1)
         ax_evidence.set_yticks([])
         _hide_top_right(ax_evidence)
         ax_evidence.spines["bottom"].set_bounds(0, 1)
@@ -490,7 +491,7 @@ def plot_position_transitions(fig: Figure, slot: SubplotSpec) -> None:
             )
         ax.set_title(
             f"{name}\n{rule}",
-            fontsize=TICK_SIZE,
+            fontsize=SMALL_SIZE,
             fontweight="bold",
             color=color,
             pad=2,
@@ -503,9 +504,9 @@ def plot_position_transitions(fig: Figure, slot: SubplotSpec) -> None:
     colorbar = fig.colorbar(image, cax=fig.add_subplot(gs[:, 2]))
     colorbar.set_ticks([0, vmax])
     colorbar.set_ticklabels(["0", "max"])
-    colorbar.ax.tick_params(labelsize=TICK_SIZE, length=2, pad=1)
+    colorbar.ax.tick_params(labelsize=SMALL_SIZE, length=2, pad=1)
     colorbar.set_label("Transition probability", fontsize=SMALL_SIZE, labelpad=-4)
-    colorbar.outline.set_linewidth(0.4)
+    colorbar.outline.set_linewidth(0.5)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -820,7 +821,7 @@ def plot_simulated_run(
         lineoffsets=np.arange(1, n_neurons + 1),
         linelengths=0.85,
         colors="black",
-        linewidths=0.3,
+        linewidths=0.5,
         rasterized=True,
     )
     ax_raster.set_ylim(0.3, n_neurons + 0.7)
@@ -860,7 +861,7 @@ def plot_simulated_run(
         sim.next_time_at_track_start(examples[1].window[1]),
         0.62 * sim.position_bins.max(),
         "animal's\nposition",
-        fontsize=TICK_SIZE,
+        fontsize=SMALL_SIZE,
         color=ANIMAL_POS_COLOR,
         ha="center",
         va="center",
@@ -879,7 +880,7 @@ def plot_simulated_run(
         sim.non_local_events[0][1] + 1.2,  # just after the first event
         DEFAULT_NON_LOCAL_THRESHOLD - 0.06,
         f"event threshold, {DEFAULT_NON_LOCAL_THRESHOLD:g}",
-        fontsize=TICK_SIZE,
+        fontsize=SMALL_SIZE,
         color="#555555",
         ha="left",
         va="top",
@@ -925,7 +926,7 @@ def plot_simulated_run(
         examples[-1].flag_time,
         DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC + 3,
         f"{DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC:g} cm/s",
-        fontsize=TICK_SIZE,
+        fontsize=SMALL_SIZE,
         color="#333333",
         ha="center",
         va="bottom",
@@ -940,7 +941,7 @@ def plot_simulated_run(
     axes = (ax_raster, ax_posterior, ax_non_local, ax_speed)
     for ax in axes:
         ax.set_xlim(sim.time[0], overview_end)
-        ax.tick_params(labelsize=TICK_SIZE, length=2)
+        ax.tick_params(labelsize=SMALL_SIZE, length=2)
         _hide_top_right(ax)
     for ax in axes[:-1]:
         ax.tick_params(labelbottom=False)
@@ -987,7 +988,7 @@ def plot_examples(
                 [0, (example.pattern[1] - origin) * 1e3],
                 [1.05, 1.05],
                 color=example.color,
-                linewidth=2.2,
+                linewidth=1.5,
                 solid_capstyle="butt",
                 transform=ax_raster.get_xaxis_transform(),
                 clip_on=False,
@@ -1008,7 +1009,7 @@ def plot_examples(
             1.39,
             example.spiking,
             transform=ax_raster.transAxes,
-            fontsize=TICK_SIZE,
+            fontsize=SMALL_SIZE,
             color="#444444",
             ha="center",
             va="top",
@@ -1057,7 +1058,7 @@ def plot_examples(
                     )
         for ax in axes:
             ax.set_xlim((start - origin) * 1e3, (end - origin) * 1e3)
-            ax.tick_params(labelsize=TICK_SIZE, length=2)
+            ax.tick_params(labelsize=SMALL_SIZE, length=2)
             _hide_top_right(ax)
             if k > 0:
                 ax.tick_params(labelleft=False)
@@ -1070,23 +1071,9 @@ def plot_examples(
                 "Decoded\nposition (cm)", fontsize=LABEL_SIZE, labelpad=3
             )
             ax_states.set_ylabel("State\nprobability", fontsize=LABEL_SIZE, labelpad=3)
-            ax_states.text(
-                0.0,
-                -0.8,
-                "Bar: when the simulated spike pattern occurs.\n"
-                "Shading: a non-local event (non-local probability above "
-                f"{DEFAULT_NON_LOCAL_THRESHOLD:g} for at least "
-                f"{NON_LOCAL_MINIMUM_DURATION_S * 1e3:g} ms while the animal is "
-                "still).",
-                fontsize=TICK_SIZE,
-                color="#555555",
-                ha="left",
-                va="top",
-                transform=ax_states.transAxes,
-            )
         if k == len(examples) - 1:
             ax_states.legend(
-                fontsize=TICK_SIZE,
+                fontsize=SMALL_SIZE,
                 frameon=False,
                 ncol=4,
                 handlelength=1.0,
@@ -1144,7 +1131,7 @@ def generate_figure(n_neurons: int = 30, seed: int = 0) -> Figure:
     set_figure_defaults(context="paper")
     # The rows are placed by hand below, from what each one draws, so the
     # automatic layout the paper defaults switch on must be off.
-    fig = plt.figure(figsize=(TWO_COLUMN, FIGURE_HEIGHT), dpi=450, layout="none")
+    fig = plt.figure(figsize=(FIGURE_WIDTH, FIGURE_HEIGHT), dpi=450, layout="none")
 
     # Provisional vertical positions; the rows are re-spaced below.
     gs_bc = fig.add_gridspec(
@@ -1174,7 +1161,7 @@ def generate_figure(n_neurons: int = 30, seed: int = 0) -> Figure:
     # of its axis label) and starts at the left edge of panel d's labels.
     top = axes_b[0].get_position().y1
     bottom = _drawn_extent(fig, axes_b).y0
-    width = (top - bottom) * FIGURE_HEIGHT / STATE_DIAGRAM_HEIGHT / TWO_COLUMN
+    width = (top - bottom) * FIGURE_HEIGHT / STATE_DIAGRAM_HEIGHT / FIGURE_WIDTH
     ax_a = fig.add_axes((_drawn_extent(fig, axes_d).x0, bottom, width, top - bottom))
     plot_state_diagram(ax_a)
     fig.draw_without_rendering()
