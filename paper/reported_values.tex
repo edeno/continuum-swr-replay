@@ -36,7 +36,7 @@
 \newcommand{\SurveyTimeBinMin}{2}  % survey.time_bin_min: Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)
 \newcommand{\SurveyTimeBinMode}{20}  % survey.time_bin_mode: Most common decoding time bin, over the 46 numeric cells of Time bin (ms)
 
-% --- detection (commit 860f344c8fb1)
+% --- detection (commit d7d80592187f)
 \newcommand{\DetectionControlsContinuingOursOnePerPartLongestFraction}{79}  % detection.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingOursSpanningShortestFraction}{88}  % detection.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingSlidingOnePerPartLongestFraction}{50}  % detection.controls_continuing_sliding_one_per_part_longest_fraction: continuing chains at the longest gap: share of trials the sliding window reports as one event per part
@@ -171,7 +171,7 @@
 \newcommand{\DetectionSweepStateSpaceFraction}{91}  % detection.sweep_state_space_fraction: over the whole grid, share the state-space detector reports under its own criteria
 \newcommand{\DetectionSweepStateSpaceOnlyFraction}{73}  % detection.sweep_state_space_only_fraction: share of the swept replays reported by the state-space detector and not by the sliding-window detector
 
-% --- events (commit 860f344c8fb1)
+% --- events (commit d7d80592187f)
 \newcommand{\EventsAnimals}{5}  % events.animals: animals in the event table
 \newcommand{\EventsAnimalsNonSwrMajority}{4}  % events.animals_non_swr_majority: animals whose share of non-SWR events (the mean over their epochs) is above one half
 \newcommand{\EventsAnimalsNonSwrMoreAtWell}{5}  % events.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's sessions of the session's share
@@ -526,7 +526,7 @@
 \newcommand{\EventsZugaroOverlapNonlocalShareMedian}{100}  % events.zugaro_overlap_nonlocal_share_median: median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\EventsZugaroOverlapUncertainShareMedian}{0}  % events.zugaro_overlap_uncertain_share_median: median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8
 
-% --- behavior (commit 860f344c8fb1)
+% --- behavior (commit d7d80592187f)
 \newcommand{\BehaviorArmrewardAll}{\ensuremath{-}0.082}  % behavior.armreward_all: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient
 \newcommand{\BehaviorArmrewardAllAnimalsPositive}{2}  % behavior.armreward_all_animals_positive: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median
 \newcommand{\BehaviorArmrewardAllQ}{0.34}  % behavior.armreward_all_q: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)

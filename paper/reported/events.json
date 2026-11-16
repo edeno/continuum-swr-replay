@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "860f344c8fb1",
+ "commit": "d7d80592187f",
  "code": {
-  "head": "860f344c8fb11bddd9556ad0506b2d778c815aae",
+  "head": "d7d80592187f107822e6ec400938c4c14acc980d",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -79,8 +79,8 @@
     "code_sha256": "4c5ce7aefdaec2986c15bb844ac865127194b243b527466266a091689a0546ea"
    },
    "src/continuum_swr_replay/analysis/detection/nonlocal_events.py": {
-    "sha256": "798431389df1954b126d83611f32a71ef20307ff0041749f1068f2b5834cfeae",
-    "code_sha256": "5a13196e3a8b4be1bde9523c0602e253ac3e41c7d71de5229d9c8bbac8b06bc6"
+    "sha256": "75b596698128c9a556ef0ed1c1e8959c46c50eb55890e052312f122b4b314d50",
+    "code_sha256": "d091aa594286d981bb59fc9ddbe2290aae2028c6fd7d978a4861625836366069"
    },
    "src/continuum_swr_replay/analysis/detection/swr_detectors.py": {
     "sha256": "d6632d4c8eeedc4b53d7e3761e6023c849802c883b30f17143da2ac685b39c4c",
@@ -195,8 +195,8 @@
     "code_sha256": "35ba5dcd3a19acacfb58ab22b22fd61299cd44fc0071d0d99f8e30e27f930744"
    },
    "src/continuum_swr_replay/analysis/event_definition/nonlocal_event_rule.py": {
-    "sha256": "0985896da37ed06963d55bf3d1111d3814c11edafd53feb99875c6230bd01f2b",
-    "code_sha256": "34a809431a07c259846688dc1d0e9f9c4e0d100fe91d0042632523c3a7dd3820"
+    "sha256": "f131c65a466c44ac7efb2a455a8a03e74596ce4fd35948fadcbeb29b7950f557",
+    "code_sha256": "10bb8f6079350b4969bdf01f70e0a5faf085ecaf99035b26af76f94d0faf1c28"
    },
    "src/continuum_swr_replay/analysis/event_definition/swr_source.py": {
     "sha256": "3a7bf9c9470c4734f876e01eda1ae04305684939318ac7412ab3d47e3d3f0f23",
