@@ -108,9 +108,10 @@ LOCAL_EXAMPLE_LEAD_S = (1.25, 0.85)
 EXAMPLE_FLAG_SPREAD_S = 0.4
 
 # Inches. ``save_figure`` crops to the drawing and adds 0.1 in on each side, so
-# this width saves at about 17.3 cm, within Cell Press's 17.4 cm full width.
+# these save at about 17.3 x 19.9 cm: within Cell Press's 17.4 cm full width and
+# the 20 cm height it recommends so that the legend fits on the page.
 FIGURE_WIDTH = 6.9
-FIGURE_HEIGHT = 8.3
+FIGURE_HEIGHT = 7.8
 # The data axes of panels d and e, in figure fractions.
 DATA_LEFT, DATA_RIGHT = 0.095, 0.985
 # A state diagram spans 1 unit across and this many up (see ``plot_state_diagram``).
@@ -165,12 +166,12 @@ def plot_state_diagram(ax: Axes) -> None:
     ax.axis("off")
 
     centers = {
-        "Local": (0.25, 0.80),
-        "No-Spike": (0.75, 0.80),
-        "Continuous": (0.25, 0.24),
-        "Fragmented": (0.75, 0.24),
+        "Local": (0.23, 0.80),
+        "No-Spike": (0.77, 0.80),
+        "Continuous": (0.23, 0.24),
+        "Fragmented": (0.77, 0.24),
     }
-    radius = 0.17
+    radius = 0.19  # wide enough for "Continuous" and "Fragmented" at 6 pt
 
     for facecolor, edgecolor, alpha in (
         (NON_LOCAL_COLOR, "none", 0.13),
