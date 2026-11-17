@@ -238,11 +238,15 @@ EXAMPLES = (
         SPARSE_REPLAY_EVENT, "Sparse", "few spikes", "declined", "state_space_only"
     ),
     Example(
-        FRAGMENTED_EVENT, "Scattered", "Fragmented state", "declined", "no_trajectory"
+        FRAGMENTED_EVENT,
+        "Random order",
+        "Fragmented state",
+        "declined",
+        "no_trajectory",
     ),
 )
 """Panel a's columns, each a simulated event named for what sets it apart, under
-the headings of :data:`EXAMPLE_GROUPS`. The sweep, the scattered event and the
+the headings of :data:`EXAMPLE_GROUPS`. The sweep, the random-order event and the
 place held still are Figure 1's examples; the others are added to its run. The
 sparse replay is the far one at a lower peak firing rate."""
 
@@ -302,7 +306,7 @@ def check_recording_claims(decoded: dict, config: MemorylessSequenceConfig) -> N
             )
     if dominant_state(decoded, FRAGMENTED_EVENT) != "Non-Local Fragmented":
         raise RuntimeError(
-            "The figure says the state-space model reports the scattered event in "
+            "The figure says the state-space model reports the random-order event in "
             "its Fragmented state; its most probable state there is "
             f"{dominant_state(decoded, FRAGMENTED_EVENT)!r}."
         )
