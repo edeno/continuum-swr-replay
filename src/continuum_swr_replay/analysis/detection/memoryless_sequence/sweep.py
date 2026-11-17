@@ -57,6 +57,7 @@ from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
 )
 from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 from continuum_swr_replay.decoding.results import ENCODING_KEY
+from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
 __all__ = [
     "CONFIG",
@@ -319,7 +320,7 @@ class ReportedEvent:
     decoded_time_s, decoded_cm : ndarray, shape (n_decoded,)
         Where the event puts the replay, and when: the kept windows' centers
         at their midpoints, or the non-local posterior's most probable place
-        at each sample.
+        at each sample that holds a spike.
     """
 
     start_s: float
@@ -498,6 +499,11 @@ def run_state_space(recording, injected, window) -> StateSpaceRun:
     bin_position_cm = np.asarray(posterior.coords["position"].values)[is_non_local]
     non_local = np.asarray(posterior.values)[:, is_non_local]
 
+    has_spike = (
+        np.sum([get_spikecount_per_time_bin(spikes, time) for spikes in injected], 0)
+        > 0
+    )
+
     def events(probability: xr.DataArray) -> list[ReportedEvent]:
         detected, _ = detect_nonlocal_events(probability, speed, time)
         reported = []
@@ -505,12 +511,16 @@ def run_state_space(recording, injected, window) -> StateSpaceRun:
             detected["start_time"], detected["end_time"], strict=True
         ):
             a, b = np.searchsorted(time, [start_s, end_s])
+            # the position is read at the samples that hold a spike: between
+            # spikes the Fragmented state ties no sample to the next, so its
+            # posterior there is flat and its most probable place says nothing
+            read = a + np.flatnonzero(has_spike[a : b + 1])
             reported.append(
                 ReportedEvent(
                     start_s=float(time[a]),
                     end_s=float(time[b]),
-                    decoded_time_s=time[a : b + 1],
-                    decoded_cm=bin_position_cm[np.argmax(non_local[a : b + 1], axis=1)],
+                    decoded_time_s=time[read],
+                    decoded_cm=bin_position_cm[np.argmax(non_local[read], axis=1)],
                 )
             )
         return reported
