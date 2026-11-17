@@ -32,7 +32,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simu
     SHORT_PATH_EVENT,
     SHORT_REPLAY_EVENT,
     SILENCE_EVENT,
-    STRAY_WINDOW_EVENT,
     SWEEP_EVENT,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
@@ -137,7 +136,6 @@ EVENT_TIMES = np.array(
         (1.12, 1.16),  # silence, over B's end and C's start
         (1.105, 1.115),  # short path, inside B
         (1.23, 1.235),  # short replay, inside D
-        (1.06, 1.08),  # stray window, inside A
     ]
 )
 STATE_SPACE_INTERVALS = [
@@ -163,8 +161,6 @@ def decoded() -> dict:
         # A has 2 draws below its spread; D none
         "shuffles": {A: _shuffle(2, 0), D: _shuffle(0, 0)},
         "state_space_intervals": STATE_SPACE_INTERVALS,
-        "stray_window_local_cm": 50.0,
-        "stray_window_remote_cm": 100.0,
     }
 
 
@@ -182,7 +178,7 @@ def test_overlap_counts_any_shared_time(decoded):
     assert rs.candidates_overlapping(decoded, SILENCE_EVENT) == [B, C]
     assert rs.candidates_overlapping(decoded, FRAGMENTED_EVENT) == []
     assert rs.accepted_overlapping(decoded, SILENCE_EVENT) == []
-    assert rs.accepted_overlapping(decoded, STRAY_WINDOW_EVENT) == [A]
+    assert rs.accepted_overlapping(decoded, SWEEP_EVENT) == [A]
     assert rs.reported_overlapping(decoded, SWEEP_EVENT) == []
     assert rs.reported_overlapping(decoded, SHORT_REPLAY_EVENT) == [D]
     assert rs.is_reported(decoded).tolist() == [False, False, False, True]
@@ -250,19 +246,6 @@ def test_best_dispersion_is_the_largest_over_every_candidate(decoded):
     assert np.isnan(rs.best_dispersion_cm(decoded, FRAGMENTED_EVENT))
 
 
-def test_outside_pieces_are_kept_windows_no_run_holds(decoded):
-    assert rs.outside_pieces(decoded, A).tolist() == [4]
-    assert rs.outside_pieces(decoded, D).tolist() == []
-
-
-def test_stray_window_dispersions_drop_the_windows_outside_every_piece(decoded):
-    full, pieces, sequence = rs.stray_window_dispersions(decoded)
-    assert sequence == A
-    assert full == pytest.approx(np.sqrt(1900 / 6))
-    # 50, 50, 60, 70, 80 cm about 60 cm
-    assert pieces == pytest.approx(np.sqrt(140))
-
-
 @pytest.mark.parametrize(
     ("n", "n_below", "expected"),
     [
@@ -304,13 +287,6 @@ def test_recording_numbers(decoded):
         "short_path_dispersion_cm": np.sqrt(150),
         "remote_stationary_dispersion_cm": 0.0,
         "state_space_bound_error_ms": 15.0,
-        "stray_window_distance_cm": 50.0,
-        "stray_window_local_fraction": 0.5,
-        "stray_window_duration_ms": 70.0,
-        "stray_window_dispersion_cm": np.sqrt(1900 / 6),
-        "stray_window_pieces_dispersion_cm": np.sqrt(140),
-        "stray_window_p_spread": 3 / 20,
-        "stray_window_p_jump": 1 / 20,
     }
     assert set(numbers) == set(expected)
     for key, value in expected.items():

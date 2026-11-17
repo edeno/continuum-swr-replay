@@ -3,9 +3,8 @@
 The fixture is the recording the supplemental figure draws
 (``comparison_simulation.simulate_and_decode``): Figure 1's simulated run, whose
 four patterns are a sweep that ends at the animal, a fragmented event, a remote
-place held still and a silence, plus a 30 cm replay, an 80 ms replay and a
-hand-placed still event with one window decoded far away. Both detectors read
-one set of place fields, fitted by the state-space model.
+place held still and a silence, plus a 30 cm replay and an 80 ms replay. Both detectors read one set
+of place fields, fitted by the state-space model.
 
 What these tests pin is the sliding-window detector's blind spot rather than its
 accuracy. It scores each window on posterior spread and on the jump to the next
@@ -32,7 +31,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simu
     SHORT_PATH_EVENT,
     SHORT_REPLAY_EVENT,
     SILENCE_EVENT,
-    STRAY_WINDOW_EVENT,
     SWEEP_EVENT,
     simulate_and_decode,
 )
@@ -84,23 +82,21 @@ class TestWhatTheSlidingWindowReports:
             (SILENCE_EVENT, "declined"),
             (SHORT_PATH_EVENT, "declined"),
             (SHORT_REPLAY_EVENT, "found"),
-            (STRAY_WINDOW_EVENT, "failed the shuffle"),
         ],
     )
     def test_verdict(self, decoded, event, expected):
         assert rs.verdict(decoded, event) == expected
 
-    def test_it_accepts_one_sequence_over_each_of_three_events_and_no_other(
+    def test_it_accepts_one_sequence_over_each_of_two_events_and_no_other(
         self, decoded
     ):
         accepted = np.flatnonzero(decoded["candidates"].is_replay).tolist()
 
         assert accepted == [
             *rs.accepted_overlapping(decoded, SWEEP_EVENT),
-            *rs.accepted_overlapping(decoded, STRAY_WINDOW_EVENT),
             *rs.accepted_overlapping(decoded, SHORT_REPLAY_EVENT),
         ]
-        assert len(accepted) == 3
+        assert len(accepted) == 2
 
     def test_only_accepted_candidates_are_tested(self, decoded):
         assert set(decoded["shuffles"]) == set(
@@ -231,42 +227,9 @@ class TestRemoteStationaryIsDeclined:
         )
 
 
-class TestOneWindowFarAway:
-    """A still event that meets the duration and dispersion criteria on the
-    strength of one far window, and then fails the shuffle.
-
-    The window is kept, dropped before the merge as a run of one, and still
-    counted in the merged event's dispersion, as the reference counts it.
-    """
-
-    def test_exactly_one_kept_window_lies_outside_the_pieces_and_it_is_far(
-        self, decoded
-    ):
-        *_, sequence = rs.stray_window_dispersions(decoded)
-        outside = rs.outside_pieces(decoded, sequence)
-
-        assert outside.size == 1
-        assert rs.decoded_center_cm(decoded)[outside[0]] == pytest.approx(
-            decoded["stray_window_remote_cm"], abs=5.0
-        )
-        assert decoded["stray_window_remote_cm"] < 40.0
-
-    def test_the_dispersion_rests_on_that_window(self, decoded):
-        full_cm, pieces_cm, _ = rs.stray_window_dispersions(decoded)
-
-        assert full_cm > CONFIG.dispersion_threshold_cm
-        assert pieces_cm < CONFIG.dispersion_threshold_cm
-
-    def test_nearly_every_window_is_the_animal_s_own_place(self, decoded):
-        assert rs.local_fraction_of_event(decoded, STRAY_WINDOW_EVENT) > 0.95
-
-
 class TestTheStateSpaceModel:
     """The comparison needs every event the sliding window mis-reports to be an
     event some detector finds, or the figure shows the limits of the data."""
-
-    # Not pinned either way: under the real settings the state-space model
-    # reports the stray window's far window as an 80 ms event.
 
     @pytest.mark.parametrize(
         "event",

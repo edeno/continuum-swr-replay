@@ -652,6 +652,7 @@ values changed: every sweep was re-run.
 | `memoryless_sequence/sweep.py`: `non_local_intervals`; `recording_statistics.state_space_intervals` | `event_definition/nonlocal_event_rule.py`: `detect_nonlocal_events`; the labeled recording's dict carries `state_space_intervals` |
 | `comparison_simulation`: `CONTINUOUS_OUTBOUND_EVENT`, `CONTINUOUS_INBOUND_EVENT`; reported values `recording_outbound_*`, `recording_inbound_*` | `SWEEP_EVENT` (the run has one sweep); `recording_sweep_*` |
 | `scripts/figures/generate_figure01.py`: colours, sizes, the decoded-position panel, the row layout | `visualization/simulated_run_panels.py`, shared with `generate_memoryless_comparison.py` |
+| `memoryless_sequence/simulation.py`: `stray_window_spikes`, `StrayWindowEvent`; `recording_statistics`: `stray_window_dispersions`, `outside_pieces`; reported values `recording_stray_window_*` | removed with the stray-window event of the labeled recording; the real-data pilot's outside-window values (`pilot_*`) remain |
 | `generate_memoryless_comparison.py`: the burst, carving and held-out panels and `check_controls_claims`, `check_heldout_claims` | removed from the figure; the sweeps and their reported values remain |
 
 ## Figure 1's simulation, 2026-11-16

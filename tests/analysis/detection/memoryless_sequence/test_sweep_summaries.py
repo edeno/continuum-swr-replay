@@ -21,8 +21,9 @@ def replay_cells() -> pd.DataFrame:
     """Four injected replays. Cells 0 and 3 are in the published definition's
     domain (path >= 45 cm, duration >= 0.12 s); cell 1's path and cell 2's
     duration are too short. Cells 0, 1 and 3 are matched by both detectors
-    before the shuffle, with sliding-window duration ratios 1, 2 and 6 (median
-    2, mean 3) and start errors 1, 2 and 10 ms."""
+    before the shuffle, which cell 1 then fails: cells 0 and 3 are the replays
+    both detectors report, with sliding-window duration ratios 1 and 6 (median
+    3.5) and start errors 1 and 10 ms."""
     n = 4
     return pd.DataFrame(
         {
@@ -69,20 +70,21 @@ class TestReplaySweepSummary:
         assert overall["state_space_replay_matches"] == pytest.approx(0.75)
         assert domain["state_space_replay_matches"] == pytest.approx(0.5)
 
-    def test_duration_ratios_are_medians_over_the_replays_both_matched(self):
+    def test_duration_ratios_are_medians_over_the_replays_both_report(self):
         rows = self.values("median_duration_ratio_by_duration")
         ratio = rows[rows.measure == "sliding_duration_ratio"].set_index("duration_s")
 
-        assert ratio.value[0.12] == pytest.approx(2.0)
+        # not cell 1, which the sliding window matched but its shuffle refused
+        assert ratio.value[0.12] == pytest.approx(3.5)
         # cell 2, which only the state-space detector matched, is not read
         assert 0.08 not in ratio.index
 
     def test_timing_errors_are_quartiles_in_milliseconds(self):
         rows = self.values("timing_by_duration").set_index("measure").value
 
-        assert rows["sliding_start_error_ms_median"] == pytest.approx(2.0)
-        assert rows["sliding_start_error_ms_q25"] == pytest.approx(1.5)
-        assert rows["sliding_start_error_ms_q75"] == pytest.approx(6.0)
+        assert rows["sliding_start_error_ms_median"] == pytest.approx(5.5)
+        assert rows["sliding_start_error_ms_q25"] == pytest.approx(3.25)
+        assert rows["sliding_start_error_ms_q75"] == pytest.approx(7.75)
 
     def test_the_misses_are_the_state_space_matches_the_window_lost(self):
         overall = self.values("overall").set_index("measure").value

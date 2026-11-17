@@ -5,9 +5,8 @@ The supplemental memoryless comparison figure
 (``scripts/checks/compare_memoryless_to_reference.py``) read one simulation
 (:func:`simulate_and_decode`): the simulated run of Figure 1
 (``analysis.detection.simulated_run.simulate_run``, whose patterns are the first
-rows of ``event_times``) with a short path, a short replay and a stray window
-added (:data:`SHORT_PATH_EVENT` and the other ``*_EVENT`` constants name the
-rows). It is decoded twice from one set of place fields: window by window under
+rows of ``event_times``) with a short path and a short replay added
+(:data:`SHORT_PATH_EVENT` and the other ``*_EVENT`` constants name the rows). It is decoded twice from one set of place fields: window by window under
 a uniform prior, as the sliding-window detector does, and by the switching
 state-space model of Figure 1, fitted as a real decode is
 (``simulated_run.estimate_state_space_model``), whose non-local events are
@@ -39,10 +38,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
     InjectedReplay,
-    immobile_intervals,
     inject_replay,
-    stray_window_spikes,
-    without,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     aggregate_windows,
@@ -71,10 +67,6 @@ __all__ = [
     "SHORT_REPLAY_EVENT",
     "SHUFFLE_RUN_SEED",
     "SILENCE_EVENT",
-    "STRAY_WINDOW_AT_S",
-    "STRAY_WINDOW_EVENT",
-    "STRAY_WINDOW_N_LOCAL",
-    "STRAY_WINDOW_STILL_S",
     "SWEEP_EVENT",
     "TRACK_HEIGHT_CM",
     "simulate_and_decode",
@@ -115,33 +107,13 @@ the candidate."""
 SWEEP_EVENT, FRAGMENTED_EVENT, REMOTE_STATIONARY_EVENT, SILENCE_EVENT = (
     PATTERNS.index(name) for name in ("sweep", "fragmented", "stationary", "silence")
 )
-SHORT_PATH_EVENT, SHORT_REPLAY_EVENT, STRAY_WINDOW_EVENT = (
-    len(PATTERNS) + added for added in range(3)
-)
+SHORT_PATH_EVENT, SHORT_REPLAY_EVENT = (len(PATTERNS) + added for added in range(2))
 """Rows of ``event_times`` in :func:`simulate_and_decode`: Figure 1's patterns
 (``simulated_run.PATTERNS``), then the events added here, in the order they are
 added."""
 
 SHUFFLE_RUN_SEED = 20260922
 """Seeds the place-cell identity shuffle, as in the sweep."""
-
-STRAY_WINDOW_AT_S = 31.40
-"""Where the hand-placed stray-window event begins: in the stillness before the
-remote stationary event, among candidates of local coding that no caption claim
-reads. The stillness before the sweep is no good: that replay's candidate
-absorbs the local coding before it, so an event there changes its verdict."""
-
-STRAY_WINDOW_N_LOCAL = 2
-STRAY_WINDOW_STILL_S = 0.120
-"""The still parts are carried by the two cells whose fields lie nearest the
-animal, firing in turn for 120 ms either side of the far window. Cells further
-along the track would pull the decode away from the animal, and the
-state-space detector then reads those parts as non-local. The parts are as
-long as the dispersion allows: the one far window keeps the event above 12 cm
-however long the still parts around it run, until about 180 ms each."""
-
-STRAY_WINDOW_PLACEMENT_MARGIN_S = 0.4
-"""How far the event's cleared span must sit from every other event."""
 
 
 def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dict:
@@ -182,36 +154,6 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         )
         event_times = np.vstack([event_times, bounds])
         is_event |= (time >= bounds[0]) & (time <= bounds[1])
-
-    # a still event at the animal's place with one window decoded far away,
-    # hand-placed in the first stillness clear of every other event
-    clear = without(
-        immobile_intervals(
-            time, speed, config.speed_threshold_cm_per_s, minimum_duration_s=1.0
-        ),
-        event_times,
-        margin_s=STRAY_WINDOW_PLACEMENT_MARGIN_S,
-    )
-    stray_local_cm = float(np.interp(STRAY_WINDOW_AT_S, time, position))
-    spike_times, stray = stray_window_spikes(
-        spike_times,
-        place_field_means,
-        STRAY_WINDOW_AT_S,
-        local_cm=stray_local_cm,
-        still_s=STRAY_WINDOW_STILL_S,
-        n_local=STRAY_WINDOW_N_LOCAL,
-        window_s=config.window_duration_s,
-        stride_s=config.stride_s,
-    )
-    if not (
-        (clear[:, 0] <= stray.cleared[0]) & (stray.cleared[1] <= clear[:, 1])
-    ).any():
-        raise RuntimeError(
-            f"The stray-window event at {STRAY_WINDOW_AT_S} s does not sit in "
-            "stillness clear of every other event; move STRAY_WINDOW_AT_S."
-        )
-    event_times = np.vstack([event_times, stray.bounds])
-    is_event |= (time >= stray.cleared[0]) & (time <= stray.cleared[1])
 
     # encode on non-event data only, the analogue of this project's no-ripple
     # training mask; spikes inside an event must not shape the place fields
@@ -280,9 +222,6 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         "candidates": candidates,
         "shuffles": shuffles,
         "bin_distance_cm": bin_distance_cm,
-        "stray_window": stray,
-        "stray_window_local_cm": stray_local_cm,
-        "stray_window_remote_cm": float(place_field_means[stray.remote_cell]),
         "state_names": tuple(
             str(name) for name in results.acausal_state_probabilities.states.values
         ),

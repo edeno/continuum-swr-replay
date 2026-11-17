@@ -401,55 +401,6 @@ def recording_values(numbers: dict, source: str) -> list[Value]:
             "the four zoomed events",
             "ms",
         ),
-        make(
-            "recording_stray_window_distance_cm",
-            numbers["stray_window_distance_cm"],
-            "quantity",
-            "int",
-            "distance from the animal of the far cell whose two spikes fill the "
-            "stray window",
-            "cm",
-        ),
-        make(
-            "recording_stray_window_local_fraction",
-            numbers["stray_window_local_fraction"],
-            "fraction",
-            "pctnum",
-            "share of the stray-window event's kept windows decoding within 15 cm "
-            "of the animal",
-        ),
-        make(
-            "recording_stray_window_duration_ms",
-            numbers["stray_window_duration_ms"],
-            "quantity",
-            "int",
-            "the stray-window event's reported duration",
-            "ms",
-        ),
-        make(
-            "recording_stray_window_dispersion_cm",
-            numbers["stray_window_dispersion_cm"],
-            "quantity",
-            "sig2",
-            "its dispersion with the window outside every piece",
-            "cm",
-        ),
-        make(
-            "recording_stray_window_pieces_dispersion_cm",
-            numbers["stray_window_pieces_dispersion_cm"],
-            "quantity",
-            "sig2",
-            "its dispersion without that window",
-            "cm",
-        ),
-        p(
-            "stray_window_p_spread",
-            "significance test of the stray-window event: spread half",
-        ),
-        p(
-            "stray_window_p_jump",
-            "significance test of the stray-window event: jump half",
-        ),
     ]
 
 

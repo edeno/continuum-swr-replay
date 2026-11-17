@@ -94,7 +94,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
 from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD,
     NON_LOCAL_MINIMUM_DURATION_S,
-    SAMPLING_FREQUENCY,
 )
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
@@ -103,6 +102,7 @@ from continuum_swr_replay.visualization.figure_utilities import (
     set_figure_defaults,
 )
 from continuum_swr_replay.visualization.simulated_run_panels import (
+    ANIMAL_POS_COLOR,
     LABEL_SIZE,
     NON_LOCAL_COLOR,
     SMALL_SIZE,
@@ -145,7 +145,7 @@ EVENT_ROWS = (
 
 # Inches. Narrower than Figure 1's 6.9: the event rows' names reach the left edge,
 # and the saved figure must stay within Cell Press's 17.4 cm.
-FIGURE_WIDTH = 6.75
+FIGURE_WIDTH = 6.7
 FIGURE_HEIGHT = 7.6
 # The data axes of the panels that span the figure, in figure fractions: wider
 # margins than Figure 1's, for the event rows' names.
@@ -221,7 +221,7 @@ EXAMPLES = (
         "found",
         flag_shift=-EXAMPLE_FLAG_SPREAD_S,
     ),
-    Example(SILENCE_EVENT, "No spikes", "", "declined"),
+    Example(SILENCE_EVENT, "No spikes", "a control", "declined"),
 )
 """Panel c's columns, in time order. The sweep, the place held still and the
 silence are Figure 1's examples; the short path and the short replay are added
@@ -244,11 +244,9 @@ def sliding_events(decoded: dict) -> list[tuple[float, float]]:
 def simulated_events(decoded: dict) -> list[tuple[float, float]]:
     """When simulated spiking represents a place other than the animal's.
 
-    Every labeled event but the silence, and the one window of the stray-window
-    event whose spikes come from a cell far from the animal (the rest of that
-    event is the animal's own place).
+    Every labeled event but the silence.
     """
-    replays = [
+    return sorted(
         tuple(decoded["event_times"][event])
         for event in (
             SWEEP_EVENT,
@@ -257,19 +255,27 @@ def simulated_events(decoded: dict) -> list[tuple[float, float]]:
             REMOTE_STATIONARY_EVENT,
             SHORT_REPLAY_EVENT,
         )
-    ]
-    far_start = decoded["stray_window"].stray_window_start_s
-    return sorted([*replays, (far_start, far_start + CONFIG.window_duration_s)])
+    )
 
 
 def sliding_outcome(decoded: dict, event: int) -> str:
-    """What the sliding-window detector did with an event, for a panel's header."""
-    what = verdict(decoded, event)
-    if what == "found":
-        return f"found, {duration_ratio(decoded, event):.1f}× too long"
-    if event == SILENCE_EVENT:
-        return "no event"
-    return {"failed the shuffle": "fails the shuffle"}.get(what, what)
+    """Whether the sliding-window detector reports an event, for a panel's header.
+
+    A reported event is given with how long the report is against the simulated
+    event.
+    """
+    if verdict(decoded, event) == "found":
+        return f"reported, {duration_ratio(decoded, event):.1f}× as long"
+    return "not reported"
+
+
+def state_space_outcome(decoded: dict, event: int) -> str:
+    """Whether the state-space model reports an event, for a panel's header."""
+    start_s, end_s = decoded["event_times"][event]
+    overlaps = any(
+        a < end_s and start_s < b for a, b in decoded["state_space_intervals"]
+    )
+    return "reported" if overlaps else "not reported"
 
 
 def check_recording_claims(decoded: dict, config: MemorylessSequenceConfig) -> None:
@@ -321,60 +327,76 @@ def check_recording_claims(decoded: dict, config: MemorylessSequenceConfig) -> N
 def plot_decision_schematic(
     fig: Figure, slot: SubplotSpec, config: MemorylessSequenceConfig
 ) -> None:
-    """The same spikes, read two ways (illustrative curves, not a decode).
+    """One simulated event, a place held still, read by each detector's rule.
 
-    Top: the sliding-window detector decodes one position per window and asks
-    whether consecutive positions travel far enough for long enough. Bottom: the
-    state-space model asks at every decode bin whether the spikes point away
-    from the animal. The numbers written are the detectors' settings.
+    Illustrative curves, not a decode. Top: the sliding-window detector decodes
+    one position per window and asks whether the positions of consecutive
+    windows are dispersed widely enough for long enough; positions that stay in
+    one place are not, so it reports no event. Bottom: the state-space model
+    asks at every decode bin whether the spikes point away from the animal;
+    they do, so it reports one. The numbers written are the detectors' settings.
     """
-    gs = slot.subgridspec(2, 1, hspace=0.95)
-    time_ms = np.linspace(0, 300, 301)
-    event = (time_ms >= 90) & (time_ms <= 210)
-    decoded_cm = np.interp(time_ms, [90, 210], [20, 80])
+    gs = slot.subgridspec(2, 1, hspace=0.8)
+    event_ms = (90.0, 210.0)
+    window_ms, stride_ms = 1000 * config.window_duration_s, 1000 * config.stride_s
+    animal_cm, remote_cm = 104.0, 50.0
 
     ax = fig.add_subplot(gs[0])
-    window_ms, stride_ms = 1000 * config.window_duration_s, 1000 * config.stride_s
-    centers = np.arange(60, 245, 4 * stride_ms)
-    smeared = np.array(
-        [
-            np.interp(c, [90 - window_ms / 2, 210 + window_ms / 2], [20, 80])
-            for c in centers
-        ]
-    )
-    ax.plot(time_ms[event], decoded_cm[event], color=SIMULATED_COLOR, linewidth=1.0)
+    # a window is decoded at the remote place once the event's spikes fill it
+    centers = np.arange(event_ms[0], event_ms[1] + stride_ms / 2, stride_ms)
+    rng = np.random.default_rng(0)
     ax.plot(
         centers,
-        smeared,
+        remote_cm + rng.normal(0, 1.2, centers.size),
         linestyle="none",
         marker="o",
-        markersize=2.2,
+        markersize=1.3,
         color=SLIDING_COLOR,
     )
-    for k, center in enumerate(centers[2:5]):
-        ax.plot(
-            [center - window_ms / 2, center + window_ms / 2],
-            [98 + 5 * k] * 2,
-            color=SLIDING_COLOR,
-            linewidth=0.8,
-            solid_capstyle="butt",
-        )
+    ax.axhline(animal_cm, color=ANIMAL_POS_COLOR, linewidth=0.9)
     ax.text(
-        295,
         4,
-        f"{window_ms:.0f} ms windows,\n{stride_ms:.0f} ms steps",
+        animal_cm - 5,
+        "animal",
+        fontsize=SMALL_SIZE,
+        color=ANIMAL_POS_COLOR,
+        ha="left",
+        va="top",
+    )
+    ax.plot(
+        [event_ms[0] - window_ms / 2, event_ms[0] + window_ms / 2],
+        [remote_cm + 25] * 2,
+        color=SLIDING_COLOR,
+        linewidth=0.8,
+        solid_capstyle="butt",
+    )
+    ax.text(
+        event_ms[0] + window_ms / 2 + 5,
+        remote_cm + 25,
+        f"{window_ms:.0f} ms window,\n{stride_ms:.0f} ms steps",
         fontsize=SMALL_SIZE,
         color=SLIDING_COLOR,
-        ha="right",
+        ha="left",
+        va="center",
+        linespacing=0.95,
+    )
+    ax.text(
+        np.mean(event_ms),
+        2,
+        "not dispersed:\nno event",
+        fontsize=SMALL_SIZE,
+        fontweight="bold",
+        color=SLIDING_COLOR,
+        ha="center",
         va="bottom",
         linespacing=0.95,
     )
     ax.set_ylim(0, 118)
     ax.set_yticks([])
-    ax.set_ylabel("Decoded\nposition", fontsize=SMALL_SIZE, labelpad=3)
+    ax.set_ylabel("Decoded\nposition", fontsize=LABEL_SIZE, labelpad=3)
     ax.set_title(
-        f"{SLIDING}\ndoes the position travel\n"
-        f"> {config.dispersion_threshold_cm:.0f} cm for "
+        f"{SLIDING}\n"
+        f"dispersed > {config.dispersion_threshold_cm:.0f} cm for "
         f"≥ {1000 * config.minimum_duration_s:.0f} ms?",
         fontsize=SMALL_SIZE,
         fontweight="bold",
@@ -384,8 +406,9 @@ def plot_decision_schematic(
     )
 
     ax_probability = fig.add_subplot(gs[1], sharex=ax)
-    probability = 1 / (1 + np.exp(-(time_ms - 90) / 3)) - 1 / (
-        1 + np.exp(-(time_ms - 210) / 3)
+    time_ms = np.linspace(0, 300, 301)
+    probability = 1 / (1 + np.exp(-(time_ms - event_ms[0]) / 3)) - 1 / (
+        1 + np.exp(-(time_ms - event_ms[1]) / 3)
     )
     ax_probability.plot(
         time_ms, 0.02 + 0.96 * probability, color=STATE_SPACE_COLOR, linewidth=1.0
@@ -393,30 +416,33 @@ def plot_decision_schematic(
     ax_probability.axhline(
         DEFAULT_NON_LOCAL_THRESHOLD, color="#999999", linestyle="--", linewidth=0.6
     )
+    ax_probability.text(
+        np.mean(event_ms),
+        0.4,
+        "non-local:\nan event",
+        fontsize=SMALL_SIZE,
+        fontweight="bold",
+        color=STATE_SPACE_COLOR,
+        ha="center",
+        va="center",
+        linespacing=0.95,
+    )
     ax_probability.set_ylim(0, 1.05)
-    ax_probability.set_yticks([0, 1])
-    ax_probability.set_ylabel("Non-local\nprob.", fontsize=SMALL_SIZE, labelpad=3)
+    ax_probability.set_yticks([0, DEFAULT_NON_LOCAL_THRESHOLD, 1])
+    ax_probability.set_yticklabels(["0", f"{DEFAULT_NON_LOCAL_THRESHOLD:g}", "1"])
+    ax_probability.set_ylabel("Non-local\nprob.", fontsize=LABEL_SIZE, labelpad=3)
     ax_probability.set_title(
-        f"{STATE_SPACE}\ndo the spikes point away from\n"
-        f"the animal for ≥ {1000 * NON_LOCAL_MINIMUM_DURATION_S:.0f} ms?",
+        f"{STATE_SPACE}\n"
+        f"away from the animal ≥ {1000 * NON_LOCAL_MINIMUM_DURATION_S:.0f} ms?",
         fontsize=SMALL_SIZE,
         fontweight="bold",
         color=STATE_SPACE_COLOR,
         pad=3,
         linespacing=0.95,
     )
-    ax_probability.text(
-        150,
-        0.4,
-        f"{1000 / SAMPLING_FREQUENCY:.0f} ms bins",
-        fontsize=SMALL_SIZE,
-        color=STATE_SPACE_COLOR,
-        ha="center",
-        va="center",
-    )
-    ax_probability.set_xlabel("Time (ms)", fontsize=SMALL_SIZE, labelpad=2)
+    ax_probability.set_xlabel("Time (ms)", fontsize=LABEL_SIZE, labelpad=2)
     for axes in (ax, ax_probability):
-        axes.axvspan(90, 210, color=SIMULATED_COLOR, alpha=0.08, linewidth=0)
+        axes.axvspan(*event_ms, color=SIMULATED_COLOR, alpha=0.08, linewidth=0)
         axes.set_xlim(0, 300)
         axes.set_xticks([0, 100, 200, 300])
         axes.tick_params(labelsize=SMALL_SIZE, length=2)
@@ -455,7 +481,9 @@ def plot_event_rows(
             ],
             (y - 0.3, 0.6),
             facecolors=color,
-            linewidth=0,
+            # an outline, so that a brief event keeps a visible width
+            edgecolors=color,
+            linewidth=0.6,
         )
     ax.set_ylim(-0.6, len(rows) - 0.4)
     ax.set_yticks([])
@@ -525,7 +553,28 @@ def plot_run(fig: Figure, slot: SubplotSpec, decoded: dict, vmax: float) -> None
         linewidth=0.6,
         dashes=(2.5, 3.5),
     )
-    ax_posterior.set_ylabel("Decoded\nposition (cm)", fontsize=LABEL_SIZE, labelpad=3)
+    ax_posterior.set_ylabel(
+        f"{STATE_SPACE}\nposition (cm)",
+        fontsize=LABEL_SIZE,
+        labelpad=3,
+        color=STATE_SPACE_COLOR,
+    )
+    # Labeled where the animal first turns at the track's start: the space above
+    # that turn is empty.
+    at_start = np.flatnonzero(
+        (time > decoded["event_times"][SWEEP_EVENT][1])
+        & (decoded["position"] <= decoded["position"].min() + 1.0)
+    )
+    ax_posterior.text(
+        float(time[at_start[0]]) + 0.5,
+        0.62 * decoded["state_space_position_bins"].max(),
+        "animal's\nposition",
+        fontsize=SMALL_SIZE,
+        color=ANIMAL_POS_COLOR,
+        ha="center",
+        va="center",
+        linespacing=0.95,
+    )
 
     plot_event_rows(ax_events, decoded, labels=True)
     ax_events.set_xlabel("Time (s)", fontsize=LABEL_SIZE, labelpad=2)
@@ -593,40 +642,31 @@ def plot_examples(
             ],
             linewidth=0.6,
         )
-        ax_raster.text(
-            0.5,
-            1.62,
-            example.name,
-            transform=ax_raster.transAxes,
-            fontsize=LABEL_SIZE,
-            fontweight="bold",
-            color=SIMULATED_COLOR,
-            ha="center",
-            va="center",
-        )
-        ax_raster.text(
-            0.5,
-            1.54,
-            example.simulated,
-            transform=ax_raster.transAxes,
-            fontsize=SMALL_SIZE,
-            color="#444444",
-            ha="center",
-            va="top",
-        )
-        ax_raster.text(
-            0.5,
-            1.42,
-            sliding_outcome(decoded, example.event),
-            transform=ax_raster.transAxes,
-            fontsize=SMALL_SIZE,
-            color=SLIDING_COLOR,
-            ha="center",
-            va="top",
-        )
+        for y, text, color, bold in (
+            (1.78, example.name, SIMULATED_COLOR, True),
+            (1.62, example.simulated, "#444444", False),
+            (1.47, sliding_outcome(decoded, example.event), SLIDING_COLOR, False),
+            (
+                1.32,
+                state_space_outcome(decoded, example.event),
+                STATE_SPACE_COLOR,
+                False,
+            ),
+        ):
+            ax_raster.text(
+                0.5,
+                y,
+                text,
+                transform=ax_raster.transAxes,
+                fontsize=LABEL_SIZE if bold else SMALL_SIZE,
+                fontweight="bold" if bold else "normal",
+                color=color,
+                ha="center",
+                va="center",
+            )
         ax_raster.text(
             0.03,
-            1.62,
+            1.78,
             str(k + 1),
             transform=ax_raster.transAxes,
             fontsize=SMALL_SIZE,
@@ -636,6 +676,21 @@ def plot_examples(
             va="center",
             bbox=example_badge(SIMULATED_COLOR),
         )
+        if k == 0:
+            for y, name, color in (
+                (1.47, SLIDING, SLIDING_COLOR),
+                (1.32, STATE_SPACE, STATE_SPACE_COLOR),
+            ):
+                ax_raster.text(
+                    -0.08,
+                    y,
+                    name,
+                    transform=ax_raster.transAxes,
+                    fontsize=SMALL_SIZE,
+                    color=color,
+                    ha="right",
+                    va="center",
+                )
 
         windows = slice(*np.searchsorted(midpoint_s, [start, end]))
         plot_posterior(
@@ -732,7 +787,7 @@ def plot_detection(ax: Axes, grid: pd.DataFrame, title: str, color: str, show_y:
                 f"{percent:.0f}",
                 ha="center",
                 va="center",
-                fontsize=SMALL_SIZE - 1,
+                fontsize=SMALL_SIZE,
                 color="white" if percent < 55 else "black",
             )
     return image
@@ -748,7 +803,7 @@ TIMING_MEASURES = tuple(
 
 
 def plot_edge_error(ax: Axes, summary: pd.DataFrame, edge: str) -> None:
-    """Reported minus true start or end, for replays both detectors found.
+    """Reported minus true start or end, for replays both detectors report.
 
     The line is the median and the band the quartiles, at each true duration.
     """
@@ -778,7 +833,7 @@ def plot_edge_error(ax: Axes, summary: pd.DataFrame, edge: str) -> None:
     ax.tick_params(labelsize=SMALL_SIZE, length=2)
     ax.set_xlabel("Duration (ms)", fontsize=LABEL_SIZE, labelpad=2)
     ax.set_ylabel(
-        f"{'Onset' if edge == 'start' else 'Offset'} error (ms)",
+        f"Reported − simulated\n{'onset' if edge == 'start' else 'offset'} (ms)",
         fontsize=LABEL_SIZE,
         labelpad=3,
     )
@@ -786,7 +841,9 @@ def plot_edge_error(ax: Axes, summary: pd.DataFrame, edge: str) -> None:
 
 def plot_sweep(fig: Figure, slot: SubplotSpec, summary: pd.DataFrame) -> None:
     """Panels d-g: detection by path and duration, then onset and offset error."""
-    gs = slot.subgridspec(1, 6, width_ratios=[1, 1, 0.045, 0.42, 0.7, 0.7], wspace=0.12)
+    gs = slot.subgridspec(
+        1, 6, width_ratios=[1, 1, 0.045, 0.6, 0.66, 0.66], wspace=0.12
+    )
     ax_sliding = fig.add_subplot(gs[0])
     ax_state_space = fig.add_subplot(gs[1])
     image = plot_detection(
@@ -809,7 +866,7 @@ def plot_sweep(fig: Figure, slot: SubplotSpec, summary: pd.DataFrame) -> None:
     colorbar.set_label("Replays reported (%)", fontsize=SMALL_SIZE, labelpad=2)
     colorbar.outline.set_linewidth(0.5)
 
-    timing = gs[4:].subgridspec(1, 2, wspace=0.6)
+    timing = gs[4:].subgridspec(1, 2, wspace=0.85)
     ax_onset = fig.add_subplot(timing[0])
     ax_offset = fig.add_subplot(timing[1])
     plot_edge_error(ax_onset, summary, "start")
@@ -819,8 +876,8 @@ def plot_sweep(fig: Figure, slot: SubplotSpec, summary: pd.DataFrame) -> None:
         frameon=False,
         handlelength=1.2,
         labelspacing=0.2,
-        loc="lower left",
-        bbox_to_anchor=(0.0, 1.0),
+        loc="lower right",
+        bbox_to_anchor=(1.0, 1.0),
         borderaxespad=0,
     )
 
@@ -914,7 +971,7 @@ def draw_figure(
         left=DATA_LEFT,
         right=DATA_RIGHT,
         top=0.95,
-        bottom=0.75,
+        bottom=0.74,
         width_ratios=[1, 3.1],
         wspace=0.36,
     )

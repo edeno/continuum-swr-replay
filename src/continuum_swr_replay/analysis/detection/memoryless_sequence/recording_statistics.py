@@ -26,15 +26,10 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simu
     REMOTE_STATIONARY_EVENT,
     SHORT_PATH_EVENT,
     SHORT_REPLAY_EVENT,
-    STRAY_WINDOW_EVENT,
     SWEEP_EVENT,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     SIGNIFICANCE_LEVEL,
-)
-from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
-    NO_CENTER,
-    dispersion_cm,
 )
 
 __all__ = [
@@ -50,11 +45,9 @@ __all__ = [
     "is_reported",
     "local_fraction",
     "local_fraction_of_event",
-    "outside_pieces",
     "recording_numbers",
     "reported_overlapping",
     "shuffle_of",
-    "stray_window_dispersions",
     "verdict",
 ]
 
@@ -222,49 +215,6 @@ def best_dispersion_cm(decoded: dict, event: int) -> float:
     )
 
 
-def outside_pieces(decoded: dict, sequence: int) -> np.ndarray:
-    """Windows of a sequence that were kept but belong to none of its pieces.
-
-    A single kept window between two runs is dropped before the merge, as the
-    reference drops it, yet still counts toward the merged sequence's
-    dispersion. Returns window indices.
-    """
-    candidates = decoded["candidates"]
-    start, stop = candidates.runs[sequence]
-    in_piece = np.zeros(stop - start + 1, dtype=bool)
-    for piece in candidates.pieces[sequence]:
-        first, last = candidates.pre_merge_runs[piece]
-        in_piece[first - start : last - start + 1] = True
-    kept = candidates.decisions.gates.kept[start : stop + 1]
-    return start + np.flatnonzero(kept & ~in_piece)
-
-
-def stray_window_dispersions(decoded: dict) -> tuple[float, float, int]:
-    """The stray-window event's dispersion with and without the windows
-    outside its pieces, and the sequence they come from.
-
-    Over the longest accepted sequence overlapping it, the one the panel shows.
-
-    Raises
-    ------
-    RuntimeError
-        If no accepted sequence overlaps the stray-window event.
-    """
-    candidates = decoded["candidates"]
-    sequence = _longest_accepted(decoded, STRAY_WINDOW_EVENT)
-    start, stop = candidates.runs[sequence]
-    center = candidates.decisions.center_index[start : stop + 1].copy()
-    center[np.isin(np.arange(start, stop + 1), outside_pieces(decoded, sequence))] = (
-        NO_CENTER
-    )
-    center[~candidates.decisions.gates.kept[start : stop + 1]] = NO_CENTER
-    return (
-        float(candidates.dispersion_cm[sequence]),
-        dispersion_cm(center, decoded["bin_distance_cm"]),
-        sequence,
-    )
-
-
 def bound_error_ms(decoded: dict, events: tuple[int, ...]) -> float:
     """Largest error in either bound of the state-space model's reports, in ms.
 
@@ -302,38 +252,30 @@ def recording_numbers(decoded: dict) -> dict[str, float | int]:
     -------
     numbers : dict
         Durations in ms, distances in cm, shares in [0, 1]. The prefixes
-        ``sweep``, ``short_replay`` and ``stray_window`` name Figure 1's sweep,
-        the 80 ms replay and the stray-window event; each value is over the
-        longest accepted sequence overlapping the event.
+        ``sweep`` and ``short_replay`` name Figure 1's sweep and the 80 ms
+        replay; each value is over the longest accepted sequence overlapping
+        the event.
 
         - ``sweep_``, ``short_replay_duration_ratio``: its reported over its
           true duration (:func:`duration_ratio`).
-        - ``sweep_``, ``short_replay_``, ``stray_window_local_fraction``:
-          the share of its kept windows decoding the animal's own place
+        - ``sweep_``, ``short_replay_local_fraction``: the share of its kept
+          windows decoding the animal's own place
           (:func:`local_fraction_of_event`).
-        - ``*_p_spread``, ``*_p_jump``, for all three: the two halves of its
+        - ``*_p_spread``, ``*_p_jump``, for both: the two halves of its
           significance test.
         - ``sweep_draws_from_passing``: :func:`draws_from_passing`.
         - ``short_path_dispersion_cm``, ``remote_stationary_dispersion_cm``: the
           largest dispersion of a candidate over each (:func:`best_dispersion_cm`).
         - ``state_space_bound_error_ms``: :func:`bound_error_ms` over
           :data:`ZOOMED_EVENTS`.
-        - ``stray_window_distance_cm``: how far the stray window's far cell is
-          from the animal.
-        - ``stray_window_duration_ms``: the stray-window sequence's duration.
-        - ``stray_window_dispersion_cm``, ``stray_window_pieces_dispersion_cm``:
-          its dispersion with and without the windows outside its pieces
-          (:func:`stray_window_dispersions`).
 
     Raises
     ------
     RuntimeError
-        If no accepted sequence overlaps one of the three events read.
+        If no accepted sequence overlaps one of the two events read.
     """
     sweep = shuffle_of(decoded, SWEEP_EVENT)
     short = shuffle_of(decoded, SHORT_REPLAY_EVENT)
-    stray_full, stray_pieces, stray_sequence = stray_window_dispersions(decoded)
-    stray = decoded["shuffles"][stray_sequence]
     return {
         "sweep_duration_ratio": duration_ratio(decoded, SWEEP_EVENT),
         "sweep_local_fraction": local_fraction_of_event(decoded, SWEEP_EVENT),
@@ -351,16 +293,4 @@ def recording_numbers(decoded: dict) -> dict[str, float | int]:
             decoded, REMOTE_STATIONARY_EVENT
         ),
         "state_space_bound_error_ms": bound_error_ms(decoded, ZOOMED_EVENTS),
-        "stray_window_distance_cm": abs(
-            decoded["stray_window_remote_cm"] - decoded["stray_window_local_cm"]
-        ),
-        "stray_window_local_fraction": local_fraction_of_event(
-            decoded, STRAY_WINDOW_EVENT
-        ),
-        "stray_window_duration_ms": 1000
-        * float(decoded["candidates"].duration_s[stray_sequence]),
-        "stray_window_dispersion_cm": stray_full,
-        "stray_window_pieces_dispersion_cm": stray_pieces,
-        "stray_window_p_spread": float(stray.p_spread),
-        "stray_window_p_jump": float(stray.p_jump),
     }

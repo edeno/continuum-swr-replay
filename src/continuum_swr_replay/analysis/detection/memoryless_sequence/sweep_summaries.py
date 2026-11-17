@@ -74,13 +74,13 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
         (``overall_in_domain``, :data:`IN_DOMAIN_PATH_CM`,
         :data:`IN_DOMAIN_DURATION_S`), and the start and end errors' quartiles
         by duration (``timing_by_duration``, ms). The duration, distance and
-        timing blocks read the replays both detectors matched.
+        timing blocks read the replays both detectors report as the injection
+        (``sliding_matches`` and ``state_space_matches``).
     """
-    # the shuffle never moves a sequence's bounds, so the duration panels read
-    # every accepted sequence that is the injection, before the shuffle
-    found = table[
-        table.sliding_matches_before_shuffle & table.state_space_matches
-    ].copy()
+    # the replays both detectors report, the sliding window under the whole
+    # published definition: the detection rates count those, and a duration or
+    # timing drawn beside them must be of the same events
+    found = table[table.sliding_matches & table.state_space_matches].copy()
     found["sliding_duration_ratio"] = found.sliding_duration_s / found.duration_s
     found["state_space_duration_ratio"] = (
         found.state_space_duration_s / found.duration_s
