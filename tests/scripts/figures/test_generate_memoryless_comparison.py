@@ -43,10 +43,9 @@ def test_a_sliding_window_report_of_a_replay_held_still_is_refused(summary):
         figure.check_summary_claims(changed)
 
 
-def test_the_examples_name_distinct_events_and_end_with_the_control():
+def test_the_examples_name_distinct_events_reported_ones_first():
     events = [example.event for example in figure.EXAMPLES]
     assert len(set(events)) == len(events)
-    # the replays both detectors report come first, the control neither does last
+    # the replays both detectors report come first
     expected = [example.expected for example in figure.EXAMPLES]
     assert expected == sorted(expected, key=["found", "declined"].index)
-    assert figure.EXAMPLES[-1].event == figure.SILENCE_EVENT

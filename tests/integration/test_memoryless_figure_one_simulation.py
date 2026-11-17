@@ -32,6 +32,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simu
     SHORT_PATH_EVENT,
     SHORT_REPLAY_EVENT,
     SILENCE_EVENT,
+    SPARSE_REPLAY_EVENT,
     SWEEP_EVENT,
     simulate_and_decode,
 )
@@ -84,6 +85,7 @@ class TestWhatTheSlidingWindowReports:
             (SHORT_PATH_EVENT, "declined"),
             (SHORT_REPLAY_EVENT, "found"),
             (FAR_REPLAY_EVENT, "found"),
+            (SPARSE_REPLAY_EVENT, "declined"),
         ],
     )
     def test_verdict(self, decoded, event, expected):

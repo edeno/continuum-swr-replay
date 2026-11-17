@@ -6,7 +6,7 @@ This figure runs the published sliding-window sequence detector (Widloski &
 Foster; ``analysis.detection.memoryless_sequence``) beside it, on replays whose
 shape is known:
 
-    a: seven simulated events at a millisecond scale — raster, each detector's
+    a: seven simulated replays at a millisecond scale — raster, each detector's
        decoded position, and three rows of events: what was simulated, what the
        sliding-window detector reports, what the state-space model reports
     b, c: the share of injected replays each detector reports, by how far the
@@ -20,7 +20,7 @@ state-space model asks where the spikes point, and reports each.
 
 Panel a is one recording and its two decodes,
 ``memoryless_sequence.comparison_simulation.simulate_and_decode``: Figure 1's
-run with three replays added, its model and event rule, and the sliding-window
+run with four replays added, its model and event rule, and the sliding-window
 detector at its published
 settings, reading the same place fields. Panels b-e read the aggregates of
 ``scripts/detection/sweep_memoryless_detection.py``, which wrote replays of
@@ -72,6 +72,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simu
     SHORT_REPLAY,
     SHORT_REPLAY_EVENT,
     SILENCE_EVENT,
+    SPARSE_REPLAY_EVENT,
     SWEEP_EVENT,
     simulate_and_decode,
 )
@@ -208,13 +209,12 @@ EXAMPLES = (
     Example(SHORT_PATH_EVENT, "Short path", f"{SHORT_PATH.path_cm:.0f} cm", "declined"),
     Example(REMOTE_STATIONARY_EVENT, "Held still", "at another position", "declined"),
     Example(FRAGMENTED_EVENT, "Scattered", "positions", "declined"),
-    Example(SILENCE_EVENT, "No spikes", "a control", "declined"),
+    Example(SPARSE_REPLAY_EVENT, "Sparse replay", "few spikes", "declined"),
 )
 """Panel a's columns: where the two detectors agree on a replay, where both
-report one and the sliding window's report runs long, where only the state-space
-model reports, and a control neither reports. The sweep, the scattered event,
-the place held still and the silence are Figure 1's examples; the others are
-added to its run."""
+report one and the sliding window's report runs long, and where only the
+state-space model reports. The sweep, the scattered event and the place held
+still are Figure 1's examples; the others are added to its run."""
 
 
 def sliding_events(decoded: dict) -> list[tuple[float, float]]:
@@ -244,6 +244,7 @@ def simulated_events(decoded: dict) -> list[tuple[float, float]]:
             REMOTE_STATIONARY_EVENT,
             SHORT_REPLAY_EVENT,
             FAR_REPLAY_EVENT,
+            SPARSE_REPLAY_EVENT,
         )
     )
 
@@ -300,7 +301,10 @@ def check_recording_claims(decoded: dict, config: MemorylessSequenceConfig) -> N
                 "long; it is not."
             )
     if not np.isfinite(
-        bound_error_ms(decoded, (*ZOOMED_EVENTS, FRAGMENTED_EVENT, FAR_REPLAY_EVENT))
+        bound_error_ms(
+            decoded,
+            (*ZOOMED_EVENTS, FRAGMENTED_EVENT, FAR_REPLAY_EVENT, SPARSE_REPLAY_EVENT),
+        )
     ):
         raise RuntimeError(
             "The state-space model is said to report every simulated replay; it "

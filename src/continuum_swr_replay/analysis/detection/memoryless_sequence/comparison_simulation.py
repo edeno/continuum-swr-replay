@@ -5,8 +5,8 @@ The supplemental memoryless comparison figure
 (``scripts/checks/compare_memoryless_to_reference.py``) read one simulation
 (:func:`simulate_and_decode`): the simulated run of Figure 1
 (``analysis.detection.simulated_run.simulate_run``, whose patterns are the first
-rows of ``event_times``) with a short path, a short replay and a replay far
-from the animal added
+rows of ``event_times``) with a short path, a short replay, a replay far from
+the animal and a sparse one added
 (:data:`SHORT_PATH_EVENT` and the other ``*_EVENT`` constants name the rows). It is decoded twice from one set of place fields: window by window under
 a uniform prior, as the sliding-window detector does, and by the switching
 state-space model of Figure 1, fitted as a real decode is
@@ -71,6 +71,8 @@ __all__ = [
     "SHORT_REPLAY_EVENT",
     "SHUFFLE_RUN_SEED",
     "SILENCE_EVENT",
+    "SPARSE_REPLAY",
+    "SPARSE_REPLAY_EVENT",
     "SWEEP_EVENT",
     "TRACK_HEIGHT_CM",
     "simulate_and_decode",
@@ -115,11 +117,19 @@ FAR_REPLAY = InjectedReplay(
 animal: 90 cm in 300 ms, ending 60 cm short of where the animal rests. Both
 detectors are expected to report it, at much the same times."""
 
+SPARSE_REPLAY = InjectedReplay(
+    start_cm=30.0, path_cm=90.0, duration_s=0.300, peak_rate_hz=20.0, at_s=7.40, seed=0
+)
+"""The same path and duration as :data:`FAR_REPLAY` at a third of its firing
+rate: a handful of spikes. Its path and duration are within the published
+definition's reach, but the detector is expected to decline it; the windows
+hold too few spikes to decode a steady sequence."""
+
 SWEEP_EVENT, FRAGMENTED_EVENT, REMOTE_STATIONARY_EVENT, SILENCE_EVENT = (
     PATTERNS.index(name) for name in ("sweep", "fragmented", "stationary", "silence")
 )
-SHORT_PATH_EVENT, SHORT_REPLAY_EVENT, FAR_REPLAY_EVENT = (
-    len(PATTERNS) + added for added in range(3)
+SHORT_PATH_EVENT, SHORT_REPLAY_EVENT, FAR_REPLAY_EVENT, SPARSE_REPLAY_EVENT = (
+    len(PATTERNS) + added for added in range(4)
 )
 """Rows of ``event_times`` in :func:`simulate_and_decode`: Figure 1's patterns
 (``simulated_run.PATTERNS``), then the events added here, in the order they are
@@ -158,8 +168,8 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
 
     # two replays the sliding-window detector is expected to mis-report and one
     # both detectors should agree on, in the order SHORT_PATH_EVENT,
-    # SHORT_REPLAY_EVENT, FAR_REPLAY_EVENT
-    for replay in (SHORT_PATH, SHORT_REPLAY, FAR_REPLAY):
+    # SHORT_REPLAY_EVENT, FAR_REPLAY_EVENT, SPARSE_REPLAY_EVENT
+    for replay in (SHORT_PATH, SHORT_REPLAY, FAR_REPLAY, SPARSE_REPLAY):
         with_replay, bounds = inject_replay(
             spike_times,
             place_field_means,
