@@ -16,7 +16,7 @@ it calls.
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
-| `detection.json` | `52491282317c` | yes | 128 | 0 |
+| `detection.json` | `4bc1045f44a5` | yes | 128 | 0 |
 | `events.json` | `d7d80592187f` | yes | 353 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
@@ -92,10 +92,10 @@ Sources:
 | `\DetectionControlsJumpOursSpanningMax` | 98 |  | highest such share | `detection.controls_values` |  |
 | `\DetectionControlsJumpOursSpanningMin` | 88 |  | lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts) | `detection.controls_values` |  |
 | `\DetectionControlsJumpSlidingSpanningMax` | 85 |  | highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts | `detection.controls_values` |  |
-| `\DetectionControlsJumpingContinuousFraction` | 35 |  | share of jumping bursts our continuous state alone covers | `detection.controls_values` |  |
-| `\DetectionControlsJumpingNonlocalFraction` | 99 |  | share of jumping bursts our detector's non-local events cover | `detection.controls_values` |  |
-| `\DetectionControlsJumpingSlidingBeforeTestFraction` | 7 |  | the same before its significance test | `detection.controls_values` |  |
-| `\DetectionControlsJumpingSlidingFraction` | 3 |  | share of jumping bursts the sliding window reports under the published definition | `detection.controls_values` |  |
+| `\DetectionControlsJumpingContinuousFraction` | 42 |  | share of jumping events our continuous state alone covers | `detection.controls_values` |  |
+| `\DetectionControlsJumpingNonlocalFraction` | 99 |  | share of jumping events our detector's non-local events cover | `detection.controls_values` |  |
+| `\DetectionControlsJumpingSlidingBeforeTestFraction` | 4 |  | the same before its significance test | `detection.controls_values` |  |
+| `\DetectionControlsJumpingSlidingFraction` | 3 |  | share of jumping events the sliding window reports under the published definition | `detection.controls_values` |  |
 | `\DetectionControlsMultipartTrials` | 432 |  | two-part trials over every jump and chain condition | `detection.controls_values` |  |
 | `\DetectionControlsNoReplayMinutes` | 1.7 | min | minutes of simulated immobility with no replay; no output reported any event there | `detection.controls_values` |  |
 | `\DetectionControlsNoReplayRateBound` | 1.8 | events per minute | 95 % upper bound on the false event rate with none observed (the rule of three over those minutes) | `detection.controls_values` |  |
@@ -104,29 +104,29 @@ Sources:
 | `\DetectionControlsOursMoreInEventTrials` | 24 |  | trials in which it recovers more inside the event than alone | `detection.controls_values` |  |
 | `\DetectionControlsOursRecoveryAloneFraction` | 94 |  | the same with each part decoded alone | `detection.controls_values` |  |
 | `\DetectionControlsOursRecoveryInEventFraction` | 96 |  | share of parts our detector recovers inside the event, the same mean | `detection.controls_values` |  |
-| `\DetectionControlsPlacelessContinuousFraction` | 0 |  | share of place-less bursts our continuous state alone covers | `detection.controls_values` |  |
-| `\DetectionControlsPlacelessFragmentedShareMax` | 93 |  | highest share of a place-less burst's time in the fragmented state, over burst durations | `detection.controls_values` |  |
-| `\DetectionControlsPlacelessFragmentedShareMin` | 72 |  | lowest share of a place-less burst's time in the fragmented state, over burst durations | `detection.controls_values` |  |
-| `\DetectionControlsPlacelessNonlocalFraction` | 96 |  | share of place-less bursts our detector's non-local events cover, pooled over the three peak rates | `detection.controls_values` |  |
-| `\DetectionControlsPlacelessNonlocalLowestRateFraction` | 88 |  | share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover | `detection.controls_values` |  |
-| `\DetectionControlsPlacelessSlidingBeforeTestFraction` | 6 |  | the same before its significance test | `detection.controls_values` |  |
-| `\DetectionControlsPlacelessSlidingFraction` | 0 |  | share of place-less bursts the sliding window reports under the published definition | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessContinuousFraction` | 0 |  | share of place-less events our continuous state alone covers | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessFragmentedShareMax` | 93 |  | highest share of a place-less event's time in the fragmented state, over control event durations | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessFragmentedShareMin` | 72 |  | lowest share of a place-less event's time in the fragmented state, over control event durations | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessNonlocalFraction` | 94 |  | share of place-less events our detector's non-local events cover, pooled over the three peak rates | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessNonlocalLowestRateFraction` | 83 |  | share of place-less events at the lowest peak rate, 20 Hz, our non-local events cover | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessSlidingBeforeTestFraction` | 3 |  | the same before its significance test | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessSlidingFraction` | 0 |  | share of place-less events the sliding window reports under the published definition | `detection.controls_values` |  |
 | `\DetectionControlsSlidingFewerInEventTrials` | 19 |  | trials in which the sliding window recovers fewer parts inside the event than alone | `detection.controls_values` |  |
 | `\DetectionControlsSlidingMoreInEventTrials` | 107 |  | trials in which it recovers more inside the event than alone | `detection.controls_values` |  |
 | `\DetectionControlsSlidingRecoveryAloneFraction` | 64 |  | the same with each part decoded alone | `detection.controls_values` |  |
 | `\DetectionControlsSlidingRecoveryInEventFraction` | 75 |  | share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels | `detection.controls_values` |  |
 | `\DetectionHeldoutEstimatorAgreementMin` | 98 |  | lowest share over folds of the events informative under both content estimates on which they agree | `detection.heldout_values` |  |
 | `\DetectionHeldoutJumpingSupportMax` | 57 |  | the higher of the two | `detection.heldout_values` |  |
-| `\DetectionHeldoutJumpingSupportMin` | 50 |  | jumping bursts: lower of folds A and B's share with held-out support | `detection.heldout_values` |  |
+| `\DetectionHeldoutJumpingSupportMin` | 50 |  | jumping events: lower of folds A and B's share with held-out support | `detection.heldout_values` |  |
 | `\DetectionHeldoutOursOnlyInformativeMax` | 15 |  | the higher of the two | `detection.heldout_values` |  |
 | `\DetectionHeldoutOursOnlyInformativeMin` | 14 |  | replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all | `detection.heldout_values` |  |
 | `\DetectionHeldoutOursOnlySupportFoldC` | 79 |  | the same share in fold C | `detection.heldout_values` |  |
 | `\DetectionHeldoutOursOnlySupportMax` | 90 |  | the higher of the two | `detection.heldout_values` |  |
 | `\DetectionHeldoutOursOnlySupportMin` | 89 |  | replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support | `detection.heldout_values` |  |
-| `\DetectionHeldoutPlacelessInformativeEvents` | 44 |  | informative place-less burst events over the three folds | `detection.heldout_values` |  |
-| `\DetectionHeldoutPlacelessLooseEvents` | 106 |  | place-less burst events informative at that floor | `detection.heldout_values` |  |
-| `\DetectionHeldoutPlacelessLooseSupportedEvents` | 1 |  | place-less burst events with held-out support at a floor of 2 expected spikes | `detection.heldout_values` |  |
-| `\DetectionHeldoutPlacelessSlidingEstimateEvents` | 44 |  | informative place-less burst events under the sliding window's content estimate | `detection.heldout_values` |  |
+| `\DetectionHeldoutPlacelessInformativeEvents` | 44 |  | informative reports on place-less events over the three folds | `detection.heldout_values` |  |
+| `\DetectionHeldoutPlacelessLooseEvents` | 106 |  | reports on place-less events informative at that floor | `detection.heldout_values` |  |
+| `\DetectionHeldoutPlacelessLooseSupportedEvents` | 1 |  | reports on place-less events with held-out support at a floor of 2 expected spikes | `detection.heldout_values` |  |
+| `\DetectionHeldoutPlacelessSlidingEstimateEvents` | 44 |  | informative reports on place-less events under the sliding window's content estimate | `detection.heldout_values` |  |
 | `\DetectionHeldoutPlacelessSlidingEstimateSupportedEvents` | 1 |  | of those, the events with held-out support | `detection.heldout_values` |  |
 | `\DetectionHeldoutPlacelessSupportedEvents` | 0 |  | of those, the events with held-out support | `detection.heldout_values` |  |
 | `\DetectionHeldoutSharedInformativeMax` | 45 |  | the higher of the two | `detection.heldout_values` |  |
@@ -2789,8 +2789,8 @@ without being called, is not listed.
 |---|---|---|---|
 | `survey.method_values` | `reported/survey.py` | `analysis.literature_survey.method_shares` |  |
 | `survey.parameter_values` | `reported/survey.py` | `analysis.literature_survey.parameter_statistics` |  |
-| `detection.controls_values` | `reported/detection.py` | `analysis.detection.memoryless_sequence.sweep_statistics.burst_share_range`, `analysis.detection.memoryless_sequence.sweep_statistics.carving_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.controls_value`, `analysis.detection.memoryless_sequence.sweep_statistics.no_replay_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.part_recovery_statistics` |  |
-| `detection.heldout_values` | `reported/detection.py` | `analysis.detection.memoryless_sequence.sweep_statistics.heldout_event_classes`, `analysis.detection.memoryless_sequence.sweep_statistics.heldout_fold_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.lowest_estimator_agreement`, `analysis.detection.memoryless_sequence.sweep_statistics.placeless_burst_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.pooled_heldout_rate` |  |
+| `detection.controls_values` | `reported/detection.py` | `analysis.detection.memoryless_sequence.sweep_statistics.carving_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.control_event_share_range`, `analysis.detection.memoryless_sequence.sweep_statistics.controls_value`, `analysis.detection.memoryless_sequence.sweep_statistics.no_replay_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.part_recovery_statistics` |  |
+| `detection.heldout_values` | `reported/detection.py` | `analysis.detection.memoryless_sequence.sweep_statistics.heldout_event_classes`, `analysis.detection.memoryless_sequence.sweep_statistics.heldout_fold_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.lowest_estimator_agreement`, `analysis.detection.memoryless_sequence.sweep_statistics.placeless_event_statistics`, `analysis.detection.memoryless_sequence.sweep_statistics.pooled_heldout_rate` |  |
 | `detection.pilot_stray_window_values` | `reported/detection.py` | `analysis.detection.memoryless_sequence.event_table.outside_window_call_statistics` |  |
 | `detection.recording_values` | `reported/detection.py` | none |  |
 | `detection.state_evidence_values` | `reported/detection.py` | none |  |

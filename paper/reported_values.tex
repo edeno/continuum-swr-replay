@@ -36,7 +36,7 @@
 \newcommand{\SurveyTimeBinMin}{2}  % survey.time_bin_min: Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)
 \newcommand{\SurveyTimeBinMode}{20}  % survey.time_bin_mode: Most common decoding time bin, over the 46 numeric cells of Time bin (ms)
 
-% --- detection (commit 52491282317c)
+% --- detection (commit 4bc1045f44a5)
 \newcommand{\DetectionControlsContinuingOursOnePerPartLongestFraction}{96}  % detection.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingOursSpanningShortestFraction}{96}  % detection.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingSlidingOnePerPartLongestFraction}{50}  % detection.controls_continuing_sliding_one_per_part_longest_fraction: continuing chains at the longest gap: share of trials the sliding window reports as one event per part
@@ -48,10 +48,10 @@
 \newcommand{\DetectionControlsJumpOursSpanningMax}{98}  % detection.controls_jump_ours_spanning_max: highest such share
 \newcommand{\DetectionControlsJumpOursSpanningMin}{88}  % detection.controls_jump_ours_spanning_min: lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts)
 \newcommand{\DetectionControlsJumpSlidingSpanningMax}{85}  % detection.controls_jump_sliding_spanning_max: highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts
-\newcommand{\DetectionControlsJumpingContinuousFraction}{35}  % detection.controls_jumping_continuous_fraction: share of jumping bursts our continuous state alone covers
-\newcommand{\DetectionControlsJumpingNonlocalFraction}{99}  % detection.controls_jumping_nonlocal_fraction: share of jumping bursts our detector's non-local events cover
-\newcommand{\DetectionControlsJumpingSlidingBeforeTestFraction}{7}  % detection.controls_jumping_sliding_before_test_fraction: the same before its significance test
-\newcommand{\DetectionControlsJumpingSlidingFraction}{3}  % detection.controls_jumping_sliding_fraction: share of jumping bursts the sliding window reports under the published definition
+\newcommand{\DetectionControlsJumpingContinuousFraction}{42}  % detection.controls_jumping_continuous_fraction: share of jumping events our continuous state alone covers
+\newcommand{\DetectionControlsJumpingNonlocalFraction}{99}  % detection.controls_jumping_nonlocal_fraction: share of jumping events our detector's non-local events cover
+\newcommand{\DetectionControlsJumpingSlidingBeforeTestFraction}{4}  % detection.controls_jumping_sliding_before_test_fraction: the same before its significance test
+\newcommand{\DetectionControlsJumpingSlidingFraction}{3}  % detection.controls_jumping_sliding_fraction: share of jumping events the sliding window reports under the published definition
 \newcommand{\DetectionControlsMultipartTrials}{432}  % detection.controls_multipart_trials: two-part trials over every jump and chain condition
 \newcommand{\DetectionControlsNoReplayMinutes}{1.7}  % detection.controls_no_replay_minutes: minutes of simulated immobility with no replay; no output reported any event there
 \newcommand{\DetectionControlsNoReplayRateBound}{1.8}  % detection.controls_no_replay_rate_bound: 95 % upper bound on the false event rate with none observed (the rule of three over those minutes)
@@ -60,13 +60,13 @@
 \newcommand{\DetectionControlsOursMoreInEventTrials}{24}  % detection.controls_ours_more_in_event_trials: trials in which it recovers more inside the event than alone
 \newcommand{\DetectionControlsOursRecoveryAloneFraction}{94}  % detection.controls_ours_recovery_alone_fraction: the same with each part decoded alone
 \newcommand{\DetectionControlsOursRecoveryInEventFraction}{96}  % detection.controls_ours_recovery_in_event_fraction: share of parts our detector recovers inside the event, the same mean
-\newcommand{\DetectionControlsPlacelessContinuousFraction}{0}  % detection.controls_placeless_continuous_fraction: share of place-less bursts our continuous state alone covers
-\newcommand{\DetectionControlsPlacelessFragmentedShareMax}{93}  % detection.controls_placeless_fragmented_share_max: highest share of a place-less burst's time in the fragmented state, over burst durations
-\newcommand{\DetectionControlsPlacelessFragmentedShareMin}{72}  % detection.controls_placeless_fragmented_share_min: lowest share of a place-less burst's time in the fragmented state, over burst durations
-\newcommand{\DetectionControlsPlacelessNonlocalFraction}{96}  % detection.controls_placeless_nonlocal_fraction: share of place-less bursts our detector's non-local events cover, pooled over the three peak rates
-\newcommand{\DetectionControlsPlacelessNonlocalLowestRateFraction}{88}  % detection.controls_placeless_nonlocal_lowest_rate_fraction: share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover
-\newcommand{\DetectionControlsPlacelessSlidingBeforeTestFraction}{6}  % detection.controls_placeless_sliding_before_test_fraction: the same before its significance test
-\newcommand{\DetectionControlsPlacelessSlidingFraction}{0}  % detection.controls_placeless_sliding_fraction: share of place-less bursts the sliding window reports under the published definition
+\newcommand{\DetectionControlsPlacelessContinuousFraction}{0}  % detection.controls_placeless_continuous_fraction: share of place-less events our continuous state alone covers
+\newcommand{\DetectionControlsPlacelessFragmentedShareMax}{93}  % detection.controls_placeless_fragmented_share_max: highest share of a place-less event's time in the fragmented state, over control event durations
+\newcommand{\DetectionControlsPlacelessFragmentedShareMin}{72}  % detection.controls_placeless_fragmented_share_min: lowest share of a place-less event's time in the fragmented state, over control event durations
+\newcommand{\DetectionControlsPlacelessNonlocalFraction}{94}  % detection.controls_placeless_nonlocal_fraction: share of place-less events our detector's non-local events cover, pooled over the three peak rates
+\newcommand{\DetectionControlsPlacelessNonlocalLowestRateFraction}{83}  % detection.controls_placeless_nonlocal_lowest_rate_fraction: share of place-less events at the lowest peak rate, 20 Hz, our non-local events cover
+\newcommand{\DetectionControlsPlacelessSlidingBeforeTestFraction}{3}  % detection.controls_placeless_sliding_before_test_fraction: the same before its significance test
+\newcommand{\DetectionControlsPlacelessSlidingFraction}{0}  % detection.controls_placeless_sliding_fraction: share of place-less events the sliding window reports under the published definition
 \newcommand{\DetectionControlsSlidingFewerInEventTrials}{19}  % detection.controls_sliding_fewer_in_event_trials: trials in which the sliding window recovers fewer parts inside the event than alone
 \newcommand{\DetectionControlsSlidingMoreInEventTrials}{107}  % detection.controls_sliding_more_in_event_trials: trials in which it recovers more inside the event than alone
 \newcommand{\DetectionControlsSlidingRecoveryAloneFraction}{64}  % detection.controls_sliding_recovery_alone_fraction: the same with each part decoded alone
@@ -91,7 +91,7 @@
 \newcommand{\DetectionHeldoutFragmentedImmobileMismatchedEpochsPositive}{117}  % detection.heldout_fragmented_immobile_mismatched_epochs_positive: epochs whose median held-out evidence of Non-Local Fragmented bouts, immobile is above zero
 \newcommand{\DetectionHeldoutFragmentedImmobileMismatchedEstimate}{0.12}  % detection.heldout_fragmented_immobile_mismatched_estimate: held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's mean epoch median
 \newcommand{\DetectionHeldoutJumpingSupportMax}{57}  % detection.heldout_jumping_support_max: the higher of the two
-\newcommand{\DetectionHeldoutJumpingSupportMin}{50}  % detection.heldout_jumping_support_min: jumping bursts: lower of folds A and B's share with held-out support
+\newcommand{\DetectionHeldoutJumpingSupportMin}{50}  % detection.heldout_jumping_support_min: jumping events: lower of folds A and B's share with held-out support
 \newcommand{\DetectionHeldoutLocalImmobileAnimalsPositive}{5}  % detection.heldout_local_immobile_animals_positive: animals whose mean held-out evidence of Local bouts, immobile is above zero
 \newcommand{\DetectionHeldoutLocalImmobileCiHigh}{4.4}  % detection.heldout_local_immobile_ci_high: upper bound of that interval
 \newcommand{\DetectionHeldoutLocalImmobileCiLow}{1.1}  % detection.heldout_local_immobile_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
@@ -109,10 +109,10 @@
 \newcommand{\DetectionHeldoutOursOnlySupportFoldC}{79}  % detection.heldout_ours_only_support_fold_c: the same share in fold C
 \newcommand{\DetectionHeldoutOursOnlySupportMax}{90}  % detection.heldout_ours_only_support_max: the higher of the two
 \newcommand{\DetectionHeldoutOursOnlySupportMin}{89}  % detection.heldout_ours_only_support_min: replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support
-\newcommand{\DetectionHeldoutPlacelessInformativeEvents}{44}  % detection.heldout_placeless_informative_events: informative place-less burst events over the three folds
-\newcommand{\DetectionHeldoutPlacelessLooseEvents}{106}  % detection.heldout_placeless_loose_events: place-less burst events informative at that floor
-\newcommand{\DetectionHeldoutPlacelessLooseSupportedEvents}{1}  % detection.heldout_placeless_loose_supported_events: place-less burst events with held-out support at a floor of 2 expected spikes
-\newcommand{\DetectionHeldoutPlacelessSlidingEstimateEvents}{44}  % detection.heldout_placeless_sliding_estimate_events: informative place-less burst events under the sliding window's content estimate
+\newcommand{\DetectionHeldoutPlacelessInformativeEvents}{44}  % detection.heldout_placeless_informative_events: informative reports on place-less events over the three folds
+\newcommand{\DetectionHeldoutPlacelessLooseEvents}{106}  % detection.heldout_placeless_loose_events: reports on place-less events informative at that floor
+\newcommand{\DetectionHeldoutPlacelessLooseSupportedEvents}{1}  % detection.heldout_placeless_loose_supported_events: reports on place-less events with held-out support at a floor of 2 expected spikes
+\newcommand{\DetectionHeldoutPlacelessSlidingEstimateEvents}{44}  % detection.heldout_placeless_sliding_estimate_events: informative reports on place-less events under the sliding window's content estimate
 \newcommand{\DetectionHeldoutPlacelessSlidingEstimateSupportedEvents}{1}  % detection.heldout_placeless_sliding_estimate_supported_events: of those, the events with held-out support
 \newcommand{\DetectionHeldoutPlacelessSupportedEvents}{0}  % detection.heldout_placeless_supported_events: of those, the events with held-out support
 \newcommand{\DetectionHeldoutSharedInformativeMax}{45}  % detection.heldout_shared_informative_max: the higher of the two

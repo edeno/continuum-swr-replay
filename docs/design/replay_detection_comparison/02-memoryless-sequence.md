@@ -719,15 +719,15 @@ continuous state alone.
   it is local coding at the track's end, where the animal pauses.
 - **Place-less events** (every cell at one rate unrelated to its field; no spatial
   content), pooled over peak rates of 20, 60 and 160 Hz. Our non-local events cover
-  <!--v:detection.controls_placeless_nonlocal_fraction-->96<!--/v-->% of them, the events spending <!--v:detection.controls_placeless_fragmented_share_min-->72<!--/v-->–<!--v:detection.controls_placeless_fragmented_share_max-->93<!--/v-->% of their time in the fragmented state; <!--v:detection.controls_placeless_nonlocal_lowest_rate_fraction-->88<!--/v-->%
+  <!--v:detection.controls_placeless_nonlocal_fraction-->94<!--/v-->% of them, the events spending <!--v:detection.controls_placeless_fragmented_share_min-->72<!--/v-->–<!--v:detection.controls_placeless_fragmented_share_max-->93<!--/v-->% of their time in the fragmented state; <!--v:detection.controls_placeless_nonlocal_lowest_rate_fraction-->83<!--/v-->%
   even at 20 Hz, where such an event fires about as fast as the local coding it
-  replaces. The continuous state alone covers <!--v:detection.controls_placeless_continuous_fraction-->0<!--/v-->%; the sliding window <!--v:detection.controls_placeless_sliding_fraction-->0<!--/v-->% (<!--v:detection.controls_placeless_sliding_before_test_fraction-->6<!--/v-->% before
+  replaces. The continuous state alone covers <!--v:detection.controls_placeless_continuous_fraction-->0<!--/v-->%; the sliding window <!--v:detection.controls_placeless_sliding_fraction-->0<!--/v-->% (<!--v:detection.controls_placeless_sliding_before_test_fraction-->3<!--/v-->% before
   its significance test). A simulated event with no place in it is therefore a non-local event
   under the project's definition, which counts the fragmented state; what in it the
   fragmented state takes up, incoherence or merely a departure from the local pattern,
   these simulations do not separate.
 - **Jumping events** (a random place every 15 ms). Our non-local events cover <!--v:detection.controls_jumping_nonlocal_fraction-->99<!--/v-->%,
-  which is right; the continuous state alone <!--v:detection.controls_jumping_continuous_fraction-->35<!--/v-->% and the sliding window <!--v:detection.controls_jumping_sliding_fraction-->3<!--/v-->% (<!--v:detection.controls_jumping_sliding_before_test_fraction-->7<!--/v-->% before
+  which is right; the continuous state alone <!--v:detection.controls_jumping_continuous_fraction-->42<!--/v-->% and the sliding window <!--v:detection.controls_jumping_sliding_fraction-->3<!--/v-->% (<!--v:detection.controls_jumping_sliding_before_test_fraction-->4<!--/v-->% before
   its test), each calling a sequence that is not there.
 - **Mid-event jumps**, their far end held 45 cm from where the animal rests. Our
   detector reports one event over both parts in <!--v:detection.controls_jump_ours_spanning_min-->88<!--/v-->–<!--v:detection.controls_jump_ours_spanning_max-->98<!--/v-->% of trials at every jump up to

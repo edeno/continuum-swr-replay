@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "52491282317c",
+ "commit": "4bc1045f44a5",
  "code": {
-  "head": "52491282317ccb814185c1c33cb60feb2f078148",
+  "head": "4bc1045f44a59fad3e87d1d487048981a66d0bb9",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -63,20 +63,20 @@
     "code_sha256": "f8cd0c094a189869c7197487c488034b921917b10f2b6db9e9c7803a81c5c2ac"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/simulation.py": {
-    "sha256": "18e35fc21ee171bc47b24b54b90a13b1f78331eb8f79a1d88619434485585f9d",
-    "code_sha256": "ba3a4f7caa38d3bb567a7f6234ed14a708eccae7dbdd37fc34d68895c5170924"
+    "sha256": "bfb731c21e43f9060a65a8560f03ce4cc05d4a568e5986c0d9f0079f4e46affb",
+    "code_sha256": "d906e85dbe682ee8dd2df892cb1944edcdcc8f88dea05555356dee1f7a9af613"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep.py": {
     "sha256": "93b1efe66779ddf1936adeade59b8edd15c5fcefe92ea23313a9a35a8a8a5dd6",
     "code_sha256": "d0fa6f130b7e01139d6558173a05bc370c09600df9905a2f67fc660e7c6300b2"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep_controls.py": {
-    "sha256": "c000e62e746617ff58ec47f4404bb72e14019e5a95d37dbcac9882036aaa6b6b",
-    "code_sha256": "3e435ef0e60b4a5af6e608df39bc4031212f18726f972b8e23c327b866b879b7"
+    "sha256": "3a9e3c804e27ff1ccdca7ff3519421ba2bcd86cd3423254c7209f9b742852ddc",
+    "code_sha256": "2d25a0b2f2cccb53da248d9f5e60587282570c4d634313e97f5c3a10c6aa8c72"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep_statistics.py": {
-    "sha256": "110d7dca7e5c8406e6f3301bb8a04eb3b94a52e6cdb01971d67bfef63542a8b2",
-    "code_sha256": "ae55757bdffdd11e0d3662b8b28ae0c6a5b8f28fba699b12602ed79af3c1b4b0"
+    "sha256": "c7717ea8aabf1334adb8f56485d1206f0caff7239b79f40ad5c3d8a65b001284",
+    "code_sha256": "eed53bbe96defa344fd47643905119c4a8683b0fb1b363c3538e0e211d51124f"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/window_statistics.py": {
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
@@ -191,8 +191,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "c84c7d8d4caa6d28beb7c405f9bb32f8f58e95ef41d9c74c43ec2a55915eda59",
-    "code_sha256": "d7332cc2af5c28b99ac813e5c477d8abf8892bd4127f91e53a9bc75f1126d7f7"
+    "sha256": "f817660d75d78c1e5cd94570d132a2cf88886b373cb820dc3028e78760297936",
+    "code_sha256": "6d38dfdb640481df0042b534fb108b24793268af72ca81c6b5996fb5d3253642"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -251,8 +251,8 @@
     "code_sha256": "3538164ea50b63e19d21eb91edeff128176d037ef70ea56c4929fcdccab6ea4e"
    },
    "paper/reported/inputs/detection/detection_controls_summary.csv": {
-    "sha256": "36641a18928cd515a3b3baf681ae843ac71eed46b6df578b9a53c68313b7ba22",
-    "code_sha256": "36641a18928cd515a3b3baf681ae843ac71eed46b6df578b9a53c68313b7ba22"
+    "sha256": "d153bb94bfd368dde965c17e9b69f21716982b8d0bd02deda6f02081217370ad",
+    "code_sha256": "d153bb94bfd368dde965c17e9b69f21716982b8d0bd02deda6f02081217370ad"
    },
    "paper/reported/inputs/detection/detection_heldout_summary.csv": {
     "sha256": "fb856765a95ab9d4b02fb93d172f3fef6bb0b97202b6bc47f4d472548318f9e6",
@@ -287,7 +287,7 @@
   },
   {
    "path": "paper/reported/inputs/detection/detection_controls_summary.csv",
-   "sha256": "36641a18928cd515a3b3baf681ae843ac71eed46b6df578b9a53c68313b7ba22"
+   "sha256": "d153bb94bfd368dde965c17e9b69f21716982b8d0bd02deda6f02081217370ad"
   },
   {
    "path": "paper/reported/inputs/detection/detection_heldout_summary.csv",
@@ -450,11 +450,11 @@
    "pending": null
   },
   "controls_jumping_continuous_fraction": {
-   "value": 0.3472222222222222,
+   "value": 0.4166666666666667,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "share of jumping bursts our continuous state alone covers",
+   "description": "share of jumping events our continuous state alone covers",
    "questions": [
     "1.1"
    ],
@@ -468,7 +468,7 @@
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "share of jumping bursts our detector's non-local events cover",
+   "description": "share of jumping events our detector's non-local events cover",
    "questions": [
     "1.1"
    ],
@@ -478,7 +478,7 @@
    "pending": null
   },
   "controls_jumping_sliding_before_test_fraction": {
-   "value": 0.0694444444444444,
+   "value": 0.0416666666666666,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -496,7 +496,7 @@
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "share of jumping bursts the sliding window reports under the published definition",
+   "description": "share of jumping events the sliding window reports under the published definition",
    "questions": [
     "1.1"
    ],
@@ -622,7 +622,7 @@
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "share of place-less bursts our continuous state alone covers",
+   "description": "share of place-less events our continuous state alone covers",
    "questions": [
     "1.1"
    ],
@@ -632,11 +632,11 @@
    "pending": null
   },
   "controls_placeless_fragmented_share_max": {
-   "value": 0.9298841233054796,
+   "value": 0.9295175895094872,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "highest share of a place-less burst's time in the fragmented state, over burst durations",
+   "description": "highest share of a place-less event's time in the fragmented state, over control event durations",
    "questions": [
     "1.1"
    ],
@@ -646,11 +646,11 @@
    "pending": null
   },
   "controls_placeless_fragmented_share_min": {
-   "value": 0.7206379130814943,
+   "value": 0.7156413970321106,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "lowest share of a place-less burst's time in the fragmented state, over burst durations",
+   "description": "lowest share of a place-less event's time in the fragmented state, over control event durations",
    "questions": [
     "1.1"
    ],
@@ -660,11 +660,11 @@
    "pending": null
   },
   "controls_placeless_nonlocal_fraction": {
-   "value": 0.9583333333333334,
+   "value": 0.9444444444444444,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "share of place-less bursts our detector's non-local events cover, pooled over the three peak rates",
+   "description": "share of place-less events our detector's non-local events cover, pooled over the three peak rates",
    "questions": [
     "1.1"
    ],
@@ -674,11 +674,11 @@
    "pending": null
   },
   "controls_placeless_nonlocal_lowest_rate_fraction": {
-   "value": 0.875,
+   "value": 0.8333333333333334,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover",
+   "description": "share of place-less events at the lowest peak rate, 20 Hz, our non-local events cover",
    "questions": [
     "1.1"
    ],
@@ -688,7 +688,7 @@
    "pending": null
   },
   "controls_placeless_sliding_before_test_fraction": {
-   "value": 0.0555555555555555,
+   "value": 0.0277777777777777,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -706,7 +706,7 @@
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "share of place-less bursts the sliding window reports under the published definition",
+   "description": "share of place-less events the sliding window reports under the published definition",
    "questions": [
     "1.1"
    ],
@@ -1056,7 +1056,7 @@
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "jumping bursts: lower of folds A and B's share with held-out support",
+   "description": "jumping events: lower of folds A and B's share with held-out support",
    "questions": [
     "1.1"
    ],
@@ -1308,7 +1308,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "informative place-less burst events over the three folds",
+   "description": "informative reports on place-less events over the three folds",
    "questions": [
     "1.1"
    ],
@@ -1322,7 +1322,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "place-less burst events informative at that floor",
+   "description": "reports on place-less events informative at that floor",
    "questions": [
     "1.1"
    ],
@@ -1336,7 +1336,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "place-less burst events with held-out support at a floor of 2 expected spikes",
+   "description": "reports on place-less events with held-out support at a floor of 2 expected spikes",
    "questions": [
     "1.1"
    ],
@@ -1350,7 +1350,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "informative place-less burst events under the sliding window's content estimate",
+   "description": "informative reports on place-less events under the sliding window's content estimate",
    "questions": [
     "1.1"
    ],

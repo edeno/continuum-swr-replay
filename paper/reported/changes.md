@@ -3750,3 +3750,13 @@ marker, and the computed value now there. Newest last.
 | `docs/design/replay_detection_comparison/05-validation.md` | `detection.heldout_placeless_informative_events` | 19 | 44 |
 | `docs/design/replay_detection_comparison/05-validation.md` | `detection.heldout_placeless_loose_supported_events` | 4 | 1 |
 | `docs/design/replay_detection_comparison/05-validation.md` | `detection.heldout_placeless_loose_events` | 75 | 106 |
+
+## 2026-11-17
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_placeless_nonlocal_fraction` | 96 | 94 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_placeless_nonlocal_lowest_rate_fraction` | 88 | 83 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_placeless_sliding_before_test_fraction` | 6 | 3 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_jumping_continuous_fraction` | 35 | 42 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_jumping_sliding_before_test_fraction` | 7 | 4 |
