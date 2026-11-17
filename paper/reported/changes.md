@@ -3885,3 +3885,16 @@ marker, and the computed value now there. Newest last.
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_replays` | 9,912 | 3,304 |
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_fraction` | 17 | 24 |
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.recording_short_replay_duration_ratio` | 2.0 | 1.9 |
+
+## 2026-11-17
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_state_space_fraction` | 98 | 100 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_state_space_fraction` | 98 | 100 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_only_before_test_replays` | 2 | 0 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_state_space_only_fraction` | 74 | 76 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_domain_state_space_published_fraction` | 99 | 100 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_ours_recovery_in_event_fraction` | 96 | 97 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_ours_fewer_in_event_trials` | 4 | 2 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_ours_more_in_event_trials` | 24 | 25 |

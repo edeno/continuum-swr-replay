@@ -538,7 +538,7 @@ accepted one on duration and dispersion 26% of the time, and that sequence was
 the injected event <!--v:detection.sweep_sliding_before_test_fraction-->25<!--/v-->% of the time. The significance test then removes few: <!--v:detection.sweep_sliding_fraction-->24<!--/v-->%
 under the whole published definition, <!--v:detection.sweep_sliding_spread_only_fraction-->25<!--/v-->% with its spread half alone. The
 state-space model reported non-local activity 91% of the time, and it was the
-injected event <!--v:detection.sweep_state_space_fraction-->98<!--/v-->% of the time. Quoting 26% against 91% compares "replay,
+injected event <!--v:detection.sweep_state_space_fraction-->100<!--/v-->% of the time. Quoting 26% against 91% compares "replay,
 classified" with "non-local, detected"; 79% against 91% is the nearer comparison of
 whether anything was seen at all.
 
@@ -598,17 +598,17 @@ EM M-step, and this sweep calls `fit`, so setting one would change nothing.
 Each reported event is scored on its own for both detectors, and the
 state-space detector's events carry the project's 15 ms minimum; an earlier
 version, replaced on 2026-09-22, scored the union of every state-space stretch above threshold, which
-read 94% rather than <!--v:detection.sweep_state_space_fraction-->98<!--/v-->%. About 4% of the state-space detector's reports come
+read 94% rather than <!--v:detection.sweep_state_space_fraction-->100<!--/v-->%. About 4% of the state-space detector's reports come
 as more than one interval, and the best of them answers for the cell, as the
 best of several accepted sliding-window sequences does (0.3% of cells).
 
 **Almost no cell is found by the sliding window and missed by the state-space model:**
-<!--v:detection.sweep_sliding_only_replays-->0<!--/v--> of <!--v:detection.sweep_replays-->3,304<!--/v--> under the published definition, and <!--v:detection.sweep_sliding_only_before_test_replays-->2<!--/v--> before the significance
+<!--v:detection.sweep_sliding_only_replays-->0<!--/v--> of <!--v:detection.sweep_replays-->3,304<!--/v--> under the published definition, and <!--v:detection.sweep_sliding_only_before_test_replays-->0<!--/v--> before the significance
 test (`found_by_sliding_window_only` and its `_before_shuffle` partner in
 `overall`). In the 5 ms sweep of 2026-11-14 the one such cell is a 40 ms, 45 cm replay
 that the state-space detector did report, bounds within 2 ms of the truth, but whose
 decoded span (89 cm) exceeds the scoring rule's allowance (read from
-`Processed-Data/replay_detection_comparison/memoryless_sweeps/e2331f976fd1/memoryless_detection_sweep.parquet`). <!--v:detection.sweep_state_space_only_fraction-->74<!--/v-->% of cells went the other way. Of those, 65% built a
+`Processed-Data/replay_detection_comparison/memoryless_sweeps/e2331f976fd1/memoryless_detection_sweep.parquet`). <!--v:detection.sweep_state_space_only_fraction-->76<!--/v-->% of cells went the other way. Of those, 65% built a
 candidate that then failed dispersion, 24% built no candidate at all, and <!--v:detection.sweep_failed_test_fraction-->2<!--/v-->% were
 the injected replay but failed the significance test, while the median share of
 windows passing the spread criterion inside the event was 1.00. The spread gate is
@@ -633,7 +633,7 @@ published, against the injected event.
 42 cm and duration over 100 ms, <!--v:detection.sweep_domain_fraction-->23<!--/v-->% of the grid — the sliding window reports <!--v:detection.sweep_domain_sliding_fraction-->90<!--/v-->%
 under the whole published definition (<!--v:detection.sweep_domain_sliding_before_test_fraction-->93<!--/v-->% before its significance test, 67% with the
 spread half alone) and the state-space model <!--v:detection.sweep_domain_state_space_fraction-->100<!--/v-->% (`overall_in_domain`); held to the
-published duration and dispersion criteria, the state-space model reports <!--v:detection.sweep_domain_state_space_published_fraction-->99<!--/v-->%, the
+published duration and dispersion criteria, the state-space model reports <!--v:detection.sweep_domain_state_space_published_fraction-->100<!--/v-->%, the
 same as the sliding window before its test. The remaining three
 quarters of the grid are events the published method is defined not to call
 replays. That is a property of the method worth measuring, and it is why the
@@ -739,10 +739,10 @@ continuous state alone.
   <!--v:detection.controls_elsewhere_ours_one_per_part_shortest_fraction-->4<!--/v-->% of trials at 10 ms and <!--v:detection.controls_elsewhere_ours_one_per_part_longest_fraction-->88<!--/v-->% at 200 ms.
 - **Each part alone**, decoded with exactly the spikes it had in its event and the
   recording's own spikes around it. Pooled over jumps and chains, recovery is higher
-  inside the event than alone: the sliding window <!--v:detection.controls_sliding_recovery_in_event_fraction-->75<!--/v-->% against <!--v:detection.controls_sliding_recovery_alone_fraction-->64<!--/v-->%, ours <!--v:detection.controls_ours_recovery_in_event_fraction-->96<!--/v-->% against
+  inside the event than alone: the sliding window <!--v:detection.controls_sliding_recovery_in_event_fraction-->75<!--/v-->% against <!--v:detection.controls_sliding_recovery_alone_fraction-->64<!--/v-->%, ours <!--v:detection.controls_ours_recovery_in_event_fraction-->97<!--/v-->% against
   <!--v:detection.controls_ours_recovery_alone_fraction-->94<!--/v-->%. The pooled gain hides losses. Paired by trial, the sliding window recovers fewer
-  parts inside the event than alone in <!--v:detection.controls_sliding_fewer_in_event_trials-->19<!--/v--> of <!--v:detection.controls_multipart_trials-->432<!--/v--> trials and more in <!--v:detection.controls_sliding_more_in_event_trials-->107<!--/v-->; ours fewer in <!--v:detection.controls_ours_fewer_in_event_trials-->4<!--/v-->
-  and more in <!--v:detection.controls_ours_more_in_event_trials-->24<!--/v--> (`n_trials_fewer_in_context`, `n_trials_more_in_context`). The sliding
+  parts inside the event than alone in <!--v:detection.controls_sliding_fewer_in_event_trials-->19<!--/v--> of <!--v:detection.controls_multipart_trials-->432<!--/v--> trials and more in <!--v:detection.controls_sliding_more_in_event_trials-->107<!--/v-->; ours fewer in <!--v:detection.controls_ours_fewer_in_event_trials-->2<!--/v-->
+  and more in <!--v:detection.controls_ours_more_in_event_trials-->25<!--/v--> (`n_trials_fewer_in_context`, `n_trials_more_in_context`). The sliding
   window's losses fall most in chains far apart (8 of 120 trials, against 1-3 of 96-120
   elsewhere), and its gains most at a 120 ms jump (32 of 96), where a merged event can
   clear the duration criterion a lone part misses. A part counts as recovered only where the
