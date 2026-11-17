@@ -54,6 +54,46 @@ LARGE_TIMING_ERROR_MS = 100.0
 (:func:`pooled_timing_errors`)."""
 
 
+EXCEEDANCE_THRESHOLDS_MS = (
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80,
+    100, 120, 150, 200, 250, 300, 400, 500, 700, 1000,
+)  # fmt: skip
+"""The absolute timing errors at which :func:`timing_error_exceedance` gives the
+share of replays beyond; :data:`LARGE_TIMING_ERROR_MS` is one of them."""
+
+
+def timing_error_exceedance(found: pd.DataFrame) -> dict[str, float]:
+    """How far off each detector's starts and ends are, as a distribution.
+
+    The share of replays whose absolute error is above each threshold: the
+    whole distribution of the error's size, tail included, which a median and
+    quartiles leave out.
+
+    Parameters
+    ----------
+    found : pd.DataFrame, shape (n_replays, n_columns)
+        The replays both detectors report, as :func:`pooled_timing_errors`
+        reads them.
+
+    Returns
+    -------
+    shares : dict
+        ``<detector>_<edge>_error_beyond_<threshold>ms`` for ``sliding`` and
+        ``state_space``, the edges ``start`` and ``end``, and each threshold of
+        :data:`EXCEEDANCE_THRESHOLDS_MS`: the share of replays whose absolute
+        error is above it.
+    """
+    shares = {}
+    for detector in ("sliding", "state_space"):
+        for edge in ("start", "end"):
+            absolute_ms = 1000.0 * found[f"{detector}_{edge}_error_s"].abs()
+            for threshold_ms in EXCEEDANCE_THRESHOLDS_MS:
+                shares[f"{detector}_{edge}_error_beyond_{threshold_ms}ms"] = float(
+                    (absolute_ms > threshold_ms).mean()
+                )
+    return shares
+
+
 def against_spike_span(table: pd.DataFrame) -> pd.DataFrame:
     """The replays' timing measured against their own first and last spike.
 
@@ -176,8 +216,9 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
         (``overall``) and over the cells the published definition can accept
         (``overall_in_domain``, :data:`IN_DOMAIN_PATH_CM`,
         :data:`IN_DOMAIN_DURATION_S`), and the start and end errors' quartiles
-        by duration (``timing_by_duration``, ms) and pooled (``timing_pooled``,
-        :func:`pooled_timing_errors`). The duration, distance and
+        by duration (``timing_by_duration``, ms), pooled (``timing_pooled``,
+        :func:`pooled_timing_errors`) and as a distribution
+        (``timing_exceedance``, :func:`timing_error_exceedance`). The duration, distance and
         timing blocks read the replays both detectors report as the injection
         (``sliding_matches`` and ``state_space_matches``), their durations and
         errors against each replay's own first and last spike
@@ -424,6 +465,13 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
     )
     pooled["summary"] = "timing_pooled"
     parts.append(pooled)
+    exceedance = (
+        pd.Series(timing_error_exceedance(found), name="value")
+        .rename_axis("measure")
+        .reset_index()
+    )
+    exceedance["summary"] = "timing_exceedance"
+    parts.append(exceedance)
 
     # the grouping column is not called "aggregate": that name shadows
     # DataFrame.aggregate, so frame.aggregate == "x" compares a method and

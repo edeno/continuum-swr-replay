@@ -578,17 +578,19 @@ def plot_simulated_run(
     examples: list[Example],
     posterior_vmax: float,
 ) -> None:
-    """Panel d: raster, decoded position, non-local probability and speed.
+    """Panel d: raster, decoded position, state probabilities, non-local
+    probability and speed.
 
     The raster is sorted by place-field position and sits directly above the
     decoded position, so the spikes can be read against the decode. Numbered
     flags mark the examples of panel e.
     """
-    gs = slot.subgridspec(4, 1, height_ratios=[0.9, 0.9, 0.5, 0.42], hspace=0.22)
+    gs = slot.subgridspec(5, 1, height_ratios=[0.8, 0.8, 0.5, 0.5, 0.48], hspace=0.24)
     ax_raster = fig.add_subplot(gs[0])
     ax_posterior = fig.add_subplot(gs[1], sharex=ax_raster)
-    ax_non_local = fig.add_subplot(gs[2], sharex=ax_raster)
-    ax_speed = fig.add_subplot(gs[3], sharex=ax_raster)
+    ax_states = fig.add_subplot(gs[2], sharex=ax_raster)
+    ax_non_local = fig.add_subplot(gs[3], sharex=ax_raster)
+    ax_speed = fig.add_subplot(gs[4], sharex=ax_raster)
 
     plot_raster(ax_raster, sim.sorted_spikes, linewidth=0.5, rasterized=True)
     ax_raster.set_ylabel("Neuron, by\nfield position", fontsize=LABEL_SIZE, labelpad=3)
@@ -638,6 +640,21 @@ def plot_simulated_run(
         va="center",
         linespacing=0.95,
     )
+
+    # The states' probabilities sum to one at every time: stacked, each state's
+    # band is its share.
+    ax_states.stackplot(
+        sim.time,
+        sim.state_probabilities.T,
+        colors=[
+            STATE_COLORS[state.removeprefix("Non-Local ")] for state in sim.state_names
+        ],
+        linewidth=0,
+        rasterized=True,
+    )
+    ax_states.set_ylim(0, 1)
+    ax_states.set_yticks([0, 1])
+    ax_states.set_ylabel("State\nprob.", fontsize=LABEL_SIZE, labelpad=3)
 
     for start, end in sim.non_local_events:
         ax_non_local.axvspan(start, end, **NON_LOCAL_SHADE)
@@ -709,7 +726,7 @@ def plot_simulated_run(
     # The run is shown until the animal is back at the track's start after the
     # last example; the pauses after that hold no example.
     overview_end = _next_time_at_track_start(sim, examples[-1].window[1])
-    axes = (ax_raster, ax_posterior, ax_non_local, ax_speed)
+    axes = (ax_raster, ax_posterior, ax_states, ax_non_local, ax_speed)
     for ax in axes:
         ax.set_xlim(sim.time[0], overview_end)
         ax.tick_params(labelsize=SMALL_SIZE, length=2)
@@ -894,7 +911,7 @@ def generate_figure() -> Figure:
         wspace=0.25,
     )
     gs_d = fig.add_gridspec(
-        1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.66, bottom=0.375
+        1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.66, bottom=0.36
     )
     gs_e = fig.add_gridspec(
         1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.30, bottom=0.055

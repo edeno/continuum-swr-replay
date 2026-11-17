@@ -61,6 +61,7 @@ from matplotlib.gridspec import SubplotSpec
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     sweep_statistics,
+    sweep_summaries,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     CONFIG,
@@ -803,44 +804,52 @@ TIMING_MEASURES = tuple(
 
 
 def plot_edge_error(ax: Axes, summary: pd.DataFrame, edge: str) -> None:
-    """Reported minus true start or end, for replays both detectors report.
+    """How far off each detector's onset or offset is, for replays both report.
 
-    The line is the median and the band the quartiles, at each true duration.
+    The share of replays whose absolute error, against the replay's own first
+    or last spike, is beyond each size: a curve's height at 50% is its median,
+    and its right end is its tail.
     """
-    timing = sweep_statistics.sweep_by_duration(
-        summary, "timing_by_duration", TIMING_MEASURES
+    shares = sweep_statistics.sweep_timing_exceedance(summary)
+    # a log axis has no zero: the curves start at the smallest size above it
+    shares = shares[shares.index > 0]
+    ax.axvline(
+        sweep_summaries.LARGE_TIMING_ERROR_MS,
+        color="#999999",
+        linewidth=0.6,
+        linestyle=":",
     )
-    duration_ms = 1000 * timing.index.to_numpy()
-    ax.axhline(0.0, color="#999999", linewidth=0.6, linestyle=":")
     for detector, color, label in (
         ("sliding", SLIDING_COLOR, SLIDING),
         ("state_space", STATE_SPACE_COLOR, STATE_SPACE),
     ):
-        median, low, high = (
-            timing[f"{detector}_{edge}_error_ms_{statistic}"].to_numpy()
-            for statistic in ("median", "q25", "q75")
-        )
-        ax.fill_between(duration_ms, low, high, color=color, alpha=0.2, linewidth=0)
-        ax.plot(
-            duration_ms,
-            median,
+        ax.step(
+            shares.index.to_numpy(),
+            100 * shares[f"{detector}_{edge}"].to_numpy(),
+            where="post",
             color=color,
             linewidth=1.0,
-            marker="o",
-            markersize=2.5,
             label=label,
         )
+    ax.set_xscale("log")
+    ax.set_xlim(shares.index[0], shares.index[-1])
+    ax.set_xticks([1, 10, 100, 1000], ["1", "10", "100", "1000"])
+    # the last label ends at the axis's end, inside the figure's width
+    ax.get_xticklabels()[-1].set_horizontalalignment("right")
+    ax.set_ylim(0, 100)
+    ax.set_yticks([0, 50, 100])
     ax.tick_params(labelsize=SMALL_SIZE, length=2)
-    ax.set_xlabel("Duration (ms)", fontsize=LABEL_SIZE, labelpad=2)
-    ax.set_ylabel(
-        f"Reported − simulated\n{'onset' if edge == 'start' else 'offset'} (ms)",
+    ax.tick_params(which="minor", length=1)
+    ax.set_xlabel(
+        f"{'Onset' if edge == 'start' else 'Offset'} error (ms)",
         fontsize=LABEL_SIZE,
-        labelpad=3,
+        labelpad=2,
     )
 
 
 def plot_sweep(fig: Figure, slot: SubplotSpec, summary: pd.DataFrame) -> None:
-    """Panels d-g: detection by path and duration, then onset and offset error."""
+    """Panels d-g: detection by path and duration, then how far off onset and
+    offset are."""
     gs = slot.subgridspec(
         1, 6, width_ratios=[1, 1, 0.045, 0.6, 0.66, 0.66], wspace=0.12
     )
@@ -866,20 +875,31 @@ def plot_sweep(fig: Figure, slot: SubplotSpec, summary: pd.DataFrame) -> None:
     colorbar.set_label("Replays reported (%)", fontsize=SMALL_SIZE, labelpad=2)
     colorbar.outline.set_linewidth(0.5)
 
-    timing = gs[4:].subgridspec(1, 2, wspace=0.85)
+    timing = gs[4:].subgridspec(1, 2, wspace=0.2)
     ax_onset = fig.add_subplot(timing[0])
     ax_offset = fig.add_subplot(timing[1])
     plot_edge_error(ax_onset, summary, "start")
     plot_edge_error(ax_offset, summary, "end")
-    ax_offset.legend(
-        fontsize=SMALL_SIZE,
-        frameon=False,
-        handlelength=1.2,
-        labelspacing=0.2,
-        loc="lower right",
-        bbox_to_anchor=(1.0, 1.0),
-        borderaxespad=0,
+    ax_onset.set_ylabel(
+        "Replays with a\nlarger error (%)", fontsize=LABEL_SIZE, labelpad=3
     )
+    ax_offset.tick_params(labelleft=False)
+    # Each curve is named once, where the space beside it is empty, in the
+    # colours of the two detection grids.
+    for ax, label, color, x, y in (
+        (ax_offset, SLIDING, SLIDING_COLOR, 130, 50),
+        (ax_onset, STATE_SPACE, STATE_SPACE_COLOR, 1.25, 30),
+    ):
+        ax.text(
+            x,
+            y,
+            label.replace(" ", "\n"),
+            color=color,
+            fontsize=SMALL_SIZE,
+            ha="left",
+            va="center",
+            linespacing=0.95,
+        )
 
 
 def check_summary_claims(summary: pd.DataFrame) -> None:

@@ -20,6 +20,7 @@ stores its timing errors in milliseconds, and the statistics of them stay in
 milliseconds.
 """
 
+import re
 from collections.abc import Sequence
 
 import numpy as np
@@ -42,6 +43,7 @@ __all__ = [
     "sweep_jump_pass_statistics",
     "sweep_measures",
     "sweep_pooled_timing_statistics",
+    "sweep_timing_exceedance",
     "sweep_timing_statistics",
 ]
 
@@ -243,6 +245,64 @@ def sweep_pooled_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
             "of it is missing"
         )
     return {str(measure): float(value) for measure, value in pooled.items()}
+
+
+_EXCEEDANCE_MEASURE = re.compile(
+    r"(?P<detector>sliding|state_space)_(?P<edge>start|end)_error_beyond_"
+    r"(?P<threshold_ms>\d+)ms"
+)
+
+
+def sweep_timing_exceedance(summary: pd.DataFrame) -> pd.DataFrame:
+    """The share of replays whose start or end error is beyond each size.
+
+    Parameters
+    ----------
+    summary : pd.DataFrame, shape (n_rows, n_columns)
+        The replay sweep's summary, with its ``timing_exceedance`` block
+        (``sweep_summaries.timing_error_exceedance``).
+
+    Returns
+    -------
+    shares : pd.DataFrame, shape (n_thresholds, 4)
+        Indexed by ``threshold_ms``, smallest first; the columns
+        ``sliding_start``, ``sliding_end``, ``state_space_start`` and
+        ``state_space_end`` hold the share of the replays both detectors report
+        whose absolute error is above the threshold.
+
+    Raises
+    ------
+    ValueError
+        If the block is absent, a measure of it is not one of these, or a share
+        is missing.
+    """
+    block = sweep_measures(summary, "timing_exceedance")
+    rows = []
+    for measure, value in block.items():
+        match = _EXCEEDANCE_MEASURE.fullmatch(str(measure))
+        if match is None:
+            raise ValueError(
+                f"replay sweep summary: timing_exceedance holds {measure!r}, which "
+                "is not a share beyond a threshold"
+            )
+        rows.append(
+            {
+                "threshold_ms": int(match["threshold_ms"]),
+                "column": f"{match['detector']}_{match['edge']}",
+                "share": float(value),
+            }
+        )
+    if not rows:
+        raise ValueError("replay sweep summary: the timing_exceedance block is absent")
+    shares = pd.DataFrame(rows).pivot(
+        index="threshold_ms", columns="column", values="share"
+    )
+    shares.columns.name = None
+    if shares.isna().any().any():
+        raise ValueError(
+            "replay sweep summary: timing_exceedance lacks a share at some threshold"
+        )
+    return shares.sort_index()
 
 
 def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:

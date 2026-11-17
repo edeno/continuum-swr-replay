@@ -922,3 +922,47 @@ def test_pooled_timing_statistics_refuse_an_absent_block_or_a_missing_value(valu
     summary = pd.DataFrame(rows, columns=["summary", "measure", "value"])
     with pytest.raises(ValueError, match="timing_pooled"):
         stats.sweep_pooled_timing_statistics(summary)
+
+
+def test_timing_exceedance_is_a_table_by_threshold():
+    summary = pd.DataFrame(
+        [
+            ("timing_exceedance", f"{column}_error_beyond_{threshold}ms", share)
+            for threshold, share in ((100, 0.2), (0, 1.0))
+            for column in (
+                "sliding_start",
+                "sliding_end",
+                "state_space_start",
+                "state_space_end",
+            )
+        ],
+        columns=["summary", "measure", "value"],
+    )
+    shares = stats.sweep_timing_exceedance(summary)
+
+    assert shares.index.tolist() == [0, 100]
+    assert shares["state_space_end"].tolist() == [1.0, 0.2]
+    assert sorted(shares.columns) == [
+        "sliding_end",
+        "sliding_start",
+        "state_space_end",
+        "state_space_start",
+    ]
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [],
+        [("timing_exceedance", "sliding_start_error_beyond_soon", 0.5)],
+        [
+            ("timing_exceedance", "sliding_start_error_beyond_0ms", 1.0),
+            ("timing_exceedance", "sliding_start_error_beyond_5ms", 0.5),
+            ("timing_exceedance", "sliding_end_error_beyond_0ms", 1.0),
+        ],
+    ],
+)
+def test_timing_exceedance_refuses_an_absent_or_incomplete_block(rows):
+    summary = pd.DataFrame(rows, columns=["summary", "measure", "value"])
+    with pytest.raises(ValueError, match="timing_exceedance"):
+        stats.sweep_timing_exceedance(summary)

@@ -139,6 +139,37 @@ class TestReplaySweepSummary:
         assert pooled["sliding_end_error_ms_far_share"] == 0.5
         assert pooled["state_space_end_error_ms_far_share"] == 0.0
 
+    def test_exceedance_is_the_share_of_replays_beyond_each_error_size(self):
+        shares = self.values("timing_exceedance").set_index("measure").value
+
+        # the sliding window's start errors against the first spike: 3 and 10 ms
+        assert shares["sliding_start_error_beyond_0ms"] == 1.0
+        assert shares["sliding_start_error_beyond_2ms"] == 1.0
+        assert shares["sliding_start_error_beyond_3ms"] == 0.5
+        assert shares["sliding_start_error_beyond_10ms"] == 0.0
+        # the state-space detector's end errors: 20 and 0 ms
+        assert shares["state_space_end_error_beyond_0ms"] == 0.5
+        assert shares["state_space_end_error_beyond_20ms"] == 0.0
+        assert len(shares) == 4 * len(sweep_summaries.EXCEEDANCE_THRESHOLDS_MS)
+
+    def test_the_far_share_is_the_exceedance_at_its_threshold(self):
+        cells = replay_cells()
+        cells.loc[3, "sliding_end_error_s"] = 0.150
+        found = sweep_summaries.against_spike_span(
+            cells[cells.sliding_matches & cells.state_space_matches]
+        )
+        far_ms = int(sweep_summaries.LARGE_TIMING_ERROR_MS)
+
+        assert (
+            sweep_summaries.timing_error_exceedance(found)[
+                f"sliding_end_error_beyond_{far_ms}ms"
+            ]
+            == sweep_summaries.pooled_timing_errors(found)[
+                "sliding_end_error_ms_far_share"
+            ]
+            == 0.5
+        )
+
     def test_the_misses_are_the_state_space_matches_the_window_lost(self):
         overall = self.values("overall").set_index("measure").value
 
