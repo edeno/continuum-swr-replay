@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 
 __all__ = [
-    "burst_share_range",
+    "control_event_share_range",
     "carving_statistics",
     "controls_value",
     "heldout_event_classes",
@@ -35,7 +35,7 @@ __all__ = [
     "no_replay_statistics",
     "part_recovery_statistics",
     "parts_by_level",
-    "placeless_burst_statistics",
+    "placeless_event_statistics",
     "pooled_heldout_rate",
     "sweep_by_duration",
     "sweep_grid_statistics",
@@ -339,7 +339,7 @@ def controls_value(
     ----------
     controls : pd.DataFrame, shape (n_rows, n_columns)
         The controls summary, with ``summary`` (the block), ``measure``,
-        ``condition``, ``level`` (a jump in cm, a gap or a burst duration in
+        ``condition``, ``level`` (a jump in cm, a gap or a control event duration in
         seconds; missing on a row pooled over levels), ``detector`` and
         ``value``.
     block, measure, condition, detector : str
@@ -451,20 +451,20 @@ def no_replay_statistics(controls: pd.DataFrame) -> dict[str, float]:
     }
 
 
-def burst_share_range(
+def control_event_share_range(
     controls: pd.DataFrame, condition: str, share: str, detector: str
 ) -> dict[str, float]:
-    """The range, over burst durations, of the share of a burst's time in a state.
+    """The range, over control event durations, of the share of an event's time in a state.
 
     Parameters
     ----------
     controls : pd.DataFrame, shape (n_rows, n_columns)
         The controls summary (:func:`controls_value`).
     condition : str
-        A burst condition (``"placeless_burst"`` or ``"jumping_burst"``).
+        A control event condition (``"placeless_event"`` or ``"jumping_event"``).
     share : str
         ``"fragmented_share"`` or ``"continuous_share"``: the mean share of a
-        burst's time the detector output gives that state.
+        event's time the detector output gives that state.
     detector : str
         The detector output (a state-space one; the sliding window has no
         states).
@@ -472,23 +472,25 @@ def burst_share_range(
     Returns
     -------
     statistics : dict
-        ``min`` and ``max``, the lowest and highest share over the burst
+        ``min`` and ``max``, the lowest and highest share over the control event
         durations the summary has a row of the share for.
 
     Raises
     ------
     ValueError
-        If the summary has no such share at any burst duration, or not exactly
+        If the summary has no such share at any control event duration, or not exactly
         one of the detector output's at a duration.
     """
-    durations = _levels(controls, condition, "bursts", share)
+    durations = _levels(controls, condition, "control_events", share)
     if not durations:
         raise ValueError(
-            f"controls summary: no {share} of {condition} at any burst duration"
+            f"controls summary: no {share} of {condition} at any control event duration"
         )
     shares = np.array(
         [
-            controls_value(controls, "bursts", share, condition, duration, detector)
+            controls_value(
+                controls, "control_events", share, condition, duration, detector
+            )
             for duration in durations
         ]
     )
@@ -796,12 +798,12 @@ def heldout_fold_statistics(
     }
 
 
-def placeless_burst_statistics(
+def placeless_event_statistics(
     heldout: pd.DataFrame, folds: Sequence[str]
 ) -> dict[str, int]:
-    """Place-less bursts in the held-out check, and how many have held-out support.
+    """Place-less events in the held-out check, and how many have held-out support.
 
-    A place-less burst is an event whose truth is ``"no_content"``, of either
+    A place-less event is an event whose truth is ``"no_content"``, of either
     class the state-space detector reported (``"ours_only"``, ``"shared"``).
     Support for one is false support: it represents no place.
 
@@ -815,7 +817,7 @@ def placeless_burst_statistics(
     Returns
     -------
     statistics : dict
-        - ``n_events``: the informative place-less burst events, summed over
+        - ``n_events``: the informative reports on place-less events, summed over
           the folds, under the state-space content estimate
           (:func:`heldout_fold_statistics`).
         - ``n_supported``: of those, the events with held-out support.

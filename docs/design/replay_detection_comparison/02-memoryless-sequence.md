@@ -717,16 +717,16 @@ continuous state alone.
   recordings, no output reported any event: fewer than <!--v:detection.controls_no_replay_rate_bound-->1.8<!--/v--> per minute at 95%
   confidence. The simulator's seed changes the spikes, not the trajectory, so all of
   it is local coding at the track's end, where the animal pauses.
-- **Place-less bursts** (every cell at one rate unrelated to its field; no spatial
+- **Place-less events** (every cell at one rate unrelated to its field; no spatial
   content), pooled over peak rates of 20, 60 and 160 Hz. Our non-local events cover
-  <!--v:detection.controls_placeless_nonlocal_fraction-->96<!--/v-->% of them, the bursts spending <!--v:detection.controls_placeless_fragmented_share_min-->72<!--/v-->–<!--v:detection.controls_placeless_fragmented_share_max-->93<!--/v-->% of their time in the fragmented state; <!--v:detection.controls_placeless_nonlocal_lowest_rate_fraction-->88<!--/v-->%
-  even at 20 Hz, where such a burst fires about as fast as the local coding it
+  <!--v:detection.controls_placeless_nonlocal_fraction-->96<!--/v-->% of them, the events spending <!--v:detection.controls_placeless_fragmented_share_min-->72<!--/v-->–<!--v:detection.controls_placeless_fragmented_share_max-->93<!--/v-->% of their time in the fragmented state; <!--v:detection.controls_placeless_nonlocal_lowest_rate_fraction-->88<!--/v-->%
+  even at 20 Hz, where such an event fires about as fast as the local coding it
   replaces. The continuous state alone covers <!--v:detection.controls_placeless_continuous_fraction-->0<!--/v-->%; the sliding window <!--v:detection.controls_placeless_sliding_fraction-->0<!--/v-->% (<!--v:detection.controls_placeless_sliding_before_test_fraction-->6<!--/v-->% before
-  its significance test). A burst with no place in it is therefore a non-local event
+  its significance test). A simulated event with no place in it is therefore a non-local event
   under the project's definition, which counts the fragmented state; what in it the
   fragmented state takes up, incoherence or merely a departure from the local pattern,
   these simulations do not separate.
-- **Jumping bursts** (a random place every 15 ms). Our non-local events cover <!--v:detection.controls_jumping_nonlocal_fraction-->99<!--/v-->%,
+- **Jumping events** (a random place every 15 ms). Our non-local events cover <!--v:detection.controls_jumping_nonlocal_fraction-->99<!--/v-->%,
   which is right; the continuous state alone <!--v:detection.controls_jumping_continuous_fraction-->35<!--/v-->% and the sliding window <!--v:detection.controls_jumping_sliding_fraction-->3<!--/v-->% (<!--v:detection.controls_jumping_sliding_before_test_fraction-->7<!--/v-->% before
   its test), each calling a sequence that is not there.
 - **Mid-event jumps**, their far end held 45 cm from where the animal rests. Our
@@ -770,15 +770,15 @@ shared events are in the summary under their own `detector`.
   fold; shared replays in <!--v:detection.heldout_shared_support_min-->97<!--/v-->–<!--v:detection.heldout_shared_support_max-->100<!--/v-->%.
 - **The test rarely supported events without content, on few of them.**
   <!--v:detection.heldout_placeless_supported_events-->0<!--/v--> of the
-  <!--v:detection.heldout_placeless_informative_events-->44<!--/v--> informative place-less burst events have
+  <!--v:detection.heldout_placeless_informative_events-->44<!--/v--> informative reports on place-less events have
   support (<!--v:detection.heldout_placeless_sliding_estimate_supported_events-->1<!--/v--> of
   <!--v:detection.heldout_placeless_sliding_estimate_events-->44<!--/v--> under the sliding window's content
   estimate); at a floor of 2 expected spikes, <!--v:detection.heldout_placeless_loose_supported_events-->1<!--/v-->
-  of <!--v:detection.heldout_placeless_loose_events-->106<!--/v--> do. Jumping bursts, which do represent places,
+  of <!--v:detection.heldout_placeless_loose_events-->106<!--/v--> do. Jumping events, which do represent places,
   <!--v:detection.heldout_jumping_support_min-->50<!--/v-->–<!--v:detection.heldout_jumping_support_max-->57<!--/v-->%. On the no-replay
   stretches neither detector reported an event from discovery cells, so no event of
   pure local coding reached the test: the false-support rate rests on place-less
-  bursts alone.
+  events alone.
 - **The content estimate barely matters here.** Ours and the sliding window's agree on
   <!--v:detection.heldout_estimator_agreement_min-->98<!--/v-->% or more of the events informative under both.
 - **The sliding window reported no event our detector missed**, so there is no

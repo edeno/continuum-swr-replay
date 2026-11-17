@@ -279,18 +279,18 @@ CONTROLS_ROWS = [
     ("no_replay", "events_per_minute", "no_replay", np.nan, OURS, 7.0),
     ("provenance", "n_seeds", np.nan, np.nan, np.nan, 4.0),
     ("provenance", "n_recordings", np.nan, np.nan, np.nan, 8.0),
-    ("bursts", "called_rate", "placeless_burst", np.nan, OURS, 0.9),
-    ("bursts", "called_rate", "placeless_burst", 0.08, OURS, 0.8),
-    ("bursts", "called_rate", "placeless_burst", np.nan, SLIDING, 0.1),
-    ("bursts", "called_rate", "jumping_burst", np.nan, OURS, 1.0),
-    ("bursts", "fragmented_share", "placeless_burst", 0.08, OURS, 0.6),
-    ("bursts", "fragmented_share", "placeless_burst", 0.2, OURS, 0.75),
-    ("bursts", "fragmented_share", "placeless_burst", 0.5, OURS, 0.7),
-    ("bursts", "fragmented_share", "jumping_burst", 0.08, OURS, 0.1),
+    ("control_events", "called_rate", "placeless_event", np.nan, OURS, 0.9),
+    ("control_events", "called_rate", "placeless_event", 0.08, OURS, 0.8),
+    ("control_events", "called_rate", "placeless_event", np.nan, SLIDING, 0.1),
+    ("control_events", "called_rate", "jumping_event", np.nan, OURS, 1.0),
+    ("control_events", "fragmented_share", "placeless_event", 0.08, OURS, 0.6),
+    ("control_events", "fragmented_share", "placeless_event", 0.2, OURS, 0.75),
+    ("control_events", "fragmented_share", "placeless_event", 0.5, OURS, 0.7),
+    ("control_events", "fragmented_share", "jumping_event", 0.08, OURS, 0.1),
     # another output's share at one duration, and a row pooled over durations
-    ("bursts", "fragmented_share", "placeless_burst", 0.2, SLIDING, 0.01),
-    ("bursts", "fragmented_share", "placeless_burst", np.nan, OURS, 0.99),
-    ("bursts", "continuous_share", "placeless_burst", 0.08, OURS, 0.05),
+    ("control_events", "fragmented_share", "placeless_event", 0.2, SLIDING, 0.01),
+    ("control_events", "fragmented_share", "placeless_event", np.nan, OURS, 0.99),
+    ("control_events", "continuous_share", "placeless_event", 0.08, OURS, 0.05),
     # jumps of 0, 20, 40 and 80 cm, listed out of order
     *_cells("segmentation_spanning", "j1", OURS, {20: 0.9, 0: 0.5, 80: 0.4, 40: 0.2}),
     *_cells("segmentation_spanning", "j2", OURS, {0: 0.7, 20: 0.7, 40: 0.0, 80: 0.2}),
@@ -317,7 +317,7 @@ CONTROLS = _controls(CONTROLS_ROWS)
 def test_controls_value_reads_one_row_at_a_level_or_pooled_over_levels():
     def called(level):
         return stats.controls_value(
-            CONTROLS, "bursts", "called_rate", "placeless_burst", level, OURS
+            CONTROLS, "control_events", "called_rate", "placeless_event", level, OURS
         )
 
     assert called(None) == 0.9
@@ -327,12 +327,12 @@ def test_controls_value_reads_one_row_at_a_level_or_pooled_over_levels():
 def test_controls_value_refuses_no_row_and_several_rows():
     with pytest.raises(ValueError, match="0 rows"):
         stats.controls_value(
-            CONTROLS, "bursts", "called_rate", "placeless_burst", 0.3, OURS
+            CONTROLS, "control_events", "called_rate", "placeless_event", 0.3, OURS
         )
     twice = pd.concat([CONTROLS, CONTROLS.iloc[[7]]], ignore_index=True)
     with pytest.raises(ValueError, match="2 rows"):
         stats.controls_value(
-            twice, "bursts", "called_rate", "placeless_burst", None, OURS
+            twice, "control_events", "called_rate", "placeless_event", None, OURS
         )
 
 
@@ -380,29 +380,33 @@ def test_no_replay_statistics_refuse_two_rows_of_the_minutes_or_recordings(measu
         stats.no_replay_statistics(CONTROLS[CONTROLS["measure"] != measure])
 
 
-def test_burst_share_range_is_over_one_outputs_shares_at_the_burst_durations():
-    result = stats.burst_share_range(
-        CONTROLS, "placeless_burst", "fragmented_share", OURS
+def test_control_event_share_range_is_over_one_outputs_shares_at_the_event_durations():
+    result = stats.control_event_share_range(
+        CONTROLS, "placeless_event", "fragmented_share", OURS
     )
     assert result == {"min": 0.6, "max": 0.75}
 
 
-def test_burst_share_range_refuses_a_duration_the_output_has_no_one_share_at():
+def test_control_event_share_range_refuses_a_duration_the_output_has_no_one_share_at():
     # the sliding window has a share at one of the three durations only
     with pytest.raises(ValueError, match="0 rows"):
-        stats.burst_share_range(
-            CONTROLS, "placeless_burst", "fragmented_share", SLIDING
+        stats.control_event_share_range(
+            CONTROLS, "placeless_event", "fragmented_share", SLIDING
         )
     twice = pd.concat(
         [CONTROLS, CONTROLS[CONTROLS["value"] == 0.75]], ignore_index=True
     )
     with pytest.raises(ValueError, match="2 rows"):
-        stats.burst_share_range(twice, "placeless_burst", "fragmented_share", OURS)
+        stats.control_event_share_range(
+            twice, "placeless_event", "fragmented_share", OURS
+        )
 
 
-def test_burst_share_range_refuses_a_condition_with_no_share():
-    with pytest.raises(ValueError, match="at any burst duration"):
-        stats.burst_share_range(CONTROLS, "no_such_burst", "fragmented_share", OURS)
+def test_control_event_share_range_refuses_a_condition_with_no_share():
+    with pytest.raises(ValueError, match="at any control event duration"):
+        stats.control_event_share_range(
+            CONTROLS, "no_such_event", "fragmented_share", OURS
+        )
 
 
 def test_parts_by_level_is_the_mean_over_conditions_at_each_level():
@@ -574,7 +578,7 @@ HELDOUT_ROWS = [
         {"n_events": 100, "support_rate": 0.1},
         detector="sliding_window",
     ),
-    # another truth: place-less bursts, 0 of 3 with support in fold A and 1 of 2
+    # another truth: place-less events, 0 of 3 with support in fold A and 1 of 2
     # in fold B; at the floor of 2 spikes, 1 of 49 and 2 of 4 (as floats, 1 / 49
     # times 49 is just short of 1)
     *_by_class(
@@ -684,7 +688,7 @@ def test_pooled_heldout_rate_refuses_a_name_the_summary_does_not_hold(which, mes
 
 
 def _jumping(measures: dict[str, float]) -> pd.DataFrame:
-    """``HELDOUT`` with fold A's ours-only and shared jumping bursts: 1 of 2
+    """``HELDOUT`` with fold A's ours-only and shared jumping events: 1 of 2
     ours-only with support, and the shared ones as given."""
     return _heldout(
         HELDOUT_ROWS
@@ -693,7 +697,7 @@ def _jumping(measures: dict[str, float]) -> pd.DataFrame:
     )
 
 
-def test_pooled_heldout_rate_pools_the_jumping_bursts():
+def test_pooled_heldout_rate_pools_the_jumping_events():
     result = stats.pooled_heldout_rate(
         _jumping({"n_events": 6, "support_rate": 0.5}), "A", EITHER, "non_local"
     )
@@ -796,7 +800,7 @@ def test_heldout_fold_statistics_have_no_range_over_a_fold_with_no_rate(folds):
 def _placeless(
     state_space_rate_b: float = 0.0, sliding_rate_b: float = 0.0
 ) -> pd.DataFrame:
-    """Place-less bursts with no support: 3 ours-only and 2 shared informative in
+    """Place-less events with no support: 3 ours-only and 2 shared informative in
     fold A, 4 ours-only in fold B; the sliding window's content judges 3 and 4
     ours-only ones."""
     return _heldout(
@@ -831,8 +835,8 @@ def _placeless(
     )
 
 
-def test_placeless_burst_statistics_count_both_classes_under_each_estimate():
-    result = stats.placeless_burst_statistics(_placeless(), ("A", "B"))
+def test_placeless_event_statistics_count_both_classes_under_each_estimate():
+    result = stats.placeless_event_statistics(_placeless(), ("A", "B"))
     # 3 + 2 in fold A and 4 in fold B; the sliding window's estimate judges 3 + 4
     assert result == {
         "n_events": 9,
@@ -846,23 +850,23 @@ def test_placeless_burst_statistics_count_both_classes_under_each_estimate():
     ("state_space_rate_b", "sliding_rate_b", "supported"),
     [(0.25, 0.0, (1, 0)), (0.0, 0.25, (0, 1))],
 )
-def test_placeless_burst_statistics_count_a_supported_burst(
+def test_placeless_event_statistics_count_a_supported_event(
     state_space_rate_b, sliding_rate_b, supported
 ):
-    # 1 of fold B's 4 informative place-less bursts, under one estimate
-    result = stats.placeless_burst_statistics(
+    # 1 of fold B's 4 informative place-less events, under one estimate
+    result = stats.placeless_event_statistics(
         _placeless(state_space_rate_b, sliding_rate_b), ("A", "B")
     )
     assert (result["n_supported"], result["n_supported_sliding_window"]) == supported
 
 
-def test_placeless_burst_statistics_ignore_a_fold_with_no_informative_burst():
-    # fold B's four bursts are not informative: no rate, which is no support
+def test_placeless_event_statistics_ignore_a_fold_with_no_informative_event():
+    # fold B's four events are not informative: no rate, which is no support
     table = _placeless()
     in_b = (table["fold"] == "B") & (table["estimator"] == "state_space")
     table.loc[in_b & (table["measure"] == "n_events"), "value"] = 0.0
     table.loc[in_b & (table["measure"] == "support_rate"), "value"] = np.nan
-    result = stats.placeless_burst_statistics(table, ("A", "B"))
+    result = stats.placeless_event_statistics(table, ("A", "B"))
     assert (result["n_events"], result["n_supported"]) == (5, 0)
 
 

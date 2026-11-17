@@ -29,9 +29,9 @@ straight, constant-speed replay. Three things a reader needs are missing:
 
 | # | Decision | Reasoning |
 |---|---|---|
-| C1 | Our detector is scored two ways throughout: canonical (Non-Local Continuous + Fragmented > 0.8 for >= 15 ms, the project's event definition) and continuous-only (same thresholds on Non-Local Continuous alone) | An incoherent burst decoded as fragmented is a correct non-local call under our model but not replay; reporting both separates the two |
-| C2 | Two kinds of burst: a place-less burst and a jumping burst | They test different criteria: the place-less burst gives a broad posterior (spread gate), the jumping burst sharp posteriors that hop (jump gate, and our fragmented state) |
-| C2a | Truth has two targets, scored separately: *non-local representation* and *continuous replay*. A continuous replay is both; a jumping burst is non-local representation but not continuous replay; local coding and a place-less burst are neither | A jumping burst represents real places every 15 ms, so calling it non-local, or finding held-out spatial information in it, is correct; only calling it a sequence is an error. A single "negative" label would score correct answers as false |
+| C1 | Our detector is scored two ways throughout: canonical (Non-Local Continuous + Fragmented > 0.8 for >= 15 ms, the project's event definition) and continuous-only (same thresholds on Non-Local Continuous alone) | An incoherent event decoded as fragmented is a correct non-local call under our model but not replay; reporting both separates the two |
+| C2 | Two kinds of control event: a place-less event and a jumping event | They test different criteria: the place-less event gives a broad posterior (spread gate), the jumping event sharp posteriors that hop (jump gate, and our fragmented state) |
+| C2a | Truth has two targets, scored separately: *non-local representation* and *continuous replay*. A continuous replay is both; a jumping event is non-local representation but not continuous replay; local coding and a place-less event are neither | A jumping event represents real places every 15 ms, so calling it non-local, or finding held-out spatial information in it, is correct; only calling it a sequence is an error. A single "negative" label would score correct answers as false |
 | C3 | Multi-part events are scored per part and by segmentation, with no outcome declared correct | Whether a jump or a chain is one event or several is a question of definition; the figure shows how each method carves the same activity |
 | C4 | Everything goes in the existing comparison figure, which grows from four rows to six | Keeps the comparison in one place |
 | C5 | Today's panel (h), reported/actual duration by true duration, is replaced by signed onset and offset error | The two errors decompose the ratio and show strictly more |
@@ -49,8 +49,8 @@ peak rates (20, 60, 160 Hz) as the injected-replay sweep.
 | Condition | What is injected | Grid |
 |---|---|---|
 | No replay | Nothing: each usable immobile stretch is decoded as it is, holding only local coding | All usable immobile time of eight simulated recordings, the sweep's and seven more: 12.6 s each, in the same places, since the simulator's seed changes the spikes and not the trajectory |
-| Place-less burst | Every cell fires at one rate unrelated to its field; population spike count matched to a replay of the same duration and peak rate | 80, 200, 500 ms |
-| Jumping burst | Represented place redrawn uniformly along the track every 15 ms; cells fire by their fields | 80, 200, 500 ms |
+| Place-less event | Every cell fires at one rate unrelated to its field; population spike count matched to a replay of the same duration and peak rate | 80, 200, 500 ms |
+| Jumping event | Represented place redrawn uniformly along the track every 15 ms; cells fire by their fields | 80, 200, 500 ms |
 | Mid-event jump | Two constant-speed segments of 60 cm; the second starts J cm behind where the first ended, with no gap in time; their far end is held at 125 cm, 45 cm from where the animal rests, for every J | J = 0 (continuous control), 20, 40, 80 cm; segment length 120 or 200 ms |
 | Chain | Two 150 ms, 60 cm replays separated by a silent gap; the second either continues from the first's end or starts >= 40 cm away | Gap 10, 30, 60, 100, 200 ms |
 | Each part alone | Every part of every jump and chain trial, decoded on its own with exactly the spikes it had in its event and the recording's own spikes around it | As the jumps and chains |
@@ -70,10 +70,10 @@ canonical and continuous-only (C1).
 
 **Controls.** No replay: reported events per minute of eligible immobility and the
 share of immobile time they cover; an event belongs to the stretch holding its
-midpoint. Bursts: share of bursts with at least one reported event overlapping them;
-for our detector, also the share of burst time in the continuous and in the fragmented
-state. Read against C2a: an event reported on local coding or a place-less burst is a
-false positive for either target; an event reported on a jumping burst is correct for
+midpoint. Control events: share of them with at least one reported event overlapping them;
+for our detector, also the share of the control event's time in the continuous and in the fragmented
+state. Read against C2a: an event reported on local coding or a place-less event is a
+false positive for either target; an event reported on a jumping event is correct for
 non-local representation and a false positive only as continuous replay, so the
 sliding window's and our continuous-only calls on it are the replay false positives,
 and our canonical call is not.
@@ -102,7 +102,7 @@ interquartile range by true duration, over replays both detectors reported (pair
 ## Held-out evidence
 
 **Local coding.** The controls' no-replay stretches are run in every fold too, so
-held-out support on pure local coding is measured, not only on place-less bursts.
+held-out support on pure local coding is measured, not only on place-less events.
 
 **Folds.** The 25 simulated cells, ordered by field position: fold A evaluates the
 even-indexed cells and discovers on the odd, fold B the reverse; fold C evaluates the
@@ -120,8 +120,8 @@ parts, not its outer bounds: an event wholly inside a chain's silent gap is
 **Event classes.** In each fold, every event is shared (strictly positive overlap with
 an event of the other method, the inventory comparison's rule), ours-only, or
 comparator-only; and, from the simulation's truth (C2a), continuous replay, non-local
-but not a sequence (a jumping burst), local coding (not the injection, or absorbed), or
-no spatial content (a place-less burst).
+but not a sequence (a jumping event), local coding (not the injection, or absorbed), or
+no spatial content (a place-less event).
 
 **Evaluation rule, identical for every event.** Over the event's own interval, on the
 2 ms grid:
@@ -145,11 +145,11 @@ no spatial content (a place-less burst).
 
 **What the simulation reports.** Per fold, event class and content estimator: the
 false-support rate (share of local-coding and place-less events with held-out support),
-the support rate for events with spatial content (continuous replays and jumping bursts,
+the support rate for events with spatial content (continuous replays and jumping events,
 reported separately), and each estimator's under-crediting (events with spatial content
 it fails to support, by which method found them), with fold C beside A and B, and the
 agreement between the two estimators event by event. Held-out support tests spatial
-information, not sequence structure, so it is expected for jumping bursts. These are
+information, not sequence structure, so it is expected for jumping events. These are
 the error estimates the real-data held-out results will be read with.
 
 ## Code layout
@@ -157,7 +157,7 @@ the error estimates the real-data held-out results will be read with.
 - `memoryless_sequence/simulation.py`: one general injector taking the represented
   position over time (NaN where silent) and a per-cell rate. `inject_replay` keeps its
   signature, is rebuilt on it, and draws its random numbers identically. New builders
-  for the place-less burst, the jumping burst, the two-segment jump and the chain.
+  for the place-less event, the jumping event, the two-segment jump and the chain.
 - `memoryless_sequence/scoring.py`: `score_against_injection` accepts a piecewise true
   path that is NaN in gaps; new pure functions for part recovery and segmentation.
 - `scripts/detection/sweep_memoryless_detection.py`: each detector's per-window function is
@@ -190,11 +190,11 @@ the error estimates the real-data held-out results will be read with.
 | 2 | (b-e) four events, unchanged |
 | 3 | (f, g) detection heatmaps, unchanged |
 | 4 | (h) onset error by true duration; (i) offset error by true duration; (j) reported duration by distance from the animal (today's panel i) |
-| 5 | (k) bursts, with the no-replay result stated on the panel; (l) mid-event jumps; (m) chains continuing; (n) chains elsewhere |
+| 5 | (k) control events, with the no-replay result stated on the panel; (l) mid-event jumps; (m) chains continuing; (n) chains elsewhere |
 | 6 | (o) held-out gain by event class (shared, ours-only, comparator-only) split by truth, under each content estimator, fold C hatched; (p) false-support and support rates by class, fold and estimator |
 
 (h, i): signed median with interquartile band, one line per detector, zero marked.
-(k): no replay as events per minute and the two bursts as share called, grouped by
+(k): no replay as events per minute and the two control events as share called, grouped by
 condition, four bars per group (sliding window before and after the shuffle; ours
 canonical and continuous-only). (l, m): stacked segmentation classes per jump size or
 gap, one bar per detector, part-recovery rate printed above.

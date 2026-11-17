@@ -613,7 +613,7 @@ _OURS = "state_space_canonical"
 
 
 def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
-    """In no figure: bursts with no clean replay, stretches with no replay, and
+    """In no figure: control events with no clean replay, stretches with no replay, and
     events in two parts."""
     make = value_factory(controls_values, source, TAGS["memoryless_unshown"])
 
@@ -622,7 +622,7 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
 
     def called(condition: str, detector: str, measure: str = "called_rate") -> float:
         return sweep_statistics.controls_value(
-            controls, "bursts", measure, condition, None, detector
+            controls, "control_events", measure, condition, None, detector
         )
 
     def trials(condition: str, detector: str) -> float:
@@ -639,8 +639,8 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
 
     # refuses a summary in which an output reported an event with no replay
     no_replay = sweep_statistics.no_replay_statistics(controls)
-    fragmented = sweep_statistics.burst_share_range(
-        controls, "placeless_burst", "fragmented_share", _OURS
+    fragmented = sweep_statistics.control_event_share_range(
+        controls, "placeless_event", "fragmented_share", _OURS
     )
     jumps = ("jump_120ms", "jump_200ms")
     spanning_ours = carving(jumps, "spanning", _OURS)
@@ -667,63 +667,63 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
     return [
         share(
             "controls_placeless_nonlocal_fraction",
-            called("placeless_burst", _OURS),
-            "share of place-less bursts our detector's non-local events cover, "
+            called("placeless_event", _OURS),
+            "share of place-less events our detector's non-local events cover, "
             "pooled over the three peak rates",
         ),
         share(
             "controls_placeless_fragmented_share_min",
             fragmented["min"],
-            "lowest share of a place-less burst's time in the fragmented state, over "
-            "burst durations",
+            "lowest share of a place-less event's time in the fragmented state, over "
+            "control event durations",
         ),
         share(
             "controls_placeless_fragmented_share_max",
             fragmented["max"],
-            "highest share of a place-less burst's time in the fragmented state, over "
-            "burst durations",
+            "highest share of a place-less event's time in the fragmented state, over "
+            "control event durations",
         ),
         share(
             "controls_placeless_continuous_fraction",
-            called("placeless_burst", "state_space_continuous"),
-            "share of place-less bursts our continuous state alone covers",
+            called("placeless_event", "state_space_continuous"),
+            "share of place-less events our continuous state alone covers",
         ),
         share(
             "controls_placeless_sliding_fraction",
-            called("placeless_burst", _SLIDING),
-            "share of place-less bursts the sliding window reports under the "
+            called("placeless_event", _SLIDING),
+            "share of place-less events the sliding window reports under the "
             "published definition",
         ),
         share(
             "controls_placeless_sliding_before_test_fraction",
-            called("placeless_burst", "sliding_accepted"),
+            called("placeless_event", "sliding_accepted"),
             "the same before its significance test",
         ),
         share(
             "controls_placeless_nonlocal_lowest_rate_fraction",
-            called("placeless_burst", _OURS, "called_rate_at_20hz"),
-            "share of place-less bursts at the lowest peak rate, 20 Hz, our non-local "
+            called("placeless_event", _OURS, "called_rate_at_20hz"),
+            "share of place-less events at the lowest peak rate, 20 Hz, our non-local "
             "events cover",
         ),
         share(
             "controls_jumping_nonlocal_fraction",
-            called("jumping_burst", _OURS),
-            "share of jumping bursts our detector's non-local events cover",
+            called("jumping_event", _OURS),
+            "share of jumping events our detector's non-local events cover",
         ),
         share(
             "controls_jumping_continuous_fraction",
-            called("jumping_burst", "state_space_continuous"),
-            "share of jumping bursts our continuous state alone covers",
+            called("jumping_event", "state_space_continuous"),
+            "share of jumping events our continuous state alone covers",
         ),
         share(
             "controls_jumping_sliding_fraction",
-            called("jumping_burst", _SLIDING),
-            "share of jumping bursts the sliding window reports under the published "
+            called("jumping_event", _SLIDING),
+            "share of jumping events the sliding window reports under the published "
             "definition",
         ),
         share(
             "controls_jumping_sliding_before_test_fraction",
-            called("jumping_burst", "sliding_accepted"),
+            called("jumping_event", "sliding_accepted"),
             "the same before its significance test",
         ),
         make(
@@ -906,7 +906,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         )
         for name, classes in (("ours", ("ours_only",)), ("shared", ("shared",)))
     }
-    placeless = sweep_statistics.placeless_burst_statistics(heldout, FOLDS)
+    placeless = sweep_statistics.placeless_event_statistics(heldout, FOLDS)
     placeless_loose = over_folds(
         FOLDS, OUR_EVENT_CLASSES, "no_content", suffix="_floor2"
     )
@@ -943,7 +943,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
             placeless["n_events"],
             "count",
             "count",
-            "informative place-less burst events over the three folds",
+            "informative reports on place-less events over the three folds",
         ),
         make(
             "heldout_placeless_supported_events",
@@ -957,7 +957,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
             placeless["n_events_sliding_window"],
             "count",
             "count",
-            "informative place-less burst events under the sliding window's content "
+            "informative reports on place-less events under the sliding window's content "
             "estimate",
         ),
         make(
@@ -972,7 +972,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
             placeless_loose["n_counted"],
             "count",
             "count",
-            "place-less burst events with held-out support at a floor of 2 expected "
+            "reports on place-less events with held-out support at a floor of 2 expected "
             "spikes",
         ),
         make(
@@ -980,12 +980,12 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
             placeless_loose["n_events"],
             "count",
             "count",
-            "place-less burst events informative at that floor",
+            "reports on place-less events informative at that floor",
         ),
         share(
             "heldout_jumping_support_min",
             jumping["rate_min"],
-            "jumping bursts: lower of folds A and B's share with held-out support",
+            "jumping events: lower of folds A and B's share with held-out support",
         ),
         share(
             "heldout_jumping_support_max", jumping["rate_max"], "the higher of the two"

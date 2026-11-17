@@ -334,7 +334,7 @@ def controls_summary(
     ----------
     trial_table : pd.DataFrame, shape (n_trial_rows, n_columns)
         One row per injected trial and scored detector output: ``condition``
-        (a ``*burst`` condition, a jump or a chain), ``level``,
+        (a ``*_event`` control event, a jump or a chain), ``level``,
         ``peak_rate_hz``, ``detector``, ``called``, the canonical output's
         ``continuous_share`` and ``fragmented_share``, and for multi-part
         trials ``n_parts``, ``n_recovered``, ``n_recovered_alone`` and
@@ -347,7 +347,7 @@ def controls_summary(
     Returns
     -------
     summary : pd.DataFrame, shape (n_values, 7)
-        ``summary`` (``no_replay``, ``bursts`` or ``parts``), ``measure``,
+        ``summary`` (``no_replay``, ``control_events`` or ``parts``), ``measure``,
         ``condition``, ``level`` (NaN for a value over every level),
         ``detector`` (empty for the immobile minutes), ``value`` and an empty
         ``note``. The no-replay exposure counts each stretch once; a part
@@ -394,19 +394,42 @@ def controls_summary(
             group.event_time_s.sum() / (60 * exposure_min),
         )
 
-    bursts = trial_table[trial_table.condition.str.endswith("burst")]
-    for (condition, level, detector), group in bursts.groupby(
+    control_events = trial_table[trial_table.condition.str.endswith("_event")]
+    for (condition, level, detector), group in control_events.groupby(
         ["condition", "level", "detector"]
     ):
-        add("bursts", "called_rate", condition, level, detector, group.called.mean())
+        add(
+            "control_events",
+            "called_rate",
+            condition,
+            level,
+            detector,
+            group.called.mean(),
+        )
         if detector == "state_space_canonical":
             for share in ("continuous_share", "fragmented_share"):
-                add("bursts", share, condition, level, detector, group[share].mean())
-    for (condition, detector), group in bursts.groupby(["condition", "detector"]):
-        add("bursts", "called_rate", condition, np.nan, detector, group.called.mean())
+                add(
+                    "control_events",
+                    share,
+                    condition,
+                    level,
+                    detector,
+                    group[share].mean(),
+                )
+    for (condition, detector), group in control_events.groupby(
+        ["condition", "detector"]
+    ):
+        add(
+            "control_events",
+            "called_rate",
+            condition,
+            np.nan,
+            detector,
+            group.called.mean(),
+        )
         for rate_hz, at_rate in group.groupby("peak_rate_hz"):
             add(
-                "bursts",
+                "control_events",
                 f"called_rate_at_{rate_hz:g}hz",
                 condition,
                 np.nan,
@@ -414,7 +437,7 @@ def controls_summary(
                 at_rate.called.mean(),
             )
 
-    multi = trial_table[~trial_table.condition.str.endswith("burst")]
+    multi = trial_table[~trial_table.condition.str.endswith("_event")]
     for (condition, level, detector), group in multi.groupby(
         ["condition", "level", "detector"]
     ):

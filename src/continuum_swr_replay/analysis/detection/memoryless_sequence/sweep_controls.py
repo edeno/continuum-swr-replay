@@ -3,7 +3,7 @@
 The controls ask what each detector reports where there is no replay
 (:func:`run_no_replay`: the recording's own immobile stretches, decoded as they
 are), and how it carves activity that is not one clean replay
-(:func:`run_trials`): a place-less and a jumping burst, a mid-event jump and a
+(:func:`run_trials`): a place-less and a jumping event, a mid-event jump and a
 chain of two replays (:func:`trials`), placed in the sweep's recording
 (``sweep.build_recording``) clear of its own events (``sweep.usable_intervals``).
 Each trial is scored for the four outputs of :data:`DETECTORS`
@@ -37,15 +37,15 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation impo
     InjectedActivity,
     Segment,
     inject_activity,
-    jumping_burst,
+    jumping_event,
     piecewise_replay,
     place_field_means,
-    placeless_burst,
+    placeless_event,
     placements,
 )
 
 __all__ = [
-    "BURST_DURATION_S",
+    "CONTROL_EVENT_DURATION_S",
     "CHAIN_GAP_S",
     "CHAIN_PART_S",
     "CHAIN_STARTS_CM",
@@ -80,7 +80,7 @@ DETECTORS = (
 significance test, and the state-space detector canonical (continuous plus
 fragmented) and continuous-only."""
 
-BURST_DURATION_S = (0.08, 0.20, 0.50)
+CONTROL_EVENT_DURATION_S = (0.08, 0.20, 0.50)
 JUMP_CM = (0.0, 20.0, 40.0, 80.0)
 SEGMENT_S = (0.12, 0.20)
 CHAIN_GAP_S = (0.01, 0.03, 0.06, 0.10, 0.20)
@@ -165,13 +165,13 @@ def trials(means: np.ndarray, sampling_frequency: float):
     """Every injected condition: name, grid level, peak rate, builder, and pieces.
 
     ``pieces`` is the multi-part event's list of segments and gaps, None for a
-    burst.
+    control event.
     """
     track_cm = TRACK_HEIGHT
 
-    def burst(builder, duration_s, rate_hz):
+    def control_event(builder, duration_s, rate_hz):
         def make(at_s, seed):
-            extra = {"seed": seed} if builder is jumping_burst else {}
+            extra = {"seed": seed} if builder is jumping_event else {}
             return builder(
                 duration_s, at_s, sampling_frequency, means, rate_hz, track_cm, **extra
             )
@@ -185,16 +185,16 @@ def trials(means: np.ndarray, sampling_frequency: float):
         return make
 
     for rate_hz in sweep.PEAK_RATE_HZ:
-        for duration_s in BURST_DURATION_S:
+        for duration_s in CONTROL_EVENT_DURATION_S:
             for name, builder in (
-                ("placeless_burst", placeless_burst),
-                ("jumping_burst", jumping_burst),
+                ("placeless_event", placeless_event),
+                ("jumping_event", jumping_event),
             ):
                 yield (
                     name,
                     duration_s,
                     rate_hz,
-                    burst(builder, duration_s, rate_hz),
+                    control_event(builder, duration_s, rate_hz),
                     None,
                 )
         for segment_s in SEGMENT_S:

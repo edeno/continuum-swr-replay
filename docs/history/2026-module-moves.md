@@ -672,3 +672,15 @@ Figure 1's recording also changed: the sweep that ends at the animal is in the f
 a remote place held still is in the third (it was two sweeps). Its detector is now built from
 the real decodes' settings (`nonlocal_detector_kwargs`, `NonLocalDecodingConfig`), where it had a
 demo transition setting of its own.
+
+## Simulated controls are events, not bursts, 2026-11-17
+
+The two simulated controls of the memoryless comparison were called bursts; "event" in this
+project already means what a detector reports, so the detectors' output on them is now a report.
+
+| Old name | New name |
+|---|---|
+| `simulation.placeless_burst`, `simulation.jumping_burst`; conditions `"placeless_burst"`, `"jumping_burst"` | `placeless_event`, `jumping_event`; `"placeless_event"`, `"jumping_event"` |
+| controls summary block `"bursts"` | `"control_events"` |
+| `sweep_controls.BURST_DURATION_S` | `CONTROL_EVENT_DURATION_S` |
+| `sweep_statistics.burst_share_range`, `placeless_burst_statistics` | `control_event_share_range`, `placeless_event_statistics` |

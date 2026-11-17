@@ -153,7 +153,7 @@ class TestPartAlone:
 
 
 def test_multipart_conditions_are_the_trials_with_two_parts():
-    """The jumps and the chains, in the order the trials yield them; no burst."""
+    """The jumps and the chains, in the order the trials yield them; no control event."""
     two_parts = dict.fromkeys(
         name
         for name, _, _, _, pieces in sweep_controls.trials(MEANS, 1000.0)

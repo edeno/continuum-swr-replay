@@ -10,10 +10,10 @@ encoding model, the same placements and scoring rule as the sweep:
 - no replay: the recording's own immobile stretches, decoded as they are. They
   hold only local coding, so every event reported there is a false positive.
   Eight simulated recordings, the sweep's and seven more, for exposure;
-- a place-less burst: every cell fires at one rate unrelated to its field, as
+- a place-less event: every cell fires at one rate unrelated to its field, as
   many spikes as a replay of the same duration and peak rate. No spatial
   content, so a detection is a false positive for either target;
-- a jumping burst: the represented place redrawn along the track every 15 ms.
+- a jumping event: the represented place redrawn along the track every 15 ms.
   Non-local representation without a sequence: calling it non-local is right,
   calling it a sequence is not;
 - a mid-event jump: two 60 cm parts at constant speed, the second starting J cm

@@ -12,10 +12,10 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation impo
     immobile_intervals,
     inject_activity,
     inject_replay,
-    jumping_burst,
+    jumping_event,
     piecewise_replay,
     place_field_means,
-    placeless_burst,
+    placeless_event,
     placements,
     without,
 )
@@ -369,18 +369,18 @@ class TestPiecewiseReplay:
             )
 
 
-class TestBursts:
+class TestControlEvents:
     means = place_field_means(25, 170.0)
 
-    def test_a_placeless_burst_fires_every_cell_at_one_rate(self):
-        activity = placeless_burst(0.2, 1.0, 1000.0, self.means, 60.0, 170.0)
+    def test_a_placeless_event_fires_every_cell_at_one_rate(self):
+        activity = placeless_event(0.2, 1.0, 1000.0, self.means, 60.0, 170.0)
 
         assert np.unique(activity.rate_hz).size == 1
         assert np.isnan(activity.position_cm).all()
         assert activity.truth == "no_content"
 
-    def test_a_placeless_burst_holds_as_many_spikes_as_a_replay_there(self):
-        activity = placeless_burst(0.2, 1.0, 1000.0, self.means, 60.0, 170.0)
+    def test_a_placeless_event_holds_as_many_spikes_as_a_replay_there(self):
+        activity = placeless_event(0.2, 1.0, 1000.0, self.means, 60.0, 170.0)
         held_at_mid_track = field_rates(
             np.full(activity.time_s.size, 85.0), self.means, 60.0
         )
@@ -389,8 +389,8 @@ class TestBursts:
             activity.rate_hz.sum(), held_at_mid_track.sum(), rtol=1e-12
         )
 
-    def test_a_jumping_burst_holds_each_place_for_its_hold(self):
-        activity = jumping_burst(0.2, 1.0, 1000.0, self.means, 60.0, 170.0, seed=2)
+    def test_a_jumping_event_holds_each_place_for_its_hold(self):
+        activity = jumping_event(0.2, 1.0, 1000.0, self.means, 60.0, 170.0, seed=2)
         hold = np.floor((activity.time_s - 1.0) / 0.015)
 
         for index in np.unique(hold):
@@ -398,11 +398,11 @@ class TestBursts:
         assert np.unique(activity.position_cm).size == np.unique(hold).size
         assert activity.truth == "non_local"
 
-    def test_a_jumping_burst_draws_places_along_the_whole_track(self):
+    def test_a_jumping_event_draws_places_along_the_whole_track(self):
         places = np.concatenate(
             [
                 np.unique(
-                    jumping_burst(
+                    jumping_event(
                         0.5, 0.0, 1000.0, self.means, 60.0, 170.0, seed=seed
                     ).position_cm
                 )

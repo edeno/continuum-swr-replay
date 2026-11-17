@@ -7,15 +7,15 @@ which is also what ``scripts/figures/generate_figure01.py`` uses; these helpers
 add an event to it and say where an event may safely go.
 
 Besides a single straight replay, the same machinery writes the activity the
-detectors should not call replay, or should split: a burst whose firing carries
-no place (``placeless_burst``), a burst whose represented place jumps at random
-(``jumping_burst``), and replays made of several parts with a jump or a silent
+detectors should not call replay, or should split: an event whose firing carries
+no place (``placeless_event``), an event whose represented place jumps at random
+(``jumping_event``), and replays made of several parts with a jump or a silent
 gap between them (``piecewise_replay``). Each is an ``InjectedActivity``: when
 it happens, which place it represents at each moment, how fast every cell fires,
 which spans are its spatial parts, and what it truly is, as one of
 ``TRUTH_LABELS``: a continuous replay is non-local representation and a
-sequence; a jumping burst is non-local representation but no sequence; local
-coding and a place-less burst are neither.
+sequence; a jumping event is non-local representation but no sequence; local
+coding and a place-less event are neither.
 
 Placement is not a detail. A window straddling the end of an immobile stretch
 loses its center to the speed gate, and because jumps are forward the sequence
@@ -41,10 +41,10 @@ __all__ = [
     "immobile_intervals",
     "inject_activity",
     "inject_replay",
-    "jumping_burst",
+    "jumping_event",
     "piecewise_replay",
     "place_field_means",
-    "placeless_burst",
+    "placeless_event",
     "placements",
     "without",
 ]
@@ -374,7 +374,7 @@ def piecewise_replay(
     )
 
 
-def placeless_burst(
+def placeless_event(
     duration_s: float,
     at_s: float,
     sampling_frequency: float,
@@ -382,10 +382,10 @@ def placeless_burst(
     peak_rate_hz: float,
     track_cm: float,
 ) -> InjectedActivity:
-    """A population burst whose firing represents no place.
+    """Population firing that represents no place.
 
     Every cell fires at one rate, the population rate of a representation held
-    at mid-track divided evenly among the cells, so the burst holds as many
+    at mid-track divided evenly among the cells, so the event holds as many
     spikes as a replay of the same duration and peak rate there.
     """
     at, step_s = _sample_times(at_s, duration_s, sampling_frequency)
@@ -403,7 +403,7 @@ def placeless_burst(
     )
 
 
-def jumping_burst(
+def jumping_event(
     duration_s: float,
     at_s: float,
     sampling_frequency: float,
@@ -413,9 +413,9 @@ def jumping_burst(
     seed: int,
     hold_s: float = 0.015,
 ) -> InjectedActivity:
-    """A burst representing a place drawn at random along the track every ``hold_s``.
+    """An event representing a place drawn at random along the track every ``hold_s``.
 
-    Cells fire by their fields at each held place, so the burst carries
+    Cells fire by their fields at each held place, so the event carries
     spatial information but no sequence. The places are drawn from their own
     stream of ``seed``, apart from the one that draws the spikes.
     """
