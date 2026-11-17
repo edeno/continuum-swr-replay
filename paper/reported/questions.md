@@ -16,7 +16,7 @@ it calls.
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
-| `detection.json` | `0569a102f85c` | yes | 146 | 0 |
+| `detection.json` | `17f05a8efbaf` | yes | 146 | 0 |
 | `events.json` | `d7d80592187f` | yes | 353 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
@@ -75,7 +75,7 @@ Status: computed. Figures: 1, memoryless_comparison. Values: 58.
 Sources:
 
 - paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
-- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)
+- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 74764f10231a)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -85,7 +85,7 @@ Sources:
 | `\DetectionRecordingShortReplayLocalFraction` | 0 |  | share of that reported event's kept windows decoding the animal's own place | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingShortReplayPJump` | 0.020 |  | significance test of the 80 ms replay: jump half | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingShortReplayPSpread` | 0.0099 |  | significance test of the 80 ms replay: spread half | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStateSpaceBoundErrorMs` | 17 | ms | largest error in either bound of the state-space detector's reports of the four zoomed events | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStateSpaceBoundErrorMs` | 17 | ms | largest error in either bound of the state-space detector's reports of the simulated replays of the labeled recording | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingSweepDrawsFromPassing` | 0 |  | how many more shuffle draws below the observed value than a pass allows | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingSweepDurationRatio` | 2.5 |  | the sliding window's reported duration of Figure 1's sweep over its true duration | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingSweepLocalFraction` | 57 |  | share of that reported event's kept windows decoding the animal's own place (within 15 cm) | `detection.recording_values` | memoryless_comparison |
