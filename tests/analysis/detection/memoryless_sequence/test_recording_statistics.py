@@ -138,6 +138,7 @@ EVENT_TIMES = np.array(
         (1.23, 1.235),  # short replay, inside D
         (1.30, 1.31),  # far replay: no candidate, one exact state-space interval
         (1.40, 1.41),  # sparse replay: the same
+        (1.50, 1.51),  # fast replay: the same
     ]
 )
 STATE_SPACE_INTERVALS = [
@@ -148,6 +149,7 @@ STATE_SPACE_INTERVALS = [
     (1.225, 1.24),
     (1.30, 1.31),
     (1.40, 1.41),
+    (1.50, 1.51),
 ]
 
 
