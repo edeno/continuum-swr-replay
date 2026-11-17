@@ -25,6 +25,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence import (
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     CONFIG,
+    FAR_REPLAY_EVENT,
     FRAGMENTED_EVENT,
     N_NEURONS,
     REMOTE_STATIONARY_EVENT,
@@ -82,12 +83,13 @@ class TestWhatTheSlidingWindowReports:
             (SILENCE_EVENT, "declined"),
             (SHORT_PATH_EVENT, "declined"),
             (SHORT_REPLAY_EVENT, "found"),
+            (FAR_REPLAY_EVENT, "found"),
         ],
     )
     def test_verdict(self, decoded, event, expected):
         assert rs.verdict(decoded, event) == expected
 
-    def test_it_accepts_one_sequence_over_each_of_two_events_and_no_other(
+    def test_it_accepts_one_sequence_over_each_of_three_events_and_no_other(
         self, decoded
     ):
         accepted = np.flatnonzero(decoded["candidates"].is_replay).tolist()
@@ -95,8 +97,19 @@ class TestWhatTheSlidingWindowReports:
         assert accepted == [
             *rs.accepted_overlapping(decoded, SWEEP_EVENT),
             *rs.accepted_overlapping(decoded, SHORT_REPLAY_EVENT),
+            *rs.accepted_overlapping(decoded, FAR_REPLAY_EVENT),
         ]
-        assert len(accepted) == 2
+        assert len(accepted) == 3
+
+    def test_the_two_detectors_agree_on_the_replay_far_from_the_animal(self, decoded):
+        # the sliding window's report is nearer the replay's own duration than
+        # its reports of the sweep that ends at the animal and the short replay
+        far = rs.duration_ratio(decoded, FAR_REPLAY_EVENT)
+        assert 1.0 < far < rs.duration_ratio(decoded, SHORT_REPLAY_EVENT)
+        assert far < rs.duration_ratio(decoded, SWEEP_EVENT)
+        assert rs.state_space_duration_ratio(
+            decoded, FAR_REPLAY_EVENT
+        ) == pytest.approx(1.0, abs=0.15)
 
     def test_only_accepted_candidates_are_tested(self, decoded):
         assert set(decoded["shuffles"]) == set(

@@ -204,6 +204,17 @@ def test_duration_ratio_is_the_reported_over_the_true_duration(decoded):
     assert rs.duration_ratio(decoded, SHORT_REPLAY_EVENT) == pytest.approx(10.0)
 
 
+def test_state_space_duration_ratio_spans_the_reports_over_the_event(decoded):
+    # one 40 ms interval over the 20 ms sweep
+    assert rs.state_space_duration_ratio(decoded, SWEEP_EVENT) == pytest.approx(2.0)
+    # two intervals over the 10 ms short path, 1.10 to 1.13 s
+    assert rs.state_space_duration_ratio(decoded, SHORT_PATH_EVENT) == pytest.approx(
+        3.0
+    )
+    # none over the fragmented event
+    assert np.isnan(rs.state_space_duration_ratio(decoded, FRAGMENTED_EVENT))
+
+
 def test_the_longest_accepted_sequence_is_the_one_read(decoded):
     # an event over both accepted sequences reads A, the longer
     decoded["event_times"] = np.array([(1.05, 1.25)])

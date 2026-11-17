@@ -48,6 +48,7 @@ __all__ = [
     "recording_numbers",
     "reported_overlapping",
     "shuffle_of",
+    "state_space_duration_ratio",
     "verdict",
 ]
 
@@ -238,6 +239,23 @@ def bound_error_ms(decoded: dict, events: tuple[int, ...]) -> float:
             abs(overlapping[-1][1] - end_s),
         )
     return 1000 * worst
+
+
+def state_space_duration_ratio(decoded: dict, event: int) -> float:
+    """How long the state-space model's report of an event is, over the event's
+    own duration.
+
+    From the start of the first state-space interval overlapping the event to
+    the end of the last, as :func:`bound_error_ms` reads them. NaN when the
+    model reports nothing over the event.
+    """
+    start_s, end_s = decoded["event_times"][event]
+    overlapping = [
+        (a, b) for a, b in decoded["state_space_intervals"] if a < end_s and start_s < b
+    ]
+    if not overlapping:
+        return float("nan")
+    return float((overlapping[-1][1] - overlapping[0][0]) / (end_s - start_s))
 
 
 def recording_numbers(decoded: dict) -> dict[str, float | int]:

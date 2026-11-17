@@ -5,7 +5,8 @@ The supplemental memoryless comparison figure
 (``scripts/checks/compare_memoryless_to_reference.py``) read one simulation
 (:func:`simulate_and_decode`): the simulated run of Figure 1
 (``analysis.detection.simulated_run.simulate_run``, whose patterns are the first
-rows of ``event_times``) with a short path and a short replay added
+rows of ``event_times``) with a short path, a short replay and a replay far
+from the animal added
 (:data:`SHORT_PATH_EVENT` and the other ``*_EVENT`` constants name the rows). It is decoded twice from one set of place fields: window by window under
 a uniform prior, as the sliding-window detector does, and by the switching
 state-space model of Figure 1, fitted as a real decode is
@@ -59,6 +60,8 @@ from continuum_swr_replay.decoding.results import ENCODING_KEY
 
 __all__ = [
     "CONFIG",
+    "FAR_REPLAY",
+    "FAR_REPLAY_EVENT",
     "FRAGMENTED_EVENT",
     "N_NEURONS",
     "REMOTE_STATIONARY_EVENT",
@@ -105,10 +108,19 @@ SHORT_PATH = InjectedReplay(
 dispersion criterion needs a path of about 42 cm, so it is expected to reject
 the candidate."""
 
+FAR_REPLAY = InjectedReplay(
+    start_cm=20.0, path_cm=90.0, duration_s=0.300, peak_rate_hz=60.0, at_s=58.30, seed=2
+)
+"""A replay within the published definition's reach that stays away from the
+animal: 90 cm in 300 ms, ending 60 cm short of where the animal rests. Both
+detectors are expected to report it, at much the same times."""
+
 SWEEP_EVENT, FRAGMENTED_EVENT, REMOTE_STATIONARY_EVENT, SILENCE_EVENT = (
     PATTERNS.index(name) for name in ("sweep", "fragmented", "stationary", "silence")
 )
-SHORT_PATH_EVENT, SHORT_REPLAY_EVENT = (len(PATTERNS) + added for added in range(2))
+SHORT_PATH_EVENT, SHORT_REPLAY_EVENT, FAR_REPLAY_EVENT = (
+    len(PATTERNS) + added for added in range(3)
+)
 """Rows of ``event_times`` in :func:`simulate_and_decode`: Figure 1's patterns
 (``simulated_run.PATTERNS``), then the events added here, in the order they are
 added."""
@@ -144,9 +156,10 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     event_times = np.array(list(run.patterns.values()))
     is_event = run.is_pattern.copy()
 
-    # two replays the sliding-window detector is expected to mis-report, in the
-    # order SHORT_PATH_EVENT, SHORT_REPLAY_EVENT
-    for replay in (SHORT_PATH, SHORT_REPLAY):
+    # two replays the sliding-window detector is expected to mis-report and one
+    # both detectors should agree on, in the order SHORT_PATH_EVENT,
+    # SHORT_REPLAY_EVENT, FAR_REPLAY_EVENT
+    for replay in (SHORT_PATH, SHORT_REPLAY, FAR_REPLAY):
         with_replay, bounds = inject_replay(
             spike_times,
             place_field_means,
