@@ -935,8 +935,8 @@ agreement,estimator_agreement,A,both,both,all,,0.9894304169113329,
 agreement,estimator_agreement,B,both,both,all,,0.9846316905140434,
 agreement,estimator_agreement,C,both,both,all,,0.9759358288770054,
 provenance,produced_by,,,,,,,scripts/detector_comparison/sweep_memoryless_heldout.py
-provenance,produced_at,,,,,,,2026-11-17T17:08:50+00:00
-provenance,git_commit,,,,,,,b128d565e6e0
+provenance,produced_at,,,,,,,2026-11-17T21:43:45+00:00
+provenance,git_commit,,,,,,,169b00b45f78
 provenance,n_seeds,,,,,,8.0,
 provenance,n_permutations,,,,,,100.0,
 provenance,n_recordings,,,,,,8.0,
