@@ -36,41 +36,41 @@
 \newcommand{\SurveyTimeBinMin}{2}  % survey.time_bin_min: Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)
 \newcommand{\SurveyTimeBinMode}{20}  % survey.time_bin_mode: Most common decoding time bin, over the 46 numeric cells of Time bin (ms)
 
-% --- detection (commit d7d80592187f)
-\newcommand{\DetectionControlsContinuingOursOnePerPartLongestFraction}{79}  % detection.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
-\newcommand{\DetectionControlsContinuingOursSpanningShortestFraction}{88}  % detection.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
+% --- detection (commit 52491282317c)
+\newcommand{\DetectionControlsContinuingOursOnePerPartLongestFraction}{96}  % detection.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
+\newcommand{\DetectionControlsContinuingOursSpanningShortestFraction}{96}  % detection.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingSlidingOnePerPartLongestFraction}{50}  % detection.controls_continuing_sliding_one_per_part_longest_fraction: continuing chains at the longest gap: share of trials the sliding window reports as one event per part
-\newcommand{\DetectionControlsContinuingSlidingSpanningShortestFraction}{75}  % detection.controls_continuing_sliding_spanning_shortest_fraction: continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts
-\newcommand{\DetectionControlsElsewhereOursOnePerPartLongestFraction}{83}  % detection.controls_elsewhere_ours_one_per_part_longest_fraction: the same at the longest gap
-\newcommand{\DetectionControlsElsewhereOursOnePerPartShortestFraction}{17}  % detection.controls_elsewhere_ours_one_per_part_shortest_fraction: chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part
-\newcommand{\DetectionControlsElsewhereSlidingMissingMax}{58}  % detection.controls_elsewhere_sliding_missing_max: highest such share
-\newcommand{\DetectionControlsElsewhereSlidingMissingMin}{33}  % detection.controls_elsewhere_sliding_missing_min: chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part
-\newcommand{\DetectionControlsJumpOursSpanningMax}{85}  % detection.controls_jump_ours_spanning_max: highest such share
-\newcommand{\DetectionControlsJumpOursSpanningMin}{73}  % detection.controls_jump_ours_spanning_min: lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts)
-\newcommand{\DetectionControlsJumpSlidingSpanningMax}{79}  % detection.controls_jump_sliding_spanning_max: highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts
-\newcommand{\DetectionControlsJumpingContinuousFraction}{50}  % detection.controls_jumping_continuous_fraction: share of jumping bursts our continuous state alone covers
-\newcommand{\DetectionControlsJumpingNonlocalFraction}{97}  % detection.controls_jumping_nonlocal_fraction: share of jumping bursts our detector's non-local events cover
-\newcommand{\DetectionControlsJumpingSlidingBeforeTestFraction}{14}  % detection.controls_jumping_sliding_before_test_fraction: the same before its significance test
-\newcommand{\DetectionControlsJumpingSlidingFraction}{8}  % detection.controls_jumping_sliding_fraction: share of jumping bursts the sliding window reports under the published definition
+\newcommand{\DetectionControlsContinuingSlidingSpanningShortestFraction}{79}  % detection.controls_continuing_sliding_spanning_shortest_fraction: continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts
+\newcommand{\DetectionControlsElsewhereOursOnePerPartLongestFraction}{88}  % detection.controls_elsewhere_ours_one_per_part_longest_fraction: the same at the longest gap
+\newcommand{\DetectionControlsElsewhereOursOnePerPartShortestFraction}{4}  % detection.controls_elsewhere_ours_one_per_part_shortest_fraction: chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part
+\newcommand{\DetectionControlsElsewhereSlidingMissingMax}{54}  % detection.controls_elsewhere_sliding_missing_max: highest such share
+\newcommand{\DetectionControlsElsewhereSlidingMissingMin}{38}  % detection.controls_elsewhere_sliding_missing_min: chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part
+\newcommand{\DetectionControlsJumpOursSpanningMax}{98}  % detection.controls_jump_ours_spanning_max: highest such share
+\newcommand{\DetectionControlsJumpOursSpanningMin}{88}  % detection.controls_jump_ours_spanning_min: lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts)
+\newcommand{\DetectionControlsJumpSlidingSpanningMax}{85}  % detection.controls_jump_sliding_spanning_max: highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts
+\newcommand{\DetectionControlsJumpingContinuousFraction}{35}  % detection.controls_jumping_continuous_fraction: share of jumping bursts our continuous state alone covers
+\newcommand{\DetectionControlsJumpingNonlocalFraction}{99}  % detection.controls_jumping_nonlocal_fraction: share of jumping bursts our detector's non-local events cover
+\newcommand{\DetectionControlsJumpingSlidingBeforeTestFraction}{7}  % detection.controls_jumping_sliding_before_test_fraction: the same before its significance test
+\newcommand{\DetectionControlsJumpingSlidingFraction}{3}  % detection.controls_jumping_sliding_fraction: share of jumping bursts the sliding window reports under the published definition
 \newcommand{\DetectionControlsMultipartTrials}{432}  % detection.controls_multipart_trials: two-part trials over every jump and chain condition
 \newcommand{\DetectionControlsNoReplayMinutes}{1.7}  % detection.controls_no_replay_minutes: minutes of simulated immobility with no replay; no output reported any event there
 \newcommand{\DetectionControlsNoReplayRateBound}{1.8}  % detection.controls_no_replay_rate_bound: 95 % upper bound on the false event rate with none observed (the rule of three over those minutes)
 \newcommand{\DetectionControlsNoReplayRecordings}{8}  % detection.controls_no_replay_recordings: simulated recordings the no-replay stretches come from
-\newcommand{\DetectionControlsOursFewerInEventTrials}{2}  % detection.controls_ours_fewer_in_event_trials: trials in which our detector recovers fewer parts inside the event than alone
-\newcommand{\DetectionControlsOursMoreInEventTrials}{22}  % detection.controls_ours_more_in_event_trials: trials in which it recovers more inside the event than alone
-\newcommand{\DetectionControlsOursRecoveryAloneFraction}{86}  % detection.controls_ours_recovery_alone_fraction: the same with each part decoded alone
-\newcommand{\DetectionControlsOursRecoveryInEventFraction}{89}  % detection.controls_ours_recovery_in_event_fraction: share of parts our detector recovers inside the event, the same mean
-\newcommand{\DetectionControlsPlacelessContinuousFraction}{1}  % detection.controls_placeless_continuous_fraction: share of place-less bursts our continuous state alone covers
-\newcommand{\DetectionControlsPlacelessFragmentedShareMax}{80}  % detection.controls_placeless_fragmented_share_max: highest share of a place-less burst's time in the fragmented state, over burst durations
-\newcommand{\DetectionControlsPlacelessFragmentedShareMin}{59}  % detection.controls_placeless_fragmented_share_min: lowest share of a place-less burst's time in the fragmented state, over burst durations
-\newcommand{\DetectionControlsPlacelessNonlocalFraction}{90}  % detection.controls_placeless_nonlocal_fraction: share of place-less bursts our detector's non-local events cover, pooled over the three peak rates
-\newcommand{\DetectionControlsPlacelessNonlocalLowestRateFraction}{75}  % detection.controls_placeless_nonlocal_lowest_rate_fraction: share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover
-\newcommand{\DetectionControlsPlacelessSlidingBeforeTestFraction}{15}  % detection.controls_placeless_sliding_before_test_fraction: the same before its significance test
-\newcommand{\DetectionControlsPlacelessSlidingFraction}{8}  % detection.controls_placeless_sliding_fraction: share of place-less bursts the sliding window reports under the published definition
-\newcommand{\DetectionControlsSlidingFewerInEventTrials}{21}  % detection.controls_sliding_fewer_in_event_trials: trials in which the sliding window recovers fewer parts inside the event than alone
-\newcommand{\DetectionControlsSlidingMoreInEventTrials}{84}  % detection.controls_sliding_more_in_event_trials: trials in which it recovers more inside the event than alone
-\newcommand{\DetectionControlsSlidingRecoveryAloneFraction}{62}  % detection.controls_sliding_recovery_alone_fraction: the same with each part decoded alone
-\newcommand{\DetectionControlsSlidingRecoveryInEventFraction}{71}  % detection.controls_sliding_recovery_in_event_fraction: share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels
+\newcommand{\DetectionControlsOursFewerInEventTrials}{4}  % detection.controls_ours_fewer_in_event_trials: trials in which our detector recovers fewer parts inside the event than alone
+\newcommand{\DetectionControlsOursMoreInEventTrials}{24}  % detection.controls_ours_more_in_event_trials: trials in which it recovers more inside the event than alone
+\newcommand{\DetectionControlsOursRecoveryAloneFraction}{94}  % detection.controls_ours_recovery_alone_fraction: the same with each part decoded alone
+\newcommand{\DetectionControlsOursRecoveryInEventFraction}{96}  % detection.controls_ours_recovery_in_event_fraction: share of parts our detector recovers inside the event, the same mean
+\newcommand{\DetectionControlsPlacelessContinuousFraction}{0}  % detection.controls_placeless_continuous_fraction: share of place-less bursts our continuous state alone covers
+\newcommand{\DetectionControlsPlacelessFragmentedShareMax}{93}  % detection.controls_placeless_fragmented_share_max: highest share of a place-less burst's time in the fragmented state, over burst durations
+\newcommand{\DetectionControlsPlacelessFragmentedShareMin}{72}  % detection.controls_placeless_fragmented_share_min: lowest share of a place-less burst's time in the fragmented state, over burst durations
+\newcommand{\DetectionControlsPlacelessNonlocalFraction}{96}  % detection.controls_placeless_nonlocal_fraction: share of place-less bursts our detector's non-local events cover, pooled over the three peak rates
+\newcommand{\DetectionControlsPlacelessNonlocalLowestRateFraction}{88}  % detection.controls_placeless_nonlocal_lowest_rate_fraction: share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover
+\newcommand{\DetectionControlsPlacelessSlidingBeforeTestFraction}{6}  % detection.controls_placeless_sliding_before_test_fraction: the same before its significance test
+\newcommand{\DetectionControlsPlacelessSlidingFraction}{0}  % detection.controls_placeless_sliding_fraction: share of place-less bursts the sliding window reports under the published definition
+\newcommand{\DetectionControlsSlidingFewerInEventTrials}{19}  % detection.controls_sliding_fewer_in_event_trials: trials in which the sliding window recovers fewer parts inside the event than alone
+\newcommand{\DetectionControlsSlidingMoreInEventTrials}{107}  % detection.controls_sliding_more_in_event_trials: trials in which it recovers more inside the event than alone
+\newcommand{\DetectionControlsSlidingRecoveryAloneFraction}{64}  % detection.controls_sliding_recovery_alone_fraction: the same with each part decoded alone
+\newcommand{\DetectionControlsSlidingRecoveryInEventFraction}{75}  % detection.controls_sliding_recovery_in_event_fraction: share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels
 \newcommand{\DetectionHeldoutContinuousImmobileAnimalsPositive}{5}  % detection.heldout_continuous_immobile_animals_positive: animals whose mean held-out evidence of Non-Local Continuous bouts, immobile is above zero
 \newcommand{\DetectionHeldoutContinuousImmobileCiHigh}{8.1}  % detection.heldout_continuous_immobile_ci_high: upper bound of that interval
 \newcommand{\DetectionHeldoutContinuousImmobileCiLow}{4.1}  % detection.heldout_continuous_immobile_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
@@ -83,15 +83,15 @@
 \newcommand{\DetectionHeldoutContinuousRunningEpochs}{242}  % detection.heldout_continuous_running_epochs: epochs with Non-Local Continuous bouts, running scored
 \newcommand{\DetectionHeldoutContinuousRunningEpochsPositive}{23}  % detection.heldout_continuous_running_epochs_positive: epochs whose median held-out evidence of Non-Local Continuous bouts, running is above zero
 \newcommand{\DetectionHeldoutContinuousRunningEstimate}{\ensuremath{-}1.2}  % detection.heldout_continuous_running_estimate: held-out evidence of Non-Local Continuous bouts, running, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median
-\newcommand{\DetectionHeldoutEstimatorAgreementMin}{99}  % detection.heldout_estimator_agreement_min: lowest share over folds of the events informative under both content estimates on which they agree
+\newcommand{\DetectionHeldoutEstimatorAgreementMin}{98}  % detection.heldout_estimator_agreement_min: lowest share over folds of the events informative under both content estimates on which they agree
 \newcommand{\DetectionHeldoutFragmentedImmobileMismatchedAnimalsPositive}{3}  % detection.heldout_fragmented_immobile_mismatched_animals_positive: animals whose mean held-out evidence of Non-Local Fragmented bouts, immobile is above zero
 \newcommand{\DetectionHeldoutFragmentedImmobileMismatchedCiHigh}{0.83}  % detection.heldout_fragmented_immobile_mismatched_ci_high: upper bound of that interval
 \newcommand{\DetectionHeldoutFragmentedImmobileMismatchedCiLow}{\ensuremath{-}0.59}  % detection.heldout_fragmented_immobile_mismatched_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
 \newcommand{\DetectionHeldoutFragmentedImmobileMismatchedEpochs}{242}  % detection.heldout_fragmented_immobile_mismatched_epochs: epochs with Non-Local Fragmented bouts, immobile scored
 \newcommand{\DetectionHeldoutFragmentedImmobileMismatchedEpochsPositive}{117}  % detection.heldout_fragmented_immobile_mismatched_epochs_positive: epochs whose median held-out evidence of Non-Local Fragmented bouts, immobile is above zero
 \newcommand{\DetectionHeldoutFragmentedImmobileMismatchedEstimate}{0.12}  % detection.heldout_fragmented_immobile_mismatched_estimate: held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's mean epoch median
-\newcommand{\DetectionHeldoutJumpingSupportMax}{63}  % detection.heldout_jumping_support_max: the higher of the two
-\newcommand{\DetectionHeldoutJumpingSupportMin}{57}  % detection.heldout_jumping_support_min: jumping bursts: lower of folds A and B's share with held-out support
+\newcommand{\DetectionHeldoutJumpingSupportMax}{57}  % detection.heldout_jumping_support_max: the higher of the two
+\newcommand{\DetectionHeldoutJumpingSupportMin}{50}  % detection.heldout_jumping_support_min: jumping bursts: lower of folds A and B's share with held-out support
 \newcommand{\DetectionHeldoutLocalImmobileAnimalsPositive}{5}  % detection.heldout_local_immobile_animals_positive: animals whose mean held-out evidence of Local bouts, immobile is above zero
 \newcommand{\DetectionHeldoutLocalImmobileCiHigh}{4.4}  % detection.heldout_local_immobile_ci_high: upper bound of that interval
 \newcommand{\DetectionHeldoutLocalImmobileCiLow}{1.1}  % detection.heldout_local_immobile_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
@@ -104,72 +104,67 @@
 \newcommand{\DetectionHeldoutNoSpikeImmobileEpochs}{241}  % detection.heldout_no_spike_immobile_epochs: epochs with No-Spike bouts, immobile scored
 \newcommand{\DetectionHeldoutNoSpikeImmobileEpochsPositive}{241}  % detection.heldout_no_spike_immobile_epochs_positive: epochs whose median held-out evidence of No-Spike bouts, immobile is above zero
 \newcommand{\DetectionHeldoutNoSpikeImmobileEstimate}{7.7}  % detection.heldout_no_spike_immobile_estimate: held-out evidence of No-Spike bouts, immobile, silence against local coding: mean over animals of each animal's mean epoch median
-\newcommand{\DetectionHeldoutOursOnlyInformativeMax}{7}  % detection.heldout_ours_only_informative_max: the higher of the two
-\newcommand{\DetectionHeldoutOursOnlyInformativeMin}{6}  % detection.heldout_ours_only_informative_min: replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all
-\newcommand{\DetectionHeldoutOursOnlySupportFoldC}{88}  % detection.heldout_ours_only_support_fold_c: the same share in fold C
-\newcommand{\DetectionHeldoutOursOnlySupportMax}{97}  % detection.heldout_ours_only_support_max: the higher of the two
-\newcommand{\DetectionHeldoutOursOnlySupportMin}{92}  % detection.heldout_ours_only_support_min: replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support
-\newcommand{\DetectionHeldoutPlacelessInformativeEvents}{19}  % detection.heldout_placeless_informative_events: informative place-less burst events over the three folds (none has held-out support)
-\newcommand{\DetectionHeldoutPlacelessLooseEvents}{75}  % detection.heldout_placeless_loose_events: place-less burst events informative at that floor
-\newcommand{\DetectionHeldoutPlacelessLooseSupportedEvents}{4}  % detection.heldout_placeless_loose_supported_events: place-less burst events with held-out support at a floor of 2 expected spikes
-\newcommand{\DetectionHeldoutSharedInformativeMax}{23}  % detection.heldout_shared_informative_max: the higher of the two
-\newcommand{\DetectionHeldoutSharedInformativeMin}{16}  % detection.heldout_shared_informative_min: shared replays: lower of folds A and B's share the evaluation cells can judge at all
-\newcommand{\DetectionHeldoutSharedSupport}{100}  % detection.heldout_shared_support: replays both detectors reported: share with held-out support, the same in every fold
+\newcommand{\DetectionHeldoutOursOnlyInformativeMax}{15}  % detection.heldout_ours_only_informative_max: the higher of the two
+\newcommand{\DetectionHeldoutOursOnlyInformativeMin}{14}  % detection.heldout_ours_only_informative_min: replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all
+\newcommand{\DetectionHeldoutOursOnlySupportFoldC}{79}  % detection.heldout_ours_only_support_fold_c: the same share in fold C
+\newcommand{\DetectionHeldoutOursOnlySupportMax}{90}  % detection.heldout_ours_only_support_max: the higher of the two
+\newcommand{\DetectionHeldoutOursOnlySupportMin}{89}  % detection.heldout_ours_only_support_min: replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support
+\newcommand{\DetectionHeldoutPlacelessInformativeEvents}{44}  % detection.heldout_placeless_informative_events: informative place-less burst events over the three folds
+\newcommand{\DetectionHeldoutPlacelessLooseEvents}{106}  % detection.heldout_placeless_loose_events: place-less burst events informative at that floor
+\newcommand{\DetectionHeldoutPlacelessLooseSupportedEvents}{1}  % detection.heldout_placeless_loose_supported_events: place-less burst events with held-out support at a floor of 2 expected spikes
+\newcommand{\DetectionHeldoutPlacelessSlidingEstimateEvents}{44}  % detection.heldout_placeless_sliding_estimate_events: informative place-less burst events under the sliding window's content estimate
+\newcommand{\DetectionHeldoutPlacelessSlidingEstimateSupportedEvents}{1}  % detection.heldout_placeless_sliding_estimate_supported_events: of those, the events with held-out support
+\newcommand{\DetectionHeldoutPlacelessSupportedEvents}{0}  % detection.heldout_placeless_supported_events: of those, the events with held-out support
+\newcommand{\DetectionHeldoutSharedInformativeMax}{45}  % detection.heldout_shared_informative_max: the higher of the two
+\newcommand{\DetectionHeldoutSharedInformativeMin}{42}  % detection.heldout_shared_informative_min: shared replays: lower of folds A and B's share the evaluation cells can judge at all
+\newcommand{\DetectionHeldoutSharedSupportMax}{100}  % detection.heldout_shared_support_max: the highest of the three
+\newcommand{\DetectionHeldoutSharedSupportMin}{97}  % detection.heldout_shared_support_min: replays both detectors reported: lowest share over the three folds with held-out support
 \newcommand{\DetectionPilotCallsDecidedByOutsideWindow}{1}  % detection.pilot_calls_decided_by_outside_window: of those, calls whose dispersion clears the threshold only with kept windows outside every piece
 \newcommand{\DetectionPilotCallsDecidedByOutsideWindowPassing}{0}  % detection.pilot_calls_decided_by_outside_window_passing: of those, calls that pass the significance test
 \newcommand{\DetectionPilotReplayCalls}{6}  % detection.pilot_replay_calls: sliding-window replay calls (duration and dispersion criteria) on the pilot epoch, chimi20200225_02_r1_HPC
-\newcommand{\DetectionRecordingInboundPJump}{0.0099}  % detection.recording_inbound_p_jump: significance test of the inbound replay: jump half
-\newcommand{\DetectionRecordingInboundPSpread}{0.0099}  % detection.recording_inbound_p_spread: significance test of the inbound replay: spread half
-\newcommand{\DetectionRecordingOutboundDrawsFromPassing}{0}  % detection.recording_outbound_draws_from_passing: how many more shuffle draws below the observed value than a pass allows
-\newcommand{\DetectionRecordingOutboundDurationRatio}{4.4}  % detection.recording_outbound_duration_ratio: the sliding window's reported duration of the continuous outbound replay over its true duration
-\newcommand{\DetectionRecordingOutboundLocalFraction}{75}  % detection.recording_outbound_local_fraction: share of that reported event's kept windows decoding the animal's own place (within 15 cm)
-\newcommand{\DetectionRecordingOutboundPJump}{0.030}  % detection.recording_outbound_p_jump: significance test of the outbound replay: jump half
-\newcommand{\DetectionRecordingOutboundPSpread}{0.0099}  % detection.recording_outbound_p_spread: significance test of the outbound replay: spread half
 \newcommand{\DetectionRecordingRemoteStationaryDispersionCm}{0}  % detection.recording_remote_stationary_dispersion_cm: largest dispersion of a candidate over the remote stationary event
-\newcommand{\DetectionRecordingShortPathDispersionCm}{6}  % detection.recording_short_path_dispersion_cm: largest dispersion of a sliding-window candidate over the 30 cm replay
-\newcommand{\DetectionRecordingShortReplayDurationRatio}{1.6}  % detection.recording_short_replay_duration_ratio: the sliding window's reported duration of the 80 ms replay over its true duration
+\newcommand{\DetectionRecordingShortPathDispersionCm}{9}  % detection.recording_short_path_dispersion_cm: largest dispersion of a sliding-window candidate over the 30 cm replay
+\newcommand{\DetectionRecordingShortReplayDurationRatio}{1.8}  % detection.recording_short_replay_duration_ratio: the sliding window's reported duration of the 80 ms replay over its true duration
 \newcommand{\DetectionRecordingShortReplayLocalFraction}{0}  % detection.recording_short_replay_local_fraction: share of that reported event's kept windows decoding the animal's own place
-\newcommand{\DetectionRecordingShortReplayPJump}{0.030}  % detection.recording_short_replay_p_jump: significance test of the 80 ms replay: jump half
+\newcommand{\DetectionRecordingShortReplayPJump}{0.020}  % detection.recording_short_replay_p_jump: significance test of the 80 ms replay: jump half
 \newcommand{\DetectionRecordingShortReplayPSpread}{0.0099}  % detection.recording_short_replay_p_spread: significance test of the 80 ms replay: spread half
-\newcommand{\DetectionRecordingStateSpaceBoundErrorMs}{42}  % detection.recording_state_space_bound_error_ms: largest error in either bound of the state-space detector's reports of the four zoomed events
-\newcommand{\DetectionRecordingStrayWindowDispersionCm}{16}  % detection.recording_stray_window_dispersion_cm: its dispersion with the window outside every piece
-\newcommand{\DetectionRecordingStrayWindowDistanceCm}{149}  % detection.recording_stray_window_distance_cm: distance from the animal of the far cell whose two spikes fill the stray window
-\newcommand{\DetectionRecordingStrayWindowDurationMs}{395}  % detection.recording_stray_window_duration_ms: the stray-window event's reported duration
-\newcommand{\DetectionRecordingStrayWindowLocalFraction}{99}  % detection.recording_stray_window_local_fraction: share of the stray-window event's kept windows decoding within 15 cm of the animal
-\newcommand{\DetectionRecordingStrayWindowPJump}{0.24}  % detection.recording_stray_window_p_jump: significance test of the stray-window event: jump half
-\newcommand{\DetectionRecordingStrayWindowPSpread}{0.31}  % detection.recording_stray_window_p_spread: significance test of the stray-window event: spread half
-\newcommand{\DetectionRecordingStrayWindowPiecesDispersionCm}{0.45}  % detection.recording_stray_window_pieces_dispersion_cm: its dispersion without that window
+\newcommand{\DetectionRecordingStateSpaceBoundErrorMs}{18}  % detection.recording_state_space_bound_error_ms: largest error in either bound of the state-space detector's reports of the four zoomed events
+\newcommand{\DetectionRecordingSweepDrawsFromPassing}{0}  % detection.recording_sweep_draws_from_passing: how many more shuffle draws below the observed value than a pass allows
+\newcommand{\DetectionRecordingSweepDurationRatio}{2.5}  % detection.recording_sweep_duration_ratio: the sliding window's reported duration of Figure 1's sweep over its true duration
+\newcommand{\DetectionRecordingSweepLocalFraction}{57}  % detection.recording_sweep_local_fraction: share of that reported event's kept windows decoding the animal's own place (within 15 cm)
+\newcommand{\DetectionRecordingSweepPJump}{0.0099}  % detection.recording_sweep_p_jump: significance test of the sweep: jump half
+\newcommand{\DetectionRecordingSweepPSpread}{0.0099}  % detection.recording_sweep_p_spread: significance test of the sweep: spread half
 \newcommand{\DetectionStateEvidenceAnimals}{5}  % detection.state_evidence_animals: animals in the held-out tetrode run
 \newcommand{\DetectionStateEvidenceEpochs}{242}  % detection.state_evidence_epochs: epochs the held-out tetrode run lists
 \newcommand{\DetectionStateEvidenceEpochsOk}{242}  % detection.state_evidence_epochs_ok: of those, epochs that passed every check of the run (status ok)
-\newcommand{\DetectionSweepDomainFraction}{25}  % detection.sweep_domain_fraction: share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms)
-\newcommand{\DetectionSweepDomainSlidingBeforeTestFraction}{68}  % detection.sweep_domain_sliding_before_test_fraction: on the shared target, share the sliding-window detector reports before its significance test
-\newcommand{\DetectionSweepDomainSlidingFraction}{62}  % detection.sweep_domain_sliding_fraction: on the shared target, share the sliding-window detector reports after its significance test
+\newcommand{\DetectionSweepDomainFraction}{21}  % detection.sweep_domain_fraction: share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms)
+\newcommand{\DetectionSweepDomainSlidingBeforeTestFraction}{70}  % detection.sweep_domain_sliding_before_test_fraction: on the shared target, share the sliding-window detector reports before its significance test
+\newcommand{\DetectionSweepDomainSlidingFraction}{64}  % detection.sweep_domain_sliding_fraction: on the shared target, share the sliding-window detector reports after its significance test
 \newcommand{\DetectionSweepDomainStateSpaceFraction}{99}  % detection.sweep_domain_state_space_fraction: on the shared target, share the state-space detector reports under its own acceptance criteria
-\newcommand{\DetectionSweepDomainStateSpacePublishedFraction}{68}  % detection.sweep_domain_state_space_published_fraction: on the shared target, share the state-space detector reports held to the published duration and dispersion criteria
-\newcommand{\DetectionSweepFailedTestFraction}{4}  % detection.sweep_failed_test_fraction: share the sliding-window detector reported and then failed on its significance test
-\newcommand{\DetectionSweepJumpHalfPassFraction}{88}  % detection.sweep_jump_half_pass_fraction: of the replays the sliding window reported before its test, share passing the test's jump half
-\newcommand{\DetectionSweepJumpHalfPassLongestFraction}{99}  % detection.sweep_jump_half_pass_longest_fraction: share of the longest (500 ms) replays passing the jump half
-\newcommand{\DetectionSweepJumpHalfPassShortestFraction}{36}  % detection.sweep_jump_half_pass_shortest_fraction: share of the shortest (40 ms) replays passing the jump half
-\newcommand{\DetectionSweepReplays}{4{,}536}  % detection.sweep_replays: replays swept (grid cells)
-\newcommand{\DetectionSweepShortestEndLateMs}{121}  % detection.sweep_shortest_end_late_ms: median amount the sliding window ends the shortest (40 ms) replays late
-\newcommand{\DetectionSweepShortestReportedDurationMs}{185}  % detection.sweep_shortest_reported_duration_ms: median duration the sliding window reports for the shortest (40 ms) replays
-\newcommand{\DetectionSweepShortestStartEarlyMs}{29}  % detection.sweep_shortest_start_early_ms: median amount the sliding window starts the shortest (40 ms) replays early
-\newcommand{\DetectionSweepSlidingBeforeTestFraction}{21}  % detection.sweep_sliding_before_test_fraction: over the whole grid, share the sliding-window detector reports before its significance test
-\newcommand{\DetectionSweepSlidingEndLateMaxMs}{121}  % detection.sweep_sliding_end_late_max_ms: largest median amount the sliding window ends late, over true durations (40 to 500 ms)
-\newcommand{\DetectionSweepSlidingEndLateMinMs}{21}  % detection.sweep_sliding_end_late_min_ms: smallest median amount the sliding window ends late, over true durations (40 to 500 ms)
-\newcommand{\DetectionSweepSlidingEndLateUpperQuartileMaxMs}{226}  % detection.sweep_sliding_end_late_upper_quartile_max_ms: largest upper quartile of the sliding window's end error, over true durations (40 to 500 ms)
-\newcommand{\DetectionSweepSlidingFraction}{18}  % detection.sweep_sliding_fraction: over the whole grid, share the sliding-window detector reports under its own criteria, significance test included
-\newcommand{\DetectionSweepSlidingNotTheReplayFraction}{21}  % detection.sweep_sliding_not_the_replay_fraction: share of the sliding-window detector's accepted events that are not the replay put in
-\newcommand{\DetectionSweepSlidingOnlyBeforeTestReplays}{4}  % detection.sweep_sliding_only_before_test_replays: the same, counting the sliding window's reports before its test
-\newcommand{\DetectionSweepSlidingOnlyReplays}{1}  % detection.sweep_sliding_only_replays: swept replays the sliding-window detector reported and the state-space detector did not
-\newcommand{\DetectionSweepSlidingSpreadOnlyFraction}{20}  % detection.sweep_sliding_spread_only_fraction: over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone
-\newcommand{\DetectionSweepSlidingStartEarlyMaxMs}{29}  % detection.sweep_sliding_start_early_max_ms: largest median amount the sliding window starts early, over true durations (40 to 500 ms)
-\newcommand{\DetectionSweepSlidingStartEarlyMinMs}{18}  % detection.sweep_sliding_start_early_min_ms: smallest median amount the sliding window starts early, over true durations (40 to 500 ms)
-\newcommand{\DetectionSweepSpreadHalfPassFraction}{96}  % detection.sweep_spread_half_pass_fraction: of the replays the sliding window reported before its test, share passing the test's spread half
-\newcommand{\DetectionSweepStateSpaceEdgeErrorMaxMs}{6}  % detection.sweep_state_space_edge_error_max_ms: largest absolute median start or end error of the state-space detector over true durations (40 to 500 ms), replays both detectors reported
-\newcommand{\DetectionSweepStateSpaceFraction}{91}  % detection.sweep_state_space_fraction: over the whole grid, share the state-space detector reports under its own criteria
-\newcommand{\DetectionSweepStateSpaceOnlyFraction}{73}  % detection.sweep_state_space_only_fraction: share of the swept replays reported by the state-space detector and not by the sliding-window detector
+\newcommand{\DetectionSweepDomainStateSpacePublishedFraction}{78}  % detection.sweep_domain_state_space_published_fraction: on the shared target, share the state-space detector reports held to the published duration and dispersion criteria
+\newcommand{\DetectionSweepFailedTestFraction}{2}  % detection.sweep_failed_test_fraction: share the sliding-window detector reported and then failed on its significance test
+\newcommand{\DetectionSweepJumpHalfPassFraction}{92}  % detection.sweep_jump_half_pass_fraction: of the replays the sliding window reported before its test, share passing the test's jump half
+\newcommand{\DetectionSweepJumpHalfPassLongestFraction}{97}  % detection.sweep_jump_half_pass_longest_fraction: share of the longest (500 ms) replays passing the jump half
+\newcommand{\DetectionSweepJumpHalfPassShortestFraction}{25}  % detection.sweep_jump_half_pass_shortest_fraction: share of the shortest (40 ms) replays passing the jump half
+\newcommand{\DetectionSweepReplays}{5{,}376}  % detection.sweep_replays: replays swept (grid cells)
+\newcommand{\DetectionSweepShortestEndLateMs}{31}  % detection.sweep_shortest_end_late_ms: median amount the sliding window ends the shortest (60 ms) replays late
+\newcommand{\DetectionSweepShortestReportedDurationMs}{125}  % detection.sweep_shortest_reported_duration_ms: median duration the sliding window reports for the shortest (60 ms) replays
+\newcommand{\DetectionSweepShortestStartEarlyMs}{29}  % detection.sweep_shortest_start_early_ms: median amount the sliding window starts the shortest (60 ms) replays early
+\newcommand{\DetectionSweepSlidingBeforeTestFraction}{16}  % detection.sweep_sliding_before_test_fraction: over the whole grid, share the sliding-window detector reports before its significance test
+\newcommand{\DetectionSweepSlidingEndLateMaxMs}{31}  % detection.sweep_sliding_end_late_max_ms: largest median amount the sliding window ends late, over true durations (60 to 500 ms)
+\newcommand{\DetectionSweepSlidingEndLateMinMs}{16}  % detection.sweep_sliding_end_late_min_ms: smallest median amount the sliding window ends late, over true durations (60 to 500 ms)
+\newcommand{\DetectionSweepSlidingEndLateUpperQuartileMaxMs}{184}  % detection.sweep_sliding_end_late_upper_quartile_max_ms: largest upper quartile of the sliding window's end error, over true durations (60 to 500 ms)
+\newcommand{\DetectionSweepSlidingFraction}{15}  % detection.sweep_sliding_fraction: over the whole grid, share the sliding-window detector reports under its own criteria, significance test included
+\newcommand{\DetectionSweepSlidingNotTheReplayFraction}{3}  % detection.sweep_sliding_not_the_replay_fraction: share of the sliding-window detector's accepted events that are not the replay put in
+\newcommand{\DetectionSweepSlidingOnlyBeforeTestReplays}{1}  % detection.sweep_sliding_only_before_test_replays: the same, counting the sliding window's reports before its test
+\newcommand{\DetectionSweepSlidingOnlyReplays}{0}  % detection.sweep_sliding_only_replays: swept replays the sliding-window detector reported and the state-space detector did not
+\newcommand{\DetectionSweepSlidingSpreadOnlyFraction}{16}  % detection.sweep_sliding_spread_only_fraction: over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone
+\newcommand{\DetectionSweepSlidingStartEarlyMaxMs}{29}  % detection.sweep_sliding_start_early_max_ms: largest median amount the sliding window starts early, over true durations (60 to 500 ms)
+\newcommand{\DetectionSweepSlidingStartEarlyMinMs}{19}  % detection.sweep_sliding_start_early_min_ms: smallest median amount the sliding window starts early, over true durations (60 to 500 ms)
+\newcommand{\DetectionSweepSpreadHalfPassFraction}{97}  % detection.sweep_spread_half_pass_fraction: of the replays the sliding window reported before its test, share passing the test's spread half
+\newcommand{\DetectionSweepStateSpaceEdgeErrorMaxMs}{5}  % detection.sweep_state_space_edge_error_max_ms: largest absolute median start or end error of the state-space detector over true durations (60 to 500 ms), replays both detectors reported
+\newcommand{\DetectionSweepStateSpaceFraction}{94}  % detection.sweep_state_space_fraction: over the whole grid, share the state-space detector reports under its own criteria
+\newcommand{\DetectionSweepStateSpaceOnlyFraction}{79}  % detection.sweep_state_space_only_fraction: share of the swept replays reported by the state-space detector and not by the sliding-window detector
 
 % --- events (commit d7d80592187f)
 \newcommand{\EventsAnimals}{5}  % events.animals: animals in the event table

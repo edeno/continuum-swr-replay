@@ -46,8 +46,8 @@ def _sweep_summary(name: str) -> pd.DataFrame:
     [
         (detection.sweep_values, 28),
         (detection.controls_values, 34),
-        (detection.heldout_values, 14),
-        (detection.recording_values, 21),
+        (detection.heldout_values, 18),
+        (detection.recording_values, 12),
     ],
 )
 def test_the_committed_inputs_give_the_committed_values(build, n_values):

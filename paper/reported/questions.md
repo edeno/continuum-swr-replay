@@ -16,7 +16,7 @@ it calls.
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
-| `detection.json` | `d7d80592187f` | yes | 133 | 0 |
+| `detection.json` | `52491282317c` | yes | 128 | 0 |
 | `events.json` | `d7d80592187f` | yes | 353 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
@@ -70,114 +70,109 @@ Sources:
 
 ### 1.1. On simulated data, how often does the detector report an event where no replay was inserted, and how does it compare with the Widloski detector on replays of known shape?
 
-Status: computed. Figures: 1, memoryless_comparison. Values: 97.
+Status: computed. Figures: 1, memoryless_comparison. Values: 92.
 
 Sources:
 
 - paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)
 - paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)
 - paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
-- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit e2331f976fd1)
+- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\DetectionControlsContinuingOursOnePerPartLongestFraction` | 79 |  | the same for our detector | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsContinuingOursSpanningShortestFraction` | 88 |  | the same for our detector | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsContinuingSlidingOnePerPartLongestFraction` | 50 |  | continuing chains at the longest gap: share of trials the sliding window reports as one event per part | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsContinuingSlidingSpanningShortestFraction` | 75 |  | continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsElsewhereOursOnePerPartLongestFraction` | 83 |  | the same at the longest gap | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsElsewhereOursOnePerPartShortestFraction` | 17 |  | chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsElsewhereSlidingMissingMax` | 58 |  | highest such share | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsElsewhereSlidingMissingMin` | 33 |  | chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsJumpOursSpanningMax` | 85 |  | highest such share | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsJumpOursSpanningMin` | 73 |  | lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts) | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsJumpSlidingSpanningMax` | 79 |  | highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsJumpingContinuousFraction` | 50 |  | share of jumping bursts our continuous state alone covers | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsJumpingNonlocalFraction` | 97 |  | share of jumping bursts our detector's non-local events cover | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsJumpingSlidingBeforeTestFraction` | 14 |  | the same before its significance test | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsJumpingSlidingFraction` | 8 |  | share of jumping bursts the sliding window reports under the published definition | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsMultipartTrials` | 432 |  | two-part trials over every jump and chain condition | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsNoReplayMinutes` | 1.7 | min | minutes of simulated immobility with no replay; no output reported any event there | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsNoReplayRateBound` | 1.8 | events per minute | 95 % upper bound on the false event rate with none observed (the rule of three over those minutes) | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsNoReplayRecordings` | 8 |  | simulated recordings the no-replay stretches come from | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsOursFewerInEventTrials` | 2 |  | trials in which our detector recovers fewer parts inside the event than alone | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsOursMoreInEventTrials` | 22 |  | trials in which it recovers more inside the event than alone | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsOursRecoveryAloneFraction` | 86 |  | the same with each part decoded alone | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsOursRecoveryInEventFraction` | 89 |  | share of parts our detector recovers inside the event, the same mean | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsPlacelessContinuousFraction` | 1 |  | share of place-less bursts our continuous state alone covers | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsPlacelessFragmentedShareMax` | 80 |  | highest share of a place-less burst's time in the fragmented state, over burst durations | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsPlacelessFragmentedShareMin` | 59 |  | lowest share of a place-less burst's time in the fragmented state, over burst durations | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsPlacelessNonlocalFraction` | 90 |  | share of place-less bursts our detector's non-local events cover, pooled over the three peak rates | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsPlacelessNonlocalLowestRateFraction` | 75 |  | share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsPlacelessSlidingBeforeTestFraction` | 15 |  | the same before its significance test | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsPlacelessSlidingFraction` | 8 |  | share of place-less bursts the sliding window reports under the published definition | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsSlidingFewerInEventTrials` | 21 |  | trials in which the sliding window recovers fewer parts inside the event than alone | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsSlidingMoreInEventTrials` | 84 |  | trials in which it recovers more inside the event than alone | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsSlidingRecoveryAloneFraction` | 62 |  | the same with each part decoded alone | `detection.controls_values` | memoryless_comparison |
-| `\DetectionControlsSlidingRecoveryInEventFraction` | 71 |  | share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels | `detection.controls_values` | memoryless_comparison |
-| `\DetectionHeldoutEstimatorAgreementMin` | 99 |  | lowest share over folds of the events informative under both content estimates on which they agree | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutJumpingSupportMax` | 63 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutJumpingSupportMin` | 57 |  | jumping bursts: lower of folds A and B's share with held-out support | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutOursOnlyInformativeMax` | 7 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutOursOnlyInformativeMin` | 6 |  | replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutOursOnlySupportFoldC` | 88 |  | the same share in fold C | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutOursOnlySupportMax` | 97 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutOursOnlySupportMin` | 92 |  | replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutPlacelessInformativeEvents` | 19 |  | informative place-less burst events over the three folds (none has held-out support) | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutPlacelessLooseEvents` | 75 |  | place-less burst events informative at that floor | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutPlacelessLooseSupportedEvents` | 4 |  | place-less burst events with held-out support at a floor of 2 expected spikes | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutSharedInformativeMax` | 23 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutSharedInformativeMin` | 16 |  | shared replays: lower of folds A and B's share the evaluation cells can judge at all | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionHeldoutSharedSupport` | 100 |  | replays both detectors reported: share with held-out support, the same in every fold | `detection.heldout_values` | memoryless_comparison |
-| `\DetectionRecordingInboundPJump` | 0.0099 |  | significance test of the inbound replay: jump half | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingInboundPSpread` | 0.0099 |  | significance test of the inbound replay: spread half | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingOutboundDrawsFromPassing` | 0 |  | how many more shuffle draws below the observed value than a pass allows | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingOutboundDurationRatio` | 4.4 |  | the sliding window's reported duration of the continuous outbound replay over its true duration | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingOutboundLocalFraction` | 75 |  | share of that reported event's kept windows decoding the animal's own place (within 15 cm) | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingOutboundPJump` | 0.030 |  | significance test of the outbound replay: jump half | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingOutboundPSpread` | 0.0099 |  | significance test of the outbound replay: spread half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionControlsContinuingOursOnePerPartLongestFraction` | 96 |  | the same for our detector | `detection.controls_values` |  |
+| `\DetectionControlsContinuingOursSpanningShortestFraction` | 96 |  | the same for our detector | `detection.controls_values` |  |
+| `\DetectionControlsContinuingSlidingOnePerPartLongestFraction` | 50 |  | continuing chains at the longest gap: share of trials the sliding window reports as one event per part | `detection.controls_values` |  |
+| `\DetectionControlsContinuingSlidingSpanningShortestFraction` | 79 |  | continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts | `detection.controls_values` |  |
+| `\DetectionControlsElsewhereOursOnePerPartLongestFraction` | 88 |  | the same at the longest gap | `detection.controls_values` |  |
+| `\DetectionControlsElsewhereOursOnePerPartShortestFraction` | 4 |  | chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part | `detection.controls_values` |  |
+| `\DetectionControlsElsewhereSlidingMissingMax` | 54 |  | highest such share | `detection.controls_values` |  |
+| `\DetectionControlsElsewhereSlidingMissingMin` | 38 |  | chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part | `detection.controls_values` |  |
+| `\DetectionControlsJumpOursSpanningMax` | 98 |  | highest such share | `detection.controls_values` |  |
+| `\DetectionControlsJumpOursSpanningMin` | 88 |  | lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts) | `detection.controls_values` |  |
+| `\DetectionControlsJumpSlidingSpanningMax` | 85 |  | highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts | `detection.controls_values` |  |
+| `\DetectionControlsJumpingContinuousFraction` | 35 |  | share of jumping bursts our continuous state alone covers | `detection.controls_values` |  |
+| `\DetectionControlsJumpingNonlocalFraction` | 99 |  | share of jumping bursts our detector's non-local events cover | `detection.controls_values` |  |
+| `\DetectionControlsJumpingSlidingBeforeTestFraction` | 7 |  | the same before its significance test | `detection.controls_values` |  |
+| `\DetectionControlsJumpingSlidingFraction` | 3 |  | share of jumping bursts the sliding window reports under the published definition | `detection.controls_values` |  |
+| `\DetectionControlsMultipartTrials` | 432 |  | two-part trials over every jump and chain condition | `detection.controls_values` |  |
+| `\DetectionControlsNoReplayMinutes` | 1.7 | min | minutes of simulated immobility with no replay; no output reported any event there | `detection.controls_values` |  |
+| `\DetectionControlsNoReplayRateBound` | 1.8 | events per minute | 95 % upper bound on the false event rate with none observed (the rule of three over those minutes) | `detection.controls_values` |  |
+| `\DetectionControlsNoReplayRecordings` | 8 |  | simulated recordings the no-replay stretches come from | `detection.controls_values` |  |
+| `\DetectionControlsOursFewerInEventTrials` | 4 |  | trials in which our detector recovers fewer parts inside the event than alone | `detection.controls_values` |  |
+| `\DetectionControlsOursMoreInEventTrials` | 24 |  | trials in which it recovers more inside the event than alone | `detection.controls_values` |  |
+| `\DetectionControlsOursRecoveryAloneFraction` | 94 |  | the same with each part decoded alone | `detection.controls_values` |  |
+| `\DetectionControlsOursRecoveryInEventFraction` | 96 |  | share of parts our detector recovers inside the event, the same mean | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessContinuousFraction` | 0 |  | share of place-less bursts our continuous state alone covers | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessFragmentedShareMax` | 93 |  | highest share of a place-less burst's time in the fragmented state, over burst durations | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessFragmentedShareMin` | 72 |  | lowest share of a place-less burst's time in the fragmented state, over burst durations | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessNonlocalFraction` | 96 |  | share of place-less bursts our detector's non-local events cover, pooled over the three peak rates | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessNonlocalLowestRateFraction` | 88 |  | share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessSlidingBeforeTestFraction` | 6 |  | the same before its significance test | `detection.controls_values` |  |
+| `\DetectionControlsPlacelessSlidingFraction` | 0 |  | share of place-less bursts the sliding window reports under the published definition | `detection.controls_values` |  |
+| `\DetectionControlsSlidingFewerInEventTrials` | 19 |  | trials in which the sliding window recovers fewer parts inside the event than alone | `detection.controls_values` |  |
+| `\DetectionControlsSlidingMoreInEventTrials` | 107 |  | trials in which it recovers more inside the event than alone | `detection.controls_values` |  |
+| `\DetectionControlsSlidingRecoveryAloneFraction` | 64 |  | the same with each part decoded alone | `detection.controls_values` |  |
+| `\DetectionControlsSlidingRecoveryInEventFraction` | 75 |  | share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels | `detection.controls_values` |  |
+| `\DetectionHeldoutEstimatorAgreementMin` | 98 |  | lowest share over folds of the events informative under both content estimates on which they agree | `detection.heldout_values` |  |
+| `\DetectionHeldoutJumpingSupportMax` | 57 |  | the higher of the two | `detection.heldout_values` |  |
+| `\DetectionHeldoutJumpingSupportMin` | 50 |  | jumping bursts: lower of folds A and B's share with held-out support | `detection.heldout_values` |  |
+| `\DetectionHeldoutOursOnlyInformativeMax` | 15 |  | the higher of the two | `detection.heldout_values` |  |
+| `\DetectionHeldoutOursOnlyInformativeMin` | 14 |  | replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all | `detection.heldout_values` |  |
+| `\DetectionHeldoutOursOnlySupportFoldC` | 79 |  | the same share in fold C | `detection.heldout_values` |  |
+| `\DetectionHeldoutOursOnlySupportMax` | 90 |  | the higher of the two | `detection.heldout_values` |  |
+| `\DetectionHeldoutOursOnlySupportMin` | 89 |  | replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support | `detection.heldout_values` |  |
+| `\DetectionHeldoutPlacelessInformativeEvents` | 44 |  | informative place-less burst events over the three folds | `detection.heldout_values` |  |
+| `\DetectionHeldoutPlacelessLooseEvents` | 106 |  | place-less burst events informative at that floor | `detection.heldout_values` |  |
+| `\DetectionHeldoutPlacelessLooseSupportedEvents` | 1 |  | place-less burst events with held-out support at a floor of 2 expected spikes | `detection.heldout_values` |  |
+| `\DetectionHeldoutPlacelessSlidingEstimateEvents` | 44 |  | informative place-less burst events under the sliding window's content estimate | `detection.heldout_values` |  |
+| `\DetectionHeldoutPlacelessSlidingEstimateSupportedEvents` | 1 |  | of those, the events with held-out support | `detection.heldout_values` |  |
+| `\DetectionHeldoutPlacelessSupportedEvents` | 0 |  | of those, the events with held-out support | `detection.heldout_values` |  |
+| `\DetectionHeldoutSharedInformativeMax` | 45 |  | the higher of the two | `detection.heldout_values` |  |
+| `\DetectionHeldoutSharedInformativeMin` | 42 |  | shared replays: lower of folds A and B's share the evaluation cells can judge at all | `detection.heldout_values` |  |
+| `\DetectionHeldoutSharedSupportMax` | 100 |  | the highest of the three | `detection.heldout_values` |  |
+| `\DetectionHeldoutSharedSupportMin` | 97 |  | replays both detectors reported: lowest share over the three folds with held-out support | `detection.heldout_values` |  |
 | `\DetectionRecordingRemoteStationaryDispersionCm` | 0 | cm | largest dispersion of a candidate over the remote stationary event | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingShortPathDispersionCm` | 6 | cm | largest dispersion of a sliding-window candidate over the 30 cm replay | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingShortReplayDurationRatio` | 1.6 |  | the sliding window's reported duration of the 80 ms replay over its true duration | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingShortPathDispersionCm` | 9 | cm | largest dispersion of a sliding-window candidate over the 30 cm replay | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingShortReplayDurationRatio` | 1.8 |  | the sliding window's reported duration of the 80 ms replay over its true duration | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingShortReplayLocalFraction` | 0 |  | share of that reported event's kept windows decoding the animal's own place | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingShortReplayPJump` | 0.030 |  | significance test of the 80 ms replay: jump half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingShortReplayPJump` | 0.020 |  | significance test of the 80 ms replay: jump half | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingShortReplayPSpread` | 0.0099 |  | significance test of the 80 ms replay: spread half | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStateSpaceBoundErrorMs` | 42 | ms | largest error in either bound of the state-space detector's reports of the four zoomed events | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowDispersionCm` | 16 | cm | its dispersion with the window outside every piece | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowDistanceCm` | 149 | cm | distance from the animal of the far cell whose two spikes fill the stray window | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowDurationMs` | 395 | ms | the stray-window event's reported duration | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowLocalFraction` | 99 |  | share of the stray-window event's kept windows decoding within 15 cm of the animal | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowPJump` | 0.24 |  | significance test of the stray-window event: jump half | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowPSpread` | 0.31 |  | significance test of the stray-window event: spread half | `detection.recording_values` | memoryless_comparison |
-| `\DetectionRecordingStrayWindowPiecesDispersionCm` | 0.45 | cm | its dispersion without that window | `detection.recording_values` | memoryless_comparison |
-| `\DetectionSweepDomainFraction` | 25 |  | share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepDomainSlidingBeforeTestFraction` | 68 |  | on the shared target, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepDomainSlidingFraction` | 62 |  | on the shared target, share the sliding-window detector reports after its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionRecordingStateSpaceBoundErrorMs` | 18 | ms | largest error in either bound of the state-space detector's reports of the four zoomed events | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingSweepDrawsFromPassing` | 0 |  | how many more shuffle draws below the observed value than a pass allows | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingSweepDurationRatio` | 2.5 |  | the sliding window's reported duration of Figure 1's sweep over its true duration | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingSweepLocalFraction` | 57 |  | share of that reported event's kept windows decoding the animal's own place (within 15 cm) | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingSweepPJump` | 0.0099 |  | significance test of the sweep: jump half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingSweepPSpread` | 0.0099 |  | significance test of the sweep: spread half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionSweepDomainFraction` | 21 |  | share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainSlidingBeforeTestFraction` | 70 |  | on the shared target, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainSlidingFraction` | 64 |  | on the shared target, share the sliding-window detector reports after its significance test | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepDomainStateSpaceFraction` | 99 |  | on the shared target, share the state-space detector reports under its own acceptance criteria | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepDomainStateSpacePublishedFraction` | 68 |  | on the shared target, share the state-space detector reports held to the published duration and dispersion criteria | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepFailedTestFraction` | 4 |  | share the sliding-window detector reported and then failed on its significance test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepJumpHalfPassFraction` | 88 |  | of the replays the sliding window reported before its test, share passing the test's jump half | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepJumpHalfPassLongestFraction` | 99 |  | share of the longest (500 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepJumpHalfPassShortestFraction` | 36 |  | share of the shortest (40 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepReplays` | 4,536 |  | replays swept (grid cells) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepShortestEndLateMs` | 121 | ms | median amount the sliding window ends the shortest (40 ms) replays late | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepShortestReportedDurationMs` | 185 | ms | median duration the sliding window reports for the shortest (40 ms) replays | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepShortestStartEarlyMs` | 29 | ms | median amount the sliding window starts the shortest (40 ms) replays early | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingBeforeTestFraction` | 21 |  | over the whole grid, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingEndLateMaxMs` | 121 | ms | largest median amount the sliding window ends late, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingEndLateMinMs` | 21 | ms | smallest median amount the sliding window ends late, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingEndLateUpperQuartileMaxMs` | 226 | ms | largest upper quartile of the sliding window's end error, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingFraction` | 18 |  | over the whole grid, share the sliding-window detector reports under its own criteria, significance test included | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingNotTheReplayFraction` | 21 |  | share of the sliding-window detector's accepted events that are not the replay put in | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingOnlyBeforeTestReplays` | 4 |  | the same, counting the sliding window's reports before its test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingOnlyReplays` | 1 |  | swept replays the sliding-window detector reported and the state-space detector did not | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingSpreadOnlyFraction` | 20 |  | over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingStartEarlyMaxMs` | 29 | ms | largest median amount the sliding window starts early, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingStartEarlyMinMs` | 18 | ms | smallest median amount the sliding window starts early, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSpreadHalfPassFraction` | 96 |  | of the replays the sliding window reported before its test, share passing the test's spread half | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepStateSpaceEdgeErrorMaxMs` | 6 | ms | largest absolute median start or end error of the state-space detector over true durations (40 to 500 ms), replays both detectors reported | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepStateSpaceFraction` | 91 |  | over the whole grid, share the state-space detector reports under its own criteria | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepStateSpaceOnlyFraction` | 73 |  | share of the swept replays reported by the state-space detector and not by the sliding-window detector | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainStateSpacePublishedFraction` | 78 |  | on the shared target, share the state-space detector reports held to the published duration and dispersion criteria | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepFailedTestFraction` | 2 |  | share the sliding-window detector reported and then failed on its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassFraction` | 92 |  | of the replays the sliding window reported before its test, share passing the test's jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassLongestFraction` | 97 |  | share of the longest (500 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassShortestFraction` | 25 |  | share of the shortest (40 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepReplays` | 5,376 |  | replays swept (grid cells) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestEndLateMs` | 31 | ms | median amount the sliding window ends the shortest (60 ms) replays late | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestReportedDurationMs` | 125 | ms | median duration the sliding window reports for the shortest (60 ms) replays | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestStartEarlyMs` | 29 | ms | median amount the sliding window starts the shortest (60 ms) replays early | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingBeforeTestFraction` | 16 |  | over the whole grid, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingEndLateMaxMs` | 31 | ms | largest median amount the sliding window ends late, over true durations (60 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingEndLateMinMs` | 16 | ms | smallest median amount the sliding window ends late, over true durations (60 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingEndLateUpperQuartileMaxMs` | 184 | ms | largest upper quartile of the sliding window's end error, over true durations (60 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingFraction` | 15 |  | over the whole grid, share the sliding-window detector reports under its own criteria, significance test included | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingNotTheReplayFraction` | 3 |  | share of the sliding-window detector's accepted events that are not the replay put in | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingOnlyBeforeTestReplays` | 1 |  | the same, counting the sliding window's reports before its test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingOnlyReplays` | 0 |  | swept replays the sliding-window detector reported and the state-space detector did not | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingSpreadOnlyFraction` | 16 |  | over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingStartEarlyMaxMs` | 29 | ms | largest median amount the sliding window starts early, over true durations (60 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingStartEarlyMinMs` | 19 | ms | smallest median amount the sliding window starts early, over true durations (60 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSpreadHalfPassFraction` | 97 |  | of the replays the sliding window reported before its test, share passing the test's spread half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepStateSpaceEdgeErrorMaxMs` | 5 | ms | largest absolute median start or end error of the state-space detector over true durations (60 to 500 ms), replays both detectors reported | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepStateSpaceFraction` | 94 |  | over the whole grid, share the state-space detector reports under its own criteria | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepStateSpaceOnlyFraction` | 79 |  | share of the swept replays reported by the state-space detector and not by the sliding-window detector | `detection.sweep_values` | memoryless_comparison |
 
 ## Part 2: it works
 
@@ -2764,7 +2759,7 @@ Unlettered: `\EventsCalibrationErrorBinEight`, `\EventsCalibrationErrorBinFive`,
 
 Script: `scripts/figures/generate_memoryless_comparison.py`. Questions: 1.1, 2a.3.
 
-Unlettered: `\DetectionControlsContinuingOursOnePerPartLongestFraction`, `\DetectionControlsContinuingOursSpanningShortestFraction`, `\DetectionControlsContinuingSlidingOnePerPartLongestFraction`, `\DetectionControlsContinuingSlidingSpanningShortestFraction`, `\DetectionControlsElsewhereOursOnePerPartLongestFraction`, `\DetectionControlsElsewhereOursOnePerPartShortestFraction`, `\DetectionControlsElsewhereSlidingMissingMax`, `\DetectionControlsElsewhereSlidingMissingMin`, `\DetectionControlsJumpOursSpanningMax`, `\DetectionControlsJumpOursSpanningMin`, `\DetectionControlsJumpSlidingSpanningMax`, `\DetectionControlsJumpingContinuousFraction`, `\DetectionControlsJumpingNonlocalFraction`, `\DetectionControlsJumpingSlidingBeforeTestFraction`, `\DetectionControlsJumpingSlidingFraction`, `\DetectionControlsMultipartTrials`, `\DetectionControlsNoReplayMinutes`, `\DetectionControlsNoReplayRateBound`, `\DetectionControlsNoReplayRecordings`, `\DetectionControlsOursFewerInEventTrials`, `\DetectionControlsOursMoreInEventTrials`, `\DetectionControlsOursRecoveryAloneFraction`, `\DetectionControlsOursRecoveryInEventFraction`, `\DetectionControlsPlacelessContinuousFraction`, `\DetectionControlsPlacelessFragmentedShareMax`, `\DetectionControlsPlacelessFragmentedShareMin`, `\DetectionControlsPlacelessNonlocalFraction`, `\DetectionControlsPlacelessNonlocalLowestRateFraction`, `\DetectionControlsPlacelessSlidingBeforeTestFraction`, `\DetectionControlsPlacelessSlidingFraction`, `\DetectionControlsSlidingFewerInEventTrials`, `\DetectionControlsSlidingMoreInEventTrials`, `\DetectionControlsSlidingRecoveryAloneFraction`, `\DetectionControlsSlidingRecoveryInEventFraction`, `\DetectionHeldoutEstimatorAgreementMin`, `\DetectionHeldoutJumpingSupportMax`, `\DetectionHeldoutJumpingSupportMin`, `\DetectionHeldoutOursOnlyInformativeMax`, `\DetectionHeldoutOursOnlyInformativeMin`, `\DetectionHeldoutOursOnlySupportFoldC`, `\DetectionHeldoutOursOnlySupportMax`, `\DetectionHeldoutOursOnlySupportMin`, `\DetectionHeldoutPlacelessInformativeEvents`, `\DetectionHeldoutPlacelessLooseEvents`, `\DetectionHeldoutPlacelessLooseSupportedEvents`, `\DetectionHeldoutSharedInformativeMax`, `\DetectionHeldoutSharedInformativeMin`, `\DetectionHeldoutSharedSupport`, `\DetectionPilotCallsDecidedByOutsideWindowPassing`, `\DetectionPilotCallsDecidedByOutsideWindow`, `\DetectionPilotReplayCalls`, `\DetectionRecordingInboundPJump`, `\DetectionRecordingInboundPSpread`, `\DetectionRecordingOutboundDrawsFromPassing`, `\DetectionRecordingOutboundDurationRatio`, `\DetectionRecordingOutboundLocalFraction`, `\DetectionRecordingOutboundPJump`, `\DetectionRecordingOutboundPSpread`, `\DetectionRecordingRemoteStationaryDispersionCm`, `\DetectionRecordingShortPathDispersionCm`, `\DetectionRecordingShortReplayDurationRatio`, `\DetectionRecordingShortReplayLocalFraction`, `\DetectionRecordingShortReplayPJump`, `\DetectionRecordingShortReplayPSpread`, `\DetectionRecordingStateSpaceBoundErrorMs`, `\DetectionRecordingStrayWindowDispersionCm`, `\DetectionRecordingStrayWindowDistanceCm`, `\DetectionRecordingStrayWindowDurationMs`, `\DetectionRecordingStrayWindowLocalFraction`, `\DetectionRecordingStrayWindowPJump`, `\DetectionRecordingStrayWindowPSpread`, `\DetectionRecordingStrayWindowPiecesDispersionCm`, `\DetectionSweepDomainFraction`, `\DetectionSweepDomainSlidingBeforeTestFraction`, `\DetectionSweepDomainSlidingFraction`, `\DetectionSweepDomainStateSpaceFraction`, `\DetectionSweepDomainStateSpacePublishedFraction`, `\DetectionSweepFailedTestFraction`, `\DetectionSweepJumpHalfPassFraction`, `\DetectionSweepJumpHalfPassLongestFraction`, `\DetectionSweepJumpHalfPassShortestFraction`, `\DetectionSweepReplays`, `\DetectionSweepShortestEndLateMs`, `\DetectionSweepShortestReportedDurationMs`, `\DetectionSweepShortestStartEarlyMs`, `\DetectionSweepSlidingBeforeTestFraction`, `\DetectionSweepSlidingEndLateMaxMs`, `\DetectionSweepSlidingEndLateMinMs`, `\DetectionSweepSlidingEndLateUpperQuartileMaxMs`, `\DetectionSweepSlidingFraction`, `\DetectionSweepSlidingNotTheReplayFraction`, `\DetectionSweepSlidingOnlyBeforeTestReplays`, `\DetectionSweepSlidingOnlyReplays`, `\DetectionSweepSlidingSpreadOnlyFraction`, `\DetectionSweepSlidingStartEarlyMaxMs`, `\DetectionSweepSlidingStartEarlyMinMs`, `\DetectionSweepSpreadHalfPassFraction`, `\DetectionSweepStateSpaceEdgeErrorMaxMs`, `\DetectionSweepStateSpaceFraction`, `\DetectionSweepStateSpaceOnlyFraction`
+Unlettered: `\DetectionPilotCallsDecidedByOutsideWindowPassing`, `\DetectionPilotCallsDecidedByOutsideWindow`, `\DetectionPilotReplayCalls`, `\DetectionRecordingRemoteStationaryDispersionCm`, `\DetectionRecordingShortPathDispersionCm`, `\DetectionRecordingShortReplayDurationRatio`, `\DetectionRecordingShortReplayLocalFraction`, `\DetectionRecordingShortReplayPJump`, `\DetectionRecordingShortReplayPSpread`, `\DetectionRecordingStateSpaceBoundErrorMs`, `\DetectionRecordingSweepDrawsFromPassing`, `\DetectionRecordingSweepDurationRatio`, `\DetectionRecordingSweepLocalFraction`, `\DetectionRecordingSweepPJump`, `\DetectionRecordingSweepPSpread`, `\DetectionSweepDomainFraction`, `\DetectionSweepDomainSlidingBeforeTestFraction`, `\DetectionSweepDomainSlidingFraction`, `\DetectionSweepDomainStateSpaceFraction`, `\DetectionSweepDomainStateSpacePublishedFraction`, `\DetectionSweepFailedTestFraction`, `\DetectionSweepJumpHalfPassFraction`, `\DetectionSweepJumpHalfPassLongestFraction`, `\DetectionSweepJumpHalfPassShortestFraction`, `\DetectionSweepReplays`, `\DetectionSweepShortestEndLateMs`, `\DetectionSweepShortestReportedDurationMs`, `\DetectionSweepShortestStartEarlyMs`, `\DetectionSweepSlidingBeforeTestFraction`, `\DetectionSweepSlidingEndLateMaxMs`, `\DetectionSweepSlidingEndLateMinMs`, `\DetectionSweepSlidingEndLateUpperQuartileMaxMs`, `\DetectionSweepSlidingFraction`, `\DetectionSweepSlidingNotTheReplayFraction`, `\DetectionSweepSlidingOnlyBeforeTestReplays`, `\DetectionSweepSlidingOnlyReplays`, `\DetectionSweepSlidingSpreadOnlyFraction`, `\DetectionSweepSlidingStartEarlyMaxMs`, `\DetectionSweepSlidingStartEarlyMinMs`, `\DetectionSweepSpreadHalfPassFraction`, `\DetectionSweepStateSpaceEdgeErrorMaxMs`, `\DetectionSweepStateSpaceFraction`, `\DetectionSweepStateSpaceOnlyFraction`
 
 ### Figure content_estimators: Content models under three estimators
 
