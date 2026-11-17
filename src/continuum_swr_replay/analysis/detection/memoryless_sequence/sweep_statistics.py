@@ -41,6 +41,7 @@ __all__ = [
     "sweep_grid_statistics",
     "sweep_jump_pass_statistics",
     "sweep_measures",
+    "sweep_pooled_timing_statistics",
     "sweep_timing_statistics",
 ]
 
@@ -211,6 +212,36 @@ def sweep_jump_pass_statistics(summary: pd.DataFrame) -> dict[str, float]:
         "longest_duration_s": float(jump_pass.index[-1]),
         "longest_fraction": float(jump_pass.iloc[-1]),
     }
+
+
+def sweep_pooled_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
+    """The start and end errors of both detectors, pooled over the replays both
+    report.
+
+    Parameters
+    ----------
+    summary : pd.DataFrame, shape (n_rows, n_columns)
+        The replay sweep's summary, with its ``timing_pooled`` block.
+
+    Returns
+    -------
+    statistics : dict
+        The block's values by measure, as
+        ``sweep_summaries.pooled_timing_errors`` names them: errors in
+        milliseconds, reported minus true.
+
+    Raises
+    ------
+    ValueError
+        If the summary has no such block, or a value of it is missing.
+    """
+    pooled = sweep_measures(summary, "timing_pooled")
+    if pooled.empty or pooled.isna().any():
+        raise ValueError(
+            "replay sweep summary: the timing_pooled block is absent, or a value "
+            "of it is missing"
+        )
+    return {str(measure): float(value) for measure, value in pooled.items()}
 
 
 def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:

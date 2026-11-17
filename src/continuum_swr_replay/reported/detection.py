@@ -44,6 +44,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     sweep_statistics,
+    sweep_summaries,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table import (
     outside_window_call_statistics,
@@ -407,6 +408,102 @@ def recording_values(numbers: dict, source: str) -> list[Value]:
 # --- the memoryless comparison: the replay sweep (d-g) ------------------------
 
 
+_TIMING_DETECTORS = {"sliding": "sliding window", "state_space": "state-space detector"}
+_TIMING_EDGES = {"start": "onset", "end": "offset"}
+_TIMING_REFERENCES = {
+    "bounds": "the replay's nominal bounds",
+    "spikes": "the replay's own first and last spike",
+}
+_TIMING_STATISTICS = {
+    "min": "smallest",
+    "q25": "lower quartile of the",
+    "median": "median",
+    "q75": "upper quartile of the",
+    "max": "largest",
+    "abs_median": "median absolute",
+}
+
+
+_TIMING_KEY_WORDS = {"q25": "lower_quartile", "q75": "upper_quartile"}
+"""A value's key holds no digit."""
+
+
+def pooled_timing_values(summary: pd.DataFrame, make) -> list[Value]:
+    """Each detector's onset and offset errors over the replays both report,
+    pooled over the sweep: reported minus true, negative for an edge placed
+    early (``sweep_summaries.pooled_timing_errors``)."""
+    pooled = sweep_statistics.sweep_pooled_timing_statistics(summary)
+    far_ms = format_number(sweep_summaries.LARGE_TIMING_ERROR_MS, "int")
+    over = "over the replays both detectors report"
+    values = [
+        make(
+            "sweep_timing_replays",
+            pooled["n_replays"],
+            "count",
+            "count",
+            "replays both detectors report, which the pooled timing errors are of",
+        )
+    ]
+    for detector, detector_name in _TIMING_DETECTORS.items():
+        for edge, edge_name in _TIMING_EDGES.items():
+            for reference, reference_name in _TIMING_REFERENCES.items():
+                measure = f"{detector}_{edge}_error_ms_{reference}"
+                key = f"sweep_timing_{detector}_{edge_name}_{reference}"
+                error = (
+                    f"{edge_name} error of the {detector_name} against "
+                    f"{reference_name}, {over}"
+                )
+                values += [
+                    make(
+                        f"{key}_{_TIMING_KEY_WORDS.get(statistic, statistic)}_ms",
+                        pooled[f"{measure}_{statistic}"],
+                        "quantity",
+                        "int",
+                        f"{statistic_name} {error}",
+                        "ms",
+                    )
+                    for statistic, statistic_name in _TIMING_STATISTICS.items()
+                ]
+                values.append(
+                    make(
+                        f"{key}_far_fraction",
+                        pooled[f"{measure}_far_share"],
+                        "fraction",
+                        "pctnum",
+                        f"share of the replays both detectors report whose {edge_name} the "
+                        f"{detector_name} places more than {far_ms} ms from "
+                        f"{reference_name}",
+                    )
+                )
+        values += [
+            make(
+                f"sweep_timing_{detector}_duration_error_"
+                f"{_TIMING_KEY_WORDS.get(statistic, statistic)}_ms",
+                pooled[f"{detector}_duration_error_ms_{statistic}"],
+                "quantity",
+                "int",
+                f"{_TIMING_STATISTICS[statistic]} reported minus nominal duration "
+                f"of the {detector_name}, {over}",
+                "ms",
+            )
+            for statistic in ("q25", "median", "q75")
+        ]
+    values += [
+        make(
+            f"sweep_timing_sliding_larger_{edge_name}_{reference}_fraction",
+            pooled[f"sliding_larger_{edge}_{reference}_share"],
+            "fraction",
+            "pctnum",
+            f"share of the replays both detectors report on which the sliding "
+            f"window's absolute {edge_name} error against {reference_name} is the "
+            "larger of the two",
+        )
+        for edge, edge_name in _TIMING_EDGES.items()
+        for reference, reference_name in _TIMING_REFERENCES.items()
+    ]
+    return values
+
+
 def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
     """Panels (d-g): replays of chosen shape, one at a time, scored against the
     known answer. Shares are of the swept replays (grid cells)."""
@@ -440,6 +537,7 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
         return make(key, x, "quantity", "int", description, "ms")
 
     return [
+        *pooled_timing_values(summary, make),
         make(
             "sweep_replays",
             grid["n_replays"],

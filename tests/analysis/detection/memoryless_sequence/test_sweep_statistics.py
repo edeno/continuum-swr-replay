@@ -900,3 +900,25 @@ def test_heldout_event_classes_refuse_an_event_only_the_sliding_window_reported(
     )
     with pytest.raises(ValueError, match="comparator-only events"):
         stats.heldout_event_classes(with_comparator)
+
+
+def test_pooled_timing_statistics_are_the_blocks_values_by_measure():
+    summary = pd.DataFrame(
+        {
+            "summary": ["timing_pooled", "timing_pooled", "overall"],
+            "measure": ["n_replays", "sliding_end_error_ms_bounds_max", "n_cells"],
+            "value": [2.0, 150.0, 4.0],
+        }
+    )
+    assert stats.sweep_pooled_timing_statistics(summary) == {
+        "n_replays": 2.0,
+        "sliding_end_error_ms_bounds_max": 150.0,
+    }
+
+
+@pytest.mark.parametrize("value", [None, float("nan")])
+def test_pooled_timing_statistics_refuse_an_absent_block_or_a_missing_value(value):
+    rows = [] if value is None else [("timing_pooled", "n_replays", value)]
+    summary = pd.DataFrame(rows, columns=["summary", "measure", "value"])
+    with pytest.raises(ValueError, match="timing_pooled"):
+        stats.sweep_pooled_timing_statistics(summary)

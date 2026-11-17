@@ -295,6 +295,21 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
         ((added >= start_s) & (added <= end_s)).sum()
         - ((original >= start_s) & (original <= end_s) & np.isin(original, added)).sum()
     )
+    # the replay's own spikes: at a low rate the first can come well after the
+    # replay's nominal start, and no detector can report what has not fired
+    added_spikes = np.concatenate(
+        [
+            np.setdiff1d(with_replay, without_replay)
+            for with_replay, without_replay in zip(
+                injected, recording["spike_times"], strict=True
+            )
+        ]
+    )
+    first_spike_s, last_spike_s = (
+        (float(added_spikes.min()), float(added_spikes.max()))
+        if added_spikes.size
+        else (np.nan, np.nan)
+    )
     row = {
         "path_cm": path_cm,
         "midpoint_cm": midpoint_cm,
@@ -308,6 +323,8 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
             - float(np.interp(at_s, recording["time"], recording["position"]))
         ),
         "n_spikes": n_spikes,
+        "first_spike_s": first_spike_s,
+        "last_spike_s": last_spike_s,
         "spikes_per_window": n_spikes * CONFIG.window_duration_s / duration_s,
     }
 

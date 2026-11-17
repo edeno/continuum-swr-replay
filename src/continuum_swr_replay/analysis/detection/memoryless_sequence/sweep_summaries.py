@@ -49,6 +49,90 @@ def melted(frame: pd.DataFrame, id_vars: list[str], summary: str) -> pd.DataFram
     )
 
 
+LARGE_TIMING_ERROR_MS = 100.0
+"""An edge placed further than this from the truth counts as far off
+(:func:`pooled_timing_errors`)."""
+
+TIMING_REFERENCES = ("bounds", "spikes")
+"""What an edge error is measured against: the replay's nominal start and end,
+or its own first and last spike."""
+
+
+def pooled_timing_errors(found: pd.DataFrame) -> dict[str, float]:
+    """Each detector's start and end errors over the replays both report, pooled.
+
+    An error is reported minus true, in milliseconds: negative for an edge
+    placed early. It is measured against the replay's nominal bounds
+    (``bounds``) and against its own first and last spike (``spikes``), since a
+    sparse replay's nominal bounds hold silent time no detector can see.
+
+    Parameters
+    ----------
+    found : pd.DataFrame, shape (n_replays, n_columns)
+        The replays both detectors report, one row each: ``at_s`` and
+        ``duration_s`` (the nominal bounds), ``first_spike_s`` and
+        ``last_spike_s``, and for ``sliding`` and ``state_space`` the
+        ``<detector>_start_error_s`` and ``<detector>_end_error_s`` against the
+        nominal bounds.
+
+    Returns
+    -------
+    statistics : dict
+        - ``n_replays``: the replays pooled.
+        - ``<detector>_<edge>_error_ms_<reference>_<statistic>`` for the edges
+          ``start`` and ``end``, the references of :data:`TIMING_REFERENCES`
+          and the statistics ``min``, ``q25``, ``median``, ``q75``, ``max``,
+          ``abs_median`` (the median absolute error) and ``far_share`` (the
+          share of replays with an absolute error above
+          :data:`LARGE_TIMING_ERROR_MS`).
+        - ``<detector>_duration_error_ms_<q25|median|q75>``: reported minus
+          nominal duration.
+        - ``sliding_larger_<edge>_<reference>_share``: the share of replays on
+          which the sliding window's absolute error is the larger of the two.
+    """
+    # the nominal bounds to the replay's own spikes, ms: at or after the start,
+    # at or before the end
+    to_spikes_ms = {
+        "start": 1000.0 * (found["first_spike_s"] - found["at_s"]),
+        "end": 1000.0 * (found["last_spike_s"] - (found["at_s"] + found["duration_s"])),
+    }
+    statistics: dict[str, float] = {"n_replays": float(len(found))}
+    errors_ms: dict[tuple[str, str, str], pd.Series] = {}
+    for detector in ("sliding", "state_space"):
+        for edge in ("start", "end"):
+            to_bounds = 1000.0 * found[f"{detector}_{edge}_error_s"]
+            errors_ms[detector, edge, "bounds"] = to_bounds
+            errors_ms[detector, edge, "spikes"] = to_bounds - to_spikes_ms[edge]
+        duration_error_ms = 1000.0 * (
+            found[f"{detector}_end_error_s"] - found[f"{detector}_start_error_s"]
+        )
+        for name, quantile in (("q25", 0.25), ("median", 0.5), ("q75", 0.75)):
+            statistics[f"{detector}_duration_error_ms_{name}"] = float(
+                duration_error_ms.quantile(quantile)
+            )
+    for (detector, edge, reference), error_ms in errors_ms.items():
+        key = f"{detector}_{edge}_error_ms_{reference}"
+        statistics |= {
+            f"{key}_min": float(error_ms.min()),
+            f"{key}_q25": float(error_ms.quantile(0.25)),
+            f"{key}_median": float(error_ms.median()),
+            f"{key}_q75": float(error_ms.quantile(0.75)),
+            f"{key}_max": float(error_ms.max()),
+            f"{key}_abs_median": float(error_ms.abs().median()),
+            f"{key}_far_share": float((error_ms.abs() > LARGE_TIMING_ERROR_MS).mean()),
+        }
+    for edge in ("start", "end"):
+        for reference in TIMING_REFERENCES:
+            sliding, state_space = (
+                errors_ms[detector, edge, reference].abs()
+                for detector in ("sliding", "state_space")
+            )
+            statistics[f"sliding_larger_{edge}_{reference}_share"] = float(
+                (sliding > state_space).mean()
+            )
+    return statistics
+
+
 def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
     """The aggregates quoted from the injected-replay sweep, in one long table.
 
@@ -73,7 +157,8 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
         (``overall``) and over the cells the published definition can accept
         (``overall_in_domain``, :data:`IN_DOMAIN_PATH_CM`,
         :data:`IN_DOMAIN_DURATION_S`), and the start and end errors' quartiles
-        by duration (``timing_by_duration``, ms). The duration, distance and
+        by duration (``timing_by_duration``, ms) and pooled (``timing_pooled``,
+        :func:`pooled_timing_errors`). The duration, distance and
         timing blocks read the replays both detectors report as the injection
         (``sliding_matches`` and ``state_space_matches``).
     """
@@ -306,6 +391,16 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
                     )
         timing.append(row)
     parts.append(melted(pd.DataFrame(timing), ["duration_s"], "timing_by_duration"))
+
+    # the same errors pooled over those replays, against the nominal bounds and
+    # against each replay's own spikes
+    pooled = (
+        pd.Series(pooled_timing_errors(found), name="value")
+        .rename_axis("measure")
+        .reset_index()
+    )
+    pooled["summary"] = "timing_pooled"
+    parts.append(pooled)
 
     # the grouping column is not called "aggregate": that name shadows
     # DataFrame.aggregate, so frame.aggregate == "x" compares a method and
