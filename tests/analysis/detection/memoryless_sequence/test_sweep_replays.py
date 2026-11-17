@@ -93,7 +93,7 @@ def test_an_event_outside_the_injection_is_not_found():
     assert np.isnan(out["state_space_position_error_cm"])
 
 
-def test_planned_cells_run_every_combination_up_then_down():
+def test_planned_cells_run_every_combination_in_each_direction():
     intervals = np.array([[5.0, 8.0], [18.0, 21.0]])
     cells = sweep_replays.planned_cells(intervals, n_seeds=2)
     grid = sweep.replay_grid()
@@ -101,9 +101,6 @@ def test_planned_cells_run_every_combination_up_then_down():
 
     # a path of 0 cm has no direction and is planned once
     assert len(cells) == 2 * (2 * len(grid) - held_still)
-    up = [cell for cell in cells if cell["direction"] == 1]
-    assert cells[: len(up)] == up
-    assert len(up) == 2 * len(grid)
     assert not any(cell["path_cm"] == 0 for cell in cells if cell["direction"] == -1)
     # the same plan every time, each placement inside a usable stretch
     assert cells == sweep_replays.planned_cells(intervals, n_seeds=2)
@@ -112,3 +109,32 @@ def test_planned_cells_run_every_combination_up_then_down():
             start <= cell["at_s"] and cell["at_s"] + cell["duration_s"] <= end
             for start, end in intervals
         )
+
+
+def test_every_planned_cell_has_its_own_placement_and_firing_noise():
+    intervals = np.array([[5.0, 8.0], [18.0, 21.0]])
+    cells = sweep_replays.planned_cells(intervals, n_seeds=2)
+
+    assert len({cell["injection_seed"] for cell in cells}) == len(cells)
+    assert len({cell["at_s"] for cell in cells}) == len(cells)
+
+
+def test_a_planned_cell_does_not_depend_on_the_other_cells():
+    intervals = np.array([[5.0, 8.0], [18.0, 21.0]])
+    by_name = {
+        n_seeds: {
+            (
+                cell["path_cm"],
+                cell["midpoint_cm"],
+                cell["duration_s"],
+                cell["rate_hz"],
+                cell["direction"],
+                cell["seed"],
+            ): cell
+            for cell in sweep_replays.planned_cells(intervals, n_seeds=n_seeds)
+        }
+        for n_seeds in (1, 3)
+    }
+    # a cell planned among three replicates is the cell planned alone
+    for name, cell in by_name[1].items():
+        assert by_name[3][name] == cell

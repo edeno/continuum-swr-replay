@@ -72,7 +72,10 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation impo
     InjectedReplay,
     inject_replay,
     place_field_means,
-    placements,
+)
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_replays import (
+    cell_key,
+    planned_cells,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     aggregate_windows,
@@ -480,57 +483,56 @@ def decode_sweep_cell(recording: dict, injected: list, window: tuple, key: str) 
 def sweep_totals(n_seeds: int) -> pd.DataFrame:
     """Both procedures on every sweep cell, the counts totalled per variant.
 
-    The cells, placements and injections are the sweep's own, drawn in the
-    sweep's order from the sweep's generator, so each cell is the one the
-    sweep scored.
+    The cells, placements and injections are the sweep's own
+    (``sweep_replays.planned_cells``), so each cell is the one the sweep scored.
     """
     recording = sweep.build_recording()
     means = place_field_means(N_NEURONS, TRACK_HEIGHT)
-    intervals = sweep.usable_intervals(recording)
-    combinations = sweep.replay_grid()
-    rng = np.random.default_rng(0)
+    cells = planned_cells(sweep.usable_intervals(recording), n_seeds)
     totals = {variant: dict.fromkeys(SWEEP_TOTALS, 0) for variant in VARIANTS}
     for variant in VARIANTS:
         totals[variant] |= {"n_cells": 0, "cells_with_replay_count_differing": 0}
         totals[variant] |= {"cells_with_published_count_differing": 0}
-    for number, (path_cm, midpoint_cm, duration_s, rate_hz) in enumerate(combinations):
-        at_s = placements(intervals, duration_s, sweep.PLACEMENT_MARGIN_S, n_seeds, rng)
-        for seed in range(n_seeds):
-            injected, bounds = inject_replay(
-                recording["spike_times"],
-                means,
-                InjectedReplay(
-                    start_cm=midpoint_cm - path_cm / 2,
-                    path_cm=path_cm,
-                    duration_s=duration_s,
-                    peak_rate_hz=rate_hz,
-                    at_s=float(at_s[seed]),
-                    seed=seed,
-                ),
-                sampling_frequency=SAMPLING_FREQUENCY,
+    for number, cell in enumerate(cells):
+        injected, bounds = inject_replay(
+            recording["spike_times"],
+            means,
+            InjectedReplay(
+                start_cm=cell["midpoint_cm"] - cell["direction"] * cell["path_cm"] / 2,
+                path_cm=cell["direction"] * cell["path_cm"],
+                duration_s=cell["duration_s"],
+                peak_rate_hz=cell["rate_hz"],
+                at_s=cell["at_s"],
+                seed=cell["injection_seed"],
+            ),
+            sampling_frequency=SAMPLING_FREQUENCY,
+        )
+        window = sweep.decode_window(recording, bounds)
+        key = cell_key(
+            cell["path_cm"],
+            cell["midpoint_cm"],
+            cell["duration_s"],
+            cell["rate_hz"],
+            cell["direction"],
+            cell["seed"],
+        )
+        decoded = decode_sweep_cell(recording, injected, window, key)
+        summaries, _ = compare_variants(
+            decoded, recording["encoding_model"], CONFIG, decoded["seed"]
+        )
+        for variant, summary in summaries.items():
+            total = totals[variant]
+            for measure in SWEEP_TOTALS:
+                total[measure] += summary[measure]
+            total["n_cells"] += 1
+            total["cells_with_replay_count_differing"] += int(
+                summary["n_replay_port"] != summary["n_replay_reference"]
             )
-            window = sweep.decode_window(recording, bounds)
-            key = (
-                f"path{path_cm}-mid{midpoint_cm}-dur{duration_s}"
-                f"-rate{rate_hz}-seed{seed}"
+            total["cells_with_published_count_differing"] += int(
+                summary["n_published_port"] != summary["n_published_reference"]
             )
-            decoded = decode_sweep_cell(recording, injected, window, key)
-            summaries, _ = compare_variants(
-                decoded, recording["encoding_model"], CONFIG, decoded["seed"]
-            )
-            for variant, summary in summaries.items():
-                total = totals[variant]
-                for measure in SWEEP_TOTALS:
-                    total[measure] += summary[measure]
-                total["n_cells"] += 1
-                total["cells_with_replay_count_differing"] += int(
-                    summary["n_replay_port"] != summary["n_replay_reference"]
-                )
-                total["cells_with_published_count_differing"] += int(
-                    summary["n_published_port"] != summary["n_published_reference"]
-                )
-        if number % 50 == 0:
-            print(f"  sweep {100 * (number + 1) / len(combinations):5.1f}%", flush=True)
+        if number % 400 == 0:
+            print(f"  sweep {100 * (number + 1) / len(cells):5.1f}%", flush=True)
     return pd.DataFrame(totals).rename_axis("measure")
 
 

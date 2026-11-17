@@ -72,6 +72,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import (
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_replays import (
     DIRECTIONS,
     SAME_PLACE_CM,
+    SWEEP_SEED,
     planned_cells,
     replay_sweep,
 )
@@ -207,6 +208,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "peak_rate_hz": list(PEAK_RATE_HZ),
         "midpoint_cm": list(MIDPOINT_CM),
         "directions": list(DIRECTIONS),
+        "sweep_seed": SWEEP_SEED,
         "decode_margin_s": DECODE_MARGIN_S,
         "placement_margin_s": PLACEMENT_MARGIN_S,
         "match_tolerance_cm": MATCH_TOLERANCE_CM,
