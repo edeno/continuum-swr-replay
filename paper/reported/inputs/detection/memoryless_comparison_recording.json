@@ -1,7 +1,7 @@
 {
  "produced_by": "scripts/figures/generate_supp_memoryless_comparison.py",
- "produced_at": "2026-11-17T19:30:38+00:00",
- "git_commit": "ecd05e2ea307",
+ "produced_at": "2026-11-17T20:15:37+00:00",
+ "git_commit": "ffa0409f8705",
  "n_neurons": 30,
  "numbers": {
   "sweep_duration_ratio": 2.493842364532045,
@@ -9,11 +9,11 @@
   "sweep_p_spread": 0.009900990099009901,
   "sweep_p_jump": 0.009900990099009901,
   "sweep_draws_from_passing": 0,
-  "short_replay_duration_ratio": 1.9833333333333485,
+  "short_replay_duration_ratio": 1.875000000000111,
   "short_replay_local_fraction": 0.0,
-  "short_replay_p_spread": 0.009900990099009901,
+  "short_replay_p_spread": 0.0297029702970297,
   "short_replay_p_jump": 0.019801980198019802,
-  "short_path_dispersion_cm": 8.581793365762875,
+  "short_path_dispersion_cm": 8.833160934591072,
   "remote_stationary_dispersion_cm": 0.0,
   "state_space_bound_error_ms": 17.333333333331424
  }
