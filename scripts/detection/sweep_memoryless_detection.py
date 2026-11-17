@@ -30,6 +30,12 @@ track are not covered here.
 Usage:
     python scripts/detection/sweep_memoryless_detection.py
     python scripts/detection/sweep_memoryless_detection.py --n-seeds 2 --out /tmp/pilot.parquet
+    python scripts/detection/sweep_memoryless_detection.py --summarize-only
+
+``--summarize-only`` rebuilds the summary from the table a run already wrote,
+without decoding anything: the summary is a function of that table alone. The
+summary then records two commits, the one that ran the cells and the one that
+summarized them.
 """
 
 import argparse
@@ -80,7 +86,7 @@ from continuum_swr_replay.parameters import (
 from continuum_swr_replay.paths import detection_comparison_dir
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
-from continuum_swr_replay.tables.io import write_table
+from continuum_swr_replay.tables.io import read_table, write_table
 
 SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_sweep_summary.csv")
 """Aggregated results, small enough to keep in the repository.
@@ -89,6 +95,37 @@ The raw sweep goes under ``Processed-Data``, which is not tracked. Quoted
 numbers come from this file, so that nobody has to transcribe them out of a
 one-off script.
 """
+
+
+def write_summary(table: pd.DataFrame, path: Path) -> None:
+    """Write the sweep's summary with where it came from.
+
+    Parameters
+    ----------
+    table : pd.DataFrame, shape (n_cells, n_columns)
+        The sweep's table, with its run's record in ``attrs``.
+    path : Path
+        Where the summary goes.
+    """
+    summary = replay_sweep_summary(table)
+    provenance = {
+        "produced_by": table.attrs["produced_by"],
+        "produced_at": table.attrs["produced_at"],
+        # the commit that ran the cells, and the one that summarized them:
+        # the same in a full run, later in a --summarize-only one
+        "git_commit": table.attrs["git_commit"],
+        "summary_git_commit": described_commit(),
+        "n_cells_total": str(len(table)),
+    }
+    for measure, note in provenance.items():
+        summary.loc[len(summary)] = {
+            "summary": "provenance",
+            "measure": measure,
+            "value": np.nan,
+            "note": note,
+        }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    summary.to_csv(path, index=False)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -114,7 +151,18 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="Where the aggregates go. Point a pilot elsewhere so it does not "
         "overwrite the committed summary.",
     )
+    parser.add_argument(
+        "--summarize-only",
+        action="store_true",
+        help="Rebuild the summary from the table at --out; run no cell.",
+    )
     args = parser.parse_args(argv)
+
+    if args.summarize_only:
+        table = read_table(args.out)
+        write_summary(table, args.summary)
+        print(f"summary of {len(table)} cells at {args.out} -> {args.summary}")
+        return
 
     started = clock.time()
     recording = build_recording()
@@ -176,22 +224,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "track": "linear",
     }
     write_table(table, args.out)
-    summary = replay_sweep_summary(table)
-    provenance = {
-        "produced_by": table.attrs["produced_by"],
-        "produced_at": table.attrs["produced_at"],
-        "git_commit": table.attrs["git_commit"],
-        "n_cells_total": str(len(table)),
-    }
-    for measure, note in provenance.items():
-        summary.loc[len(summary)] = {
-            "summary": "provenance",
-            "measure": measure,
-            "value": np.nan,
-            "note": note,
-        }
-    args.summary.parent.mkdir(parents=True, exist_ok=True)
-    summary.to_csv(args.summary, index=False)
+    write_summary(table, args.summary)
 
     print(f"\n{len(table)} cells in {(clock.time() - started) / 60:.1f} min")
     print(f"  raw      -> {args.out}")

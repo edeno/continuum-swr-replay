@@ -23,27 +23,17 @@ from non_local_detector.simulate.sorted_spikes_simulation import (
 from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
-from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
-    detect_candidate_sequences,
-)
-from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood import (
-    sorted_spikes_epoch_log_likelihood,
-    window_midpoints_s,
-    with_reference_rate_floor,
-)
-from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
-    DEFAULT_N_SHUFFLES,
-    ShuffleSeed,
-    shuffle_candidate_sorted,
-)
 from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
     InjectedReplay,
     added_spike_span,
     inject_replay,
 )
-from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
-    aggregate_windows,
-    normalize_windows,
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import (
+    CONFIG,
+    N_NEURONS,
+    SHUFFLE_RUN_SEED,
+    run_sliding_window,
+    sliding_window_fields,
 )
 from continuum_swr_replay.analysis.detection.simulated_run import (
     PATTERNS,
@@ -51,7 +41,6 @@ from continuum_swr_replay.analysis.detection.simulated_run import (
     read_state_space_decode,
     simulate_run,
 )
-from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 
 __all__ = [
@@ -73,15 +62,6 @@ __all__ = [
     "SWEEP_EVENT",
     "simulate_and_decode",
 ]
-
-N_NEURONS = 30
-"""Cells in the simulation the figure and its recorded numbers are made from,
-and in the memoryless sweeps' recording (``sweep.build_recording``): Figure 1's."""
-
-CONFIG = MemorylessSequenceConfig()
-"""The sliding-window detector's settings, in the figure and in the sweeps: the
-published 80 ms window stepped by 5 ms, decoded on a 200 Hz grid derived from
-that 500 Hz decode grid (``likelihood.likelihood_grid``)."""
 
 SHORT_REPLAY = InjectedReplay(
     start_cm=35.0,
@@ -140,9 +120,6 @@ REPLAY_EVENTS = (
 """Every labeled event in which the spikes represent a place other than the
 animal's: all but the silence."""
 
-SHUFFLE_RUN_SEED = 20260922
-"""Seeds the place-cell identity shuffle, as in the sweep."""
-
 
 def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dict:
     """Simulate the comparison's recording and decode it both ways.
@@ -194,42 +171,11 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     decode = read_state_space_decode(results, speed, time)
 
     # one set of place fields for both procedures, read from the detector that
-    # fitted them; the sliding window decodes them as the reference does, with
-    # its floor under every field
-    encoding_model = with_reference_rate_floor(
-        detector.encoding_model_[ENCODING_KEY], config
+    # fitted them, and the sliding window run as the sweeps run it
+    fields = sliding_window_fields(detector.encoding_model_[ENCODING_KEY], config)
+    sliding = run_sliding_window(
+        fields, spike_times, (time, position, speed), "figure-one-simulation", config
     )
-    environment = encoding_model["environment"]
-
-    result = sorted_spikes_epoch_log_likelihood(
-        time, position, spike_times, encoding_model, config
-    )
-    posterior = normalize_windows(
-        aggregate_windows(
-            result.log_likelihood, config.window_n_samples, config.stride_n_samples
-        )
-    )
-    midpoint_s = window_midpoints_s(result.time, config)
-    window_speed = np.interp(midpoint_s, time, speed)
-    bin_distance_cm = interior_bin_distances_cm(environment)
-    candidates = detect_candidate_sequences(
-        posterior, midpoint_s, bin_distance_cm, window_speed, config
-    )
-    # the reference's own significance test
-    shuffles = {
-        int(i): shuffle_candidate_sorted(
-            int(candidates.runs[i, 0]),
-            int(candidates.runs[i, 1]),
-            time,
-            spike_times,
-            encoding_model,
-            bin_distance_cm,
-            config,
-            seed=ShuffleSeed(run=SHUFFLE_RUN_SEED, session="figure-one-simulation"),
-            n_shuffles=DEFAULT_N_SHUFFLES,
-        )
-        for i in np.flatnonzero(candidates.is_replay)
-    }
 
     return {
         "detector": detector,
@@ -239,13 +185,13 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         "position": position,
         "spike_times": spike_times,
         "event_times": event_times,
-        "place_bin_centers_cm": result.place_bin_centers_cm,
-        "posterior": posterior,
-        "midpoint_s": midpoint_s,
-        "window_speed": window_speed,
-        "candidates": candidates,
-        "shuffles": shuffles,
-        "bin_distance_cm": bin_distance_cm,
+        "place_bin_centers_cm": fields["place_bin_centers_cm"],
+        "posterior": sliding.posterior,
+        "midpoint_s": sliding.midpoint_s,
+        "window_speed": sliding.window_speed,
+        "candidates": sliding.candidates,
+        "shuffles": sliding.shuffles,
+        "bin_distance_cm": fields["bin_distance_cm"],
         "state_space_posterior": decode.posterior,
         "state_space_position_bins": decode.position_bins,
         "state_space_intervals": decode.non_local_events,

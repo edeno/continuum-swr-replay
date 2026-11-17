@@ -299,6 +299,12 @@ def run_cell(
 
     ``direction`` is 1 for a replay that travels up the track, towards larger
     positions, and -1 for one that travels down it over the same path.
+
+    ``seed`` is the replicate's index and seeds the injection's firing noise by
+    itself, so replays of one duration and replicate share one noise draw
+    whatever their path, place, rate and direction: they differ in what the
+    cells are asked to fire, not in the noise. A statistic pooled over the grid
+    is therefore over fewer independent draws than it has replays.
     """
     injected, bounds = inject_replay(
         recording["spike_times"],

@@ -21,10 +21,8 @@ import numpy as np
 import xarray as xr
 from non_local_detector.simulate.sorted_spikes_simulation import TRACK_HEIGHT
 
-from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
-    CONFIG,
-    N_NEURONS,
-    SHUFFLE_RUN_SEED,
+from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
+    MemorylessSequenceConfig,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     CandidateSequences,
@@ -61,6 +59,8 @@ from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 
 __all__ = [
+    "CONFIG",
+    "N_NEURONS",
     "DECODE_MARGIN_S",
     "DURATION_S",
     "MATCH_TOLERANCE_CM",
@@ -82,6 +82,19 @@ __all__ = [
     "run_state_space",
     "usable_intervals",
 ]
+
+N_NEURONS = 30
+"""Cells in the simulated recording of the comparison figure and of the
+memoryless sweeps (:func:`build_recording`): Figure 1's."""
+
+CONFIG = MemorylessSequenceConfig()
+"""The sliding-window detector's settings, in the figure and in the sweeps: the
+published 80 ms window stepped by 5 ms, decoded on a 200 Hz grid derived from
+that 500 Hz decode grid (``likelihood.likelihood_grid``)."""
+
+SHUFFLE_RUN_SEED = 20260922
+"""Seeds the place-cell identity shuffle; each stretch's draws are keyed on the
+stretch too (:func:`run_sliding_window`)."""
 
 PATH_CM = (0.0, 10.0, 20.0, 30.0, 45.0, 60.0, 90.0, 130.0)
 """How far the represented position travels; 0 is a place held still."""
@@ -140,7 +153,6 @@ def build_recording(seed: int = 0, cells: np.ndarray | None = None):
     # the two procedures read the same object rather than two fits of the same
     # data, which differed by about 4% of peak firing rate.
     encoding_model = detector.encoding_model_[ENCODING_KEY]
-    environment = encoding_model["environment"]
 
     return {
         "time": run.time,
@@ -152,11 +164,35 @@ def build_recording(seed: int = 0, cells: np.ndarray | None = None):
         # (n_patterns, 2), s
         "event_times": np.array(list(run.pattern_windows.values())),
         "encoding_model": encoding_model,
-        # the same fields, decoded as the reference decodes them, with its
-        # floor under every one; the state-space detector reads them as fitted
-        "sliding_encoding_model": with_reference_rate_floor(encoding_model, CONFIG),
-        "bin_distance_cm": interior_bin_distances_cm(environment),
         "detector": detector,
+        **sliding_window_fields(encoding_model),
+    }
+
+
+def sliding_window_fields(
+    encoding_model: dict, config: MemorylessSequenceConfig = CONFIG
+) -> dict:
+    """What the sliding-window detector reads of a fitted encoding model.
+
+    Parameters
+    ----------
+    encoding_model : dict
+        The state-space detector's own, so both detectors read one fit.
+    config : MemorylessSequenceConfig, optional
+        The sliding-window detector's settings.
+
+    Returns
+    -------
+    dict
+        ``sliding_encoding_model``: the same fields, decoded as the reference
+        decodes them, with its floor under every one (the state-space detector
+        reads them as fitted); ``bin_distance_cm``, shape (n_bins, n_bins); and
+        ``place_bin_centers_cm``, shape (n_bins,), the interior place bins.
+    """
+    environment = encoding_model["environment"]
+    return {
+        "sliding_encoding_model": with_reference_rate_floor(encoding_model, config),
+        "bin_distance_cm": interior_bin_distances_cm(environment),
         "place_bin_centers_cm": np.asarray(environment.place_bin_centers_).ravel()[
             np.asarray(environment.is_track_interior_).ravel()
         ],
@@ -284,6 +320,7 @@ class SlidingWindowRun:
 
     time: np.ndarray
     midpoint_s: np.ndarray
+    window_speed: np.ndarray  # the animal's speed at each window's midpoint
     posterior: np.ndarray
     candidates: CandidateSequences
     accepted: list[int]
@@ -291,21 +328,27 @@ class SlidingWindowRun:
     shuffles: dict[int, ShuffleResult]
 
 
-def run_sliding_window(recording, injected, window, cell_key) -> SlidingWindowRun:
-    """Decode a stretch window by window, assemble, and test every accepted sequence."""
+def run_sliding_window(
+    recording, injected, window, cell_key, config: MemorylessSequenceConfig = CONFIG
+) -> SlidingWindowRun:
+    """Decode a stretch window by window, assemble, and test every accepted sequence.
+
+    ``recording`` needs :func:`sliding_window_fields`' entries; ``cell_key``
+    names the stretch for its shuffle draws.
+    """
     time, position, speed = window
     result = sorted_spikes_epoch_log_likelihood(
-        time, position, injected, recording["sliding_encoding_model"], CONFIG
+        time, position, injected, recording["sliding_encoding_model"], config
     )
     posterior = normalize_windows(
         aggregate_windows(
-            result.log_likelihood, CONFIG.window_n_samples, CONFIG.stride_n_samples
+            result.log_likelihood, config.window_n_samples, config.stride_n_samples
         )
     )
-    midpoint_s = window_midpoints_s(result.time, CONFIG)
+    midpoint_s = window_midpoints_s(result.time, config)
     window_speed = np.interp(midpoint_s, time, speed)
     candidates = detect_candidate_sequences(
-        posterior, midpoint_s, recording["bin_distance_cm"], window_speed, CONFIG
+        posterior, midpoint_s, recording["bin_distance_cm"], window_speed, config
     )
     accepted = [int(i) for i in np.flatnonzero(candidates.is_replay)]
 
@@ -335,7 +378,7 @@ def run_sliding_window(recording, injected, window, cell_key) -> SlidingWindowRu
             injected,
             recording["sliding_encoding_model"],
             recording["bin_distance_cm"],
-            CONFIG,
+            config,
             seed=ShuffleSeed(run=SHUFFLE_RUN_SEED, session=cell_key),
             n_shuffles=DEFAULT_N_SHUFFLES,
         )
@@ -344,6 +387,7 @@ def run_sliding_window(recording, injected, window, cell_key) -> SlidingWindowRu
     return SlidingWindowRun(
         time=time,
         midpoint_s=midpoint_s,
+        window_speed=window_speed,
         posterior=posterior,
         candidates=candidates,
         accepted=accepted,

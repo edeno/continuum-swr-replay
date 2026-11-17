@@ -33,9 +33,11 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
     SIGNIFICANCE_LEVEL,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import overlaps
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_replays import (
+    SAME_PLACE_CM,
+)
 
 __all__ = [
-    "LOCAL_TOLERANCE_CM",
     "accepted_overlapping",
     "best_dispersion_cm",
     "bound_error_ms",
@@ -54,9 +56,6 @@ __all__ = [
     "state_space_duration_ratio",
     "verdict",
 ]
-
-LOCAL_TOLERANCE_CM = 15.0
-"""A window decodes the animal's own place when its center is closer than this."""
 
 
 def candidates_overlapping(decoded: dict, event: int) -> list[int]:
@@ -183,7 +182,7 @@ def decoded_center_cm(decoded: dict) -> np.ndarray:
 
 def local_fraction(decoded: dict, sequence: int) -> float:
     """Share of a sequence's kept windows whose center is the animal's own place:
-    closer than :data:`LOCAL_TOLERANCE_CM` to where the animal is at the
+    closer than :data:`~.sweep_replays.SAME_PLACE_CM` to where the animal is at the
     window's midpoint.
 
     Kept windows only, as the sweep scores them: a window inside a merged gap
@@ -196,9 +195,7 @@ def local_fraction(decoded: dict, sequence: int) -> float:
         decoded["midpoint_s"][start : stop + 1], decoded["time"], decoded["position"]
     )
     kept = candidates.assembly.kept[start : stop + 1]
-    return float(
-        np.mean(np.abs(center_cm[kept] - animal_cm[kept]) < LOCAL_TOLERANCE_CM)
-    )
+    return float(np.mean(np.abs(center_cm[kept] - animal_cm[kept]) < SAME_PLACE_CM))
 
 
 def local_fraction_of_event(decoded: dict, event: int) -> float:

@@ -85,6 +85,7 @@ class TestPublishedEvents:
         run = sweep.SlidingWindowRun(
             time=np.zeros(0),
             midpoint_s=np.zeros(0),
+            window_speed=np.zeros(0),
             posterior=np.zeros((0, 0)),
             candidates=None,
             accepted=[0, 2, 3, 5],
@@ -101,7 +102,7 @@ class TestPublishedEvents:
 
     def test_none_accepted_is_none_published(self):
         run = sweep.SlidingWindowRun(
-            np.zeros(0), np.zeros(0), np.zeros((0, 0)), None, [], {}, {}
+            np.zeros(0), np.zeros(0), np.zeros(0), np.zeros((0, 0)), None, [], {}, {}
         )
 
         assert sweep.published_events(run) == []

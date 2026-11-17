@@ -80,7 +80,7 @@ Rule R-T: per epoch, keep the CA1 band tetrodes that ripple with the rest.
 
 The simulated run of Figure 1, decoded by the switching state-space model.
 
-`splice_remote_stationary`, `make_example_detector`, `estimate_state_space_model`, `SimulatedRun`, `DecodedSimulation`, `simulate_run`, `simulate_and_decode`
+`splice_remote_stationary`, `make_example_detector`, `estimate_state_space_model`, `SimulatedRun`, `DecodedSimulation`, `spike_span`, `spike_free_span`, `simulate_run`, `StateSpaceDecode`, `read_state_space_decode`, `simulate_and_decode`
 
 ### `src/continuum_swr_replay/analysis/event_definition/analysed_time.py`
 
