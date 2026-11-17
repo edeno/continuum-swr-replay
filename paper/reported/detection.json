@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "55cf40eaed8b",
+ "commit": "5b4387d64477",
  "code": {
-  "head": "55cf40eaed8b0f5a1dd5cc8d41083716d24f3ebe",
+  "head": "5b4387d64477b99f0b52f3a6ddbf892c0db4b80a",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -31,8 +31,8 @@
     "code_sha256": "d13e698505baf703f76df758efb47db9b104ff5368c6e52f34734430c8313d56"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/comparison_simulation.py": {
-    "sha256": "b94d9186c5685b2ae111a0a70cc83465bc390eff585239f4f691a85a4af98d5a",
-    "code_sha256": "7ed27d420ededa45f5ce58f8ce381ce850a4d4e4b71587ee60779448bb7fbcf2"
+    "sha256": "32b8d91490319b6fb2cbd07a89a80a887b4d489ce79b78d9f7b125d6d3ba6561",
+    "code_sha256": "8b3069f282d5b2738233872231b07bbef917fbf54c6033cc5cd5db2870b71bc8"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/config.py": {
     "sha256": "9cb02ea860ed4ed5ea892382c8be8d6ff8dc2a1fed495234e113713998829f64",
@@ -247,8 +247,8 @@
     "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
    },
    "paper/reported/inputs/detection/memoryless_comparison_recording.json": {
-    "sha256": "ffa96a1b3787d08777b3aa2653d73252913637b744ea2abf38b685c25821fe33",
-    "code_sha256": "ffa96a1b3787d08777b3aa2653d73252913637b744ea2abf38b685c25821fe33"
+    "sha256": "a2df6696c0b6aed4cd6e017fe58d90586b486a01ab2c5ca9ca920dc9685daa3d",
+    "code_sha256": "a2df6696c0b6aed4cd6e017fe58d90586b486a01ab2c5ca9ca920dc9685daa3d"
    },
    "paper/reported/inputs/detection/detection_sweep_summary.csv": {
     "sha256": "661e0d6004764d1650f20d0655ba0e60c727fb0d03bbd15117e029510868c394",
@@ -283,7 +283,7 @@
   },
   {
    "path": "paper/reported/inputs/detection/memoryless_comparison_recording.json",
-   "sha256": "ffa96a1b3787d08777b3aa2653d73252913637b744ea2abf38b685c25821fe33"
+   "sha256": "a2df6696c0b6aed4cd6e017fe58d90586b486a01ab2c5ca9ca920dc9685daa3d"
   },
   {
    "path": "paper/reported/inputs/detection/detection_sweep_summary.csv",
@@ -1507,7 +1507,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
@@ -1523,7 +1523,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
@@ -1539,7 +1539,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
@@ -1555,7 +1555,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
@@ -1571,7 +1571,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
@@ -1587,7 +1587,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
@@ -1603,7 +1603,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
@@ -1619,7 +1619,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
@@ -1635,7 +1635,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
@@ -1651,7 +1651,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
@@ -1667,7 +1667,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
@@ -1683,7 +1683,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 9463d672860f)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
    "function": "recording_values",
    "pending": null
   },
