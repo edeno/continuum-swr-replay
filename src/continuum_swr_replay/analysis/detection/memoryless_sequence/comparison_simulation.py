@@ -18,7 +18,6 @@ The sliding-window detector's settings are :data:`CONFIG`.
 import numpy as np
 from non_local_detector.simulate.sorted_spikes_simulation import (
     SAMPLING_FREQUENCY,
-    TRACK_HEIGHT,
 )
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
@@ -49,11 +48,8 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
 from continuum_swr_replay.analysis.detection.simulated_run import (
     PATTERNS,
     estimate_state_space_model,
+    read_state_space_decode,
     simulate_run,
-)
-from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
-    detect_nonlocal_events,
-    nonlocal_state_probability,
 )
 from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 from continuum_swr_replay.decoding.results import ENCODING_KEY
@@ -65,6 +61,7 @@ __all__ = [
     "FRAGMENTED_EVENT",
     "N_NEURONS",
     "REMOTE_STATIONARY_EVENT",
+    "REPLAY_EVENTS",
     "SHORT_PATH",
     "SHORT_PATH_EVENT",
     "SHORT_REPLAY",
@@ -74,12 +71,8 @@ __all__ = [
     "SPARSE_REPLAY",
     "SPARSE_REPLAY_EVENT",
     "SWEEP_EVENT",
-    "TRACK_HEIGHT_CM",
     "simulate_and_decode",
 ]
-
-TRACK_HEIGHT_CM = float(TRACK_HEIGHT)
-"""The simulation package's own track length, read rather than restated."""
 
 N_NEURONS = 30
 """Cells in the simulation the figure and its recorded numbers are made from,
@@ -100,7 +93,7 @@ SHORT_REPLAY = InjectedReplay(
 )
 """A replay that travels far but lasts only 80 ms, firing strongly enough that
 spike count is not the issue. The detector is expected to find it and report
-it too long; the panel title reads the ratio off the data rather than stating
+it too long; the figure reads the ratio off the data rather than stating
 it here. The window puts a floor under any duration the method can report."""
 
 SHORT_PATH = InjectedReplay(
@@ -135,6 +128,18 @@ SHORT_PATH_EVENT, SHORT_REPLAY_EVENT, FAR_REPLAY_EVENT, SPARSE_REPLAY_EVENT = (
 (``simulated_run.PATTERNS``), then the events added here, in the order they are
 added."""
 
+REPLAY_EVENTS = (
+    SWEEP_EVENT,
+    FRAGMENTED_EVENT,
+    REMOTE_STATIONARY_EVENT,
+    SHORT_PATH_EVENT,
+    SHORT_REPLAY_EVENT,
+    FAR_REPLAY_EVENT,
+    SPARSE_REPLAY_EVENT,
+)
+"""Every labeled event in which the spikes represent a place other than the
+animal's: all but the silence."""
+
 SHUFFLE_RUN_SEED = 20260922
 """Seeds the place-cell identity shuffle, as in the sweep."""
 
@@ -152,13 +157,12 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     Returns
     -------
     dict
-        The recording (``time``, ``position``, ``speed``, ``spike_times``,
-        ``place_field_means``, ``event_times``), the sliding-window decode and
-        its candidate sequences (``posterior``, ``midpoint_s``, ``candidates``,
-        ``shuffles``), and the state-space decode on ``time``
-        (``state_names``, ``state_probabilities``, ``non_local_probability``,
-        ``state_space_posterior`` over ``state_space_position_bins``, and its
-        events, ``state_space_intervals``).
+        The recording (``time``, ``position``, ``spike_times``,
+        ``event_times``), the sliding-window decode and its candidate sequences
+        (``posterior``, ``midpoint_s``, ``candidates``, ``shuffles``), and the
+        state-space decode on ``time`` (``state_space_posterior`` over
+        ``state_space_position_bins``, and its events,
+        ``state_space_intervals``; ``simulated_run.read_state_space_decode``).
     """
     run = simulate_run(n_neurons=n_neurons)
     time, position, speed = run.time, run.position, run.speed
@@ -166,8 +170,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     event_times = np.array(list(run.patterns.values()))
     is_event = run.is_pattern.copy()
 
-    # two replays the sliding-window detector is expected to mis-report and one
-    # both detectors should agree on, in the order SHORT_PATH_EVENT,
+    # the replays added to the run, in the order SHORT_PATH_EVENT,
     # SHORT_REPLAY_EVENT, FAR_REPLAY_EVENT, SPARSE_REPLAY_EVENT
     for replay in (SHORT_PATH, SHORT_REPLAY, FAR_REPLAY, SPARSE_REPLAY):
         with_replay, bounds = inject_replay(
@@ -188,12 +191,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     detector, results = estimate_state_space_model(
         time, position, spike_times, ~is_event
     )
-    non_local_probability = nonlocal_state_probability(
-        results.acausal_state_probabilities
-    ).squeeze()
-    events, _ = detect_nonlocal_events(non_local_probability, speed, time)
-    # No-Spike has no position, so its bins are NaN and drop out of the sum.
-    by_state = results["acausal_posterior"].unstack("state_bins")
+    decode = read_state_space_decode(results, speed, time)
 
     # one set of place fields for both procedures, read from the detector that
     # fitted them; the sliding window decodes them as the reference does, with
@@ -239,9 +237,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         # the grid spikes are binned against: the decode grid itself
         "binning_time": time,
         "position": position,
-        "speed": speed,
         "spike_times": spike_times,
-        "place_field_means": place_field_means,
         "event_times": event_times,
         "place_bin_centers_cm": result.place_bin_centers_cm,
         "posterior": posterior,
@@ -250,16 +246,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         "candidates": candidates,
         "shuffles": shuffles,
         "bin_distance_cm": bin_distance_cm,
-        "state_names": tuple(
-            str(name) for name in results.acausal_state_probabilities.states.values
-        ),
-        "state_probabilities": np.asarray(results.acausal_state_probabilities.values),
-        "non_local_probability": np.asarray(non_local_probability.values),
-        "state_space_posterior": np.asarray(
-            by_state.sum("state").transpose("time", "position").values
-        ),
-        "state_space_position_bins": np.asarray(by_state.coords["position"].values),
-        "state_space_intervals": list(
-            zip(events["start_time"].tolist(), events["end_time"].tolist(), strict=True)
-        ),
+        "state_space_posterior": decode.posterior,
+        "state_space_position_bins": decode.position_bins,
+        "state_space_intervals": decode.non_local_events,
     }

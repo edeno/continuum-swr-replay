@@ -136,6 +136,8 @@ EVENT_TIMES = np.array(
         (1.12, 1.16),  # silence, over B's end and C's start
         (1.105, 1.115),  # short path, inside B
         (1.23, 1.235),  # short replay, inside D
+        (1.30, 1.31),  # far replay: no candidate, one exact state-space interval
+        (1.40, 1.41),  # sparse replay: the same
     ]
 )
 STATE_SPACE_INTERVALS = [
@@ -144,6 +146,8 @@ STATE_SPACE_INTERVALS = [
     (1.110, 1.13),
     (1.16, 1.18),
     (1.225, 1.24),
+    (1.30, 1.31),
+    (1.40, 1.41),
 ]
 
 
@@ -278,7 +282,10 @@ def test_bound_error_is_the_worst_edge_of_the_first_and_last_interval(decoded):
     # the first starts 5 ms early, the last ends 15 ms late
     assert rs.bound_error_ms(decoded, (SHORT_PATH_EVENT,)) == pytest.approx(15.0)
     assert rs.bound_error_ms(decoded, (SWEEP_EVENT,)) == pytest.approx(10.0)
-    assert rs.bound_error_ms(decoded, rs.ZOOMED_EVENTS) == pytest.approx(15.0)
+    assert rs.bound_error_ms(
+        decoded,
+        (SWEEP_EVENT, SHORT_REPLAY_EVENT, SHORT_PATH_EVENT, REMOTE_STATIONARY_EVENT),
+    ) == pytest.approx(15.0)
     # nothing is reported over the event between B and C
     assert np.isnan(rs.bound_error_ms(decoded, (SWEEP_EVENT, FRAGMENTED_EVENT)))
 
@@ -297,8 +304,9 @@ def test_recording_numbers(decoded):
         "short_replay_p_jump": 1 / 20,
         "short_path_dispersion_cm": np.sqrt(150),
         "remote_stationary_dispersion_cm": 0.0,
-        "state_space_bound_error_ms": 15.0,
     }
+    # over every simulated replay, and the fragmented one has no report here
+    assert np.isnan(numbers.pop("state_space_bound_error_ms"))
     assert set(numbers) == set(expected)
     for key, value in expected.items():
         assert numbers[key] == pytest.approx(value), key

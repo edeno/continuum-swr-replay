@@ -9,7 +9,8 @@ The figure explains the model and then shows it at work on simulated data:
        position, the positions each state allows, and the evidence that results,
        in three scenarios
     c: how the represented position moves within each state
-    d: a simulated run — raster, decoded position, non-local probability, speed
+    d: a simulated run — raster, decoded position, state probabilities,
+       non-local probability, speed
     e: one example of each kind of simulated spiking in d, at a millisecond
        scale — raster, decoded position, the four state probabilities
 
@@ -74,6 +75,7 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
     letter_panel,
     plot_posterior,
     plot_raster,
+    posterior_color_limit,
     space_rows_evenly,
 )
 
@@ -550,19 +552,6 @@ def choose_examples(sim: DecodedSimulation) -> list[Example]:
     ]
 
 
-def posterior_color_limit(sim: DecodedSimulation) -> float:
-    """Top of the decoded-position colour scale.
-
-    Set by the non-local posterior inside the non-local events (its 99th
-    percentile). Local's posterior is more concentrated and would set a scale on
-    which a non-local event is faint; on this scale Local saturates.
-    """
-    in_event = np.zeros(sim.time.size, dtype=bool)
-    for start, end in sim.non_local_events:
-        in_event |= (sim.time >= start) & (sim.time <= end)
-    return float(np.percentile(sim.non_local_posterior[in_event], 99))
-
-
 def _next_time_at_track_start(sim: DecodedSimulation, after: float) -> float:
     """Middle of the animal's first visit to the track's start after ``after``, in s."""
     at_start = (sim.time > after) & (sim.position <= sim.position.min() + 1.0)
@@ -892,7 +881,10 @@ def generate_figure() -> Figure:
     print("Simulating and decoding (EM)...")
     sim = simulate_and_decode()
     examples = choose_examples(sim)
-    posterior_vmax = posterior_color_limit(sim)
+    # the scale of the non-local posterior inside the non-local events
+    posterior_vmax = posterior_color_limit(
+        sim.non_local_posterior, sim.time, sim.non_local_events
+    )
 
     set_figure_defaults(context="paper")
     # The rows are placed by hand below, from what each one draws, so the

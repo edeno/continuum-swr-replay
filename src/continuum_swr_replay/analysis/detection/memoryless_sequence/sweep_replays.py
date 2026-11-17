@@ -84,9 +84,13 @@ def best_entry(scored: list[tuple]) -> tuple:
 
 
 def score_sliding_window(
-    run: SlidingWindowRun, bounds, true_position_cm, path_cm, position
+    run: SlidingWindowRun, bounds, span, true_position_cm, path_cm, position
 ) -> dict:
     """What the sliding-window detector reports for one injected event.
+
+    ``bounds`` is the window the event was drawn in, which decides whether a
+    report overlaps it; ``span`` is its own first and last spike, which a
+    report's start and end are held to (:func:`run_cell`).
 
     Scored three ways, because the published definition has three parts and
     the reference's detection script applied only some of them.
@@ -181,8 +185,8 @@ def score_sliding_window(
         "sliding_span_cm": score.span_cm,
         "sliding_duration_s": float(candidates.duration_s[i]),
         "sliding_dispersion_cm": float(candidates.dispersion_cm[i]),
-        "sliding_start_error_s": float(event.start_s - start_s),
-        "sliding_end_error_s": float(event.end_s - end_s),
+        "sliding_start_error_s": float(event.start_s - span[0]),
+        "sliding_end_error_s": float(event.end_s - span[1]),
         "sliding_n_pieces": int(candidates.pieces[i].size),
         "sliding_local_fraction": float(
             np.mean(np.abs(event.decoded_cm - animal_cm) < SAME_PLACE_CM)
@@ -192,15 +196,15 @@ def score_sliding_window(
 
 
 def memoryless_outcome(
-    recording, injected, window, bounds, true_position_cm, path_cm, cell_key
+    recording, injected, window, bounds, span, true_position_cm, path_cm, cell_key
 ):
     """The sliding-window detector run over the window and scored against the event."""
     run = run_sliding_window(recording, injected, window, cell_key)
-    return score_sliding_window(run, bounds, true_position_cm, path_cm, window[1])
+    return score_sliding_window(run, bounds, span, true_position_cm, path_cm, window[1])
 
 
 def score_state_space(
-    recording, run: StateSpaceRun, bounds, true_position_cm, path_cm
+    recording, run: StateSpaceRun, bounds, span, true_position_cm, path_cm
 ) -> dict:
     """What the switching state-space model reports for the same event.
 
@@ -265,17 +269,19 @@ def score_state_space(
         "state_space_position_error_cm": score.position_error_cm,
         "state_space_span_cm": score.span_cm,
         "state_space_duration_s": duration_s,
-        "state_space_start_error_s": float(event.start_s - start_s),
-        "state_space_end_error_s": float(event.end_s - end_s),
+        "state_space_start_error_s": float(event.start_s - span[0]),
+        "state_space_end_error_s": float(event.end_s - span[1]),
         "state_space_dispersion_cm": dispersion,
     }
     return out
 
 
-def state_space_outcome(recording, injected, window, bounds, true_position_cm, path_cm):
+def state_space_outcome(
+    recording, injected, window, bounds, span, true_position_cm, path_cm
+):
     """The state-space model run over the window and scored against the event."""
     run = run_state_space(recording, injected, window)
-    return score_state_space(recording, run, bounds, true_position_cm, path_cm)
+    return score_state_space(recording, run, bounds, span, true_position_cm, path_cm)
 
 
 def run_cell(
@@ -316,8 +322,10 @@ def run_cell(
         ((added >= start_s) & (added <= end_s)).sum()
         - ((original >= start_s) & (original <= end_s) & np.isin(original, added)).sum()
     )
-    # what the replay's timing is held to (sweep_summaries.against_spike_span)
-    first_spike_s, last_spike_s = added_spike_span(recording["spike_times"], injected)
+    # A replay's timing is held to its own first and last spike, not to the
+    # window it was drawn in: a sparse replay's first spike can come well
+    # after the window opens, and no detector can report what has not fired.
+    span = added_spike_span(recording["spike_times"], injected)
     row = {
         "path_cm": path_cm,
         "midpoint_cm": midpoint_cm,
@@ -332,8 +340,8 @@ def run_cell(
             - float(np.interp(at_s, recording["time"], recording["position"]))
         ),
         "n_spikes": n_spikes,
-        "first_spike_s": first_spike_s,
-        "last_spike_s": last_spike_s,
+        "first_spike_s": span[0],
+        "last_spike_s": span[1],
         "spikes_per_window": n_spikes * CONFIG.window_duration_s / duration_s,
     }
 
@@ -349,10 +357,10 @@ def run_cell(
         + ("" if direction == 1 else "-down")
     )
     row |= memoryless_outcome(
-        recording, injected, window, bounds, true_position_cm, path_cm, cell_key
+        recording, injected, window, bounds, span, true_position_cm, path_cm, cell_key
     )
     row |= state_space_outcome(
-        recording, injected, window, bounds, true_position_cm, path_cm
+        recording, injected, window, bounds, span, true_position_cm, path_cm
     )
     return row
 

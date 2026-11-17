@@ -403,7 +403,7 @@ def recording_values(numbers: dict, source: str) -> list[Value]:
             "quantity",
             "int",
             "largest error in either bound of the state-space detector's reports of "
-            "the four zoomed events",
+            "the simulated replays of the labeled recording",
             "ms",
         ),
     ]

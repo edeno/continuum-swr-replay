@@ -24,6 +24,7 @@ from non_local_detector.simulate.sorted_spikes_simulation import TRACK_HEIGHT
 from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     CONFIG,
     N_NEURONS,
+    SHUFFLE_RUN_SEED,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
     CandidateSequences,
@@ -102,9 +103,6 @@ PLACEMENT_MARGIN_S = 0.25
 Enough for a window of full support plus context, and small enough that the
 pieces left after cutting out the recording's own events can still hold an
 event."""
-
-SHUFFLE_RUN_SEED = 20260922
-"""Seeds the place-cell identity shuffle; each cell's draws are keyed on the cell too."""
 
 MATCH_TOLERANCE_CM = 20.0
 """How far a detector's decoded position may sit from the injected one.

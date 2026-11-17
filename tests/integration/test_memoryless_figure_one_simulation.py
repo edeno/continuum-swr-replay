@@ -3,8 +3,9 @@
 The fixture is the recording the supplemental figure draws
 (``comparison_simulation.simulate_and_decode``): Figure 1's simulated run, whose
 four patterns are a sweep that ends at the animal, a fragmented event, a remote
-place held still and a silence, plus a 30 cm replay and an 80 ms replay. Both detectors read one set
-of place fields, fitted by the state-space model.
+place held still and a silence, plus four added replays: a 30 cm one, an 80 ms
+one, one far from the animal and a sparse one. Both detectors read one set of
+place fields, fitted by the state-space model.
 
 What these tests pin is the sliding-window detector's blind spot rather than its
 accuracy. It scores each window on posterior spread and on the jump to the next

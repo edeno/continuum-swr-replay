@@ -63,6 +63,8 @@ __all__ = [
     "estimate_state_space_model",
     "make_example_detector",
     "simulate_and_decode",
+    "StateSpaceDecode",
+    "read_state_space_decode",
     "simulate_run",
     "spike_free_span",
     "spike_span",
@@ -427,6 +429,70 @@ def simulate_run(n_neurons: int = 30, seed: int = 0) -> SimulatedRun:
     )
 
 
+@dataclass(frozen=True)
+class StateSpaceDecode:
+    """What Figure 1 and its companion read from a decode of the simulated run.
+
+    Every array with a time axis is on the decode grid.
+    """
+
+    state_names: tuple[str, ...]  # the detector's states, (n_states,)
+    state_probabilities: np.ndarray  # (n_time, n_states)
+    posterior: np.ndarray  # (n_time, n_position): every state with a position
+    non_local_posterior: np.ndarray  # (n_time, n_position): the non-local states
+    position_bins: np.ndarray  # (n_position,), cm
+    non_local_probability: np.ndarray  # (n_time,)
+    non_local_events: list[tuple[float, float]]  # s; by the project's event rule
+
+
+def read_state_space_decode(
+    results, speed: np.ndarray, time: np.ndarray
+) -> StateSpaceDecode:
+    """The state probabilities, decoded position and non-local events of a decode.
+
+    Parameters
+    ----------
+    results : xarray.Dataset
+        :func:`estimate_state_space_model`'s results.
+    speed : ndarray, shape (n_time,)
+        The animal's speed on the decode grid, in cm/s.
+    time : ndarray, shape (n_time,)
+        The decode grid, in seconds.
+
+    Returns
+    -------
+    StateSpaceDecode
+        Its events are the project's non-local events
+        (``nonlocal_event_rule.detect_nonlocal_events``).
+    """
+    non_local_probability = nonlocal_state_probability(
+        results.acausal_state_probabilities
+    ).squeeze()
+    events, _ = detect_nonlocal_events(non_local_probability, speed, time)
+
+    # No-Spike has no position, so its bins are NaN and drop out of the sums.
+    by_state = results["acausal_posterior"].unstack("state_bins")
+    on_grid = ("time", "position")
+    return StateSpaceDecode(
+        state_names=tuple(
+            str(name) for name in results.acausal_state_probabilities.states.values
+        ),
+        state_probabilities=np.asarray(results.acausal_state_probabilities.values),
+        posterior=np.asarray(by_state.sum("state").transpose(*on_grid).values),
+        non_local_posterior=np.asarray(
+            by_state.sel(state=list(NON_LOCAL_STATES))
+            .sum("state")
+            .transpose(*on_grid)
+            .values
+        ),
+        position_bins=np.asarray(by_state.coords["position"].values),
+        non_local_probability=np.asarray(non_local_probability.values),
+        non_local_events=list(
+            zip(events["start_time"].tolist(), events["end_time"].tolist(), strict=True)
+        ),
+    )
+
+
 def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation:
     """Simulate the run of Figure 1, decode it and find its non-local events.
 
@@ -451,14 +517,7 @@ def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation
         time, run.position, run.spike_times, ~run.is_pattern
     )
 
-    non_local_probability = nonlocal_state_probability(
-        results.acausal_state_probabilities
-    ).squeeze()
-    events, _ = detect_nonlocal_events(non_local_probability, speed, time)
-
-    # No-Spike has no position, so its bins are NaN and drop out of the sums.
-    by_state = results["acausal_posterior"].unstack("state_bins")
-    on_grid = ("time", "position")
+    decode = read_state_space_decode(results, speed, time)
 
     # cells in the order of their fitted place-field peaks, for the rasters
     encoding_model = detector.encoding_model_[ENCODING_KEY]
@@ -470,21 +529,12 @@ def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation
         speed=speed,
         sorted_spikes=[run.spike_times[i] for i in order],
         place_field_means=run.place_field_means[order],
-        state_names=tuple(
-            str(name) for name in results.acausal_state_probabilities.states.values
-        ),
-        state_probabilities=np.asarray(results.acausal_state_probabilities.values),
-        posterior=np.asarray(by_state.sum("state").transpose(*on_grid).values),
-        non_local_posterior=np.asarray(
-            by_state.sel(state=list(NON_LOCAL_STATES))
-            .sum("state")
-            .transpose(*on_grid)
-            .values
-        ),
-        position_bins=np.asarray(by_state.coords["position"].values),
-        non_local_probability=np.asarray(non_local_probability.values),
+        state_names=decode.state_names,
+        state_probabilities=decode.state_probabilities,
+        posterior=decode.posterior,
+        non_local_posterior=decode.non_local_posterior,
+        position_bins=decode.position_bins,
+        non_local_probability=decode.non_local_probability,
         patterns=run.patterns,
-        non_local_events=list(
-            zip(events["start_time"].tolist(), events["end_time"].tolist(), strict=True)
-        ),
+        non_local_events=decode.non_local_events,
     )

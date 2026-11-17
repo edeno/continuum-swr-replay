@@ -1,6 +1,6 @@
 """What the two replay detectors made of the labeled events of one simulated recording.
 
-The memoryless comparison figure's upper panels decode one recording
+The supplementary comparison figure's examples come from one decoded recording
 (:func:`~continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation.simulate_and_decode`)
 holding events whose bounds and content are known. The functions here read that
 decode and return what each detector did with an event: the sliding-window
@@ -24,6 +24,7 @@ import numpy as np
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     REMOTE_STATIONARY_EVENT,
+    REPLAY_EVENTS,
     SHORT_PATH_EVENT,
     SHORT_REPLAY_EVENT,
     SWEEP_EVENT,
@@ -31,10 +32,10 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simu
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     SIGNIFICANCE_LEVEL,
 )
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import overlaps
 
 __all__ = [
     "LOCAL_TOLERANCE_CM",
-    "ZOOMED_EVENTS",
     "accepted_overlapping",
     "best_dispersion_cm",
     "bound_error_ms",
@@ -42,12 +43,14 @@ __all__ = [
     "decoded_center_cm",
     "draws_from_passing",
     "duration_ratio",
+    "duration_ratios",
     "is_reported",
     "local_fraction",
     "local_fraction_of_event",
     "recording_numbers",
     "reported_overlapping",
     "shuffle_of",
+    "state_space_overlapping",
     "state_space_duration_ratio",
     "verdict",
 ]
@@ -55,25 +58,25 @@ __all__ = [
 LOCAL_TOLERANCE_CM = 15.0
 """A window decodes the animal's own place when its center is closer than this."""
 
-ZOOMED_EVENTS = (
-    SWEEP_EVENT,
-    SHORT_REPLAY_EVENT,
-    SHORT_PATH_EVENT,
-    REMOTE_STATIONARY_EVENT,
-)
-"""The replays whose bounds the state-space detector is scored on
-(:func:`bound_error_ms`): the ones the figure zooms on."""
-
 
 def candidates_overlapping(decoded: dict, event: int) -> list[int]:
     """Every candidate sequence that overlaps a labeled event, accepted or not."""
-    candidates = decoded["candidates"]
-    event_start, event_end = decoded["event_times"][event]
+    midpoint_s = decoded["midpoint_s"]
+    bounds = tuple(decoded["event_times"][event])
     return [
         i
-        for i, (start, stop) in enumerate(candidates.runs)
-        if decoded["midpoint_s"][start] < event_end
-        and event_start < decoded["midpoint_s"][stop]
+        for i, (start, stop) in enumerate(decoded["candidates"].runs)
+        if overlaps((midpoint_s[start], midpoint_s[stop]), bounds)
+    ]
+
+
+def state_space_overlapping(decoded: dict, event: int) -> list[tuple[float, float]]:
+    """The state-space model's events that overlap a labeled event, in time order."""
+    bounds = tuple(decoded["event_times"][event])
+    return [
+        interval
+        for interval in decoded["state_space_intervals"]
+        if overlaps(interval, bounds)
     ]
 
 
@@ -220,17 +223,14 @@ def bound_error_ms(decoded: dict, events: tuple[int, ...]) -> float:
     """Largest error in either bound of the state-space model's reports, in ms.
 
     For each event, the start of the first state-space interval overlapping
-    it against the event's start, and the end of the last against its end.
-    NaN when the state-space detector reports nothing over one of ``events``.
+    it against the event's start, and the end of the last against its end
+    (:func:`state_space_overlapping`). NaN when the state-space detector
+    reports nothing over one of ``events``.
     """
     worst = 0.0
     for event in events:
         start_s, end_s = decoded["event_times"][event]
-        overlapping = [
-            (a, b)
-            for a, b in decoded["state_space_intervals"]
-            if a < end_s and start_s < b
-        ]
+        overlapping = state_space_overlapping(decoded, event)
         if not overlapping:
             return float("nan")
         worst = max(
@@ -246,16 +246,27 @@ def state_space_duration_ratio(decoded: dict, event: int) -> float:
     own duration.
 
     From the start of the first state-space interval overlapping the event to
-    the end of the last, as :func:`bound_error_ms` reads them. NaN when the
-    model reports nothing over the event.
+    the end of the last (:func:`state_space_overlapping`). NaN when the model
+    reports nothing over the event.
     """
     start_s, end_s = decoded["event_times"][event]
-    overlapping = [
-        (a, b) for a, b in decoded["state_space_intervals"] if a < end_s and start_s < b
-    ]
+    overlapping = state_space_overlapping(decoded, event)
     if not overlapping:
         return float("nan")
     return float((overlapping[-1][1] - overlapping[0][0]) / (end_s - start_s))
+
+
+def duration_ratios(decoded: dict, event: int) -> tuple[float, float]:
+    """How long each detector's report of an event is, over the event's own
+    duration: the sliding window's (:func:`duration_ratio`), then the
+    state-space model's (:func:`state_space_duration_ratio`). NaN for a
+    detector that does not report the event."""
+    sliding = (
+        duration_ratio(decoded, event)
+        if verdict(decoded, event) == "found"
+        else float("nan")
+    )
+    return sliding, state_space_duration_ratio(decoded, event)
 
 
 def recording_numbers(decoded: dict) -> dict[str, float | int]:
@@ -285,7 +296,7 @@ def recording_numbers(decoded: dict) -> dict[str, float | int]:
         - ``short_path_dispersion_cm``, ``remote_stationary_dispersion_cm``: the
           largest dispersion of a candidate over each (:func:`best_dispersion_cm`).
         - ``state_space_bound_error_ms``: :func:`bound_error_ms` over
-          :data:`ZOOMED_EVENTS`.
+          :data:`~.comparison_simulation.REPLAY_EVENTS`.
 
     Raises
     ------
@@ -310,5 +321,5 @@ def recording_numbers(decoded: dict) -> dict[str, float | int]:
         "remote_stationary_dispersion_cm": best_dispersion_cm(
             decoded, REMOTE_STATIONARY_EVENT
         ),
-        "state_space_bound_error_ms": bound_error_ms(decoded, ZOOMED_EVENTS),
+        "state_space_bound_error_ms": bound_error_ms(decoded, REPLAY_EVENTS),
     }

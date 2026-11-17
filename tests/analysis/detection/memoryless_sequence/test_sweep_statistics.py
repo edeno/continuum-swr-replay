@@ -30,7 +30,6 @@ SWEEP_ROWS = [
     ("shuffle_pass_rate_by_duration", "sliding_jump_pass", 0.1, 0.6),
     ("shuffle_pass_rate_by_duration", "sliding_spread_pass", 0.02, 0.7),
     ("shuffle_pass_rate_by_duration", "sliding_spread_pass", 0.5, 0.99),
-    # the largest state-space error is an early start, 4 ms
 ]
 SWEEP = _sweep(SWEEP_ROWS)
 
@@ -75,17 +74,6 @@ def test_sweep_jump_pass_statistics_read_the_shortest_and_longest_durations():
     assert result["longest_fraction"] == 0.9
 
 
-def _without(block: str, measure: str, duration_s: float) -> pd.DataFrame:
-    """``SWEEP`` less one measure's row at one duration."""
-    row = (
-        (SWEEP["summary"] == block)
-        & (SWEEP["measure"] == measure)
-        & (SWEEP["duration_s"] == duration_s)
-    )
-    assert row.sum() == 1
-    return SWEEP[~row]
-
-
 def _with_no_duration(block: str, measure: str, duration_s: float) -> pd.DataFrame:
     """``SWEEP`` with one measure's row at one duration left without a duration."""
     row = (
@@ -117,13 +105,13 @@ def test_pooled_timing_statistics_are_the_blocks_values_by_measure():
     summary = pd.DataFrame(
         {
             "summary": ["timing_pooled", "timing_pooled", "overall"],
-            "measure": ["n_replays", "sliding_end_error_ms_bounds_max", "n_cells"],
+            "measure": ["n_replays", "sliding_end_error_ms_max", "n_cells"],
             "value": [2.0, 150.0, 4.0],
         }
     )
     assert stats.sweep_pooled_timing_statistics(summary) == {
         "n_replays": 2.0,
-        "sliding_end_error_ms_bounds_max": 150.0,
+        "sliding_end_error_ms_max": 150.0,
     }
 
 

@@ -94,38 +94,6 @@ def timing_error_exceedance(found: pd.DataFrame) -> dict[str, float]:
     return shares
 
 
-def against_spike_span(table: pd.DataFrame) -> pd.DataFrame:
-    """The replays' start and end errors measured against their own first and
-    last spike.
-
-    A replay's nominal start and end hold silent time when it is sparse: its
-    first spike can come well after the nominal start. No detector can report
-    what has not fired, so the truth a start or an end is held to is the span
-    of the replay's own spikes.
-
-    Parameters
-    ----------
-    table : pd.DataFrame, shape (n_replays, n_columns)
-        One row per injected replay: ``at_s`` and ``duration_s`` (the nominal
-        start and duration), ``first_spike_s`` and ``last_spike_s``, and for
-        ``sliding`` and ``state_space`` the ``<detector>_start_error_s`` and
-        ``<detector>_end_error_s`` against the nominal bounds.
-
-    Returns
-    -------
-    table : pd.DataFrame, shape (n_replays, n_columns)
-        A copy whose start and end errors are against the first and the last
-        spike.
-    """
-    table = table.copy()
-    start_shift_s = table["first_spike_s"] - table["at_s"]
-    end_shift_s = table["last_spike_s"] - (table["at_s"] + table["duration_s"])
-    for detector in ("sliding", "state_space"):
-        table[f"{detector}_start_error_s"] -= start_shift_s
-        table[f"{detector}_end_error_s"] -= end_shift_s
-    return table
-
-
 def pooled_timing_errors(found: pd.DataFrame) -> dict[str, float]:
     """Each detector's start and end errors over the replays both report, pooled.
 
@@ -137,7 +105,8 @@ def pooled_timing_errors(found: pd.DataFrame) -> dict[str, float]:
     found : pd.DataFrame, shape (n_replays, n_columns)
         The replays both detectors report, one row each, with for ``sliding``
         and ``state_space`` the ``<detector>_start_error_s`` and
-        ``<detector>_end_error_s`` (:func:`against_spike_span`).
+        ``<detector>_end_error_s``, against the replay's own first and last
+        spike (``sweep_replays.run_cell``).
 
     Returns
     -------
@@ -182,7 +151,7 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
     ----------
     table : pd.DataFrame, shape (n_cells, n_columns)
         The sweep's raw table, one row per injected replay (cell): its
-        ``path_cm``, ``duration_s`` and ``distance_from_animal_cm``, and each
+        ``path_cm`` and ``duration_s``, and each
         detector's outcome (the ``sliding_*`` and ``state_space_*`` columns
         ``scripts/detection/sweep_memoryless_detection.py`` writes).
 
@@ -201,12 +170,12 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
         (``timing_exceedance``, :func:`timing_error_exceedance`). The timing
         blocks read the replays both detectors report as the injection
         (``sliding_matches`` and ``state_space_matches``), their errors against
-        each replay's own first and last spike (:func:`against_spike_span`).
+        each replay's own first and last spike.
     """
     # the replays both detectors report, the sliding window under the whole
-    # published definition: the detection rates count those, and a duration or
-    # timing drawn beside them must be of the same events
-    found = against_spike_span(table[table.sliding_matches & table.state_space_matches])
+    # published definition: the detection rates count those, and a timing
+    # error drawn beside them must be of the same events
+    found = table[table.sliding_matches & table.state_space_matches]
     missed = table[table.state_space_matches & ~table.sliding_matches]
 
     parts = []
@@ -234,9 +203,6 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
             "detection_rate_by_path_and_duration",
         )
     )
-
-    # the published replay definition applied to the state-space detector's
-    # own events, by path, so the dispersion floor can be read off the file
 
     # each half of the significance test, among the replays reported before
     # it, by duration: a short replay covers its path in few windows, so its
@@ -366,20 +332,16 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
     # where each detector puts an event's start and end against the truth, on
     # the replays both reported: signed, so absorbed local coding shows as an
     # early start or a late end rather than only as a longer event
-    pooled = (
-        pd.Series(pooled_timing_errors(found), name="value")
-        .rename_axis("measure")
-        .reset_index()
-    )
-    pooled["summary"] = "timing_pooled"
-    parts.append(pooled)
-    exceedance = (
-        pd.Series(timing_error_exceedance(found), name="value")
-        .rename_axis("measure")
-        .reset_index()
-    )
-    exceedance["summary"] = "timing_exceedance"
-    parts.append(exceedance)
+    for block, statistics in (
+        ("timing_pooled", pooled_timing_errors),
+        ("timing_exceedance", timing_error_exceedance),
+    ):
+        parts.append(
+            pd.Series(statistics(found), name="value")
+            .rename_axis("measure")
+            .reset_index()
+            .assign(summary=block)
+        )
 
     # the grouping column is not called "aggregate": that name shadows
     # DataFrame.aggregate, so frame.aggregate == "x" compares a method and

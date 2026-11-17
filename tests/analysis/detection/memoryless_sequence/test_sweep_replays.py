@@ -60,7 +60,9 @@ def run(*events):
 
 
 def score(*events):
-    return score_state_space(RECORDING, run(*events), BOUNDS, true_position_cm, PATH_CM)
+    return score_state_space(
+        RECORDING, run(*events), BOUNDS, BOUNDS, true_position_cm, PATH_CM
+    )
 
 
 def test_the_matching_event_answers_for_the_cell_whatever_comes_first():

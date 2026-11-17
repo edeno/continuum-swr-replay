@@ -22,14 +22,15 @@ def replay_cells() -> pd.DataFrame:
     domain (path >= 45 cm, duration >= 0.12 s); cell 1's path and cell 2's
     duration are too short. Cells 0, 1 and 3 are matched by both detectors
     before the shuffle, which cell 1 then fails: cells 0 and 3 are the replays
-    both detectors report, with sliding-window durations 0.12 and 0.72 s and start
-    errors, against the nominal bounds, of 1 and 10 ms."""
+    both detectors report. A timing error is against the replay's own first
+    or last spike: the sliding window starts cell 0 3 ms early and cell 3 10 ms
+    late; the state-space detector starts cell 0 4 ms early; both end cell 0
+    20 ms late."""
     n = 4
     return pd.DataFrame(
         {
             "path_cm": [45.0, 30.0, 60.0, 90.0],
             "duration_s": [0.12, 0.12, 0.08, 0.12],
-            "distance_from_animal_cm": np.full(n, 50.0),
             "sliding_found": [True, False, False, True],
             "sliding_matches": [True, False, False, True],
             "sliding_matches_before_shuffle": [True, True, False, True],
@@ -37,8 +38,6 @@ def replay_cells() -> pd.DataFrame:
             "sliding_any_candidate": np.ones(n, dtype=bool),
             "sliding_p_spread": [0.01, 0.5, 0.01, 0.01],
             "sliding_p_jump": [0.01, 0.01, 0.01, 0.01],
-            "sliding_duration_s": [0.12, 0.24, 0.08, 0.72],
-            "sliding_local_fraction": np.full(n, 0.1),
             "sliding_n_accepted": np.ones(n, dtype=np.int64),
             "sliding_n_candidates": np.ones(n, dtype=np.int64),
             "sliding_best_dispersion_cm": np.full(n, 20.0),
@@ -46,18 +45,11 @@ def replay_cells() -> pd.DataFrame:
             "state_space_found": np.ones(n, dtype=bool),
             "state_space_matches": np.ones(n, dtype=bool),
             "state_space_replay_matches": [True, True, True, False],
-            "state_space_dispersion_cm": [10.0, 20.0, 30.0, 40.0],
-            "state_space_duration_s": [0.12, 0.12, 0.08, 0.12],
             "state_space_n_intervals": np.ones(n, dtype=np.int64),
-            "at_s": np.full(n, 10.0),
-            # cell 0's first spike is 4 ms after its nominal start and its last
-            # 20 ms before its nominal end; cell 3's spikes fill its bounds
-            "first_spike_s": [10.004, 10.0, 10.0, 10.0],
-            "last_spike_s": [10.100, 10.12, 10.08, 10.12],
-            "sliding_start_error_s": [0.001, 0.002, 0.0, 0.010],
-            "sliding_end_error_s": np.zeros(n),
-            "state_space_start_error_s": np.zeros(n),
-            "state_space_end_error_s": np.zeros(n),
+            "sliding_start_error_s": [-0.003, 0.002, 0.0, 0.010],
+            "sliding_end_error_s": [0.020, 0.0, 0.0, 0.0],
+            "state_space_start_error_s": [-0.004, 0.0, 0.0, 0.0],
+            "state_space_end_error_s": [0.020, 0.0, 0.0, 0.0],
         }
     )
 
@@ -75,15 +67,6 @@ class TestReplaySweepSummary:
         assert overall["state_space_replay_matches"] == pytest.approx(0.75)
         assert domain["state_space_replay_matches"] == pytest.approx(0.5)
 
-    def test_timing_is_against_each_replays_own_spikes(self):
-        cells = sweep_summaries.against_spike_span(replay_cells())
-
-        # cell 0: first spike 4 ms in, last 20 ms before the nominal end
-        assert cells.sliding_start_error_s[0] == pytest.approx(-0.003)
-        assert cells.state_space_end_error_s[0] == pytest.approx(0.020)
-        # cell 3's spikes fill its bounds: nothing moves
-        assert cells.sliding_start_error_s[3] == pytest.approx(0.010)
-
     def test_pooled_timing_errors_are_of_the_replays_both_report(self):
         pooled = self.values("timing_pooled").set_index("measure").value
 
@@ -92,8 +75,8 @@ class TestReplaySweepSummary:
         assert pooled["sliding_start_error_ms_min"] == pytest.approx(-3.0)
         assert pooled["sliding_start_error_ms_median"] == pytest.approx(3.5)
         assert pooled["sliding_start_error_ms_max"] == pytest.approx(10.0)
-        # the state-space detector, exact against the nominal bounds, starts
-        # cell 0 4 ms before its first spike and ends it 20 ms after its last
+        # the state-space detector starts cell 0 4 ms before its first spike
+        # and ends it 20 ms after its last
         assert pooled["state_space_start_error_ms_min"] == pytest.approx(-4.0)
         assert pooled["state_space_end_error_ms_max"] == pytest.approx(20.0)
         # the sliding window's start error is the larger on cell 3 only
@@ -105,9 +88,7 @@ class TestReplaySweepSummary:
         cells = replay_cells()
         cells.loc[3, "sliding_end_error_s"] = 0.150
         pooled = sweep_summaries.pooled_timing_errors(
-            sweep_summaries.against_spike_span(
-                cells[cells.sliding_matches & cells.state_space_matches]
-            )
+            cells[cells.sliding_matches & cells.state_space_matches]
         )
 
         assert sweep_summaries.LARGE_TIMING_ERROR_MS == 100.0
@@ -130,9 +111,7 @@ class TestReplaySweepSummary:
     def test_the_far_share_is_the_exceedance_at_its_threshold(self):
         cells = replay_cells()
         cells.loc[3, "sliding_end_error_s"] = 0.150
-        found = sweep_summaries.against_spike_span(
-            cells[cells.sliding_matches & cells.state_space_matches]
-        )
+        found = cells[cells.sliding_matches & cells.state_space_matches]
         far_ms = int(sweep_summaries.LARGE_TIMING_ERROR_MS)
 
         assert (

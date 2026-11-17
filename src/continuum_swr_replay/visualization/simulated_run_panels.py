@@ -19,6 +19,14 @@ from continuum_swr_replay.visualization.figure_utilities import WONG
 from continuum_swr_replay.visualization.palettes import COLORS
 
 __all__ = [
+    "axes_added",
+    "drawn_extent",
+    "example_badge",
+    "letter_panel",
+    "plot_posterior",
+    "plot_raster",
+    "posterior_color_limit",
+    "space_rows_evenly",
     "ANIMAL_POS_COLOR",
     "DATA_LEFT",
     "DATA_RIGHT",
@@ -27,18 +35,8 @@ __all__ = [
     "NON_LOCAL_COLOR",
     "NON_LOCAL_SHADE",
     "NON_LOCAL_SHADE_ALPHA",
-    "PANEL_LETTER_SIZE",
-    "POSITION_MARGIN_CM",
     "SMALL_SIZE",
     "STATE_COLORS",
-    "axes_added",
-    "drawn_extent",
-    "example_badge",
-    "letter_panel",
-    "plot_posterior",
-    "plot_raster",
-    "shift_vertically",
-    "space_rows_evenly",
 ]
 
 # Keyed by the figures' name for each state: the detector's name without its
@@ -172,6 +170,28 @@ def plot_posterior(
         position_bins[0] - POSITION_MARGIN_CM,
         position_bins[-1] + POSITION_MARGIN_CM,
     )
+
+
+def posterior_color_limit(posterior: np.ndarray, time: np.ndarray, events) -> float:
+    """Top of a decoded-position colour scale: the posterior's 99th percentile
+    inside ``events``.
+
+    Outside an event the posterior sits on the animal and is more concentrated;
+    it would set a scale on which an event is faint, so on this scale it
+    saturates.
+
+    Parameters
+    ----------
+    posterior : ndarray, shape (n_time, n_position)
+    time : ndarray, shape (n_time,)
+        The posterior's time axis, in seconds.
+    events : iterable of (float, float)
+        Start and end of each event, in seconds; both ends are inside it.
+    """
+    inside = np.zeros(time.size, dtype=bool)
+    for start, end in events:
+        inside |= (time >= start) & (time <= end)
+    return float(np.percentile(posterior[inside], 99))
 
 
 def axes_added(fig: Figure, draw: Callable[[], None]) -> list[Axes]:

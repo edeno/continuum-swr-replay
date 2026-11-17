@@ -69,6 +69,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simu
     FRAGMENTED_EVENT,
     N_NEURONS,
     REMOTE_STATIONARY_EVENT,
+    REPLAY_EVENTS,
     SHORT_PATH,
     SHORT_PATH_EVENT,
     SHORT_REPLAY,
@@ -82,19 +83,19 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.recording_statistics import (
-    ZOOMED_EVENTS,
     best_dispersion_cm,
     bound_error_ms,
     duration_ratio,
+    duration_ratios,
     is_reported,
     recording_numbers,
     reported_overlapping,
-    state_space_duration_ratio,
     verdict,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
 )
+from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import overlaps
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.visualization.figure_utilities import (
@@ -110,6 +111,7 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
     letter_panel,
     plot_posterior,
     plot_raster,
+    posterior_color_limit,
     space_rows_evenly,
 )
 
@@ -121,7 +123,7 @@ SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_sweep_summary.csv
 RECORDING_NUMBERS_PATH = Path(
     "paper/reported/inputs/detection/memoryless_comparison_recording.json"
 )
-"""The numbers reported about the one labeled recording (b, c)
+"""The numbers reported about the one labeled recording (panel a)
 (``recording_statistics.recording_numbers``), which this script writes; the
 detection summary reads them."""
 
@@ -249,34 +251,9 @@ def sliding_events(decoded: dict) -> list[tuple[float, float]]:
 
 
 def simulated_events(decoded: dict) -> list[tuple[float, float]]:
-    """When simulated spiking represents a place other than the animal's.
-
-    Every labeled event but the silence.
-    """
-    return sorted(
-        tuple(decoded["event_times"][event])
-        for event in (
-            SWEEP_EVENT,
-            FRAGMENTED_EVENT,
-            SHORT_PATH_EVENT,
-            REMOTE_STATIONARY_EVENT,
-            SHORT_REPLAY_EVENT,
-            FAR_REPLAY_EVENT,
-            SPARSE_REPLAY_EVENT,
-        )
-    )
-
-
-def duration_ratios(decoded: dict, event: int) -> tuple[float, float]:
-    """How long each detector's report of an event is, over the event's own
-    duration: the sliding window's, then the state-space model's. NaN for a
-    detector that does not report it."""
-    sliding = (
-        duration_ratio(decoded, event)
-        if verdict(decoded, event) == "found"
-        else float("nan")
-    )
-    return sliding, state_space_duration_ratio(decoded, event)
+    """When simulated spiking represents a place other than the animal's: every
+    labeled event but the silence, in time order."""
+    return sorted(tuple(decoded["event_times"][event]) for event in REPLAY_EVENTS)
 
 
 def check_recording_claims(decoded: dict, config: MemorylessSequenceConfig) -> None:
@@ -307,20 +284,15 @@ def check_recording_claims(decoded: dict, config: MemorylessSequenceConfig) -> N
                 f"The sliding window's report of event {event} is said to be too "
                 "long; it is not."
             )
-    if not np.isfinite(
-        bound_error_ms(
-            decoded,
-            (*ZOOMED_EVENTS, FRAGMENTED_EVENT, FAR_REPLAY_EVENT, SPARSE_REPLAY_EVENT),
-        )
-    ):
+    if not np.isfinite(bound_error_ms(decoded, REPLAY_EVENTS)):
         raise RuntimeError(
             "The state-space model is said to report every simulated replay; it "
             "misses one."
         )
-    silence_start, silence_end = decoded["event_times"][SILENCE_EVENT]
+    silence = tuple(decoded["event_times"][SILENCE_EVENT])
     if any(
-        a < silence_end and silence_start < b
-        for a, b in (*decoded["state_space_intervals"], *sliding_events(decoded))
+        overlaps(reported, silence)
+        for reported in (*decoded["state_space_intervals"], *sliding_events(decoded))
     ):
         raise RuntimeError("A detector reports an event over the silence.")
 
@@ -334,8 +306,8 @@ def plot_event_rows(
     ax: Axes,
     decoded: dict,
     *,
-    scale: float = 1.0,
-    origin: float = 0.0,
+    scale: float,
+    origin: float,
     labels: bool,
 ) -> None:
     """Three rows of bars: what was simulated and what each detector reports.
@@ -370,14 +342,6 @@ def plot_event_rows(
         for label, (_, color) in zip(ax.get_yticklabels(), EVENT_ROWS, strict=True):
             label.set_color(color)
     ax.spines["left"].set_visible(False)
-
-
-def color_limit(posterior: np.ndarray, time: np.ndarray, events) -> float:
-    """Top of a decoded-position colour scale: its 99th percentile inside ``events``."""
-    inside = np.zeros(time.size, dtype=bool)
-    for start, end in events:
-        inside |= (time >= start) & (time <= end)
-    return float(np.percentile(posterior[inside], 99))
 
 
 def plot_examples(
@@ -487,7 +451,11 @@ def plot_examples(
             strict=True,
         ):
             if np.isfinite(ratio):
-                last = max(b for a, b in events if a < event_end and event_start < b)
+                last = max(
+                    end
+                    for start_, end in events
+                    if overlaps((start_, end), (event_start, event_end))
+                )
                 ax_events.annotate(
                     f"{ratio:.1f}×",
                     (to_ms(last), y),
@@ -751,9 +719,7 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def make_figure(
-    n_neurons: int, config: MemorylessSequenceConfig, summary: pd.DataFrame
-) -> tuple[Figure, dict]:
+def make_figure(summary: pd.DataFrame) -> tuple[Figure, dict]:
     """Decode the labeled recording and draw the figure.
 
     Returns
@@ -762,19 +728,14 @@ def make_figure(
     decoded : dict
         ``comparison_simulation.simulate_and_decode``'s.
     """
-    decoded = simulate_and_decode(n_neurons, config)
-    check_recording_claims(decoded, config)
-    return draw_figure(decoded, summary), decoded
-
-
-def draw_figure(decoded: dict, summary: pd.DataFrame) -> Figure:
-    """Draw the figure from a decoded recording and the sweep's summary."""
-    state_space_vmax = color_limit(
+    decoded = simulate_and_decode(N_NEURONS, CONFIG)
+    check_recording_claims(decoded, CONFIG)
+    state_space_vmax = posterior_color_limit(
         decoded["state_space_posterior"],
         decoded["time"],
         decoded["state_space_intervals"],
     )
-    sliding_vmax = color_limit(
+    sliding_vmax = posterior_color_limit(
         decoded["posterior"], decoded["midpoint_s"], simulated_events(decoded)
     )
 
@@ -815,7 +776,7 @@ def draw_figure(decoded: dict, summary: pd.DataFrame) -> Figure:
         ("e", drawn_extent(fig, [ax_offset]).x0, extents[1].y1),
     ):
         letter_panel(fig, letter, x, y)
-    return fig
+    return fig, decoded
 
 
 def write_recording_numbers(numbers: dict, n_neurons: int, path: Path) -> None:
@@ -836,12 +797,6 @@ def write_recording_numbers(numbers: dict, n_neurons: int, path: Path) -> None:
     )
 
 
-def read_summary(path: Path, producer: str) -> pd.DataFrame:
-    if not path.exists():
-        raise FileNotFoundError(f"No summary at {path}. Run `python {producer}` first.")
-    return pd.read_csv(path)
-
-
 def main(argv: Sequence[str] | None = None) -> None:
     # the CPU unless JAX_PLATFORMS names another
     default_jax_platforms("cpu")
@@ -859,12 +814,15 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
-    summary = read_summary(
-        args.summary, "scripts/detection/sweep_memoryless_detection.py"
-    )
+    if not args.summary.exists():
+        raise FileNotFoundError(
+            f"No summary at {args.summary}. Run "
+            "`python scripts/detection/sweep_memoryless_detection.py` first."
+        )
+    summary = pd.read_csv(args.summary)
     check_caption_settings(CONFIG)
     check_summary_claims(summary)
-    fig, decoded = make_figure(N_NEURONS, CONFIG, summary)
+    fig, decoded = make_figure(summary)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     save_figure(fig, "supp_memoryless_comparison", base_dir=args.output_dir)
