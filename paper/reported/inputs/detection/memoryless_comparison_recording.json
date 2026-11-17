@@ -1,7 +1,7 @@
 {
  "produced_by": "scripts/figures/generate_supp_memoryless_comparison.py",
- "produced_at": "2026-11-17T15:25:54+00:00",
- "git_commit": "59f28d0ba47d",
+ "produced_at": "2026-11-17T16:03:15+00:00",
+ "git_commit": "af32738aada6",
  "n_neurons": 30,
  "numbers": {
   "sweep_duration_ratio": 2.493842364532045,
