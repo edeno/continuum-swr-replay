@@ -709,3 +709,19 @@ truth is now the span of the event's own spikes:
 - The sweep's cells run in parallel processes (`--n-workers`, 24 by default): most of a cell's time
   is JAX compiling the state-space decode for that cell's window. A row does not depend on the
   process count.
+
+## The simulated comparison's code by experiment, 2026-11-17
+
+| Old place | New place |
+|---|---|
+| `memoryless_sequence/sweep_statistics.py`: the controls' statistics (`controls_value`, `no_replay_statistics`, `control_event_share_range`, `parts_by_level`, `carving_statistics`, `part_recovery_statistics`) | `memoryless_sequence/controls_statistics.py` |
+| `memoryless_sequence/sweep_statistics.py`: the held-out check's statistics (`pooled_heldout_rate`, `heldout_fold_statistics`, `placeless_event_statistics`, `lowest_estimator_agreement`, `heldout_event_classes`) | `detector_comparison/heldout_statistics.py` |
+| `scripts/figures/generate_memoryless_comparison.py`, `paper/figures/memoryless_comparison/` | `scripts/figures/generate_supp_memoryless_comparison.py`, `paper/figures/supp_memoryless_comparison/` (tracked; Supplementary Figure S1 in `paper/main.tex`) |
+
+Removed with the values that read them: `sweep_statistics.sweep_timing_statistics` and
+`sweep_by_duration`, and the replay sweep summary's blocks `timing_by_duration`,
+`median_duration_ratio_by_duration`, `by_path` and `median_by_distance_from_animal`. The pooled
+timing block and the error distribution replace the first two; nothing read the last two.
+
+The controls and the held-out check answer questions of their own in the question list (1.2 and
+1.3); they were tagged to question 1.1 with the comparison figure's values.

@@ -107,7 +107,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `generate_uncertainty_content_figure.py` — the uncertainty/content story and its diagnostic figures.
 - `generate_supp_*.py`, `generate_event_gallery.py`, `run_event_gallery.sh`.
 - `plot_swr_contrast_coefs.py` — per-animal coefficient forest plots for the `is_swr` rate and content contrast ladders.
-- `generate_memoryless_comparison.py` — supplemental figure: the Widloski & Foster detector against the state-space detector in simulation.
+- `generate_supp_memoryless_comparison.py` — supplemental figure: the Widloski & Foster detector against the state-space detector in simulation.
 - `generate_inventory_examples.py` — seeded example events from each cell of one inventory comparison run.
 - `generate_event_feature_examples.py` — seeded comparator-only and ours-only example events from one event features run.
 

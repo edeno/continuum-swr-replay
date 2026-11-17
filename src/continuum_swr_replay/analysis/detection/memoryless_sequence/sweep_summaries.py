@@ -95,12 +95,13 @@ def timing_error_exceedance(found: pd.DataFrame) -> dict[str, float]:
 
 
 def against_spike_span(table: pd.DataFrame) -> pd.DataFrame:
-    """The replays' timing measured against their own first and last spike.
+    """The replays' start and end errors measured against their own first and
+    last spike.
 
     A replay's nominal start and end hold silent time when it is sparse: its
     first spike can come well after the nominal start. No detector can report
-    what has not fired, so the truth a start, an end or a duration is held to
-    is the span of the replay's own spikes.
+    what has not fired, so the truth a start or an end is held to is the span
+    of the replay's own spikes.
 
     Parameters
     ----------
@@ -108,27 +109,20 @@ def against_spike_span(table: pd.DataFrame) -> pd.DataFrame:
         One row per injected replay: ``at_s`` and ``duration_s`` (the nominal
         start and duration), ``first_spike_s`` and ``last_spike_s``, and for
         ``sliding`` and ``state_space`` the ``<detector>_start_error_s`` and
-        ``<detector>_end_error_s`` against the nominal bounds and the reported
-        ``<detector>_duration_s``.
+        ``<detector>_end_error_s`` against the nominal bounds.
 
     Returns
     -------
-    table : pd.DataFrame, shape (n_replays, n_columns + 3)
+    table : pd.DataFrame, shape (n_replays, n_columns)
         A copy whose start and end errors are against the first and the last
-        spike, with ``spike_duration_s`` (last minus first spike) and each
-        detector's ``<detector>_duration_ratio``, its reported duration over
-        that one.
+        spike.
     """
     table = table.copy()
     start_shift_s = table["first_spike_s"] - table["at_s"]
     end_shift_s = table["last_spike_s"] - (table["at_s"] + table["duration_s"])
-    table["spike_duration_s"] = table["last_spike_s"] - table["first_spike_s"]
     for detector in ("sliding", "state_space"):
         table[f"{detector}_start_error_s"] -= start_shift_s
         table[f"{detector}_end_error_s"] -= end_shift_s
-        table[f"{detector}_duration_ratio"] = (
-            table[f"{detector}_duration_s"] / table["spike_duration_s"]
-        )
     return table
 
 
@@ -194,24 +188,20 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
 
     Returns
     -------
-    summary : pd.DataFrame, shape (n_values, 7)
+    summary : pd.DataFrame, shape (n_values, 6)
         ``summary`` (the block), ``measure``, the block's grouping columns
-        ``path_cm``, ``duration_s`` and ``distance_bin_cm`` (NaN where the
-        block is not grouped by it), ``value`` and an empty ``note``. The
-        blocks: detection rates by path and duration
-        (``detection_rate_by_path_and_duration``) and by path (``by_path``),
-        the shuffle's pass rates by duration, median duration ratios by
-        distance from the animal, the rates over every cell (``overall``) and
-        over the cells the published definition can accept
+        ``path_cm`` and ``duration_s`` (NaN where the block is not grouped by
+        it), ``value`` and an empty ``note``. The blocks: detection rates by
+        path and duration (``detection_rate_by_path_and_duration``), the
+        shuffle's pass rates by duration, the rates over every cell
+        (``overall``) and over the cells the published definition can accept
         (``overall_in_domain``, :data:`IN_DOMAIN_PATH_CM`,
         :data:`IN_DOMAIN_DURATION_S`), and the start and end errors pooled
         (``timing_pooled``, :func:`pooled_timing_errors`) and as a distribution
-        (``timing_exceedance``, :func:`timing_error_exceedance`). The distance and
-        timing blocks read the replays both detectors report as the injection
-        (``sliding_matches`` and ``state_space_matches``), their durations and
-        errors against each replay's own first and last spike
-        (:func:`against_spike_span`); ``duration_s`` on a row is still the
-        nominal duration the sweep's grid names.
+        (``timing_exceedance``, :func:`timing_error_exceedance`). The timing
+        blocks read the replays both detectors report as the injection
+        (``sliding_matches`` and ``state_space_matches``), their errors against
+        each replay's own first and last spike (:func:`against_spike_span`).
     """
     # the replays both detectors report, the sliding window under the whole
     # published definition: the detection rates count those, and a duration or
@@ -247,27 +237,6 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
 
     # the published replay definition applied to the state-space detector's
     # own events, by path, so the dispersion floor can be read off the file
-    by_path = (
-        # before the shuffle, sliding_matches_before_shuffle is the like-for-like
-        # partner of state_space_replay_matches: both are the duration and
-        # dispersion criteria alone
-        table.groupby("path_cm")[
-            [
-                "sliding_matches",
-                "sliding_matches_before_shuffle",
-                "state_space_replay_matches",
-            ]
-        ]
-        .mean()
-        .join(
-            table[table.state_space_matches]
-            .groupby("path_cm")
-            .state_space_dispersion_cm.median()
-            .rename("state_space_median_dispersion_cm")
-        )
-        .reset_index()
-    )
-    parts.append(melted(by_path, ["path_cm"], "by_path"))
 
     # each half of the significance test, among the replays reported before
     # it, by duration: a short replay covers its path in few windows, so its
@@ -284,24 +253,6 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
     )
     parts.append(
         melted(shuffle_by_duration, ["duration_s"], "shuffle_pass_rate_by_duration")
-    )
-
-    found["distance_bin_cm"] = pd.cut(
-        found.distance_from_animal_cm, [0, 40, 80, 120, 200]
-    ).astype(str)
-    by_distance = (
-        found.groupby("distance_bin_cm", observed=True)[
-            [
-                "sliding_duration_ratio",
-                "sliding_local_fraction",
-                "state_space_duration_ratio",
-            ]
-        ]
-        .median()
-        .reset_index()
-    )
-    parts.append(
-        melted(by_distance, ["distance_bin_cm"], "median_by_distance_from_animal")
     )
 
     overall = pd.DataFrame(
@@ -441,7 +392,6 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
             "measure",
             "path_cm",
             "duration_s",
-            "distance_bin_cm",
             "value",
             "note",
         ]

@@ -158,8 +158,22 @@ The code for every analysis and figure is at
 \setcounter{table}{0}
 \renewcommand{\thetable}{S\arabic{table}}
 
-\begin{landscape}
+\clearpage
 \section*{Supplementary material}
+
+\setcounter{figure}{0}
+\renewcommand{\thefigure}{S\arabic{figure}}
+
+% Supplementary figures, each made by its own scripts/figures/generate_supp_*.py.
+
+\begin{figure}[p]
+  \centering
+  \paperfigure{figures/supp_memoryless_comparison/supp_memoryless_comparison.pdf}{scripts/figures/generate_supp_memoryless_comparison.py}
+  \caption{To be written.}
+  \label{fig:supp_memoryless_comparison}
+\end{figure}
+
+\begin{landscape}
 
 % Made by scripts/figures/generate_supp_literature_table.py.
 \input{tables/table_s1_literature.tex}

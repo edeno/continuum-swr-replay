@@ -5,6 +5,16 @@ detector (spec 02) and our state-space detector. Agreed 2026-09-25.
 
 *2026-11-16: these sweeps now run on Figure 1's 30-cell run with the state-space model fitted by EM (see the note at the top of spec 02), and their panels left the comparison figure; their values stay in the detection summary. The cell counts, runtimes and panel table below describe the earlier design.*
 
+*2026-11-17: where each sweep lives now.*
+
+| Sweep | Question | Runner | What it runs | Its summary | Its statistics | Reported by |
+|---|---|---|---|---|---|---|
+| Controls | 1.2 | `scripts/detection/sweep_memoryless_controls.py` | `memoryless_sequence/sweep_controls.py` | `sweep_summaries.controls_summary` | `memoryless_sequence/controls_statistics.py` | `reported/detection.py`: `controls_values` |
+| Held-out check | 1.3 | `scripts/detector_comparison/sweep_memoryless_heldout.py` | `detector_comparison/heldout_sweep.py` | `detector_comparison/heldout.py`: `heldout_summary` | `detector_comparison/heldout_statistics.py` | `reported/detection.py`: `heldout_values` |
+
+Both write a summary under `paper/reported/inputs/detection/` and are shown in no figure. The
+simulated controls are called events here, not bursts (2026-11-17).
+
 ## Why
 
 The injected-replay sweep measures only sensitivity: every cell holds exactly one
@@ -180,7 +190,7 @@ the error estimates the real-data held-out results will be read with.
   replays and the conditions above; raw table to `Processed-Data`, aggregates to
   `paper/reported/inputs/detection/detection_heldout_summary.csv`. About 3 x 5100 cells at the sweep's
   0.045 s per cell, near 12 minutes, measured on one seed of one fold first.
-- `scripts/figures/generate_memoryless_comparison.py`: reads all three summaries.
+- `scripts/figures/generate_supp_memoryless_comparison.py`: reads all three summaries.
 
 ## Figure
 

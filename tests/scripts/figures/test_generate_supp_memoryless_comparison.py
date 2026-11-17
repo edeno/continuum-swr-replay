@@ -11,7 +11,7 @@ matplotlib.use("Agg")
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
-from scripts.figures import generate_memoryless_comparison as figure  # noqa: E402
+from scripts.figures import generate_supp_memoryless_comparison as figure  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[3]
 

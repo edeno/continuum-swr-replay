@@ -1,7 +1,7 @@
 """The memoryless comparison's simulation: Figure 1's run with added events, decoded.
 
 The supplemental memoryless comparison figure
-(``scripts/figures/generate_memoryless_comparison.py``) and the reference check
+(``scripts/figures/generate_supp_memoryless_comparison.py``) and the reference check
 (``scripts/checks/compare_memoryless_to_reference.py``) read one simulation
 (:func:`simulate_and_decode`): the simulated run of Figure 1
 (``analysis.detection.simulated_run.simulate_run``, whose patterns are the first

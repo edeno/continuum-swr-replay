@@ -79,13 +79,10 @@ class TestReplaySweepSummary:
         cells = sweep_summaries.against_spike_span(replay_cells())
 
         # cell 0: first spike 4 ms in, last 20 ms before the nominal end
-        assert cells.spike_duration_s[0] == pytest.approx(0.096)
         assert cells.sliding_start_error_s[0] == pytest.approx(-0.003)
         assert cells.state_space_end_error_s[0] == pytest.approx(0.020)
-        assert cells.sliding_duration_ratio[0] == pytest.approx(0.12 / 0.096)
         # cell 3's spikes fill its bounds: nothing moves
         assert cells.sliding_start_error_s[3] == pytest.approx(0.010)
-        assert cells.sliding_duration_ratio[3] == pytest.approx(6.0)
 
     def test_pooled_timing_errors_are_of_the_replays_both_report(self):
         pooled = self.values("timing_pooled").set_index("measure").value

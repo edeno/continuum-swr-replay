@@ -468,8 +468,9 @@ Each builder's statistics:
 - mpfc: `analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`, and
   `analysis/pfc/marked_family_statistics.py` (through the marked-family summary
   `scripts/pfc/summarize_pfc_marked_family.py` writes);
-- detection: `analysis/detection/memoryless_sequence/sweep_statistics.py`, `recording_statistics.py`
-  and `event_table.py`;
+- detection: `analysis/detection/memoryless_sequence/sweep_statistics.py` (the replay sweep),
+  `controls_statistics.py` (the controls), `recording_statistics.py` and `event_table.py`, and
+  `analysis/detector_comparison/heldout_statistics.py` (the held-out check on simulated data);
 - behavior: `analysis/replay_models/coefficient_statistics.py` (a per-session fit summarized over sessions and
   animals; the other modules build on it), `rate/rate_fit_statistics.py`, `rate/stop_statistics.py`,
   `content/content_statistics.py`, `content/estimator_comparison.py` (the three content estimators

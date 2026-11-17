@@ -6,7 +6,8 @@ refitted or re-decoded here. This module names and describes the values. A
 statistic an input already holds is copied from it; the statistics of the sweeps'
 summaries, of the labeled recording and of the pilot's events are computed in
 ``analysis.detection.memoryless_sequence`` (``sweep_statistics``,
-``recording_statistics`` and ``event_table``); here only the size of an input
+``controls_statistics``, ``recording_statistics`` and ``event_table``) and
+``analysis.detector_comparison.heldout_statistics``; here only the size of an input
 (its epochs, its animals) is counted. The inputs (:class:`DetectionInputs`):
 
 - the held-out tetrode test per decoder state
@@ -17,12 +18,12 @@ summaries, of the labeled recording and of the pilot's events are computed in
   (``paper/reported/inputs/detection/detection_{sweep,controls,heldout}_summary.csv``,
   from ``scripts/detection/sweep_memoryless_{detection,controls}.py`` and
   ``scripts/detector_comparison/sweep_memoryless_heldout.py``),
-  the first for the memoryless-comparison figure's panels (c-f), the other two
-  shown in no figure;
-- the one labeled recording of that figure's panels (a, b)
+  the first for the supplementary comparison figure's panels (b-e), the other
+  two shown in no figure (questions 1.2 and 1.3);
+- the one labeled recording of that figure's panel (a)
   (``paper/reported/inputs/detection/memoryless_comparison_recording.json``:
   ``memoryless_sequence.recording_statistics.recording_numbers``, written by
-  ``scripts/figures/generate_memoryless_comparison.py``);
+  ``scripts/figures/generate_supp_memoryless_comparison.py``);
 - the pilot epoch of the main memoryless run (:data:`MEMORYLESS_PILOT_RUN`, a
   ``replay_detection_comparison/memoryless`` run, from
   ``scripts/detection/run_memoryless_detection.py``), for the caption's
@@ -43,6 +44,7 @@ from pathlib import Path
 import pandas as pd
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence import (
+    controls_statistics,
     sweep_statistics,
     sweep_summaries,
 )
@@ -52,6 +54,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.event_table imp
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_controls import (
     MULTIPART_CONDITIONS,
 )
+from continuum_swr_replay.analysis.detector_comparison import heldout_statistics
 from continuum_swr_replay.analysis.detector_comparison.heldout_sweep import (
     FOLDS,
     OUR_EVENT_CLASSES,
@@ -88,7 +91,8 @@ SWEEP_DIR = Path("paper/reported/inputs/detection")
 TAGS = {
     "state_evidence": Tags(("2a.7",)),
     "memoryless": Tags(("1.1",), ("memoryless_comparison",)),
-    "memoryless_unshown": Tags(("1.1",)),
+    "controls": Tags(("1.2",)),
+    "heldout": Tags(("1.3",)),
     "pilot": Tags(("2a.3",), ("memoryless_comparison",)),
 }
 """Each group of values: the questions it answers and the figures that show it.
@@ -318,11 +322,11 @@ def pilot_stray_window_values(
     ]
 
 
-# --- the memoryless comparison: one labeled recording (a, b) ------------------
+# --- the memoryless comparison: one labeled recording (a) ------------------
 
 
 def recording_values(numbers: dict, source: str) -> list[Value]:
-    """Panels (a, b): what each detector made of the labeled events of one
+    """Panel (a): what each detector made of the labeled events of one
     simulated recording (``recording_statistics.recording_numbers``, which the
     figure script writes)."""
     make = value_factory(recording_values, source, TAGS["memoryless"])
@@ -405,7 +409,7 @@ def recording_values(numbers: dict, source: str) -> list[Value]:
     ]
 
 
-# --- the memoryless comparison: the replay sweep (c-f) ------------------------
+# --- the memoryless comparison: the replay sweep (b-e) ------------------------
 
 
 _TIMING_DETECTORS = {"sliding": "sliding window", "state_space": "state-space detector"}
@@ -486,7 +490,7 @@ def pooled_timing_values(summary: pd.DataFrame, make) -> list[Value]:
 
 
 def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
-    """Panels (c-f): replays of chosen shape, one at a time, scored against the
+    """Panels (b-e): replays of chosen shape, one at a time, scored against the
     known answer. Shares are of the swept replays (grid cells)."""
     make = value_factory(sweep_values, source, TAGS["memoryless"])
     overall = sweep_statistics.sweep_measures(summary, "overall")
@@ -632,33 +636,33 @@ _OURS = "state_space_canonical"
 
 
 def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
-    """In no figure: control events with no clean replay, stretches with no replay, and
+    """Question 1.2, in no figure: control events with no clean replay, stretches with no replay, and
     events in two parts."""
-    make = value_factory(controls_values, source, TAGS["memoryless_unshown"])
+    make = value_factory(controls_values, source, TAGS["controls"])
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)
 
     def called(condition: str, detector: str, measure: str = "called_rate") -> float:
-        return sweep_statistics.controls_value(
+        return controls_statistics.controls_value(
             controls, "control_events", measure, condition, None, detector
         )
 
     def trials(condition: str, detector: str) -> float:
-        return sweep_statistics.controls_value(
+        return controls_statistics.controls_value(
             controls, "parts", "n_trials", condition, None, detector
         )
 
     def carving(
         conditions: tuple[str, ...], label: str, detector: str
     ) -> dict[str, float]:
-        return sweep_statistics.carving_statistics(
+        return controls_statistics.carving_statistics(
             controls, conditions, label, detector
         )
 
     # refuses a summary in which an output reported an event with no replay
-    no_replay = sweep_statistics.no_replay_statistics(controls)
-    fragmented = sweep_statistics.control_event_share_range(
+    no_replay = controls_statistics.no_replay_statistics(controls)
+    fragmented = controls_statistics.control_event_share_range(
         controls, "placeless_event", "fragmented_share", _OURS
     )
     jumps = ("jump_120ms", "jump_200ms")
@@ -672,7 +676,7 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
     elsewhere_missing = carving(("chain_elsewhere",), "parts_missing", _SLIDING)
     elsewhere_split = carving(("chain_elsewhere",), "one_per_part", _OURS)
     recovery = {
-        detector: sweep_statistics.part_recovery_statistics(
+        detector: controls_statistics.part_recovery_statistics(
             controls, MULTIPART_CONDITIONS, detector
         )
         for detector in (_SLIDING, _OURS)
@@ -896,10 +900,10 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
 
 
 def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
-    """In no figure: content estimated from discovery cells, scored on held-out
+    """Question 1.3, in no figure: content estimated from discovery cells, scored on held-out
     evaluation cells. Folds A and B tile the track; fold C's evaluation cells
     cover half of it."""
-    make = value_factory(heldout_values, source, TAGS["memoryless_unshown"])
+    make = value_factory(heldout_values, source, TAGS["heldout"])
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)
@@ -907,12 +911,12 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
     def over_folds(
         folds: tuple[str, ...], classes: tuple[str, ...], truth: str, **which
     ) -> dict[str, float]:
-        return sweep_statistics.heldout_fold_statistics(
+        return heldout_statistics.heldout_fold_statistics(
             heldout, folds, classes, truth, **which
         )
 
     def in_fold(fold: str, classes: tuple[str, ...]) -> float:
-        return sweep_statistics.pooled_heldout_rate(
+        return heldout_statistics.pooled_heldout_rate(
             heldout, fold, classes, "continuous_replay"
         )["rate"]
 
@@ -925,12 +929,12 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         )
         for name, classes in (("ours", ("ours_only",)), ("shared", ("shared",)))
     }
-    placeless = sweep_statistics.placeless_event_statistics(heldout, FOLDS)
+    placeless = heldout_statistics.placeless_event_statistics(heldout, FOLDS)
     placeless_loose = over_folds(
         FOLDS, OUR_EVENT_CLASSES, "no_content", suffix="_floor2"
     )
     # refuses a summary holding an event only the sliding window reported
-    sweep_statistics.heldout_event_classes(heldout)
+    heldout_statistics.heldout_event_classes(heldout)
     return [
         share(
             "heldout_ours_only_support_min",
@@ -1011,7 +1015,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         ),
         share(
             "heldout_estimator_agreement_min",
-            sweep_statistics.lowest_estimator_agreement(heldout),
+            heldout_statistics.lowest_estimator_agreement(heldout),
             "lowest share over folds of the events informative under both content "
             "estimates on which they agree",
         ),

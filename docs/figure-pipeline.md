@@ -43,7 +43,7 @@ panels.
 | Figure | Script | Output |
 | --- | --- | --- |
 | Decoder validation: the 0.8 threshold, state fractions, calibration, triggered averages, event durations | `scripts/figures/generate_supp_decoder_validation.py` | `paper/figures/supp_decoder_validation/` |
-| The companion to Figure 1: the Widloski & Foster sliding-window detector on the same simulated run, and on replays swept over path length and duration | `scripts/figures/generate_memoryless_comparison.py` | `paper/figures/memoryless_comparison/` |
+| The companion to Figure 1: the Widloski & Foster sliding-window detector on the same simulated run, and on replays swept over path length and duration | `scripts/figures/generate_supp_memoryless_comparison.py` | `paper/figures/supp_memoryless_comparison/` |
 | The analysis pipeline, as a schematic and as a data flow | `scripts/figures/generate_supp_pipeline_schematic.py`, `scripts/figures/generate_supp_pipeline_data_flow.py` | `paper/figures/qc_diagnosis/` |
 | Examples from each cell of the detector comparison | `scripts/figures/generate_inventory_examples.py` | `paper/figures/inventory_comparison/<run id>/examples/` |
 | Comparator-only and ours-only events, with their spike evidence | `scripts/figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` |

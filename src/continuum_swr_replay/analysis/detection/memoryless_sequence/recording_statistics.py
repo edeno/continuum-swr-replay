@@ -9,7 +9,7 @@ its report is the animal's own place, how far its significance test is from a
 pass, and how far the state-space detector's bounds are from the truth.
 :func:`recording_numbers` gathers the ones the detection summary reports
 (``continuum_swr_replay.reported.detection`` names and describes them), and the
-figure (``scripts/figures/generate_memoryless_comparison.py``) draws and checks
+figure (``scripts/figures/generate_supp_memoryless_comparison.py``) draws and checks
 the same functions' values.
 
 Every function but :func:`draws_from_passing` (which takes the result of

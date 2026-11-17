@@ -114,7 +114,7 @@ FIGURES: dict[str, Figure] = {
     ),
     "memoryless_comparison": Figure(
         "Our detector and the Widloski & Foster detector on simulated replays",
-        "scripts/figures/generate_memoryless_comparison.py",
+        "scripts/figures/generate_supp_memoryless_comparison.py",
     ),
     "content_estimators": Figure(
         "Content models under three estimators",
@@ -178,8 +178,18 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     Question(
         "1.1",
-        "On simulated data, how often does the detector report an event where no replay was inserted, and how does it compare with the Widloski detector on replays of known shape?",
+        "On simulated replays of known shape, how often does each detector report the replay and how well does it place its start and end, the state-space detector against the Widloski & Foster sliding-window detector?",
         figures=("1", "memoryless_comparison"),
+    ),
+    Question(
+        "1.2",
+        "On simulated activity that is not one clean replay (rest with nothing added, events that represent no place, events whose place jumps, replays in two parts), what does each detector report?",
+        note="The controls sweep. No figure shows it; it holds the simulation's false-positive evidence.",
+    ),
+    Question(
+        "1.3",
+        "On simulated data, where the truth of every event is known, does the held-out spike test support events with spatial content and not events without it?",
+        note="The held-out sweep. It calibrates the held-out test that question 2c.3 applies to the recordings. No figure shows it.",
     ),
     Question(
         "2a.1",
