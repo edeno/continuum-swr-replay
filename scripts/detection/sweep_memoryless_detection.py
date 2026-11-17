@@ -64,7 +64,9 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import (
     usable_intervals,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_replays import (
+    DIRECTIONS,
     SAME_PLACE_CM,
+    planned_cells,
     replay_sweep,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_summaries import (
@@ -95,6 +97,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-seeds", type=int, default=8)
     parser.add_argument(
+        "--n-workers",
+        type=int,
+        default=24,
+        help="Processes the cells are run in. A cell's row does not depend on it.",
+    )
+    parser.add_argument(
         "--out",
         type=Path,
         default=detection_comparison_dir() / "memoryless_detection_sweep.parquet",
@@ -118,17 +126,19 @@ def main(argv: Sequence[str] | None = None) -> None:
         f"spanning {np.diff(intervals, axis=1).sum():.1f}s"
     )
 
-    combinations = replay_grid()
     print(
-        f"{len(combinations)} combinations x {args.n_seeds} seeds = "
-        f"{len(combinations) * args.n_seeds} cells"
+        f"{len(replay_grid())} combinations, up and down the track, x "
+        f"{args.n_seeds} seeds, in {args.n_workers} processes"
     )
 
+    n_cells = len(planned_cells(intervals, args.n_seeds))
     rows, started = [], clock.time()
-    for index, cells in enumerate(replay_sweep(recording, intervals, args.n_seeds)):
-        rows += cells
-        if index % 25 == 0:
-            done = (index + 1) / len(combinations)
+    for index, row in enumerate(
+        replay_sweep(recording, intervals, args.n_seeds, args.n_workers)
+    ):
+        rows.append(row)
+        if index % 500 == 0:
+            done = (index + 1) / n_cells
             elapsed = clock.time() - started
             print(
                 f"  {100 * done:5.1f}%  {elapsed / 60:5.1f} min elapsed, "
@@ -148,6 +158,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "duration_s": list(DURATION_S),
         "peak_rate_hz": list(PEAK_RATE_HZ),
         "midpoint_cm": list(MIDPOINT_CM),
+        "directions": list(DIRECTIONS),
         "decode_margin_s": DECODE_MARGIN_S,
         "placement_margin_s": PLACEMENT_MARGIN_S,
         "match_tolerance_cm": MATCH_TOLERANCE_CM,

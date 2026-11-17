@@ -3,7 +3,10 @@
 import numpy as np
 import pytest
 
-from continuum_swr_replay.analysis.detection.memoryless_sequence import sweep
+from continuum_swr_replay.analysis.detection.memoryless_sequence import (
+    sweep,
+    sweep_replays,
+)
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_replays import (
     score_state_space,
 )
@@ -86,3 +89,24 @@ def test_an_event_outside_the_injection_is_not_found():
     assert out["state_space_n_intervals"] == 0
     assert not out["state_space_matches"]
     assert np.isnan(out["state_space_position_error_cm"])
+
+
+def test_planned_cells_run_every_combination_up_then_down():
+    intervals = np.array([[5.0, 8.0], [18.0, 21.0]])
+    cells = sweep_replays.planned_cells(intervals, n_seeds=2)
+    grid = sweep.replay_grid()
+    held_still = sum(path_cm == 0 for path_cm, *_ in grid)
+
+    # a path of 0 cm has no direction and is planned once
+    assert len(cells) == 2 * (2 * len(grid) - held_still)
+    up = [cell for cell in cells if cell["direction"] == 1]
+    assert cells[: len(up)] == up
+    assert len(up) == 2 * len(grid)
+    assert not any(cell["path_cm"] == 0 for cell in cells if cell["direction"] == -1)
+    # the same plan every time, each placement inside a usable stretch
+    assert cells == sweep_replays.planned_cells(intervals, n_seeds=2)
+    for cell in cells:
+        assert any(
+            start <= cell["at_s"] and cell["at_s"] + cell["duration_s"] <= end
+            for start, end in intervals
+        )

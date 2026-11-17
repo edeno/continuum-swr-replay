@@ -6,10 +6,14 @@ around it with both detectors, and scores what each reports
 (:func:`run_cell`). A detector finds the event only when what it reports is the
 injected event (``scoring.score_against_injection``); every reported event
 that overlaps the injection is scored, and the best answers for the cell
-(:func:`best_entry`). :func:`replay_sweep` runs every cell of the grid.
+(:func:`best_entry`). :func:`replay_sweep` runs every cell of the grid, in
+each direction (:func:`planned_cells`).
 """
 
+import multiprocessing
+import pickle
 from collections.abc import Iterator
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 from non_local_detector.simulate.sorted_spikes_simulation import (
@@ -54,7 +58,9 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
 __all__ = [
     "SAME_PLACE_CM",
     "best_entry",
+    "DIRECTIONS",
     "memoryless_outcome",
+    "planned_cells",
     "replay_sweep",
     "run_cell",
     "score_sliding_window",
@@ -272,14 +278,28 @@ def state_space_outcome(recording, injected, window, bounds, true_position_cm, p
     return score_state_space(recording, run, bounds, true_position_cm, path_cm)
 
 
-def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, seed):
-    """One combination: inject, decode with both detectors, summarize."""
+def run_cell(
+    recording,
+    means,
+    path_cm,
+    midpoint_cm,
+    duration_s,
+    rate_hz,
+    at_s,
+    seed,
+    direction=1,
+):
+    """One combination: inject, decode with both detectors, summarize.
+
+    ``direction`` is 1 for a replay that travels up the track, towards larger
+    positions, and -1 for one that travels down it over the same path.
+    """
     injected, bounds = inject_replay(
         recording["spike_times"],
         means,
         InjectedReplay(
-            start_cm=midpoint_cm - path_cm / 2,
-            path_cm=path_cm,
+            start_cm=midpoint_cm - direction * path_cm / 2,
+            path_cm=direction * path_cm,
             duration_s=duration_s,
             peak_rate_hz=rate_hz,
             at_s=at_s,
@@ -303,6 +323,7 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
         "midpoint_cm": midpoint_cm,
         "duration_s": duration_s,
         "peak_rate_hz": rate_hz,
+        "direction": direction,
         "seed": seed,
         "at_s": at_s,
         "speed_cm_per_s": path_cm / duration_s,
@@ -319,10 +340,13 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
     def true_position_cm(at):
         """Where the injected replay says the animal is, at these times."""
         fraction = np.clip((np.asarray(at) - start_s) / (end_s - start_s), 0, 1)
-        return midpoint_cm - path_cm / 2 + path_cm * fraction
+        return midpoint_cm - direction * path_cm / 2 + direction * path_cm * fraction
 
+    # an upward cell keeps the key it had before the sweep had a direction, so
+    # its shuffle draws are the same
     cell_key = (
         f"path{path_cm}-mid{midpoint_cm}-dur{duration_s}-rate{rate_hz}-seed{seed}"
+        + ("" if direction == 1 else "-down")
     )
     row |= memoryless_outcome(
         recording, injected, window, bounds, true_position_cm, path_cm, cell_key
@@ -333,14 +357,79 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
     return row
 
 
-def replay_sweep(
-    recording: dict, intervals: np.ndarray, n_seeds: int
-) -> Iterator[list[dict]]:
-    """Every cell of the sweep, one combination of :func:`sweep.replay_grid` at a time.
+DIRECTIONS = (1, -1)
+"""Up the track and down it. The animal rests at the top of the track wherever a
+replay is placed, so an upward replay ends at its edge nearest the animal and a
+downward one starts there. Upward first: those cells' placements are the ones
+the sweep drew before it had a direction."""
 
-    Each combination is injected ``n_seeds`` times, at start times drawn from
-    one generator seeded 0 and shared by every combination in grid order, so a
-    cell's placement depends on the combinations before it.
+
+def planned_cells(intervals: np.ndarray, n_seeds: int) -> list[dict]:
+    """Every cell of the sweep: each combination of ``sweep.replay_grid`` in each
+    direction, ``n_seeds`` times.
+
+    The start times are drawn from one generator seeded 0 and shared by every
+    combination in order, so a cell's placement depends on the combinations
+    before it. A path of 0 cm has no direction and is planned once.
+
+    Parameters
+    ----------
+    intervals : ndarray, shape (n_intervals, 2)
+        Where events may be placed: ``sweep.usable_intervals(recording)``.
+    n_seeds : int
+        Injections per combination; seed ``k`` draws the ``k``-th placement.
+
+    Returns
+    -------
+    list of dict
+        :func:`run_cell`'s keyword arguments after the recording and the
+        fields, one dict per cell.
+    """
+    rng = np.random.default_rng(0)
+    cells = []
+    for direction in DIRECTIONS:
+        for path_cm, midpoint_cm, duration_s, rate_hz in replay_grid():
+            if direction != 1 and path_cm == 0:
+                continue
+            at_s = placements(intervals, duration_s, PLACEMENT_MARGIN_S, n_seeds, rng)
+            cells += [
+                {
+                    "path_cm": path_cm,
+                    "midpoint_cm": midpoint_cm,
+                    "duration_s": duration_s,
+                    "rate_hz": rate_hz,
+                    "at_s": float(at_s[seed]),
+                    "seed": seed,
+                    "direction": direction,
+                }
+                for seed in range(n_seeds)
+            ]
+    return cells
+
+
+_WORKER: dict = {}
+"""A worker process's recording and fields (:func:`_start_worker`)."""
+
+
+def _start_worker(recording_bytes: bytes) -> None:
+    # JAX runs where the parent's JAX_PLATFORMS says: the variable is inherited
+    _WORKER["recording"] = pickle.loads(recording_bytes)
+    _WORKER["means"] = place_field_means(N_NEURONS, TRACK_HEIGHT)
+
+
+def _run_planned_cell(cell: dict) -> dict:
+    return run_cell(_WORKER["recording"], _WORKER["means"], **cell)
+
+
+def replay_sweep(
+    recording: dict, intervals: np.ndarray, n_seeds: int, n_workers: int = 1
+) -> Iterator[dict]:
+    """Run every cell of :func:`planned_cells`, in its order.
+
+    Most of a cell's time is the state-space decode compiling for that cell's
+    window, which no cell shares with the next; the cells are independent, so
+    they are run in ``n_workers`` processes. Each process is given the one
+    fitted recording, and a cell's row does not depend on which runs it.
 
     Parameters
     ----------
@@ -349,27 +438,26 @@ def replay_sweep(
     intervals : ndarray, shape (n_intervals, 2)
         Where events may be placed: ``sweep.usable_intervals(recording)``.
     n_seeds : int
-        Injections per combination; seed ``k`` draws the ``k``-th placement.
+        Injections per combination.
+    n_workers : int, optional
+        Processes to run the cells in; 1 runs them in this one.
 
     Yields
     ------
-    list of dict
-        The combination's :func:`run_cell` rows, one per seed.
+    dict
+        A cell's :func:`run_cell` row.
     """
-    means = place_field_means(N_NEURONS, TRACK_HEIGHT)
-    rng = np.random.default_rng(0)
-    for path_cm, midpoint_cm, duration_s, rate_hz in replay_grid():
-        at_s = placements(intervals, duration_s, PLACEMENT_MARGIN_S, n_seeds, rng)
-        yield [
-            run_cell(
-                recording,
-                means,
-                path_cm,
-                midpoint_cm,
-                duration_s,
-                rate_hz,
-                float(at_s[seed]),
-                seed,
-            )
-            for seed in range(n_seeds)
-        ]
+    cells = planned_cells(intervals, n_seeds)
+    if n_workers == 1:
+        means = place_field_means(N_NEURONS, TRACK_HEIGHT)
+        for cell in cells:
+            yield run_cell(recording, means, **cell)
+        return
+    # spawned, not forked: JAX is multithreaded
+    with ProcessPoolExecutor(
+        max_workers=n_workers,
+        mp_context=multiprocessing.get_context("spawn"),
+        initializer=_start_worker,
+        initargs=(pickle.dumps(recording),),
+    ) as pool:
+        yield from pool.map(_run_planned_cell, cells, chunksize=8)

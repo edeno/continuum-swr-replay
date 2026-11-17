@@ -701,3 +701,11 @@ truth is now the span of the event's own spikes:
   first and last spike (`sweep_summaries.against_spike_span`); `duration_s` on a row is still the
   nominal duration of the grid. A pooled block (`timing_pooled`) gives the errors' quartiles,
   extremes and tail over the replays both detectors report.
+- The replay sweep runs each combination up the track and down it (`sweep_replays.planned_cells`,
+  `DIRECTIONS`; 9,912 cells). The animal rests at the top of the track wherever a replay is placed,
+  so an upward replay ends at its edge nearest the animal and a downward one starts there; with
+  upward replays alone the sliding window's long errors looked like a property of offsets. The
+  upward cells are the earlier sweep's, row for row.
+- The sweep's cells run in parallel processes (`--n-workers`, 24 by default): most of a cell's time
+  is JAX compiling the state-space decode for that cell's window. A row does not depend on the
+  process count.
