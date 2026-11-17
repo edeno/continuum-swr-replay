@@ -17,8 +17,9 @@ summaries, of the labeled recording and of the pilot's events are computed in
   (``paper/reported/inputs/detection/detection_{sweep,controls,heldout}_summary.csv``,
   from ``scripts/detection/sweep_memoryless_{detection,controls}.py`` and
   ``scripts/detector_comparison/sweep_memoryless_heldout.py``),
-  for the memoryless-comparison caption's panels (g-q);
-- the one labeled recording of that caption's panels (a-f)
+  the first for the memoryless-comparison figure's panels (d-g), the other two
+  shown in no figure;
+- the one labeled recording of that figure's panels (b, c)
   (``paper/reported/inputs/detection/memoryless_comparison_recording.json``:
   ``memoryless_sequence.recording_statistics.recording_numbers``, written by
   ``scripts/figures/generate_memoryless_comparison.py``);
@@ -86,6 +87,7 @@ SWEEP_DIR = Path("paper/reported/inputs/detection")
 TAGS = {
     "state_evidence": Tags(("2a.7",)),
     "memoryless": Tags(("1.1",), ("memoryless_comparison",)),
+    "memoryless_unshown": Tags(("1.1",)),
     "pilot": Tags(("2a.3",), ("memoryless_comparison",)),
 }
 """Each group of values: the questions it answers and the figures that show it.
@@ -315,11 +317,11 @@ def pilot_stray_window_values(
     ]
 
 
-# --- the memoryless comparison: one labeled recording (a-f) -------------------
+# --- the memoryless comparison: one labeled recording (b, c) ------------------
 
 
 def recording_values(numbers: dict, source: str) -> list[Value]:
-    """Panels (a-f): what each detector made of the labeled events of one
+    """Panels (b, c): what each detector made of the labeled events of one
     simulated recording (``recording_statistics.recording_numbers``, which the
     figure script writes)."""
     make = value_factory(recording_values, source, TAGS["memoryless"])
@@ -451,11 +453,11 @@ def recording_values(numbers: dict, source: str) -> list[Value]:
     ]
 
 
-# --- the memoryless comparison: the replay sweep (g-k) ------------------------
+# --- the memoryless comparison: the replay sweep (d-g) ------------------------
 
 
 def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
-    """Panels (g-k): replays of chosen shape, one at a time, scored against the
+    """Panels (d-g): replays of chosen shape, one at a time, scored against the
     known answer. Shares are of the swept replays (grid cells)."""
     make = value_factory(sweep_values, source, TAGS["memoryless"])
     overall = sweep_statistics.sweep_measures(summary, "overall")
@@ -652,16 +654,16 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
     ]
 
 
-# --- the memoryless comparison: activity that is not one clean replay (l-o) ---
+# --- the memoryless comparison: activity that is not one clean replay ---------
 
 _SLIDING = "sliding_published"
 _OURS = "state_space_canonical"
 
 
 def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
-    """Panels (l-o): bursts with no clean replay, stretches with no replay, and
+    """In no figure: bursts with no clean replay, stretches with no replay, and
     events in two parts."""
-    make = value_factory(controls_values, source, TAGS["memoryless"])
+    make = value_factory(controls_values, source, TAGS["memoryless_unshown"])
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)
@@ -919,14 +921,14 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
     ]
 
 
-# --- the memoryless comparison: held-out evidence (p, q) ----------------------
+# --- the memoryless comparison: held-out evidence -----------------------------
 
 
 def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
-    """Panels (p, q): content estimated from discovery cells, scored on held-out
+    """In no figure: content estimated from discovery cells, scored on held-out
     evaluation cells. Folds A and B tile the track; fold C's evaluation cells
     cover half of it."""
-    make = value_factory(heldout_values, source, TAGS["memoryless"])
+    make = value_factory(heldout_values, source, TAGS["memoryless_unshown"])
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)

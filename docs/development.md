@@ -89,7 +89,7 @@ src/continuum_swr_replay/
 ├── decoding/              # decode configs and detector classes, transitions, the fit (fit.py), identifiers and file names, the results.nc reader and load_results, a saved decode's encoding model (encoding_model.py)
 ├── runs/                  # run infrastructure: provenance, CLI, batch loops, BLAS thread pin (threads), JAX device choice (device)
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, atomic writes, parity
-├── visualization/         # Plotting utilities; palettes.py holds COLORS, figure_utilities.py the publication-figure helpers
+├── visualization/         # Plotting utilities; palettes.py holds COLORS, figure_utilities.py the publication-figure helpers, simulated_run_panels.py what Figure 1 and its companion share
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
 ├── columns.py             # require_columns, the one check that a table carries the columns a step reads
 ├── reported/              # reported numbers: the summary builders (survey, detection, events, and behavior/ and mpfc/, packages with one module per subject), the question list, values, the code record, rounding, the macro emitter, Table S1

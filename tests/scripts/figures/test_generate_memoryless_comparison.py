@@ -1,4 +1,4 @@
-"""The memoryless comparison figure's checks of its caption's claims."""
+"""The memoryless comparison figure's checks of what it commits to."""
 
 from __future__ import annotations
 
@@ -17,23 +17,34 @@ REPO = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture(scope="module")
-def controls() -> pd.DataFrame:
-    """The committed controls summary the figure reads."""
-    return pd.read_csv(REPO / figure.CONTROLS_SUMMARY_PATH)
+def summary() -> pd.DataFrame:
+    """The committed sweep summary the figure reads."""
+    return pd.read_csv(REPO / figure.SUMMARY_PATH)
 
 
-def test_committed_controls_summary_passes(controls):
-    figure.check_controls_claims(controls)
+def test_the_legend_settings_are_the_codes():
+    figure.check_caption_settings(figure.CONFIG)
 
 
-def test_no_replay_claim_needs_every_output(controls):
-    """The caption's no-replay claim covers the four outputs the figure scores:
-    a summary in which one of them was not run there is refused."""
-    missing = (
-        (controls["summary"] == "no_replay")
-        & (controls["measure"] == "n_events")
-        & (controls["detector"] == "state_space_continuous")
+def test_committed_sweep_summary_passes(summary):
+    figure.check_summary_claims(summary)
+
+
+def test_a_sliding_window_report_of_a_replay_held_still_is_refused(summary):
+    held_still = (
+        (summary["summary"] == "detection_rate_by_path_and_duration")
+        & (summary["measure"] == "sliding_matches")
+        & (summary["path_cm"] == 0.0)
     )
-    assert missing.sum() == 1
-    with pytest.raises(RuntimeError, match="3 detector outputs"):
-        figure.check_controls_claims(controls[~missing])
+    assert held_still.sum() > 0
+    changed = summary.copy()
+    changed.loc[held_still, "value"] = 0.1
+    with pytest.raises(RuntimeError, match="no replay held"):
+        figure.check_summary_claims(changed)
+
+
+def test_the_examples_are_in_time_order_and_name_distinct_events():
+    events = [example.event for example in figure.EXAMPLES]
+    assert len(set(events)) == len(events)
+    assert figure.EXAMPLES[0].event == figure.SWEEP_EVENT
+    assert figure.EXAMPLES[-1].event == figure.SILENCE_EVENT

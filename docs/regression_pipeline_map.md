@@ -76,6 +76,12 @@ Rule R-T: per epoch, keep the CA1 band tetrodes that ripple with the rest.
 
 `TetrodeSelection`, `TetrodeSelectionError`, `check_one_channel_per_tetrode`, `select_ripple_tetrodes`
 
+### `src/continuum_swr_replay/analysis/detection/simulated_run.py`
+
+The simulated run of Figure 1, decoded by the switching state-space model.
+
+`splice_remote_stationary`, `make_example_detector`, `estimate_state_space_model`, `SimulatedRun`, `DecodedSimulation`, `simulate_run`, `simulate_and_decode`
+
 ### `src/continuum_swr_replay/analysis/event_definition/analysed_time.py`
 
 The analysed-time read point: a decode frame held to the one analysed-time rule.
@@ -140,7 +146,7 @@ Canonical whole-event immobility rules for neural event cohorts.
 
 The non-local event rule and the SWR-overlap classification of those events.
 
-`nonlocal_probability`, `nonlocal_state_probability`, `get_confident_times`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `nonlocal_event_bins_by_swr`, `get_overlap_times`, `classify_swr_overlap`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
+`nonlocal_probability`, `nonlocal_state_probability`, `get_confident_times`, `detect_nonlocal_events`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `nonlocal_event_bins_by_swr`, `get_overlap_times`, `classify_swr_overlap`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
 
 ### `src/continuum_swr_replay/analysis/event_definition/swr_source.py`
 

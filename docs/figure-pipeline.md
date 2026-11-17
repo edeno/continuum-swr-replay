@@ -43,7 +43,7 @@ panels.
 | Figure | Script | Output |
 | --- | --- | --- |
 | Decoder validation: the 0.8 threshold, state fractions, calibration, triggered averages, event durations | `scripts/figures/generate_supp_decoder_validation.py` | `paper/figures/supp_decoder_validation/` |
-| Our detector and the Widloski & Foster detector on simulated replays | `scripts/figures/generate_memoryless_comparison.py` | `paper/figures/memoryless_comparison/` |
+| The companion to Figure 1: the Widloski & Foster sliding-window detector on the same simulated run, and on replays swept over path length and duration | `scripts/figures/generate_memoryless_comparison.py` | `paper/figures/memoryless_comparison/` |
 | The analysis pipeline, as a schematic and as a data flow | `scripts/figures/generate_supp_pipeline_schematic.py`, `scripts/figures/generate_supp_pipeline_data_flow.py` | `paper/figures/qc_diagnosis/` |
 | Examples from each cell of the detector comparison | `scripts/figures/generate_inventory_examples.py` | `paper/figures/inventory_comparison/<run id>/examples/` |
 | Comparator-only and ours-only events, with their spike evidence | `scripts/figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` |
@@ -69,11 +69,10 @@ No caption draft is kept in the repository. Three were, beside their figures, un
 2026-11-11 (`paper/figures/<topic>/<topic>_caption.md` for `memoryless_comparison`,
 `content_estimators` and `uncertainty_content`; they are in git history). The
 content-estimator and uncertainty-content scripts write theirs again when they run;
-the memoryless comparison's was hand-written prose, and its script still checks the
-verdicts that prose stated (those about the labeled recording through
-`memoryless_sequence/recording_statistics.py`, most of those about the sweeps through
-`memoryless_sequence/sweep_statistics.py` (the checks of the by-path and by-distance rows read
-the sweep summary directly), both of which the detection summary reads too). A number in a caption is never typed by hand: in a
+the memoryless comparison's was hand-written prose for an earlier design of that figure. Its
+script checks the verdicts its panels commit to (those about the labeled recording through
+`memoryless_sequence/recording_statistics.py`, those about the sweep's timing through
+`memoryless_sequence/sweep_statistics.py`, both of which the detection summary reads too). A number in a caption is never typed by hand: in a
 markdown draft it is an inline value marker, `<!--v:<summary>.key-->…<!--/v-->`,
 which `make reported-values` fills, and in `paper/main.tex` it is the matching macro
 ([paper/README.md](../paper/README.md#numbers)).

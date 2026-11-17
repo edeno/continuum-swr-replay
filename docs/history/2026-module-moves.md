@@ -641,6 +641,19 @@ decode's masks and SWR source) and `tables` (atomic writes), which `decoding/` m
 import. The memoryless detector's grid, windows and likelihood stay in its
 `likelihood.py`.
 
+## The memoryless comparison on Figure 1's run, 2026-11-16
+
+The simulated comparison of the two replay detectors reads Figure 1's run and model. Its
+values changed: every sweep was re-run.
+
+| Old place | New place |
+|---|---|
+| `memoryless_sequence/sweep.py`: `build_recording`'s own recording (25 cells) and plain fit | `simulated_run.simulate_run` and `simulated_run.estimate_state_space_model` (30 cells, EM, the real decodes' settings) |
+| `memoryless_sequence/sweep.py`: `non_local_intervals`; `recording_statistics.state_space_intervals` | `event_definition/nonlocal_event_rule.py`: `detect_nonlocal_events`; the labeled recording's dict carries `state_space_intervals` |
+| `comparison_simulation`: `CONTINUOUS_OUTBOUND_EVENT`, `CONTINUOUS_INBOUND_EVENT`; reported values `recording_outbound_*`, `recording_inbound_*` | `SWEEP_EVENT` (the run has one sweep); `recording_sweep_*` |
+| `scripts/figures/generate_figure01.py`: colours, sizes, the decoded-position panel, the row layout | `visualization/simulated_run_panels.py`, shared with `generate_memoryless_comparison.py` |
+| `generate_memoryless_comparison.py`: the burst, carving and held-out panels and `check_controls_claims`, `check_heldout_claims` | removed from the figure; the sweeps and their reported values remain |
+
 ## Figure 1's simulation, 2026-11-16
 
 Figure 1's simulation and decode moved out of its script, and the non-local event rule became

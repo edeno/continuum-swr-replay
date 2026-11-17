@@ -10,6 +10,8 @@ comparison between inventories lives in `analysis/detector_comparison/`
 data are results; everything else is a proposed analysis.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
 
+*2026-11-16: the simulated comparison was rebuilt on Figure 1's run (`analysis/detection/simulated_run.py`): 30 cells, the remote stationary event in the third pause and no outbound replay; the state-space model fitted by EM with the real decodes' settings, its events found by `detect_nonlocal_events`; a 0 cm path added to the sweep. The filled value markers below are current. The prose around them, written for the earlier 25-cell recording (the outbound replay, 4,536 cells, a plain fit with the library's default transitions, the figure's panels a-q), has not been revised and is wrong where it states those facts.*
+
 *2026-11-13: the detector now steps its 80 ms window by the published 5 ms, on a 200 Hz
 likelihood grid of its own (V10). Every simulation result, table and reported value below
 was computed at the earlier 4 ms step and predates the change; they are rerun with the
@@ -350,7 +352,7 @@ the animal's own position rather than a replayed one.
 window, and carries no hypothesis that competes with a replay for a window. Local coding
 during immobility is smooth, narrow and slow, so it passes both criteria. The merge rule
 then does most of the work: with merging disabled the same data gives 1.4x and 2.1x
-inflation instead of <!--v:detection.recording_outbound_duration_ratio-->4.4<!--/v-->x and 4.3x. Absorption needs a travelling event *spatially near*
+inflation instead of <!--v:detection.recording_sweep_duration_ratio-->4.4<!--/v-->x. Absorption needs a travelling event *spatially near*
 the stationary one — here the replay begins at the animal's own place, which is the usual
 geometry for awake replay. The added remote stationary event has no travelling neighbour,
 and is declined for going nowhere; that is the method working as designed, since extended
@@ -878,7 +880,7 @@ reproduced from this repository and should be re-run before being cited.
 | by design | remote place held still | decoded confidently, assembled, declined for going nowhere | measured |
 | miss | one unusable window inside a replay | removes its predecessor too and splits the run | from the criteria |
 | miss | gap over 50 ms, or bridge over 20 cm | merge blocked, each piece must clear 100 ms alone | from the criteria |
-| over-call | local coding beside a replay | absorbed, <!--v:detection.recording_outbound_duration_ratio-->4.4<!--/v-->x and 4.3x duration inflation | measured |
+| over-call | local coding beside a replay | absorbed, <!--v:detection.recording_sweep_duration_ratio-->4.4<!--/v-->x duration inflation | measured |
 | neither | spurious events with no replay in them | none in 65 s of simulation | measured |
 
 **The state-space model finds every one of these.** Run on the same recording, with the same encoding settings, it reports all six labeled events at P(non-local) = 1.00 and stays silent through the silent stretch (peak 0.04). Its bounds sit within about 20 ms of the truth, and all of its intervals are real events (measured on 2026-09-21; no summary holds these numbers). So these cases are limits of the sliding-window criteria, not limits of the data or of decoding in general. Note what this does and does not show: both procedures read the same encoding model, but the state-space model was given the labeled events as its held-out set, exactly as the sliding-window port was, and no threshold on either side was tuned for this comparison.

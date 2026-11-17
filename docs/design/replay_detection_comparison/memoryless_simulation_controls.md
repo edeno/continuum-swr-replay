@@ -3,6 +3,8 @@
 Design for extending the simulated comparison of the memoryless sliding-window
 detector (spec 02) and our state-space detector. Agreed 2026-09-25.
 
+*2026-11-16: these sweeps now run on Figure 1's 30-cell run with the state-space model fitted by EM (see the note at the top of spec 02), and their panels left the comparison figure; their values stay in the detection summary. The cell counts, runtimes and panel table below describe the earlier design.*
+
 ## Why
 
 The injected-replay sweep measures only sensitivity: every cell holds exactly one

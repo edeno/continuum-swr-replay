@@ -22,18 +22,18 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-import xarray as xr
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence import (
     recording_statistics as rs,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
-    CONTINUOUS_INBOUND_EVENT,
-    CONTINUOUS_OUTBOUND_EVENT,
+    FRAGMENTED_EVENT,
     REMOTE_STATIONARY_EVENT,
     SHORT_PATH_EVENT,
     SHORT_REPLAY_EVENT,
+    SILENCE_EVENT,
     STRAY_WINDOW_EVENT,
+    SWEEP_EVENT,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
@@ -131,12 +131,10 @@ def _shuffle(n_below_spread: int, n_below_jump: int, n: int = 19) -> ShuffleResu
 # event rows, in the simulation's order (comparison_simulation's *_EVENT)
 EVENT_TIMES = np.array(
     [
-        (1.03, 1.05),  # outbound, inside A
-        (1.135, 1.145),  # between B and C: no candidate
-        (1.22, 1.24),  # inbound, inside D
-        (1.12, 1.16),  # over B's end and C's start
-        (1.27, 1.27),  # zero width, after every candidate
+        (1.03, 1.05),  # sweep, inside A
+        (1.135, 1.145),  # fragmented, between B and C: no candidate
         (1.16, 1.17),  # remote stationary, inside C
+        (1.12, 1.16),  # silence, over B's end and C's start
         (1.105, 1.115),  # short path, inside B
         (1.23, 1.235),  # short replay, inside D
         (1.06, 1.08),  # stray window, inside A
@@ -180,24 +178,24 @@ def test_the_recording_is_the_one_described(decoded):
 
 
 def test_overlap_counts_any_shared_time(decoded):
-    assert rs.candidates_overlapping(decoded, 0) == [A]
-    assert rs.candidates_overlapping(decoded, 3) == [B, C]
-    assert rs.candidates_overlapping(decoded, 1) == []
-    assert rs.accepted_overlapping(decoded, 3) == []
+    assert rs.candidates_overlapping(decoded, SWEEP_EVENT) == [A]
+    assert rs.candidates_overlapping(decoded, SILENCE_EVENT) == [B, C]
+    assert rs.candidates_overlapping(decoded, FRAGMENTED_EVENT) == []
+    assert rs.accepted_overlapping(decoded, SILENCE_EVENT) == []
     assert rs.accepted_overlapping(decoded, STRAY_WINDOW_EVENT) == [A]
-    assert rs.reported_overlapping(decoded, 0) == []
-    assert rs.reported_overlapping(decoded, 2) == [D]
+    assert rs.reported_overlapping(decoded, SWEEP_EVENT) == []
+    assert rs.reported_overlapping(decoded, SHORT_REPLAY_EVENT) == [D]
     assert rs.is_reported(decoded).tolist() == [False, False, False, True]
 
 
 @pytest.mark.parametrize(
     ("event", "expected"),
     [
-        (CONTINUOUS_OUTBOUND_EVENT, "failed the shuffle"),
-        (CONTINUOUS_INBOUND_EVENT, "found"),
+        (SWEEP_EVENT, "failed the shuffle"),
+        (SHORT_REPLAY_EVENT, "found"),
         (SHORT_PATH_EVENT, "declined"),
         (REMOTE_STATIONARY_EVENT, "declined"),
-        (1, "missed"),
+        (FRAGMENTED_EVENT, "missed"),
     ],
 )
 def test_verdict(decoded, event, expected):
@@ -205,9 +203,8 @@ def test_verdict(decoded, event, expected):
 
 
 def test_duration_ratio_is_the_reported_over_the_true_duration(decoded):
-    # A spans 70 ms over a 20 ms event; D 50 ms over 20 ms and over 5 ms
-    assert rs.duration_ratio(decoded, CONTINUOUS_OUTBOUND_EVENT) == pytest.approx(3.5)
-    assert rs.duration_ratio(decoded, CONTINUOUS_INBOUND_EVENT) == pytest.approx(2.5)
+    # A spans 70 ms over a 20 ms event; D 50 ms over a 5 ms one
+    assert rs.duration_ratio(decoded, SWEEP_EVENT) == pytest.approx(3.5)
     assert rs.duration_ratio(decoded, SHORT_REPLAY_EVENT) == pytest.approx(10.0)
 
 
@@ -223,7 +220,7 @@ def test_the_longest_accepted_sequence_is_the_one_read(decoded):
     [rs.duration_ratio, rs.shuffle_of, rs.local_fraction_of_event],
 )
 def test_an_event_no_accepted_sequence_overlaps_is_refused(decoded, read):
-    with pytest.raises(RuntimeError, match="No accepted sequence overlaps event 6"):
+    with pytest.raises(RuntimeError, match="No accepted sequence overlaps event 4"):
         read(decoded, SHORT_PATH_EVENT)
 
 
@@ -234,7 +231,7 @@ def test_local_fraction_counts_kept_windows_closer_than_15_cm(decoded):
     # D's decode 20 to 70 cm with the animal at 25: 5 and 5 cm away are local,
     # 15 cm is not
     assert rs.local_fraction(decoded, D) == pytest.approx(2 / 6)
-    assert rs.local_fraction_of_event(decoded, CONTINUOUS_INBOUND_EVENT) == (
+    assert rs.local_fraction_of_event(decoded, SHORT_REPLAY_EVENT) == (
         pytest.approx(2 / 6)
     )
 
@@ -248,9 +245,9 @@ def test_decoded_center_is_nan_where_a_window_has_none(decoded):
 
 
 def test_best_dispersion_is_the_largest_over_every_candidate(decoded):
-    assert rs.best_dispersion_cm(decoded, 3) == pytest.approx(np.sqrt(150))
+    assert rs.best_dispersion_cm(decoded, SILENCE_EVENT) == pytest.approx(np.sqrt(150))
     assert rs.best_dispersion_cm(decoded, REMOTE_STATIONARY_EVENT) == 0.0
-    assert np.isnan(rs.best_dispersion_cm(decoded, 1))
+    assert np.isnan(rs.best_dispersion_cm(decoded, FRAGMENTED_EVENT))
 
 
 def test_outside_pieces_are_kept_windows_no_run_holds(decoded):
@@ -286,24 +283,20 @@ def test_bound_error_is_the_worst_edge_of_the_first_and_last_interval(decoded):
     # the short path's event, 1.105 to 1.115 s, is covered by two intervals:
     # the first starts 5 ms early, the last ends 15 ms late
     assert rs.bound_error_ms(decoded, (SHORT_PATH_EVENT,)) == pytest.approx(15.0)
-    assert rs.bound_error_ms(decoded, (CONTINUOUS_OUTBOUND_EVENT,)) == pytest.approx(
-        10.0
-    )
+    assert rs.bound_error_ms(decoded, (SWEEP_EVENT,)) == pytest.approx(10.0)
     assert rs.bound_error_ms(decoded, rs.ZOOMED_EVENTS) == pytest.approx(15.0)
     # nothing is reported over the event between B and C
-    assert np.isnan(rs.bound_error_ms(decoded, (CONTINUOUS_OUTBOUND_EVENT, 1)))
+    assert np.isnan(rs.bound_error_ms(decoded, (SWEEP_EVENT, FRAGMENTED_EVENT)))
 
 
 def test_recording_numbers(decoded):
     numbers = rs.recording_numbers(decoded)
     expected = {
-        "outbound_duration_ratio": 3.5,
-        "outbound_local_fraction": 0.5,
-        "outbound_p_spread": 3 / 20,
-        "outbound_p_jump": 1 / 20,
-        "outbound_draws_from_passing": 2,
-        "inbound_p_spread": 1 / 20,
-        "inbound_p_jump": 1 / 20,
+        "sweep_duration_ratio": 3.5,
+        "sweep_local_fraction": 0.5,
+        "sweep_p_spread": 3 / 20,
+        "sweep_p_jump": 1 / 20,
+        "sweep_draws_from_passing": 2,
         "short_replay_duration_ratio": 10.0,
         "short_replay_local_fraction": 2 / 6,
         "short_replay_p_spread": 1 / 20,
@@ -322,47 +315,4 @@ def test_recording_numbers(decoded):
     assert set(numbers) == set(expected)
     for key, value in expected.items():
         assert numbers[key] == pytest.approx(value), key
-    assert isinstance(numbers["outbound_draws_from_passing"], int)
-
-
-class _Predicted:
-    """What a fitted detector's ``predict`` returns, as far as
-    :func:`state_space_intervals` reads it."""
-
-    def __init__(self, non_local: np.ndarray):
-        n = non_local.size
-        # all of the non-local mass in one state, so that it sums exactly
-        probability = np.stack([1.0 - non_local, non_local, np.zeros(n)], axis=1)
-        self.acausal_state_probabilities = xr.DataArray(
-            probability,
-            dims=("time", "states"),
-            coords={
-                "states": ["Local", "Non-Local Continuous", "Non-Local Fragmented"],
-                "time": np.arange(n),
-            },
-        )
-
-
-class _Detector:
-    def __init__(self, non_local: np.ndarray):
-        self._predicted = _Predicted(non_local)
-
-    def predict(self, **_):
-        return self._predicted
-
-
-def test_state_space_intervals_need_a_15_ms_span_above_threshold():
-    time = 0.002 * np.arange(40)
-    non_local = np.zeros(40)
-    non_local[2:11] = 0.9  # 9 samples: 16 ms first to last, kept
-    non_local[15:22] = 0.9  # 7 samples: 12 ms, too short
-    non_local[25:35] = 0.8  # at the threshold, not above it
-    non_local[36:] = 0.81  # above to the end: 6 ms
-    decoded = {
-        "time": time,
-        "position": np.zeros(40),
-        "spike_times": [],
-        "detector": _Detector(non_local),
-    }
-    intervals = rs.state_space_intervals(decoded)
-    assert intervals == [(time[2], time[10])]
+    assert isinstance(numbers["sweep_draws_from_passing"], int)

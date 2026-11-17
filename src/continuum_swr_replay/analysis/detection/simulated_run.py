@@ -3,9 +3,9 @@
 Figure 1 (``scripts/figures/generate_figure01.py``) shows the model at work on a
 recording whose spiking is known: an animal runs back and forth on a linear
 track, pausing at the far end, and during four of those pauses the spikes follow
-a pattern the simulation puts there (:data:`PATTERNS`). :func:`simulate_and_decode`
-builds that recording and treats it as the analyses treat a real one: the
-detector is built from the real decodes' settings (:func:`make_example_detector`),
+a pattern the simulation puts there (:data:`PATTERNS`). :func:`simulate_run`
+builds that recording and :func:`simulate_and_decode` treats it as the analyses
+treat a real one: the detector is built from the real decodes' settings (:func:`make_example_detector`),
 fitted by the same call (``estimate_parameters``), and its non-local events are
 found by the same rule
 (``event_definition.nonlocal_event_rule.detect_nonlocal_events``). What a real
@@ -19,10 +19,11 @@ sweep, which ends at the animal, is moved into that pause. A remote place held
 still (:func:`splice_remote_stationary`) takes the pause the second sweep left.
 Its silence is lengthened (:data:`SILENCE_DURATION_S`).
 
-The memoryless comparison (``memoryless_sequence.comparison_simulation``) starts
-from the same ``make_simulated_data`` and shares this module's decode grid
-(:data:`DECODE_BIN_STRIDE`) and its remote stationary event, but it is a
-different recording and a different decode: see that module.
+The memoryless comparison reads the same run and the same model: its sweeps
+(``memoryless_sequence.sweep.build_recording``) inject replays into
+:func:`simulate_run`'s recording, and its labeled recording
+(``memoryless_sequence.comparison_simulation``) adds a few events to it; both
+fit :func:`estimate_state_space_model`.
 """
 
 from dataclasses import dataclass
