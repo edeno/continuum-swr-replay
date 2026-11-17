@@ -10,9 +10,13 @@ once, here.
 
 from collections.abc import Callable, Sequence
 
+import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
+from matplotlib.collections import LineCollection
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
+from matplotlib.text import Text
 from matplotlib.transforms import Bbox
 
 from continuum_swr_replay.visualization.figure_utilities import WONG
@@ -20,6 +24,7 @@ from continuum_swr_replay.visualization.palettes import COLORS
 
 __all__ = [
     "axes_added",
+    "check_journal_limits",
     "drawn_extent",
     "example_badge",
     "letter_panel",
@@ -32,11 +37,14 @@ __all__ = [
     "DATA_RIGHT",
     "FIGURE_WIDTH",
     "LABEL_SIZE",
+    "LINE_WIDTH_LIMITS_PT",
+    "MAX_FIGURE_SIZE_CM",
     "NON_LOCAL_COLOR",
     "NON_LOCAL_SHADE",
     "NON_LOCAL_SHADE_ALPHA",
     "SMALL_SIZE",
     "STATE_COLORS",
+    "TEXT_SIZE_LIMITS_PT",
 ]
 
 # Keyed by the figures' name for each state: the detector's name without its
@@ -170,6 +178,86 @@ def plot_posterior(
         position_bins[0] - POSITION_MARGIN_CM,
         position_bins[-1] + POSITION_MARGIN_CM,
     )
+
+
+MAX_FIGURE_SIZE_CM = (17.4, 20.0)
+"""Cell Press's widest and tallest figure: a full page width, and a page's height
+less room for the legend."""
+TEXT_SIZE_LIMITS_PT = (6.0, 8.0)
+"""Cell Press's smallest and largest text in a figure at its printed size."""
+LINE_WIDTH_LIMITS_PT = (0.5, 1.5)
+"""Cell Press's thinnest and thickest line."""
+
+
+def check_journal_limits(fig: Figure) -> None:
+    """Stop rather than save a figure outside Cell Press's figure guidelines.
+
+    Checks the size of the figure as it is saved (cropped to what it draws,
+    with the saving margin), the size of every text and the width of every
+    line, axis spine and tick. Panel letters, fonts and colours are not
+    checked here.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        The finished figure.
+
+    Raises
+    ------
+    ValueError
+        If the saved figure is wider or taller than :data:`MAX_FIGURE_SIZE_CM`,
+        a text is outside :data:`TEXT_SIZE_LIMITS_PT`, or a line is outside
+        :data:`LINE_WIDTH_LIMITS_PT`.
+    """
+    fig.draw_without_rendering()
+    problems = []
+
+    saved = fig.get_tightbbox()
+    margin = 2 * float(plt.rcParams["savefig.pad_inches"])
+    size_cm = ((saved.width + margin) * 2.54, (saved.height + margin) * 2.54)
+    if size_cm[0] > MAX_FIGURE_SIZE_CM[0] or size_cm[1] > MAX_FIGURE_SIZE_CM[1]:
+        problems.append(
+            f"saved size {size_cm[0]:.2f} x {size_cm[1]:.2f} cm is over "
+            f"{MAX_FIGURE_SIZE_CM[0]} x {MAX_FIGURE_SIZE_CM[1]} cm"
+        )
+
+    low, high = TEXT_SIZE_LIMITS_PT
+    for text in fig.findobj(Text):
+        if text.get_visible() and text.get_text().strip():
+            if not low <= text.get_fontsize() <= high:
+                problems.append(
+                    f"text {text.get_text()!r} is {text.get_fontsize():g} pt"
+                )
+
+    low, high = LINE_WIDTH_LIMITS_PT
+    widths: list[tuple[str, float]] = []
+    for line in fig.findobj(Line2D):
+        drawn = line.get_linestyle() not in ("None", "", " ")
+        if line.get_visible() and drawn and np.size(line.get_xdata()):
+            widths.append((f"line {line.get_label()!r}", line.get_linewidth()))
+    for collection in fig.findobj(LineCollection):
+        if collection.get_visible() and len(collection.get_segments()):
+            widths += [
+                ("line collection", float(width))
+                for width in np.atleast_1d(collection.get_linewidths())
+            ]
+    for ax in fig.axes:
+        widths += [
+            (f"{name} spine", spine.get_linewidth())
+            for name, spine in ax.spines.items()
+            if spine.get_visible()
+        ]
+    problems += [
+        f"{what} is {width:g} pt wide"
+        for what, width in widths
+        if width > 0 and not low <= width <= high
+    ]
+
+    if problems:
+        raise ValueError(
+            "The figure is outside Cell Press's figure guidelines: "
+            + "; ".join(sorted(set(problems)))
+        )
 
 
 def posterior_color_limit(posterior: np.ndarray, time: np.ndarray, events) -> float:

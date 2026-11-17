@@ -107,6 +107,7 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
     NON_LOCAL_COLOR,
     SMALL_SIZE,
     axes_added,
+    check_journal_limits,
     drawn_extent,
     letter_panel,
     plot_posterior,
@@ -825,6 +826,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     fig, decoded = make_figure(summary)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    check_journal_limits(fig)
     save_figure(fig, "supp_memoryless_comparison", base_dir=args.output_dir)
     plt.close(fig)
     write_recording_numbers(

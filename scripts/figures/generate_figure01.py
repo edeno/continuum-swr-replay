@@ -70,6 +70,7 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
     STATE_COLORS,
     axes_added,
+    check_journal_limits,
     drawn_extent,
     example_badge,
     letter_panel,
@@ -965,6 +966,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     fig = generate_figure()
 
     print(f"Saving to {args.output_dir}...")
+    check_journal_limits(fig)
     save_figure(fig, "figure01", base_dir=args.output_dir, dpi=args.dpi)
 
     if args.show:
