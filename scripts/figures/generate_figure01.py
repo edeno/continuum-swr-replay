@@ -30,7 +30,7 @@ Usage:
 import argparse
 import os
 import warnings
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,7 +44,6 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.figure import Figure
 from matplotlib.gridspec import SubplotSpec
 from matplotlib.offsetbox import AnchoredOffsetbox, HPacker, TextArea
-from matplotlib.transforms import Bbox
 
 from continuum_swr_replay.analysis.detection.simulated_run import (
     DecodedSimulation,
@@ -55,40 +54,32 @@ from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.visualization.figure_utilities import (
-    WONG,
     save_figure,
     set_figure_defaults,
 )
-from continuum_swr_replay.visualization.palettes import COLORS
+from continuum_swr_replay.visualization.simulated_run_panels import (
+    ANIMAL_POS_COLOR,
+    DATA_LEFT,
+    DATA_RIGHT,
+    FIGURE_WIDTH,
+    LABEL_SIZE,
+    NON_LOCAL_COLOR,
+    NON_LOCAL_SHADE,
+    NON_LOCAL_SHADE_ALPHA,
+    SMALL_SIZE,
+    STATE_COLORS,
+    axes_added,
+    drawn_extent,
+    example_badge,
+    letter_panel,
+    plot_posterior,
+    plot_raster,
+    space_rows_evenly,
+)
 
 warnings.filterwarnings("ignore")
 
-# ---------------------------------------------------------------------------
-# Colors — colorblind-friendly, consistent across the figure
-# ---------------------------------------------------------------------------
-# Keyed by the figure's name for each state: the detector's name without its
-# "Non-Local " prefix.
-STATE_COLORS = {
-    "Local": WONG[5],
-    "No-Spike": "#999999",
-    "Continuous": WONG[1],
-    "Fragmented": WONG[6],
-}
 LOCAL_COLOR, NO_SPIKE_COLOR, CONTINUOUS_COLOR, FRAGMENTED_COLOR = STATE_COLORS.values()
-NON_LOCAL_COLOR = COLORS["Non-Local"]
-NON_LOCAL_SHADE_ALPHA = 0.13
-# The shading of a non-local event in panels d and e.
-NON_LOCAL_SHADE = {
-    "color": NON_LOCAL_COLOR,
-    "alpha": NON_LOCAL_SHADE_ALPHA,
-    "linewidth": 0,
-}
-ANIMAL_POS_COLOR = "magenta"
-
-# Cell Press asks for text of about 6-8 pt at print size.
-LABEL_SIZE = 7
-SMALL_SIZE = 6
-PANEL_LETTER_SIZE = 8
 
 # Panel e's Local example is taken from the pause that holds the first pattern:
 # it starts and ends this long before the pattern does.
@@ -99,15 +90,9 @@ EXAMPLE_FLAG_SPREAD_S = 0.4
 # Panel d's threshold label starts this long after the first non-local event.
 THRESHOLD_LABEL_LAG_S = 1.2
 
-# Inches. ``save_figure`` crops to the drawing and adds 0.1 in on each side, so
-# these save at about 17.3 x 19.9 cm: within Cell Press's 17.4 cm full width and
-# the 20 cm height it recommends so that the legend fits on the page.
-FIGURE_WIDTH = 6.9
+# Inches. With FIGURE_WIDTH, the figure saves at about 17.3 x 19.9 cm: within the
+# 20 cm height Cell Press recommends so that the legend fits on the page.
 FIGURE_HEIGHT = 7.8
-# The data axes of panels d and e, in figure fractions.
-DATA_LEFT, DATA_RIGHT = 0.095, 0.985
-# Space shown beyond each end of the track in the decoded-position plots.
-POSITION_MARGIN_CM = 8.0
 # A state diagram spans 1 unit across and this many up (see ``plot_state_diagram``).
 STATE_DIAGRAM_HEIGHT = 1.14
 
@@ -586,58 +571,6 @@ def _next_time_at_track_start(sim: DecodedSimulation, after: float) -> float:
     return float(sim.time[(first + last) // 2])
 
 
-def _example_badge(color: str) -> dict:
-    return {"boxstyle": "circle,pad=0.18", "facecolor": color, "edgecolor": "none"}
-
-
-def _plot_posterior(
-    ax: Axes,
-    sim: DecodedSimulation,
-    rows: slice,
-    time: np.ndarray,
-    *,
-    vmax: float,
-    linewidth: float,
-    dashes: tuple[float, float] | None = None,
-) -> None:
-    """Posterior over position with the animal's position on top.
-
-    ``time`` is the x coordinate of ``rows`` (s in panel d, ms in panel e), on
-    an even grid.
-    """
-    time_step = time[1] - time[0]
-    bin_size = sim.position_bins[1] - sim.position_bins[0]
-    # Every decoded bin is given to the renderer, which averages the bins that
-    # share a pixel ("antialiased"); none is dropped.
-    ax.imshow(
-        sim.posterior[rows].T,
-        origin="lower",
-        aspect="auto",
-        extent=(
-            time[0] - time_step / 2,
-            time[-1] + time_step / 2,
-            sim.position_bins[0] - bin_size / 2,
-            sim.position_bins[-1] + bin_size / 2,
-        ),
-        cmap="bone_r",
-        vmin=0,
-        vmax=vmax,
-        interpolation="antialiased",
-        rasterized=True,
-    )
-    (line,) = ax.plot(
-        time, sim.position[rows], color=ANIMAL_POS_COLOR, linewidth=linewidth
-    )
-    if dashes:
-        line.set_dashes(dashes)
-    # Room beyond the track's ends: the animal pauses at an end, and its position
-    # would otherwise lie on the edge of the axes and be clipped.
-    ax.set_ylim(
-        sim.position_bins[0] - POSITION_MARGIN_CM,
-        sim.position_bins[-1] + POSITION_MARGIN_CM,
-    )
-
-
 def plot_simulated_run(
     fig: Figure,
     slot: SubplotSpec,
@@ -656,18 +589,8 @@ def plot_simulated_run(
     ax_posterior = fig.add_subplot(gs[1], sharex=ax_raster)
     ax_non_local = fig.add_subplot(gs[2], sharex=ax_raster)
     ax_speed = fig.add_subplot(gs[3], sharex=ax_raster)
-    n_neurons = len(sim.sorted_spikes)
 
-    ax_raster.eventplot(
-        sim.sorted_spikes,
-        lineoffsets=np.arange(1, n_neurons + 1),
-        linelengths=0.85,
-        colors="black",
-        linewidths=0.5,
-        rasterized=True,
-    )
-    ax_raster.set_ylim(0.3, n_neurons + 0.7)
-    ax_raster.set_yticks([1, n_neurons])
+    plot_raster(ax_raster, sim.sorted_spikes, linewidth=0.5, rasterized=True)
     ax_raster.set_ylabel("Neuron, by\nfield position", fontsize=LABEL_SIZE, labelpad=3)
     for k, example in enumerate(examples):
         ax_raster.annotate(
@@ -682,7 +605,7 @@ def plot_simulated_run(
             ha="center",
             va="center",
             annotation_clip=False,
-            bbox=_example_badge(example.color),
+            bbox=example_badge(example.color),
             arrowprops={
                 "arrowstyle": "-",
                 "color": example.color,
@@ -692,11 +615,12 @@ def plot_simulated_run(
             },
         )
 
-    _plot_posterior(
+    plot_posterior(
         ax_posterior,
-        sim,
-        slice(None),
+        sim.posterior,
+        sim.position_bins,
         sim.time,
+        sim.position,
         vmax=posterior_vmax,
         linewidth=0.6,
         dashes=(2.5, 3.5),
@@ -810,7 +734,6 @@ def plot_examples(
     gs = slot.subgridspec(
         3, len(examples), height_ratios=[1.0, 1.0, 0.75], hspace=0.14, wspace=0.2
     )
-    n_neurons = len(sim.sorted_spikes)
     for k, example in enumerate(examples):
         start, end = example.window
 
@@ -825,18 +748,14 @@ def plot_examples(
         ax_states = fig.add_subplot(gs[2, k], sharex=ax_raster)
         axes = (ax_raster, ax_posterior, ax_states)
 
-        ax_raster.eventplot(
+        plot_raster(
+            ax_raster,
             [
                 to_ms(spikes[(spikes >= start) & (spikes <= end)])
                 for spikes in sim.sorted_spikes
             ],
-            lineoffsets=np.arange(1, n_neurons + 1),
-            linelengths=0.85,
-            colors="black",
-            linewidths=0.6,
+            linewidth=0.6,
         )
-        ax_raster.set_ylim(0.3, n_neurons + 0.7)
-        ax_raster.set_yticks([1, n_neurons])
         if example.pattern is not None:
             ax_raster.plot(
                 [0, to_ms(example.pattern[1])],
@@ -879,11 +798,17 @@ def plot_examples(
             color="white",
             ha="center",
             va="center",
-            bbox=_example_badge(example.color),
+            bbox=example_badge(example.color),
         )
 
-        _plot_posterior(
-            ax_posterior, sim, rows, time_ms, vmax=posterior_vmax, linewidth=0.8
+        plot_posterior(
+            ax_posterior,
+            sim.posterior[rows],
+            sim.position_bins,
+            time_ms,
+            sim.position[rows],
+            vmax=posterior_vmax,
+            linewidth=0.8,
         )
 
         for i, state in enumerate(sim.state_names):
@@ -937,26 +862,6 @@ def plot_examples(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def _axes_added(fig: Figure, draw: Callable[[], None]) -> list[Axes]:
-    """Run ``draw`` and return the axes it added to ``fig``, in order."""
-    before = set(fig.axes)
-    draw()
-    return [ax for ax in fig.axes if ax not in before]
-
-
-def _drawn_extent(fig: Figure, axes: Sequence[Axes]) -> Bbox:
-    """Bounding box of everything ``axes`` draw (labels included), in figure fractions."""
-    return Bbox.union([ax.get_tightbbox() for ax in axes]).transformed(
-        fig.transFigure.inverted()
-    )
-
-
-def _shift_vertically(axes: Sequence[Axes], dy: float) -> None:
-    for ax in axes:
-        box = ax.get_position(original=True)
-        ax.set_position([box.x0, box.y0 + dy, box.width, box.height])
-
-
 def generate_figure() -> Figure:
     """Generate complete Figure 1.
 
@@ -994,12 +899,12 @@ def generate_figure() -> Figure:
     gs_e = fig.add_gridspec(
         1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.30, bottom=0.055
     )
-    axes_b = _axes_added(fig, lambda: plot_spike_scoring(fig, gs_bc[0]))
-    axes_c = _axes_added(fig, lambda: plot_position_transitions(fig, gs_bc[1]))
-    axes_d = _axes_added(
+    axes_b = axes_added(fig, lambda: plot_spike_scoring(fig, gs_bc[0]))
+    axes_c = axes_added(fig, lambda: plot_position_transitions(fig, gs_bc[1]))
+    axes_d = axes_added(
         fig, lambda: plot_simulated_run(fig, gs_d[0], sim, examples, posterior_vmax)
     )
-    axes_e = _axes_added(
+    axes_e = axes_added(
         fig, lambda: plot_examples(fig, gs_e[0], sim, examples, posterior_vmax)
     )
     fig.align_ylabels([*axes_d, *axes_e[:3]])
@@ -1008,42 +913,26 @@ def generate_figure() -> Figure:
     # Panel a is as tall as panel b's drawing (the top of its plots to the bottom
     # of its axis label) and starts at the left edge of panel d's labels.
     top = axes_b[0].get_position().y1
-    bottom = _drawn_extent(fig, axes_b).y0
+    bottom = drawn_extent(fig, axes_b).y0
     width = (top - bottom) * FIGURE_HEIGHT / STATE_DIAGRAM_HEIGHT / FIGURE_WIDTH
-    ax_a = fig.add_axes((_drawn_extent(fig, axes_d).x0, bottom, width, top - bottom))
+    ax_a = fig.add_axes((drawn_extent(fig, axes_d).x0, bottom, width, top - bottom))
     plot_state_diagram(ax_a)
     fig.draw_without_rendering()
 
     # Equal gaps between the rows, measured from one row's drawing to the next's.
     rows = [[ax_a, *axes_b, *axes_c], axes_d, axes_e]
-    extents = [_drawn_extent(fig, row) for row in rows]
-    margin = 0.012
-    gap = (1 - 2 * margin - sum(extent.height for extent in extents)) / (len(rows) - 1)
-    row_top = 1 - margin
-    for row, extent in zip(rows, extents, strict=True):
-        _shift_vertically(row, row_top - extent.y1)
-        row_top -= extent.height + gap
-    fig.draw_without_rendering()
+    extents = space_rows_evenly(fig, rows)
 
     # Panel letters: a, d and e share a left edge; a, b and c share a top edge.
-    extents = [_drawn_extent(fig, row) for row in rows]
     left = min(extent.x0 for extent in extents)
     for letter, x, y in (
         ("a", left, extents[0].y1),
-        ("b", _drawn_extent(fig, axes_b).x0, extents[0].y1),
-        ("c", _drawn_extent(fig, axes_c).x0, extents[0].y1),
+        ("b", drawn_extent(fig, axes_b).x0, extents[0].y1),
+        ("c", drawn_extent(fig, axes_c).x0, extents[0].y1),
         ("d", left, extents[1].y1),
         ("e", left, extents[2].y1),
     ):
-        fig.text(
-            x,
-            y,
-            letter,
-            fontsize=PANEL_LETTER_SIZE,
-            fontweight="bold",
-            ha="left",
-            va="top",
-        )
+        letter_panel(fig, letter, x, y)
 
     return fig
 
