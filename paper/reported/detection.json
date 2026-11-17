@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "e500b029d473",
+ "commit": "4f8d475f5ab5",
  "code": {
-  "head": "e500b029d4736e8a8727765c3ddbd7ccd049b144",
+  "head": "4f8d475f5ab5b77d92f7944e3980325eae6b9fdd",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -59,8 +59,8 @@
     "code_sha256": "16fd0775a6a8a0952a29cb42f474282def0736e35ef32d324821ad5d115e3216"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/scoring.py": {
-    "sha256": "79e9fef9746006cf71c934ddffcfa6d97202cbbf6889369526c6d23e9f23890a",
-    "code_sha256": "abae8af6b5c0d65c5ea37982540933d62c9965dfac098868368e572f0e94db46"
+    "sha256": "d1ff143c4b13b0cb30bccbc88f67861550ab2151815d84ac4f29322da63086ad",
+    "code_sha256": "719193813d60d8a8793038f8e925d147156d2cddd3e7787e52bec5be3e5b7ade"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/shuffle.py": {
     "sha256": "a6b25b0d7018667e0906fa29db23592d27fa56edcee5873ed62090590fb48cd9",
@@ -79,12 +79,12 @@
     "code_sha256": "2d25a0b2f2cccb53da248d9f5e60587282570c4d634313e97f5c3a10c6aa8c72"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep_statistics.py": {
-    "sha256": "721fd0dceefa9b4cb29554b7e0c55a63f13fa976cb06e9d08e00e3275f3c79d8",
-    "code_sha256": "25059bb54f689be644374b3914ee828adfd1ae122cdce9811a398d0a3ee83d0f"
+    "sha256": "958210907cc023941889be0a52ebd1b428c19a342cc21772827e090dc1b062b2",
+    "code_sha256": "beb7172e59b29bdb2f34077a459d08a6159ecac3fd0e93a04ce06e471e403171"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep_summaries.py": {
-    "sha256": "77f742ba70b6b132fced06cbc65693d1994ba2067ab70f2d9a1d050047c4c479",
-    "code_sha256": "41e2e54c7a26a084b2169e7a4dff5562db970ad901d18039475ed80bd1d2a94f"
+    "sha256": "9b95d6a6e6077c07747a12f87fe894a866cc712bee00fadb52b636c02260c71d",
+    "code_sha256": "d2800ca5399f612cc33e897153d43290d92111f2b049691866f6e969d78632aa"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/window_statistics.py": {
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
@@ -203,8 +203,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "3711b53f7eedb48fdb64d548d6743602934a05943c8bd9e11c25a3b9135782ba",
-    "code_sha256": "ceb29a2e3b6a70bf2c0e6c7f9486613baafe20ee3f36f2a3c252a7933a8c475a"
+    "sha256": "713e952e16a98f234901594b862b133fa28284e2c97b74313bff716d72477050",
+    "code_sha256": "1deeb4fe048b102fa2664f15ae4c8caf74fad8c6564096f716ef799ad5ca5ad9"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -255,12 +255,12 @@
     "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
    },
    "paper/reported/inputs/detection/memoryless_comparison_recording.json": {
-    "sha256": "fa381fffb0e6da5d860b85359b9525265f3f9e9b3d40eb29bf5730c6f24ff044",
-    "code_sha256": "fa381fffb0e6da5d860b85359b9525265f3f9e9b3d40eb29bf5730c6f24ff044"
+    "sha256": "1994211f36c79882f54973d5734bb12672678993d020e0bfb5fe9ed0aadf5500",
+    "code_sha256": "1994211f36c79882f54973d5734bb12672678993d020e0bfb5fe9ed0aadf5500"
    },
    "paper/reported/inputs/detection/detection_sweep_summary.csv": {
-    "sha256": "26232d566dddc6925df974703864896be9a3391b217997d3f3e92328205c60d9",
-    "code_sha256": "26232d566dddc6925df974703864896be9a3391b217997d3f3e92328205c60d9"
+    "sha256": "e3fe7cd4712ae88832274a3f85b47fbe7196b456b2d4d0a621d2779b4a6f85dd",
+    "code_sha256": "e3fe7cd4712ae88832274a3f85b47fbe7196b456b2d4d0a621d2779b4a6f85dd"
    },
    "paper/reported/inputs/detection/detection_controls_summary.csv": {
     "sha256": "630c35bddb4c7e1d6b9987a39b4d795023103a934a3d805b267a490b7f0ce608",
@@ -291,11 +291,11 @@
   },
   {
    "path": "paper/reported/inputs/detection/memoryless_comparison_recording.json",
-   "sha256": "fa381fffb0e6da5d860b85359b9525265f3f9e9b3d40eb29bf5730c6f24ff044"
+   "sha256": "1994211f36c79882f54973d5734bb12672678993d020e0bfb5fe9ed0aadf5500"
   },
   {
    "path": "paper/reported/inputs/detection/detection_sweep_summary.csv",
-   "sha256": "26232d566dddc6925df974703864896be9a3391b217997d3f3e92328205c60d9"
+   "sha256": "e3fe7cd4712ae88832274a3f85b47fbe7196b456b2d4d0a621d2779b4a6f85dd"
   },
   {
    "path": "paper/reported/inputs/detection/detection_controls_summary.csv",
@@ -1515,7 +1515,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1531,7 +1531,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1547,7 +1547,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1563,7 +1563,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1579,7 +1579,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1595,7 +1595,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1611,7 +1611,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1627,7 +1627,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1643,7 +1643,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1659,7 +1659,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1675,7 +1675,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1691,7 +1691,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 3e47dc0a2ad4)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit ecd05e2ea307)",
    "function": "recording_values",
    "pending": null
   },
@@ -1871,6 +1871,374 @@
    "style": "pctnum",
    "unit": "",
    "description": "share of the shortest (40 ms) replays passing the jump half",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_error_fastest_cm": {
+   "value": 13.269689803787651,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median position error of the sliding window over the fastest replays both detectors report (above 8.0 m/s)",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_error_slowest_cm": {
+   "value": 1.401044720775289,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median position error of the sliding window over the slowest replays both detectors report (above 0 m/s)",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_larger_fraction": {
+   "value": 0.8278145695364238,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the replays both detectors report on which the sliding window's position error is the larger of the two",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_lead_lower_quartile": {
+   "value": -0.6432638047237447,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "lower quartile of the distance the decoded position sits ahead of the true one along the replay's direction (negative: behind), replays that travel, of the sliding window, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_lead_median": {
+   "value": 0.0387467652199546,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median distance the decoded position sits ahead of the true one along the replay's direction (negative: behind), replays that travel, of the sliding window, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_lead_upper_quartile": {
+   "value": 0.6713633819212745,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "upper quartile of the distance the decoded position sits ahead of the true one along the replay's direction (negative: behind), replays that travel, of the sliding window, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_position_error_lower_quartile": {
+   "value": 1.5313895915296951,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "lower quartile of the distance of the decoded position from the replay's true position, the median over the report, of the sliding window, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_position_error_median": {
+   "value": 2.1860029852681717,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median distance of the decoded position from the replay's true position, the median over the report, of the sliding window, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_position_error_upper_quartile": {
+   "value": 3.974630453685364,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "upper quartile of the distance of the decoded position from the replay's true position, the median over the report, of the sliding window, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_speed_ratio_lower_quartile": {
+   "value": 0.8800015837815282,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "lower quartile of the decoded speed over the replay's true speed, replays that travel, of the sliding window, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_speed_ratio_median": {
+   "value": 0.9471714875466124,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "median decoded speed over the replay's true speed, replays that travel, of the sliding window, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_sliding_speed_ratio_upper_quartile": {
+   "value": 0.9877449152847966,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "upper quartile of the decoded speed over the replay's true speed, replays that travel, of the sliding window, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_state_space_error_fastest_cm": {
+   "value": 2.392857914682569,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median position error of the state-space detector over the fastest replays both detectors report (above 8.0 m/s)",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_state_space_error_slowest_cm": {
+   "value": 1.261955635258353,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median position error of the state-space detector over the slowest replays both detectors report (above 0 m/s)",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_state_space_lead_lower_quartile": {
+   "value": -0.2739735014026259,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "lower quartile of the distance the decoded position sits ahead of the true one along the replay's direction (negative: behind), replays that travel, of the state-space detector, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_state_space_lead_median": {
+   "value": 0.2790768265832213,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median distance the decoded position sits ahead of the true one along the replay's direction (negative: behind), replays that travel, of the state-space detector, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_state_space_lead_upper_quartile": {
+   "value": 0.8279083292238241,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "upper quartile of the distance the decoded position sits ahead of the true one along the replay's direction (negative: behind), replays that travel, of the state-space detector, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_state_space_position_error_lower_quartile": {
+   "value": 1.074377798688701,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "lower quartile of the distance of the decoded position from the replay's true position, the median over the report, of the state-space detector, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_state_space_position_error_median": {
+   "value": 1.294948125313688,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median distance of the decoded position from the replay's true position, the median over the report, of the state-space detector, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_state_space_position_error_upper_quartile": {
+   "value": 1.6584522440643852,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "upper quartile of the distance of the decoded position from the replay's true position, the median over the report, of the state-space detector, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_state_space_speed_ratio_lower_quartile": {
+   "value": 0.9504387013469354,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "lower quartile of the decoded speed over the replay's true speed, replays that travel, of the state-space detector, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_state_space_speed_ratio_median": {
+   "value": 0.9823626041212165,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "median decoded speed over the replay's true speed, replays that travel, of the state-space detector, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_position_state_space_speed_ratio_upper_quartile": {
+   "value": 1.0087572853569258,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "upper quartile of the decoded speed over the replay's true speed, replays that travel, of the state-space detector, over the replays both detectors report",
    "questions": [
     "1.1"
    ],
