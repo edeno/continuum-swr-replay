@@ -329,32 +329,30 @@ def recording_values(numbers: dict, source: str) -> list[Value]:
 
     return [
         make(
-            "recording_outbound_duration_ratio",
-            numbers["outbound_duration_ratio"],
+            "recording_sweep_duration_ratio",
+            numbers["sweep_duration_ratio"],
             "quantity",
             "sig2",
-            "the sliding window's reported duration of the continuous outbound "
-            "replay over its true duration",
+            "the sliding window's reported duration of Figure 1's sweep over its "
+            "true duration",
         ),
         make(
-            "recording_outbound_local_fraction",
-            numbers["outbound_local_fraction"],
+            "recording_sweep_local_fraction",
+            numbers["sweep_local_fraction"],
             "fraction",
             "pctnum",
             "share of that reported event's kept windows decoding the animal's own "
             "place (within 15 cm)",
         ),
-        p("outbound_p_spread", "significance test of the outbound replay: spread half"),
-        p("outbound_p_jump", "significance test of the outbound replay: jump half"),
+        p("sweep_p_spread", "significance test of the sweep: spread half"),
+        p("sweep_p_jump", "significance test of the sweep: jump half"),
         make(
-            "recording_outbound_draws_from_passing",
-            numbers["outbound_draws_from_passing"],
+            "recording_sweep_draws_from_passing",
+            numbers["sweep_draws_from_passing"],
             "count",
             "count",
             "how many more shuffle draws below the observed value than a pass allows",
         ),
-        p("inbound_p_spread", "significance test of the inbound replay: spread half"),
-        p("inbound_p_jump", "significance test of the inbound replay: jump half"),
         make(
             "recording_short_replay_duration_ratio",
             numbers["short_replay_duration_ratio"],

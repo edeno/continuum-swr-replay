@@ -18,16 +18,11 @@ state-space model (:func:`run_state_space`), each reporting its events as
 from dataclasses import dataclass
 
 import numpy as np
-from non_local_detector import NonLocalSortedSpikesDetector
-from non_local_detector.environment import Environment
-from non_local_detector.simulate.sorted_spikes_simulation import (
-    TRACK_HEIGHT,
-    make_simulated_data,
-)
+import xarray as xr
+from non_local_detector.simulate.sorted_spikes_simulation import TRACK_HEIGHT
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     CONFIG,
-    DECODE_BIN_STRIDE,
     N_NEURONS,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.detect import (
@@ -53,14 +48,16 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
     aggregate_windows,
     normalize_windows,
 )
+from continuum_swr_replay.analysis.detection.simulated_run import (
+    estimate_state_space_model,
+    simulate_run,
+)
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    NON_LOCAL_STATES,
+    detect_nonlocal_events,
+)
 from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 from continuum_swr_replay.decoding.results import ENCODING_KEY
-from continuum_swr_replay.intervals import contiguous_true_runs
-from continuum_swr_replay.parameters import (
-    DEFAULT_NON_LOCAL_THRESHOLD,
-    LOCAL_POSITION_STD,
-    NON_LOCAL_MINIMUM_DURATION_S,
-)
 
 __all__ = [
     "DECODE_MARGIN_S",
@@ -77,7 +74,6 @@ __all__ = [
     "build_recording",
     "decode_window",
     "nearest_bin",
-    "non_local_intervals",
     "overlaps",
     "published_events",
     "replay_grid",
@@ -86,7 +82,8 @@ __all__ = [
     "usable_intervals",
 ]
 
-PATH_CM = (10.0, 20.0, 30.0, 45.0, 60.0, 90.0, 130.0)
+PATH_CM = (0.0, 10.0, 20.0, 30.0, 45.0, 60.0, 90.0, 130.0)
+"""How far the represented position travels; 0 is a place held still."""
 DURATION_S = (0.04, 0.06, 0.08, 0.12, 0.20, 0.30, 0.50)
 PEAK_RATE_HZ = (20.0, 60.0, 160.0)
 MIDPOINT_CM = (30.0, 60.0, 90.0, 120.0, 150.0)
@@ -112,7 +109,7 @@ SHUFFLE_RUN_SEED = 20260922
 MATCH_TOLERANCE_CM = 20.0
 """How far a detector's decoded position may sit from the injected one.
 
-Generous against a 2 cm grid and a 6 cm smoothing kernel, so it separates
+Generous against a 2 cm grid and the place fields' smoothing kernel, so it separates
 "reported the injected path" from "reported somewhere else entirely" rather
 than grading accuracy."""
 
@@ -120,51 +117,24 @@ than grading accuracy."""
 def build_recording(seed: int = 0, cells: np.ndarray | None = None):
     """One simulated recording, with both detectors fitted on its non-event data.
 
+    The recording is Figure 1's simulated run (``simulated_run.simulate_run``)
+    and the state-space model is Figure 1's, fitted as a real decode is
+    (``simulated_run.estimate_state_space_model``): the real decodes' settings,
+    the place fields and the transitions estimated by EM.
+
     ``seed`` is the simulator's; 0 is the recording every sweep reads. With
     ``cells``, the detectors are fitted on those cells alone, in that order,
     and the recording's ``spike_times`` are theirs; ``all_spike_times`` keeps
     every cell's.
     """
-    (
-        speed,
-        position,
-        spike_times,
-        time,
-        event_times,
-        _sampling_frequency,
-        is_event,
-        _place_fields,
-    ) = make_simulated_data(n_neurons=N_NEURONS, seed=seed)
-    all_spike_times = spike_times
+    run = simulate_run(n_neurons=N_NEURONS, seed=seed)
+    all_spike_times = run.spike_times
+    spike_times = all_spike_times
     if cells is not None:
         spike_times = [all_spike_times[cell] for cell in cells]
-    time, position, speed, is_event = (
-        array[::DECODE_BIN_STRIDE] for array in (time, position, speed, is_event)
-    )
 
-    is_training = ~is_event
-
-    # the grid both procedures decode on comes from the config, so the jump
-    # and spread thresholds in cm and the bins they are measured over cannot
-    # drift apart
-    detector = NonLocalSortedSpikesDetector(
-        environments=[Environment(place_bin_size=CONFIG.place_bin_size_cm)],
-        sorted_spikes_algorithm="sorted_spikes_kde",
-        sorted_spikes_algorithm_params={"position_std": 6.0, "block_size": int(2**8)},
-        local_position_std=LOCAL_POSITION_STD,
-    )
-    # fit, not estimate_parameters. After EM the detector returns an all-zero
-    # posterior when predict is given a different time grid from the one it was
-    # fitted on, silently, so every sweep cell would read as "not found". The
-    # state-space model therefore runs on the library's default discrete
-    # transitions: discrete_transition_stickiness is a Dirichlet concentration
-    # read only by the EM M-step, so passing one here would change nothing and
-    # would read as tuning.
-    detector.fit(
-        position_time=time,
-        position=position,
-        spike_times=spike_times,
-        is_training=is_training,
+    detector, _ = estimate_state_space_model(
+        run.time, run.position, spike_times, ~run.is_pattern
     )
 
     # One set of place fields, not two. The detector's own encoding model holds
@@ -175,14 +145,13 @@ def build_recording(seed: int = 0, cells: np.ndarray | None = None):
     environment = encoding_model["environment"]
 
     return {
-        "time": time,
-        "position": position,
-        "speed": speed,
+        "time": run.time,
+        "position": run.position,
+        "speed": run.speed,
         "spike_times": spike_times,
         "all_spike_times": all_spike_times,
-        "event_times": event_times,
-        "is_event": is_event,
-        "environment": environment,
+        # the run's patterns, in time order: (n_patterns, 2), s
+        "event_times": np.array(list(run.patterns.values())),
         "encoding_model": encoding_model,
         # the same fields, decoded as the reference decodes them, with its
         # floor under every one; the state-space detector reads them as fitted
@@ -406,29 +375,6 @@ def nearest_bin(recording, position_cm: np.ndarray) -> np.ndarray:
     return np.abs(centers[None, :] - np.asarray(position_cm)[:, None]).argmin(axis=1)
 
 
-def non_local_intervals(
-    time: np.ndarray, probability: np.ndarray
-) -> list[tuple[int, int]]:
-    """The state-space detector's events: index bounds of every stretch above
-    the project's non-local threshold whose first-to-last timestamp span is at
-    least its nominal minimum duration.
-
-    Non-local probability above ``DEFAULT_NON_LOCAL_THRESHOLD`` (0.8) over a
-    first-to-last span of at least ``NON_LOCAL_MINIMUM_DURATION_S`` (15 ms),
-    i.e. 9 samples on the sweep's 2 ms grid. ``get_confident_times`` counts
-    samples instead (7 on the real decode grid;
-    ``docs/known_issues/nonlocal_minimum_duration_rounding.md``). The span test
-    is kept so the published sweep numbers do not change.
-    """
-    above = probability > DEFAULT_NON_LOCAL_THRESHOLD
-    starts, stops = (contiguous_true_runs(above) - [0, 1]).T
-    return [
-        (a, b)
-        for a, b in zip(starts, stops, strict=True)
-        if time[b] - time[a] >= NON_LOCAL_MINIMUM_DURATION_S
-    ]
-
-
 @dataclass(frozen=True)
 class StateSpaceRun:
     """What the switching state-space model reports over one decoded stretch.
@@ -439,8 +385,10 @@ class StateSpaceRun:
     p_continuous, p_fragmented : ndarray, shape (n_time,)
         Probability of each non-local state.
     canonical : list of ReportedEvent
-        The project's events: continuous plus fragmented above threshold for
-        at least the minimum duration.
+        The project's non-local events
+        (``nonlocal_event_rule.detect_nonlocal_events``): continuous plus
+        fragmented above threshold for the minimum duration, the animal
+        immobile throughout.
     continuous_only : list of ReportedEvent
         The same rule on the continuous state alone.
     non_local_posterior : ndarray, shape (n_time, n_bins)
@@ -458,7 +406,7 @@ class StateSpaceRun:
 
 def run_state_space(recording, injected, window) -> StateSpaceRun:
     """Decode a stretch with the state-space model and read off its events."""
-    time, position, _speed = window
+    time, position, speed = window
     results = recording["detector"].predict(
         position_time=time, position=position, spike_times=injected, time=time
     )
@@ -470,33 +418,37 @@ def run_state_space(recording, injected, window) -> StateSpaceRun:
             "estimate_parameters does this silently when predict is given another "
             "time grid."
         )
-    states = results.acausal_state_probabilities
-    p_continuous = np.asarray(
-        states.sel(states="Non-Local Continuous").values
-    ).squeeze()
-    p_fragmented = np.asarray(
-        states.sel(states="Non-Local Fragmented").values
-    ).squeeze()
+    continuous, fragmented = (
+        results.acausal_state_probabilities.sel(states=state).squeeze()
+        for state in NON_LOCAL_STATES
+    )
+    p_continuous, p_fragmented = np.asarray(continuous), np.asarray(fragmented)
 
     # where the non-local states put the animal, to score this the same way
     posterior = results["acausal_posterior"]
     is_non_local = np.isin(
         np.asarray(posterior.coords["state"].values),
-        ["Non-Local Continuous", "Non-Local Fragmented"],
+        NON_LOCAL_STATES,
     )
     bin_position_cm = np.asarray(posterior.coords["position"].values)[is_non_local]
     non_local = np.asarray(posterior.values)[:, is_non_local]
 
-    def events(probability) -> list[ReportedEvent]:
-        return [
-            ReportedEvent(
-                start_s=float(time[a]),
-                end_s=float(time[b]),
-                decoded_time_s=time[a : b + 1],
-                decoded_cm=bin_position_cm[np.argmax(non_local[a : b + 1], axis=1)],
+    def events(probability: xr.DataArray) -> list[ReportedEvent]:
+        detected, _ = detect_nonlocal_events(probability, speed, time)
+        reported = []
+        for start_s, end_s in zip(
+            detected["start_time"], detected["end_time"], strict=True
+        ):
+            a, b = np.searchsorted(time, [start_s, end_s])
+            reported.append(
+                ReportedEvent(
+                    start_s=float(time[a]),
+                    end_s=float(time[b]),
+                    decoded_time_s=time[a : b + 1],
+                    decoded_cm=bin_position_cm[np.argmax(non_local[a : b + 1], axis=1)],
+                )
             )
-            for a, b in non_local_intervals(time, probability)
-        ]
+        return reported
 
     # each non-local state's columns onto the interior bins they stand for
     to_bin = np.zeros((bin_position_cm.size, recording["place_bin_centers_cm"].size))
@@ -506,7 +458,7 @@ def run_state_space(recording, injected, window) -> StateSpaceRun:
         time=time,
         p_continuous=p_continuous,
         p_fragmented=p_fragmented,
-        canonical=events(p_continuous + p_fragmented),
-        continuous_only=events(p_continuous),
+        canonical=events(continuous + fragmented),
+        continuous_only=events(continuous),
         non_local_posterior=content / content.sum(axis=1, keepdims=True),
     )

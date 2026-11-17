@@ -3,7 +3,7 @@
 
 Held-out evidence on simulated data, where the truth of every event is known,
 so the held-out test itself can be calibrated before it is used on recordings.
-The simulated recording's 25 cells are split into discovery and evaluation
+The simulated recording's cells are split into discovery and evaluation
 cells three ways: two interleaved folds, roles swapped, each half covering the
 track; and one whose evaluation cells cover only its lower half. In each fold
 both detectors are fitted and run on the discovery cells alone, on every
@@ -51,6 +51,7 @@ from continuum_swr_replay.analysis.detector_comparison.heldout_sweep import (
     run_no_replay_fold,
 )
 from continuum_swr_replay.paths import detection_comparison_dir
+from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.io import write_table
 
@@ -58,6 +59,8 @@ SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_heldout_summary.c
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    # the CPU unless JAX_PLATFORMS names another, as the replay sweep
+    default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-seeds", type=int, default=8)
     parser.add_argument("--folds", nargs="+", default=["A", "B", "C"])

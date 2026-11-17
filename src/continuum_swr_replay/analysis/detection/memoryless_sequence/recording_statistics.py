@@ -13,10 +13,8 @@ figure (``scripts/figures/generate_memoryless_comparison.py``) draws and checks
 the same functions' values.
 
 Every function but :func:`draws_from_passing` (which takes the result of
-:func:`shuffle_of`) takes ``decoded``, :func:`simulate_and_decode`'s dict; those
-reading the state-space detector's events (:func:`bound_error_ms`,
-:func:`recording_numbers`) also need its ``"state_space_intervals"``, which
-:func:`state_space_intervals` gives. An event is a row of
+:func:`shuffle_of`) takes ``decoded``, :func:`simulate_and_decode`'s dict; the
+state-space detector's events are its ``"state_space_intervals"``. An event is a row of
 ``decoded["event_times"]``; a sequence is an index into
 ``decoded["candidates"]``. Times are in seconds unless a name says ms, distances
 in cm, shares in [0, 1].
@@ -25,25 +23,18 @@ in cm, shares in [0, 1].
 import numpy as np
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
-    CONTINUOUS_INBOUND_EVENT,
-    CONTINUOUS_OUTBOUND_EVENT,
     REMOTE_STATIONARY_EVENT,
     SHORT_PATH_EVENT,
     SHORT_REPLAY_EVENT,
     STRAY_WINDOW_EVENT,
+    SWEEP_EVENT,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     SIGNIFICANCE_LEVEL,
 )
-from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import (
-    non_local_intervals,
-)
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
     NO_CENTER,
     dispersion_cm,
-)
-from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
-    nonlocal_state_probability,
 )
 
 __all__ = [
@@ -63,7 +54,6 @@ __all__ = [
     "recording_numbers",
     "reported_overlapping",
     "shuffle_of",
-    "state_space_intervals",
     "stray_window_dispersions",
     "verdict",
 ]
@@ -72,54 +62,13 @@ LOCAL_TOLERANCE_CM = 15.0
 """A window decodes the animal's own place when its center is closer than this."""
 
 ZOOMED_EVENTS = (
-    CONTINUOUS_OUTBOUND_EVENT,
+    SWEEP_EVENT,
     SHORT_REPLAY_EVENT,
     SHORT_PATH_EVENT,
     REMOTE_STATIONARY_EVENT,
 )
-"""The zoomed events whose bounds the state-space detector is scored on
-(:func:`bound_error_ms`): every one the figure zooms on but the stray-window
-event, over which it reports nothing."""
-
-
-def state_space_intervals(decoded: dict) -> list[tuple[float, float]]:
-    """When the switching state-space model calls the representation non-local.
-
-    Its events are the sweep's (:func:`~continuum_swr_replay.analysis.detection.memoryless_sequence.sweep.non_local_intervals`:
-    non-local probability above 0.8 over a first-to-last span of at least
-    15 ms), as (start, end) times.
-
-    The comparison needs this. Every event the sliding-window detector misses
-    has to be an event some detector can find, or the figure shows the limits
-    of the data rather than the limits of the method.
-
-    Reads the detector fitted in :func:`simulate_and_decode`, which is also the
-    one whose place fields the sliding-window likelihood was given, so the two
-    procedures differ in how they use the encoding model and not in what it is.
-
-    The state-space model is otherwise left on the library's defaults. Figure 1
-    sets a discrete transition stickiness, but stickiness is a Dirichlet
-    concentration read only by the EM M-step, and this comparison calls `fit`
-    rather than `estimate_parameters`, so passing one would change nothing here
-    and would read as tuning.
-    """
-    time = decoded["time"]
-    results = decoded["detector"].predict(
-        position_time=time,
-        position=decoded["position"],
-        spike_times=decoded["spike_times"],
-        time=time,
-    )
-    probability = np.asarray(
-        nonlocal_state_probability(results.acausal_state_probabilities).values
-    ).squeeze()
-    if not np.isfinite(probability).all() or probability.max() <= 0.0:
-        raise RuntimeError(
-            "The state-space model returned no probability mass; its state "
-            "probabilities must sum to one at every time."
-        )
-
-    return [(time[a], time[b]) for a, b in non_local_intervals(time, probability)]
+"""The replays whose bounds the state-space detector is scored on
+(:func:`bound_error_ms`): the ones the figure zooms on."""
 
 
 def candidates_overlapping(decoded: dict, event: int) -> list[int]:
@@ -347,26 +296,24 @@ def recording_numbers(decoded: dict) -> dict[str, float | int]:
     Parameters
     ----------
     decoded : dict
-        :func:`simulate_and_decode`'s dict with ``"state_space_intervals"``
-        (:func:`state_space_intervals`) added.
+        :func:`simulate_and_decode`'s dict.
 
     Returns
     -------
     numbers : dict
         Durations in ms, distances in cm, shares in [0, 1]. The prefixes
-        ``outbound``, ``inbound``, ``short_replay`` and ``stray_window`` name
-        the continuous outbound and inbound replays, the 80 ms replay and the
-        stray-window event; each value is over the longest accepted sequence
-        overlapping the event.
+        ``sweep``, ``short_replay`` and ``stray_window`` name Figure 1's sweep,
+        the 80 ms replay and the stray-window event; each value is over the
+        longest accepted sequence overlapping the event.
 
-        - ``outbound_``, ``short_replay_duration_ratio``: its reported over its
+        - ``sweep_``, ``short_replay_duration_ratio``: its reported over its
           true duration (:func:`duration_ratio`).
-        - ``outbound_``, ``short_replay_``, ``stray_window_local_fraction``:
+        - ``sweep_``, ``short_replay_``, ``stray_window_local_fraction``:
           the share of its kept windows decoding the animal's own place
           (:func:`local_fraction_of_event`).
-        - ``*_p_spread``, ``*_p_jump``, for all four: the two halves of its
+        - ``*_p_spread``, ``*_p_jump``, for all three: the two halves of its
           significance test.
-        - ``outbound_draws_from_passing``: :func:`draws_from_passing`.
+        - ``sweep_draws_from_passing``: :func:`draws_from_passing`.
         - ``short_path_dispersion_cm``, ``remote_stationary_dispersion_cm``: the
           largest dispersion of a candidate over each (:func:`best_dispersion_cm`).
         - ``state_space_bound_error_ms``: :func:`bound_error_ms` over
@@ -381,23 +328,18 @@ def recording_numbers(decoded: dict) -> dict[str, float | int]:
     Raises
     ------
     RuntimeError
-        If no accepted sequence overlaps one of the four events read.
+        If no accepted sequence overlaps one of the three events read.
     """
-    outbound = shuffle_of(decoded, CONTINUOUS_OUTBOUND_EVENT)
-    inbound = shuffle_of(decoded, CONTINUOUS_INBOUND_EVENT)
+    sweep = shuffle_of(decoded, SWEEP_EVENT)
     short = shuffle_of(decoded, SHORT_REPLAY_EVENT)
     stray_full, stray_pieces, stray_sequence = stray_window_dispersions(decoded)
     stray = decoded["shuffles"][stray_sequence]
     return {
-        "outbound_duration_ratio": duration_ratio(decoded, CONTINUOUS_OUTBOUND_EVENT),
-        "outbound_local_fraction": local_fraction_of_event(
-            decoded, CONTINUOUS_OUTBOUND_EVENT
-        ),
-        "outbound_p_spread": float(outbound.p_spread),
-        "outbound_p_jump": float(outbound.p_jump),
-        "outbound_draws_from_passing": draws_from_passing(outbound),
-        "inbound_p_spread": float(inbound.p_spread),
-        "inbound_p_jump": float(inbound.p_jump),
+        "sweep_duration_ratio": duration_ratio(decoded, SWEEP_EVENT),
+        "sweep_local_fraction": local_fraction_of_event(decoded, SWEEP_EVENT),
+        "sweep_p_spread": float(sweep.p_spread),
+        "sweep_p_jump": float(sweep.p_jump),
+        "sweep_draws_from_passing": draws_from_passing(sweep),
         "short_replay_duration_ratio": duration_ratio(decoded, SHORT_REPLAY_EVENT),
         "short_replay_local_fraction": local_fraction_of_event(
             decoded, SHORT_REPLAY_EVENT

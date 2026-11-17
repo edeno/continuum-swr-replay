@@ -1,34 +1,24 @@
-"""The memoryless comparison's simulation: a simulated run with added events, decoded.
+"""The memoryless comparison's simulation: Figure 1's run with added events, decoded.
 
 The supplemental memoryless comparison figure
 (``scripts/figures/generate_memoryless_comparison.py``) and the reference check
 (``scripts/checks/compare_memoryless_to_reference.py``) read one simulation
-(:func:`simulate_and_decode`): ``non_local_detector``'s ``make_simulated_data``
-with a remote stationary event, a short path, a short replay and a stray window
-added (their rows of ``event_times`` are :data:`SHORT_PATH_EVENT` and the other
-``*_EVENT`` constants), decoded window by window under a uniform prior and by
-the switching state-space model fitted on the same non-event data. The figure's
-numbers are those of :data:`N_NEURONS` cells decoded under :data:`CONFIG`.
-
-It is not the recording or the decode of Figure 1
-(``analysis.detection.simulated_run``), though both start from
-``make_simulated_data`` and share the decode grid (``DECODE_BIN_STRIDE``) and
-the remote stationary event (``splice_remote_stationary``), which are defined
-there. Figure 1 has 30 cells, puts the remote stationary event in place of the
-second sweep, moves that sweep into the first pause, lengthens the silence, and
-estimates the place fields and the transitions by EM with the real decodes'
-settings; this simulation has :data:`N_NEURONS` cells, keeps both sweeps, adds
-its events in other pauses and fits the detector once, with the library's
-default transitions.
+(:func:`simulate_and_decode`): the simulated run of Figure 1
+(``analysis.detection.simulated_run.simulate_run``, whose patterns are the first
+rows of ``event_times``) with a short path, a short replay and a stray window
+added (:data:`SHORT_PATH_EVENT` and the other ``*_EVENT`` constants name the
+rows). It is decoded twice from one set of place fields: window by window under
+a uniform prior, as the sliding-window detector does, and by the switching
+state-space model of Figure 1, fitted as a real decode is
+(``simulated_run.estimate_state_space_model``), whose non-local events are
+found by the project's rule (``nonlocal_event_rule.detect_nonlocal_events``).
+The sliding-window detector's settings are :data:`CONFIG`.
 """
 
 import numpy as np
-from non_local_detector import NonLocalSortedSpikesDetector
-from non_local_detector.environment import Environment
 from non_local_detector.simulate.sorted_spikes_simulation import (
     SAMPLING_FREQUENCY,
     TRACK_HEIGHT,
-    make_simulated_data,
 )
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
@@ -59,44 +49,43 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
     normalize_windows,
 )
 from continuum_swr_replay.analysis.detection.simulated_run import (
-    DECODE_BIN_STRIDE,
-    REMOTE_STATIONARY_CM,
-    REMOTE_STATIONARY_S,
-    splice_remote_stationary,
+    PATTERNS,
+    estimate_state_space_model,
+    simulate_run,
+)
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    detect_nonlocal_events,
+    nonlocal_state_probability,
 )
 from continuum_swr_replay.decoding.encoding_model import interior_bin_distances_cm
 from continuum_swr_replay.decoding.results import ENCODING_KEY
-from continuum_swr_replay.parameters import LOCAL_POSITION_STD
 
 __all__ = [
     "CONFIG",
-    "CONTINUOUS_INBOUND_EVENT",
-    "CONTINUOUS_OUTBOUND_EVENT",
-    "DECODE_BIN_STRIDE",
+    "FRAGMENTED_EVENT",
     "N_NEURONS",
-    "REMOTE_STATIONARY_CM",
     "REMOTE_STATIONARY_EVENT",
-    "REMOTE_STATIONARY_S",
     "SHORT_PATH",
     "SHORT_PATH_EVENT",
     "SHORT_REPLAY",
     "SHORT_REPLAY_EVENT",
     "SHUFFLE_RUN_SEED",
+    "SILENCE_EVENT",
     "STRAY_WINDOW_AT_S",
     "STRAY_WINDOW_EVENT",
     "STRAY_WINDOW_N_LOCAL",
     "STRAY_WINDOW_STILL_S",
+    "SWEEP_EVENT",
     "TRACK_HEIGHT_CM",
     "simulate_and_decode",
-    "splice_remote_stationary",
 ]
 
 TRACK_HEIGHT_CM = float(TRACK_HEIGHT)
 """The simulation package's own track length, read rather than restated."""
 
-N_NEURONS = 25
+N_NEURONS = 30
 """Cells in the simulation the figure and its recorded numbers are made from,
-and in the memoryless sweeps' recording (``sweep.build_recording``)."""
+and in the memoryless sweeps' recording (``sweep.build_recording``): Figure 1's."""
 
 CONFIG = MemorylessSequenceConfig()
 """The sliding-window detector's settings, in the figure and in the sweeps: the
@@ -123,20 +112,23 @@ SHORT_PATH = InjectedReplay(
 dispersion criterion needs a path of about 42 cm, so it is expected to reject
 the candidate."""
 
-SHORT_PATH_EVENT, SHORT_REPLAY_EVENT = 6, 7
-CONTINUOUS_OUTBOUND_EVENT, CONTINUOUS_INBOUND_EVENT = 0, 2
-REMOTE_STATIONARY_EVENT = 5
-STRAY_WINDOW_EVENT = 8
-"""Rows of ``event_times`` in :func:`simulate_and_decode`, in the order the
-events are added."""
+SWEEP_EVENT, FRAGMENTED_EVENT, REMOTE_STATIONARY_EVENT, SILENCE_EVENT = (
+    PATTERNS.index(name) for name in ("sweep", "fragmented", "stationary", "silence")
+)
+SHORT_PATH_EVENT, SHORT_REPLAY_EVENT, STRAY_WINDOW_EVENT = (
+    len(PATTERNS) + added for added in range(3)
+)
+"""Rows of ``event_times`` in :func:`simulate_and_decode`: Figure 1's patterns
+(``simulated_run.PATTERNS``), then the events added here, in the order they are
+added."""
 
 SHUFFLE_RUN_SEED = 20260922
 """Seeds the place-cell identity shuffle, as in the sweep."""
 
 STRAY_WINDOW_AT_S = 31.40
 """Where the hand-placed stray-window event begins: in the stillness before the
-inbound replay, among candidates of local coding that no caption claim reads.
-The stillness before the outbound replay is no good: that replay's candidate
+remote stationary event, among candidates of local coding that no caption claim
+reads. The stillness before the sweep is no good: that replay's candidate
 absorbs the local coding before it, so an event there changes its verdict."""
 
 STRAY_WINDOW_N_LOCAL = 2
@@ -153,30 +145,34 @@ STRAY_WINDOW_PLACEMENT_MARGIN_S = 0.4
 
 
 def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dict:
-    """Decode the comparison's simulated run window by window under a uniform prior."""
-    (
-        speed,
-        position,
-        spike_times,
-        time,
-        event_times,
-        _sampling_frequency,
-        is_event,
-        _place_fields,
-    ) = make_simulated_data(n_neurons=n_neurons)
+    """Simulate the comparison's recording and decode it both ways.
 
-    place_field_means = np.linspace(0, TRACK_HEIGHT_CM, n_neurons)
+    Parameters
+    ----------
+    n_neurons : int
+        Number of place cells; the figure's is :data:`N_NEURONS`.
+    config : MemorylessSequenceConfig
+        The sliding-window detector's settings.
 
-    # the package has no remote stationary event; add one in the last pause,
-    # and hold it out of training like every other event
-    spike_times, remote_stationary = splice_remote_stationary(
-        spike_times, place_field_means, float(event_times[4, 0])
-    )
-    event_times = np.vstack([event_times, remote_stationary])
-    is_event |= (time >= remote_stationary[0]) & (time <= remote_stationary[1])
+    Returns
+    -------
+    dict
+        The recording (``time``, ``position``, ``speed``, ``spike_times``,
+        ``place_field_means``, ``event_times``), the sliding-window decode and
+        its candidate sequences (``posterior``, ``midpoint_s``, ``candidates``,
+        ``shuffles``), and the state-space decode on ``time``
+        (``state_names``, ``state_probabilities``, ``non_local_probability``,
+        ``state_space_posterior`` over ``state_space_position_bins``, and its
+        events, ``state_space_intervals``).
+    """
+    run = simulate_run(n_neurons=n_neurons)
+    time, position, speed = run.time, run.position, run.speed
+    spike_times, place_field_means = run.spike_times, run.place_field_means
+    event_times = np.array(list(run.patterns.values()))
+    is_event = run.is_pattern.copy()
 
-    # two replays the detector is expected to mis-report, in the order
-    # SHORT_PATH_EVENT, SHORT_REPLAY_EVENT
+    # two replays the sliding-window detector is expected to mis-report, in the
+    # order SHORT_PATH_EVENT, SHORT_REPLAY_EVENT
     for replay in (SHORT_PATH, SHORT_REPLAY):
         spike_times, bounds = inject_replay(
             spike_times,
@@ -188,11 +184,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         is_event |= (time >= bounds[0]) & (time <= bounds[1])
 
     # a still event at the animal's place with one window decoded far away,
-    # hand-placed in the first stillness clear of every other event. It is
-    # written into the spikes that are decoded and nowhere else: the encoding
-    # model is fitted on the recording as it was before, so adding this event
-    # leaves every other panel exactly as it was
-    training_spike_times, is_training_event = spike_times, is_event.copy()
+    # hand-placed in the first stillness clear of every other event
     clear = without(
         immobile_intervals(
             time, speed, config.speed_threshold_cm_per_s, minimum_duration_s=1.0
@@ -200,7 +192,6 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         event_times,
         margin_s=STRAY_WINDOW_PLACEMENT_MARGIN_S,
     )
-
     stray_local_cm = float(np.interp(STRAY_WINDOW_AT_S, time, position))
     spike_times, stray = stray_window_spikes(
         spike_times,
@@ -220,33 +211,19 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
             "stillness clear of every other event; move STRAY_WINDOW_AT_S."
         )
     event_times = np.vstack([event_times, stray.bounds])
-    is_event |= (time >= stray.bounds[0]) & (time <= stray.bounds[1])
-
-    time, position, speed, is_event, is_training_event = (
-        array[::DECODE_BIN_STRIDE]
-        for array in (time, position, speed, is_event, is_training_event)
-    )
+    is_event |= (time >= stray.cleared[0]) & (time <= stray.cleared[1])
 
     # encode on non-event data only, the analogue of this project's no-ripple
     # training mask; spikes inside an event must not shape the place fields
-    is_training = ~is_training_event
-
-    # the grid both procedures decode on comes from the config, matching the sweep
-    detector = NonLocalSortedSpikesDetector(
-        environments=[Environment(place_bin_size=config.place_bin_size_cm)],
-        sorted_spikes_algorithm="sorted_spikes_kde",
-        sorted_spikes_algorithm_params={"position_std": 6.0, "block_size": int(2**8)},
-        local_position_std=LOCAL_POSITION_STD,
+    detector, results = estimate_state_space_model(
+        time, position, spike_times, ~is_event
     )
-    # fit rather than estimate_parameters, matching the sweep: EM would
-    # re-estimate the place fields and the transitions on the data it is then
-    # read on, and the two scripts should not differ in that.
-    detector.fit(
-        position_time=time,
-        position=position,
-        spike_times=training_spike_times,
-        is_training=is_training,
-    )
+    non_local_probability = nonlocal_state_probability(
+        results.acausal_state_probabilities
+    ).squeeze()
+    events, _ = detect_nonlocal_events(non_local_probability, speed, time)
+    # No-Spike has no position, so its bins are NaN and drop out of the sum.
+    by_state = results["acausal_posterior"].unstack("state_bins")
 
     # one set of place fields for both procedures, read from the detector that
     # fitted them; the sliding window decodes them as the reference does, with
@@ -259,24 +236,18 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     result = sorted_spikes_epoch_log_likelihood(
         time, position, spike_times, encoding_model, config
     )
-    # the decode grid's rows, its final sample dropped as the likelihood drops
-    # its own; the state-space detector predicts on these
-    decode_rows = time[:-1]
-    position, speed = position[:-1], speed[:-1]
-
     posterior = normalize_windows(
         aggregate_windows(
             result.log_likelihood, config.window_n_samples, config.stride_n_samples
         )
     )
     midpoint_s = window_midpoints_s(result.time, config)
-    window_speed = np.interp(midpoint_s, decode_rows, speed)
+    window_speed = np.interp(midpoint_s, time, speed)
     bin_distance_cm = interior_bin_distances_cm(environment)
     candidates = detect_candidate_sequences(
         posterior, midpoint_s, bin_distance_cm, window_speed, config
     )
-    # the reference's own significance test, on the full decode grid: the
-    # likelihood's grid has lost the final row, which spikes are binned against
+    # the reference's own significance test
     shuffles = {
         int(i): shuffle_candidate_sorted(
             int(candidates.runs[i, 0]),
@@ -294,12 +265,13 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
 
     return {
         "detector": detector,
-        "time": decode_rows,
+        "time": time,
+        # the grid spikes are binned against: the decode grid itself
         "binning_time": time,
-        "is_event": is_event[:-1],
         "position": position,
         "speed": speed,
         "spike_times": spike_times,
+        "place_field_means": place_field_means,
         "event_times": event_times,
         "place_bin_centers_cm": result.place_bin_centers_cm,
         "posterior": posterior,
@@ -311,4 +283,16 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         "stray_window": stray,
         "stray_window_local_cm": stray_local_cm,
         "stray_window_remote_cm": float(place_field_means[stray.remote_cell]),
+        "state_names": tuple(
+            str(name) for name in results.acausal_state_probabilities.states.values
+        ),
+        "state_probabilities": np.asarray(results.acausal_state_probabilities.values),
+        "non_local_probability": np.asarray(non_local_probability.values),
+        "state_space_posterior": np.asarray(
+            by_state.sum("state").transpose("time", "position").values
+        ),
+        "state_space_position_bins": np.asarray(by_state.coords["position"].values),
+        "state_space_intervals": list(
+            zip(events["start_time"].tolist(), events["end_time"].tolist(), strict=True)
+        ),
     }

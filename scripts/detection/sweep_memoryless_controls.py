@@ -58,6 +58,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_summaries
     controls_summary,
 )
 from continuum_swr_replay.paths import detection_comparison_dir
+from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.io import write_table
 
@@ -65,6 +66,8 @@ SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_controls_summary.
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    # the CPU unless JAX_PLATFORMS names another, as the replay sweep
+    default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-seeds", type=int, default=8)
     parser.add_argument("--n-recordings", type=int, default=N_RECORDINGS)

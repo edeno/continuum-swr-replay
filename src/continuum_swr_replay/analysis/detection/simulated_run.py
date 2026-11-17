@@ -28,6 +28,7 @@ different recording and a different decode: see that module.
 from dataclasses import dataclass
 
 import numpy as np
+import xarray as xr
 from non_local_detector import NonLocalSortedSpikesDetector
 from non_local_detector.environment import Environment
 from non_local_detector.simulate.sorted_spikes_simulation import (
@@ -57,8 +58,11 @@ __all__ = [
     "REMOTE_STATIONARY_S",
     "SILENCE_DURATION_S",
     "DecodedSimulation",
+    "SimulatedRun",
+    "estimate_state_space_model",
     "make_example_detector",
     "simulate_and_decode",
+    "simulate_run",
     "splice_remote_stationary",
 ]
 
@@ -165,6 +169,73 @@ def make_example_detector() -> NonLocalSortedSpikesDetector:
     )
 
 
+def estimate_state_space_model(
+    time: np.ndarray,
+    position: np.ndarray,
+    spike_times: list[np.ndarray],
+    is_training: np.ndarray,
+) -> tuple[NonLocalSortedSpikesDetector, xr.Dataset]:
+    """Fit Figure 1's detector to a simulated recording as a real decode is fitted.
+
+    The encoding model and the transitions are estimated by EM
+    (``estimate_parameters``, as in ``decoding.fit.perform_decoding``).
+
+    EM also replaces the detector's initial conditions with the posterior at the
+    recording's first time bin, and a detector left like that returns an all-zero
+    posterior for any stretch that starts elsewhere (non_local_detector issue
+    232). The initial conditions are therefore put back to the model's prior
+    after the fit, so that the returned detector can ``predict`` on a window of
+    the recording; ``results``, the decode of the whole recording, is the EM
+    pass's own.
+
+    Parameters
+    ----------
+    time : np.ndarray, shape (n_time,)
+        The decode grid, in seconds.
+    position : np.ndarray, shape (n_time,)
+        The animal's position on it, in cm.
+    spike_times : list of np.ndarray
+        Each cell's spike times, in seconds.
+    is_training : np.ndarray, shape (n_time,)
+        The bins the place fields are fitted on.
+
+    Returns
+    -------
+    detector : NonLocalSortedSpikesDetector
+        Fitted, with the prior's initial conditions.
+    results : xr.Dataset
+        The decode of the recording it was fitted on.
+    """
+    detector = make_example_detector()
+    prior = np.array(detector.discrete_initial_conditions)
+    results = detector.estimate_parameters(
+        position_time=time,
+        position=position,
+        spike_times=spike_times,
+        time=time,
+        is_training=is_training,
+    )
+    detector.discrete_initial_conditions = prior
+    detector.initialize_initial_conditions()
+    return detector, results
+
+
+@dataclass(frozen=True)
+class SimulatedRun:
+    """The simulated run of Figure 1, before it is decoded.
+
+    Every array with a time axis is on the decode grid, ``time``.
+    """
+
+    time: np.ndarray  # (n_time,), s
+    position: np.ndarray  # (n_time,), cm
+    speed: np.ndarray  # (n_time,), cm/s
+    spike_times: list[np.ndarray]  # spike times (s) per cell, in simulator order
+    place_field_means: np.ndarray  # (n_neurons,), cm, in the order of spike_times
+    patterns: dict[str, tuple[float, float]]  # s; when each of PATTERNS occurs
+    is_pattern: np.ndarray  # (n_time,), bool: inside a pattern or a simulator event
+
+
 @dataclass(frozen=True)
 class DecodedSimulation:
     """The simulated run and what the detector decoded from it.
@@ -187,13 +258,8 @@ class DecodedSimulation:
     non_local_events: list[tuple[float, float]]  # s; by the project's event rule
 
 
-def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation:
-    """Simulate the run of Figure 1, decode it and find its non-local events.
-
-    The encoding model and the transitions are estimated by EM
-    (``estimate_parameters``, as in ``decoding.fit.perform_decoding``) on the
-    time outside the patterns: spikes inside a pattern do not shape the place
-    fields, as a real decode's training mask keeps ripple times out.
+def simulate_run(n_neurons: int = 30, seed: int = 0) -> SimulatedRun:
+    """Simulate the run of Figure 1: the simulator's recording with its patterns.
 
     Parameters
     ----------
@@ -204,7 +270,7 @@ def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation
 
     Returns
     -------
-    DecodedSimulation
+    SimulatedRun
     """
     (
         speed,
@@ -271,13 +337,39 @@ def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation
         for array in (time, position, speed, is_event)
     )
 
-    detector = make_example_detector()
-    results = detector.estimate_parameters(
-        position_time=time,
-        position=position,
-        spike_times=spike_times,
+    return SimulatedRun(
         time=time,
-        is_training=~is_event,
+        position=position,
+        speed=speed,
+        spike_times=spike_times,
+        place_field_means=place_field_means,
+        patterns=patterns,
+        is_pattern=is_event,
+    )
+
+
+def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation:
+    """Simulate the run of Figure 1, decode it and find its non-local events.
+
+    The model is fitted (:func:`estimate_state_space_model`) on the time outside
+    the patterns: spikes inside a pattern do not shape the place fields, as a
+    real decode's training mask keeps ripple times out.
+
+    Parameters
+    ----------
+    n_neurons : int, optional
+        Number of place cells, by default 30.
+    seed : int, optional
+        Seed of ``make_simulated_data``'s random generator, by default 0.
+
+    Returns
+    -------
+    DecodedSimulation
+    """
+    run = simulate_run(n_neurons=n_neurons, seed=seed)
+    time, speed = run.time, run.speed
+    detector, results = estimate_state_space_model(
+        time, run.position, run.spike_times, ~run.is_pattern
     )
 
     non_local_probability = nonlocal_state_probability(
@@ -295,10 +387,10 @@ def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation
 
     return DecodedSimulation(
         time=time,
-        position=position,
+        position=run.position,
         speed=speed,
-        sorted_spikes=[spike_times[i] for i in order],
-        place_field_means=place_field_means[order],
+        sorted_spikes=[run.spike_times[i] for i in order],
+        place_field_means=run.place_field_means[order],
         state_names=tuple(
             str(name) for name in results.acausal_state_probabilities.states.values
         ),
@@ -312,7 +404,7 @@ def simulate_and_decode(n_neurons: int = 30, seed: int = 0) -> DecodedSimulation
         ),
         position_bins=np.asarray(by_state.coords["position"].values),
         non_local_probability=np.asarray(non_local_probability.values),
-        patterns=patterns,
+        patterns=run.patterns,
         non_local_events=list(
             zip(events["start_time"].tolist(), events["end_time"].tolist(), strict=True)
         ),
