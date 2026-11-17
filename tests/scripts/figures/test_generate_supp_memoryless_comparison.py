@@ -46,6 +46,9 @@ def test_a_sliding_window_report_of_a_replay_held_still_is_refused(summary):
 def test_the_examples_name_distinct_events_reported_ones_first():
     events = [example.event for example in figure.EXAMPLES]
     assert len(set(events)) == len(events)
-    # the replays both detectors report come first
-    expected = [example.expected for example in figure.EXAMPLES]
-    assert expected == sorted(expected, key=["found", "declined"].index)
+    # the columns run in the order of their headings, each heading's together
+    groups = [example.group for example in figure.EXAMPLES]
+    assert groups == sorted(groups, key=list(figure.EXAMPLE_GROUPS).index)
+    # the scattered positions are not filed with the replays
+    scattered = next(e for e in figure.EXAMPLES if e.event == figure.FRAGMENTED_EVENT)
+    assert scattered.group == "no_trajectory"

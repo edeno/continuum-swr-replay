@@ -311,3 +311,16 @@ def test_recording_numbers(decoded):
     for key, value in expected.items():
         assert numbers[key] == pytest.approx(value), key
     assert isinstance(numbers["sweep_draws_from_passing"], int)
+
+
+def test_dominant_state_is_the_most_probable_over_the_event():
+    decoded = {
+        "time": np.array([0.0, 0.1, 0.2, 0.3]),
+        "event_times": np.array([(0.1, 0.2)]),
+        "state_names": ("Local", "Non-Local Fragmented"),
+        # Local outside the event, mostly Fragmented inside it
+        "state_probabilities": np.array(
+            [[1.0, 0.0], [0.4, 0.6], [0.1, 0.9], [1.0, 0.0]]
+        ),
+    }
+    assert rs.dominant_state(decoded, 0) == "Non-Local Fragmented"

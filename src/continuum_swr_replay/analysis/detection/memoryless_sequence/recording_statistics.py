@@ -43,6 +43,7 @@ __all__ = [
     "bound_error_ms",
     "candidates_overlapping",
     "decoded_center_cm",
+    "dominant_state",
     "draws_from_passing",
     "duration_ratio",
     "duration_ratios",
@@ -214,6 +215,19 @@ def best_dispersion_cm(decoded: dict, event: int) -> float:
         (float(dispersion[i]) for i in candidates_overlapping(decoded, event)),
         default=float("nan"),
     )
+
+
+def dominant_state(decoded: dict, event: int) -> str:
+    """The state the state-space model gives most probability over an event.
+
+    The mean of each state's probability over the decode samples inside the
+    event, largest first; the name is the detector's own (``"Local"``,
+    ``"Non-Local Fragmented"``, ...).
+    """
+    start_s, end_s = decoded["event_times"][event]
+    inside = (decoded["time"] >= start_s) & (decoded["time"] <= end_s)
+    mean = decoded["state_probabilities"][inside].mean(axis=0)
+    return decoded["state_names"][int(np.argmax(mean))]
 
 
 def bound_error_ms(decoded: dict, events: tuple[int, ...]) -> float:

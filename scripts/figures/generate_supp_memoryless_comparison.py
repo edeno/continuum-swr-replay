@@ -85,6 +85,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
 from continuum_swr_replay.analysis.detection.memoryless_sequence.recording_statistics import (
     best_dispersion_cm,
     bound_error_ms,
+    dominant_state,
     duration_ratio,
     duration_ratios,
     is_reported,
@@ -200,6 +201,7 @@ class Example:
     name: str
     simulated: str  # what the simulated spikes do
     expected: str  # the sliding-window detector's verdict the figure commits to
+    group: str  # a key of EXAMPLE_GROUPS: the heading the column sits under
 
 
 EXAMPLES = (
@@ -208,34 +210,53 @@ EXAMPLES = (
         "Far from animal",
         f"{FAR_REPLAY.path_cm:.0f} cm in {1000 * FAR_REPLAY.duration_s:.0f} ms",
         "found",
+        "both",
     ),
-    Example(SWEEP_EVENT, "Ends at animal", "the whole track", "found"),
+    Example(SWEEP_EVENT, "Ends at animal", "the whole track", "found", "both"),
     Example(
-        SHORT_REPLAY_EVENT, "Brief", f"{1000 * SHORT_REPLAY.duration_s:.0f} ms", "found"
+        SHORT_REPLAY_EVENT,
+        "Brief",
+        f"{1000 * SHORT_REPLAY.duration_s:.0f} ms",
+        "found",
+        "both",
     ),
-    Example(SHORT_PATH_EVENT, "Short path", f"{SHORT_PATH.path_cm:.0f} cm", "declined"),
-    Example(REMOTE_STATIONARY_EVENT, "Stationary", "one remote position", "declined"),
-    Example(FRAGMENTED_EVENT, "Scattered", "no trajectory", "declined"),
     Example(
-        SPARSE_REPLAY_EVENT,
-        "Sparse",
-        "few spikes",
+        SHORT_PATH_EVENT,
+        "Short path",
+        f"{SHORT_PATH.path_cm:.0f} cm",
         "declined",
+        "state_space_only",
+    ),
+    Example(
+        REMOTE_STATIONARY_EVENT,
+        "Stationary",
+        "one remote position",
+        "declined",
+        "state_space_only",
+    ),
+    Example(
+        SPARSE_REPLAY_EVENT, "Sparse", "few spikes", "declined", "state_space_only"
+    ),
+    Example(
+        FRAGMENTED_EVENT, "Scattered", "Fragmented state", "declined", "no_trajectory"
     ),
 )
-"""Panel a's columns, each a simulated replay named for what sets it apart: the
-ones both detectors report, then the ones only the state-space model reports
-(:data:`EXAMPLE_GROUPS`). The sweep, the scattered event and the place held
-still are Figure 1's examples; the others are added to its run. The sparse
-replay is the far one at a lower peak firing rate."""
+"""Panel a's columns, each a simulated event named for what sets it apart, under
+the headings of :data:`EXAMPLE_GROUPS`. The sweep, the scattered event and the
+place held still are Figure 1's examples; the others are added to its run. The
+sparse replay is the far one at a lower peak firing rate."""
 
 EXAMPLE_GROUPS = {
-    "found": "Both detectors report",
-    "declined": "Only the state-space model reports",
+    "both": "Both detectors report",
+    "state_space_only": "Only the state-space model reports",
+    "no_trajectory": "Not a trajectory",
 }
-"""The heading over the columns the sliding-window detector reports, and over
-those it does not; :func:`check_recording_claims` stops unless the state-space
-model reports every one."""
+"""The heading over each run of columns. The first two hold replays: the ones the
+sliding-window detector reports and the ones it does not. The last holds spikes
+at scattered positions, which are not at the animal's position and are no
+trajectory either: the state-space model reports them, in its Fragmented state,
+which is how it tells them from a replay. :func:`check_recording_claims` stops
+unless the detectors do what each heading says."""
 
 
 def sliding_events(decoded: dict) -> list[tuple[float, float]]:
@@ -273,6 +294,18 @@ def check_recording_claims(decoded: dict, config: MemorylessSequenceConfig) -> N
                 f"The figure says the sliding-window detector {example.expected} "
                 f"the {example.name.lower()!r} example; the data say {got}."
             )
+        wanted = "found" if example.group == "both" else "declined"
+        if example.expected != wanted:
+            raise RuntimeError(
+                f"The {example.name.lower()!r} example sits under "
+                f"{EXAMPLE_GROUPS[example.group]!r} but is expected {example.expected}."
+            )
+    if dominant_state(decoded, FRAGMENTED_EVENT) != "Non-Local Fragmented":
+        raise RuntimeError(
+            "The figure says the state-space model reports the scattered event in "
+            "its Fragmented state; its most probable state there is "
+            f"{dominant_state(decoded, FRAGMENTED_EVENT)!r}."
+        )
     for event in (SHORT_PATH_EVENT, REMOTE_STATIONARY_EVENT):
         if not best_dispersion_cm(decoded, event) < config.dispersion_threshold_cm:
             raise RuntimeError(
@@ -491,11 +524,11 @@ def plot_examples(
                 color=STATE_SPACE_COLOR,
             )
 
-    # A heading over each run of columns the sliding window does or does not
-    # report, with a rule as wide as the columns it covers.
-    expected = [example.expected for example in EXAMPLES]
-    for verdict_, heading in EXAMPLE_GROUPS.items():
-        columns = [k for k, e in enumerate(expected) if e == verdict_]
+    # A heading over each run of columns, with a rule as wide as the columns it
+    # covers.
+    groups = [example.group for example in EXAMPLES]
+    for group, heading in EXAMPLE_GROUPS.items():
+        columns = [k for k, name in enumerate(groups) if name == group]
         first, last = rasters[columns[0]], rasters[columns[-1]]
         left, right = first.get_position().x0, last.get_position().x1
         # the columns' span on the first one's own x axis, where 1 is its width

@@ -137,7 +137,8 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         The recording (``time``, ``position``, ``spike_times``,
         ``event_times``), the sliding-window decode and its candidate sequences
         (``posterior``, ``midpoint_s``, ``candidates``, ``shuffles``), and the
-        state-space decode on ``time`` (``state_space_posterior`` over
+        state-space decode on ``time`` (``state_names``,
+        ``state_probabilities``, ``state_space_posterior`` over
         ``state_space_position_bins``, and its events,
         ``state_space_intervals``; ``simulated_run.read_state_space_decode``).
     """
@@ -192,6 +193,8 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         "candidates": sliding.candidates,
         "shuffles": sliding.shuffles,
         "bin_distance_cm": fields["bin_distance_cm"],
+        "state_names": decode.state_names,
+        "state_probabilities": decode.state_probabilities,
         "state_space_posterior": decode.posterior,
         "state_space_position_bins": decode.position_bins,
         "state_space_intervals": decode.non_local_events,
