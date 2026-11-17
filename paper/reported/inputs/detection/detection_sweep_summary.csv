@@ -640,6 +640,7 @@ timing_exceedance,state_space_end_error_beyond_500ms,,,0.0,
 timing_exceedance,state_space_end_error_beyond_700ms,,,0.0,
 timing_exceedance,state_space_end_error_beyond_1000ms,,,0.0,
 provenance,produced_by,,,,scripts/detection/sweep_memoryless_detection.py
-provenance,produced_at,,,,2026-11-17T13:47:24+00:00
-provenance,git_commit,,,,b4a1d327f5fe
+provenance,produced_at,,,,2026-11-17T15:01:18+00:00
+provenance,git_commit,,,,082cdef60ad7
+provenance,summary_git_commit,,,,082cdef60ad7
 provenance,n_cells_total,,,,9912
