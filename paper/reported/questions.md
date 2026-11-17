@@ -16,7 +16,7 @@ it calls.
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
-| `detection.json` | `87b31989c0bb` | yes | 146 | 0 |
+| `detection.json` | `ce69d2d8285c` | yes | 146 | 0 |
 | `events.json` | `d7d80592187f` | yes | 353 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
@@ -75,7 +75,7 @@ Status: computed. Figures: 1, memoryless_comparison. Values: 58.
 Sources:
 
 - paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
-- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)
+- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit af32738aada6)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
