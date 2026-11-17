@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "a71e9cec4c3f",
+ "commit": "fbc31d3f204c",
  "code": {
-  "head": "a71e9cec4c3fba70e5185e30af79d0fc4cb500fc",
+  "head": "fbc31d3f204c98361f8fa13e945db86e36d3e46b",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -255,12 +255,12 @@
     "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
    },
    "paper/reported/inputs/detection/memoryless_comparison_recording.json": {
-    "sha256": "240eeaea804b86b0f875fee60e991e8451a1c01c91f0316355d6eef80e650aa8",
-    "code_sha256": "240eeaea804b86b0f875fee60e991e8451a1c01c91f0316355d6eef80e650aa8"
+    "sha256": "395bd5b98c7e6505934a58a338852859457942673f037d6ca26aedb3ef396d1b",
+    "code_sha256": "395bd5b98c7e6505934a58a338852859457942673f037d6ca26aedb3ef396d1b"
    },
    "paper/reported/inputs/detection/detection_sweep_summary.csv": {
-    "sha256": "225c71d703d0fea03b865c95c45bf638bcf8143368386a7c2688ff32dc27f371",
-    "code_sha256": "225c71d703d0fea03b865c95c45bf638bcf8143368386a7c2688ff32dc27f371"
+    "sha256": "26232d566dddc6925df974703864896be9a3391b217997d3f3e92328205c60d9",
+    "code_sha256": "26232d566dddc6925df974703864896be9a3391b217997d3f3e92328205c60d9"
    },
    "paper/reported/inputs/detection/detection_controls_summary.csv": {
     "sha256": "d153bb94bfd368dde965c17e9b69f21716982b8d0bd02deda6f02081217370ad",
@@ -291,11 +291,11 @@
   },
   {
    "path": "paper/reported/inputs/detection/memoryless_comparison_recording.json",
-   "sha256": "240eeaea804b86b0f875fee60e991e8451a1c01c91f0316355d6eef80e650aa8"
+   "sha256": "395bd5b98c7e6505934a58a338852859457942673f037d6ca26aedb3ef396d1b"
   },
   {
    "path": "paper/reported/inputs/detection/detection_sweep_summary.csv",
-   "sha256": "225c71d703d0fea03b865c95c45bf638bcf8143368386a7c2688ff32dc27f371"
+   "sha256": "26232d566dddc6925df974703864896be9a3391b217997d3f3e92328205c60d9"
   },
   {
    "path": "paper/reported/inputs/detection/detection_controls_summary.csv",
@@ -1515,7 +1515,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1531,7 +1531,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1547,7 +1547,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1563,7 +1563,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1579,7 +1579,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1595,7 +1595,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1611,7 +1611,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1627,7 +1627,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1643,7 +1643,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1659,7 +1659,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1675,7 +1675,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1691,7 +1691,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)",
    "function": "recording_values",
    "pending": null
   },
@@ -1754,7 +1754,7 @@
    "pending": null
   },
   "sweep_domain_sliding_before_test_fraction": {
-   "value": 0.7000868055555556,
+   "value": 0.7118055555555556,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1770,7 +1770,7 @@
    "pending": null
   },
   "sweep_domain_sliding_fraction": {
-   "value": 0.6575520833333334,
+   "value": 0.6701388888888888,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1786,7 +1786,7 @@
    "pending": null
   },
   "sweep_domain_state_space_fraction": {
-   "value": 0.9952256944444444,
+   "value": 0.9947916666666666,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1802,7 +1802,7 @@
    "pending": null
   },
   "sweep_domain_state_space_published_fraction": {
-   "value": 0.7903645833333334,
+   "value": 0.7712673611111112,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1818,7 +1818,7 @@
    "pending": null
   },
   "sweep_failed_test_fraction": {
-   "value": 0.0206573989866181,
+   "value": 0.0205452390359541,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1834,7 +1834,7 @@
    "pending": null
   },
   "sweep_jump_half_pass_fraction": {
-   "value": 0.920314253647587,
+   "value": 0.9257017061089708,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1850,7 +1850,7 @@
    "pending": null
   },
   "sweep_jump_half_pass_longest_fraction": {
-   "value": 0.9798387096774194,
+   "value": 0.974903474903475,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1866,7 +1866,7 @@
    "pending": null
   },
   "sweep_jump_half_pass_shortest_fraction": {
-   "value": 0.2,
+   "value": 0.5714285714285714,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1898,7 +1898,7 @@
    "pending": null
   },
   "sweep_sliding_before_test_fraction": {
-   "value": 0.1797820823244552,
+   "value": 0.1833131557707829,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1914,7 +1914,7 @@
    "pending": null
   },
   "sweep_sliding_fraction": {
-   "value": 0.1636400322841,
+   "value": 0.1675746569814366,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1930,7 +1930,7 @@
    "pending": null
   },
   "sweep_sliding_not_the_replay_fraction": {
-   "value": 0.0240963855421686,
+   "value": 0.0215401184706515,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1946,7 +1946,7 @@
    "pending": null
   },
   "sweep_sliding_only_before_test_replays": {
-   "value": 1,
+   "value": 0,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -1978,7 +1978,7 @@
    "pending": null
   },
   "sweep_sliding_spread_only_fraction": {
-   "value": 0.1760492332526231,
+   "value": 0.1796811945117029,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1994,7 +1994,7 @@
    "pending": null
   },
   "sweep_spread_half_pass_fraction": {
-   "value": 0.979236812570146,
+   "value": 0.9801871216290589,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2010,7 +2010,7 @@
    "pending": null
   },
   "sweep_state_space_fraction": {
-   "value": 0.9401735270379338,
+   "value": 0.9336158192090396,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2026,7 +2026,7 @@
    "pending": null
   },
   "sweep_state_space_only_fraction": {
-   "value": 0.7765334947538337,
+   "value": 0.7660411622276029,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2042,7 +2042,7 @@
    "pending": null
   },
   "sweep_timing_replays": {
-   "value": 1622,
+   "value": 1661,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2058,7 +2058,7 @@
    "pending": null
   },
   "sweep_timing_sliding_larger_offset_fraction": {
-   "value": 0.9741060419235512,
+   "value": 0.9765201685731488,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2074,7 +2074,7 @@
    "pending": null
   },
   "sweep_timing_sliding_larger_onset_fraction": {
-   "value": 0.9741060419235512,
+   "value": 0.9650812763395544,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2090,7 +2090,7 @@
    "pending": null
   },
   "sweep_timing_sliding_offset_far_fraction": {
-   "value": 0.1054254007398273,
+   "value": 0.0951234196267308,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2106,7 +2106,7 @@
    "pending": null
   },
   "sweep_timing_sliding_offset_lower_quartile_ms": {
-   "value": 17.559199134733028,
+   "value": 16.914158027674375,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2122,7 +2122,7 @@
    "pending": null
   },
   "sweep_timing_sliding_offset_max_ms": {
-   "value": 956.6338712046328,
+   "value": 987.7183868566348,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2138,7 +2138,7 @@
    "pending": null
   },
   "sweep_timing_sliding_offset_median_ms": {
-   "value": 26.77930666699524,
+   "value": 26.33749201469016,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2154,7 +2154,7 @@
    "pending": null
   },
   "sweep_timing_sliding_offset_min_ms": {
-   "value": -292.7832558630996,
+   "value": -240.14622875426997,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2170,7 +2170,7 @@
    "pending": null
   },
   "sweep_timing_sliding_offset_upper_quartile_ms": {
-   "value": 32.24733404722535,
+   "value": 32.12873596106647,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2186,7 +2186,7 @@
    "pending": null
   },
   "sweep_timing_sliding_onset_far_fraction": {
-   "value": 0.1035758323057953,
+   "value": 0.1047561709813365,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2202,7 +2202,7 @@
    "pending": null
   },
   "sweep_timing_sliding_onset_lower_quartile_ms": {
-   "value": -37.11665104011175,
+   "value": -37.11807264945577,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2218,7 +2218,7 @@
    "pending": null
   },
   "sweep_timing_sliding_onset_max_ms": {
-   "value": 293.8906344247769,
+   "value": 220.74835138728588,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2234,7 +2234,7 @@
    "pending": null
   },
   "sweep_timing_sliding_onset_median_ms": {
-   "value": -31.794581431235255,
+   "value": -32.34170544291004,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2250,7 +2250,7 @@
    "pending": null
   },
   "sweep_timing_sliding_onset_min_ms": {
-   "value": -978.5042752708932,
+   "value": -977.1652297447986,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2266,7 +2266,7 @@
    "pending": null
   },
   "sweep_timing_sliding_onset_upper_quartile_ms": {
-   "value": -22.93856129369232,
+   "value": -23.43980499815501,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2282,7 +2282,7 @@
    "pending": null
   },
   "sweep_timing_state_space_offset_far_fraction": {
-   "value": 0.001233045622688,
+   "value": 0.0006020469596628,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2298,7 +2298,7 @@
    "pending": null
   },
   "sweep_timing_state_space_offset_lower_quartile_ms": {
-   "value": 1.0741134217209236,
+   "value": 1.109494474022199,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2314,7 +2314,7 @@
    "pending": null
   },
   "sweep_timing_state_space_offset_max_ms": {
-   "value": 14.326908818070194,
+   "value": 26.45014682091329,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2330,7 +2330,7 @@
    "pending": null
   },
   "sweep_timing_state_space_offset_median_ms": {
-   "value": 3.5579619394567885,
+   "value": 3.592705376071592,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2346,7 +2346,7 @@
    "pending": null
   },
   "sweep_timing_state_space_offset_min_ms": {
-   "value": -139.91472173134412,
+   "value": -111.3996236112058,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2362,7 +2362,7 @@
    "pending": null
   },
   "sweep_timing_state_space_offset_upper_quartile_ms": {
-   "value": 5.524320751429279,
+   "value": 5.585996105622826,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2378,7 +2378,7 @@
    "pending": null
   },
   "sweep_timing_state_space_onset_far_fraction": {
-   "value": 0.000616522811344,
+   "value": 0.0018061408789885,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2394,7 +2394,7 @@
    "pending": null
   },
   "sweep_timing_state_space_onset_lower_quartile_ms": {
-   "value": -10.647500623935713,
+   "value": -10.430731619503142,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2410,7 +2410,7 @@
    "pending": null
   },
   "sweep_timing_state_space_onset_max_ms": {
-   "value": 206.12615798818723,
+   "value": 366.2786038256698,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2426,7 +2426,7 @@
    "pending": null
   },
   "sweep_timing_state_space_onset_median_ms": {
-   "value": -6.665834872670473,
+   "value": -6.729689686757467,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2442,7 +2442,7 @@
    "pending": null
   },
   "sweep_timing_state_space_onset_min_ms": {
-   "value": -19.271442461080923,
+   "value": -17.947960489458126,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -2458,7 +2458,7 @@
    "pending": null
   },
   "sweep_timing_state_space_onset_upper_quartile_ms": {
-   "value": -3.4623670889659675,
+   "value": -3.45308652112486,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",

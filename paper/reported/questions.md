@@ -16,7 +16,7 @@ it calls.
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
-| `detection.json` | `a71e9cec4c3f` | yes | 146 | 0 |
+| `detection.json` | `fbc31d3f204c` | yes | 146 | 0 |
 | `events.json` | `d7d80592187f` | yes | 353 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
@@ -75,7 +75,7 @@ Status: computed. Figures: 1, memoryless_comparison. Values: 58.
 Sources:
 
 - paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
-- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 2d1320b47992)
+- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 59f28d0ba47d)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -92,50 +92,50 @@ Sources:
 | `\DetectionRecordingSweepPJump` | 0.0099 |  | significance test of the sweep: jump half | `detection.recording_values` | memoryless_comparison |
 | `\DetectionRecordingSweepPSpread` | 0.0099 |  | significance test of the sweep: spread half | `detection.recording_values` | memoryless_comparison |
 | `\DetectionSweepDomainFraction` | 23 |  | share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepDomainSlidingBeforeTestFraction` | 70 |  | on the shared target, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepDomainSlidingFraction` | 66 |  | on the shared target, share the sliding-window detector reports after its significance test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepDomainStateSpaceFraction` | 100 |  | on the shared target, share the state-space detector reports under its own acceptance criteria | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepDomainStateSpacePublishedFraction` | 79 |  | on the shared target, share the state-space detector reports held to the published duration and dispersion criteria | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainSlidingBeforeTestFraction` | 71 |  | on the shared target, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainSlidingFraction` | 67 |  | on the shared target, share the sliding-window detector reports after its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainStateSpaceFraction` | 99 |  | on the shared target, share the state-space detector reports under its own acceptance criteria | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainStateSpacePublishedFraction` | 77 |  | on the shared target, share the state-space detector reports held to the published duration and dispersion criteria | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepFailedTestFraction` | 2 |  | share the sliding-window detector reported and then failed on its significance test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepJumpHalfPassFraction` | 92 |  | of the replays the sliding window reported before its test, share passing the test's jump half | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepJumpHalfPassLongestFraction` | 98 |  | share of the longest (500 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepJumpHalfPassShortestFraction` | 20 |  | share of the shortest (40 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassFraction` | 93 |  | of the replays the sliding window reported before its test, share passing the test's jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassLongestFraction` | 97 |  | share of the longest (500 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassShortestFraction` | 57 |  | share of the shortest (40 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepReplays` | 9,912 |  | replays swept (grid cells) | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingBeforeTestFraction` | 18 |  | over the whole grid, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingFraction` | 16 |  | over the whole grid, share the sliding-window detector reports under its own criteria, significance test included | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingFraction` | 17 |  | over the whole grid, share the sliding-window detector reports under its own criteria, significance test included | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingNotTheReplayFraction` | 2 |  | share of the sliding-window detector's accepted events that are not the replay put in | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingOnlyBeforeTestReplays` | 1 |  | the same, counting the sliding window's reports before its test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingOnlyBeforeTestReplays` | 0 |  | the same, counting the sliding window's reports before its test | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingOnlyReplays` | 0 |  | swept replays the sliding-window detector reported and the state-space detector did not | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingSpreadOnlyFraction` | 18 |  | over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSpreadHalfPassFraction` | 98 |  | of the replays the sliding window reported before its test, share passing the test's spread half | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepStateSpaceFraction` | 94 |  | over the whole grid, share the state-space detector reports under its own criteria | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepStateSpaceOnlyFraction` | 78 |  | share of the swept replays reported by the state-space detector and not by the sliding-window detector | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingReplays` | 1,622 |  | replays both detectors report, which the pooled timing errors are of | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingSlidingLargerOffsetFraction` | 97 |  | share of the replays both detectors report on which the sliding window's absolute offset error is the larger of the two | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepStateSpaceFraction` | 93 |  | over the whole grid, share the state-space detector reports under its own criteria | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepStateSpaceOnlyFraction` | 77 |  | share of the swept replays reported by the state-space detector and not by the sliding-window detector | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingReplays` | 1,661 |  | replays both detectors report, which the pooled timing errors are of | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingSlidingLargerOffsetFraction` | 98 |  | share of the replays both detectors report on which the sliding window's absolute offset error is the larger of the two | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingSlidingLargerOnsetFraction` | 97 |  | share of the replays both detectors report on which the sliding window's absolute onset error is the larger of the two | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingSlidingOffsetFarFraction` | 11 |  | share of the replays both detectors report whose offset the sliding window places more than 100 ms from the replay's last spike | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingSlidingOffsetLowerQuartileMs` | 18 | ms | lower quartile of the offset error of the sliding window against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingSlidingOffsetMaxMs` | 957 | ms | largest offset error of the sliding window against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingSlidingOffsetMedianMs` | 27 | ms | median offset error of the sliding window against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingSlidingOffsetMinMs` | −293 | ms | smallest offset error of the sliding window against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingSlidingOffsetFarFraction` | 10 |  | share of the replays both detectors report whose offset the sliding window places more than 100 ms from the replay's last spike | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingSlidingOffsetLowerQuartileMs` | 17 | ms | lower quartile of the offset error of the sliding window against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingSlidingOffsetMaxMs` | 988 | ms | largest offset error of the sliding window against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingSlidingOffsetMedianMs` | 26 | ms | median offset error of the sliding window against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingSlidingOffsetMinMs` | −240 | ms | smallest offset error of the sliding window against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingSlidingOffsetUpperQuartileMs` | 32 | ms | upper quartile of the offset error of the sliding window against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingSlidingOnsetFarFraction` | 10 |  | share of the replays both detectors report whose onset the sliding window places more than 100 ms from the replay's first spike | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingSlidingOnsetLowerQuartileMs` | −37 | ms | lower quartile of the onset error of the sliding window against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingSlidingOnsetMaxMs` | 294 | ms | largest onset error of the sliding window against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingSlidingOnsetMaxMs` | 221 | ms | largest onset error of the sliding window against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingSlidingOnsetMedianMs` | −32 | ms | median onset error of the sliding window against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingSlidingOnsetMinMs` | −979 | ms | smallest onset error of the sliding window against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingSlidingOnsetMinMs` | −977 | ms | smallest onset error of the sliding window against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingSlidingOnsetUpperQuartileMs` | −23 | ms | upper quartile of the onset error of the sliding window against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingStateSpaceOffsetFarFraction` | 0 |  | share of the replays both detectors report whose offset the state-space detector places more than 100 ms from the replay's last spike | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingStateSpaceOffsetLowerQuartileMs` | 1 | ms | lower quartile of the offset error of the state-space detector against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingStateSpaceOffsetMaxMs` | 14 | ms | largest offset error of the state-space detector against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingStateSpaceOffsetMaxMs` | 26 | ms | largest offset error of the state-space detector against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingStateSpaceOffsetMedianMs` | 4 | ms | median offset error of the state-space detector against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingStateSpaceOffsetMinMs` | −140 | ms | smallest offset error of the state-space detector against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingStateSpaceOffsetMinMs` | −111 | ms | smallest offset error of the state-space detector against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingStateSpaceOffsetUpperQuartileMs` | 6 | ms | upper quartile of the offset error of the state-space detector against the replay's last spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingStateSpaceOnsetFarFraction` | 0 |  | share of the replays both detectors report whose onset the state-space detector places more than 100 ms from the replay's first spike | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingStateSpaceOnsetLowerQuartileMs` | −11 | ms | lower quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingStateSpaceOnsetMaxMs` | 206 | ms | largest onset error of the state-space detector against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingStateSpaceOnsetLowerQuartileMs` | −10 | ms | lower quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingStateSpaceOnsetMaxMs` | 366 | ms | largest onset error of the state-space detector against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingStateSpaceOnsetMedianMs` | −7 | ms | median onset error of the state-space detector against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepTimingStateSpaceOnsetMinMs` | −19 | ms | smallest onset error of the state-space detector against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepTimingStateSpaceOnsetMinMs` | −18 | ms | smallest onset error of the state-space detector against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepTimingStateSpaceOnsetUpperQuartileMs` | −3 | ms | upper quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report | `detection.sweep_values` | memoryless_comparison |
 
 ### 1.2. On simulated activity that is not one clean replay (rest with nothing added, events that represent no place, events whose place jumps, replays in two parts), what does each detector report?
