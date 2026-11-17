@@ -70,9 +70,7 @@ def test_a_sliding_window_that_does_not_start_early_and_end_late_is_refused(
 
 
 def test_the_sweep_descriptions_state_the_durations_the_summary_holds(sweep):
-    # every true duration doubled: the pass rates' 40 to 500 ms become 80 to
-    # 1000 ms, and the timing errors' 60 to 500 ms (the replays both detectors
-    # report) 120 to 1000 ms
+    # every true duration doubled: 80 to 1000 ms in place of 40 to 500 ms
     doubled = sweep.assign(duration_s=2 * sweep["duration_s"])
     description = {
         value.key: value.description
@@ -80,9 +78,9 @@ def test_the_sweep_descriptions_state_the_durations_the_summary_holds(sweep):
     }
     assert "shortest (80 ms)" in description["sweep_jump_half_pass_shortest_fraction"]
     assert "longest (1000 ms)" in description["sweep_jump_half_pass_longest_fraction"]
-    assert "shortest (120 ms)" in description["sweep_shortest_start_early_ms"]
-    assert "shortest (120 ms)" in description["sweep_shortest_reported_duration_ms"]
-    assert "(120 to 1000 ms)" in description["sweep_sliding_end_late_max_ms"]
+    assert "shortest (80 ms)" in description["sweep_shortest_start_early_ms"]
+    assert "shortest (80 ms)" in description["sweep_shortest_reported_duration_ms"]
+    assert "(80 to 1000 ms)" in description["sweep_sliding_end_late_max_ms"]
 
 
 def test_an_event_where_there_was_no_replay_is_refused(controls):

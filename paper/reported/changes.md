@@ -3760,3 +3760,34 @@ marker, and the computed value now there. Newest last.
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_placeless_sliding_before_test_fraction` | 6 | 3 |
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_jumping_continuous_fraction` | 35 | 42 |
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.controls_jumping_sliding_before_test_fraction` | 7 | 4 |
+
+## 2026-11-17
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_replays` | 5,376 | 9,912 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_replays` | 5,376 | 9,912 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_replays` | 5,376 | 9,912 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_before_test_fraction` | 16 | 18 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_fraction` | 15 | 16 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_spread_only_fraction` | 16 | 18 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_jump_half_pass_shortest_fraction` | 25 | 20 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_jump_half_pass_longest_fraction` | 97 | 98 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_spread_half_pass_fraction` | 97 | 98 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_fraction` | 15 | 16 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_not_the_replay_fraction` | 3 | 2 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_replays` | 5,376 | 9,912 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_state_space_only_fraction` | 79 | 78 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_domain_fraction` | 21 | 23 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_domain_sliding_fraction` | 64 | 66 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_domain_state_space_fraction` | 99 | 100 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_domain_state_space_published_fraction` | 78 | 79 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.recording_short_replay_duration_ratio` | 1.8 | 2.0 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_not_the_replay_fraction` | 3 | 2 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_shortest_start_early_ms` | 29 | 55 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_shortest_end_late_ms` | 31 | 29 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_end_late_upper_quartile_max_ms` | 184 | 36 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_state_space_edge_error_max_ms` | 5 | 8 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_replays` | 5,376 | 9,912 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_fraction` | 15 | 16 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.recording_short_replay_duration_ratio` | 1.8 | 2.0 |

@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "4bc1045f44a5",
+ "commit": "3858c5564cbd",
  "code": {
-  "head": "4bc1045f44a59fad3e87d1d487048981a66d0bb9",
+  "head": "3858c5564cbdcb93499e93eb9612e8a0d14c8c5e",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -31,8 +31,8 @@
     "code_sha256": "d13e698505baf703f76df758efb47db9b104ff5368c6e52f34734430c8313d56"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/comparison_simulation.py": {
-    "sha256": "007d6e41b0b796669c0045b96fc5261c0e5ef1ba50659e663117e8589db0e258",
-    "code_sha256": "0d31040ee2be58a99f88ed863d889776450462f9628212dcf02990a993ebc7a1"
+    "sha256": "4a0fdb9d46f485e56c68d2333a916cfb02576597f2e805f382c0dd62cda92f31",
+    "code_sha256": "9b396d5763716866e2d9cdadbb6300e19148ff825c04190c1f8eb9c444825e90"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/config.py": {
     "sha256": "9cb02ea860ed4ed5ea892382c8be8d6ff8dc2a1fed495234e113713998829f64",
@@ -63,28 +63,32 @@
     "code_sha256": "f8cd0c094a189869c7197487c488034b921917b10f2b6db9e9c7803a81c5c2ac"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/simulation.py": {
-    "sha256": "bfb731c21e43f9060a65a8560f03ce4cc05d4a568e5986c0d9f0079f4e46affb",
-    "code_sha256": "d906e85dbe682ee8dd2df892cb1944edcdcc8f88dea05555356dee1f7a9af613"
+    "sha256": "674dd7207ec88ba537e328e0201980467ff6391ee31ef0f391c0c9e260ff0049",
+    "code_sha256": "84cb785d668f6a0fe9fdce7006a312da5fc6e4f8a06dac067b2b840033ab549f"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep.py": {
-    "sha256": "93b1efe66779ddf1936adeade59b8edd15c5fcefe92ea23313a9a35a8a8a5dd6",
-    "code_sha256": "d0fa6f130b7e01139d6558173a05bc370c09600df9905a2f67fc660e7c6300b2"
+    "sha256": "da183cd3df80d14664c002f3246a3aeb1d7f1ceec70acf3fbcc8afd7b18345e5",
+    "code_sha256": "a759c41091aa00628d7f901fef7b348cc8838f4caedf4e5b34c82349fd9147ab"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep_controls.py": {
     "sha256": "3a9e3c804e27ff1ccdca7ff3519421ba2bcd86cd3423254c7209f9b742852ddc",
     "code_sha256": "2d25a0b2f2cccb53da248d9f5e60587282570c4d634313e97f5c3a10c6aa8c72"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep_statistics.py": {
-    "sha256": "c7717ea8aabf1334adb8f56485d1206f0caff7239b79f40ad5c3d8a65b001284",
-    "code_sha256": "eed53bbe96defa344fd47643905119c4a8683b0fb1b363c3538e0e211d51124f"
+    "sha256": "f68a64647721385e7b9eaa8a9ee584d1d3b5a4e229a4e732d2bf93db0a3121b4",
+    "code_sha256": "02a33605f664f58c38f486357d02efdca294d2a63f1b546abd6707e6380f70a8"
+   },
+   "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep_summaries.py": {
+    "sha256": "9f1c838ab79606a4b3ac93047f767dde8ec82e66281ff1621cde28d234d893c8",
+    "code_sha256": "2e96659bb4f3d7915d4f777110383c7aa1a5d6a1d308ff69bf7d8eb65041f6c2"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/window_statistics.py": {
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
     "code_sha256": "4c5ce7aefdaec2986c15bb844ac865127194b243b527466266a091689a0546ea"
    },
    "src/continuum_swr_replay/analysis/detection/simulated_run.py": {
-    "sha256": "cc20b8cca8a9c6b3f64c283a0614730379e48c3befc59ab63846ca04fec0bcc1",
-    "code_sha256": "9c95323b5aedf08b418514c60a80b732d1b83bade3a3e9121c24751d02c802bf"
+    "sha256": "89bfb93e2a5c28b68084e014733b8739079236bfe9f4f465104570a0ac3d9361",
+    "code_sha256": "ca5612fee72c82b83978a6ab9b47f56c9c9b80ad2383b16d1aa9eff8222d69b0"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/__init__.py": {
     "sha256": "e48de542300d0417f2fb98d15d34c8713efd5261deef06696cfdf7106edf3596",
@@ -191,8 +195,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "f817660d75d78c1e5cd94570d132a2cf88886b373cb820dc3028e78760297936",
-    "code_sha256": "6d38dfdb640481df0042b534fb108b24793268af72ca81c6b5996fb5d3253642"
+    "sha256": "f980ad3ad7546009172ff3fa46aa2adb09a0cc6345f220f65e4fcb5ff9f28e83",
+    "code_sha256": "e90f63ac653060f2da7dc0a6c3ff0e953e51e94306ee0de7465b6bb75d496d34"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -243,12 +247,12 @@
     "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
    },
    "paper/reported/inputs/detection/memoryless_comparison_recording.json": {
-    "sha256": "93dd1e365dba00524ce39de374c8d69f91e5133fac7023fc38404761a3ce3f1e",
-    "code_sha256": "93dd1e365dba00524ce39de374c8d69f91e5133fac7023fc38404761a3ce3f1e"
+    "sha256": "e13fb31138e901fa552515ef0a4018deb29209c1cc9f6480136acd4bdc57fccb",
+    "code_sha256": "e13fb31138e901fa552515ef0a4018deb29209c1cc9f6480136acd4bdc57fccb"
    },
    "paper/reported/inputs/detection/detection_sweep_summary.csv": {
-    "sha256": "3538164ea50b63e19d21eb91edeff128176d037ef70ea56c4929fcdccab6ea4e",
-    "code_sha256": "3538164ea50b63e19d21eb91edeff128176d037ef70ea56c4929fcdccab6ea4e"
+    "sha256": "661e0d6004764d1650f20d0655ba0e60c727fb0d03bbd15117e029510868c394",
+    "code_sha256": "661e0d6004764d1650f20d0655ba0e60c727fb0d03bbd15117e029510868c394"
    },
    "paper/reported/inputs/detection/detection_controls_summary.csv": {
     "sha256": "d153bb94bfd368dde965c17e9b69f21716982b8d0bd02deda6f02081217370ad",
@@ -279,11 +283,11 @@
   },
   {
    "path": "paper/reported/inputs/detection/memoryless_comparison_recording.json",
-   "sha256": "93dd1e365dba00524ce39de374c8d69f91e5133fac7023fc38404761a3ce3f1e"
+   "sha256": "e13fb31138e901fa552515ef0a4018deb29209c1cc9f6480136acd4bdc57fccb"
   },
   {
    "path": "paper/reported/inputs/detection/detection_sweep_summary.csv",
-   "sha256": "3538164ea50b63e19d21eb91edeff128176d037ef70ea56c4929fcdccab6ea4e"
+   "sha256": "661e0d6004764d1650f20d0655ba0e60c727fb0d03bbd15117e029510868c394"
   },
   {
    "path": "paper/reported/inputs/detection/detection_controls_summary.csv",
@@ -1503,7 +1507,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
@@ -1519,12 +1523,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
   "recording_short_replay_duration_ratio": {
-   "value": 1.7500000000000444,
+   "value": 1.9833333333333485,
    "kind": "quantity",
    "style": "sig2",
    "unit": "",
@@ -1535,7 +1539,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
@@ -1551,7 +1555,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
@@ -1567,7 +1571,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
@@ -1583,12 +1587,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
   "recording_state_space_bound_error_ms": {
-   "value": 17.999999999998906,
+   "value": 17.333333333331424,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -1599,7 +1603,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
@@ -1615,12 +1619,12 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
   "recording_sweep_duration_ratio": {
-   "value": 2.4877149877150053,
+   "value": 2.493842364532045,
    "kind": "quantity",
    "style": "sig2",
    "unit": "",
@@ -1631,7 +1635,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
@@ -1647,7 +1651,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
@@ -1663,7 +1667,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
@@ -1679,7 +1683,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 28e36f3fa9c1)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 264f14ca4423)",
    "function": "recording_values",
    "pending": null
   },
@@ -1726,7 +1730,7 @@
    "pending": null
   },
   "sweep_domain_fraction": {
-   "value": 0.21428571428571427,
+   "value": 0.2324455205811138,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1742,7 +1746,7 @@
    "pending": null
   },
   "sweep_domain_sliding_before_test_fraction": {
-   "value": 0.6953125,
+   "value": 0.7000868055555556,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1758,7 +1762,7 @@
    "pending": null
   },
   "sweep_domain_sliding_fraction": {
-   "value": 0.6432291666666666,
+   "value": 0.6575520833333334,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1774,7 +1778,7 @@
    "pending": null
   },
   "sweep_domain_state_space_fraction": {
-   "value": 0.9939236111111112,
+   "value": 0.9952256944444444,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1790,7 +1794,7 @@
    "pending": null
   },
   "sweep_domain_state_space_published_fraction": {
-   "value": 0.7821180555555556,
+   "value": 0.7903645833333334,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1806,7 +1810,7 @@
    "pending": null
   },
   "sweep_failed_test_fraction": {
-   "value": 0.0199530516431924,
+   "value": 0.0206573989866181,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1822,7 +1826,7 @@
    "pending": null
   },
   "sweep_jump_half_pass_fraction": {
-   "value": 0.9157175398633256,
+   "value": 0.920314253647587,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1838,7 +1842,7 @@
    "pending": null
   },
   "sweep_jump_half_pass_longest_fraction": {
-   "value": 0.9715447154471544,
+   "value": 0.9798387096774194,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1854,7 +1858,7 @@
    "pending": null
   },
   "sweep_jump_half_pass_shortest_fraction": {
-   "value": 0.25,
+   "value": 0.2,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1870,7 +1874,7 @@
    "pending": null
   },
   "sweep_replays": {
-   "value": 5376,
+   "value": 9912,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -1886,11 +1890,11 @@
    "pending": null
   },
   "sweep_shortest_end_late_ms": {
-   "value": 31.1859773362535,
+   "value": 29.029146707053144,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median amount the sliding window ends the shortest (60 ms) replays late",
+   "description": "median amount the sliding window ends the shortest (40 ms) replays late",
    "questions": [
     "1.1"
    ],
@@ -1902,11 +1906,11 @@
    "pending": null
   },
   "sweep_shortest_reported_duration_ms": {
-   "value": 124.99999999999646,
+   "value": 119.9999999999974,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median duration the sliding window reports for the shortest (60 ms) replays",
+   "description": "median duration the sliding window reports for the shortest (40 ms) replays",
    "questions": [
     "1.1"
    ],
@@ -1918,11 +1922,11 @@
    "pending": null
   },
   "sweep_shortest_start_early_ms": {
-   "value": 29.177351953007857,
+   "value": 55.03864990311769,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median amount the sliding window starts the shortest (60 ms) replays early",
+   "description": "median amount the sliding window starts the shortest (40 ms) replays early",
    "questions": [
     "1.1"
    ],
@@ -1934,7 +1938,7 @@
    "pending": null
   },
   "sweep_sliding_before_test_fraction": {
-   "value": 0.1633184523809523,
+   "value": 0.1797820823244552,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -1950,11 +1954,11 @@
    "pending": null
   },
   "sweep_sliding_end_late_max_ms": {
-   "value": 31.1859773362535,
+   "value": 31.84739924583191,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "largest median amount the sliding window ends late, over true durations (60 to 500 ms)",
+   "description": "largest median amount the sliding window ends late, over true durations (40 to 500 ms)",
    "questions": [
     "1.1"
    ],
@@ -1966,11 +1970,11 @@
    "pending": null
   },
   "sweep_sliding_end_late_min_ms": {
-   "value": 16.329434200088144,
+   "value": 26.157029341057125,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "smallest median amount the sliding window ends late, over true durations (60 to 500 ms)",
+   "description": "smallest median amount the sliding window ends late, over true durations (40 to 500 ms)",
    "questions": [
     "1.1"
    ],
@@ -1982,11 +1986,11 @@
    "pending": null
   },
   "sweep_sliding_end_late_upper_quartile_max_ms": {
-   "value": 184.2075069470992,
+   "value": 36.27845692316001,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "largest upper quartile of the sliding window's end error, over true durations (60 to 500 ms)",
+   "description": "largest upper quartile of the sliding window's end error, over true durations (40 to 500 ms)",
    "questions": [
     "1.1"
    ],
@@ -1998,7 +2002,7 @@
    "pending": null
   },
   "sweep_sliding_fraction": {
-   "value": 0.1473214285714285,
+   "value": 0.1636400322841,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2014,7 +2018,7 @@
    "pending": null
   },
   "sweep_sliding_not_the_replay_fraction": {
-   "value": 0.0287610619469026,
+   "value": 0.0240963855421686,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2062,7 +2066,7 @@
    "pending": null
   },
   "sweep_sliding_spread_only_fraction": {
-   "value": 0.1586681547619047,
+   "value": 0.1760492332526231,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2078,11 +2082,11 @@
    "pending": null
   },
   "sweep_sliding_start_early_max_ms": {
-   "value": 29.280234797472104,
+   "value": 55.03864990311769,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "largest median amount the sliding window starts early, over true durations (60 to 500 ms)",
+   "description": "largest median amount the sliding window starts early, over true durations (40 to 500 ms)",
    "questions": [
     "1.1"
    ],
@@ -2094,11 +2098,11 @@
    "pending": null
   },
   "sweep_sliding_start_early_min_ms": {
-   "value": 18.979601777097344,
+   "value": 30.109435009144647,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "smallest median amount the sliding window starts early, over true durations (60 to 500 ms)",
+   "description": "smallest median amount the sliding window starts early, over true durations (40 to 500 ms)",
    "questions": [
     "1.1"
    ],
@@ -2110,7 +2114,7 @@
    "pending": null
   },
   "sweep_spread_half_pass_fraction": {
-   "value": 0.9715261958997722,
+   "value": 0.979236812570146,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2126,11 +2130,11 @@
    "pending": null
   },
   "sweep_state_space_edge_error_max_ms": {
-   "value": 4.514614905721803,
+   "value": 8.37015863558399,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "largest absolute median start or end error of the state-space detector over true durations (60 to 500 ms), replays both detectors reported",
+   "description": "largest absolute median start or end error of the state-space detector over true durations (40 to 500 ms), replays both detectors reported",
    "questions": [
     "1.1"
    ],
@@ -2142,7 +2146,7 @@
    "pending": null
   },
   "sweep_state_space_fraction": {
-   "value": 0.9397321428571428,
+   "value": 0.9401735270379338,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
@@ -2158,11 +2162,603 @@
    "pending": null
   },
   "sweep_state_space_only_fraction": {
-   "value": 0.7924107142857143,
+   "value": 0.7765334947538337,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
    "description": "share of the swept replays reported by the state-space detector and not by the sliding-window detector",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_replays": {
+   "value": 1622,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "replays both detectors report, which the pooled timing errors are of",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_duration_error_lower_quartile_ms": {
+   "value": 44.345794392523175,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lower quartile of the duration the sliding window reports less the span of the replay's own spikes, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_duration_error_median_ms": {
+   "value": 56.75781468956088,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median duration the sliding window reports less the span of the replay's own spikes, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_duration_error_upper_quartile_ms": {
+   "value": 69.05179477247536,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "upper quartile of the duration the sliding window reports less the span of the replay's own spikes, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_larger_offset_fraction": {
+   "value": 0.9741060419235512,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the replays both detectors report on which the sliding window's absolute offset error is the larger of the two",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_larger_onset_fraction": {
+   "value": 0.9741060419235512,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the replays both detectors report on which the sliding window's absolute onset error is the larger of the two",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_offset_abs_median_ms": {
+   "value": 27.446654919748514,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median absolute offset error of the sliding window against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_offset_far_fraction": {
+   "value": 0.1054254007398273,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the replays both detectors report whose offset the sliding window places more than 100 ms from the replay's last spike",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_offset_lower_quartile_ms": {
+   "value": 17.559199134733028,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lower quartile of the offset error of the sliding window against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_offset_max_ms": {
+   "value": 956.6338712046328,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "largest offset error of the sliding window against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_offset_median_ms": {
+   "value": 26.77930666699524,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median offset error of the sliding window against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_offset_min_ms": {
+   "value": -292.7832558630996,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "smallest offset error of the sliding window against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_offset_upper_quartile_ms": {
+   "value": 32.24733404722535,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "upper quartile of the offset error of the sliding window against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_onset_abs_median_ms": {
+   "value": 32.60735613302401,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median absolute onset error of the sliding window against the replay's first spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_onset_far_fraction": {
+   "value": 0.1035758323057953,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the replays both detectors report whose onset the sliding window places more than 100 ms from the replay's first spike",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_onset_lower_quartile_ms": {
+   "value": -37.11665104011175,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lower quartile of the onset error of the sliding window against the replay's first spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_onset_max_ms": {
+   "value": 293.8906344247769,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "largest onset error of the sliding window against the replay's first spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_onset_median_ms": {
+   "value": -31.794581431235255,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median onset error of the sliding window against the replay's first spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_onset_min_ms": {
+   "value": -978.5042752708932,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "smallest onset error of the sliding window against the replay's first spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_sliding_onset_upper_quartile_ms": {
+   "value": -22.93856129369232,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "upper quartile of the onset error of the sliding window against the replay's first spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_duration_error_lower_quartile_ms": {
+   "value": 6.675567423229722,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lower quartile of the duration the state-space detector reports less the span of the replay's own spikes, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_duration_error_median_ms": {
+   "value": 10.167410922818476,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median duration the state-space detector reports less the span of the replay's own spikes, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_duration_error_upper_quartile_ms": {
+   "value": 14.670226969293765,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "upper quartile of the duration the state-space detector reports less the span of the replay's own spikes, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_offset_abs_median_ms": {
+   "value": 3.6805925328415863,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median absolute offset error of the state-space detector against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_offset_far_fraction": {
+   "value": 0.001233045622688,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the replays both detectors report whose offset the state-space detector places more than 100 ms from the replay's last spike",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_offset_lower_quartile_ms": {
+   "value": 1.0741134217209236,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lower quartile of the offset error of the state-space detector against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_offset_max_ms": {
+   "value": 14.326908818070194,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "largest offset error of the state-space detector against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_offset_median_ms": {
+   "value": 3.5579619394567885,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median offset error of the state-space detector against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_offset_min_ms": {
+   "value": -139.91472173134412,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "smallest offset error of the state-space detector against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_offset_upper_quartile_ms": {
+   "value": 5.524320751429279,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "upper quartile of the offset error of the state-space detector against the replay's last spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_onset_abs_median_ms": {
+   "value": 6.922456367103536,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median absolute onset error of the state-space detector against the replay's first spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_onset_far_fraction": {
+   "value": 0.000616522811344,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the replays both detectors report whose onset the state-space detector places more than 100 ms from the replay's first spike",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_onset_lower_quartile_ms": {
+   "value": -10.647500623935713,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lower quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_onset_max_ms": {
+   "value": 206.12615798818723,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "largest onset error of the state-space detector against the replay's first spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_onset_median_ms": {
+   "value": -6.665834872670473,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median onset error of the state-space detector against the replay's first spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_onset_min_ms": {
+   "value": -19.271442461080923,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "smallest onset error of the state-space detector against the replay's first spike, over the replays both detectors report",
+   "questions": [
+    "1.1"
+   ],
+   "figures": [
+    "memoryless_comparison"
+   ],
+   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
+   "pending": null
+  },
+  "sweep_timing_state_space_onset_upper_quartile_ms": {
+   "value": -3.4623670889659675,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "upper quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report",
    "questions": [
     "1.1"
    ],

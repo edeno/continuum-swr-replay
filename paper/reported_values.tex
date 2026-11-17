@@ -36,7 +36,7 @@
 \newcommand{\SurveyTimeBinMin}{2}  % survey.time_bin_min: Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)
 \newcommand{\SurveyTimeBinMode}{20}  % survey.time_bin_mode: Most common decoding time bin, over the 46 numeric cells of Time bin (ms)
 
-% --- detection (commit 4bc1045f44a5)
+% --- detection (commit 3858c5564cbd)
 \newcommand{\DetectionControlsContinuingOursOnePerPartLongestFraction}{96}  % detection.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingOursSpanningShortestFraction}{96}  % detection.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingSlidingOnePerPartLongestFraction}{50}  % detection.controls_continuing_sliding_one_per_part_longest_fraction: continuing chains at the longest gap: share of trials the sliding window reports as one event per part
@@ -124,11 +124,11 @@
 \newcommand{\DetectionPilotReplayCalls}{6}  % detection.pilot_replay_calls: sliding-window replay calls (duration and dispersion criteria) on the pilot epoch, chimi20200225_02_r1_HPC
 \newcommand{\DetectionRecordingRemoteStationaryDispersionCm}{0}  % detection.recording_remote_stationary_dispersion_cm: largest dispersion of a candidate over the remote stationary event
 \newcommand{\DetectionRecordingShortPathDispersionCm}{9}  % detection.recording_short_path_dispersion_cm: largest dispersion of a sliding-window candidate over the 30 cm replay
-\newcommand{\DetectionRecordingShortReplayDurationRatio}{1.8}  % detection.recording_short_replay_duration_ratio: the sliding window's reported duration of the 80 ms replay over its true duration
+\newcommand{\DetectionRecordingShortReplayDurationRatio}{2.0}  % detection.recording_short_replay_duration_ratio: the sliding window's reported duration of the 80 ms replay over its true duration
 \newcommand{\DetectionRecordingShortReplayLocalFraction}{0}  % detection.recording_short_replay_local_fraction: share of that reported event's kept windows decoding the animal's own place
 \newcommand{\DetectionRecordingShortReplayPJump}{0.020}  % detection.recording_short_replay_p_jump: significance test of the 80 ms replay: jump half
 \newcommand{\DetectionRecordingShortReplayPSpread}{0.0099}  % detection.recording_short_replay_p_spread: significance test of the 80 ms replay: spread half
-\newcommand{\DetectionRecordingStateSpaceBoundErrorMs}{18}  % detection.recording_state_space_bound_error_ms: largest error in either bound of the state-space detector's reports of the four zoomed events
+\newcommand{\DetectionRecordingStateSpaceBoundErrorMs}{17}  % detection.recording_state_space_bound_error_ms: largest error in either bound of the state-space detector's reports of the four zoomed events
 \newcommand{\DetectionRecordingSweepDrawsFromPassing}{0}  % detection.recording_sweep_draws_from_passing: how many more shuffle draws below the observed value than a pass allows
 \newcommand{\DetectionRecordingSweepDurationRatio}{2.5}  % detection.recording_sweep_duration_ratio: the sliding window's reported duration of Figure 1's sweep over its true duration
 \newcommand{\DetectionRecordingSweepLocalFraction}{57}  % detection.recording_sweep_local_fraction: share of that reported event's kept windows decoding the animal's own place (within 15 cm)
@@ -137,34 +137,71 @@
 \newcommand{\DetectionStateEvidenceAnimals}{5}  % detection.state_evidence_animals: animals in the held-out tetrode run
 \newcommand{\DetectionStateEvidenceEpochs}{242}  % detection.state_evidence_epochs: epochs the held-out tetrode run lists
 \newcommand{\DetectionStateEvidenceEpochsOk}{242}  % detection.state_evidence_epochs_ok: of those, epochs that passed every check of the run (status ok)
-\newcommand{\DetectionSweepDomainFraction}{21}  % detection.sweep_domain_fraction: share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms)
+\newcommand{\DetectionSweepDomainFraction}{23}  % detection.sweep_domain_fraction: share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms)
 \newcommand{\DetectionSweepDomainSlidingBeforeTestFraction}{70}  % detection.sweep_domain_sliding_before_test_fraction: on the shared target, share the sliding-window detector reports before its significance test
-\newcommand{\DetectionSweepDomainSlidingFraction}{64}  % detection.sweep_domain_sliding_fraction: on the shared target, share the sliding-window detector reports after its significance test
-\newcommand{\DetectionSweepDomainStateSpaceFraction}{99}  % detection.sweep_domain_state_space_fraction: on the shared target, share the state-space detector reports under its own acceptance criteria
-\newcommand{\DetectionSweepDomainStateSpacePublishedFraction}{78}  % detection.sweep_domain_state_space_published_fraction: on the shared target, share the state-space detector reports held to the published duration and dispersion criteria
+\newcommand{\DetectionSweepDomainSlidingFraction}{66}  % detection.sweep_domain_sliding_fraction: on the shared target, share the sliding-window detector reports after its significance test
+\newcommand{\DetectionSweepDomainStateSpaceFraction}{100}  % detection.sweep_domain_state_space_fraction: on the shared target, share the state-space detector reports under its own acceptance criteria
+\newcommand{\DetectionSweepDomainStateSpacePublishedFraction}{79}  % detection.sweep_domain_state_space_published_fraction: on the shared target, share the state-space detector reports held to the published duration and dispersion criteria
 \newcommand{\DetectionSweepFailedTestFraction}{2}  % detection.sweep_failed_test_fraction: share the sliding-window detector reported and then failed on its significance test
 \newcommand{\DetectionSweepJumpHalfPassFraction}{92}  % detection.sweep_jump_half_pass_fraction: of the replays the sliding window reported before its test, share passing the test's jump half
-\newcommand{\DetectionSweepJumpHalfPassLongestFraction}{97}  % detection.sweep_jump_half_pass_longest_fraction: share of the longest (500 ms) replays passing the jump half
-\newcommand{\DetectionSweepJumpHalfPassShortestFraction}{25}  % detection.sweep_jump_half_pass_shortest_fraction: share of the shortest (40 ms) replays passing the jump half
-\newcommand{\DetectionSweepReplays}{5{,}376}  % detection.sweep_replays: replays swept (grid cells)
-\newcommand{\DetectionSweepShortestEndLateMs}{31}  % detection.sweep_shortest_end_late_ms: median amount the sliding window ends the shortest (60 ms) replays late
-\newcommand{\DetectionSweepShortestReportedDurationMs}{125}  % detection.sweep_shortest_reported_duration_ms: median duration the sliding window reports for the shortest (60 ms) replays
-\newcommand{\DetectionSweepShortestStartEarlyMs}{29}  % detection.sweep_shortest_start_early_ms: median amount the sliding window starts the shortest (60 ms) replays early
-\newcommand{\DetectionSweepSlidingBeforeTestFraction}{16}  % detection.sweep_sliding_before_test_fraction: over the whole grid, share the sliding-window detector reports before its significance test
-\newcommand{\DetectionSweepSlidingEndLateMaxMs}{31}  % detection.sweep_sliding_end_late_max_ms: largest median amount the sliding window ends late, over true durations (60 to 500 ms)
-\newcommand{\DetectionSweepSlidingEndLateMinMs}{16}  % detection.sweep_sliding_end_late_min_ms: smallest median amount the sliding window ends late, over true durations (60 to 500 ms)
-\newcommand{\DetectionSweepSlidingEndLateUpperQuartileMaxMs}{184}  % detection.sweep_sliding_end_late_upper_quartile_max_ms: largest upper quartile of the sliding window's end error, over true durations (60 to 500 ms)
-\newcommand{\DetectionSweepSlidingFraction}{15}  % detection.sweep_sliding_fraction: over the whole grid, share the sliding-window detector reports under its own criteria, significance test included
-\newcommand{\DetectionSweepSlidingNotTheReplayFraction}{3}  % detection.sweep_sliding_not_the_replay_fraction: share of the sliding-window detector's accepted events that are not the replay put in
+\newcommand{\DetectionSweepJumpHalfPassLongestFraction}{98}  % detection.sweep_jump_half_pass_longest_fraction: share of the longest (500 ms) replays passing the jump half
+\newcommand{\DetectionSweepJumpHalfPassShortestFraction}{20}  % detection.sweep_jump_half_pass_shortest_fraction: share of the shortest (40 ms) replays passing the jump half
+\newcommand{\DetectionSweepReplays}{9{,}912}  % detection.sweep_replays: replays swept (grid cells)
+\newcommand{\DetectionSweepShortestEndLateMs}{29}  % detection.sweep_shortest_end_late_ms: median amount the sliding window ends the shortest (40 ms) replays late
+\newcommand{\DetectionSweepShortestReportedDurationMs}{120}  % detection.sweep_shortest_reported_duration_ms: median duration the sliding window reports for the shortest (40 ms) replays
+\newcommand{\DetectionSweepShortestStartEarlyMs}{55}  % detection.sweep_shortest_start_early_ms: median amount the sliding window starts the shortest (40 ms) replays early
+\newcommand{\DetectionSweepSlidingBeforeTestFraction}{18}  % detection.sweep_sliding_before_test_fraction: over the whole grid, share the sliding-window detector reports before its significance test
+\newcommand{\DetectionSweepSlidingEndLateMaxMs}{32}  % detection.sweep_sliding_end_late_max_ms: largest median amount the sliding window ends late, over true durations (40 to 500 ms)
+\newcommand{\DetectionSweepSlidingEndLateMinMs}{26}  % detection.sweep_sliding_end_late_min_ms: smallest median amount the sliding window ends late, over true durations (40 to 500 ms)
+\newcommand{\DetectionSweepSlidingEndLateUpperQuartileMaxMs}{36}  % detection.sweep_sliding_end_late_upper_quartile_max_ms: largest upper quartile of the sliding window's end error, over true durations (40 to 500 ms)
+\newcommand{\DetectionSweepSlidingFraction}{16}  % detection.sweep_sliding_fraction: over the whole grid, share the sliding-window detector reports under its own criteria, significance test included
+\newcommand{\DetectionSweepSlidingNotTheReplayFraction}{2}  % detection.sweep_sliding_not_the_replay_fraction: share of the sliding-window detector's accepted events that are not the replay put in
 \newcommand{\DetectionSweepSlidingOnlyBeforeTestReplays}{1}  % detection.sweep_sliding_only_before_test_replays: the same, counting the sliding window's reports before its test
 \newcommand{\DetectionSweepSlidingOnlyReplays}{0}  % detection.sweep_sliding_only_replays: swept replays the sliding-window detector reported and the state-space detector did not
-\newcommand{\DetectionSweepSlidingSpreadOnlyFraction}{16}  % detection.sweep_sliding_spread_only_fraction: over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone
-\newcommand{\DetectionSweepSlidingStartEarlyMaxMs}{29}  % detection.sweep_sliding_start_early_max_ms: largest median amount the sliding window starts early, over true durations (60 to 500 ms)
-\newcommand{\DetectionSweepSlidingStartEarlyMinMs}{19}  % detection.sweep_sliding_start_early_min_ms: smallest median amount the sliding window starts early, over true durations (60 to 500 ms)
-\newcommand{\DetectionSweepSpreadHalfPassFraction}{97}  % detection.sweep_spread_half_pass_fraction: of the replays the sliding window reported before its test, share passing the test's spread half
-\newcommand{\DetectionSweepStateSpaceEdgeErrorMaxMs}{5}  % detection.sweep_state_space_edge_error_max_ms: largest absolute median start or end error of the state-space detector over true durations (60 to 500 ms), replays both detectors reported
+\newcommand{\DetectionSweepSlidingSpreadOnlyFraction}{18}  % detection.sweep_sliding_spread_only_fraction: over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone
+\newcommand{\DetectionSweepSlidingStartEarlyMaxMs}{55}  % detection.sweep_sliding_start_early_max_ms: largest median amount the sliding window starts early, over true durations (40 to 500 ms)
+\newcommand{\DetectionSweepSlidingStartEarlyMinMs}{30}  % detection.sweep_sliding_start_early_min_ms: smallest median amount the sliding window starts early, over true durations (40 to 500 ms)
+\newcommand{\DetectionSweepSpreadHalfPassFraction}{98}  % detection.sweep_spread_half_pass_fraction: of the replays the sliding window reported before its test, share passing the test's spread half
+\newcommand{\DetectionSweepStateSpaceEdgeErrorMaxMs}{8}  % detection.sweep_state_space_edge_error_max_ms: largest absolute median start or end error of the state-space detector over true durations (40 to 500 ms), replays both detectors reported
 \newcommand{\DetectionSweepStateSpaceFraction}{94}  % detection.sweep_state_space_fraction: over the whole grid, share the state-space detector reports under its own criteria
-\newcommand{\DetectionSweepStateSpaceOnlyFraction}{79}  % detection.sweep_state_space_only_fraction: share of the swept replays reported by the state-space detector and not by the sliding-window detector
+\newcommand{\DetectionSweepStateSpaceOnlyFraction}{78}  % detection.sweep_state_space_only_fraction: share of the swept replays reported by the state-space detector and not by the sliding-window detector
+\newcommand{\DetectionSweepTimingReplays}{1{,}622}  % detection.sweep_timing_replays: replays both detectors report, which the pooled timing errors are of
+\newcommand{\DetectionSweepTimingSlidingDurationErrorLowerQuartileMs}{44}  % detection.sweep_timing_sliding_duration_error_lower_quartile_ms: lower quartile of the duration the sliding window reports less the span of the replay's own spikes, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingDurationErrorMedianMs}{57}  % detection.sweep_timing_sliding_duration_error_median_ms: median duration the sliding window reports less the span of the replay's own spikes, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingDurationErrorUpperQuartileMs}{69}  % detection.sweep_timing_sliding_duration_error_upper_quartile_ms: upper quartile of the duration the sliding window reports less the span of the replay's own spikes, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingLargerOffsetFraction}{97}  % detection.sweep_timing_sliding_larger_offset_fraction: share of the replays both detectors report on which the sliding window's absolute offset error is the larger of the two
+\newcommand{\DetectionSweepTimingSlidingLargerOnsetFraction}{97}  % detection.sweep_timing_sliding_larger_onset_fraction: share of the replays both detectors report on which the sliding window's absolute onset error is the larger of the two
+\newcommand{\DetectionSweepTimingSlidingOffsetAbsMedianMs}{27}  % detection.sweep_timing_sliding_offset_abs_median_ms: median absolute offset error of the sliding window against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingOffsetFarFraction}{11}  % detection.sweep_timing_sliding_offset_far_fraction: share of the replays both detectors report whose offset the sliding window places more than 100 ms from the replay's last spike
+\newcommand{\DetectionSweepTimingSlidingOffsetLowerQuartileMs}{18}  % detection.sweep_timing_sliding_offset_lower_quartile_ms: lower quartile of the offset error of the sliding window against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingOffsetMaxMs}{957}  % detection.sweep_timing_sliding_offset_max_ms: largest offset error of the sliding window against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingOffsetMedianMs}{27}  % detection.sweep_timing_sliding_offset_median_ms: median offset error of the sliding window against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingOffsetMinMs}{\ensuremath{-}293}  % detection.sweep_timing_sliding_offset_min_ms: smallest offset error of the sliding window against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingOffsetUpperQuartileMs}{32}  % detection.sweep_timing_sliding_offset_upper_quartile_ms: upper quartile of the offset error of the sliding window against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingOnsetAbsMedianMs}{33}  % detection.sweep_timing_sliding_onset_abs_median_ms: median absolute onset error of the sliding window against the replay's first spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingOnsetFarFraction}{10}  % detection.sweep_timing_sliding_onset_far_fraction: share of the replays both detectors report whose onset the sliding window places more than 100 ms from the replay's first spike
+\newcommand{\DetectionSweepTimingSlidingOnsetLowerQuartileMs}{\ensuremath{-}37}  % detection.sweep_timing_sliding_onset_lower_quartile_ms: lower quartile of the onset error of the sliding window against the replay's first spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingOnsetMaxMs}{294}  % detection.sweep_timing_sliding_onset_max_ms: largest onset error of the sliding window against the replay's first spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingOnsetMedianMs}{\ensuremath{-}32}  % detection.sweep_timing_sliding_onset_median_ms: median onset error of the sliding window against the replay's first spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingOnsetMinMs}{\ensuremath{-}979}  % detection.sweep_timing_sliding_onset_min_ms: smallest onset error of the sliding window against the replay's first spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingSlidingOnsetUpperQuartileMs}{\ensuremath{-}23}  % detection.sweep_timing_sliding_onset_upper_quartile_ms: upper quartile of the onset error of the sliding window against the replay's first spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceDurationErrorLowerQuartileMs}{7}  % detection.sweep_timing_state_space_duration_error_lower_quartile_ms: lower quartile of the duration the state-space detector reports less the span of the replay's own spikes, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceDurationErrorMedianMs}{10}  % detection.sweep_timing_state_space_duration_error_median_ms: median duration the state-space detector reports less the span of the replay's own spikes, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceDurationErrorUpperQuartileMs}{15}  % detection.sweep_timing_state_space_duration_error_upper_quartile_ms: upper quartile of the duration the state-space detector reports less the span of the replay's own spikes, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOffsetAbsMedianMs}{4}  % detection.sweep_timing_state_space_offset_abs_median_ms: median absolute offset error of the state-space detector against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOffsetFarFraction}{0}  % detection.sweep_timing_state_space_offset_far_fraction: share of the replays both detectors report whose offset the state-space detector places more than 100 ms from the replay's last spike
+\newcommand{\DetectionSweepTimingStateSpaceOffsetLowerQuartileMs}{1}  % detection.sweep_timing_state_space_offset_lower_quartile_ms: lower quartile of the offset error of the state-space detector against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOffsetMaxMs}{14}  % detection.sweep_timing_state_space_offset_max_ms: largest offset error of the state-space detector against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOffsetMedianMs}{4}  % detection.sweep_timing_state_space_offset_median_ms: median offset error of the state-space detector against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOffsetMinMs}{\ensuremath{-}140}  % detection.sweep_timing_state_space_offset_min_ms: smallest offset error of the state-space detector against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOffsetUpperQuartileMs}{6}  % detection.sweep_timing_state_space_offset_upper_quartile_ms: upper quartile of the offset error of the state-space detector against the replay's last spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOnsetAbsMedianMs}{7}  % detection.sweep_timing_state_space_onset_abs_median_ms: median absolute onset error of the state-space detector against the replay's first spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOnsetFarFraction}{0}  % detection.sweep_timing_state_space_onset_far_fraction: share of the replays both detectors report whose onset the state-space detector places more than 100 ms from the replay's first spike
+\newcommand{\DetectionSweepTimingStateSpaceOnsetLowerQuartileMs}{\ensuremath{-}11}  % detection.sweep_timing_state_space_onset_lower_quartile_ms: lower quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOnsetMaxMs}{206}  % detection.sweep_timing_state_space_onset_max_ms: largest onset error of the state-space detector against the replay's first spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOnsetMedianMs}{\ensuremath{-}7}  % detection.sweep_timing_state_space_onset_median_ms: median onset error of the state-space detector against the replay's first spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOnsetMinMs}{\ensuremath{-}19}  % detection.sweep_timing_state_space_onset_min_ms: smallest onset error of the state-space detector against the replay's first spike, over the replays both detectors report
+\newcommand{\DetectionSweepTimingStateSpaceOnsetUpperQuartileMs}{\ensuremath{-}3}  % detection.sweep_timing_state_space_onset_upper_quartile_ms: upper quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 
 % --- events (commit d7d80592187f)
 \newcommand{\EventsAnimals}{5}  % events.animals: animals in the event table
