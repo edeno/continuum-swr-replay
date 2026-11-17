@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "fbc31d3f204c",
+ "commit": "87b31989c0bb",
  "code": {
-  "head": "fbc31d3f204c98361f8fa13e945db86e36d3e46b",
+  "head": "87b31989c0bbcdcaee844da294b96e112daac5df",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -203,8 +203,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "7966599ed4ff17364c28b0ed2998aa51e347306df63d2b399bcb2a70a2771d81",
-    "code_sha256": "6473d836092e311ea05d5dbcab95f66e349b3fcc3cee808b32cbc296403bb9bd"
+    "sha256": "3711b53f7eedb48fdb64d548d6743602934a05943c8bd9e11c25a3b9135782ba",
+    "code_sha256": "ceb29a2e3b6a70bf2c0e6c7f9486613baafe20ee3f36f2a3c252a7933a8c475a"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -1822,7 +1822,7 @@
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "share the sliding-window detector reported and then failed on its significance test",
+   "description": "of the swept replays the state-space detector reports and the sliding-window detector does not, share the sliding window reported before its significance test and then failed on it",
    "questions": [
     "1.1"
    ],

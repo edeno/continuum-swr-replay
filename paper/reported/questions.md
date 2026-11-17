@@ -16,7 +16,7 @@ it calls.
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
-| `detection.json` | `fbc31d3f204c` | yes | 146 | 0 |
+| `detection.json` | `87b31989c0bb` | yes | 146 | 0 |
 | `events.json` | `d7d80592187f` | yes | 353 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
@@ -96,7 +96,7 @@ Sources:
 | `\DetectionSweepDomainSlidingFraction` | 67 |  | on the shared target, share the sliding-window detector reports after its significance test | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepDomainStateSpaceFraction` | 99 |  | on the shared target, share the state-space detector reports under its own acceptance criteria | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepDomainStateSpacePublishedFraction` | 77 |  | on the shared target, share the state-space detector reports held to the published duration and dispersion criteria | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepFailedTestFraction` | 2 |  | share the sliding-window detector reported and then failed on its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepFailedTestFraction` | 2 |  | of the swept replays the state-space detector reports and the sliding-window detector does not, share the sliding window reported before its significance test and then failed on it | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepJumpHalfPassFraction` | 93 |  | of the replays the sliding window reported before its test, share passing the test's jump half | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepJumpHalfPassLongestFraction` | 97 |  | share of the longest (500 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepJumpHalfPassShortestFraction` | 57 |  | share of the shortest (40 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |

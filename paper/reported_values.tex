@@ -36,7 +36,7 @@
 \newcommand{\SurveyTimeBinMin}{2}  % survey.time_bin_min: Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)
 \newcommand{\SurveyTimeBinMode}{20}  % survey.time_bin_mode: Most common decoding time bin, over the 46 numeric cells of Time bin (ms)
 
-% --- detection (commit fbc31d3f204c)
+% --- detection (commit 87b31989c0bb)
 \newcommand{\DetectionControlsContinuingOursOnePerPartLongestFraction}{96}  % detection.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingOursSpanningShortestFraction}{96}  % detection.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingSlidingOnePerPartLongestFraction}{50}  % detection.controls_continuing_sliding_one_per_part_longest_fraction: continuing chains at the longest gap: share of trials the sliding window reports as one event per part
@@ -142,7 +142,7 @@
 \newcommand{\DetectionSweepDomainSlidingFraction}{67}  % detection.sweep_domain_sliding_fraction: on the shared target, share the sliding-window detector reports after its significance test
 \newcommand{\DetectionSweepDomainStateSpaceFraction}{99}  % detection.sweep_domain_state_space_fraction: on the shared target, share the state-space detector reports under its own acceptance criteria
 \newcommand{\DetectionSweepDomainStateSpacePublishedFraction}{77}  % detection.sweep_domain_state_space_published_fraction: on the shared target, share the state-space detector reports held to the published duration and dispersion criteria
-\newcommand{\DetectionSweepFailedTestFraction}{2}  % detection.sweep_failed_test_fraction: share the sliding-window detector reported and then failed on its significance test
+\newcommand{\DetectionSweepFailedTestFraction}{2}  % detection.sweep_failed_test_fraction: of the swept replays the state-space detector reports and the sliding-window detector does not, share the sliding window reported before its significance test and then failed on it
 \newcommand{\DetectionSweepJumpHalfPassFraction}{93}  % detection.sweep_jump_half_pass_fraction: of the replays the sliding window reported before its test, share passing the test's jump half
 \newcommand{\DetectionSweepJumpHalfPassLongestFraction}{97}  % detection.sweep_jump_half_pass_longest_fraction: share of the longest (500 ms) replays passing the jump half
 \newcommand{\DetectionSweepJumpHalfPassShortestFraction}{57}  % detection.sweep_jump_half_pass_shortest_fraction: share of the shortest (40 ms) replays passing the jump half
