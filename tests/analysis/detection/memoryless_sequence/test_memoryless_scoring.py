@@ -11,6 +11,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.scoring import 
     recovered_parts,
     score_against_injection,
     segmentation,
+    trajectory_bias,
 )
 
 BOUNDS = (1.0, 1.2)
@@ -376,3 +377,37 @@ class TestBoundErrors:
             0,
             2,
         )
+
+
+def _line(at):
+    """A replay from 20 cm at 1 s moving at 100 cm/s."""
+    return 20.0 + 100.0 * (np.asarray(at) - 1.0)
+
+
+def test_trajectory_bias_is_the_signed_error_and_the_decoded_slope():
+    times = np.array([1.0, 1.1, 1.2])
+    # 5 cm ahead of the replay throughout, moving at the replay's speed
+    signed_error_cm, slope_cm_per_s = trajectory_bias(
+        times, _line(times) + 5.0, _line, (1.0, 1.2)
+    )
+    assert signed_error_cm == pytest.approx(5.0)
+    assert slope_cm_per_s == pytest.approx(100.0)
+    # the same positions read at half the speed: the slope halves
+    _, slower = trajectory_bias(times, 20.0 + 50.0 * (times - 1.0), _line, (1.0, 1.2))
+    assert slower == pytest.approx(50.0)
+
+
+def test_trajectory_bias_reads_only_inside_the_spike_span():
+    times = np.array([0.9, 1.0, 1.1, 1.2, 1.5])
+    decoded = _line(times)
+    decoded[[0, -1]] = 170.0  # the animal's place, before and after the replay
+    signed_error_cm, slope_cm_per_s = trajectory_bias(times, decoded, _line, (1.0, 1.2))
+    assert signed_error_cm == pytest.approx(0.0)
+    assert slope_cm_per_s == pytest.approx(100.0)
+
+
+def test_trajectory_bias_with_too_little_to_read():
+    nothing = trajectory_bias(np.array([0.5]), np.array([1.0]), _line, (1.0, 1.2))
+    assert np.isnan(nothing).all()
+    one = trajectory_bias(np.array([1.1]), np.array([35.0]), _line, (1.0, 1.2))
+    assert one[0] == pytest.approx(5.0) and np.isnan(one[1])

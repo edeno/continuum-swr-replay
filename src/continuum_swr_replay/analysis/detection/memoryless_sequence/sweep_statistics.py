@@ -25,6 +25,8 @@ __all__ = [
     "sweep_jump_pass_statistics",
     "sweep_measures",
     "sweep_pooled_timing_statistics",
+    "sweep_position_by_speed",
+    "sweep_position_statistics",
     "sweep_timing_exceedance",
     "whole_count",
 ]
@@ -185,6 +187,74 @@ def sweep_pooled_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
             "of it is missing"
         )
     return {str(measure): float(value) for measure, value in pooled.items()}
+
+
+def sweep_position_statistics(summary: pd.DataFrame) -> dict[str, float]:
+    """How well each detector's decoded position follows the replay, pooled over
+    the replays both report.
+
+    Parameters
+    ----------
+    summary : pd.DataFrame, shape (n_rows, n_columns)
+        The replay sweep's summary, with its ``position_pooled`` block.
+
+    Returns
+    -------
+    statistics : dict
+        The block's values by measure, as
+        ``sweep_summaries.pooled_position_errors`` names them: distances in cm,
+        the speed ratio a pure number.
+
+    Raises
+    ------
+    ValueError
+        If the summary has no such block, or a value of it is missing.
+    """
+    pooled = sweep_measures(summary, "position_pooled")
+    if pooled.empty or pooled.isna().any():
+        raise ValueError(
+            "replay sweep summary: the position_pooled block is absent, or a value "
+            "of it is missing"
+        )
+    return {str(measure): float(value) for measure, value in pooled.items()}
+
+
+def sweep_position_by_speed(summary: pd.DataFrame) -> pd.DataFrame:
+    """Each detector's median position error at each replay speed.
+
+    Parameters
+    ----------
+    summary : pd.DataFrame, shape (n_rows, n_columns)
+        The replay sweep's summary, with its ``position_by_speed`` block
+        (``sweep_summaries.position_error_by_speed``).
+
+    Returns
+    -------
+    by_speed : pd.DataFrame, shape (n_bins, 3)
+        Indexed by ``speed_m_per_s``, the lower edge of each speed bin,
+        slowest first; the columns ``sliding_position_error_cm`` and
+        ``state_space_position_error_cm`` hold the medians, in cm, and
+        ``n_replays`` the replays in the bin.
+
+    Raises
+    ------
+    ValueError
+        If the block is absent, a row has no speed, or a detector has no
+        median at some speed.
+    """
+    block = summary[summary["summary"] == "position_by_speed"]
+    if block.empty or block["speed_m_per_s"].isna().any():
+        raise ValueError(
+            "replay sweep summary: the position_by_speed block is absent, or a row "
+            "of it has no speed"
+        )
+    by_speed = block.pivot(index="speed_m_per_s", columns="measure", values="value")
+    by_speed.columns.name = None
+    if by_speed.isna().any().any():
+        raise ValueError(
+            "replay sweep summary: position_by_speed lacks a value at some speed"
+        )
+    return by_speed.sort_index()
 
 
 _EXCEEDANCE_MEASURE = re.compile(

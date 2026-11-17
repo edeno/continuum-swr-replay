@@ -165,3 +165,58 @@ def test_timing_exceedance_refuses_an_absent_or_incomplete_block(rows):
     summary = pd.DataFrame(rows, columns=["summary", "measure", "value"])
     with pytest.raises(ValueError, match="timing_exceedance"):
         stats.sweep_timing_exceedance(summary)
+
+
+def test_position_statistics_are_the_blocks_values_by_measure():
+    summary = pd.DataFrame(
+        {
+            "summary": ["position_pooled", "position_pooled", "overall"],
+            "measure": ["sliding_lead_cm_median", "sliding_speed_ratio_median", "n"],
+            "value": [-2.0, 0.8, 4.0],
+        }
+    )
+    assert stats.sweep_position_statistics(summary) == {
+        "sliding_lead_cm_median": -2.0,
+        "sliding_speed_ratio_median": 0.8,
+    }
+    with pytest.raises(ValueError, match="position_pooled"):
+        stats.sweep_position_statistics(summary[summary["summary"] == "overall"])
+
+
+def _by_speed(rows: list[tuple]) -> pd.DataFrame:
+    return pd.DataFrame(
+        [("position_by_speed", *row) for row in rows],
+        columns=["summary", "measure", "speed_m_per_s", "value"],
+    )
+
+
+def test_position_by_speed_is_a_table_slowest_first():
+    by_speed = stats.sweep_position_by_speed(
+        _by_speed(
+            [
+                ("sliding_position_error_cm", 5.0, 9.0),
+                ("sliding_position_error_cm", 0.0, 1.4),
+                ("state_space_position_error_cm", 0.0, 1.3),
+                ("state_space_position_error_cm", 5.0, 1.5),
+            ]
+        )
+    )
+    assert by_speed.index.tolist() == [0.0, 5.0]
+    assert by_speed["sliding_position_error_cm"].tolist() == [1.4, 9.0]
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [],
+        [("sliding_position_error_cm", np.nan, 1.0)],
+        [
+            ("sliding_position_error_cm", 0.0, 1.4),
+            ("sliding_position_error_cm", 5.0, 9.0),
+            ("state_space_position_error_cm", 0.0, 1.3),
+        ],
+    ],
+)
+def test_position_by_speed_refuses_an_absent_or_incomplete_block(rows):
+    with pytest.raises(ValueError, match="position_by_speed"):
+        stats.sweep_position_by_speed(_by_speed(rows))

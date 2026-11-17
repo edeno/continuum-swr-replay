@@ -10,9 +10,10 @@ shape is known:
     a: eight simulated events at a millisecond scale — raster, each detector's
        decoded position, and three rows of events: what was simulated, what the
        sliding-window detector reports, what the state-space model reports
-    b, c: the share of injected replays each detector reports, by how far the
+    b: the share of injected replays each detector reports, by how far the
        replay travels and how long it lasts
-    d, e: the share of replays whose onset or offset error is beyond each size
+    c: the share of replays whose onset or offset error is beyond each size
+    d: each detector's position error against the replay's speed
 
 The narrative is: the sliding-window detector asks whether the decoded position
 moves far enough for long enough, so it declines a replay that is short in
@@ -23,7 +24,7 @@ Panel a is one recording and its two decodes,
 ``memoryless_sequence.comparison_simulation.simulate_and_decode``: Figure 1's
 run with five replays added, its model and event rule, and the sliding-window
 detector at its published
-settings, reading the same place fields. Panels b-e read the aggregates of
+settings, reading the same place fields. Panels b-d read the aggregates of
 ``scripts/detection/sweep_memoryless_detection.py``, which wrote replays of
 chosen path length, duration, firing rate and distance from the animal one at a
 time into that run; re-run the sweep to change them. The timing panels read
@@ -155,6 +156,9 @@ FIGURE_HEIGHT = 5.9
 # The data axes of the panels that span the figure, in figure fractions: wider
 # margins than Figure 1's, for the event rows' names.
 DATA_LEFT, DATA_RIGHT = 0.12, 0.975
+# The sweep's row needs less room on its left than the examples' row, whose
+# first column carries the event rows' names.
+SWEEP_LEFT = 0.085
 
 CAPTION_SETTINGS = {
     "n_shuffles": 100,
@@ -654,25 +658,58 @@ def plot_edge_error(ax: Axes, summary: pd.DataFrame, edge: str) -> None:
         )
     ax.set_xscale("log")
     ax.set_xlim(shares.index[0], shares.index[-1])
-    ax.set_xticks([1, 10, 100, 1000], ["1", "10", "100", "1000"])
-    # the last label ends at the axis's end, inside the figure's width
-    ax.get_xticklabels()[-1].set_horizontalalignment("right")
+    # 1000 ms is the axis's end; unlabeled, it leaves room for the next panel
+    ax.set_xticks([1, 10, 100, 1000], ["1", "10", "100", ""])
     ax.set_ylim(0, 100)
     ax.set_yticks([0, 50, 100])
     ax.tick_params(labelsize=SMALL_SIZE, length=2)
     ax.tick_params(which="minor", length=1)
+    # on two lines: the two parts' labels would meet on one
     ax.set_xlabel(
-        f"{'Onset' if edge == 'start' else 'Offset'} error (ms)",
+        f"{'Onset' if edge == 'start' else 'Offset'}\nerror (ms)",
         fontsize=LABEL_SIZE,
         labelpad=2,
     )
 
 
+def plot_position_error(ax: Axes, summary: pd.DataFrame) -> None:
+    """How far each detector's decoded position is from the replay's true
+    position, against the replay's speed, for replays both detectors report.
+
+    Each point is the median, over the replays of a speed bin, of a report's
+    own median distance.
+    """
+    by_speed = sweep_statistics.sweep_position_by_speed(summary)
+    edges = [*by_speed.index, np.inf]
+    labels = [
+        f">{low:g}" if np.isinf(high) else f"{low:g}–{high:g}"
+        for low, high in zip(edges[:-1], edges[1:], strict=True)
+    ]
+    x = np.arange(len(by_speed))
+    for detector, color in (
+        ("sliding", SLIDING_COLOR),
+        ("state_space", STATE_SPACE_COLOR),
+    ):
+        ax.plot(
+            x,
+            by_speed[f"{detector}_position_error_cm"].to_numpy(),
+            color=color,
+            linewidth=1.0,
+            marker="o",
+            markersize=2.5,
+        )
+    ax.set_xticks(x, labels, rotation=45, ha="right", rotation_mode="anchor")
+    ax.set_ylim(0, None)
+    ax.tick_params(labelsize=SMALL_SIZE, length=2)
+    ax.set_xlabel("Replay speed (m/s)", fontsize=LABEL_SIZE, labelpad=2)
+    ax.set_ylabel("Position\nerror (cm)", fontsize=LABEL_SIZE, labelpad=3)
+
+
 def plot_sweep(fig: Figure, slot: SubplotSpec, summary: pd.DataFrame) -> None:
-    """Panels b-e: detection by path and duration, then how far off onset and
-    offset are."""
+    """Panels b-d: detection by path and duration, how far off onset and offset
+    are, and how far off the decoded position is."""
     gs = slot.subgridspec(
-        1, 6, width_ratios=[1, 1, 0.045, 0.6, 0.66, 0.66], wspace=0.12
+        1, 5, width_ratios=[0.86, 0.86, 0.035, 0.55, 1.9], wspace=0.12
     )
     ax_sliding = fig.add_subplot(gs[0])
     ax_state_space = fig.add_subplot(gs[1])
@@ -696,9 +733,12 @@ def plot_sweep(fig: Figure, slot: SubplotSpec, summary: pd.DataFrame) -> None:
     colorbar.set_label("Replays reported (%)", fontsize=SMALL_SIZE, labelpad=2)
     colorbar.outline.set_linewidth(0.5)
 
-    timing = gs[4:].subgridspec(1, 2, wspace=0.2)
+    # onset and offset are one panel in two parts: they share a y axis and a letter
+    right = gs[4].subgridspec(1, 2, width_ratios=[2.0, 1.0], wspace=0.62)
+    timing = right[0].subgridspec(1, 2, wspace=0.25)
     ax_onset = fig.add_subplot(timing[0])
     ax_offset = fig.add_subplot(timing[1])
+    plot_position_error(fig.add_subplot(right[1]), summary)
     plot_edge_error(ax_onset, summary, "start")
     plot_edge_error(ax_offset, summary, "end")
     ax_onset.set_ylabel(
@@ -801,7 +841,7 @@ def make_figure(summary: pd.DataFrame) -> tuple[Figure, dict]:
         1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.90, bottom=0.42
     )
     gs_sweep = fig.add_gridspec(
-        1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.30, bottom=0.07
+        1, 1, left=SWEEP_LEFT, right=DATA_RIGHT, top=0.30, bottom=0.07
     )
     axes_examples = axes_added(
         fig,
@@ -817,15 +857,14 @@ def make_figure(summary: pd.DataFrame) -> tuple[Figure, dict]:
     extents = space_rows_evenly(fig, [axes_examples, axes_sweep])
 
     # Panel letters: a and b share a left edge; the letters of the sweep's row
-    # share its top edge.
+    # share its top edge. The two grids are one panel, as are onset and offset.
     left = min(extent.x0 for extent in extents)
-    ax_sliding, ax_state_space, _, ax_onset, ax_offset = axes_sweep
+    _, _, _, ax_onset, _, ax_position = axes_sweep
     for letter, x, y in (
         ("a", left, extents[0].y1),
         ("b", left, extents[1].y1),
-        ("c", drawn_extent(fig, [ax_state_space]).x0, extents[1].y1),
-        ("d", drawn_extent(fig, [ax_onset]).x0, extents[1].y1),
-        ("e", drawn_extent(fig, [ax_offset]).x0, extents[1].y1),
+        ("c", drawn_extent(fig, [ax_onset]).x0, extents[1].y1),
+        ("d", drawn_extent(fig, [ax_position]).x0, extents[1].y1),
     ):
         letter_panel(fig, letter, x, y)
     return fig, decoded

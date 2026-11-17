@@ -29,6 +29,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simu
 from continuum_swr_replay.analysis.detection.memoryless_sequence.scoring import (
     best_scored,
     score_against_injection,
+    trajectory_bias,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     SIGNIFICANCE_LEVEL,
@@ -144,6 +145,8 @@ def score_sliding_window(
         "sliding_p_jump": np.nan,
         "sliding_position_error_cm": np.nan,
         "sliding_span_cm": np.nan,
+        "sliding_signed_error_cm": np.nan,
+        "sliding_slope_cm_per_s": np.nan,
     }
     if not accepted:
         return out
@@ -176,7 +179,12 @@ def score_sliding_window(
     i, score = best_entry(scored)
     event = run.events[i]
     animal_cm = np.interp(event.decoded_time_s, run.time, position[: run.time.size])
+    signed_error_cm, slope_cm_per_s = trajectory_bias(
+        event.decoded_time_s, event.decoded_cm, true_position_cm, span
+    )
     out |= {
+        "sliding_signed_error_cm": signed_error_cm,
+        "sliding_slope_cm_per_s": slope_cm_per_s,
         "sliding_matches_before_shuffle": score.matches,
         "sliding_matches": any_match(lambda j: shuffles[j].passes),
         "sliding_matches_spread_only": any_match(
@@ -235,6 +243,8 @@ def score_state_space(
         "state_space_replay_matches": False,
         "state_space_position_error_cm": np.nan,
         "state_space_span_cm": np.nan,
+        "state_space_signed_error_cm": np.nan,
+        "state_space_slope_cm_per_s": np.nan,
         "state_space_dispersion_cm": np.nan,
     }
     if not hits:
@@ -266,7 +276,12 @@ def score_state_space(
         scored.append((event, score, duration_s, dispersion, meets_replay_definition))
     event, score, duration_s, dispersion, _ = best_entry(scored)
 
+    signed_error_cm, slope_cm_per_s = trajectory_bias(
+        event.decoded_time_s, event.decoded_cm, true_position_cm, span
+    )
     out |= {
+        "state_space_signed_error_cm": signed_error_cm,
+        "state_space_slope_cm_per_s": slope_cm_per_s,
         "state_space_matches": score.matches,
         "state_space_replay_matches": any(entry[4] for entry in scored),
         "state_space_position_error_cm": score.position_error_cm,
@@ -386,6 +401,18 @@ def run_cell(
     row |= state_space_outcome(
         recording, injected, window, bounds, span, true_position_cm, path_cm
     )
+    # In the replay's own frame: how far ahead of the true position, along the
+    # direction of travel, the decoded one sits, and the decoded speed over the
+    # true one. A replay held still has no direction and no speed.
+    true_speed_cm_per_s = direction * path_cm / duration_s
+    for detector in ("sliding", "state_space"):
+        signed_error_cm = row.pop(f"{detector}_signed_error_cm")
+        slope_cm_per_s = row.pop(f"{detector}_slope_cm_per_s")
+        moves = path_cm > 0
+        row[f"{detector}_lead_cm"] = direction * signed_error_cm if moves else np.nan
+        row[f"{detector}_speed_ratio"] = (
+            slope_cm_per_s / true_speed_cm_per_s if moves else np.nan
+        )
     return row
 
 

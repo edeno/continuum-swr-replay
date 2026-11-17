@@ -94,6 +94,83 @@ def timing_error_exceedance(found: pd.DataFrame) -> dict[str, float]:
     return shares
 
 
+SPEED_BIN_EDGES_M_PER_S = (0.0, 1.5, 3.0, 5.0, 8.0, np.inf)
+"""The replay speeds the position error is given at (:func:`position_error_by_speed`):
+each bin is above its lower edge and up to its upper."""
+
+
+def pooled_position_errors(found: pd.DataFrame) -> dict[str, float]:
+    """How well each detector's decoded position follows the replay, pooled over
+    the replays both report.
+
+    Parameters
+    ----------
+    found : pd.DataFrame, shape (n_replays, n_columns)
+        The replays both detectors report, one row each, with for ``sliding``
+        and ``state_space``: ``<detector>_position_error_cm`` (the median
+        distance of the decoded position from the true one over the report),
+        ``<detector>_lead_cm`` (how far ahead of the true position, along the
+        replay's direction, the decoded one sits) and
+        ``<detector>_speed_ratio`` (decoded speed over true speed). The last
+        two are NaN for a replay held still.
+
+    Returns
+    -------
+    statistics : dict
+        ``<detector>_<quantity>_<q25|median|q75>`` for the quantities
+        ``position_error_cm``, ``lead_cm`` and ``speed_ratio``, a missing value
+        left out; and ``sliding_larger_position_error_share``, the share of
+        replays on which the sliding window's position error is the larger.
+    """
+    statistics = {}
+    for detector in ("sliding", "state_space"):
+        for quantity in ("position_error_cm", "lead_cm", "speed_ratio"):
+            values = found[f"{detector}_{quantity}"]
+            for name, quantile in (("q25", 0.25), ("median", 0.5), ("q75", 0.75)):
+                statistics[f"{detector}_{quantity}_{name}"] = float(
+                    values.quantile(quantile)
+                )
+    statistics["sliding_larger_position_error_share"] = float(
+        (
+            found["sliding_position_error_cm"] > found["state_space_position_error_cm"]
+        ).mean()
+    )
+    return statistics
+
+
+def position_error_by_speed(found: pd.DataFrame) -> pd.DataFrame:
+    """Each detector's median position error at each replay speed.
+
+    Parameters
+    ----------
+    found : pd.DataFrame, shape (n_replays, n_columns)
+        The replays both detectors report: ``path_cm``, ``duration_s`` and each
+        detector's ``<detector>_position_error_cm``.
+
+    Returns
+    -------
+    by_speed : pd.DataFrame, shape (n_bins, 4)
+        ``speed_m_per_s`` (the bin's lower edge, of
+        :data:`SPEED_BIN_EDGES_M_PER_S`), ``n_replays``, and each detector's
+        ``<detector>_position_error_cm`` (the median); a bin with no replay is
+        left out.
+    """
+    speed_m_per_s = found["path_cm"] / found["duration_s"] / 100.0
+    edges = np.asarray(SPEED_BIN_EDGES_M_PER_S)
+    # a replay held still has speed 0 and belongs to the first bin
+    lower = edges[
+        np.clip(np.searchsorted(edges, speed_m_per_s, side="left") - 1, 0, None)
+    ]
+    columns = ["sliding_position_error_cm", "state_space_position_error_cm"]
+    grouped = found.assign(speed_m_per_s=lower).groupby("speed_m_per_s")
+    return (
+        grouped[columns]
+        .median()
+        .assign(n_replays=grouped.size().astype(float))
+        .reset_index()
+    )
+
+
 def pooled_timing_errors(found: pd.DataFrame) -> dict[str, float]:
     """Each detector's start and end errors over the replays both report, pooled.
 
@@ -157,18 +234,21 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
 
     Returns
     -------
-    summary : pd.DataFrame, shape (n_values, 6)
+    summary : pd.DataFrame, shape (n_values, 7)
         ``summary`` (the block), ``measure``, the block's grouping columns
-        ``path_cm`` and ``duration_s`` (NaN where the block is not grouped by
-        it), ``value`` and an empty ``note``. The blocks: detection rates by
+        ``path_cm``, ``duration_s`` and ``speed_m_per_s`` (NaN where the block is
+        not grouped by it), ``value`` and an empty ``note``. The blocks: detection rates by
         path and duration (``detection_rate_by_path_and_duration``), the
         shuffle's pass rates by duration, the rates over every cell
         (``overall``) and over the cells the published definition can accept
         (``overall_in_domain``, :data:`IN_DOMAIN_PATH_CM`,
         :data:`IN_DOMAIN_DURATION_S`), and the start and end errors pooled
         (``timing_pooled``, :func:`pooled_timing_errors`) and as a distribution
-        (``timing_exceedance``, :func:`timing_error_exceedance`). The timing
-        blocks read the replays both detectors report as the injection
+        (``timing_exceedance``, :func:`timing_error_exceedance`), and how well
+        the decoded position follows the replay, pooled (``position_pooled``,
+        :func:`pooled_position_errors`) and by the replay's speed
+        (``position_by_speed``, :func:`position_error_by_speed`). The timing
+        and position blocks read the replays both detectors report as the injection
         (``sliding_matches`` and ``state_space_matches``), their errors against
         each replay's own first and last spike.
     """
@@ -332,9 +412,13 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
     # where each detector puts an event's start and end against the truth, on
     # the replays both reported: signed, so absorbed local coding shows as an
     # early start or a late end rather than only as a longer event
+    parts.append(
+        melted(position_error_by_speed(found), ["speed_m_per_s"], "position_by_speed")
+    )
     for block, statistics in (
         ("timing_pooled", pooled_timing_errors),
         ("timing_exceedance", timing_error_exceedance),
+        ("position_pooled", pooled_position_errors),
     ):
         parts.append(
             pd.Series(statistics(found), name="value")
@@ -354,6 +438,7 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
             "measure",
             "path_cm",
             "duration_s",
+            "speed_m_per_s",
             "value",
             "note",
         ]

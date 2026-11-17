@@ -41,6 +41,7 @@ __all__ = [
     "part_agreement",
     "recovered_parts",
     "score_against_injection",
+    "trajectory_bias",
     "segmentation",
 ]
 
@@ -131,6 +132,50 @@ def score_against_injection(
         position_error_cm=error_cm,
         span_cm=span_cm,
     )
+
+
+def trajectory_bias(
+    decoded_time_s: NDArray,
+    decoded_cm: NDArray,
+    true_position_cm: Callable[[NDArray], NDArray],
+    span: tuple[float, float],
+) -> tuple[float, float]:
+    """Which way a reported event's decoded position errs, and how fast it moves.
+
+    Read over the decoded positions inside ``span`` only, so that what a report
+    holds before the replay's first spike or after its last does not enter.
+
+    Parameters
+    ----------
+    decoded_time_s : ndarray, shape (n_decoded,)
+        When each decoded position of the reported event was read.
+    decoded_cm : ndarray, shape (n_decoded,)
+        The decoded position at each of those times.
+    true_position_cm : callable
+        Where the injected replay says the animal is, at the times it is given.
+    span : tuple of float
+        The replay's own first and last spike, in seconds.
+
+    Returns
+    -------
+    signed_error_cm : float
+        Median of decoded minus true position, in track coordinates. NaN with
+        no decoded position inside the span.
+    slope_cm_per_s : float
+        Least-squares slope of the decoded position against time. NaN with
+        fewer than two decoded times inside the span.
+    """
+    times = np.asarray(decoded_time_s, dtype=np.float64)
+    decoded = np.asarray(decoded_cm, dtype=np.float64)
+    truth = np.asarray(true_position_cm(times), dtype=np.float64)
+    inside = (times >= span[0]) & (times <= span[1]) & np.isfinite(truth)
+    if not inside.any():
+        return float("nan"), float("nan")
+    signed_error_cm = float(np.median(decoded[inside] - truth[inside]))
+    if np.unique(times[inside]).size < 2:
+        return signed_error_cm, float("nan")
+    slope_cm_per_s = float(np.polyfit(times[inside], decoded[inside], 1)[0])
+    return signed_error_cm, slope_cm_per_s
 
 
 def best_scored(scores: list[InjectionScore]) -> int:

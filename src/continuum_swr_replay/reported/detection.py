@@ -489,6 +489,83 @@ def pooled_timing_values(summary: pd.DataFrame, make) -> list[Value]:
     return values
 
 
+_POSITION_QUANTITIES = {
+    "position_error_cm": (
+        "position_error",
+        "cm",
+        "sig2",
+        "distance of the decoded position from the replay's true position, the "
+        "median over the report",
+    ),
+    "lead_cm": (
+        "lead",
+        "cm",
+        "sig2",
+        "distance the decoded position sits ahead of the true one along the "
+        "replay's direction (negative: behind), replays that travel",
+    ),
+    "speed_ratio": (
+        "speed_ratio",
+        None,
+        "dec2",
+        "decoded speed over the replay's true speed, replays that travel",
+    ),
+}
+"""A quantity of the pooled position block: its word in a value's key, its
+units, its format and its description."""
+
+
+def position_values(summary: pd.DataFrame, make) -> list[Value]:
+    """How well each detector's decoded position follows the replay, over the
+    replays both report (``sweep_summaries.pooled_position_errors``,
+    ``position_error_by_speed``)."""
+    pooled = sweep_statistics.sweep_position_statistics(summary)
+    by_speed = sweep_statistics.sweep_position_by_speed(summary)
+    over = "over the replays both detectors report"
+    values = []
+    for detector, detector_name in _TIMING_DETECTORS.items():
+        for quantity, (word, units, style, what) in _POSITION_QUANTITIES.items():
+            for statistic in ("q25", "median", "q75"):
+                key_word, name = _TIMING_STATISTICS[statistic]
+                values.append(
+                    make(
+                        f"sweep_position_{detector}_{word}_{key_word}",
+                        pooled[f"{detector}_{quantity}_{statistic}"],
+                        "quantity",
+                        style,
+                        f"{name} {what}, of the {detector_name}, {over}",
+                        *([units] if units else []),
+                    )
+                )
+        for which, speed in (
+            ("slowest", by_speed.index[0]),
+            ("fastest", by_speed.index[-1]),
+        ):
+            values.append(
+                make(
+                    f"sweep_position_{detector}_error_{which}_cm",
+                    by_speed.loc[speed, f"{detector}_position_error_cm"],
+                    "quantity",
+                    "sig2",
+                    f"median position error of the {detector_name} over the "
+                    f"{which} replays both detectors report (above "
+                    f"{format_number(float(speed), 'sig2')} m/s)",
+                    "cm",
+                )
+            )
+    values.append(
+        make(
+            "sweep_position_sliding_larger_fraction",
+            pooled["sliding_larger_position_error_share"],
+            "fraction",
+            "pctnum",
+            "share of the replays both detectors report on which the sliding "
+            "window's position error is the larger of the two",
+        )
+    )
+    return values
+
+
 def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
     """Panels (b-e): replays of chosen shape, one at a time, scored against the
     known answer. Shares are of the swept replays (grid cells)."""
@@ -510,6 +587,7 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
 
     return [
         *pooled_timing_values(summary, make),
+        *position_values(summary, make),
         make(
             "sweep_replays",
             grid["n_replays"],

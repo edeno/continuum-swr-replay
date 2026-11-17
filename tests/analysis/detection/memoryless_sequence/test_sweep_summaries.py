@@ -46,6 +46,13 @@ def replay_cells() -> pd.DataFrame:
             "state_space_matches": np.ones(n, dtype=bool),
             "state_space_replay_matches": [True, True, True, False],
             "state_space_n_intervals": np.ones(n, dtype=np.int64),
+            # cells 0 and 3 travel at 3.75 and 7.5 m/s
+            "sliding_position_error_cm": [2.0, 9.0, 9.0, 8.0],
+            "state_space_position_error_cm": [1.0, 9.0, 9.0, 3.0],
+            "sliding_lead_cm": [-1.0, 0.0, 0.0, -3.0],
+            "state_space_lead_cm": [0.5, 0.0, 0.0, 0.5],
+            "sliding_speed_ratio": [0.9, 1.0, 1.0, 0.7],
+            "state_space_speed_ratio": [1.0, 1.0, 1.0, 1.0],
             "sliding_start_error_s": [-0.003, 0.002, 0.0, 0.010],
             "sliding_end_error_s": [0.020, 0.0, 0.0, 0.0],
             "state_space_start_error_s": [-0.004, 0.0, 0.0, 0.0],
@@ -123,6 +130,33 @@ class TestReplaySweepSummary:
             ]
             == 0.5
         )
+
+    def test_position_errors_are_pooled_over_the_replays_both_report(self):
+        pooled = self.values("position_pooled").set_index("measure").value
+
+        # cells 0 and 3
+        assert pooled["sliding_position_error_cm_median"] == pytest.approx(5.0)
+        assert pooled["state_space_position_error_cm_median"] == pytest.approx(2.0)
+        assert pooled["sliding_lead_cm_median"] == pytest.approx(-2.0)
+        assert pooled["sliding_speed_ratio_median"] == pytest.approx(0.8)
+        assert pooled["sliding_larger_position_error_share"] == 1.0
+
+    def test_position_error_is_given_at_each_replay_speed(self):
+        rows = self.values("position_by_speed")
+        by_speed = rows.pivot(index="speed_m_per_s", columns="measure", values="value")
+
+        # 45 cm in 0.12 s is 3.75 m/s (above 3); 90 cm in 0.12 s is 7.5 (above 5)
+        assert by_speed.index.tolist() == [3.0, 5.0]
+        assert by_speed["sliding_position_error_cm"].tolist() == [2.0, 8.0]
+        assert by_speed["state_space_position_error_cm"].tolist() == [1.0, 3.0]
+        assert by_speed["n_replays"].tolist() == [1.0, 1.0]
+
+    def test_a_speed_on_a_bin_edge_belongs_to_the_slower_bin(self):
+        cells = replay_cells().iloc[[0]].assign(path_cm=18.0, duration_s=0.12)
+        by_speed = sweep_summaries.position_error_by_speed(cells)
+
+        # exactly 1.5 m/s
+        assert by_speed["speed_m_per_s"].tolist() == [0.0]
 
     def test_the_misses_are_the_state_space_matches_the_window_lost(self):
         overall = self.values("overall").set_index("measure").value
