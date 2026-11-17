@@ -36,7 +36,7 @@
 \newcommand{\SurveyTimeBinMin}{2}  % survey.time_bin_min: Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)
 \newcommand{\SurveyTimeBinMode}{20}  % survey.time_bin_mode: Most common decoding time bin, over the 46 numeric cells of Time bin (ms)
 
-% --- detection (commit ce69d2d8285c)
+% --- detection (commit 602f8d5f67e4)
 \newcommand{\DetectionControlsContinuingOursOnePerPartLongestFraction}{96}  % detection.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingOursSpanningShortestFraction}{96}  % detection.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingSlidingOnePerPartLongestFraction}{50}  % detection.controls_continuing_sliding_one_per_part_longest_fraction: continuing chains at the longest gap: share of trials the sliding window reports as one event per part
@@ -90,8 +90,8 @@
 \newcommand{\DetectionHeldoutFragmentedImmobileMismatchedEpochs}{242}  % detection.heldout_fragmented_immobile_mismatched_epochs: epochs with Non-Local Fragmented bouts, immobile scored
 \newcommand{\DetectionHeldoutFragmentedImmobileMismatchedEpochsPositive}{117}  % detection.heldout_fragmented_immobile_mismatched_epochs_positive: epochs whose median held-out evidence of Non-Local Fragmented bouts, immobile is above zero
 \newcommand{\DetectionHeldoutFragmentedImmobileMismatchedEstimate}{0.12}  % detection.heldout_fragmented_immobile_mismatched_estimate: held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's mean epoch median
-\newcommand{\DetectionHeldoutJumpingSupportMax}{57}  % detection.heldout_jumping_support_max: the higher of the two
-\newcommand{\DetectionHeldoutJumpingSupportMin}{50}  % detection.heldout_jumping_support_min: jumping events: lower of folds A and B's share with held-out support
+\newcommand{\DetectionHeldoutJumpingSupportMax}{65}  % detection.heldout_jumping_support_max: the higher of the two
+\newcommand{\DetectionHeldoutJumpingSupportMin}{57}  % detection.heldout_jumping_support_min: jumping events: lower of folds A and B's share with held-out support
 \newcommand{\DetectionHeldoutLocalImmobileAnimalsPositive}{5}  % detection.heldout_local_immobile_animals_positive: animals whose mean held-out evidence of Local bouts, immobile is above zero
 \newcommand{\DetectionHeldoutLocalImmobileCiHigh}{4.4}  % detection.heldout_local_immobile_ci_high: upper bound of that interval
 \newcommand{\DetectionHeldoutLocalImmobileCiLow}{1.1}  % detection.heldout_local_immobile_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
@@ -113,7 +113,7 @@
 \newcommand{\DetectionHeldoutPlacelessLooseEvents}{106}  % detection.heldout_placeless_loose_events: reports on place-less events informative at that floor
 \newcommand{\DetectionHeldoutPlacelessLooseSupportedEvents}{1}  % detection.heldout_placeless_loose_supported_events: reports on place-less events with held-out support at a floor of 2 expected spikes
 \newcommand{\DetectionHeldoutPlacelessSlidingEstimateEvents}{44}  % detection.heldout_placeless_sliding_estimate_events: informative reports on place-less events under the sliding window's content estimate
-\newcommand{\DetectionHeldoutPlacelessSlidingEstimateSupportedEvents}{1}  % detection.heldout_placeless_sliding_estimate_supported_events: of those, the events with held-out support
+\newcommand{\DetectionHeldoutPlacelessSlidingEstimateSupportedEvents}{0}  % detection.heldout_placeless_sliding_estimate_supported_events: of those, the events with held-out support
 \newcommand{\DetectionHeldoutPlacelessSupportedEvents}{0}  % detection.heldout_placeless_supported_events: of those, the events with held-out support
 \newcommand{\DetectionHeldoutSharedInformativeMax}{45}  % detection.heldout_shared_informative_max: the higher of the two
 \newcommand{\DetectionHeldoutSharedInformativeMin}{42}  % detection.heldout_shared_informative_min: shared replays: lower of folds A and B's share the evaluation cells can judge at all

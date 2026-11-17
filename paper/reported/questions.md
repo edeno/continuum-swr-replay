@@ -16,7 +16,7 @@ it calls.
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
-| `detection.json` | `ce69d2d8285c` | yes | 146 | 0 |
+| `detection.json` | `602f8d5f67e4` | yes | 146 | 0 |
 | `events.json` | `d7d80592187f` | yes | 353 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
@@ -75,7 +75,7 @@ Status: computed. Figures: 1, memoryless_comparison. Values: 58.
 Sources:
 
 - paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
-- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit af32738aada6)
+- paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit 929d2f7dd139)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -198,8 +198,8 @@ Sources:
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\DetectionHeldoutEstimatorAgreementMin` | 98 |  | lowest share over folds of the events informative under both content estimates on which they agree | `detection.heldout_values` |  |
-| `\DetectionHeldoutJumpingSupportMax` | 57 |  | the higher of the two | `detection.heldout_values` |  |
-| `\DetectionHeldoutJumpingSupportMin` | 50 |  | jumping events: lower of folds A and B's share with held-out support | `detection.heldout_values` |  |
+| `\DetectionHeldoutJumpingSupportMax` | 65 |  | the higher of the two | `detection.heldout_values` |  |
+| `\DetectionHeldoutJumpingSupportMin` | 57 |  | jumping events: lower of folds A and B's share with held-out support | `detection.heldout_values` |  |
 | `\DetectionHeldoutOursOnlyInformativeMax` | 15 |  | the higher of the two | `detection.heldout_values` |  |
 | `\DetectionHeldoutOursOnlyInformativeMin` | 14 |  | replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all | `detection.heldout_values` |  |
 | `\DetectionHeldoutOursOnlySupportFoldC` | 79 |  | the same share in fold C | `detection.heldout_values` |  |
@@ -209,7 +209,7 @@ Sources:
 | `\DetectionHeldoutPlacelessLooseEvents` | 106 |  | reports on place-less events informative at that floor | `detection.heldout_values` |  |
 | `\DetectionHeldoutPlacelessLooseSupportedEvents` | 1 |  | reports on place-less events with held-out support at a floor of 2 expected spikes | `detection.heldout_values` |  |
 | `\DetectionHeldoutPlacelessSlidingEstimateEvents` | 44 |  | informative reports on place-less events under the sliding window's content estimate | `detection.heldout_values` |  |
-| `\DetectionHeldoutPlacelessSlidingEstimateSupportedEvents` | 1 |  | of those, the events with held-out support | `detection.heldout_values` |  |
+| `\DetectionHeldoutPlacelessSlidingEstimateSupportedEvents` | 0 |  | of those, the events with held-out support | `detection.heldout_values` |  |
 | `\DetectionHeldoutPlacelessSupportedEvents` | 0 |  | of those, the events with held-out support | `detection.heldout_values` |  |
 | `\DetectionHeldoutSharedInformativeMax` | 45 |  | the higher of the two | `detection.heldout_values` |  |
 | `\DetectionHeldoutSharedInformativeMin` | 42 |  | shared replays: lower of folds A and B's share the evaluation cells can judge at all | `detection.heldout_values` |  |

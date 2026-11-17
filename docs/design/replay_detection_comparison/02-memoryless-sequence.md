@@ -771,11 +771,11 @@ shared events are in the summary under their own `detector`.
 - **The test rarely supported events without content, on few of them.**
   <!--v:detection.heldout_placeless_supported_events-->0<!--/v--> of the
   <!--v:detection.heldout_placeless_informative_events-->44<!--/v--> informative reports on place-less events have
-  support (<!--v:detection.heldout_placeless_sliding_estimate_supported_events-->1<!--/v--> of
+  support (<!--v:detection.heldout_placeless_sliding_estimate_supported_events-->0<!--/v--> of
   <!--v:detection.heldout_placeless_sliding_estimate_events-->44<!--/v--> under the sliding window's content
   estimate); at a floor of 2 expected spikes, <!--v:detection.heldout_placeless_loose_supported_events-->1<!--/v-->
   of <!--v:detection.heldout_placeless_loose_events-->106<!--/v--> do. Jumping events, which do represent places,
-  <!--v:detection.heldout_jumping_support_min-->50<!--/v-->–<!--v:detection.heldout_jumping_support_max-->57<!--/v-->%. On the no-replay
+  <!--v:detection.heldout_jumping_support_min-->57<!--/v-->–<!--v:detection.heldout_jumping_support_max-->65<!--/v-->%. On the no-replay
   stretches neither detector reported an event from discovery cells, so no event of
   pure local coding reached the test: the false-support rate rests on place-less
   events alone.

@@ -3835,3 +3835,11 @@ marker, and the computed value now there. Newest last.
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_sliding_offset_lower_quartile_ms` | 18 | 17 |
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_sliding_offset_far_fraction` | 11 | 10 |
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_fraction` | 16 | 17 |
+
+## 2026-11-17
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.heldout_placeless_sliding_estimate_supported_events` | 1 | 0 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.heldout_jumping_support_min` | 50 | 57 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.heldout_jumping_support_max` | 57 | 65 |
