@@ -7,7 +7,7 @@ This figure runs the published sliding-window sequence detector (Widloski &
 Foster; ``analysis.detection.memoryless_sequence``) beside it, on replays whose
 shape is known:
 
-    a: eight simulated events at a millisecond scale, in two rows — raster, each detector's
+    a: eight simulated events at a millisecond scale — raster, each detector's
        decoded position, and three rows of events: what was simulated, what the
        sliding-window detector reports, what the state-space model reports
     b, c: the share of injected replays each detector reports, by how far the
@@ -151,7 +151,7 @@ EVENT_ROWS = (
 # Inches. Narrower than Figure 1's 6.9: the event rows' names reach the left edge,
 # and the saved figure must stay within Cell Press's 17.4 cm.
 FIGURE_WIDTH = 6.7
-FIGURE_HEIGHT = 7.6
+FIGURE_HEIGHT = 5.9
 # The data axes of the panels that span the figure, in figure fractions: wider
 # margins than Figure 1's, for the event rows' names.
 DATA_LEFT, DATA_RIGHT = 0.12, 0.975
@@ -210,12 +210,12 @@ class Example:
 EXAMPLES = (
     Example(
         FAR_REPLAY_EVENT,
-        "Far from animal",
+        "Distant",
         f"{FAR_REPLAY.path_cm:.0f} cm in {1000 * FAR_REPLAY.duration_s:.0f} ms",
         "found",
         "both",
     ),
-    Example(SWEEP_EVENT, "Ends at animal", "the whole track", "found", "both"),
+    Example(SWEEP_EVENT, "At animal", "the whole track", "found", "both"),
     Example(
         SHORT_REPLAY_EVENT,
         "Brief",
@@ -259,10 +259,6 @@ EXAMPLES = (
 the headings of :data:`EXAMPLE_GROUPS`. The sweep, the random-order event and the
 place held still are Figure 1's examples; the others are added to its run. The
 sparse replay is the far one at a lower peak firing rate."""
-
-EXAMPLE_ROWS = (("both", "no_trajectory"), ("state_space_only",))
-"""Panel a's rows: the groups of :data:`EXAMPLE_GROUPS` each row of examples
-holds, left to right."""
 
 EXAMPLE_GROUPS = {
     "both": "Both detectors report",
@@ -400,13 +396,10 @@ def plot_examples(
     fig: Figure,
     slot: SubplotSpec,
     decoded: dict,
-    examples: Sequence[Example],
-    n_columns: int,
     sliding_vmax: float,
     state_space_vmax: float,
 ) -> None:
-    """One row of panel a: raster, each detector's decoded position, and the
-    events, for ``examples``, in the first of ``n_columns`` equal columns.
+    """Panel a: raster, each detector's decoded position, and the events.
 
     Each column is one example on its own millisecond axis, zero at the start
     of the simulated event. The sliding-window detector's decode is its
@@ -415,15 +408,15 @@ def plot_examples(
     """
     gs = slot.subgridspec(
         4,
-        n_columns,
-        height_ratios=[1.0, 1.0, 1.0, 0.6],
+        len(EXAMPLES),
+        height_ratios=[1.0, 1.0, 1.0, 0.5],
         hspace=0.16,
         wspace=0.14,
     )
     time, midpoint_s = decoded["time"], decoded["midpoint_s"]
     animal_at_midpoint = np.interp(midpoint_s, time, decoded["position"])
     rasters: list[Axes] = []
-    for k, example in enumerate(examples):
+    for k, example in enumerate(EXAMPLES):
         event_start, event_end = decoded["event_times"][example.event]
         # room for the sliding window's reports of the event
         runs = decoded["candidates"].runs
@@ -551,9 +544,8 @@ def plot_examples(
 
     # A heading over each run of columns, with a rule as wide as the columns it
     # covers.
-    groups = [example.group for example in examples]
-    for group in dict.fromkeys(groups):
-        heading = EXAMPLE_GROUPS[group]
+    groups = [example.group for example in EXAMPLES]
+    for group, heading in EXAMPLE_GROUPS.items():
         columns = [k for k, name in enumerate(groups) if name == group]
         first, last = rasters[columns[0]], rasters[columns[-1]]
         left, right = first.get_position().x0, last.get_position().x1
@@ -805,34 +797,24 @@ def make_figure(summary: pd.DataFrame) -> tuple[Figure, dict]:
     fig = plt.figure(figsize=(FIGURE_WIDTH, FIGURE_HEIGHT), dpi=450, layout="none")
 
     # Provisional vertical positions; the rows are re-spaced below.
-    rows = [
-        [example for example in EXAMPLES if example.group in groups]
-        for groups in EXAMPLE_ROWS
-    ]
-    n_columns = max(len(row) for row in rows)
-    slots = (
-        fig.add_gridspec(1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.93, bottom=0.66),
-        fig.add_gridspec(1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.58, bottom=0.31),
+    gs_examples = fig.add_gridspec(
+        1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.90, bottom=0.42
     )
     gs_sweep = fig.add_gridspec(
-        1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.22, bottom=0.06
+        1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.30, bottom=0.07
     )
-    n_axes = 4  # an example's axes
-    axes_rows = [
-        axes_added(
-            fig,
-            lambda slot=slot, row=row: plot_examples(
-                fig, slot[0], decoded, row, n_columns, sliding_vmax, state_space_vmax
-            ),
-        )
-        for slot, row in zip(slots, rows, strict=True)
-    ]
+    axes_examples = axes_added(
+        fig,
+        lambda: plot_examples(
+            fig, gs_examples[0], decoded, sliding_vmax, state_space_vmax
+        ),
+    )
     axes_sweep = axes_added(fig, lambda: plot_sweep(fig, gs_sweep[0], summary))
-    # the first column's labels of both rows of examples on one line
-    fig.align_ylabels([ax for axes in axes_rows for ax in axes[:n_axes]])
+    n_axes = 4  # an example's axes
+    fig.align_ylabels(axes_examples[:n_axes])
     fig.draw_without_rendering()
 
-    extents = space_rows_evenly(fig, [*axes_rows, axes_sweep])
+    extents = space_rows_evenly(fig, [axes_examples, axes_sweep])
 
     # Panel letters: a and b share a left edge; the letters of the sweep's row
     # share its top edge.
@@ -840,10 +822,10 @@ def make_figure(summary: pd.DataFrame) -> tuple[Figure, dict]:
     ax_sliding, ax_state_space, _, ax_onset, ax_offset = axes_sweep
     for letter, x, y in (
         ("a", left, extents[0].y1),
-        ("b", left, extents[-1].y1),
-        ("c", drawn_extent(fig, [ax_state_space]).x0, extents[-1].y1),
-        ("d", drawn_extent(fig, [ax_onset]).x0, extents[-1].y1),
-        ("e", drawn_extent(fig, [ax_offset]).x0, extents[-1].y1),
+        ("b", left, extents[1].y1),
+        ("c", drawn_extent(fig, [ax_state_space]).x0, extents[1].y1),
+        ("d", drawn_extent(fig, [ax_onset]).x0, extents[1].y1),
+        ("e", drawn_extent(fig, [ax_offset]).x0, extents[1].y1),
     ):
         letter_panel(fig, letter, x, y)
     return fig, decoded
