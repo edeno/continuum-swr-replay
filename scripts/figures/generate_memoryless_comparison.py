@@ -6,25 +6,24 @@ This figure runs the published sliding-window sequence detector (Widloski &
 Foster; ``analysis.detection.memoryless_sequence``) beside it, on replays whose
 shape is known:
 
-    a: how each detector decides, on the same spikes (schematic)
-    b: Figure 1's run with two replays added — raster, the state-space model's
+    a: Figure 1's run with two replays added — raster, the state-space model's
        decoded position, and three rows of events: what was simulated, what the
        sliding-window detector reports, what the state-space model reports
-    c: five of those events at a millisecond scale — raster, each detector's
+    b: five of those events at a millisecond scale — raster, each detector's
        decoded position, and the same three rows of events
-    d, e: the share of injected replays each detector reports, by how far the
+    c, d: the share of injected replays each detector reports, by how far the
        replay travels and how long it lasts
-    f, g: the error in each detector's onset and offset, by duration
+    e, f: the share of replays whose onset or offset error is beyond each size
 
 The narrative is: the sliding-window detector asks whether the decoded position
 moves far enough for long enough, so it declines a replay that is short in
 path, held still or scattered, and it reports the ones it finds too long; the
 state-space model asks where the spikes point, and reports each.
 
-Panels b and c are one recording and its two decodes,
+Panels a and b are one recording and its two decodes,
 ``memoryless_sequence.comparison_simulation.simulate_and_decode``: Figure 1's
 run, model and event rule, and the sliding-window detector at its published
-settings, reading the same place fields. Panels d-g read the aggregates of
+settings, reading the same place fields. Panels c-f read the aggregates of
 ``scripts/detection/sweep_memoryless_detection.py``, which wrote replays of
 chosen path length, duration, firing rate and distance from the animal one at a
 time into that run; re-run the sweep to change them. The timing panels read
@@ -92,10 +91,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.recording_stati
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
 )
-from continuum_swr_replay.parameters import (
-    DEFAULT_NON_LOCAL_THRESHOLD,
-    NON_LOCAL_MINIMUM_DURATION_S,
-)
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.visualization.figure_utilities import (
@@ -119,7 +114,7 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 warnings.filterwarnings("ignore")
 
 SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_sweep_summary.csv")
-"""Aggregates of the replay sweep, drawn in panels d-g."""
+"""Aggregates of the replay sweep, drawn in panels c-f."""
 
 RECORDING_NUMBERS_PATH = Path(
     "paper/reported/inputs/detection/memoryless_comparison_recording.json"
@@ -151,7 +146,7 @@ FIGURE_HEIGHT = 7.6
 # The data axes of the panels that span the figure, in figure fractions: wider
 # margins than Figure 1's, for the event rows' names.
 DATA_LEFT, DATA_RIGHT = 0.12, 0.985
-# Panel b's flags for two examples in one pause are moved this far apart.
+# Panel a's flags for two examples in one pause are moved this far apart.
 EXAMPLE_FLAG_SPREAD_S = 0.9
 
 CAPTION_SETTINGS = {
@@ -190,19 +185,19 @@ def check_caption_settings(config: MemorylessSequenceConfig) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# The examples of panel c
+# The examples of panel b
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 @dataclass(frozen=True)
 class Example:
-    """One column of panel c and its numbered flag in panel b."""
+    """One column of panel b and its numbered flag in panel a."""
 
     event: int  # row of the recording's ``event_times``
     name: str
     simulated: str  # what the simulated spikes do
     expected: str  # the sliding-window detector's verdict the figure commits to
-    flag_shift: float = 0.0  # s; how far panel b's flag sits from where it points
+    flag_shift: float = 0.0  # s; how far panel a's flag sits from where it points
 
 
 EXAMPLES = (
@@ -224,7 +219,7 @@ EXAMPLES = (
     ),
     Example(SILENCE_EVENT, "No spikes", "a control", "declined"),
 )
-"""Panel c's columns, in time order. The sweep, the place held still and the
+"""Panel b's columns, in time order. The sweep, the place held still and the
 silence are Figure 1's examples; the short path and the short replay are added
 to its run."""
 
@@ -321,137 +316,7 @@ def check_recording_claims(decoded: dict, config: MemorylessSequenceConfig) -> N
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Panel a — how each detector decides
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def plot_decision_schematic(
-    fig: Figure, slot: SubplotSpec, config: MemorylessSequenceConfig
-) -> None:
-    """One simulated event, a place held still, read by each detector's rule.
-
-    Illustrative curves, not a decode. Top: the sliding-window detector decodes
-    one position per window and asks whether the positions of consecutive
-    windows are dispersed widely enough for long enough; positions that stay in
-    one place are not, so it reports no event. Bottom: the state-space model
-    asks at every decode bin whether the spikes point away from the animal;
-    they do, so it reports one. The numbers written are the detectors' settings.
-    """
-    gs = slot.subgridspec(2, 1, hspace=0.8)
-    event_ms = (90.0, 210.0)
-    window_ms, stride_ms = 1000 * config.window_duration_s, 1000 * config.stride_s
-    animal_cm, remote_cm = 104.0, 50.0
-
-    ax = fig.add_subplot(gs[0])
-    # a window is decoded at the remote place once the event's spikes fill it
-    centers = np.arange(event_ms[0], event_ms[1] + stride_ms / 2, stride_ms)
-    rng = np.random.default_rng(0)
-    ax.plot(
-        centers,
-        remote_cm + rng.normal(0, 1.2, centers.size),
-        linestyle="none",
-        marker="o",
-        markersize=1.3,
-        color=SLIDING_COLOR,
-    )
-    ax.axhline(animal_cm, color=ANIMAL_POS_COLOR, linewidth=0.9)
-    ax.text(
-        4,
-        animal_cm - 5,
-        "animal",
-        fontsize=SMALL_SIZE,
-        color=ANIMAL_POS_COLOR,
-        ha="left",
-        va="top",
-    )
-    ax.plot(
-        [event_ms[0] - window_ms / 2, event_ms[0] + window_ms / 2],
-        [remote_cm + 25] * 2,
-        color=SLIDING_COLOR,
-        linewidth=0.8,
-        solid_capstyle="butt",
-    )
-    ax.text(
-        event_ms[0] + window_ms / 2 + 5,
-        remote_cm + 25,
-        f"{window_ms:.0f} ms window,\n{stride_ms:.0f} ms steps",
-        fontsize=SMALL_SIZE,
-        color=SLIDING_COLOR,
-        ha="left",
-        va="center",
-        linespacing=0.95,
-    )
-    ax.text(
-        np.mean(event_ms),
-        2,
-        "not dispersed:\nno event",
-        fontsize=SMALL_SIZE,
-        fontweight="bold",
-        color=SLIDING_COLOR,
-        ha="center",
-        va="bottom",
-        linespacing=0.95,
-    )
-    ax.set_ylim(0, 118)
-    ax.set_yticks([])
-    ax.set_ylabel("Decoded\nposition", fontsize=LABEL_SIZE, labelpad=3)
-    ax.set_title(
-        f"{SLIDING}\n"
-        f"dispersed > {config.dispersion_threshold_cm:.0f} cm for "
-        f"≥ {1000 * config.minimum_duration_s:.0f} ms?",
-        fontsize=SMALL_SIZE,
-        fontweight="bold",
-        color=SLIDING_COLOR,
-        pad=3,
-        linespacing=0.95,
-    )
-
-    ax_probability = fig.add_subplot(gs[1], sharex=ax)
-    time_ms = np.linspace(0, 300, 301)
-    probability = 1 / (1 + np.exp(-(time_ms - event_ms[0]) / 3)) - 1 / (
-        1 + np.exp(-(time_ms - event_ms[1]) / 3)
-    )
-    ax_probability.plot(
-        time_ms, 0.02 + 0.96 * probability, color=STATE_SPACE_COLOR, linewidth=1.0
-    )
-    ax_probability.axhline(
-        DEFAULT_NON_LOCAL_THRESHOLD, color="#999999", linestyle="--", linewidth=0.6
-    )
-    ax_probability.text(
-        np.mean(event_ms),
-        0.4,
-        "non-local:\nan event",
-        fontsize=SMALL_SIZE,
-        fontweight="bold",
-        color=STATE_SPACE_COLOR,
-        ha="center",
-        va="center",
-        linespacing=0.95,
-    )
-    ax_probability.set_ylim(0, 1.05)
-    ax_probability.set_yticks([0, DEFAULT_NON_LOCAL_THRESHOLD, 1])
-    ax_probability.set_yticklabels(["0", f"{DEFAULT_NON_LOCAL_THRESHOLD:g}", "1"])
-    ax_probability.set_ylabel("Non-local\nprob.", fontsize=LABEL_SIZE, labelpad=3)
-    ax_probability.set_title(
-        f"{STATE_SPACE}\n"
-        f"away from the animal ≥ {1000 * NON_LOCAL_MINIMUM_DURATION_S:.0f} ms?",
-        fontsize=SMALL_SIZE,
-        fontweight="bold",
-        color=STATE_SPACE_COLOR,
-        pad=3,
-        linespacing=0.95,
-    )
-    ax_probability.set_xlabel("Time (ms)", fontsize=LABEL_SIZE, labelpad=2)
-    for axes in (ax, ax_probability):
-        axes.axvspan(*event_ms, color=SIMULATED_COLOR, alpha=0.08, linewidth=0)
-        axes.set_xlim(0, 300)
-        axes.set_xticks([0, 100, 200, 300])
-        axes.tick_params(labelsize=SMALL_SIZE, length=2)
-    ax.tick_params(labelbottom=False)
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Panels b and c — the labeled recording
+# Panels a and b — the labeled recording
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -506,11 +371,11 @@ def color_limit(posterior: np.ndarray, time: np.ndarray, events) -> float:
 
 
 def plot_run(fig: Figure, slot: SubplotSpec, decoded: dict, vmax: float) -> None:
-    """Panel b: raster, the state-space model's decoded position, and the events.
+    """Panel a: raster, the state-space model's decoded position, and the events.
 
     The raster is sorted by place-field position and sits directly above the
     decoded position, as in Figure 1. Numbered flags mark the examples of
-    panel c.
+    panel b.
     """
     gs = slot.subgridspec(3, 1, height_ratios=[0.9, 0.9, 0.5], hspace=0.2)
     ax_raster = fig.add_subplot(gs[0])
@@ -594,7 +459,7 @@ def plot_examples(
     sliding_vmax: float,
     state_space_vmax: float,
 ) -> None:
-    """Panel c: raster, each detector's decoded position, and the events.
+    """Panel b: raster, each detector's decoded position, and the events.
 
     Each column is one example on its own millisecond axis, zero at the start
     of the simulated event. The sliding-window detector's decode is its
@@ -742,7 +607,7 @@ def plot_examples(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Panels d-g — the sweep
+# Panels c-f — the sweep
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -848,7 +713,7 @@ def plot_edge_error(ax: Axes, summary: pd.DataFrame, edge: str) -> None:
 
 
 def plot_sweep(fig: Figure, slot: SubplotSpec, summary: pd.DataFrame) -> None:
-    """Panels d-g: detection by path and duration, then how far off onset and
+    """Panels c-f: detection by path and duration, then how far off onset and
     offset are."""
     gs = slot.subgridspec(
         1, 6, width_ratios=[1, 1, 0.045, 0.6, 0.66, 0.66], wspace=0.12
@@ -963,12 +828,10 @@ def make_figure(
     """
     decoded = simulate_and_decode(n_neurons, config)
     check_recording_claims(decoded, config)
-    return draw_figure(decoded, config, summary), decoded
+    return draw_figure(decoded, summary), decoded
 
 
-def draw_figure(
-    decoded: dict, config: MemorylessSequenceConfig, summary: pd.DataFrame
-) -> Figure:
+def draw_figure(decoded: dict, summary: pd.DataFrame) -> Figure:
     """Draw the figure from a decoded recording and the sweep's summary."""
     state_space_vmax = color_limit(
         decoded["state_space_posterior"],
@@ -985,15 +848,8 @@ def draw_figure(
     fig = plt.figure(figsize=(FIGURE_WIDTH, FIGURE_HEIGHT), dpi=450, layout="none")
 
     # Provisional vertical positions; the rows are re-spaced below.
-    gs_ab = fig.add_gridspec(
-        1,
-        2,
-        left=DATA_LEFT,
-        right=DATA_RIGHT,
-        top=0.95,
-        bottom=0.74,
-        width_ratios=[1, 3.1],
-        wspace=0.36,
+    gs_run = fig.add_gridspec(
+        1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.95, bottom=0.74
     )
     gs_c = fig.add_gridspec(
         1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.64, bottom=0.31
@@ -1001,32 +857,32 @@ def draw_figure(
     gs_sweep = fig.add_gridspec(
         1, 1, left=DATA_LEFT, right=DATA_RIGHT, top=0.22, bottom=0.05
     )
-    axes_a = axes_added(fig, lambda: plot_decision_schematic(fig, gs_ab[0], config))
-    axes_b = axes_added(fig, lambda: plot_run(fig, gs_ab[1], decoded, state_space_vmax))
+    axes_b = axes_added(
+        fig, lambda: plot_run(fig, gs_run[0], decoded, state_space_vmax)
+    )
     axes_c = axes_added(
         fig,
         lambda: plot_examples(fig, gs_c[0], decoded, sliding_vmax, state_space_vmax),
     )
     axes_sweep = axes_added(fig, lambda: plot_sweep(fig, gs_sweep[0], summary))
-    n_rows = 4  # panel c's axes per column
+    n_rows = 4  # panel b's axes per column
     fig.align_ylabels(axes_c[:n_rows])
     fig.align_ylabels(axes_b)
     fig.draw_without_rendering()
 
-    extents = space_rows_evenly(fig, [[*axes_a, *axes_b], axes_c, axes_sweep])
+    extents = space_rows_evenly(fig, [axes_b, axes_c, axes_sweep])
 
-    # Panel letters: a, c and d share a left edge; the letters of a row share
-    # its top edge.
+    # Panel letters: a, b and c share a left edge; the letters of the sweep's
+    # row share its top edge.
     left = min(extent.x0 for extent in extents)
     ax_sliding, ax_state_space, _, ax_onset, ax_offset = axes_sweep
     for letter, x, y in (
         ("a", left, extents[0].y1),
-        ("b", drawn_extent(fig, axes_b).x0, extents[0].y1),
-        ("c", left, extents[1].y1),
-        ("d", left, extents[2].y1),
-        ("e", drawn_extent(fig, [ax_state_space]).x0, extents[2].y1),
-        ("f", drawn_extent(fig, [ax_onset]).x0, extents[2].y1),
-        ("g", drawn_extent(fig, [ax_offset]).x0, extents[2].y1),
+        ("b", left, extents[1].y1),
+        ("c", left, extents[2].y1),
+        ("d", drawn_extent(fig, [ax_state_space]).x0, extents[2].y1),
+        ("e", drawn_extent(fig, [ax_onset]).x0, extents[2].y1),
+        ("f", drawn_extent(fig, [ax_offset]).x0, extents[2].y1),
     ):
         letter_panel(fig, letter, x, y)
     return fig

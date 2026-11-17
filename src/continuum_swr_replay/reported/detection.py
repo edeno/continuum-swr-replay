@@ -17,9 +17,9 @@ summaries, of the labeled recording and of the pilot's events are computed in
   (``paper/reported/inputs/detection/detection_{sweep,controls,heldout}_summary.csv``,
   from ``scripts/detection/sweep_memoryless_{detection,controls}.py`` and
   ``scripts/detector_comparison/sweep_memoryless_heldout.py``),
-  the first for the memoryless-comparison figure's panels (d-g), the other two
+  the first for the memoryless-comparison figure's panels (c-f), the other two
   shown in no figure;
-- the one labeled recording of that figure's panels (b, c)
+- the one labeled recording of that figure's panels (a, b)
   (``paper/reported/inputs/detection/memoryless_comparison_recording.json``:
   ``memoryless_sequence.recording_statistics.recording_numbers``, written by
   ``scripts/figures/generate_memoryless_comparison.py``);
@@ -318,11 +318,11 @@ def pilot_stray_window_values(
     ]
 
 
-# --- the memoryless comparison: one labeled recording (b, c) ------------------
+# --- the memoryless comparison: one labeled recording (a, b) ------------------
 
 
 def recording_values(numbers: dict, source: str) -> list[Value]:
-    """Panels (b, c): what each detector made of the labeled events of one
+    """Panels (a, b): what each detector made of the labeled events of one
     simulated recording (``recording_statistics.recording_numbers``, which the
     figure script writes)."""
     make = value_factory(recording_values, source, TAGS["memoryless"])
@@ -405,7 +405,7 @@ def recording_values(numbers: dict, source: str) -> list[Value]:
     ]
 
 
-# --- the memoryless comparison: the replay sweep (d-g) ------------------------
+# --- the memoryless comparison: the replay sweep (c-f) ------------------------
 
 
 _TIMING_DETECTORS = {"sliding": "sliding window", "state_space": "state-space detector"}
@@ -500,7 +500,7 @@ def pooled_timing_values(summary: pd.DataFrame, make) -> list[Value]:
 
 
 def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
-    """Panels (d-g): replays of chosen shape, one at a time, scored against the
+    """Panels (c-f): replays of chosen shape, one at a time, scored against the
     known answer. Shares are of the swept replays (grid cells)."""
     make = value_factory(sweep_values, source, TAGS["memoryless"])
     overall = sweep_statistics.sweep_measures(summary, "overall")
