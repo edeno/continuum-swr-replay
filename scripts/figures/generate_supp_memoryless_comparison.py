@@ -26,7 +26,7 @@ run with four replays drawn in, its model and event rule, and the sliding-window
 detector at its published
 settings, reading the same place fields. Panels b-d read the aggregates of
 ``scripts/detection/sweep_memoryless_detection.py``, which wrote replays of
-chosen path length, duration, firing rate and distance from the animal one at a
+chosen path length, duration and distance from the animal one at a
 time into that run; re-run the sweep to change them. The timing panels read
 them through ``memoryless_sequence.sweep_statistics``, which the detection
 summary reports from.
@@ -123,7 +123,7 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 warnings.filterwarnings("ignore")
 
 SUMMARY_PATH = Path("paper/reported/inputs/detection/detection_sweep_summary.csv")
-"""Aggregates of the replay sweep, drawn in panels b-e."""
+"""Aggregates of the replay sweep, drawn in panels b-d."""
 
 RECORDING_NUMBERS_PATH = Path(
     "paper/reported/inputs/detection/memoryless_comparison_recording.json"
@@ -257,8 +257,7 @@ EXAMPLES = (
 )
 """Panel a's columns, each a simulated event named for what sets it apart, under
 the headings of :data:`EXAMPLE_GROUPS`. The sweep, the random-order event and the
-place held still are Figure 1's examples; the others are added to its run. The
-sparse replay is the far one at a lower peak firing rate."""
+place held still are Figure 1's examples; the others are drawn into its run."""
 
 EXAMPLE_GROUPS = {
     "both": "Both detectors report",
@@ -572,7 +571,7 @@ def plot_examples(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Panels b-e — the sweep
+# Panels b-d — the sweep
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -676,10 +675,9 @@ def plot_position_error(ax: Axes, summary: pd.DataFrame) -> None:
     own median distance.
     """
     by_speed = sweep_statistics.sweep_position_by_speed(summary)
-    edges = [*by_speed.index, np.inf]
     labels = [
         f">{low:g}" if np.isinf(high) else f"{low:g}–{high:g}"
-        for low, high in zip(edges[:-1], edges[1:], strict=True)
+        for low, high in by_speed["upper_m_per_s"].items()
     ]
     x = np.arange(len(by_speed))
     for detector, color in (

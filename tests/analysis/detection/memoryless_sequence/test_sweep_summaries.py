@@ -35,6 +35,8 @@ def replay_cells() -> pd.DataFrame:
             "sliding_matches": [True, False, False, True],
             "sliding_matches_before_shuffle": [True, True, False, True],
             "sliding_matches_spread_only": [True, True, False, True],
+            # cell 2's sequence is the replay, too short for the definition
+            "sliding_matches_relaxed": [True, True, True, True],
             "sliding_any_candidate": np.ones(n, dtype=bool),
             "sliding_p_spread": [0.01, 0.5, 0.01, 0.01],
             "sliding_p_jump": [0.01, 0.01, 0.01, 0.01],
@@ -73,6 +75,22 @@ class TestReplaySweepSummary:
         assert (overall["n_cells"], domain["n_cells"]) == (4, 2)
         assert overall["state_space_replay_matches"] == pytest.approx(0.75)
         assert domain["state_space_replay_matches"] == pytest.approx(0.5)
+
+    def test_the_cells_the_definition_cannot_accept_have_their_own_block(self):
+        outside = self.values("overall_outside_domain").set_index("measure").value
+
+        # cells 1 and 2: neither is reported under the definition, both are
+        # captured by a sequence once its criteria are left out
+        assert outside["n_cells"] == 2
+        assert outside["sliding_matches"] == 0.0
+        assert outside["sliding_matches_relaxed"] == 1.0
+
+    def test_a_speed_bin_carries_its_upper_edge(self):
+        by_speed = sweep_summaries.position_error_by_speed(replay_cells().iloc[[0, 3]])
+
+        # 3.75 and 7.5 m/s
+        assert by_speed["speed_m_per_s"].tolist() == [3.0, 5.0]
+        assert by_speed["upper_m_per_s"].tolist() == [5.0, 8.0]
 
     def test_pooled_timing_errors_are_of_the_replays_both_report(self):
         pooled = self.values("timing_pooled").set_index("measure").value

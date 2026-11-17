@@ -149,11 +149,11 @@ def position_error_by_speed(found: pd.DataFrame) -> pd.DataFrame:
 
     Returns
     -------
-    by_speed : pd.DataFrame, shape (n_bins, 4)
+    by_speed : pd.DataFrame, shape (n_bins, 5)
         ``speed_m_per_s`` (the bin's lower edge, of
-        :data:`SPEED_BIN_EDGES_M_PER_S`), ``n_replays``, and each detector's
-        ``<detector>_position_error_cm`` (the median); a bin with no replay is
-        left out.
+        :data:`SPEED_BIN_EDGES_M_PER_S`), ``upper_m_per_s`` (its upper edge),
+        ``n_replays``, and each detector's ``<detector>_position_error_cm``
+        (the median); a bin with no replay is left out.
     """
     speed_m_per_s = found["path_cm"] / found["duration_s"] / 100.0
     edges = np.asarray(SPEED_BIN_EDGES_M_PER_S)
@@ -161,6 +161,7 @@ def position_error_by_speed(found: pd.DataFrame) -> pd.DataFrame:
     lower = edges[
         np.clip(np.searchsorted(edges, speed_m_per_s, side="left") - 1, 0, None)
     ]
+    upper_edge = dict(zip(edges[:-1], edges[1:], strict=True))
     columns = ["sliding_position_error_cm", "state_space_position_error_cm"]
     grouped = found.assign(speed_m_per_s=lower).groupby("speed_m_per_s")
     return (
@@ -168,6 +169,7 @@ def position_error_by_speed(found: pd.DataFrame) -> pd.DataFrame:
         .median()
         .assign(n_replays=grouped.size().astype(float))
         .reset_index()
+        .assign(upper_m_per_s=lambda bins: bins["speed_m_per_s"].map(upper_edge))
     )
 
 
@@ -267,6 +269,7 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
                 "sliding_matches",
                 "sliding_matches_before_shuffle",
                 "sliding_matches_spread_only",
+                "sliding_matches_relaxed",
                 "sliding_any_candidate",
                 "state_space_found",
                 "state_space_matches",
@@ -312,6 +315,7 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
                 "sliding_shuffle_spread_pass_rate",
                 "sliding_shuffle_jump_pass_rate",
                 "missed_failed_shuffle",
+                "sliding_matches_relaxed",
                 "sliding_any_candidate",
                 "state_space_found",
                 "state_space_matches",
@@ -345,6 +349,7 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
                     .mean()
                 ),
                 float(missed.sliding_matches_before_shuffle.mean()),
+                float(table.sliding_matches_relaxed.mean()),
                 float(table.sliding_any_candidate.mean()),
                 float(table.state_space_found.mean()),
                 float(table.state_space_matches.mean()),
@@ -382,39 +387,42 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
     overall["summary"] = "overall"
     parts.append(overall)
 
-    in_domain = table[
-        (table.path_cm >= IN_DOMAIN_PATH_CM)
-        & (table.duration_s >= IN_DOMAIN_DURATION_S)
-    ]
-    domain = pd.DataFrame(
-        {
-            "measure": [
-                "n_cells",
-                "sliding_matches",
-                "sliding_matches_before_shuffle",
-                "sliding_matches_spread_only",
-                "state_space_matches",
-                "state_space_replay_matches",
-            ],
-            "value": [
-                float(len(in_domain)),
-                float(in_domain.sliding_matches.mean()),
-                float(in_domain.sliding_matches_before_shuffle.mean()),
-                float(in_domain.sliding_matches_spread_only.mean()),
-                float(in_domain.state_space_matches.mean()),
-                float(in_domain.state_space_replay_matches.mean()),
-            ],
-        }
+    # inside the published definition's reach and outside it: the definition
+    # can accept a replay only of this path and duration or more
+    is_in_domain = (table.path_cm >= IN_DOMAIN_PATH_CM) & (
+        table.duration_s >= IN_DOMAIN_DURATION_S
     )
-    domain["summary"] = "overall_in_domain"
-    parts.append(domain)
+    domain_measures = [
+        "sliding_matches",
+        "sliding_matches_before_shuffle",
+        "sliding_matches_spread_only",
+        "sliding_matches_relaxed",
+        "state_space_matches",
+        "state_space_replay_matches",
+    ]
+    for block, cells in (
+        ("overall_in_domain", table[is_in_domain]),
+        ("overall_outside_domain", table[~is_in_domain]),
+    ):
+        parts.append(
+            pd.DataFrame(
+                {
+                    "measure": ["n_cells", *domain_measures],
+                    "value": [
+                        float(len(cells)),
+                        *(float(cells[measure].mean()) for measure in domain_measures),
+                    ],
+                    "summary": block,
+                }
+            )
+        )
 
-    # where each detector puts an event's start and end against the truth, on
-    # the replays both reported: signed, so absorbed local coding shows as an
-    # early start or a late end rather than only as a longer event
     parts.append(
         melted(position_error_by_speed(found), ["speed_m_per_s"], "position_by_speed")
     )
+    # where each detector puts an event's start and end against the truth, on
+    # the replays both reported: signed, so absorbed local coding shows as an
+    # early start or a late end rather than only as a longer event
     for block, statistics in (
         ("timing_pooled", pooled_timing_errors),
         ("timing_exceedance", timing_error_exceedance),

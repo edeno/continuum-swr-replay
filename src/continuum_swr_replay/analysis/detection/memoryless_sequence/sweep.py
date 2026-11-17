@@ -5,10 +5,11 @@ the held-out check (``detector_comparison.heldout_sweep``) and the reference
 check (``scripts/checks/compare_memoryless_to_reference.py``) read one simulated
 recording (:func:`build_recording`, sorted spikes on a linear track, both
 detectors fitted on its non-event data), place events in its immobile stretches
-clear of its own events (:func:`usable_intervals`), read one grid of injected
-replays (:data:`PATH_CM`, :data:`DURATION_S`, :data:`PEAK_RATE_HZ`,
-:data:`MIDPOINT_CM`; the combinations inside the track are :func:`replay_grid`),
-and run the two detectors over a stretch of it (:func:`decode_window`) the same
+clear of its own events (:func:`usable_intervals`), read one grid of replays
+(:data:`PATH_CM`, :data:`DURATION_S`, :data:`MIDPOINT_CM`; the combinations
+inside the track are :func:`drawn_replay_grid`, and :func:`replay_grid` gives
+each at every :data:`PEAK_RATE_HZ` for the sweeps whose replays spike at
+random), and run the two detectors over a stretch of it (:func:`decode_window`) the same
 way: the memoryless sliding window (:func:`run_sliding_window`, whose events
 under the published definition are :func:`published_events`) and the switching
 state-space model (:func:`run_state_space`), each reporting its events as
@@ -213,13 +214,9 @@ def replay_grid() -> list[tuple[float, float, float, float]]:
         is left out.
     """
     return [
-        (path_cm, midpoint_cm, duration_s, rate_hz)
-        for path_cm in PATH_CM
-        for midpoint_cm in MIDPOINT_CM
-        for duration_s in DURATION_S
+        (*combination, rate_hz)
+        for combination in drawn_replay_grid()
         for rate_hz in PEAK_RATE_HZ
-        if 0.0 <= midpoint_cm - path_cm / 2
-        and midpoint_cm + path_cm / 2 <= TRACK_HEIGHT
     ]
 
 
@@ -333,7 +330,8 @@ class ReportedEvent:
 class SlidingWindowRun:
     """What the sliding-window detector reports over one decoded stretch.
 
-    Every candidate meeting the duration and dispersion criteria is
+    ``events`` holds every candidate sequence, by its index. Every candidate
+    meeting the duration and dispersion criteria is
     ``accepted`` and tested against the place-cell identity shuffle; a
     candidate's draws are seeded by the stretch's key and its first window,
     so which other candidates are tested does not change its result.
@@ -380,8 +378,7 @@ def run_sliding_window(
     # not a decoded position, whatever center its wide posterior happens to
     # have.
     events = {}
-    for i in accepted:
-        run_start, run_stop = candidates.runs[i]
+    for i, (run_start, run_stop) in enumerate(candidates.runs):
         centers = candidates.decisions.center_index[run_start : run_stop + 1]
         times = midpoint_s[run_start : run_stop + 1]
         present = candidates.assembly.kept[run_start : run_stop + 1]
@@ -499,10 +496,7 @@ def run_state_space(recording, injected, window) -> StateSpaceRun:
     bin_position_cm = np.asarray(posterior.coords["position"].values)[is_non_local]
     non_local = np.asarray(posterior.values)[:, is_non_local]
 
-    has_spike = (
-        np.sum([get_spikecount_per_time_bin(spikes, time) for spikes in injected], 0)
-        > 0
-    )
+    has_spike = get_spikecount_per_time_bin(np.concatenate(injected), time) > 0
 
     def events(probability: xr.DataArray) -> list[ReportedEvent]:
         detected, _ = detect_nonlocal_events(probability, speed, time)
@@ -511,9 +505,10 @@ def run_state_space(recording, injected, window) -> StateSpaceRun:
             detected["start_time"], detected["end_time"], strict=True
         ):
             a, b = np.searchsorted(time, [start_s, end_s])
-            # the position is read at the samples that hold a spike: between
-            # spikes the Fragmented state ties no sample to the next, so its
-            # posterior there is flat and its most probable place says nothing
+            # the position is read at the samples that hold a spike, as the
+            # sliding window's is at its kept windows: between spikes the
+            # Fragmented state ties no sample to the next, so its posterior
+            # there is flat and its most probable place says nothing
             read = a + np.flatnonzero(has_spike[a : b + 1])
             reported.append(
                 ReportedEvent(

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """What each detector does to a replay of known shape.
 
-Injects replays of controlled path length, duration, firing rate and distance
+Draws replays of controlled path length, duration and distance
 from the animal's own place into a simulated recording, and records what the
 memoryless sliding-window detector and this project's switching state-space
 model each report. Both read the same encoding model: the state-space detector

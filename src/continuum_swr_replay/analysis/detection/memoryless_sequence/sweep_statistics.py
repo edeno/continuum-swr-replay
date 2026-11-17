@@ -158,6 +158,17 @@ def sweep_jump_pass_statistics(summary: pd.DataFrame) -> dict[str, float]:
     }
 
 
+def _complete_block(summary: pd.DataFrame, block: str) -> dict[str, float]:
+    """A block's values by measure; refuses an absent block or a missing value."""
+    values = sweep_measures(summary, block)
+    if values.empty or values.isna().any():
+        raise ValueError(
+            f"replay sweep summary: the {block} block is absent, or a value "
+            "of it is missing"
+        )
+    return {str(measure): float(value) for measure, value in values.items()}
+
+
 def sweep_pooled_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
     """The start and end errors of both detectors, pooled over the replays both
     report.
@@ -180,13 +191,7 @@ def sweep_pooled_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
     ValueError
         If the summary has no such block, or a value of it is missing.
     """
-    pooled = sweep_measures(summary, "timing_pooled")
-    if pooled.empty or pooled.isna().any():
-        raise ValueError(
-            "replay sweep summary: the timing_pooled block is absent, or a value "
-            "of it is missing"
-        )
-    return {str(measure): float(value) for measure, value in pooled.items()}
+    return _complete_block(summary, "timing_pooled")
 
 
 def sweep_position_statistics(summary: pd.DataFrame) -> dict[str, float]:
@@ -210,13 +215,7 @@ def sweep_position_statistics(summary: pd.DataFrame) -> dict[str, float]:
     ValueError
         If the summary has no such block, or a value of it is missing.
     """
-    pooled = sweep_measures(summary, "position_pooled")
-    if pooled.empty or pooled.isna().any():
-        raise ValueError(
-            "replay sweep summary: the position_pooled block is absent, or a value "
-            "of it is missing"
-        )
-    return {str(measure): float(value) for measure, value in pooled.items()}
+    return _complete_block(summary, "position_pooled")
 
 
 def sweep_position_by_speed(summary: pd.DataFrame) -> pd.DataFrame:
@@ -230,9 +229,10 @@ def sweep_position_by_speed(summary: pd.DataFrame) -> pd.DataFrame:
 
     Returns
     -------
-    by_speed : pd.DataFrame, shape (n_bins, 3)
+    by_speed : pd.DataFrame, shape (n_bins, 4)
         Indexed by ``speed_m_per_s``, the lower edge of each speed bin,
-        slowest first; the columns ``sliding_position_error_cm`` and
+        slowest first, with ``upper_m_per_s`` its upper edge (infinite for the
+        fastest); the columns ``sliding_position_error_cm`` and
         ``state_space_position_error_cm`` hold the medians, in cm, and
         ``n_replays`` the replays in the bin.
 

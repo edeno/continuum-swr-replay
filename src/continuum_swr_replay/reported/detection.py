@@ -18,7 +18,7 @@ summaries, of the labeled recording and of the pilot's events are computed in
   (``paper/reported/inputs/detection/detection_{sweep,controls,heldout}_summary.csv``,
   from ``scripts/detection/sweep_memoryless_{detection,controls}.py`` and
   ``scripts/detector_comparison/sweep_memoryless_heldout.py``),
-  the first for the supplementary comparison figure's panels (b-e), the other
+  the first for the supplementary comparison figure's panels (b-d), the other
   two shown in no figure (questions 1.2 and 1.3);
 - the one labeled recording of that figure's panel (a)
   (``paper/reported/inputs/detection/memoryless_comparison_recording.json``:
@@ -409,7 +409,7 @@ def recording_values(numbers: dict, source: str) -> list[Value]:
     ]
 
 
-# --- the memoryless comparison: the replay sweep (b-e) ------------------------
+# --- the memoryless comparison: the replay sweep (b-d) ------------------------
 
 
 _TIMING_DETECTORS = {"sliding": "sliding window", "state_space": "state-space detector"}
@@ -521,6 +521,10 @@ def position_values(summary: pd.DataFrame, make) -> list[Value]:
     ``position_error_by_speed``)."""
     pooled = sweep_statistics.sweep_position_statistics(summary)
     by_speed = sweep_statistics.sweep_position_by_speed(summary)
+    speeds = [
+        format_number(float(edge), "sig2")
+        for edge in (by_speed["upper_m_per_s"].iloc[0], by_speed.index[-1])
+    ]
     over = "over the replays both detectors report"
     values = []
     for detector, detector_name in _TIMING_DETECTORS.items():
@@ -537,9 +541,9 @@ def position_values(summary: pd.DataFrame, make) -> list[Value]:
                         *([units] if units else []),
                     )
                 )
-        for which, speed in (
-            ("slowest", by_speed.index[0]),
-            ("fastest", by_speed.index[-1]),
+        for which, speed, bin_range in (
+            ("slowest", by_speed.index[0], f"up to {speeds[0]} m/s"),
+            ("fastest", by_speed.index[-1], f"above {speeds[1]} m/s"),
         ):
             values.append(
                 make(
@@ -548,8 +552,7 @@ def position_values(summary: pd.DataFrame, make) -> list[Value]:
                     "quantity",
                     "sig2",
                     f"median position error of the {detector_name} over the "
-                    f"{which} replays both detectors report (above "
-                    f"{format_number(float(speed), 'sig2')} m/s)",
+                    f"{which} replays both detectors report ({bin_range})",
                     "cm",
                 )
             )
@@ -567,11 +570,12 @@ def position_values(summary: pd.DataFrame, make) -> list[Value]:
 
 
 def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
-    """Panels (b-e): replays of chosen shape, one at a time, scored against the
+    """Panels (b-d): replays of chosen shape, one at a time, scored against the
     known answer. Shares are of the swept replays (grid cells)."""
     make = value_factory(sweep_values, source, TAGS["memoryless"])
     overall = sweep_statistics.sweep_measures(summary, "overall")
     domain = sweep_statistics.sweep_measures(summary, "overall_in_domain")
+    outside = sweep_statistics.sweep_measures(summary, "overall_outside_domain")
     grid = sweep_statistics.sweep_grid_statistics(summary)
     jump_pass = sweep_statistics.sweep_jump_pass_statistics(summary)
     jump_shortest, jump_longest = (
@@ -642,6 +646,27 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
             overall["sliding_matches_before_shuffle"],
             "over the whole grid, share the sliding-window detector reports before "
             "its significance test",
+        ),
+        share(
+            "sweep_sliding_relaxed_fraction",
+            overall["sliding_matches_relaxed"],
+            "over the whole grid, share captured by any sequence the "
+            "sliding-window detector assembles, with no duration or dispersion "
+            "criterion and no significance test",
+        ),
+        share(
+            "sweep_outside_domain_sliding_relaxed_fraction",
+            outside["sliding_matches_relaxed"],
+            "of the swept replays the published definition cannot accept (shorter "
+            "path or duration than its shared target), share captured by any "
+            "sequence the sliding-window detector assembles, with no duration or "
+            "dispersion criterion and no significance test",
+        ),
+        share(
+            "sweep_outside_domain_state_space_fraction",
+            outside["state_space_matches"],
+            "of the swept replays the published definition cannot accept, share "
+            "the state-space detector reports under its own criteria",
         ),
         share(
             "sweep_sliding_spread_only_fraction",

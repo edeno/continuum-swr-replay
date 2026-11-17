@@ -68,12 +68,12 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
     sorted_candidate_set_aside_pairs,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
-    DrawnReplay,
     draw_replay,
     place_field_means,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_replays import (
     cell_key,
+    drawn_replay,
     planned_cells,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
@@ -496,11 +496,12 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
         injected, bounds = draw_replay(
             recording["spike_times"],
             means,
-            DrawnReplay(
-                start_cm=cell["midpoint_cm"] - cell["direction"] * cell["path_cm"] / 2,
-                path_cm=cell["direction"] * cell["path_cm"],
-                duration_s=cell["duration_s"],
-                at_s=cell["at_s"],
+            drawn_replay(
+                cell["path_cm"],
+                cell["midpoint_cm"],
+                cell["duration_s"],
+                cell["direction"],
+                cell["at_s"],
             ),
         )
         window = sweep.decode_window(recording, bounds)

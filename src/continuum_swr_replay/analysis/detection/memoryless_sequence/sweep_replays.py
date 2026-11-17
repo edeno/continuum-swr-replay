@@ -63,6 +63,7 @@ __all__ = [
     "DIRECTIONS",
     "SWEEP_SEED",
     "cell_key",
+    "drawn_replay",
     "memoryless_outcome",
     "planned_cells",
     "replay_sweep",
@@ -107,6 +108,9 @@ def score_sliding_window(
     passed that half; ``sliding_matches_spread_only`` is what its own filter
     applied.
     ``sliding_matches_before_shuffle`` leaves the shuffle out.
+    ``sliding_matches_relaxed`` leaves the whole definition out: any sequence
+    the detector assembles that is the injected replay, whatever its duration
+    or dispersion and untested. What it misses the windows cannot resolve.
     """
     candidates, midpoint_s = run.candidates, run.midpoint_s
     start_s, end_s = bounds
@@ -122,9 +126,20 @@ def score_sliding_window(
     def inside_rate(flag):
         return float(flag[inside].mean()) if inside.any() else np.nan
 
+    def score(i):
+        return score_against_injection(
+            run.events[i].decoded_time_s,
+            run.events[i].decoded_cm,
+            true_position_cm,
+            bounds,
+            path_cm,
+            MATCH_TOLERANCE_CM,
+        )
+
     out = {
         "sliding_found": bool(accepted),
         "sliding_any_candidate": bool(overlapping),
+        "sliding_matches_relaxed": any(score(i).matches for i in overlapping),
         "sliding_n_candidates": len(overlapping),
         "sliding_n_accepted": len(accepted),
         "sliding_has_center": inside_rate(gates.has_center),
@@ -157,20 +172,7 @@ def score_sliding_window(
     # not cover far more ground than the path does. An absorbed sequence
     # tracks the injection during the injection and then sits at the animal's
     # own place, which is where its dispersion comes from.
-    scored = [
-        (
-            i,
-            score_against_injection(
-                run.events[i].decoded_time_s,
-                run.events[i].decoded_cm,
-                true_position_cm,
-                bounds,
-                path_cm,
-                MATCH_TOLERANCE_CM,
-            ),
-        )
-        for i in accepted
-    ]
+    scored = [(i, score(i)) for i in accepted]
     shuffles = run.shuffles
 
     def any_match(keep) -> bool:
@@ -220,7 +222,8 @@ def score_state_space(
     """What the switching state-space model reports for the same event.
 
     Scored by the same rule as the sliding window: every reported event that
-    overlaps the injection is scored on its own, over its whole extent, and
+    overlaps the injection is scored on its own, over every decoded position
+    it has (the samples that hold a spike, ``sweep.run_state_space``), and
     the best answers for the cell.
     """
     time = run.time
@@ -322,6 +325,19 @@ def cell_key(
     )
 
 
+def drawn_replay(
+    path_cm: float, midpoint_cm: float, duration_s: float, direction: int, at_s: float
+) -> DrawnReplay:
+    """The replay of one cell: its path centered on the midpoint, run up the
+    track (``direction`` 1) or down it (-1)."""
+    return DrawnReplay(
+        start_cm=midpoint_cm - direction * path_cm / 2,
+        path_cm=direction * path_cm,
+        duration_s=duration_s,
+        at_s=at_s,
+    )
+
+
 def run_cell(
     recording,
     means,
@@ -345,12 +361,7 @@ def run_cell(
     injected, bounds = draw_replay(
         recording["spike_times"],
         means,
-        DrawnReplay(
-            start_cm=midpoint_cm - direction * path_cm / 2,
-            path_cm=direction * path_cm,
-            duration_s=duration_s,
-            at_s=at_s,
-        ),
+        drawn_replay(path_cm, midpoint_cm, duration_s, direction, at_s),
     )
     start_s, end_s = bounds
     window = decode_window(recording, bounds)
@@ -394,10 +405,10 @@ def run_cell(
     # direction of travel, the decoded one sits, and the decoded speed over the
     # true one. A replay held still has no direction and no speed.
     true_speed_cm_per_s = direction * path_cm / duration_s
+    moves = path_cm > 0
     for detector in ("sliding", "state_space"):
         signed_error_cm = row.pop(f"{detector}_signed_error_cm")
         slope_cm_per_s = row.pop(f"{detector}_slope_cm_per_s")
-        moves = path_cm > 0
         row[f"{detector}_lead_cm"] = direction * signed_error_cm if moves else np.nan
         row[f"{detector}_speed_ratio"] = (
             slope_cm_per_s / true_speed_cm_per_s if moves else np.nan

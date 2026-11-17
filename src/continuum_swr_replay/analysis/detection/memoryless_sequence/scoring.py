@@ -14,7 +14,11 @@ else, and only the whole event shows it.
 
 Both tests read the whole reported event, whichever detector produced it.
 Reading only the part that overlaps the injection would hide what the event
-does outside it, which is the very thing the tests are for.
+does outside it, which is the very thing the tests are for. An event has a
+decoded position where its detector has spikes to decode from: the sliding
+window's kept windows, and the state-space model's samples that hold a spike
+(``sweep.run_sliding_window``, ``sweep.run_state_space``). The whole event is
+all of those.
 
 An injected event may have several parts, with a jump or a silent gap between
 them. Its true path is then NaN in the gaps: decoded positions there have no
