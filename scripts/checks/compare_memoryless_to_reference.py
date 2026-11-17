@@ -37,7 +37,6 @@ import numpy as np
 import pandas as pd
 from non_local_detector.likelihoods.common import get_spikecount_per_time_bin
 from non_local_detector.simulate.sorted_spikes_simulation import (
-    SAMPLING_FREQUENCY,
     TRACK_HEIGHT,
 )
 
@@ -69,8 +68,8 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
     sorted_candidate_set_aside_pairs,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
-    InjectedReplay,
-    inject_replay,
+    DrawnReplay,
+    draw_replay,
     place_field_means,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_replays import (
@@ -494,25 +493,21 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
         totals[variant] |= {"n_cells": 0, "cells_with_replay_count_differing": 0}
         totals[variant] |= {"cells_with_published_count_differing": 0}
     for number, cell in enumerate(cells):
-        injected, bounds = inject_replay(
+        injected, bounds = draw_replay(
             recording["spike_times"],
             means,
-            InjectedReplay(
+            DrawnReplay(
                 start_cm=cell["midpoint_cm"] - cell["direction"] * cell["path_cm"] / 2,
                 path_cm=cell["direction"] * cell["path_cm"],
                 duration_s=cell["duration_s"],
-                peak_rate_hz=cell["rate_hz"],
                 at_s=cell["at_s"],
-                seed=cell["injection_seed"],
             ),
-            sampling_frequency=SAMPLING_FREQUENCY,
         )
         window = sweep.decode_window(recording, bounds)
         key = cell_key(
             cell["path_cm"],
             cell["midpoint_cm"],
             cell["duration_s"],
-            cell["rate_hz"],
             cell["direction"],
             cell["seed"],
         )

@@ -728,3 +728,15 @@ timing block and the error distribution replace the first two; nothing read the 
 
 The controls and the held-out check answer questions of their own in the question list (1.2 and
 1.3); they were tagged to question 1.1 with the comparison figure's values.
+
+## The replay sweep draws its replays, 2026-11-17
+
+A swept replay's spikes were sampled at random from each cell's firing rate, so 280 of 9,912
+replays had no spike at all and many had one or two. They are now drawn as Figure 1's patterns
+are (`simulation.draw_replay`, `DrawnReplay`): spikes evenly spaced from the replay's start to
+its end, at Figure 1's sweep's rate (`DRAWN_SPIKE_RATE_HZ`), each fired by the cell whose place
+field the replay is passing. A replay's first and last spike are its start and end, and every
+replay has at least five spikes. The sweep loses its firing-rate axis (`sweep.drawn_replay_grid`;
+3,304 cells), and replicates differ only in where in the run the replay is placed. The four
+replays added to the comparison's recording are drawn the same way. The controls and the
+held-out check still sample their spikes (`sweep.replay_grid`, `inject_replay`).

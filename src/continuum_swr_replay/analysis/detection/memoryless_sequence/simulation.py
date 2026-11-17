@@ -32,6 +32,9 @@ from numpy.typing import NDArray
 from continuum_swr_replay.intervals import contiguous_true_runs
 
 __all__ = [
+    "DRAWN_SPIKE_RATE_HZ",
+    "DrawnReplay",
+    "draw_replay",
     "added_spike_span",
     "TRUTH_LABELS",
     "Gap",
@@ -312,6 +315,94 @@ def inject_replay(
         truth="continuous_replay",
     )
     return inject_activity(spike_times, activity, replay.seed), activity.bounds
+
+
+DRAWN_SPIKE_RATE_HZ = 110.0
+"""Spikes per second, over all cells, of a drawn replay: Figure 1's sweep, in
+which each of 30 cells fires once in 271 ms."""
+
+
+@dataclass(frozen=True)
+class DrawnReplay:
+    """One replay to draw into a recording, spike by spike (:func:`draw_replay`).
+
+    Attributes
+    ----------
+    start_cm : float
+        Where the represented path begins.
+    path_cm : float
+        How far it travels, signed: negative runs toward lower positions.
+    duration_s : float
+        Positive; from the first spike to the last.
+    at_s : float
+        When the first spike is.
+    spike_rate_hz : float
+        Spikes per second over all cells.
+    """
+
+    start_cm: float
+    path_cm: float
+    duration_s: float
+    at_s: float
+    spike_rate_hz: float = DRAWN_SPIKE_RATE_HZ
+
+    def __post_init__(self) -> None:
+        for field in ("start_cm", "path_cm", "duration_s", "at_s", "spike_rate_hz"):
+            value = getattr(self, field)
+            if not math.isfinite(value):
+                raise ValueError(f"{field} must be finite, got {value!r}.")
+        if self.duration_s <= 0 or self.spike_rate_hz <= 0:
+            raise ValueError("duration_s and spike_rate_hz must be positive.")
+
+
+def draw_replay(
+    spike_times: list[NDArray], place_field_means: NDArray, replay: DrawnReplay
+) -> tuple[list[NDArray], tuple[float, float]]:
+    """Add a replay as the spikes that trace it, with nothing left to chance.
+
+    Spikes are spaced evenly from the replay's start to its end, the first at
+    one and the last at the other, and each is fired by the cell whose place
+    field is nearest the position the replay represents at that moment. A
+    replay that travels fires its cells in order, as Figure 1's sweep does, and
+    one held still fires one cell again and again, as Figure 1's does. Every
+    replay has at least two spikes, so its start and end are its first and
+    last spike.
+
+    Every spike already in the replay's span is removed, in every cell, as
+    :func:`inject_activity` does.
+
+    Parameters
+    ----------
+    spike_times : list of ndarray
+        One array per cell. Not modified.
+    place_field_means : ndarray, shape (n_neurons,)
+    replay : DrawnReplay
+
+    Returns
+    -------
+    spike_times : list of ndarray
+        A new list, sorted per cell.
+    bounds : tuple of float
+        When the replay begins and ends: its first and last spike.
+
+    Raises
+    ------
+    ValueError
+        There is not one place field per cell.
+    """
+    means = np.asarray(place_field_means, dtype=np.float64)
+    if len(spike_times) != means.size:
+        raise ValueError(f"{len(spike_times)} cells but {means.size} place fields.")
+    start_s, end_s = replay.at_s, replay.at_s + replay.duration_s
+    n_spikes = max(2, round(replay.spike_rate_hz * replay.duration_s) + 1)
+    at = np.linspace(start_s, end_s, n_spikes)
+    position_cm = replay.start_cm + replay.path_cm * np.linspace(0.0, 1.0, n_spikes)
+    cell = np.abs(means[None, :] - position_cm[:, None]).argmin(axis=1)
+    drawn = []
+    for neuron, neuron_times in enumerate(spike_times):
+        kept = neuron_times[(neuron_times < start_s) | (neuron_times > end_s)]
+        drawn.append(np.sort(np.concatenate([kept, at[cell == neuron]])))
+    return drawn, (float(start_s), float(end_s))
 
 
 def added_spike_span(

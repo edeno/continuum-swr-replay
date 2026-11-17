@@ -5,8 +5,8 @@ The supplemental memoryless comparison figure
 (``scripts/checks/compare_memoryless_to_reference.py``) read one simulation
 (:func:`simulate_and_decode`): the simulated run of Figure 1
 (``analysis.detection.simulated_run.simulate_run``, whose patterns are the first
-rows of ``event_times``) with five replays added: a short path, a short
-replay, one far from the animal, a sparse one and a fast one
+rows of ``event_times``) with four replays drawn in (``simulation.draw_replay``):
+a short path, a short replay, one far from the animal and a fast one
 (:data:`SHORT_PATH_EVENT` and the other ``*_EVENT`` constants name the rows). It is decoded twice from one set of place fields: window by window under
 a uniform prior, as the sliding-window detector does, and by the switching
 state-space model of Figure 1, fitted as a real decode is
@@ -16,17 +16,14 @@ The sliding-window detector's settings are :data:`CONFIG`.
 """
 
 import numpy as np
-from non_local_detector.simulate.sorted_spikes_simulation import (
-    SAMPLING_FREQUENCY,
-)
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
-    InjectedReplay,
+    DrawnReplay,
     added_spike_span,
-    inject_replay,
+    draw_replay,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import (
     CONFIG,
@@ -59,65 +56,37 @@ __all__ = [
     "SHORT_REPLAY_EVENT",
     "SHUFFLE_RUN_SEED",
     "SILENCE_EVENT",
-    "SPARSE_REPLAY",
-    "SPARSE_REPLAY_EVENT",
     "SWEEP_EVENT",
     "simulate_and_decode",
 ]
 
-SHORT_REPLAY = InjectedReplay(
-    start_cm=35.0,
-    path_cm=100.0,
-    duration_s=0.080,
-    peak_rate_hz=120.0,
-    at_s=44.40,
-    seed=1,
-)
-"""A replay that travels far but lasts only 80 ms, firing strongly enough that
-spike count is not the issue. The detector is expected to find it and report
-it too long; the figure reads the ratio off the data rather than stating
-it here. The window puts a floor under any duration the method can report."""
+SHORT_REPLAY = DrawnReplay(start_cm=35.0, path_cm=100.0, duration_s=0.080, at_s=44.40)
+"""A replay that travels far but lasts only 80 ms. The detector is expected to
+find it and report it too long; the figure reads the ratio off the data rather
+than stating it here. The window puts a floor under any duration the method can
+report."""
 
-SHORT_PATH = InjectedReplay(
-    start_cm=40.0, path_cm=30.0, duration_s=0.300, peak_rate_hz=40.0, at_s=20.50, seed=0
-)
+SHORT_PATH = DrawnReplay(start_cm=40.0, path_cm=30.0, duration_s=0.300, at_s=20.50)
 """A replay that travels only 30 cm. The detector decodes it well, but the
 dispersion criterion needs a path of about 42 cm, so it is expected to reject
 the candidate."""
 
-FAR_REPLAY = InjectedReplay(
-    start_cm=20.0, path_cm=90.0, duration_s=0.300, peak_rate_hz=60.0, at_s=58.30, seed=2
-)
+FAR_REPLAY = DrawnReplay(start_cm=20.0, path_cm=90.0, duration_s=0.300, at_s=58.30)
 """A replay within the published definition's reach that stays away from the
 animal: 90 cm in 300 ms, ending 60 cm short of where the animal rests. Both
 detectors are expected to report it, at much the same times."""
 
-SPARSE_REPLAY = InjectedReplay(
-    start_cm=30.0, path_cm=90.0, duration_s=0.300, peak_rate_hz=20.0, at_s=7.40, seed=0
-)
-"""The same path and duration as :data:`FAR_REPLAY` at a third of its firing
-rate: a handful of spikes. Its path and duration are within the published
-definition's reach, but the detector is expected to decline it; the windows
-hold too few spikes to decode a steady sequence."""
-
-FAST_REPLAY = InjectedReplay(
-    start_cm=20.0, path_cm=90.0, duration_s=0.120, peak_rate_hz=60.0, at_s=31.50, seed=0
-)
-"""The far replay's path and firing rate in 120 ms, at 7.5 m/s: longer than the
-published 100 ms and far from the animal, but within one 80 ms window the
-represented position crosses most of the path. The detector is expected to
-decline it."""
+FAST_REPLAY = DrawnReplay(start_cm=15.0, path_cm=130.0, duration_s=0.120, at_s=31.50)
+"""A replay of 130 cm in 120 ms, about 11 m/s: longer than the published
+100 ms, but within one 80 ms window the represented position crosses most of
+the path. The detector is expected not to report it."""
 
 SWEEP_EVENT, FRAGMENTED_EVENT, REMOTE_STATIONARY_EVENT, SILENCE_EVENT = (
     PATTERNS.index(name) for name in ("sweep", "fragmented", "stationary", "silence")
 )
-(
-    SHORT_PATH_EVENT,
-    SHORT_REPLAY_EVENT,
-    FAR_REPLAY_EVENT,
-    SPARSE_REPLAY_EVENT,
-    FAST_REPLAY_EVENT,
-) = (len(PATTERNS) + added for added in range(5))
+SHORT_PATH_EVENT, SHORT_REPLAY_EVENT, FAR_REPLAY_EVENT, FAST_REPLAY_EVENT = (
+    len(PATTERNS) + added for added in range(4)
+)
 """Rows of ``event_times`` in :func:`simulate_and_decode`: Figure 1's patterns
 (``simulated_run.PATTERNS``), then the events added here, in the order they are
 added."""
@@ -129,7 +98,6 @@ REPLAY_EVENTS = (
     SHORT_PATH_EVENT,
     SHORT_REPLAY_EVENT,
     FAR_REPLAY_EVENT,
-    SPARSE_REPLAY_EVENT,
     FAST_REPLAY_EVENT,
 )
 """Every labeled event in which the spikes represent a place other than the
@@ -165,13 +133,8 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
 
     # the replays added to the run, in the order of their rows of event_times
     # (SHORT_PATH_EVENT to FAST_REPLAY_EVENT)
-    for replay in (SHORT_PATH, SHORT_REPLAY, FAR_REPLAY, SPARSE_REPLAY, FAST_REPLAY):
-        with_replay, bounds = inject_replay(
-            spike_times,
-            place_field_means,
-            replay,
-            sampling_frequency=SAMPLING_FREQUENCY,
-        )
+    for replay in (SHORT_PATH, SHORT_REPLAY, FAR_REPLAY, FAST_REPLAY):
+        with_replay, bounds = draw_replay(spike_times, place_field_means, replay)
         # an event is when its spikes are, as the run's patterns are
         event_times = np.vstack(
             [event_times, added_spike_span(spike_times, with_replay)]

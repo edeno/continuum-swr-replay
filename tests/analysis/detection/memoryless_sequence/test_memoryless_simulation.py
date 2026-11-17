@@ -4,10 +4,12 @@ import numpy as np
 import pytest
 
 from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
+    DrawnReplay,
     Gap,
     InjectedActivity,
     InjectedReplay,
     Segment,
+    draw_replay,
     field_rates,
     immobile_intervals,
     inject_activity,
@@ -437,3 +439,58 @@ class TestInjectedActivity:
                 ((0.0, 2.0),),
                 "local",
             )
+
+
+class TestDrawnReplay:
+    means = np.linspace(0.0, 170.0, 30)
+    quiet = [np.array([0.5, 1.05, 2.0]) for _ in range(30)]
+
+    def test_a_travelling_replay_fires_its_cells_in_order(self):
+        drawn, bounds = draw_replay(
+            self.quiet, self.means, DrawnReplay(20.0, 90.0, 0.3, at_s=1.0)
+        )
+        added = [np.setdiff1d(after, [0.5, 2.0]) for after in drawn]
+        firing = [cell for cell, times in enumerate(added) if times.size]
+        first = [added[cell][0] for cell in firing]
+
+        assert bounds == (1.0, 1.3)
+        # 110 spikes/s for 0.3 s, both ends included
+        assert sum(times.size for times in added) == 34
+        # the cells nearest 20 cm to 110 cm, each first firing later than the last
+        assert self.means[firing[0]] == pytest.approx(20.0, abs=3.0)
+        assert self.means[firing[-1]] == pytest.approx(110.0, abs=3.0)
+        assert first == sorted(first)
+        # the first and the last spike are the replay's start and end
+        times = np.concatenate(added)
+        assert (times.min(), times.max()) == pytest.approx((1.0, 1.3))
+
+    def test_a_replay_held_still_fires_one_cell(self):
+        drawn, _ = draw_replay(
+            self.quiet, self.means, DrawnReplay(40.0, 0.0, 0.3, at_s=1.0)
+        )
+        firing = [
+            cell
+            for cell, times in enumerate(drawn)
+            if ((times >= 1.0) & (times <= 1.3)).any()
+        ]
+        assert len(firing) == 1
+        assert self.means[firing[0]] == pytest.approx(40.0, abs=3.0)
+
+    def test_the_span_is_cleared_and_no_replay_is_empty(self):
+        drawn, bounds = draw_replay(
+            self.quiet, self.means, DrawnReplay(20.0, 90.0, 0.001, at_s=1.05)
+        )
+        inside = np.concatenate(drawn)
+        inside = inside[(inside >= bounds[0]) & (inside <= bounds[1])]
+        # the recording's own spike at 1.05 s is gone; the replay's two remain
+        assert inside.size == 2
+        assert [times.size for times in self.quiet] == [3] * 30
+
+    def test_a_downward_replay_runs_the_other_way(self):
+        drawn, _ = draw_replay(
+            self.quiet, self.means, DrawnReplay(110.0, -90.0, 0.3, at_s=1.0)
+        )
+        added = [np.setdiff1d(after, [0.5, 2.0]) for after in drawn]
+        firing = [cell for cell, times in enumerate(added) if times.size]
+        first = [added[cell][0] for cell in firing]
+        assert first == sorted(first, reverse=True)

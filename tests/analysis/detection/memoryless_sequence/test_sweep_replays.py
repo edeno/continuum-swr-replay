@@ -96,7 +96,7 @@ def test_an_event_outside_the_injection_is_not_found():
 def test_planned_cells_run_every_combination_in_each_direction():
     intervals = np.array([[5.0, 8.0], [18.0, 21.0]])
     cells = sweep_replays.planned_cells(intervals, n_seeds=2)
-    grid = sweep.replay_grid()
+    grid = sweep.drawn_replay_grid()
     held_still = sum(path_cm == 0 for path_cm, *_ in grid)
 
     # a path of 0 cm has no direction and is planned once
@@ -109,13 +109,6 @@ def test_planned_cells_run_every_combination_in_each_direction():
             start <= cell["at_s"] and cell["at_s"] + cell["duration_s"] <= end
             for start, end in intervals
         )
-
-
-def test_every_planned_cell_has_its_own_placement_and_firing_noise():
-    intervals = np.array([[5.0, 8.0], [18.0, 21.0]])
-    cells = sweep_replays.planned_cells(intervals, n_seeds=2)
-
-    assert len({cell["injection_seed"] for cell in cells}) == len(cells)
     assert len({cell["at_s"] for cell in cells}) == len(cells)
 
 
@@ -127,7 +120,6 @@ def test_a_planned_cell_does_not_depend_on_the_other_cells():
                 cell["path_cm"],
                 cell["midpoint_cm"],
                 cell["duration_s"],
-                cell["rate_hz"],
                 cell["direction"],
                 cell["seed"],
             ): cell

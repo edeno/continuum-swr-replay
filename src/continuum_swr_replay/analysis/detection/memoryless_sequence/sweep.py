@@ -74,6 +74,7 @@ __all__ = [
     "StateSpaceRun",
     "build_recording",
     "decode_window",
+    "drawn_replay_grid",
     "nearest_bin",
     "overlaps",
     "published_events",
@@ -216,6 +217,27 @@ def replay_grid() -> list[tuple[float, float, float, float]]:
         for midpoint_cm in MIDPOINT_CM
         for duration_s in DURATION_S
         for rate_hz in PEAK_RATE_HZ
+        if 0.0 <= midpoint_cm - path_cm / 2
+        and midpoint_cm + path_cm / 2 <= TRACK_HEIGHT
+    ]
+
+
+def drawn_replay_grid() -> list[tuple[float, float, float]]:
+    """Every replay the replay sweep draws: a path, where it is centered, and
+    how long it lasts.
+
+    Returns
+    -------
+    list of (path_cm, midpoint_cm, duration_s)
+        In the order :data:`PATH_CM`, :data:`MIDPOINT_CM`, :data:`DURATION_S`,
+        the last varying fastest; a combination whose path, centered on its
+        midpoint, would run off either end of the track is left out.
+    """
+    return [
+        (path_cm, midpoint_cm, duration_s)
+        for path_cm in PATH_CM
+        for midpoint_cm in MIDPOINT_CM
+        for duration_s in DURATION_S
         if 0.0 <= midpoint_cm - path_cm / 2
         and midpoint_cm + path_cm / 2 <= TRACK_HEIGHT
     ]

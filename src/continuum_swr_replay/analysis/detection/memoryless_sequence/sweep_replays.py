@@ -1,7 +1,8 @@
 """The injected-replay sweep: what each detector does to a replay of known shape.
 
-Each cell injects one replay of a given path length, duration, peak rate and
-midpoint (``sweep.replay_grid``) into the sweep's recording, decodes a window
+Each cell draws one replay of a given path length, duration and midpoint
+(``sweep.drawn_replay_grid``, ``simulation.draw_replay``) into the sweep's
+recording, decodes a window
 around it with both detectors, and scores what each reports
 (:func:`run_cell`). A detector finds the event only when what it reports is the
 injected event (``scoring.score_against_injection``); every reported event
@@ -18,7 +19,6 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 from non_local_detector.simulate.sorted_spikes_simulation import (
-    SAMPLING_FREQUENCY,
     TRACK_HEIGHT,
 )
 
@@ -35,9 +35,9 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
     SIGNIFICANCE_LEVEL,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
-    InjectedReplay,
+    DrawnReplay,
     added_spike_span,
-    inject_replay,
+    draw_replay,
     place_field_means,
     placements,
 )
@@ -47,9 +47,9 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import (
     SlidingWindowRun,
     StateSpaceRun,
     decode_window,
+    drawn_replay_grid,
     nearest_bin,
     overlaps,
-    replay_grid,
     run_sliding_window,
     run_state_space,
 )
@@ -306,7 +306,6 @@ def cell_key(
     path_cm: float,
     midpoint_cm: float,
     duration_s: float,
-    rate_hz: float,
     direction: int,
     replicate: int,
 ) -> str:
@@ -318,7 +317,7 @@ def cell_key(
     other cells the sweep holds.
     """
     return (
-        f"path{path_cm}-mid{midpoint_cm}-dur{duration_s}-rate{rate_hz}"
+        f"path{path_cm}-mid{midpoint_cm}-dur{duration_s}"
         f"-dir{direction:+d}-rep{replicate}"
     )
 
@@ -330,53 +329,43 @@ def run_cell(
     path_cm,
     midpoint_cm,
     duration_s,
-    rate_hz,
     direction,
     seed,
     at_s,
-    injection_seed,
 ):
-    """One cell: inject, decode with both detectors, summarize.
+    """One cell: draw the replay, decode with both detectors, summarize.
 
     ``direction`` is 1 for a replay that travels up the track, towards larger
     positions, and -1 for one that travels down it over the same path.
-    ``seed`` is the replicate's index; ``at_s`` and ``injection_seed`` are the
-    cell's own placement and firing noise (:func:`planned_cells`).
+    ``seed`` is the replicate's index and ``at_s`` the cell's own placement
+    (:func:`planned_cells`). The replay's spikes are drawn, not sampled
+    (``simulation.draw_replay``), so replicates differ only in where in the
+    run the replay sits.
     """
-    injected, bounds = inject_replay(
+    injected, bounds = draw_replay(
         recording["spike_times"],
         means,
-        InjectedReplay(
+        DrawnReplay(
             start_cm=midpoint_cm - direction * path_cm / 2,
             path_cm=direction * path_cm,
             duration_s=duration_s,
-            peak_rate_hz=rate_hz,
             at_s=at_s,
-            seed=injection_seed,
         ),
-        sampling_frequency=SAMPLING_FREQUENCY,
     )
     start_s, end_s = bounds
     window = decode_window(recording, bounds)
 
-    original = np.concatenate(recording["spike_times"])
-    added = np.concatenate(injected)
-    n_spikes = int(
-        ((added >= start_s) & (added <= end_s)).sum()
-        - ((original >= start_s) & (original <= end_s) & np.isin(original, added)).sum()
-    )
-    # A replay's timing is held to its own first and last spike, not to the
-    # window it was drawn in: a sparse replay's first spike can come well
-    # after the window opens, and no detector can report what has not fired.
+    # The span is cleared before the replay is drawn, so every spike in it is
+    # the replay's, and its first and last spike are its start and end.
     span = added_spike_span(recording["spike_times"], injected)
+    drawn = np.concatenate(injected)
+    n_spikes = int(((drawn >= start_s) & (drawn <= end_s)).sum())
     row = {
         "path_cm": path_cm,
         "midpoint_cm": midpoint_cm,
         "duration_s": duration_s,
-        "peak_rate_hz": rate_hz,
         "direction": direction,
         "seed": seed,
-        "injection_seed": injection_seed,
         "at_s": at_s,
         "speed_cm_per_s": path_cm / duration_s,
         "distance_from_animal_cm": abs(
@@ -394,7 +383,7 @@ def run_cell(
         fraction = np.clip((np.asarray(at) - start_s) / (end_s - start_s), 0, 1)
         return midpoint_cm - direction * path_cm / 2 + direction * path_cm * fraction
 
-    key = cell_key(path_cm, midpoint_cm, duration_s, rate_hz, direction, seed)
+    key = cell_key(path_cm, midpoint_cm, duration_s, direction, seed)
     row |= memoryless_outcome(
         recording, injected, window, bounds, span, true_position_cm, path_cm, key
     )
@@ -422,19 +411,18 @@ replay is placed, so an upward replay ends at its edge nearest the animal and a
 downward one starts there."""
 
 SWEEP_SEED = 20261117
-"""Seeds every cell's placement and firing noise, with the cell's own name
+"""Seeds every cell's placement, with the cell's own name
 (:func:`planned_cells`)."""
 
 
 def planned_cells(intervals: np.ndarray, n_seeds: int) -> list[dict]:
-    """Every cell of the sweep: each combination of ``sweep.replay_grid`` in each
-    direction, ``n_seeds`` times.
+    """Every cell of the sweep: each combination of ``sweep.drawn_replay_grid``
+    in each direction, ``n_seeds`` times.
 
-    A cell's start time and firing noise are drawn from generators seeded by
-    :data:`SWEEP_SEED` and the cell's own name (:func:`cell_key`), one stream
-    each. So every cell has its own noise, and neither draw depends on the
-    grid's order or on which other cells are planned. A path of 0 cm has no
-    direction and is planned once.
+    A cell's start time is drawn from a generator seeded by
+    :data:`SWEEP_SEED` and the cell's own name (:func:`cell_key`), so it does
+    not depend on the grid's order or on which other cells are planned. A path
+    of 0 cm has no direction and is planned once.
 
     Parameters
     ----------
@@ -448,36 +436,29 @@ def planned_cells(intervals: np.ndarray, n_seeds: int) -> list[dict]:
     list of dict
         :func:`run_cell`'s keyword arguments after the recording and the
         fields, one dict per cell: its combination, ``direction``, ``seed``
-        (the replicate's index), ``at_s`` and ``injection_seed``.
+        (the replicate's index) and ``at_s``.
     """
     cells = []
-    for path_cm, midpoint_cm, duration_s, rate_hz in replay_grid():
+    for path_cm, midpoint_cm, duration_s in drawn_replay_grid():
         for direction in DIRECTIONS if path_cm > 0 else DIRECTIONS[:1]:
             for replicate in range(n_seeds):
-                key = cell_key(
-                    path_cm, midpoint_cm, duration_s, rate_hz, direction, replicate
-                )
+                key = cell_key(path_cm, midpoint_cm, duration_s, direction, replicate)
                 named = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big")
-                placement, injection = np.random.SeedSequence(
-                    [SWEEP_SEED, named]
-                ).spawn(2)
                 at_s = placements(
                     intervals,
                     duration_s,
                     PLACEMENT_MARGIN_S,
                     1,
-                    np.random.default_rng(placement),
+                    np.random.default_rng([SWEEP_SEED, named]),
                 )
                 cells.append(
                     {
                         "path_cm": path_cm,
                         "midpoint_cm": midpoint_cm,
                         "duration_s": duration_s,
-                        "rate_hz": rate_hz,
                         "direction": direction,
                         "seed": replicate,
                         "at_s": float(at_s[0]),
-                        "injection_seed": int(injection.generate_state(1)[0]),
                     }
                 )
     return cells

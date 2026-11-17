@@ -56,17 +56,19 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.likelihood impo
 from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import (
     DEFAULT_N_SHUFFLES,
 )
+from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
+    DRAWN_SPIKE_RATE_HZ,
+)
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep import (
     DECODE_MARGIN_S,
     DURATION_S,
     MATCH_TOLERANCE_CM,
     MIDPOINT_CM,
     PATH_CM,
-    PEAK_RATE_HZ,
     PLACEMENT_MARGIN_S,
     SHUFFLE_RUN_SEED,
     build_recording,
-    replay_grid,
+    drawn_replay_grid,
     usable_intervals,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.sweep_replays import (
@@ -176,7 +178,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
 
     print(
-        f"{len(replay_grid())} combinations, up and down the track, x "
+        f"{len(drawn_replay_grid())} combinations, up and down the track, x "
         f"{args.n_seeds} seeds, in {args.n_workers} processes"
     )
 
@@ -205,7 +207,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "n_neurons": N_NEURONS,
         "path_cm": list(PATH_CM),
         "duration_s": list(DURATION_S),
-        "peak_rate_hz": list(PEAK_RATE_HZ),
+        "spike_rate_hz": DRAWN_SPIKE_RATE_HZ,
         "midpoint_cm": list(MIDPOINT_CM),
         "directions": list(DIRECTIONS),
         "sweep_seed": SWEEP_SEED,

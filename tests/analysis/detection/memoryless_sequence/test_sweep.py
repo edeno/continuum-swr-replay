@@ -30,6 +30,10 @@ class TestReplayGrid:
             (170.0, 85.0, 0.1, 20.0),
             (170.0, 85.0, 0.1, 60.0),
         ]
+        # the replay sweep draws its replays: the same grid without a rate
+        assert sweep.drawn_replay_grid() == list(
+            dict.fromkeys(combination[:3] for combination in sweep.replay_grid())
+        )
 
 
 class TestUsableIntervals:

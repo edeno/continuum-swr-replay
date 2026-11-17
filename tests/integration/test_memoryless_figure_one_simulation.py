@@ -3,8 +3,8 @@
 The fixture is the recording the supplemental figure draws
 (``comparison_simulation.simulate_and_decode``): Figure 1's simulated run, whose
 four patterns are a sweep that ends at the animal, a fragmented event, a remote
-place held still and a silence, plus five added replays: a 30 cm one, an 80 ms
-one, one far from the animal, a sparse one and a fast one. Both detectors read one set of
+place held still and a silence, plus four replays drawn in: a 30 cm one, an 80 ms
+one, one far from the animal and a fast one. Both detectors read one set of
 place fields, fitted by the state-space model.
 
 What these tests pin is the sliding-window detector's blind spot rather than its
@@ -34,7 +34,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simu
     SHORT_PATH_EVENT,
     SHORT_REPLAY_EVENT,
     SILENCE_EVENT,
-    SPARSE_REPLAY_EVENT,
     SWEEP_EVENT,
     simulate_and_decode,
 )
@@ -87,8 +86,7 @@ class TestWhatTheSlidingWindowReports:
             (SHORT_PATH_EVENT, "declined"),
             (SHORT_REPLAY_EVENT, "found"),
             (FAR_REPLAY_EVENT, "found"),
-            (SPARSE_REPLAY_EVENT, "declined"),
-            (FAST_REPLAY_EVENT, "missed"),
+            (FAST_REPLAY_EVENT, "declined"),
         ],
     )
     def test_verdict(self, decoded, event, expected):

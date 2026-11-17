@@ -7,7 +7,7 @@ This figure runs the published sliding-window sequence detector (Widloski &
 Foster; ``analysis.detection.memoryless_sequence``) beside it, on replays whose
 shape is known:
 
-    a: eight simulated events at a millisecond scale — raster, each detector's
+    a: seven simulated events at a millisecond scale — raster, each detector's
        decoded position, and three rows of events: what was simulated, what the
        sliding-window detector reports, what the state-space model reports
     b: the share of injected replays each detector reports, by how far the
@@ -22,7 +22,7 @@ state-space model asks where the spikes point, and reports each.
 
 Panel a is one recording and its two decodes,
 ``memoryless_sequence.comparison_simulation.simulate_and_decode``: Figure 1's
-run with five replays added, its model and event rule, and the sliding-window
+run with four replays drawn in, its model and event rule, and the sliding-window
 detector at its published
 settings, reading the same place fields. Panels b-d read the aggregates of
 ``scripts/detection/sweep_memoryless_detection.py``, which wrote replays of
@@ -79,7 +79,6 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simu
     SHORT_REPLAY,
     SHORT_REPLAY_EVENT,
     SILENCE_EVENT,
-    SPARSE_REPLAY_EVENT,
     SWEEP_EVENT,
     simulate_and_decode,
 )
@@ -242,13 +241,10 @@ EXAMPLES = (
         "state_space_only",
     ),
     Example(
-        SPARSE_REPLAY_EVENT, "Sparse", "few spikes", "declined", "state_space_only"
-    ),
-    Example(
         FAST_REPLAY_EVENT,
         "Fast",
         f"{FAST_REPLAY.path_cm:.0f} cm in {1000 * FAST_REPLAY.duration_s:.0f} ms",
-        "missed",
+        "declined",
         "state_space_only",
     ),
     Example(
