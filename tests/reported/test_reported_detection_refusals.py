@@ -53,22 +53,6 @@ def test_the_repositorys_summaries_are_accepted(sweep, controls, heldout):
         assert {value.function for value in values} == {build.__name__}
 
 
-@pytest.mark.parametrize(
-    ("edge", "error_ms"), [("start", 1.0), ("start", 0.0), ("end", -1.0), ("end", 0.0)]
-)
-def test_a_sliding_window_that_does_not_start_early_and_end_late_is_refused(
-    sweep, edge, error_ms
-):
-    changed = _with_value(
-        sweep,
-        error_ms,
-        summary="timing_by_duration",
-        measure=f"sliding_{edge}_error_ms_median",
-    )
-    with pytest.raises(ValueError, match="starts early and ends late"):
-        detection.sweep_values(changed, "source")
-
-
 def test_the_sweep_descriptions_state_the_durations_the_summary_holds(sweep):
     # every true duration doubled: 80 to 1000 ms in place of 40 to 500 ms
     doubled = sweep.assign(duration_s=2 * sweep["duration_s"])
@@ -78,9 +62,6 @@ def test_the_sweep_descriptions_state_the_durations_the_summary_holds(sweep):
     }
     assert "shortest (80 ms)" in description["sweep_jump_half_pass_shortest_fraction"]
     assert "longest (1000 ms)" in description["sweep_jump_half_pass_longest_fraction"]
-    assert "shortest (80 ms)" in description["sweep_shortest_start_early_ms"]
-    assert "shortest (80 ms)" in description["sweep_shortest_reported_duration_ms"]
-    assert "(80 to 1000 ms)" in description["sweep_sliding_end_late_max_ms"]
 
 
 def test_an_event_where_there_was_no_replay_is_refused(controls):

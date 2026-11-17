@@ -654,22 +654,22 @@ local stretch sits more than 20 cm from the path fails the position test and is
 counted among the <!--v:detection.sweep_sliding_not_the_replay_fraction-->2<!--/v-->% above rather than here, so this table is the window floor
 plus whatever absorption falls within the tolerance.
 
-**Where the extra length goes.** The same events' signed bound errors, reported minus
-true, median (`timing_by_duration`):
+**Where the extra length goes** (rewritten 2026-11-17; the per-duration table that
+stood here was dropped with its values). Over the <!--v:detection.sweep_timing_replays-->0<!--/v--> replays both
+detectors report, each edge measured against the replay's own first or last spike, reported
+minus true:
 
-| true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
-|---|---|---|---|---|---|---|---|
-| sliding window, start (ms) | -<!--v:detection.sweep_shortest_start_early_ms-->55<!--/v--> | -28 | -24 | -23 | -19 | -20 | -18 |
-| sliding window, end (ms) | +<!--v:detection.sweep_shortest_end_late_ms-->29<!--/v--> | +32 | +31 | +30 | +21 | +23 | +22 |
-| state-space, start (ms) | -3 | -3 | 0 | 0 | +1 | +1 | +2 |
-| state-space, end (ms) | +2 | -1 | -2 | -1 | -6 | -3 | -5 |
+| | sliding window | state-space |
+|---|---|---|
+| onset, median (quartiles), ms | <!--v:detection.sweep_timing_sliding_onset_median_ms-->0<!--/v--> (<!--v:detection.sweep_timing_sliding_onset_lower_quartile_ms-->0<!--/v--> to <!--v:detection.sweep_timing_sliding_onset_upper_quartile_ms-->0<!--/v-->) | <!--v:detection.sweep_timing_state_space_onset_median_ms-->0<!--/v--> (<!--v:detection.sweep_timing_state_space_onset_lower_quartile_ms-->0<!--/v--> to <!--v:detection.sweep_timing_state_space_onset_upper_quartile_ms-->0<!--/v-->) |
+| offset, median (quartiles), ms | <!--v:detection.sweep_timing_sliding_offset_median_ms-->0<!--/v--> (<!--v:detection.sweep_timing_sliding_offset_lower_quartile_ms-->0<!--/v--> to <!--v:detection.sweep_timing_sliding_offset_upper_quartile_ms-->0<!--/v-->) | <!--v:detection.sweep_timing_state_space_offset_median_ms-->0<!--/v--> (<!--v:detection.sweep_timing_state_space_offset_lower_quartile_ms-->0<!--/v--> to <!--v:detection.sweep_timing_state_space_offset_upper_quartile_ms-->0<!--/v-->) |
+| onset more than 100 ms off, % | <!--v:detection.sweep_timing_sliding_onset_far_fraction-->0<!--/v--> | <!--v:detection.sweep_timing_state_space_onset_far_fraction-->0<!--/v--> |
+| offset more than 100 ms off, % | <!--v:detection.sweep_timing_sliding_offset_far_fraction-->0<!--/v--> | <!--v:detection.sweep_timing_state_space_offset_far_fraction-->0<!--/v--> |
 
-At 40 ms these medians rest on 8 events that both detectors reported, half their
-windows on the animal's own place (the same parquet), so that column is noisy. The sliding
-window starts early and ends late at every duration; its bounds are window
-midpoints, and its 80 ms windows reach 40 ms past each. Its late ends carry a long tail,
-the upper quartile reaching <!--v:detection.sweep_sliding_end_late_upper_quartile_max_ms-->36<!--/v--> ms (at 40 ms). The state-space detector's medians sit
-within <!--v:detection.sweep_state_space_edge_error_max_ms-->8<!--/v--> ms of the truth throughout.
+The sliding window starts early and ends late; its bounds are window midpoints, and its
+80 ms windows reach 40 ms past each. Its long errors are at the edge of a replay that lies
+within the jump limit of the animal's own place, where the sequence runs on into local
+coding; the sweep runs replays towards the animal and away from it, so both edges show it.
 
 **Absorption reaches about 80 cm.** Among events both reported, by the distance
 between the replay and the animal's own place:

@@ -419,7 +419,6 @@ _TIMING_STATISTICS = {
     "median": ("median", "median"),
     "q75": ("upper_quartile", "upper quartile of the"),
     "max": ("max", "largest"),
-    "abs_median": ("abs_median", "median absolute"),
 }
 """A statistic of the pooled timing block: its word in a value's key, which
 holds no digit, and in a description."""
@@ -472,19 +471,6 @@ def pooled_timing_values(summary: pd.DataFrame, make) -> list[Value]:
                     f"replay's {spike}",
                 )
             )
-        for statistic in ("q25", "median", "q75"):
-            word, name = _TIMING_STATISTICS[statistic]
-            values.append(
-                make(
-                    f"sweep_timing_{detector}_duration_error_{word}_ms",
-                    pooled[f"{detector}_duration_error_ms_{statistic}"],
-                    "quantity",
-                    "int",
-                    f"{name} duration the {detector_name} reports less the span of "
-                    f"the replay's own spikes, {over}",
-                    "ms",
-                )
-            )
     values += [
         make(
             f"sweep_timing_sliding_larger_{edge_name}_fraction",
@@ -507,29 +493,16 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
     domain = sweep_statistics.sweep_measures(summary, "overall_in_domain")
     grid = sweep_statistics.sweep_grid_statistics(summary)
     jump_pass = sweep_statistics.sweep_jump_pass_statistics(summary)
-    # refuses a sweep whose sliding window does not start early and end late
-    timing = sweep_statistics.sweep_timing_statistics(summary)
-
-    # the two families name their own durations: the timing errors are of the
-    # replays both detectors report, which need not reach the shortest swept
-    def duration_labels(statistics: dict) -> tuple[str, str]:
-        return tuple(
-            format_number(milliseconds(statistics[key]), "int")
-            for key in ("shortest_duration_s", "longest_duration_s")
+    jump_shortest, jump_longest = (
+        f"{which} ({format_number(milliseconds(jump_pass[key]), 'int')} ms)"
+        for which, key in (
+            ("shortest", "shortest_duration_s"),
+            ("longest", "longest_duration_s"),
         )
-
-    jump_shortest_ms, jump_longest_ms = duration_labels(jump_pass)
-    shortest_ms, longest_ms = duration_labels(timing)
-    jump_shortest = f"shortest ({jump_shortest_ms} ms)"
-    jump_longest = f"longest ({jump_longest_ms} ms)"
-    shortest = f"shortest ({shortest_ms} ms)"
-    over_durations = f"over true durations ({shortest_ms} to {longest_ms} ms)"
+    )
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)
-
-    def ms(key: str, x: float, description: str) -> Value:
-        return make(key, x, "quantity", "int", description, "ms")
 
     return [
         *pooled_timing_values(summary, make),
@@ -642,53 +615,6 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
             "count",
             "count",
             "the same, counting the sliding window's reports before its test",
-        ),
-        ms(
-            "sweep_state_space_edge_error_max_ms",
-            timing["state_space_edge_error_max_ms"],
-            "largest absolute median start or end error of the state-space "
-            f"detector {over_durations}, replays both detectors reported",
-        ),
-        ms(
-            "sweep_sliding_start_early_min_ms",
-            timing["sliding_start_early_min_ms"],
-            f"smallest median amount the sliding window starts early, {over_durations}",
-        ),
-        ms(
-            "sweep_sliding_start_early_max_ms",
-            timing["sliding_start_early_max_ms"],
-            f"largest median amount the sliding window starts early, {over_durations}",
-        ),
-        ms(
-            "sweep_sliding_end_late_min_ms",
-            timing["sliding_end_late_min_ms"],
-            f"smallest median amount the sliding window ends late, {over_durations}",
-        ),
-        ms(
-            "sweep_sliding_end_late_max_ms",
-            timing["sliding_end_late_max_ms"],
-            f"largest median amount the sliding window ends late, {over_durations}",
-        ),
-        ms(
-            "sweep_sliding_end_late_upper_quartile_max_ms",
-            timing["sliding_end_late_upper_quartile_max_ms"],
-            "largest upper quartile of the sliding window's end error, "
-            f"{over_durations}",
-        ),
-        ms(
-            "sweep_shortest_start_early_ms",
-            timing["shortest_start_early_ms"],
-            f"median amount the sliding window starts the {shortest} replays early",
-        ),
-        ms(
-            "sweep_shortest_end_late_ms",
-            timing["shortest_end_late_ms"],
-            f"median amount the sliding window ends the {shortest} replays late",
-        ),
-        ms(
-            "sweep_shortest_reported_duration_ms",
-            timing["shortest_reported_duration_ms"],
-            f"median duration the sliding window reports for the {shortest} replays",
         ),
         share(
             "sweep_sliding_not_the_replay_fraction",

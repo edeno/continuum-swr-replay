@@ -75,24 +75,6 @@ class TestReplaySweepSummary:
         assert overall["state_space_replay_matches"] == pytest.approx(0.75)
         assert domain["state_space_replay_matches"] == pytest.approx(0.5)
 
-    def test_duration_ratios_are_medians_over_the_replays_both_report(self):
-        rows = self.values("median_duration_ratio_by_duration")
-        ratio = rows[rows.measure == "sliding_duration_ratio"].set_index("duration_s")
-
-        # not cell 1, which the sliding window matched but its shuffle refused;
-        # cell 0's 120 ms over its spikes' 96 ms, and cell 3's 6
-        assert ratio.value[0.12] == pytest.approx(3.625)
-        # cell 2, which only the state-space detector matched, is not read
-        assert 0.08 not in ratio.index
-
-    def test_timing_errors_are_quartiles_in_milliseconds(self):
-        rows = self.values("timing_by_duration").set_index("measure").value
-
-        # against the first spike: -3 and 10 ms
-        assert rows["sliding_start_error_ms_median"] == pytest.approx(3.5)
-        assert rows["sliding_start_error_ms_q25"] == pytest.approx(0.25)
-        assert rows["sliding_start_error_ms_q75"] == pytest.approx(6.75)
-
     def test_timing_is_against_each_replays_own_spikes(self):
         cells = sweep_summaries.against_spike_span(replay_cells())
 
@@ -113,7 +95,6 @@ class TestReplaySweepSummary:
         assert pooled["sliding_start_error_ms_min"] == pytest.approx(-3.0)
         assert pooled["sliding_start_error_ms_median"] == pytest.approx(3.5)
         assert pooled["sliding_start_error_ms_max"] == pytest.approx(10.0)
-        assert pooled["sliding_start_error_ms_abs_median"] == pytest.approx(6.5)
         # the state-space detector, exact against the nominal bounds, starts
         # cell 0 4 ms before its first spike and ends it 20 ms after its last
         assert pooled["state_space_start_error_ms_min"] == pytest.approx(-4.0)
@@ -122,9 +103,6 @@ class TestReplaySweepSummary:
         # (3 < 4, 10 > 0), its end error on neither (20 = 20, 0 = 0)
         assert pooled["sliding_larger_start_share"] == 0.5
         assert pooled["sliding_larger_end_share"] == 0.0
-        # the end error minus the start error: 23 and -10 ms; 24 and 0 ms
-        assert pooled["sliding_duration_error_ms_median"] == pytest.approx(6.5)
-        assert pooled["state_space_duration_error_ms_median"] == pytest.approx(12.0)
 
     def test_a_far_edge_is_one_beyond_the_threshold(self):
         cells = replay_cells()

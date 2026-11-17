@@ -44,7 +44,7 @@ def _sweep_summary(name: str) -> pd.DataFrame:
 @pytest.mark.parametrize(
     ("build", "n_values"),
     [
-        (detection.sweep_values, 65),
+        (detection.sweep_values, 46),
         (detection.controls_values, 34),
         (detection.heldout_values, 18),
         (detection.recording_values, 12),

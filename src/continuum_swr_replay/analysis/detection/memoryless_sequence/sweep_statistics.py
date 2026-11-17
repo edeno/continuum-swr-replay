@@ -38,13 +38,11 @@ __all__ = [
     "parts_by_level",
     "placeless_event_statistics",
     "pooled_heldout_rate",
-    "sweep_by_duration",
     "sweep_grid_statistics",
     "sweep_jump_pass_statistics",
     "sweep_measures",
     "sweep_pooled_timing_statistics",
     "sweep_timing_exceedance",
-    "sweep_timing_statistics",
 ]
 
 # --- the injected-replay sweep --------------------------------------------------
@@ -87,46 +85,6 @@ def _by_duration(summary: pd.DataFrame, block: str, measure: str) -> pd.Series:
             "no duration_s"
         )
     return rows.sort_values("duration_s").set_index("duration_s")["value"]
-
-
-def sweep_by_duration(
-    summary: pd.DataFrame, block: str, measures: Sequence[str]
-) -> pd.DataFrame:
-    """Measures of one by-duration block of the replay sweep's summary, side by
-    side.
-
-    Parameters
-    ----------
-    summary : pd.DataFrame, shape (n_rows, n_columns)
-        The replay sweep's summary (:func:`sweep_measures`), with ``duration_s``
-        on the rows of ``block``.
-    block : str
-        A block with one row per measure and true duration, such as
-        ``"timing_by_duration"``.
-    measures : sequence of str
-        The measures read, such as ``"sliding_start_error_ms_median"``.
-
-    Returns
-    -------
-    values : pd.DataFrame, shape (n_durations, n_measures)
-        One column per measure, in the order given, indexed by the true
-        duration in seconds, shortest first; in the units the summary stores
-        (the timing errors in milliseconds).
-
-    Raises
-    ------
-    ValueError
-        If a measure has no row or a row with no ``duration_s``, or the
-        measures are not all at the same durations.
-    """
-    columns = {measure: _by_duration(summary, block, measure) for measure in measures}
-    durations = columns[measures[0]].index
-    if not all(column.index.equals(durations) for column in columns.values()):
-        raise ValueError(
-            f"replay sweep summary: the {block} measures are not all at the same "
-            "durations"
-        )
-    return pd.DataFrame(columns)
 
 
 def _whole_count(share: float, n: float) -> int:
@@ -303,101 +261,6 @@ def sweep_timing_exceedance(summary: pd.DataFrame) -> pd.DataFrame:
             "replay sweep summary: timing_exceedance lacks a share at some threshold"
         )
     return shares.sort_index()
-
-
-def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
-    """Where each detector puts a replay's start and end, over true durations:
-    the sliding window starting early and ending late at every one, or the
-    summary is refused.
-
-    A timing error is reported minus true, on the replays both detectors
-    reported: the sliding window starts early when its start error is negative
-    and ends late when its end error is positive. The summary holds the median
-    and quartiles of each error at each true duration.
-
-    Parameters
-    ----------
-    summary : pd.DataFrame, shape (n_rows, n_columns)
-        The replay sweep's summary, with ``duration_s`` on the rows of its
-        ``timing_by_duration`` and ``median_duration_ratio_by_duration`` blocks.
-
-    Returns
-    -------
-    statistics : dict
-        The errors and the reported duration are in milliseconds, as the
-        summary stores them; "over durations" is over the true durations the
-        two blocks have rows for, the same for every measure read.
-
-        - ``shortest_duration_s``, ``longest_duration_s``: the shortest and
-          longest of those durations, in seconds.
-        - ``state_space_edge_error_max_ms``: the largest absolute median start
-          or end error of the state-space detector over durations.
-        - ``sliding_start_early_min_ms``, ``sliding_start_early_max_ms``: the
-          smallest and largest median amount the sliding window starts early,
-          over durations (the start error's sign reversed).
-        - ``sliding_end_late_min_ms``, ``sliding_end_late_max_ms``: the smallest
-          and largest median amount it ends late, over durations.
-        - ``sliding_end_late_upper_quartile_max_ms``: the largest upper quartile
-          of its end error, over durations.
-        - ``shortest_start_early_ms``, ``shortest_end_late_ms``: the median
-          amounts at the shortest duration.
-        - ``shortest_reported_duration_ms``: the median duration the sliding
-          window reports for the shortest replays.
-
-    Raises
-    ------
-    ValueError
-        If a measure has no row or a row with no ``duration_s``, the measures
-        are not all at the same durations, or at some duration the sliding
-        window's median start error is not below zero or its median end error
-        not above zero (a missing one is neither).
-    """
-    errors = sweep_by_duration(
-        summary,
-        "timing_by_duration",
-        [
-            "sliding_start_error_ms_median",
-            "sliding_end_error_ms_median",
-            "sliding_end_error_ms_q75",
-            "state_space_start_error_ms_median",
-            "state_space_end_error_ms_median",
-        ],
-    )
-    reported_s = _by_duration(
-        summary, "median_duration_ratio_by_duration", "sliding_duration_s"
-    )
-    durations = errors.index
-    if not reported_s.index.equals(durations):
-        raise ValueError(
-            "replay sweep summary: the timing errors and the reported duration are "
-            "not all at the same durations"
-        )
-    # as arrays, so that a missing value is NaN in the result and not skipped
-    start = errors["sliding_start_error_ms_median"].to_numpy()
-    end = errors["sliding_end_error_ms_median"].to_numpy()
-    state_space = errors[
-        ["state_space_start_error_ms_median", "state_space_end_error_ms_median"]
-    ].to_numpy()
-    if not (-start.max() > 0 and end.min() > 0):
-        raise ValueError(
-            "replay sweep summary: expected the sliding window starts early and ends "
-            "late at every duration; its median timing errors disagree"
-        )
-    return {
-        "shortest_duration_s": float(durations[0]),
-        "longest_duration_s": float(durations[-1]),
-        "state_space_edge_error_max_ms": float(np.abs(state_space).max()),
-        "sliding_start_early_min_ms": float(-start.max()),
-        "sliding_start_early_max_ms": float(-start.min()),
-        "sliding_end_late_min_ms": float(end.min()),
-        "sliding_end_late_max_ms": float(end.max()),
-        "sliding_end_late_upper_quartile_max_ms": float(
-            errors["sliding_end_error_ms_q75"].to_numpy().max()
-        ),
-        "shortest_start_early_ms": float(-start[0]),
-        "shortest_end_late_ms": float(end[0]),
-        "shortest_reported_duration_ms": float(1000 * reported_s.iloc[0]),
-    }
 
 
 # --- the controls: activity that is not one clean replay -------------------------

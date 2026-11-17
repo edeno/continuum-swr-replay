@@ -151,11 +151,8 @@ def pooled_timing_errors(found: pd.DataFrame) -> dict[str, float]:
         - ``n_replays``: the replays pooled.
         - ``<detector>_<edge>_error_ms_<statistic>`` for the edges ``start``
           and ``end`` and the statistics ``min``, ``q25``, ``median``, ``q75``,
-          ``max``, ``abs_median`` (the median absolute error) and ``far_share``
-          (the share of replays with an absolute error above
-          :data:`LARGE_TIMING_ERROR_MS`).
-        - ``<detector>_duration_error_ms_<q25|median|q75>``: reported minus
-          true duration (the end error minus the start error).
+          ``max`` and ``far_share`` (the share of replays with an absolute error
+          above :data:`LARGE_TIMING_ERROR_MS`).
         - ``sliding_larger_<edge>_share``: the share of replays on which the
           sliding window's absolute error is the larger of the two.
     """
@@ -170,18 +167,10 @@ def pooled_timing_errors(found: pd.DataFrame) -> dict[str, float]:
                 f"{key}_median": float(error_ms.median()),
                 f"{key}_q75": float(error_ms.quantile(0.75)),
                 f"{key}_max": float(error_ms.max()),
-                f"{key}_abs_median": float(error_ms.abs().median()),
                 f"{key}_far_share": float(
                     (error_ms.abs() > LARGE_TIMING_ERROR_MS).mean()
                 ),
             }
-        duration_error_ms = 1000.0 * (
-            found[f"{detector}_end_error_s"] - found[f"{detector}_start_error_s"]
-        )
-        for name, quantile in (("q25", 0.25), ("median", 0.5), ("q75", 0.75)):
-            statistics[f"{detector}_duration_error_ms_{name}"] = float(
-                duration_error_ms.quantile(quantile)
-            )
     for edge in ("start", "end"):
         statistics[f"sliding_larger_{edge}_share"] = float(
             (
@@ -212,13 +201,12 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
         blocks: detection rates by path and duration
         (``detection_rate_by_path_and_duration``) and by path (``by_path``),
         the shuffle's pass rates by duration, median duration ratios by
-        duration and by distance from the animal, the rates over every cell
-        (``overall``) and over the cells the published definition can accept
+        distance from the animal, the rates over every cell (``overall``) and
+        over the cells the published definition can accept
         (``overall_in_domain``, :data:`IN_DOMAIN_PATH_CM`,
-        :data:`IN_DOMAIN_DURATION_S`), and the start and end errors' quartiles
-        by duration (``timing_by_duration``, ms), pooled (``timing_pooled``,
-        :func:`pooled_timing_errors`) and as a distribution
-        (``timing_exceedance``, :func:`timing_error_exceedance`). The duration, distance and
+        :data:`IN_DOMAIN_DURATION_S`), and the start and end errors pooled
+        (``timing_pooled``, :func:`pooled_timing_errors`) and as a distribution
+        (``timing_exceedance``, :func:`timing_error_exceedance`). The distance and
         timing blocks read the replays both detectors report as the injection
         (``sliding_matches`` and ``state_space_matches``), their durations and
         errors against each replay's own first and last spike
@@ -296,23 +284,6 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
     )
     parts.append(
         melted(shuffle_by_duration, ["duration_s"], "shuffle_pass_rate_by_duration")
-    )
-
-    by_duration = (
-        found.groupby("duration_s")[
-            # the sliding window's reported duration itself, beside its ratio
-            # to the replay's spike span
-            [
-                "sliding_duration_ratio",
-                "state_space_duration_ratio",
-                "sliding_duration_s",
-            ]
-        ]
-        .median()
-        .reset_index()
-    )
-    parts.append(
-        melted(by_duration, ["duration_s"], "median_duration_ratio_by_duration")
     )
 
     found["distance_bin_cm"] = pd.cut(
@@ -444,20 +415,6 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
     # where each detector puts an event's start and end against the truth, on
     # the replays both reported: signed, so absorbed local coding shows as an
     # early start or a late end rather than only as a longer event
-    timing = []
-    for duration_s, group in found.groupby("duration_s"):
-        row = {"duration_s": duration_s}
-        for detector in ("sliding", "state_space"):
-            for edge in ("start", "end"):
-                error_ms = 1000.0 * group[f"{detector}_{edge}_error_s"]
-                for name, quantile in (("q25", 0.25), ("median", 0.5), ("q75", 0.75)):
-                    row[f"{detector}_{edge}_error_ms_{name}"] = float(
-                        error_ms.quantile(quantile)
-                    )
-        timing.append(row)
-    parts.append(melted(pd.DataFrame(timing), ["duration_s"], "timing_by_duration"))
-
-    # the same errors pooled over those replays
     pooled = (
         pd.Series(pooled_timing_errors(found), name="value")
         .rename_axis("measure")

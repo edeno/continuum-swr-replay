@@ -63,6 +63,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence import (
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.comparison_simulation import (
     CONFIG,
+    FAR_REPLAY,
     FAR_REPLAY_EVENT,
     FRAGMENTED_EVENT,
     N_NEURONS,
@@ -198,23 +199,39 @@ class Example:
 
 
 EXAMPLES = (
-    Example(FAR_REPLAY_EVENT, "Replay", "far from the animal", "found"),
-    Example(SWEEP_EVENT, "Replay", "ending at the animal", "found"),
     Example(
-        SHORT_REPLAY_EVENT,
-        "Short replay",
-        f"{1000 * SHORT_REPLAY.duration_s:.0f} ms",
+        FAR_REPLAY_EVENT,
+        "Far from animal",
+        f"{FAR_REPLAY.path_cm:.0f} cm in {1000 * FAR_REPLAY.duration_s:.0f} ms",
         "found",
     ),
+    Example(SWEEP_EVENT, "Ends at animal", "the whole track", "found"),
+    Example(
+        SHORT_REPLAY_EVENT, "Brief", f"{1000 * SHORT_REPLAY.duration_s:.0f} ms", "found"
+    ),
     Example(SHORT_PATH_EVENT, "Short path", f"{SHORT_PATH.path_cm:.0f} cm", "declined"),
-    Example(REMOTE_STATIONARY_EVENT, "Held still", "at another position", "declined"),
-    Example(FRAGMENTED_EVENT, "Scattered", "positions", "declined"),
-    Example(SPARSE_REPLAY_EVENT, "Sparse replay", "few spikes", "declined"),
+    Example(REMOTE_STATIONARY_EVENT, "Stationary", "one remote position", "declined"),
+    Example(FRAGMENTED_EVENT, "Scattered", "no trajectory", "declined"),
+    Example(
+        SPARSE_REPLAY_EVENT,
+        "Sparse",
+        "few spikes",
+        "declined",
+    ),
 )
-"""Panel a's columns: where the two detectors agree on a replay, where both
-report one and the sliding window's report runs long, and where only the
-state-space model reports. The sweep, the scattered event and the place held
-still are Figure 1's examples; the others are added to its run."""
+"""Panel a's columns, each a simulated replay named for what sets it apart: the
+ones both detectors report, then the ones only the state-space model reports
+(:data:`EXAMPLE_GROUPS`). The sweep, the scattered event and the place held
+still are Figure 1's examples; the others are added to its run. The sparse
+replay is the far one at a lower peak firing rate."""
+
+EXAMPLE_GROUPS = {
+    "found": "Both detectors report",
+    "declined": "Only the state-space model reports",
+}
+"""The heading over the columns the sliding-window detector reports, and over
+those it does not; :func:`check_recording_claims` stops unless the state-space
+model reports every one."""
 
 
 def sliding_events(decoded: dict) -> list[tuple[float, float]]:
@@ -247,17 +264,6 @@ def simulated_events(decoded: dict) -> list[tuple[float, float]]:
             SPARSE_REPLAY_EVENT,
         )
     )
-
-
-def sliding_outcome(decoded: dict, event: int) -> str:
-    """Whether the sliding-window detector reports an event, for a panel's header."""
-    return "reported" if verdict(decoded, event) == "found" else "not reported"
-
-
-def state_space_outcome(decoded: dict, event: int) -> str:
-    """Whether the state-space model reports an event, for a panel's header."""
-    reported = np.isfinite(state_space_duration_ratio(decoded, event))
-    return "reported" if reported else "not reported"
 
 
 def duration_ratios(decoded: dict, event: int) -> tuple[float, float]:
@@ -396,6 +402,7 @@ def plot_examples(
     )
     time, midpoint_s = decoded["time"], decoded["midpoint_s"]
     animal_at_midpoint = np.interp(midpoint_s, time, decoded["position"])
+    rasters: list[Axes] = []
     for k, example in enumerate(EXAMPLES):
         event_start, event_end = decoded["event_times"][example.event]
         # room for the sliding window's reports of the event
@@ -430,15 +437,8 @@ def plot_examples(
             linewidth=0.6,
         )
         for y, text, color, bold in (
-            (1.78, example.name, SIMULATED_COLOR, True),
-            (1.62, example.simulated, "#444444", False),
-            (1.47, sliding_outcome(decoded, example.event), SLIDING_COLOR, False),
-            (
-                1.32,
-                state_space_outcome(decoded, example.event),
-                STATE_SPACE_COLOR,
-                False,
-            ),
+            (1.3, example.name, SIMULATED_COLOR, True),
+            (1.13, example.simulated, "#444444", False),
         ):
             ax_raster.text(
                 0.5,
@@ -451,21 +451,7 @@ def plot_examples(
                 ha="center",
                 va="center",
             )
-        if k == 0:
-            for y, name, color in (
-                (1.47, SLIDING, SLIDING_COLOR),
-                (1.32, STATE_SPACE, STATE_SPACE_COLOR),
-            ):
-                ax_raster.text(
-                    -0.08,
-                    y,
-                    name,
-                    transform=ax_raster.transAxes,
-                    fontsize=SMALL_SIZE,
-                    color=color,
-                    ha="right",
-                    va="center",
-                )
+        rasters.append(ax_raster)
 
         windows = slice(*np.searchsorted(midpoint_s, [start, end]))
         plot_posterior(
@@ -535,6 +521,34 @@ def plot_examples(
                 color=STATE_SPACE_COLOR,
             )
 
+    # A heading over each run of columns the sliding window does or does not
+    # report, with a rule as wide as the columns it covers.
+    expected = [example.expected for example in EXAMPLES]
+    for verdict_, heading in EXAMPLE_GROUPS.items():
+        columns = [k for k, e in enumerate(expected) if e == verdict_]
+        first, last = rasters[columns[0]], rasters[columns[-1]]
+        left, right = first.get_position().x0, last.get_position().x1
+        # the columns' span on the first one's own x axis, where 1 is its width
+        span = (right - left) / first.get_position().width
+        first.plot(
+            [0, span],
+            [1.5, 1.5],
+            color=SIMULATED_COLOR,
+            linewidth=0.6,
+            transform=first.transAxes,
+            clip_on=False,
+        )
+        first.text(
+            span / 2,
+            1.6,
+            heading,
+            transform=first.transAxes,
+            fontsize=LABEL_SIZE,
+            color=SIMULATED_COLOR,
+            ha="center",
+            va="center",
+        )
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Panels b-e — the sweep
@@ -587,15 +601,6 @@ def plot_detection(ax: Axes, grid: pd.DataFrame, title: str, color: str, show_y:
                 color="white" if percent < 55 else "black",
             )
     return image
-
-
-TIMING_MEASURES = tuple(
-    f"{detector}_{edge}_error_ms_{statistic}"
-    for detector in ("sliding", "state_space")
-    for edge in ("start", "end")
-    for statistic in ("median", "q25", "q75")
-)
-"""The timing errors the onset and offset panels draw, in ms, by true duration."""
 
 
 def plot_edge_error(ax: Axes, summary: pd.DataFrame, edge: str) -> None:
@@ -719,24 +724,24 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
             "The figure says the state-space model reports most replays held "
             "still at every duration; the sweep disagrees."
         )
-    # refuses a sweep whose sliding window does not start early and end late
-    sweep_statistics.sweep_timing_statistics(summary)
-    errors = sweep_statistics.sweep_by_duration(
-        summary, "timing_by_duration", TIMING_MEASURES
+    pooled = sweep_statistics.sweep_pooled_timing_statistics(summary)
+    early_and_late = (
+        pooled["sliding_start_error_ms_median"]
+        < pooled["state_space_start_error_ms_median"]
+        < 0
+        < pooled["state_space_end_error_ms_median"]
+        < pooled["sliding_end_error_ms_median"]
     )
-    sliding_onset, state_space_onset, sliding_offset, state_space_offset = (
-        errors[f"{detector}_{edge}_error_ms_median"].to_numpy()
+    longer_tail = all(
+        pooled[f"sliding_{edge}_error_ms_far_share"]
+        > pooled[f"state_space_{edge}_error_ms_far_share"]
         for edge in ("start", "end")
-        for detector in ("sliding", "state_space")
     )
-    if not (
-        (sliding_onset < state_space_onset).all()
-        and (sliding_offset > state_space_offset).all()
-    ):
+    if not (early_and_late and longer_tail):
         raise RuntimeError(
-            "The figure contrasts the sliding window's early starts and late ends "
-            "with the state-space model's; at some duration they do not differ "
-            "that way."
+            "The figure contrasts the sliding window's early starts, late ends and "
+            "long tail of timing errors with the state-space model's; the sweep's "
+            "pooled errors do not differ that way."
         )
 
 
