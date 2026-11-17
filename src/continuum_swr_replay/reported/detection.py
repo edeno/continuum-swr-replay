@@ -602,8 +602,9 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
         share(
             "sweep_failed_test_fraction",
             overall["missed_failed_shuffle"],
-            "share the sliding-window detector reported and then failed on its "
-            "significance test",
+            "of the swept replays the state-space detector reports and the "
+            "sliding-window detector does not, share the sliding window reported "
+            "before its significance test and then failed on it",
         ),
         make(
             "sweep_sliding_only_replays",
