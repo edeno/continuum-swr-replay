@@ -745,7 +745,7 @@ def plot_sweep(fig: Figure, slot: SubplotSpec, summary: pd.DataFrame) -> None:
     # colours of the two detection grids.
     for ax, label, color, x, y in (
         (ax_offset, SLIDING, SLIDING_COLOR, 130, 50),
-        (ax_onset, STATE_SPACE, STATE_SPACE_COLOR, 1.25, 30),
+        (ax_onset, STATE_SPACE, STATE_SPACE_COLOR, 1.25, 16),
     ):
         ax.text(
             x,
