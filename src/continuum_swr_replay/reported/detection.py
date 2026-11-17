@@ -409,29 +409,27 @@ def recording_values(numbers: dict, source: str) -> list[Value]:
 
 
 _TIMING_DETECTORS = {"sliding": "sliding window", "state_space": "state-space detector"}
-_TIMING_EDGES = {"start": "onset", "end": "offset"}
-_TIMING_REFERENCES = {
-    "bounds": "the replay's nominal bounds",
-    "spikes": "the replay's own first and last spike",
+_TIMING_EDGES = {
+    "start": ("onset", "first spike"),
+    "end": ("offset", "last spike"),
 }
 _TIMING_STATISTICS = {
-    "min": "smallest",
-    "q25": "lower quartile of the",
-    "median": "median",
-    "q75": "upper quartile of the",
-    "max": "largest",
-    "abs_median": "median absolute",
+    "min": ("min", "smallest"),
+    "q25": ("lower_quartile", "lower quartile of the"),
+    "median": ("median", "median"),
+    "q75": ("upper_quartile", "upper quartile of the"),
+    "max": ("max", "largest"),
+    "abs_median": ("abs_median", "median absolute"),
 }
-
-
-_TIMING_KEY_WORDS = {"q25": "lower_quartile", "q75": "upper_quartile"}
-"""A value's key holds no digit."""
+"""A statistic of the pooled timing block: its word in a value's key, which
+holds no digit, and in a description."""
 
 
 def pooled_timing_values(summary: pd.DataFrame, make) -> list[Value]:
     """Each detector's onset and offset errors over the replays both report,
     pooled over the sweep: reported minus true, negative for an edge placed
-    early (``sweep_summaries.pooled_timing_errors``)."""
+    early, the truth being the replay's own first and last spike
+    (``sweep_summaries.pooled_timing_errors``)."""
     pooled = sweep_statistics.sweep_pooled_timing_statistics(summary)
     far_ms = format_number(sweep_summaries.LARGE_TIMING_ERROR_MS, "int")
     over = "over the replays both detectors report"
@@ -445,61 +443,58 @@ def pooled_timing_values(summary: pd.DataFrame, make) -> list[Value]:
         )
     ]
     for detector, detector_name in _TIMING_DETECTORS.items():
-        for edge, edge_name in _TIMING_EDGES.items():
-            for reference, reference_name in _TIMING_REFERENCES.items():
-                measure = f"{detector}_{edge}_error_ms_{reference}"
-                key = f"sweep_timing_{detector}_{edge_name}_{reference}"
-                error = (
-                    f"{edge_name} error of the {detector_name} against "
-                    f"{reference_name}, {over}"
-                )
-                values += [
-                    make(
-                        f"{key}_{_TIMING_KEY_WORDS.get(statistic, statistic)}_ms",
-                        pooled[f"{measure}_{statistic}"],
-                        "quantity",
-                        "int",
-                        f"{statistic_name} {error}",
-                        "ms",
-                    )
-                    for statistic, statistic_name in _TIMING_STATISTICS.items()
-                ]
-                values.append(
-                    make(
-                        f"{key}_far_fraction",
-                        pooled[f"{measure}_far_share"],
-                        "fraction",
-                        "pctnum",
-                        f"share of the replays both detectors report whose {edge_name} the "
-                        f"{detector_name} places more than {far_ms} ms from "
-                        f"{reference_name}",
-                    )
-                )
-        values += [
-            make(
-                f"sweep_timing_{detector}_duration_error_"
-                f"{_TIMING_KEY_WORDS.get(statistic, statistic)}_ms",
-                pooled[f"{detector}_duration_error_ms_{statistic}"],
-                "quantity",
-                "int",
-                f"{_TIMING_STATISTICS[statistic]} reported minus nominal duration "
-                f"of the {detector_name}, {over}",
-                "ms",
+        for edge, (edge_name, spike) in _TIMING_EDGES.items():
+            measure = f"{detector}_{edge}_error_ms"
+            key = f"sweep_timing_{detector}_{edge_name}"
+            error = (
+                f"{edge_name} error of the {detector_name} against the replay's "
+                f"{spike}, {over}"
             )
-            for statistic in ("q25", "median", "q75")
-        ]
+            values += [
+                make(
+                    f"{key}_{word}_ms",
+                    pooled[f"{measure}_{statistic}"],
+                    "quantity",
+                    "int",
+                    f"{name} {error}",
+                    "ms",
+                )
+                for statistic, (word, name) in _TIMING_STATISTICS.items()
+            ]
+            values.append(
+                make(
+                    f"{key}_far_fraction",
+                    pooled[f"{measure}_far_share"],
+                    "fraction",
+                    "pctnum",
+                    f"share of the replays both detectors report whose {edge_name} "
+                    f"the {detector_name} places more than {far_ms} ms from the "
+                    f"replay's {spike}",
+                )
+            )
+        for statistic in ("q25", "median", "q75"):
+            word, name = _TIMING_STATISTICS[statistic]
+            values.append(
+                make(
+                    f"sweep_timing_{detector}_duration_error_{word}_ms",
+                    pooled[f"{detector}_duration_error_ms_{statistic}"],
+                    "quantity",
+                    "int",
+                    f"{name} duration the {detector_name} reports less the span of "
+                    f"the replay's own spikes, {over}",
+                    "ms",
+                )
+            )
     values += [
         make(
-            f"sweep_timing_sliding_larger_{edge_name}_{reference}_fraction",
-            pooled[f"sliding_larger_{edge}_{reference}_share"],
+            f"sweep_timing_sliding_larger_{edge_name}_fraction",
+            pooled[f"sliding_larger_{edge}_share"],
             "fraction",
             "pctnum",
             f"share of the replays both detectors report on which the sliding "
-            f"window's absolute {edge_name} error against {reference_name} is the "
-            "larger of the two",
+            f"window's absolute {edge_name} error is the larger of the two",
         )
-        for edge, edge_name in _TIMING_EDGES.items()
-        for reference, reference_name in _TIMING_REFERENCES.items()
+        for edge, (edge_name, _) in _TIMING_EDGES.items()
     ]
     return values
 

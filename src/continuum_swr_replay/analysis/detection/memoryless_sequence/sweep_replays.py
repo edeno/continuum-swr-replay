@@ -30,6 +30,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
     InjectedReplay,
+    added_spike_span,
     inject_replay,
     place_field_means,
     placements,
@@ -295,21 +296,8 @@ def run_cell(recording, means, path_cm, midpoint_cm, duration_s, rate_hz, at_s, 
         ((added >= start_s) & (added <= end_s)).sum()
         - ((original >= start_s) & (original <= end_s) & np.isin(original, added)).sum()
     )
-    # the replay's own spikes: at a low rate the first can come well after the
-    # replay's nominal start, and no detector can report what has not fired
-    added_spikes = np.concatenate(
-        [
-            np.setdiff1d(with_replay, without_replay)
-            for with_replay, without_replay in zip(
-                injected, recording["spike_times"], strict=True
-            )
-        ]
-    )
-    first_spike_s, last_spike_s = (
-        (float(added_spikes.min()), float(added_spikes.max()))
-        if added_spikes.size
-        else (np.nan, np.nan)
-    )
+    # what the replay's timing is held to (sweep_summaries.against_spike_span)
+    first_spike_s, last_spike_s = added_spike_span(recording["spike_times"], injected)
     row = {
         "path_cm": path_cm,
         "midpoint_cm": midpoint_cm,

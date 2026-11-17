@@ -51,9 +51,9 @@ SWEEP_ROWS = [
     ("timing_by_duration", "state_space_end_error_ms_median", 0.04, 3.0),
     ("timing_by_duration", "state_space_end_error_ms_median", 0.1, -1.0),
     ("timing_by_duration", "state_space_end_error_ms_median", 0.2, 2.0),
-    ("median_duration_ratio_by_duration", "sliding_duration_ratio", 0.2, 1.25),
-    ("median_duration_ratio_by_duration", "sliding_duration_ratio", 0.04, 2.5),
-    ("median_duration_ratio_by_duration", "sliding_duration_ratio", 0.1, 1.5),
+    ("median_duration_ratio_by_duration", "sliding_duration_s", 0.2, 0.25),
+    ("median_duration_ratio_by_duration", "sliding_duration_s", 0.04, 0.1),
+    ("median_duration_ratio_by_duration", "sliding_duration_s", 0.1, 0.15),
     ("median_duration_ratio_by_duration", "state_space_duration_ratio", 0.02, 9.0),
 ]
 SWEEP = _sweep(SWEEP_ROWS)
@@ -198,7 +198,7 @@ def test_sweep_timing_statistics_are_in_ms_and_signed_as_early_and_late():
         ("timing_by_duration", "sliding_end_error_ms_q75"),
         ("timing_by_duration", "state_space_start_error_ms_median"),
         ("timing_by_duration", "state_space_end_error_ms_median"),
-        ("median_duration_ratio_by_duration", "sliding_duration_ratio"),
+        ("median_duration_ratio_by_duration", "sliding_duration_s"),
     ],
 )
 def test_sweep_timing_statistics_refuse_measures_at_different_durations(block, measure):

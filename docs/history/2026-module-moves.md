@@ -684,3 +684,20 @@ project already means what a detector reports, so the detectors' output on them 
 | controls summary block `"bursts"` | `"control_events"` |
 | `sweep_controls.BURST_DURATION_S` | `CONTROL_EVENT_DURATION_S` |
 | `sweep_statistics.burst_share_range`, `placeless_burst_statistics` | `control_event_share_range`, `placeless_event_statistics` |
+
+## A simulated event is when its spikes are, 2026-11-17
+
+A simulated event's start and end were the bounds it was drawn in. A sparse event's first spike
+can come well after its nominal start, and no detector can report what has not fired, so the
+truth is now the span of the event's own spikes:
+
+- Figure 1's run (`simulated_run.SimulatedRun.patterns`): each pattern from its first to its last
+  spike, the silence from the last spike before it to the first after. The windows the patterns
+  were drawn in are kept as `pattern_windows`; the training mask and the sweeps' placements still
+  read those, so no fitted model or sweep recording changed.
+- The comparison's recording (`comparison_simulation.simulate_and_decode`): the two added replays'
+  rows of `event_times` are their spike spans (`simulation.added_spike_span`).
+- The replay sweep: its summary's durations and onset and offset errors are against each replay's
+  first and last spike (`sweep_summaries.against_spike_span`); `duration_s` on a row is still the
+  nominal duration of the grid. A pooled block (`timing_pooled`) gives the errors' quartiles,
+  extremes and tail over the replays both detectors report.

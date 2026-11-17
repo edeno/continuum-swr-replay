@@ -64,6 +64,8 @@ __all__ = [
     "make_example_detector",
     "simulate_and_decode",
     "simulate_run",
+    "spike_free_span",
+    "spike_span",
     "splice_remote_stationary",
 ]
 
@@ -233,8 +235,12 @@ class SimulatedRun:
     speed: np.ndarray  # (n_time,), cm/s
     spike_times: list[np.ndarray]  # spike times (s) per cell, in simulator order
     place_field_means: np.ndarray  # (n_neurons,), cm, in the order of spike_times
-    patterns: dict[str, tuple[float, float]]  # s; when each of PATTERNS occurs
-    is_pattern: np.ndarray  # (n_time,), bool: inside a pattern or a simulator event
+    # s; each of PATTERNS from its first to its last spike, and the silence
+    # from the last spike before it to the first after
+    patterns: dict[str, tuple[float, float]]
+    # s; the window each pattern was drawn in, which holds the pattern
+    pattern_windows: dict[str, tuple[float, float]]
+    is_pattern: np.ndarray  # (n_time,), bool: inside a window a pattern was drawn in
 
 
 @dataclass(frozen=True)
@@ -255,8 +261,70 @@ class DecodedSimulation:
     non_local_posterior: np.ndarray  # (n_time, n_position): the non-local states
     position_bins: np.ndarray  # (n_position,), cm
     non_local_probability: np.ndarray  # (n_time,)
-    patterns: dict[str, tuple[float, float]]  # s; when each of PATTERNS occurs
+    # s; each of PATTERNS from its first to its last spike, and the silence
+    # from the last spike before it to the first after
+    patterns: dict[str, tuple[float, float]]
     non_local_events: list[tuple[float, float]]  # s; by the project's event rule
+
+
+def spike_span(
+    spike_times: list[np.ndarray], window: tuple[float, float]
+) -> tuple[float, float]:
+    """The first and the last spike of any cell inside ``window``, in seconds.
+
+    Parameters
+    ----------
+    spike_times : list of ndarray
+        One array of spike times per cell, in seconds.
+    window : (float, float)
+        Start and end, in seconds; both ends are inside it.
+
+    Returns
+    -------
+    first, last : float
+
+    Raises
+    ------
+    ValueError
+        If no cell fires inside the window.
+    """
+    spikes = np.concatenate(spike_times)
+    inside = spikes[(spikes >= window[0]) & (spikes <= window[1])]
+    if inside.size == 0:
+        raise ValueError(f"no spike between {window[0]} and {window[1]} s")
+    return float(inside.min()), float(inside.max())
+
+
+def spike_free_span(
+    spike_times: list[np.ndarray], window: tuple[float, float]
+) -> tuple[float, float]:
+    """The silence that holds ``window``: from the last spike of any cell before
+    it to the first after it, in seconds.
+
+    Parameters
+    ----------
+    spike_times : list of ndarray
+        One array of spike times per cell, in seconds.
+    window : (float, float)
+        Start and end of a stretch with no spike in it, in seconds.
+
+    Returns
+    -------
+    last_before, first_after : float
+
+    Raises
+    ------
+    ValueError
+        If a cell fires inside the window, or none fires before or after it.
+    """
+    spikes = np.concatenate(spike_times)
+    before, after = spikes[spikes < window[0]], spikes[spikes > window[1]]
+    if before.size + after.size != spikes.size or not (before.size and after.size):
+        raise ValueError(
+            f"{window[0]} to {window[1]} s holds a spike, or no spike comes before "
+            "or after it"
+        )
+    return float(before.max()), float(after.min())
 
 
 def simulate_run(n_neurons: int = 30, seed: int = 0) -> SimulatedRun:
@@ -323,14 +391,23 @@ def simulate_run(n_neurons: int = 30, seed: int = 0) -> SimulatedRun:
         cell[(cell < silence[0]) | (cell > silence[1])] for cell in spike_times
     ]
 
-    patterns = {
+    for start, end in (sweep, stationary, silence):
+        is_event = is_event | ((time >= start) & (time <= end))
+    pattern_windows = {
         "sweep": sweep,
         "fragmented": event_times[_FRAGMENTED_ROW],
         "stationary": stationary,
         "silence": silence,
     }
-    for start, end in (sweep, stationary, silence):
-        is_event = is_event | ((time >= start) & (time <= end))
+    # A pattern is when its spikes are, not the window it was drawn in: a
+    # window holds silent time after its last spike, and the pause is silent
+    # for longer than the window that cleared it.
+    patterns = {
+        name: (spike_free_span if name == "silence" else spike_span)(
+            spike_times, window
+        )
+        for name, window in pattern_windows.items()
+    }
 
     # the decode grid; the spike times keep their own resolution
     time, position, speed, is_event = (
@@ -345,6 +422,7 @@ def simulate_run(n_neurons: int = 30, seed: int = 0) -> SimulatedRun:
         spike_times=spike_times,
         place_field_means=place_field_means,
         patterns=patterns,
+        pattern_windows=pattern_windows,
         is_pattern=is_event,
     )
 

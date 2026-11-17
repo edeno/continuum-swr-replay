@@ -228,7 +228,8 @@ def sweep_pooled_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
     statistics : dict
         The block's values by measure, as
         ``sweep_summaries.pooled_timing_errors`` names them: errors in
-        milliseconds, reported minus true.
+        milliseconds, reported minus true, the truth being the replay's own
+        first and last spike.
 
     Raises
     ------
@@ -281,8 +282,7 @@ def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
         - ``shortest_start_early_ms``, ``shortest_end_late_ms``: the median
           amounts at the shortest duration.
         - ``shortest_reported_duration_ms``: the median duration the sliding
-          window reports for the shortest replays (the shortest duration times
-          the median ratio of reported to true duration there).
+          window reports for the shortest replays.
 
     Raises
     ------
@@ -303,13 +303,13 @@ def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
             "state_space_end_error_ms_median",
         ],
     )
-    ratio = _by_duration(
-        summary, "median_duration_ratio_by_duration", "sliding_duration_ratio"
+    reported_s = _by_duration(
+        summary, "median_duration_ratio_by_duration", "sliding_duration_s"
     )
     durations = errors.index
-    if not ratio.index.equals(durations):
+    if not reported_s.index.equals(durations):
         raise ValueError(
-            "replay sweep summary: the timing errors and the duration ratio are "
+            "replay sweep summary: the timing errors and the reported duration are "
             "not all at the same durations"
         )
     # as arrays, so that a missing value is NaN in the result and not skipped
@@ -336,7 +336,7 @@ def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
         ),
         "shortest_start_early_ms": float(-start[0]),
         "shortest_end_late_ms": float(end[0]),
-        "shortest_reported_duration_ms": float(1000 * durations[0] * ratio.iloc[0]),
+        "shortest_reported_duration_ms": float(1000 * reported_s.iloc[0]),
     }
 
 

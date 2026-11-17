@@ -150,8 +150,9 @@ def build_recording(seed: int = 0, cells: np.ndarray | None = None):
         "speed": run.speed,
         "spike_times": spike_times,
         "all_spike_times": all_spike_times,
-        # the run's patterns, in time order: (n_patterns, 2), s
-        "event_times": np.array(list(run.patterns.values())),
+        # the windows the run's patterns were drawn in, in time order:
+        # (n_patterns, 2), s
+        "event_times": np.array(list(run.pattern_windows.values())),
         "encoding_model": encoding_model,
         # the same fields, decoded as the reference decodes them, with its
         # floor under every one; the state-space detector reads them as fitted

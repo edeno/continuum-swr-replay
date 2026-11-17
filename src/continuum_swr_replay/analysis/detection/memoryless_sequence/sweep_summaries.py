@@ -53,56 +53,88 @@ LARGE_TIMING_ERROR_MS = 100.0
 """An edge placed further than this from the truth counts as far off
 (:func:`pooled_timing_errors`)."""
 
-TIMING_REFERENCES = ("bounds", "spikes")
-"""What an edge error is measured against: the replay's nominal start and end,
-or its own first and last spike."""
+
+def against_spike_span(table: pd.DataFrame) -> pd.DataFrame:
+    """The replays' timing measured against their own first and last spike.
+
+    A replay's nominal start and end hold silent time when it is sparse: its
+    first spike can come well after the nominal start. No detector can report
+    what has not fired, so the truth a start, an end or a duration is held to
+    is the span of the replay's own spikes.
+
+    Parameters
+    ----------
+    table : pd.DataFrame, shape (n_replays, n_columns)
+        One row per injected replay: ``at_s`` and ``duration_s`` (the nominal
+        start and duration), ``first_spike_s`` and ``last_spike_s``, and for
+        ``sliding`` and ``state_space`` the ``<detector>_start_error_s`` and
+        ``<detector>_end_error_s`` against the nominal bounds and the reported
+        ``<detector>_duration_s``.
+
+    Returns
+    -------
+    table : pd.DataFrame, shape (n_replays, n_columns + 3)
+        A copy whose start and end errors are against the first and the last
+        spike, with ``spike_duration_s`` (last minus first spike) and each
+        detector's ``<detector>_duration_ratio``, its reported duration over
+        that one.
+    """
+    table = table.copy()
+    start_shift_s = table["first_spike_s"] - table["at_s"]
+    end_shift_s = table["last_spike_s"] - (table["at_s"] + table["duration_s"])
+    table["spike_duration_s"] = table["last_spike_s"] - table["first_spike_s"]
+    for detector in ("sliding", "state_space"):
+        table[f"{detector}_start_error_s"] -= start_shift_s
+        table[f"{detector}_end_error_s"] -= end_shift_s
+        table[f"{detector}_duration_ratio"] = (
+            table[f"{detector}_duration_s"] / table["spike_duration_s"]
+        )
+    return table
 
 
 def pooled_timing_errors(found: pd.DataFrame) -> dict[str, float]:
     """Each detector's start and end errors over the replays both report, pooled.
 
     An error is reported minus true, in milliseconds: negative for an edge
-    placed early. It is measured against the replay's nominal bounds
-    (``bounds``) and against its own first and last spike (``spikes``), since a
-    sparse replay's nominal bounds hold silent time no detector can see.
+    placed early.
 
     Parameters
     ----------
     found : pd.DataFrame, shape (n_replays, n_columns)
-        The replays both detectors report, one row each: ``at_s`` and
-        ``duration_s`` (the nominal bounds), ``first_spike_s`` and
-        ``last_spike_s``, and for ``sliding`` and ``state_space`` the
-        ``<detector>_start_error_s`` and ``<detector>_end_error_s`` against the
-        nominal bounds.
+        The replays both detectors report, one row each, with for ``sliding``
+        and ``state_space`` the ``<detector>_start_error_s`` and
+        ``<detector>_end_error_s`` (:func:`against_spike_span`).
 
     Returns
     -------
     statistics : dict
         - ``n_replays``: the replays pooled.
-        - ``<detector>_<edge>_error_ms_<reference>_<statistic>`` for the edges
-          ``start`` and ``end``, the references of :data:`TIMING_REFERENCES`
-          and the statistics ``min``, ``q25``, ``median``, ``q75``, ``max``,
-          ``abs_median`` (the median absolute error) and ``far_share`` (the
-          share of replays with an absolute error above
+        - ``<detector>_<edge>_error_ms_<statistic>`` for the edges ``start``
+          and ``end`` and the statistics ``min``, ``q25``, ``median``, ``q75``,
+          ``max``, ``abs_median`` (the median absolute error) and ``far_share``
+          (the share of replays with an absolute error above
           :data:`LARGE_TIMING_ERROR_MS`).
         - ``<detector>_duration_error_ms_<q25|median|q75>``: reported minus
-          nominal duration.
-        - ``sliding_larger_<edge>_<reference>_share``: the share of replays on
-          which the sliding window's absolute error is the larger of the two.
+          true duration (the end error minus the start error).
+        - ``sliding_larger_<edge>_share``: the share of replays on which the
+          sliding window's absolute error is the larger of the two.
     """
-    # the nominal bounds to the replay's own spikes, ms: at or after the start,
-    # at or before the end
-    to_spikes_ms = {
-        "start": 1000.0 * (found["first_spike_s"] - found["at_s"]),
-        "end": 1000.0 * (found["last_spike_s"] - (found["at_s"] + found["duration_s"])),
-    }
     statistics: dict[str, float] = {"n_replays": float(len(found))}
-    errors_ms: dict[tuple[str, str, str], pd.Series] = {}
     for detector in ("sliding", "state_space"):
         for edge in ("start", "end"):
-            to_bounds = 1000.0 * found[f"{detector}_{edge}_error_s"]
-            errors_ms[detector, edge, "bounds"] = to_bounds
-            errors_ms[detector, edge, "spikes"] = to_bounds - to_spikes_ms[edge]
+            error_ms = 1000.0 * found[f"{detector}_{edge}_error_s"]
+            key = f"{detector}_{edge}_error_ms"
+            statistics |= {
+                f"{key}_min": float(error_ms.min()),
+                f"{key}_q25": float(error_ms.quantile(0.25)),
+                f"{key}_median": float(error_ms.median()),
+                f"{key}_q75": float(error_ms.quantile(0.75)),
+                f"{key}_max": float(error_ms.max()),
+                f"{key}_abs_median": float(error_ms.abs().median()),
+                f"{key}_far_share": float(
+                    (error_ms.abs() > LARGE_TIMING_ERROR_MS).mean()
+                ),
+            }
         duration_error_ms = 1000.0 * (
             found[f"{detector}_end_error_s"] - found[f"{detector}_start_error_s"]
         )
@@ -110,26 +142,13 @@ def pooled_timing_errors(found: pd.DataFrame) -> dict[str, float]:
             statistics[f"{detector}_duration_error_ms_{name}"] = float(
                 duration_error_ms.quantile(quantile)
             )
-    for (detector, edge, reference), error_ms in errors_ms.items():
-        key = f"{detector}_{edge}_error_ms_{reference}"
-        statistics |= {
-            f"{key}_min": float(error_ms.min()),
-            f"{key}_q25": float(error_ms.quantile(0.25)),
-            f"{key}_median": float(error_ms.median()),
-            f"{key}_q75": float(error_ms.quantile(0.75)),
-            f"{key}_max": float(error_ms.max()),
-            f"{key}_abs_median": float(error_ms.abs().median()),
-            f"{key}_far_share": float((error_ms.abs() > LARGE_TIMING_ERROR_MS).mean()),
-        }
     for edge in ("start", "end"):
-        for reference in TIMING_REFERENCES:
-            sliding, state_space = (
-                errors_ms[detector, edge, reference].abs()
-                for detector in ("sliding", "state_space")
-            )
-            statistics[f"sliding_larger_{edge}_{reference}_share"] = float(
-                (sliding > state_space).mean()
-            )
+        statistics[f"sliding_larger_{edge}_share"] = float(
+            (
+                found[f"sliding_{edge}_error_s"].abs()
+                > found[f"state_space_{edge}_error_s"].abs()
+            ).mean()
+        )
     return statistics
 
 
@@ -160,16 +179,15 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
         by duration (``timing_by_duration``, ms) and pooled (``timing_pooled``,
         :func:`pooled_timing_errors`). The duration, distance and
         timing blocks read the replays both detectors report as the injection
-        (``sliding_matches`` and ``state_space_matches``).
+        (``sliding_matches`` and ``state_space_matches``), their durations and
+        errors against each replay's own first and last spike
+        (:func:`against_spike_span`); ``duration_s`` on a row is still the
+        nominal duration the sweep's grid names.
     """
     # the replays both detectors report, the sliding window under the whole
     # published definition: the detection rates count those, and a duration or
     # timing drawn beside them must be of the same events
-    found = table[table.sliding_matches & table.state_space_matches].copy()
-    found["sliding_duration_ratio"] = found.sliding_duration_s / found.duration_s
-    found["state_space_duration_ratio"] = (
-        found.state_space_duration_s / found.duration_s
-    )
+    found = against_spike_span(table[table.sliding_matches & table.state_space_matches])
     missed = table[table.state_space_matches & ~table.sliding_matches]
 
     parts = []
@@ -241,7 +259,13 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
 
     by_duration = (
         found.groupby("duration_s")[
-            ["sliding_duration_ratio", "state_space_duration_ratio"]
+            # the sliding window's reported duration itself, beside its ratio
+            # to the replay's spike span
+            [
+                "sliding_duration_ratio",
+                "state_space_duration_ratio",
+                "sliding_duration_s",
+            ]
         ]
         .median()
         .reset_index()
@@ -392,8 +416,7 @@ def replay_sweep_summary(table: pd.DataFrame) -> pd.DataFrame:
         timing.append(row)
     parts.append(melted(pd.DataFrame(timing), ["duration_s"], "timing_by_duration"))
 
-    # the same errors pooled over those replays, against the nominal bounds and
-    # against each replay's own spikes
+    # the same errors pooled over those replays
     pooled = (
         pd.Series(pooled_timing_errors(found), name="value")
         .rename_axis("measure")

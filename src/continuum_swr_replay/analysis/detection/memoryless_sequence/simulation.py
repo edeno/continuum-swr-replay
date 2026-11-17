@@ -32,6 +32,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.intervals import contiguous_true_runs
 
 __all__ = [
+    "added_spike_span",
     "TRUTH_LABELS",
     "Gap",
     "InjectedActivity",
@@ -311,6 +312,38 @@ def inject_replay(
         truth="continuous_replay",
     )
     return inject_activity(spike_times, activity, replay.seed), activity.bounds
+
+
+def added_spike_span(
+    spike_times: list[NDArray], with_added: list[NDArray]
+) -> tuple[float, float]:
+    """The first and the last of the spikes an injection added, in seconds.
+
+    An injected event is held to these, not to the bounds it was drawn in: when
+    it is sparse its first spike can come well after its nominal start, and no
+    detector can report what has not fired.
+
+    Parameters
+    ----------
+    spike_times : list of ndarray
+        One array per cell, before the injection.
+    with_added : list of ndarray
+        The same cells after it (:func:`inject_activity`).
+
+    Returns
+    -------
+    first, last : float
+        NaN when the injection added no spike.
+    """
+    added = np.concatenate(
+        [
+            np.setdiff1d(after, before)
+            for before, after in zip(spike_times, with_added, strict=True)
+        ]
+    )
+    if added.size == 0:
+        return (np.nan, np.nan)
+    return float(added.min()), float(added.max())
 
 
 def piecewise_replay(

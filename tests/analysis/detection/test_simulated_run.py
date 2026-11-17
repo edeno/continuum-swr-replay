@@ -71,8 +71,9 @@ class TestSimulatedRun:
             assert (still < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC).all(), name
 
     def test_stationary_pattern_is_one_cell_far_from_the_animal(self, sim):
+        # from its first to its last spike, inside the window it was drawn in
         start, end = sim.patterns["stationary"]
-        assert end - start == pytest.approx(REMOTE_STATIONARY_S)
+        assert 0.9 * REMOTE_STATIONARY_S < end - start <= REMOTE_STATIONARY_S
         firing = [
             cell
             for cell, times in enumerate(sim.sorted_spikes)
@@ -84,10 +85,12 @@ class TestSimulatedRun:
         assert (np.abs(animal - REMOTE_STATIONARY_CM) > 100).all()
 
     def test_silence_has_no_spikes(self, sim):
+        # from the last spike before the cleared window to the first after it
         start, end = sim.patterns["silence"]
-        assert end - start == pytest.approx(SILENCE_DURATION_S)
-        for times in sim.sorted_spikes:
-            assert not ((times >= start) & (times <= end)).any()
+        assert end - start >= SILENCE_DURATION_S
+        spikes = np.concatenate(sim.sorted_spikes)
+        assert not ((spikes > start) & (spikes < end)).any()
+        assert (spikes == start).any() and (spikes == end).any()
 
     def test_each_pattern_is_decoded_as_its_state(self, sim):
         for name, state in EXPECTED_STATE.items():

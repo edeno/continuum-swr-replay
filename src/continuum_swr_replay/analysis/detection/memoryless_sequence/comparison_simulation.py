@@ -38,6 +38,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.simulation import (
     InjectedReplay,
+    added_spike_span,
     inject_replay,
 )
 from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statistics import (
@@ -146,14 +147,18 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
     # two replays the sliding-window detector is expected to mis-report, in the
     # order SHORT_PATH_EVENT, SHORT_REPLAY_EVENT
     for replay in (SHORT_PATH, SHORT_REPLAY):
-        spike_times, bounds = inject_replay(
+        with_replay, bounds = inject_replay(
             spike_times,
             place_field_means,
             replay,
             sampling_frequency=SAMPLING_FREQUENCY,
         )
-        event_times = np.vstack([event_times, bounds])
+        # an event is when its spikes are, as the run's patterns are
+        event_times = np.vstack(
+            [event_times, added_spike_span(spike_times, with_replay)]
+        )
         is_event |= (time >= bounds[0]) & (time <= bounds[1])
+        spike_times = with_replay
 
     # encode on non-event data only, the analogue of this project's no-ripple
     # training mask; spikes inside an event must not shape the place fields
