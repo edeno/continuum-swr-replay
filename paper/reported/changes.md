@@ -3791,3 +3791,23 @@ marker, and the computed value now there. Newest last.
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_replays` | 5,376 | 9,912 |
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_sliding_fraction` | 15 | 16 |
 | `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.recording_short_replay_duration_ratio` | 1.8 | 2.0 |
+
+## 2026-11-17
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_replays` | 0 | 1,622 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_sliding_onset_median_ms` | 0 | −32 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_sliding_onset_lower_quartile_ms` | 0 | −37 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_sliding_onset_upper_quartile_ms` | 0 | −23 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_state_space_onset_median_ms` | 0 | −7 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_state_space_onset_lower_quartile_ms` | 0 | −11 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_state_space_onset_upper_quartile_ms` | 0 | −3 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_sliding_offset_median_ms` | 0 | 27 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_sliding_offset_lower_quartile_ms` | 0 | 18 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_sliding_offset_upper_quartile_ms` | 0 | 32 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_state_space_offset_median_ms` | 0 | 4 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_state_space_offset_lower_quartile_ms` | 0 | 1 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_state_space_offset_upper_quartile_ms` | 0 | 6 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_sliding_onset_far_fraction` | 0 | 10 |
+| `docs/design/replay_detection_comparison/02-memoryless-sequence.md` | `detection.sweep_timing_sliding_offset_far_fraction` | 0 | 11 |

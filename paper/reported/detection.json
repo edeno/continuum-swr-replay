@@ -3,9 +3,9 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "5b4387d64477",
+ "commit": "0569a102f85c",
  "code": {
-  "head": "5b4387d64477b99f0b52f3a6ddbf892c0db4b80a",
+  "head": "0569a102f85cde6ccbd0d212b17bdf8ba70cac78",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -31,12 +31,16 @@
     "code_sha256": "d13e698505baf703f76df758efb47db9b104ff5368c6e52f34734430c8313d56"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/comparison_simulation.py": {
-    "sha256": "32b8d91490319b6fb2cbd07a89a80a887b4d489ce79b78d9f7b125d6d3ba6561",
+    "sha256": "5976cd1191bb7ad119c3dc005ff1fa8eaa94c7c76c6ad9d5b2d465bce55df0d5",
     "code_sha256": "8b3069f282d5b2738233872231b07bbef917fbf54c6033cc5cd5db2870b71bc8"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/config.py": {
     "sha256": "9cb02ea860ed4ed5ea892382c8be8d6ff8dc2a1fed495234e113713998829f64",
     "code_sha256": "13b18b0de515e3d3d3564bcea6008503418f266dcca3d71da0a94a14ec20f7a0"
+   },
+   "src/continuum_swr_replay/analysis/detection/memoryless_sequence/controls_statistics.py": {
+    "sha256": "8e00ab0263ad0ff52cd32937b8263b74be94654ebe7500a4669cdf912d897c34",
+    "code_sha256": "e846f9e38317a10db1e6ba9214d495a25ec225de3f259d4d0cd1418f91d40598"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/detect.py": {
     "sha256": "5f3791c76f81e90168af14e998158144cf0f7f86dc4848dde9ee1cbcfa80007d",
@@ -75,12 +79,12 @@
     "code_sha256": "2d25a0b2f2cccb53da248d9f5e60587282570c4d634313e97f5c3a10c6aa8c72"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep_statistics.py": {
-    "sha256": "f68a64647721385e7b9eaa8a9ee584d1d3b5a4e229a4e732d2bf93db0a3121b4",
-    "code_sha256": "02a33605f664f58c38f486357d02efdca294d2a63f1b546abd6707e6380f70a8"
+    "sha256": "721fd0dceefa9b4cb29554b7e0c55a63f13fa976cb06e9d08e00e3275f3c79d8",
+    "code_sha256": "25059bb54f689be644374b3914ee828adfd1ae122cdce9811a398d0a3ee83d0f"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/sweep_summaries.py": {
-    "sha256": "9f1c838ab79606a4b3ac93047f767dde8ec82e66281ff1621cde28d234d893c8",
-    "code_sha256": "2e96659bb4f3d7915d4f777110383c7aa1a5d6a1d308ff69bf7d8eb65041f6c2"
+    "sha256": "0714df649caf78c063d62afe0a4552a412cb730816595513d2e2b31a340bffc5",
+    "code_sha256": "de005bdf278037036d8cd081bfd60a072da36dd8d1f596fbb9d398b94216f6cc"
    },
    "src/continuum_swr_replay/analysis/detection/memoryless_sequence/window_statistics.py": {
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
@@ -97,6 +101,10 @@
    "src/continuum_swr_replay/analysis/detector_comparison/heldout.py": {
     "sha256": "0fad6002b7b47e2a2c2b9c93e292c073749d567a90d6b4df20bdc9b3a94d76f4",
     "code_sha256": "e22b28a46ff6c168de5adf28274f95ddfa6f302681cec1d4bd1fb461b924eb04"
+   },
+   "src/continuum_swr_replay/analysis/detector_comparison/heldout_statistics.py": {
+    "sha256": "6cbf3af002ef0deb429980a72266f0c1cf171f4bec0e976e1149fbde666f7d74",
+    "code_sha256": "689626650cd4c9eac28346d8d56add0c7f2140968e2dc780452977c9d4ea9884"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/heldout_sweep.py": {
     "sha256": "9068ba750e93af37913070088a7a791bc3e31a0b6bb83e57fd120ebed5348dae",
@@ -195,8 +203,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "bff7c0bfb140938182ae3af2a7e1136e1fa78d6c0fa419ef0c4e770a9d1d48d6",
-    "code_sha256": "e90f63ac653060f2da7dc0a6c3ff0e953e51e94306ee0de7465b6bb75d496d34"
+    "sha256": "967bd0b5dfcd1a4da4e0f35febcc12311e28fa87c8f0ca2e09bc55c9cc4dc306",
+    "code_sha256": "8cea2384af5b40516b86e1432866a4059759d801538a79ebd1f29ba7ec4a3438"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -247,12 +255,12 @@
     "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
    },
    "paper/reported/inputs/detection/memoryless_comparison_recording.json": {
-    "sha256": "a2df6696c0b6aed4cd6e017fe58d90586b486a01ab2c5ca9ca920dc9685daa3d",
-    "code_sha256": "a2df6696c0b6aed4cd6e017fe58d90586b486a01ab2c5ca9ca920dc9685daa3d"
+    "sha256": "3d0dc272c4726dbc5e9b3023e75e40d659716ced80c7d8d4152a227a7bf23c46",
+    "code_sha256": "3d0dc272c4726dbc5e9b3023e75e40d659716ced80c7d8d4152a227a7bf23c46"
    },
    "paper/reported/inputs/detection/detection_sweep_summary.csv": {
-    "sha256": "661e0d6004764d1650f20d0655ba0e60c727fb0d03bbd15117e029510868c394",
-    "code_sha256": "661e0d6004764d1650f20d0655ba0e60c727fb0d03bbd15117e029510868c394"
+    "sha256": "68208b804e6186ddd764e268fd4103ef70a6823cc30520504e5a848f32850d61",
+    "code_sha256": "68208b804e6186ddd764e268fd4103ef70a6823cc30520504e5a848f32850d61"
    },
    "paper/reported/inputs/detection/detection_controls_summary.csv": {
     "sha256": "d153bb94bfd368dde965c17e9b69f21716982b8d0bd02deda6f02081217370ad",
@@ -283,11 +291,11 @@
   },
   {
    "path": "paper/reported/inputs/detection/memoryless_comparison_recording.json",
-   "sha256": "a2df6696c0b6aed4cd6e017fe58d90586b486a01ab2c5ca9ca920dc9685daa3d"
+   "sha256": "3d0dc272c4726dbc5e9b3023e75e40d659716ced80c7d8d4152a227a7bf23c46"
   },
   {
    "path": "paper/reported/inputs/detection/detection_sweep_summary.csv",
-   "sha256": "661e0d6004764d1650f20d0655ba0e60c727fb0d03bbd15117e029510868c394"
+   "sha256": "68208b804e6186ddd764e268fd4103ef70a6823cc30520504e5a848f32850d61"
   },
   {
    "path": "paper/reported/inputs/detection/detection_controls_summary.csv",
@@ -306,7 +314,7 @@
    "unit": "",
    "description": "the same for our detector",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -320,7 +328,7 @@
    "unit": "",
    "description": "the same for our detector",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -334,7 +342,7 @@
    "unit": "",
    "description": "continuing chains at the longest gap: share of trials the sliding window reports as one event per part",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -348,7 +356,7 @@
    "unit": "",
    "description": "continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -362,7 +370,7 @@
    "unit": "",
    "description": "the same at the longest gap",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -376,7 +384,7 @@
    "unit": "",
    "description": "chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -390,7 +398,7 @@
    "unit": "",
    "description": "highest such share",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -404,7 +412,7 @@
    "unit": "",
    "description": "chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -418,7 +426,7 @@
    "unit": "",
    "description": "highest such share",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -432,7 +440,7 @@
    "unit": "",
    "description": "lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts)",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -446,7 +454,7 @@
    "unit": "",
    "description": "highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -460,7 +468,7 @@
    "unit": "",
    "description": "share of jumping events our continuous state alone covers",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -474,7 +482,7 @@
    "unit": "",
    "description": "share of jumping events our detector's non-local events cover",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -488,7 +496,7 @@
    "unit": "",
    "description": "the same before its significance test",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -502,7 +510,7 @@
    "unit": "",
    "description": "share of jumping events the sliding window reports under the published definition",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -516,7 +524,7 @@
    "unit": "",
    "description": "two-part trials over every jump and chain condition",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -530,7 +538,7 @@
    "unit": "min",
    "description": "minutes of simulated immobility with no replay; no output reported any event there",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -544,7 +552,7 @@
    "unit": "events per minute",
    "description": "95 % upper bound on the false event rate with none observed (the rule of three over those minutes)",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -558,7 +566,7 @@
    "unit": "",
    "description": "simulated recordings the no-replay stretches come from",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -572,7 +580,7 @@
    "unit": "",
    "description": "trials in which our detector recovers fewer parts inside the event than alone",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -586,7 +594,7 @@
    "unit": "",
    "description": "trials in which it recovers more inside the event than alone",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -600,7 +608,7 @@
    "unit": "",
    "description": "the same with each part decoded alone",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -614,7 +622,7 @@
    "unit": "",
    "description": "share of parts our detector recovers inside the event, the same mean",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -628,7 +636,7 @@
    "unit": "",
    "description": "share of place-less events our continuous state alone covers",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -642,7 +650,7 @@
    "unit": "",
    "description": "highest share of a place-less event's time in the fragmented state, over control event durations",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -656,7 +664,7 @@
    "unit": "",
    "description": "lowest share of a place-less event's time in the fragmented state, over control event durations",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -670,7 +678,7 @@
    "unit": "",
    "description": "share of place-less events our detector's non-local events cover, pooled over the three peak rates",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -684,7 +692,7 @@
    "unit": "",
    "description": "share of place-less events at the lowest peak rate, 20 Hz, our non-local events cover",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -698,7 +706,7 @@
    "unit": "",
    "description": "the same before its significance test",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -712,7 +720,7 @@
    "unit": "",
    "description": "share of place-less events the sliding window reports under the published definition",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -726,7 +734,7 @@
    "unit": "",
    "description": "trials in which the sliding window recovers fewer parts inside the event than alone",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -740,7 +748,7 @@
    "unit": "",
    "description": "trials in which it recovers more inside the event than alone",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -754,7 +762,7 @@
    "unit": "",
    "description": "the same with each part decoded alone",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -768,7 +776,7 @@
    "unit": "",
    "description": "share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels",
    "questions": [
-    "1.1"
+    "1.2"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
@@ -950,7 +958,7 @@
    "unit": "",
    "description": "lowest share over folds of the events informative under both content estimates on which they agree",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1048,7 +1056,7 @@
    "unit": "",
    "description": "the higher of the two",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1062,7 +1070,7 @@
    "unit": "",
    "description": "jumping events: lower of folds A and B's share with held-out support",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1244,7 +1252,7 @@
    "unit": "",
    "description": "the higher of the two",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1258,7 +1266,7 @@
    "unit": "",
    "description": "replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1272,7 +1280,7 @@
    "unit": "",
    "description": "the same share in fold C",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1286,7 +1294,7 @@
    "unit": "",
    "description": "the higher of the two",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1300,7 +1308,7 @@
    "unit": "",
    "description": "replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1314,7 +1322,7 @@
    "unit": "",
    "description": "informative reports on place-less events over the three folds",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1328,7 +1336,7 @@
    "unit": "",
    "description": "reports on place-less events informative at that floor",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1342,7 +1350,7 @@
    "unit": "",
    "description": "reports on place-less events with held-out support at a floor of 2 expected spikes",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1356,7 +1364,7 @@
    "unit": "",
    "description": "informative reports on place-less events under the sliding window's content estimate",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1370,7 +1378,7 @@
    "unit": "",
    "description": "of those, the events with held-out support",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1384,7 +1392,7 @@
    "unit": "",
    "description": "of those, the events with held-out support",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1398,7 +1406,7 @@
    "unit": "",
    "description": "the higher of the two",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1412,7 +1420,7 @@
    "unit": "",
    "description": "shared replays: lower of folds A and B's share the evaluation cells can judge at all",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1426,7 +1434,7 @@
    "unit": "",
    "description": "the highest of the three",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1440,7 +1448,7 @@
    "unit": "",
    "description": "replays both detectors reported: lowest share over the three folds with held-out support",
    "questions": [
-    "1.1"
+    "1.3"
    ],
    "figures": [],
    "source": "paper/reported/inputs/detection/detection_heldout_summary.csv (scripts/detector_comparison/sweep_memoryless_heldout.py)",
@@ -1507,7 +1515,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1523,7 +1531,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1539,7 +1547,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1555,7 +1563,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1571,7 +1579,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1587,7 +1595,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1603,7 +1611,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1619,7 +1627,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1635,7 +1643,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1651,7 +1659,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1667,7 +1675,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1683,7 +1691,7 @@
    "figures": [
     "memoryless_comparison"
    ],
-   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit b397e03e2638)",
+   "source": "paper/reported/inputs/detection/memoryless_comparison_recording.json (scripts/figures/generate_supp_memoryless_comparison.py, commit cd8ac23385ee)",
    "function": "recording_values",
    "pending": null
   },
@@ -1889,108 +1897,12 @@
    "function": "sweep_values",
    "pending": null
   },
-  "sweep_shortest_end_late_ms": {
-   "value": 29.029146707053144,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "median amount the sliding window ends the shortest (40 ms) replays late",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_shortest_reported_duration_ms": {
-   "value": 119.9999999999974,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "median duration the sliding window reports for the shortest (40 ms) replays",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_shortest_start_early_ms": {
-   "value": 55.03864990311769,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "median amount the sliding window starts the shortest (40 ms) replays early",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
   "sweep_sliding_before_test_fraction": {
    "value": 0.1797820823244552,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
    "description": "over the whole grid, share the sliding-window detector reports before its significance test",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_sliding_end_late_max_ms": {
-   "value": 31.84739924583191,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "largest median amount the sliding window ends late, over true durations (40 to 500 ms)",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_sliding_end_late_min_ms": {
-   "value": 26.157029341057125,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "smallest median amount the sliding window ends late, over true durations (40 to 500 ms)",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_sliding_end_late_upper_quartile_max_ms": {
-   "value": 36.27845692316001,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "largest upper quartile of the sliding window's end error, over true durations (40 to 500 ms)",
    "questions": [
     "1.1"
    ],
@@ -2081,60 +1993,12 @@
    "function": "sweep_values",
    "pending": null
   },
-  "sweep_sliding_start_early_max_ms": {
-   "value": 55.03864990311769,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "largest median amount the sliding window starts early, over true durations (40 to 500 ms)",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_sliding_start_early_min_ms": {
-   "value": 30.109435009144647,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "smallest median amount the sliding window starts early, over true durations (40 to 500 ms)",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
   "sweep_spread_half_pass_fraction": {
    "value": 0.979236812570146,
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
    "description": "of the replays the sliding window reported before its test, share passing the test's spread half",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_state_space_edge_error_max_ms": {
-   "value": 8.37015863558399,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "largest absolute median start or end error of the state-space detector over true durations (40 to 500 ms), replays both detectors reported",
    "questions": [
     "1.1"
    ],
@@ -2193,54 +2057,6 @@
    "function": "sweep_values",
    "pending": null
   },
-  "sweep_timing_sliding_duration_error_lower_quartile_ms": {
-   "value": 44.345794392523175,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "lower quartile of the duration the sliding window reports less the span of the replay's own spikes, over the replays both detectors report",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_timing_sliding_duration_error_median_ms": {
-   "value": 56.75781468956088,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "median duration the sliding window reports less the span of the replay's own spikes, over the replays both detectors report",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_timing_sliding_duration_error_upper_quartile_ms": {
-   "value": 69.05179477247536,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "upper quartile of the duration the sliding window reports less the span of the replay's own spikes, over the replays both detectors report",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
   "sweep_timing_sliding_larger_offset_fraction": {
    "value": 0.9741060419235512,
    "kind": "fraction",
@@ -2263,22 +2079,6 @@
    "style": "pctnum",
    "unit": "",
    "description": "share of the replays both detectors report on which the sliding window's absolute onset error is the larger of the two",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_timing_sliding_offset_abs_median_ms": {
-   "value": 27.446654919748514,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "median absolute offset error of the sliding window against the replay's last spike, over the replays both detectors report",
    "questions": [
     "1.1"
    ],
@@ -2385,22 +2185,6 @@
    "function": "sweep_values",
    "pending": null
   },
-  "sweep_timing_sliding_onset_abs_median_ms": {
-   "value": 32.60735613302401,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "median absolute onset error of the sliding window against the replay's first spike, over the replays both detectors report",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
   "sweep_timing_sliding_onset_far_fraction": {
    "value": 0.1035758323057953,
    "kind": "fraction",
@@ -2497,70 +2281,6 @@
    "function": "sweep_values",
    "pending": null
   },
-  "sweep_timing_state_space_duration_error_lower_quartile_ms": {
-   "value": 6.675567423229722,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "lower quartile of the duration the state-space detector reports less the span of the replay's own spikes, over the replays both detectors report",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_timing_state_space_duration_error_median_ms": {
-   "value": 10.167410922818476,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "median duration the state-space detector reports less the span of the replay's own spikes, over the replays both detectors report",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_timing_state_space_duration_error_upper_quartile_ms": {
-   "value": 14.670226969293765,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "upper quartile of the duration the state-space detector reports less the span of the replay's own spikes, over the replays both detectors report",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_timing_state_space_offset_abs_median_ms": {
-   "value": 3.6805925328415863,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "median absolute offset error of the state-space detector against the replay's last spike, over the replays both detectors report",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
   "sweep_timing_state_space_offset_far_fraction": {
    "value": 0.001233045622688,
    "kind": "fraction",
@@ -2647,22 +2367,6 @@
    "style": "int",
    "unit": "ms",
    "description": "upper quartile of the offset error of the state-space detector against the replay's last spike, over the replays both detectors report",
-   "questions": [
-    "1.1"
-   ],
-   "figures": [
-    "memoryless_comparison"
-   ],
-   "source": "paper/reported/inputs/detection/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
-   "function": "sweep_values",
-   "pending": null
-  },
-  "sweep_timing_state_space_onset_abs_median_ms": {
-   "value": 6.922456367103536,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "median absolute onset error of the state-space detector against the replay's first spike, over the replays both detectors report",
    "questions": [
     "1.1"
    ],

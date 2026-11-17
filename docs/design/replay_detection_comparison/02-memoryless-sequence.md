@@ -655,16 +655,16 @@ counted among the <!--v:detection.sweep_sliding_not_the_replay_fraction-->2<!--/
 plus whatever absorption falls within the tolerance.
 
 **Where the extra length goes** (rewritten 2026-11-17; the per-duration table that
-stood here was dropped with its values). Over the <!--v:detection.sweep_timing_replays-->0<!--/v--> replays both
+stood here was dropped with its values). Over the <!--v:detection.sweep_timing_replays-->1,622<!--/v--> replays both
 detectors report, each edge measured against the replay's own first or last spike, reported
 minus true:
 
 | | sliding window | state-space |
 |---|---|---|
-| onset, median (quartiles), ms | <!--v:detection.sweep_timing_sliding_onset_median_ms-->0<!--/v--> (<!--v:detection.sweep_timing_sliding_onset_lower_quartile_ms-->0<!--/v--> to <!--v:detection.sweep_timing_sliding_onset_upper_quartile_ms-->0<!--/v-->) | <!--v:detection.sweep_timing_state_space_onset_median_ms-->0<!--/v--> (<!--v:detection.sweep_timing_state_space_onset_lower_quartile_ms-->0<!--/v--> to <!--v:detection.sweep_timing_state_space_onset_upper_quartile_ms-->0<!--/v-->) |
-| offset, median (quartiles), ms | <!--v:detection.sweep_timing_sliding_offset_median_ms-->0<!--/v--> (<!--v:detection.sweep_timing_sliding_offset_lower_quartile_ms-->0<!--/v--> to <!--v:detection.sweep_timing_sliding_offset_upper_quartile_ms-->0<!--/v-->) | <!--v:detection.sweep_timing_state_space_offset_median_ms-->0<!--/v--> (<!--v:detection.sweep_timing_state_space_offset_lower_quartile_ms-->0<!--/v--> to <!--v:detection.sweep_timing_state_space_offset_upper_quartile_ms-->0<!--/v-->) |
-| onset more than 100 ms off, % | <!--v:detection.sweep_timing_sliding_onset_far_fraction-->0<!--/v--> | <!--v:detection.sweep_timing_state_space_onset_far_fraction-->0<!--/v--> |
-| offset more than 100 ms off, % | <!--v:detection.sweep_timing_sliding_offset_far_fraction-->0<!--/v--> | <!--v:detection.sweep_timing_state_space_offset_far_fraction-->0<!--/v--> |
+| onset, median (quartiles), ms | <!--v:detection.sweep_timing_sliding_onset_median_ms-->−32<!--/v--> (<!--v:detection.sweep_timing_sliding_onset_lower_quartile_ms-->−37<!--/v--> to <!--v:detection.sweep_timing_sliding_onset_upper_quartile_ms-->−23<!--/v-->) | <!--v:detection.sweep_timing_state_space_onset_median_ms-->−7<!--/v--> (<!--v:detection.sweep_timing_state_space_onset_lower_quartile_ms-->−11<!--/v--> to <!--v:detection.sweep_timing_state_space_onset_upper_quartile_ms-->−3<!--/v-->) |
+| offset, median (quartiles), ms | <!--v:detection.sweep_timing_sliding_offset_median_ms-->27<!--/v--> (<!--v:detection.sweep_timing_sliding_offset_lower_quartile_ms-->18<!--/v--> to <!--v:detection.sweep_timing_sliding_offset_upper_quartile_ms-->32<!--/v-->) | <!--v:detection.sweep_timing_state_space_offset_median_ms-->4<!--/v--> (<!--v:detection.sweep_timing_state_space_offset_lower_quartile_ms-->1<!--/v--> to <!--v:detection.sweep_timing_state_space_offset_upper_quartile_ms-->6<!--/v-->) |
+| onset more than 100 ms off, % | <!--v:detection.sweep_timing_sliding_onset_far_fraction-->10<!--/v--> | <!--v:detection.sweep_timing_state_space_onset_far_fraction-->0<!--/v--> |
+| offset more than 100 ms off, % | <!--v:detection.sweep_timing_sliding_offset_far_fraction-->11<!--/v--> | <!--v:detection.sweep_timing_state_space_offset_far_fraction-->0<!--/v--> |
 
 The sliding window starts early and ends late; its bounds are window midpoints, and its
 80 ms windows reach 40 ms past each. Its long errors are at the edge of a replay that lies
