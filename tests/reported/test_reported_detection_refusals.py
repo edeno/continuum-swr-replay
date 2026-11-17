@@ -9,9 +9,6 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.detection.memoryless_sequence import (
-    sweep_statistics,
-)
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported import detection
 
@@ -72,19 +69,10 @@ def test_a_sliding_window_that_does_not_start_early_and_end_late_is_refused(
         detection.sweep_values(changed, "source")
 
 
-def test_jump_pass_rates_and_timing_errors_at_other_durations_are_refused(sweep):
-    # without its 40 ms rows, the shortest replays of the pass rates are 60 ms
-    # ones, and those of the timing errors still 40 ms ones
-    shortest = (sweep["summary"] == "shuffle_pass_rate_by_duration") & (
-        sweep["duration_s"] == 0.04
-    )
-    assert shortest.sum() == 2
-    with pytest.raises(ValueError, match="not of the same durations"):
-        detection.sweep_values(sweep[~shortest], "source")
-
-
 def test_the_sweep_descriptions_state_the_durations_the_summary_holds(sweep):
-    # every true duration doubled: 80 to 1000 ms in place of 40 to 500 ms
+    # every true duration doubled: the pass rates' 40 to 500 ms become 80 to
+    # 1000 ms, and the timing errors' 60 to 500 ms (the replays both detectors
+    # report) 120 to 1000 ms
     doubled = sweep.assign(duration_s=2 * sweep["duration_s"])
     description = {
         value.key: value.description
@@ -92,9 +80,9 @@ def test_the_sweep_descriptions_state_the_durations_the_summary_holds(sweep):
     }
     assert "shortest (80 ms)" in description["sweep_jump_half_pass_shortest_fraction"]
     assert "longest (1000 ms)" in description["sweep_jump_half_pass_longest_fraction"]
-    assert "shortest (80 ms)" in description["sweep_shortest_start_early_ms"]
-    assert "shortest (80 ms)" in description["sweep_shortest_reported_duration_ms"]
-    assert "(80 to 1000 ms)" in description["sweep_sliding_end_late_max_ms"]
+    assert "shortest (120 ms)" in description["sweep_shortest_start_early_ms"]
+    assert "shortest (120 ms)" in description["sweep_shortest_reported_duration_ms"]
+    assert "(120 to 1000 ms)" in description["sweep_sliding_end_late_max_ms"]
 
 
 def test_an_event_where_there_was_no_replay_is_refused(controls):
@@ -137,68 +125,6 @@ def test_detectors_scored_on_as_many_trials_of_other_conditions_are_refused(cont
     )
     with pytest.raises(ValueError, match="different multi-part trials"):
         detection.controls_values(changed, "source")
-
-
-SHARED_REPLAYS = {
-    "summary": "by_class",
-    "estimator": "state_space",
-    "detector": "state_space",
-    "event_class": "shared",
-    "truth": "continuous_replay",
-}
-
-
-# the informative shared replays of each fold; all have held-out support
-@pytest.mark.parametrize(("fold", "n_events"), [("A", 137), ("B", 173), ("C", 23)])
-def test_shared_replays_whose_support_differs_between_folds_are_refused(
-    heldout, fold, n_events
-):
-    assert (
-        sweep_statistics.pooled_heldout_rate(
-            heldout, fold, ("shared",), "continuous_replay"
-        )["n_events"]
-        == n_events
-    )
-    changed = _with_value(
-        heldout,
-        (n_events - 1) / n_events,
-        measure="support_rate",
-        fold=fold,
-        **SHARED_REPLAYS,
-    )
-    with pytest.raises(ValueError, match="one held-out support rate"):
-        detection.heldout_values(changed, "source")
-
-
-def test_a_fold_with_no_informative_shared_replay_is_refused(heldout):
-    # with no rate in fold C there is no one rate "the same in every fold"
-    changed = _with_value(
-        _with_value(heldout, 0.0, measure="n_events", fold="C", **SHARED_REPLAYS),
-        float("nan"),
-        measure="support_rate",
-        fold="C",
-        **SHARED_REPLAYS,
-    )
-    with pytest.raises(ValueError, match="one held-out support rate"):
-        detection.heldout_values(changed, "source")
-
-
-@pytest.mark.parametrize("estimator", ["state_space", "sliding_window"])
-def test_a_placeless_burst_with_heldout_support_is_refused(heldout, estimator):
-    # 1 of fold A's 10 informative place-less events
-    changed = _with_value(
-        heldout,
-        1 / 10,
-        summary="by_class",
-        measure="support_rate",
-        fold="A",
-        estimator=estimator,
-        detector="state_space",
-        event_class="ours_only",
-        truth="no_content",
-    )
-    with pytest.raises(ValueError, match="no informative place-less burst"):
-        detection.heldout_values(changed, "source")
 
 
 def test_an_event_only_the_sliding_window_reported_is_refused(heldout):

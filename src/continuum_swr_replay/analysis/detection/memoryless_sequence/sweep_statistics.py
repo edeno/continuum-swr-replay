@@ -799,11 +799,11 @@ def heldout_fold_statistics(
 def placeless_burst_statistics(
     heldout: pd.DataFrame, folds: Sequence[str]
 ) -> dict[str, int]:
-    """Place-less bursts in the held-out check: none informative has held-out
-    support, under either content estimate, or the summary is refused.
+    """Place-less bursts in the held-out check, and how many have held-out support.
 
     A place-less burst is an event whose truth is ``"no_content"``, of either
     class the state-space detector reported (``"ours_only"``, ``"shared"``).
+    Support for one is false support: it represents no place.
 
     Parameters
     ----------
@@ -818,30 +818,27 @@ def placeless_burst_statistics(
         - ``n_events``: the informative place-less burst events, summed over
           the folds, under the state-space content estimate
           (:func:`heldout_fold_statistics`).
+        - ``n_supported``: of those, the events with held-out support.
+        - ``n_events_sliding_window``, ``n_supported_sliding_window``: the same
+          two counts under the sliding window's content estimate.
 
     Raises
     ------
     ValueError
-        If a fold's rate of held-out support among its informative place-less
-        bursts is above zero under either content estimate, or a row read is
-        missing (:func:`pooled_heldout_rate`).
+        If a row read is missing (:func:`pooled_heldout_rate`).
     """
-    by_estimator = {
-        estimator: heldout_fold_statistics(
+    state_space, sliding_window = (
+        heldout_fold_statistics(
             heldout, folds, ("ours_only", "shared"), "no_content", estimator=estimator
         )
         for estimator in ("state_space", "sliding_window")
+    )
+    return {
+        "n_events": state_space["n_events"],
+        "n_supported": state_space["n_counted"],
+        "n_events_sliding_window": sliding_window["n_events"],
+        "n_supported_sliding_window": sliding_window["n_counted"],
     }
-    supported = {
-        estimator: statistics["n_folds_with_support"]
-        for estimator, statistics in by_estimator.items()
-    }
-    if any(supported.values()):
-        raise ValueError(
-            "held-out summary: expected no informative place-less burst with "
-            f"held-out support; folds with support, by content estimate: {supported}"
-        )
-    return {"n_events": by_estimator["state_space"]["n_events"]}
 
 
 def lowest_estimator_agreement(heldout: pd.DataFrame) -> float:

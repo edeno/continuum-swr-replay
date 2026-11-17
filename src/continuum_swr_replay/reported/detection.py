@@ -417,19 +417,20 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
     jump_pass = sweep_statistics.sweep_jump_pass_statistics(summary)
     # refuses a sweep whose sliding window does not start early and end late
     timing = sweep_statistics.sweep_timing_statistics(summary)
-    durations = (timing["shortest_duration_s"], timing["longest_duration_s"])
-    jump_durations = (jump_pass["shortest_duration_s"], jump_pass["longest_duration_s"])
-    if jump_durations != durations:
-        raise ValueError(
-            "the shortest and longest replays of the jump half's pass rates and of "
-            f"the timing errors are not of the same durations: {jump_durations} and "
-            f"{durations} s"
+
+    # the two families name their own durations: the timing errors are of the
+    # replays both detectors report, which need not reach the shortest swept
+    def duration_labels(statistics: dict) -> tuple[str, str]:
+        return tuple(
+            format_number(milliseconds(statistics[key]), "int")
+            for key in ("shortest_duration_s", "longest_duration_s")
         )
-    shortest_ms, longest_ms = (
-        format_number(milliseconds(duration), "int") for duration in durations
-    )
+
+    jump_shortest_ms, jump_longest_ms = duration_labels(jump_pass)
+    shortest_ms, longest_ms = duration_labels(timing)
+    jump_shortest = f"shortest ({jump_shortest_ms} ms)"
+    jump_longest = f"longest ({jump_longest_ms} ms)"
     shortest = f"shortest ({shortest_ms} ms)"
-    longest = f"longest ({longest_ms} ms)"
     over_durations = f"over true durations ({shortest_ms} to {longest_ms} ms)"
 
     def share(key: str, x: float, description: str) -> Value:
@@ -515,12 +516,12 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
         share(
             "sweep_jump_half_pass_shortest_fraction",
             jump_pass["shortest_fraction"],
-            f"share of the {shortest} replays passing the jump half",
+            f"share of the {jump_shortest} replays passing the jump half",
         ),
         share(
             "sweep_jump_half_pass_longest_fraction",
             jump_pass["longest_fraction"],
-            f"share of the {longest} replays passing the jump half",
+            f"share of the {jump_longest} replays passing the jump half",
         ),
         share(
             "sweep_state_space_only_fraction",
@@ -905,17 +906,10 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         )
         for name, classes in (("ours", ("ours_only",)), ("shared", ("shared",)))
     }
-    # refuses a summary in which an informative place-less burst has support
     placeless = sweep_statistics.placeless_burst_statistics(heldout, FOLDS)
     placeless_loose = over_folds(
         FOLDS, OUR_EVENT_CLASSES, "no_content", suffix="_floor2"
     )
-    if shared["rate_spread"] != 0:
-        raise ValueError(
-            "the caption states one held-out support rate for shared replays; the "
-            "folds differ, or one has no informative shared replay (from "
-            f"{shared['rate_min']} to {shared['rate_max']})"
-        )
     # refuses a summary holding an event only the sliding window reported
     sweep_statistics.heldout_event_classes(heldout)
     return [
@@ -936,18 +930,42 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
             "the same share in fold C",
         ),
         share(
-            "heldout_shared_support",
+            "heldout_shared_support_min",
             shared["rate_min"],
-            "replays both detectors reported: share with held-out support, the same "
-            "in every fold",
+            "replays both detectors reported: lowest share over the three folds with "
+            "held-out support",
+        ),
+        share(
+            "heldout_shared_support_max", shared["rate_max"], "the highest of the three"
         ),
         make(
             "heldout_placeless_informative_events",
             placeless["n_events"],
             "count",
             "count",
-            "informative place-less burst events over the three folds (none has "
-            "held-out support)",
+            "informative place-less burst events over the three folds",
+        ),
+        make(
+            "heldout_placeless_supported_events",
+            placeless["n_supported"],
+            "count",
+            "count",
+            "of those, the events with held-out support",
+        ),
+        make(
+            "heldout_placeless_sliding_estimate_events",
+            placeless["n_events_sliding_window"],
+            "count",
+            "count",
+            "informative place-less burst events under the sliding window's content "
+            "estimate",
+        ),
+        make(
+            "heldout_placeless_sliding_estimate_supported_events",
+            placeless["n_supported_sliding_window"],
+            "count",
+            "count",
+            "of those, the events with held-out support",
         ),
         make(
             "heldout_placeless_loose_supported_events",

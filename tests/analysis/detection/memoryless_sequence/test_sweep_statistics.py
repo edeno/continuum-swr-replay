@@ -831,23 +831,29 @@ def _placeless(
     )
 
 
-def test_placeless_burst_statistics_count_both_classes_under_our_estimate():
+def test_placeless_burst_statistics_count_both_classes_under_each_estimate():
     result = stats.placeless_burst_statistics(_placeless(), ("A", "B"))
-    # 3 + 2 in fold A and 4 in fold B; the sliding window's estimate judges 7
-    assert result == {"n_events": 9}
+    # 3 + 2 in fold A and 4 in fold B; the sliding window's estimate judges 3 + 4
+    assert result == {
+        "n_events": 9,
+        "n_supported": 0,
+        "n_events_sliding_window": 7,
+        "n_supported_sliding_window": 0,
+    }
 
 
 @pytest.mark.parametrize(
-    ("state_space_rate_b", "sliding_rate_b"), [(0.25, 0.0), (0.0, 0.25)]
+    ("state_space_rate_b", "sliding_rate_b", "supported"),
+    [(0.25, 0.0, (1, 0)), (0.0, 0.25, (0, 1))],
 )
-def test_placeless_burst_statistics_refuse_a_supported_burst(
-    state_space_rate_b, sliding_rate_b
+def test_placeless_burst_statistics_count_a_supported_burst(
+    state_space_rate_b, sliding_rate_b, supported
 ):
-    # 1 of fold B's 4 informative place-less bursts, under either estimate
-    with pytest.raises(ValueError, match="no informative place-less burst"):
-        stats.placeless_burst_statistics(
-            _placeless(state_space_rate_b, sliding_rate_b), ("A", "B")
-        )
+    # 1 of fold B's 4 informative place-less bursts, under one estimate
+    result = stats.placeless_burst_statistics(
+        _placeless(state_space_rate_b, sliding_rate_b), ("A", "B")
+    )
+    assert (result["n_supported"], result["n_supported_sliding_window"]) == supported
 
 
 def test_placeless_burst_statistics_ignore_a_fold_with_no_informative_burst():
@@ -856,7 +862,8 @@ def test_placeless_burst_statistics_ignore_a_fold_with_no_informative_burst():
     in_b = (table["fold"] == "B") & (table["estimator"] == "state_space")
     table.loc[in_b & (table["measure"] == "n_events"), "value"] = 0.0
     table.loc[in_b & (table["measure"] == "support_rate"), "value"] = np.nan
-    assert stats.placeless_burst_statistics(table, ("A", "B")) == {"n_events": 5}
+    result = stats.placeless_burst_statistics(table, ("A", "B"))
+    assert (result["n_events"], result["n_supported"]) == (5, 0)
 
 
 def test_lowest_estimator_agreement_is_over_folds():

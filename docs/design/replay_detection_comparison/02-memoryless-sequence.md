@@ -767,10 +767,13 @@ shared events are in the summary under their own `detector`.
   true replays only our detector reported have held-out support in
   <!--v:detection.heldout_ours_only_support_min-->92<!--/v-->–<!--v:detection.heldout_ours_only_support_max-->97<!--/v-->% of cases in
   the interleaved folds and <!--v:detection.heldout_ours_only_support_fold_c-->88<!--/v-->% in the half-coverage
-  fold; shared replays in <!--v:detection.heldout_shared_support-->100<!--/v-->%.
-- **The test did not support events without content, on few of them.** None of the
-  <!--v:detection.heldout_placeless_informative_events-->19<!--/v--> informative place-less burst events has
-  support; at a floor of 2 expected spikes, <!--v:detection.heldout_placeless_loose_supported_events-->4<!--/v-->
+  fold; shared replays in <!--v:detection.heldout_shared_support_min-->100<!--/v-->–<!--v:detection.heldout_shared_support_max-->100<!--/v-->%.
+- **The test rarely supported events without content, on few of them.**
+  <!--v:detection.heldout_placeless_supported_events-->0<!--/v--> of the
+  <!--v:detection.heldout_placeless_informative_events-->19<!--/v--> informative place-less burst events have
+  support (<!--v:detection.heldout_placeless_sliding_estimate_supported_events-->0<!--/v--> of
+  <!--v:detection.heldout_placeless_sliding_estimate_events-->19<!--/v--> under the sliding window's content
+  estimate); at a floor of 2 expected spikes, <!--v:detection.heldout_placeless_loose_supported_events-->4<!--/v-->
   of <!--v:detection.heldout_placeless_loose_events-->75<!--/v--> do. Jumping bursts, which do represent places,
   <!--v:detection.heldout_jumping_support_min-->57<!--/v-->–<!--v:detection.heldout_jumping_support_max-->63<!--/v-->%. On the no-replay
   stretches neither detector reported an event from discovery cells, so no event of
