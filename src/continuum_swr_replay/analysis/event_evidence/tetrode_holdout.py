@@ -351,8 +351,12 @@ def holdout_scores(
         ``n_scored_bins``, ``n_spikes`` (the tetrode's), ``population``,
         ``local``, ``local_bin``, ``uniform``, ``gain`` (population - local),
         ``gain_bin`` (population - local_bin), ``agreement`` (population -
-        uniform) and ``nonlocal_prob`` (the mean
-        over the window of the reduced decode's non-local probability).
+        uniform), ``nonlocal_prob`` (the mean over the window of the reduced
+        decode's non-local probability), ``gain_silent`` and
+        ``agreement_silent`` (the part of each from bins where the tetrode did
+        not spike) and ``spread_cm`` (the mean over scored bins of the
+        population distribution's effective width, ``exp(entropy)`` place bins
+        times the place-bin size).
     record : dict
         Timings and checks.
     """
@@ -408,6 +412,7 @@ def holdout_scores(
     )
     animal_bin = nearest_interior_bins(environment, np.asarray(linear_position)[rows])
     counts = terms.spike_counts()[rows]
+    bin_cm = float(np.median(np.diff(np.sort(centers.ravel()))))
     missing = is_missing[rows]
     n_bins = e - s + 1
 
@@ -437,6 +442,12 @@ def holdout_scores(
         local_bin = mine[np.arange(rows.size), animal_bin]
         uniform = logsumexp(mine, axis=1) - np.log(mine.shape[1])
         scored = np.isfinite(population) & ~missing
+        silent = scored & (counts[:, k] == 0)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            entropy = -np.nansum(
+                np.where(distribution > 0, distribution * np.log(distribution), 0.0),
+                axis=1,
+            )
         per_bin = np.column_stack(
             [
                 np.where(scored, population, 0.0),
@@ -446,6 +457,9 @@ def holdout_scores(
                 np.where(scored, uniform, 0.0),
                 counts[:, k],
                 state_probability[:, nonlocal_states].sum(axis=1),
+                np.where(silent, population - local, 0.0),
+                np.where(silent, population - uniform, 0.0),
+                np.where(scored, np.exp(entropy) * bin_cm, 0.0),
             ]
         )
         sums = window_sums(per_bin, rows, s, e)
@@ -462,6 +476,9 @@ def holdout_scores(
                     "local_bin": sums[:, 2],
                     "uniform": sums[:, 4],
                     "nonlocal_prob": sums[:, 6] / n_bins,
+                    "gain_silent": sums[:, 7],
+                    "agreement_silent": sums[:, 8],
+                    "spread_cm": sums[:, 9] / np.maximum(sums[:, 3], 1),
                 }
             )
         )
