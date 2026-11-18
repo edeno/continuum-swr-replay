@@ -77,7 +77,9 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
     plot_posterior,
     plot_raster,
     posterior_color_limit,
+    readable_text_color,
     space_rows_evenly,
+    text_color_on,
 )
 
 warnings.filterwarnings("ignore")
@@ -108,7 +110,7 @@ def _colored_yticks(
     ax.set_yticklabels(labels, fontsize=SMALL_SIZE)
     ax.tick_params(axis="y", length=0, pad=2)
     for label, color in zip(ax.get_yticklabels(), colors, strict=True):
-        label.set_color(color)
+        label.set_color(readable_text_color(color))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -199,7 +201,7 @@ def plot_state_diagram(ax: Axes) -> None:
             cx,
             cy,
             name,
-            color="white",
+            color=text_color_on(STATE_COLORS[name]),
             fontsize=SMALL_SIZE,
             fontweight="bold",
             ha="center",
@@ -347,7 +349,7 @@ def plot_spike_scoring(fig: Figure, slot: SubplotSpec) -> None:
             fontsize=SMALL_SIZE,
             va="center",
             ha="left",
-            color=evidence_colors[favored],
+            color=readable_text_color(evidence_colors[favored]),
             fontweight="bold",
         )
         ax_evidence.set_xlim(0, 1.45)
@@ -450,7 +452,7 @@ def plot_position_transitions(fig: Figure, slot: SubplotSpec) -> None:
             f"{name}\n{rule}",
             fontsize=SMALL_SIZE,
             fontweight="bold",
-            color=color,
+            color=readable_text_color(color),
             pad=2,
             linespacing=0.95,
         )
@@ -593,7 +595,7 @@ def plot_simulated_run(
             textcoords=ax_raster.get_xaxis_transform(),
             fontsize=SMALL_SIZE,
             fontweight="bold",
-            color="white",
+            color=text_color_on(example.color),
             ha="center",
             va="center",
             annotation_clip=False,
@@ -780,7 +782,7 @@ def plot_examples(
             transform=ax_raster.transAxes,
             fontsize=LABEL_SIZE,
             fontweight="bold",
-            color=example.color,
+            color=readable_text_color(example.color),
             ha="center",
             va="center",
         )
@@ -802,7 +804,7 @@ def plot_examples(
             transform=ax_raster.transAxes,
             fontsize=SMALL_SIZE,
             fontweight="bold",
-            color="white",
+            color=text_color_on(example.color),
             ha="center",
             va="center",
             bbox=example_badge(example.color),

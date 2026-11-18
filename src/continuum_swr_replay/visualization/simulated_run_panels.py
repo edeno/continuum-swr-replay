@@ -9,11 +9,13 @@ once, here.
 """
 
 from collections.abc import Callable, Sequence
+from colorsys import hls_to_rgb, rgb_to_hls
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection
+from matplotlib.colors import to_hex, to_rgb
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.text import Text
@@ -31,6 +33,8 @@ __all__ = [
     "plot_posterior",
     "plot_raster",
     "posterior_color_limit",
+    "readable_text_color",
+    "text_color_on",
     "space_rows_evenly",
     "ANIMAL_POS_COLOR",
     "DATA_LEFT",
@@ -48,13 +52,19 @@ __all__ = [
 ]
 
 # Keyed by the figures' name for each state: the detector's name without its
-# "Non-Local " prefix.
+# "Non-Local " prefix. Local and No-Spike are the palette's (``COLORS``), as in
+# every other figure; the palette has no colour for the two non-local states.
 STATE_COLORS = {
-    "Local": WONG[5],
-    "No-Spike": "#999999",
+    "Local": COLORS["Local"],
+    "No-Spike": COLORS["No-Spike"],
     "Continuous": WONG[1],
     "Fragmented": WONG[6],
 }
+# A colour lighter than this (HLS lightness) is too pale for text on white, and
+# too pale under white text.
+LIGHT_COLOR_LIGHTNESS = 0.6
+# The lightness a pale colour is darkened to when text is written in it.
+TEXT_LIGHTNESS = 0.4
 NON_LOCAL_COLOR = COLORS["Non-Local"]
 NON_LOCAL_SHADE_ALPHA = 0.13
 # The shading of a non-local event.
@@ -77,6 +87,24 @@ FIGURE_WIDTH = 6.9
 DATA_LEFT, DATA_RIGHT = 0.095, 0.985
 # Space shown beyond each end of the track in the decoded-position plots.
 POSITION_MARGIN_CM = 8.0
+
+
+def readable_text_color(color: str) -> str:
+    """The colour to write text in ``color`` on white.
+
+    A pale colour (Local's light blue, No-Spike's grey) is darkened to
+    :data:`TEXT_LIGHTNESS`, keeping its hue, so the text can be read and still
+    names its state by colour; any other colour is returned as given.
+    """
+    hue, lightness, saturation = rgb_to_hls(*to_rgb(color))
+    if lightness <= LIGHT_COLOR_LIGHTNESS:
+        return color
+    return to_hex(hls_to_rgb(hue, TEXT_LIGHTNESS, saturation))
+
+
+def text_color_on(fill: str) -> str:
+    """Black on a pale fill, white on any other: the colour of text drawn over ``fill``."""
+    return "black" if rgb_to_hls(*to_rgb(fill))[1] > LIGHT_COLOR_LIGHTNESS else "white"
 
 
 def example_badge(color: str) -> dict:
