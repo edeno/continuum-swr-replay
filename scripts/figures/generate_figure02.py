@@ -21,16 +21,17 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         2026-10-16 run; to be replaced by the run on the canonical events.
     g — Ripple power and MUA around non-local event starts, SWR vs no-SWR, with
         the epochs' rest level (rest bins in no event).
-    h — The share of non-local events each SWR definition, MUA and the
-        Widloski detector overlaps; any SWR or MUA together as a reference.
+    h — For each SWR definition, MUA and the Widloski detector: the share of
+        non-local events its events overlap, and the share of its own events
+        that overlap a non-local event.
     i — The share of rest time bins decoded non-local by ripple power, one line
         per animal: no step at the SWR threshold.
 
 Panels c and e are drawn from the canonical event table by the functions the
 events summary uses (``event_statistics.overlap_class_statistics``,
 ``boundary_offsets``); d from ``nonlocal_comparison.other_detector_statistics``
-on the event features run the summary reads, and h's "any SWR or MUA" from
-``left_out_statistics``; f's rest lines from ``event_statistics.reference_medians``
+on the event features run the summary reads, and c's time share from
+``left_out_statistics``; g's rest lines from ``event_statistics.reference_medians``
 of the brain-state reference. Panels g and i are per-time-bin signals no stored
 output holds, computed from the aggregated decode frames (cached), whose event
 counts by SWR overlap must equal the canonical table's.
@@ -472,11 +473,9 @@ def detector_comparison() -> dict:
         ``kay``: :func:`nonlocal_comparison.other_detector_statistics`'s row of
         Kay's SWRs (d); ``overlap``: the share of non-local events each of
         :data:`DETECTOR_LABELS` overlaps and ``with_nonlocal``, the share of
-        each one's events that overlap a non-local event (h); from
-        ``left_out_statistics``,
-        ``any_swr_or_mua``, the share any SWR definition or MUA event overlaps
-        (g), and ``time_outside_swr``, the share of non-local time outside Kay's
-        SWRs (c).
+        each one's events that overlap a non-local event (h); and, from
+        ``left_out_statistics``, ``time_outside_swr``, the share of non-local
+        time outside Kay's SWRs (c).
     """
     run = event_features_root() / EVENT_FEATURES_RUN
     others = nonlocal_comparison.other_detector_events(run)
@@ -495,7 +494,6 @@ def detector_comparison() -> dict:
         "with_nonlocal": nonlocal_comparison.events_overlapping_nonlocal(
             directional, tuple(DETECTOR_LABELS)
         ),
-        "any_swr_or_mua": 1 - left_out["nonlocal_events_outside_trigger_fraction"],
         "time_outside_swr": left_out["nonlocal_time_outside_kay_fraction"],
     }
 
@@ -996,25 +994,18 @@ def draw_detector_bars(
 
 
 def draw_detector_overlap(
-    ax_caught, ax_content, overlap: pd.DataFrame, with_nonlocal: pd.DataFrame,
-    any_swr_or_mua: float,
-) -> None:  # fmt: skip
+    ax_caught, ax_content, overlap: pd.DataFrame, with_nonlocal: pd.DataFrame
+) -> None:
     """Panel h: what each detector catches, and what its events contain.
 
     Bars pool all events; dots are animals (for the caption).
 
-    Left, the share of non-local events each detector's events overlap, with a
-    dashed line at the share any SWR definition or MUA event overlaps; right,
+    Left, the share of non-local events each detector's events overlap; right,
     the share of its own events that overlap a non-local event.
     """
     n_rows = len(overlap)
     draw_detector_bars(ax_caught, overlap, n_rows, "% events", True)
     ax_caught.set_title("Non-local\nevents found", fontsize=SMALL_SIZE, pad=3)
-    ax_caught.axvline(100 * any_swr_or_mua, color="k", lw=0.6, ls="--")
-    ax_caught.text(
-        100 * any_swr_or_mua - 3, 0, "any SWR\nor MUA", ha="right", va="center",
-        fontsize=SMALL_SIZE,
-    )  # fmt: skip
     draw_detector_bars(ax_content, with_nonlocal, n_rows, "% events", False)
     ax_content.set_title(
         "Detections with\nnon-local activity", fontsize=SMALL_SIZE, pad=3
@@ -1186,7 +1177,6 @@ def generate_figure(
         ax_h2,
         inputs["overlap"],
         inputs["with_nonlocal"],
-        inputs["any_swr_or_mua"],
     )
     ax_i = fig.add_subplot(row4[3])
     draw_share_by_power(ax_i, inputs["share_by_power"])
