@@ -1,45 +1,52 @@
-"""The held-out tetrode score end to end, on a clusterless recording with known
+"""The held-out tetrode score end to end, on clusterless recordings with known
 content (``tests.support.tetrode_holdout_simulation``).
 
-Remote content (a sweep, a held remote place) must score clearly above local
-coding on tetrodes that did not see it; local content (a burst at the animal's
-place, quiet rest) must not.
+The score's two contrasts are checked on every kind of content:
+
+- gain (population minus local coding) is positive for remote content of every
+  kind the detector finds, grows with distance from the animal, and is about
+  zero for local content and rest;
+- agreement (population minus no place preferred) is positive when the
+  tetrodes share content and negative for a burst whose tetrodes each follow
+  their own random place, which the gain and the in-sample score still credit.
+
+Also: the rebuilt likelihood is the decoder's; a tetrode with no field at
+either place contributes nothing; an event across a time-block boundary, a
+window with missing bins and a silent window are scored as specified.
 """
 
 import numpy as np
 import pandas as pd
 import pytest
+from non_local_detector.likelihoods.no_spike import predict_no_spike_log_likelihood
 
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
-from tests.support.tetrode_holdout_simulation import fit_detector, simulate_recording
+from continuum_swr_replay.decoding.results import ENCODING_KEY
+from tests.support import tetrode_holdout_simulation as sim
 
 pytestmark = pytest.mark.integration
 
+REMOTE = ("sweep", "stationary", "fragmented", "close_20", "close_40", "close_80")
+N_MISSING = 10
 
-@pytest.fixture(scope="module")
-def scored():
-    recording = simulate_recording(seed=0)
-    detector = fit_detector(recording)
-    events = recording.events
+
+def _quiet(message: str) -> None:
+    pass
+
+
+def _rest_windows(recording: sim.Recording, n: int, length: int) -> pd.DataFrame:
     rest = ~recording.is_running
-    for s, e in zip(events.s, events.e, strict=True):
+    for s, e in zip(recording.events.s, recording.events.e, strict=True):
         rest[max(0, s - 250) : e + 250] = False
-    length = int(events.e.iloc[0] - events.s.iloc[0] + 1)
     starts = np.flatnonzero(np.convolve(rest, np.ones(length, int), "valid") == length)
-    controls = np.random.default_rng(1).choice(starts, 12, replace=False)
-    windows = pd.concat(
-        [
-            events.assign(window_id=[f"event{i}" for i in range(len(events))]),
-            pd.DataFrame(
-                {
-                    "kind": "rest",
-                    "s": controls,
-                    "e": controls + length - 1,
-                    "window_id": [f"rest{i}" for i in range(controls.size)],
-                }
-            ),
-        ],
-        ignore_index=True,
+    chosen = np.random.default_rng(1).choice(starts, n, replace=False)
+    return pd.DataFrame({"kind": "rest", "s": chosen, "e": chosen + length - 1})
+
+
+def _score(detector, recording, windows, is_missing=None) -> pd.DataFrame:
+    windows = windows.reset_index(drop=True).rename_axis("window_id").reset_index()
+    missing = (
+        np.zeros(recording.time.size, dtype=bool) if is_missing is None else is_missing
     )
     scores, _ = th.holdout_scores(
         detector,
@@ -49,21 +56,170 @@ def scored():
         recording.spike_times,
         recording.marks,
         recording.is_running,
-        np.zeros(recording.time.size, dtype=bool),
+        missing,
         windows,
-        log=lambda message: None,
+        log=_quiet,
     )
-    per_window = scores.groupby("window_id")[["gain", "n_spikes"]].sum()
-    return per_window.join(windows.set_index("window_id")["kind"])
+    return scores.join(windows.set_index("window_id")["kind"], on="window_id")
 
 
-def test_remote_content_scores_above_local_coding_on_held_out_tetrodes(scored):
-    remote = scored[scored["kind"].isin(["sweep", "stationary"])]
-    assert len(remote) == 24
-    assert (remote["gain"] / remote["n_spikes"] > 1.0).all()
+def _per_window(scores: pd.DataFrame) -> pd.DataFrame:
+    out = scores.groupby(["window_id", "kind"]).agg(
+        gain=("gain", "sum"),
+        agreement=("agreement", "sum"),
+        n_spikes=("n_spikes", "sum"),
+        n_bins=("n_bins", "first"),
+        n_scored_bins=("n_scored_bins", "first"),
+    )
+    spikes = out["n_spikes"].where(out["n_spikes"] > 0)
+    out["gain_per_spike"] = out["gain"] / spikes
+    out["agreement_per_spike"] = out["agreement"] / spikes
+    return out.reset_index()
 
 
-def test_local_content_does_not_score_above_local_coding(scored):
-    local = scored[scored["kind"].isin(["local_burst", "rest"])]
+@pytest.fixture(scope="module")
+def recording():
+    recording = sim.simulate_recording(seed=0)
+    return recording, sim.fit_detector(recording)
+
+
+@pytest.fixture(scope="module")
+def inserted(recording):
+    recording, detector = recording
+    length = int(sim.EVENT_S * 500)
+    windows = pd.concat(
+        [recording.events, _rest_windows(recording, 12, length)], ignore_index=True
+    )
+    is_missing = np.zeros(recording.time.size, dtype=bool)
+    first = recording.events[recording.events.kind == "stationary"].iloc[0]
+    is_missing[first.s + 10 : first.s + 10 + N_MISSING] = True
+    scores = _score(detector, recording, windows, is_missing)
+    return scores, _per_window(scores), int(first.name)
+
+
+@pytest.fixture(scope="module")
+def detected(recording):
+    recording, detector = recording
+    events = sim.detected_events(detector, recording)
+    return events, _per_window(_score(detector, recording, events))
+
+
+@pytest.fixture(scope="module")
+def chance():
+    recording = sim.simulate_recording(
+        kinds=sim.CHANCE_KINDS, boundary_event=False, seed=1
+    )
+    detector = sim.fit_detector(recording)
+    events = sim.detected_events(detector, recording)
+    return events, _per_window(_score(detector, recording, events))
+
+
+def test_the_rebuilt_likelihood_is_the_decoders(recording):
+    recording, detector = recording
+    encoding = detector.encoding_model_[ENCODING_KEY]
+    environment = encoding["environment"]
+    interior = np.asarray(environment.is_track_interior_).ravel()
+    one_block = np.zeros(recording.time.size, dtype=np.int64)
+    terms = th.fold_terms(
+        [encoding],
+        recording.spike_times,
+        recording.marks,
+        recording.time,
+        np.asarray(environment.place_bin_centers_)[interior],
+        one_block,
+    )
+    position = recording.position[:, None]
+    no_spike = np.asarray(
+        predict_no_spike_log_likelihood(
+            recording.time, recording.spike_times, detector.no_spike_rate
+        )
+    )[:, 0]
+    kernel = np.asarray(
+        detector._compute_local_position_kernel(
+            recording.time, recording.time, position, environment
+        )
+    )
+    rebuilt = th.state_log_likelihood(
+        terms.total(),
+        no_spike,
+        kernel,
+        np.asarray(detector.state_ind_)[detector.is_track_interior_state_bins_],
+        detector.state_names,
+        np.zeros(recording.time.size, dtype=bool),
+    )
+    decoders = np.asarray(
+        detector.compute_log_likelihood(
+            recording.time,
+            recording.time,
+            position,
+            recording.spike_times,
+            recording.marks,
+        )
+    )
+    np.testing.assert_allclose(rebuilt, decoders, atol=1e-3)
+
+
+def test_every_remote_event_is_detected_and_scores_on_both_contrasts(detected):
+    events, per_window = detected
+    for kind in REMOTE:
+        assert (events.kind == kind).sum() == 6, kind
+    assert (events.kind == "none").sum() == 0
+    remote = per_window[per_window["kind"].isin([*REMOTE, "short"])]
+    assert (remote["gain_per_spike"] > 0.3).all()
+    assert (remote["agreement_per_spike"] > 0.5).all()
+
+
+def test_the_gain_grows_with_distance_from_the_animal(inserted):
+    _, per_window, _ = inserted
+    mean = per_window.groupby("kind")["gain_per_spike"].mean()
+    assert mean["close_20"] < mean["close_40"] < mean["close_80"]
+
+
+def test_local_content_and_rest_gain_nothing(inserted):
+    _, per_window, _ = inserted
+    local = per_window[per_window["kind"].isin(["local_burst", "rest", "silent"])]
     assert len(local) == 24
-    assert (local["gain"] < 0.1).all()
+    assert (local["gain"].abs() < 0.15).all()
+
+
+def test_a_silent_window_has_a_score_but_no_score_per_spike(inserted):
+    _, per_window, _ = inserted
+    silent = per_window[per_window["kind"] == "silent"]
+    assert (silent["n_spikes"] == 0).all()
+    assert np.isfinite(silent["gain"]).all()
+    assert silent["gain_per_spike"].isna().all()
+
+
+def test_a_tetrode_with_no_field_at_either_place_contributes_nothing(inserted):
+    scores, _, _ = inserted
+    stationary = scores[scores["kind"] == "stationary"]
+    region = stationary[stationary["tetrode"] == sim.N_TETRODES]
+    others = stationary[stationary["tetrode"] != sim.N_TETRODES]
+    assert region["gain"].abs().max() < 0.01
+    assert others["gain"].mean() > 10
+
+
+def test_an_event_across_a_block_boundary_is_scored_whole(inserted):
+    _, per_window, _ = inserted
+    boundary = per_window[per_window["kind"] == "boundary"]
+    assert len(boundary) >= 1
+    assert (boundary["n_scored_bins"] == boundary["n_bins"]).all()
+    assert (boundary["gain_per_spike"] > 1).all()
+
+
+def test_missing_bins_are_not_scored(inserted):
+    _, per_window, missing_window = inserted
+    row = per_window[per_window["window_id"] == missing_window].iloc[0]
+    assert row["n_scored_bins"] == row["n_bins"] - N_MISSING
+
+
+def test_bursts_without_shared_content_gain_but_do_not_agree(chance):
+    events, per_window = chance
+    assert (events.kind == "nonspatial").sum() >= 12
+    nonspatial = per_window[per_window["kind"] == "nonspatial"]
+    shared = per_window[per_window["kind"] == "shared_random"]
+    # the gain credits any non-local activity the population covers...
+    assert (nonspatial["gain_per_spike"] > 1).all()
+    # ...the agreement only content the tetrodes share
+    assert (nonspatial["agreement_per_spike"] < 0).all()
+    assert (shared["agreement_per_spike"] > 0).all()

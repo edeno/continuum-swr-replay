@@ -28,10 +28,16 @@ each epoch:
    - population: ``log sum_x exp(l_k(t, x)) pi_{-k}(t, x)``;
    - local: ``log sum_x exp(l_k(t, x)) K(x | animal(t))``, ``K`` the decoder's
      Local kernel normalized over the place bins;
-   - local at the animal's bin: ``l_k(t, animal bin)`` (panel h's definition).
+   - local at the animal's bin: ``l_k(t, animal bin)`` (panel h's definition);
+   - uniform: ``log mean_x exp(l_k(t, x))``, no place preferred.
 
    A window's gain for tetrode k is the sum over its bins of population minus
-   local. Its spikes and its silence both count.
+   local; its agreement, population minus uniform. Its spikes and its silence
+   both count. The gain is positive whenever tetrode k's activity is not local
+   and the population's distribution covers it, coherent or not (a burst whose
+   tetrodes each follow their own random place scores positive); the agreement
+   is positive only when the population's distribution predicts where tetrode k
+   points better than no preference does.
 
 Bins are scored one at a time and summed; the joint score of a whole window
 would need the posterior over paths.
@@ -343,8 +349,9 @@ def holdout_scores(
     scores : pd.DataFrame
         One row per window and tetrode: ``window_id``, ``tetrode``, ``n_bins``,
         ``n_scored_bins``, ``n_spikes`` (the tetrode's), ``population``,
-        ``local``, ``local_bin``, ``gain`` (population - local),
-        ``gain_bin`` (population - local_bin) and ``nonlocal_prob`` (the mean
+        ``local``, ``local_bin``, ``uniform``, ``gain`` (population - local),
+        ``gain_bin`` (population - local_bin), ``agreement`` (population -
+        uniform) and ``nonlocal_prob`` (the mean
         over the window of the reduced decode's non-local probability).
     record : dict
         Timings and checks.
@@ -428,6 +435,7 @@ def holdout_scores(
         population = predictive_log_score(mine, distribution)
         local = predictive_log_score(mine, local_weights)
         local_bin = mine[np.arange(rows.size), animal_bin]
+        uniform = logsumexp(mine, axis=1) - np.log(mine.shape[1])
         scored = np.isfinite(population) & ~missing
         per_bin = np.column_stack(
             [
@@ -435,6 +443,7 @@ def holdout_scores(
                 np.where(scored, local, 0.0),
                 np.where(scored, local_bin, 0.0),
                 scored,
+                np.where(scored, uniform, 0.0),
                 counts[:, k],
                 state_probability[:, nonlocal_states].sum(axis=1),
             ]
@@ -447,11 +456,12 @@ def holdout_scores(
                     "tetrode": k,
                     "n_bins": n_bins,
                     "n_scored_bins": sums[:, 3].astype(np.int64),
-                    "n_spikes": sums[:, 4].astype(np.int64),
+                    "n_spikes": sums[:, 5].astype(np.int64),
                     "population": sums[:, 0],
                     "local": sums[:, 1],
                     "local_bin": sums[:, 2],
-                    "nonlocal_prob": sums[:, 5] / n_bins,
+                    "uniform": sums[:, 4],
+                    "nonlocal_prob": sums[:, 6] / n_bins,
                 }
             )
         )
@@ -460,5 +470,6 @@ def holdout_scores(
     scores = pd.concat(parts, ignore_index=True)
     scores["gain"] = scores["population"] - scores["local"]
     scores["gain_bin"] = scores["population"] - scores["local_bin"]
+    scores["agreement"] = scores["population"] - scores["uniform"]
     record["total_s"] = round(clock.time() - started, 1)
     return scores, record

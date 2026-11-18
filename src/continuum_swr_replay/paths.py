@@ -173,6 +173,10 @@ EVENT_LIKELIHOOD_ADVANTAGE_DIR = "event_likelihood_advantage"
 """The spike likelihood at decoded and actual positions of the canonical
 non-local events, under the processed-data root
 (``scripts/event_evidence/score_event_likelihood_advantage.py``)."""
+EVENT_TETRODE_HOLDOUT_DIR = "event_tetrode_holdout"
+"""The held-out tetrode score of the canonical non-local events and their
+Local-rest controls, under the processed-data root
+(``scripts/event_evidence/score_tetrode_holdout.py``)."""
 EVENT_PARTICIPATION_DIR = "event_participation"
 """The tetrode participation and spike rate of the canonical non-local events
 and of Local-rest control windows, under the processed-data root
