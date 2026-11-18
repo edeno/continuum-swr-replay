@@ -780,19 +780,23 @@ def draw_examples(fig, spec, inputs, windows: dict, max_pos: float):
     return first[0]
 
 
-def draw_donut(ax, wedges, centre: tuple[str, str], title) -> None:
+def draw_donut(
+    ax, wedges, centre: tuple[str, str], title, label_space: float = 2.2
+) -> None:
     """A donut of (label, fraction, colour, highlighted) wedges.
 
-    The wedges with a label are listed to the right of the donut in their
-    colours, the highlighted ones in bold; the others are faded. ``centre`` is
-    a number and its caption, written in the hole.
+    The wedges with a label are listed, one line each, to the right of the
+    donut in their colours, the highlighted ones in bold; the others are faded. ``centre`` is
+    a number and its caption, written in the hole. ``label_space`` is the room
+    kept right of the donut for the labels, in donut radii: the labels' width
+    over the donut's sets the donut's size in its axes.
     """
     patches, _ = ax.pie(
         [w[1] for w in wedges],
         colors=[w[2] for w in wedges],
         startangle=90,
         counterclock=False,
-        wedgeprops={"width": 0.36, "edgecolor": "white", "linewidth": 0.6},
+        wedgeprops={"width": 0.28, "edgecolor": "white", "linewidth": 0.6},
     )
     k = 0
     for patch, (label, _, color, highlighted) in zip(patches, wedges, strict=True):
@@ -800,7 +804,7 @@ def draw_donut(ax, wedges, centre: tuple[str, str], title) -> None:
             patch.set_alpha(0.5)
         if label:
             ax.text(
-                1.25, 0.55 - 0.55 * k, label, ha="left", va="center",
+                1.2, 0.4 - 0.4 * k, label, ha="left", va="center",
                 fontsize=SMALL_SIZE, fontweight="bold" if highlighted else "normal",
                 color=readable_text_color(color),
             )  # fmt: skip
@@ -808,15 +812,15 @@ def draw_donut(ax, wedges, centre: tuple[str, str], title) -> None:
     number, caption = centre
     ax.text(
         0,
-        0.12,
+        0.17,
         number,
         ha="center",
         va="center",
         fontsize=SMALL_SIZE,
         fontweight="bold",
     )
-    ax.text(0, -0.16, caption, ha="center", va="center", fontsize=SMALL_SIZE)
-    ax.set_xlim(-1.05, 2.9)
+    ax.text(0, -0.19, caption, ha="center", va="center", fontsize=SMALL_SIZE)
+    ax.set_xlim(-1.05, 1.2 + label_space)
     ax.set_ylim(-1.1, 1.1)
     ax.set_aspect("equal")
     ax.set_title(title, fontsize=SMALL_SIZE, pad=2, loc="left")
@@ -826,7 +830,7 @@ def draw_events_donut(ax, classes: dict, time_outside_swr: float) -> None:
     """Panel c: the non-local events by SWR overlap, and the time outside SWRs."""
     wedges = [
         (
-            f"{CLASS_LABELS[c]}\n{format_number(classes[f'{c}_fraction'], 'pctnum')}%",
+            f"{CLASS_LABELS[c]} {format_number(classes[f'{c}_fraction'], 'pctnum')}%",
             classes[f"{c}_fraction"],
             CLASS_COLORS[c],
             c == "non_swr",
@@ -838,6 +842,7 @@ def draw_events_donut(ax, classes: dict, time_outside_swr: float) -> None:
         wedges,
         (f"{classes['n_non_swr']:,}", "no SWR"),
         f"Non-local events (n = {classes['n_events']:,})",
+        label_space=1.6,
     )
     low = format_number(classes["non_swr_fraction_animal_min"], "pctnum")
     high = format_number(classes["non_swr_fraction_animal_max"], "pctnum")
@@ -855,19 +860,19 @@ def draw_swr_donut(ax, kay: pd.Series) -> None:
     mostly_local = kay["mostly_local_fraction"]
     wedges = [
         (
-            f"With non-local\n{format_number(1 - no_nonlocal, 'pctnum')}%",
+            f"With non-local {format_number(1 - no_nonlocal, 'pctnum')}%",
             1 - no_nonlocal,
             C_NL,
             False,
         ),
         (
-            f"Mostly Local\n{format_number(mostly_local, 'pctnum')}%",
+            f"Mostly Local {format_number(mostly_local, 'pctnum')}%",
             mostly_local,
             C_LOCAL,
             True,
         ),
         (
-            f"Other, no non-local\n{format_number(no_nonlocal - mostly_local, 'pctnum')}%",
+            f"Other {format_number(no_nonlocal - mostly_local, 'pctnum')}%",
             no_nonlocal - mostly_local,
             C_NOSPIKE,
             False,
@@ -1075,20 +1080,20 @@ def draw_offsets(ax_start, ax_end, offsets: pd.DataFrame) -> None:
         ax.set_yscale("log")
         ax.axvline(0, color="k", lw=0.5, ls=":")
         ax.set_xlim(-150, 150)
-        ax.set_ylim(1, 2e5)
+        ax.set_ylim(1, 2e6)
         ax.set_yticks([1, 100, 10000], ["1", "$10^2$", "$10^4$"])
         beyond = ", ".join(
             f">{ms} ms {format_number(tails[f'{bound}_offset_beyond_{ms}ms_fraction'], 'pctnum')}%"
             for ms in OFFSET_TAILS_MS
         )
         ax.text(
-            0.02, 0.97, f"{label}: {beyond}", transform=ax.transAxes, va="top",
+            0.02, 0.97, f"{label}\n{beyond}", transform=ax.transAxes, va="top",
             fontsize=SMALL_SIZE,
         )  # fmt: skip
     ax_start.tick_params(labelbottom=False)
     ax_end.set_xlabel("Event − SWR bound (ms)\n< 0: event first")
     ax_start.set_ylabel("Event–SWR pairs")
-    ax_start.yaxis.set_label_coords(-0.22, 0.0)
+    ax_start.yaxis.set_label_coords(-0.3, 0.0)
 
 
 def letter(
@@ -1187,7 +1192,7 @@ def generate_figure(
     max_pos = float(np.ceil(inputs["data"]["position_info"].linear_position.max()))
     ax_a, ax_a_top = draw_overview(fig, outer[0], inputs, session_events, max_pos)
     ax_b = draw_examples(fig, outer[1], inputs, windows, max_pos)
-    row3 = outer[2].subgridspec(1, 4, width_ratios=[0.85, 0.85, 1.55, 1.0], wspace=0.5)
+    row3 = outer[2].subgridspec(1, 4, width_ratios=[1.1, 1.3, 1.3, 1.05], wspace=0.5)
     ax_c = fig.add_subplot(row3[0])
     draw_events_donut(ax_c, classes, inputs["time_outside_swr"])
     ax_d = fig.add_subplot(row3[1])
