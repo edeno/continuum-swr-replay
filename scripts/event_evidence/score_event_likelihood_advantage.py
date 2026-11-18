@@ -9,9 +9,11 @@ normalizes ``D_spike`` is the participation run's (``event_participation``, the
 same window: the first bin's time to the decode time after the last bin), joined
 on ``event_id``; every event of the table must have one.
 
-Writes ``{epoch_id}.parquet`` per epoch (one row per event: ``event_id``,
-``animal``, ``epoch_id``, ``group``, ``n_bins``, ``n_scored_bins``, ``D``,
-``D_bin``, ``n_spikes``, ``D_spike``) and ``manifest.json``.
+Writes ``{epoch_id}_likelihood_advantage.parquet`` per epoch (one row per event:
+``event_id``, ``animal``, ``epoch_id``, ``group``, ``n_bins``, ``n_scored_bins``,
+``D``, ``D_bin``, ``n_spikes``, ``D_spike``) and ``manifest.json`` (with the
+SHA-256 of the event table and of the participation tables it read). The epochs
+are those the participation run's manifest marks ok.
 
 Reads only stored files (no database).
 
@@ -56,11 +58,21 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.runs.io import write_json
+from continuum_swr_replay.runs.io import (
+    files_sha256,
+    ok_epochs,
+    ok_table_paths,
+    output_path,
+    read_manifest,
+    sha256_file,
+    write_json,
+)
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.io import write_table
 
 PRODUCED_BY = produced_by(__file__)
+OUTPUT_NAME = "likelihood_advantage"
+PARTICIPATION_NAME = "participation"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
@@ -123,11 +135,11 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
     """Score one epoch and write its table; return its status record."""
     started = clock.time()
     participation = pd.read_parquet(
-        data_dir / EVENT_PARTICIPATION_DIR / f"{epoch_id}.parquet"
+        output_path(epoch_id, data_dir / EVENT_PARTICIPATION_DIR, PARTICIPATION_NAME)
     )
     events = epoch_events(read_swr_table(event_table), participation)
     table = epoch_scores(epoch_id, events, data_dir)
-    write_table(table, output / f"{epoch_id}.parquet")
+    write_table(table, output_path(epoch_id, output, OUTPUT_NAME))
     return {
         "status": "ok",
         "n_events": len(table),
@@ -155,14 +167,20 @@ def main(argv: list[str] | None = None) -> None:
     event_table = table_path(
         "event_table", data_dir / replay_content_dir().relative_to(processed_data_dir())
     )
-    measured = sorted(
-        p.stem for p in (data_dir / EVENT_PARTICIPATION_DIR).glob("*_HPC.parquet")
-    )
-    epochs = args.epochs or measured
+    participation_dir = data_dir / EVENT_PARTICIPATION_DIR
+    inputs = {
+        "event_table": {"sha256": sha256_file(event_table)},
+        "event_participation": {
+            "sha256": files_sha256(
+                ok_table_paths(participation_dir, PARTICIPATION_NAME)
+            )
+        },
+    }
+    epochs = args.epochs or ok_epochs(read_manifest(participation_dir))
     to_run = [
         epoch_id
         for epoch_id in epochs
-        if args.overwrite or not (output / f"{epoch_id}.parquet").exists()
+        if args.overwrite or not output_path(epoch_id, output, OUTPUT_NAME).exists()
     ]
     records: dict[str, dict] = {}
     with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
@@ -182,6 +200,7 @@ def main(argv: list[str] | None = None) -> None:
         {
             "produced_by": PRODUCED_BY,
             "provenance": provenance,
+            "inputs": inputs,
             "settings": {"event_table": str(event_table)},
             "epochs": records,
         },

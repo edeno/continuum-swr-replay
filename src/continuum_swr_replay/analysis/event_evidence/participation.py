@@ -240,7 +240,7 @@ def participation_statistics(table: pd.DataFrame) -> pd.DataFrame:
     statistics : pd.DataFrame
         Indexed by (group, kind): for each measure, ``{measure}_animals`` (the
         animals' values, in sorted animal order) and
-        ``{measure}_animal_mean``; and ``n_animals``.
+        ``{measure}_animal_mean``; ``animal_names`` and ``n_animals``.
     """
     rows = {}
     for (group, kind), mine in table.groupby(["group", "kind"]):
@@ -251,8 +251,42 @@ def participation_statistics(table: pd.DataFrame) -> pd.DataFrame:
             )
             row[f"{measure}_animals"] = per_animal.to_numpy()
             row[f"{measure}_animal_mean"] = float(per_animal.mean())
+        row["animal_names"] = per_animal.index.to_numpy()
         row["n_animals"] = len(per_animal)
         rows[(group, kind)] = row
     statistics = pd.DataFrame.from_dict(rows, orient="index")
     statistics.index.names = ["group", "kind"]
     return statistics
+
+
+def participation_differences(statistics: pd.DataFrame) -> pd.DataFrame:
+    """For each event group, how many animals' events exceed their Local rest.
+
+    Parameters
+    ----------
+    statistics : pd.DataFrame
+        :func:`participation_statistics`.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by group: for each measure, ``{measure}_n_animals_above`` (the
+        animals whose events' value is above their controls'); and ``n_animals``
+        (the animals with both).
+    """
+    rows = {}
+    for group in statistics.index.get_level_values("group").unique():
+        event, control = (
+            statistics.loc[(group, "event")],
+            statistics.loc[(group, "control")],
+        )
+        row = {}
+        for measure in MEASURES:
+            above = pd.Series(
+                event[f"{measure}_animals"], index=event["animal_names"]
+            ) - pd.Series(control[f"{measure}_animals"], index=control["animal_names"])
+            above = above.dropna()
+            row[f"{measure}_n_animals_above"] = int((above > 0).sum())
+        row["n_animals"] = len(above)
+        rows[group] = row
+    return pd.DataFrame.from_dict(rows, orient="index").rename_axis("group")

@@ -101,3 +101,26 @@ def test_window_stops_are_the_next_decoder_timestamp():
     np.testing.assert_allclose(
         pt.window_stops(time, np.array([0, 1, 3])), [0.002, 0.0041, 0.008]
     )
+
+
+def test_participation_differences_count_the_animals_whose_events_exceed_rest():
+    rows = []
+    for animal, event, control in (("a", 0.6, 0.3), ("b", 0.4, 0.5)):
+        for kind, value in (("event", event), ("control", control)):
+            rows.append(
+                {
+                    "animal": animal,
+                    "epoch_id": f"{animal}1",
+                    "group": "no SWR",
+                    "kind": kind,
+                    "participation": value,
+                    "spike_rate_hz": 10 * value,
+                }
+            )
+    differences = pt.participation_differences(
+        pt.participation_statistics(pd.DataFrame(rows))
+    )
+    row = differences.loc["no SWR"]
+    assert row["participation_n_animals_above"] == 1
+    assert row["spike_rate_hz_n_animals_above"] == 1
+    assert row["n_animals"] == 2

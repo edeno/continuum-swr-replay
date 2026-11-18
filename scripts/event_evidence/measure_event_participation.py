@@ -6,11 +6,12 @@ read through the SWR source) and one control window of the same length drawn fro
 Local rest in the same epoch (``analysis.event_evidence.participation``), count each
 HPC tetrode's spikes and write:
 
-- ``{epoch_id}.parquet`` per epoch: one row per window (``kind`` ``"event"`` or
+- ``{epoch_id}_participation.parquet`` per epoch: one row per window (``kind`` ``"event"`` or
   ``"control"``), with ``event_id``, ``group`` (``"SWR"`` or ``"no SWR"``, the
   event's), ``n_bins``, ``duration_s``, ``n_spikes``, ``n_active_tetrodes``,
   ``n_tetrodes``, ``participation`` and ``spike_rate_hz``;
-- ``manifest.json``: the settings, the code's provenance and each epoch's status.
+- ``manifest.json``: the settings, the event table's SHA-256 (``inputs``), the
+  code's provenance and the status of each epoch of this invocation.
 
 Spike times are read from the lab's database through ``load_data`` (read only).
 
@@ -48,11 +49,13 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.runs.io import write_json
+from continuum_swr_replay.runs.io import output_path, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.io import write_table
 
 PRODUCED_BY = produced_by(__file__)
+OUTPUT_NAME = "participation"
+"""Each epoch's table is ``{epoch_id}_participation.parquet``."""
 SEED = 20261118
 """The control windows' seed, with the epoch id."""
 
@@ -128,7 +131,7 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
     started = clock.time()
     events = epoch_events(read_swr_table(event_table), epoch_id)
     table = epoch_table(epoch_id, events, data_dir)
-    write_table(table, output / f"{epoch_id}.parquet")
+    write_table(table, output_path(epoch_id, output, OUTPUT_NAME))
     return {
         "status": "ok",
         "n_events": len(events),
@@ -155,6 +158,7 @@ def main(argv: list[str] | None = None) -> None:
     event_table = table_path(
         "event_table", data_dir / replay_content_dir().relative_to(processed_data_dir())
     )
+    event_table_sha256 = sha256_file(event_table)
     events = read_swr_table(event_table)
     all_epochs = sorted(
         (events["animal"] + events["session_date"].astype(str) + "_")
@@ -166,7 +170,7 @@ def main(argv: list[str] | None = None) -> None:
     to_run = [
         epoch_id
         for epoch_id in epochs
-        if args.overwrite or not (output / f"{epoch_id}.parquet").exists()
+        if args.overwrite or not output_path(epoch_id, output, OUTPUT_NAME).exists()
     ]
     records: dict[str, dict] = {}
     with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
@@ -186,6 +190,7 @@ def main(argv: list[str] | None = None) -> None:
         {
             "produced_by": PRODUCED_BY,
             "provenance": provenance,
+            "inputs": {"event_table": {"sha256": event_table_sha256}},
             "settings": {
                 "event_table": str(event_table),
                 "seed": SEED,
