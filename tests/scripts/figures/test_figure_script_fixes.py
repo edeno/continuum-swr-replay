@@ -339,9 +339,8 @@ def _figure02_events() -> pd.DataFrame:
     )
 
 
-#: ``_figure02_events``'s overlap classes, and the decode frames' event counts
-#: by SWR overlap that agree with them.
-FIGURE02_CLASS_COUNTS = {"swr_contained": 1, "swr_partial": 2, "non_swr": 5, "total": 8}
+#: The decode frames' event counts by SWR overlap that agree with
+#: ``_figure02_events``'s overlap classes.
 FIGURE02_FRAME_COUNTS = {"swr": 3, "non_swr": 5, "total": 8}
 
 
@@ -427,8 +426,8 @@ def test_figure02_checks_the_event_table_against_the_cached_frame_counts(
 
 def _figure02_example_table(figure02) -> pd.DataFrame:
     """One row per fixed example, each of its drawn class, and one other."""
-    ids = list(figure02.EXAMPLE_EVENT_IDS.values())
-    classes = [figure02.EXAMPLE_CLASSES[t] for t in figure02.EXAMPLE_EVENT_IDS]
+    ids = [event_id for event_id, _ in figure02.EXAMPLES.values()]
+    classes = [overlap_class for _, overlap_class in figure02.EXAMPLES.values()]
     return pd.DataFrame(
         {
             "event_id": [*ids, 1],
@@ -461,7 +460,7 @@ def test_figure02_examples_are_checked_rows_of_the_event_table(offline):
     windows = figure02.example_windows(
         events, ripples, _figure02_local_results(figure02, 0.95)
     )
-    assert list(windows) == [*figure02.EXAMPLE_EVENT_IDS, "SWR, Local only"]
+    assert list(windows) == [*figure02.EXAMPLES, "SWR, Local only"]
     assert windows["Inside SWR"] == (10.0, 10.1)
     assert windows["SWR, Local only"] == (start, start + 0.1)
 

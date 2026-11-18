@@ -58,6 +58,10 @@ from continuum_swr_replay.visualization.figure_utilities import (
     save_figure,
     set_figure_defaults,
 )
+from continuum_swr_replay.visualization.palettes import (
+    readable_text_color,
+    text_color_on,
+)
 from continuum_swr_replay.visualization.simulated_run_panels import (
     ANIMAL_POS_COLOR,
     DATA_LEFT,
@@ -77,9 +81,7 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
     plot_posterior,
     plot_raster,
     posterior_color_limit,
-    readable_text_color,
     space_rows_evenly,
-    text_color_on,
 )
 
 warnings.filterwarnings("ignore")

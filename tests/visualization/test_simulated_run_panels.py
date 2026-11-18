@@ -65,7 +65,7 @@ def test_the_state_colours_are_the_palette_colours():
     ],
 )
 def test_text_on_a_light_fill_is_black_and_on_a_dark_fill_white(color, expected):
-    from continuum_swr_replay.visualization.simulated_run_panels import text_color_on
+    from continuum_swr_replay.visualization.palettes import text_color_on
 
     assert text_color_on(color) == expected
 
@@ -75,9 +75,7 @@ def test_a_light_colour_is_darkened_for_text_and_a_dark_one_kept():
 
     from matplotlib.colors import to_rgb
 
-    from continuum_swr_replay.visualization.simulated_run_panels import (
-        readable_text_color,
-    )
+    from continuum_swr_replay.visualization.palettes import readable_text_color
 
     assert readable_text_color("#1b9e77") == "#1b9e77"
     darkened = readable_text_color("#add8e6")

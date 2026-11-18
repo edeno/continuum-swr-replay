@@ -22,10 +22,13 @@ Both return ``dict[int, tuple[float, float, float, float]]`` mapping
 
 from __future__ import annotations
 
+from colorsys import hls_to_rgb, rgb_to_hls
+
 import matplotlib
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+from matplotlib.colors import to_hex, to_rgb
 from numpy.typing import NDArray
 
 from continuum_swr_replay.data_loaders.constants import (
@@ -38,6 +41,8 @@ _LEAF_ARMS = set(LEAF_ARMS)  # arms touching a well: 0-5
 
 COLORS: dict[str, str] = {
     "SWR": "#d95f02",
+    # A non-local event partly in an SWR: a sand between SWR and Non-Local.
+    "SWR partial": "#b5825a",
     "MUA": "#7570b3",
     "Non-Local": "#1b9e77",
     "Local": "#add8e6",  # Soft Blue for Local
@@ -48,6 +53,33 @@ COLORS: dict[str, str] = {
     "Combined": "#e6ab02",
 }
 """Colour scheme for plotting the event types and decoder states."""
+
+LIGHT_COLOR_LIGHTNESS = 0.6
+"""A colour lighter than this (HLS lightness) is too pale for text on white, and
+too pale under white text."""
+
+TEXT_LIGHTNESS = 0.4
+"""The lightness a pale colour is darkened to when text is written in it."""
+
+
+def readable_text_color(color: str) -> str:
+    """The colour to write text in ``color`` on white.
+
+    A pale colour (``COLORS["Local"]``'s light blue, ``COLORS["No-Spike"]``'s
+    grey) is darkened to :data:`TEXT_LIGHTNESS`, keeping its hue, so the text can
+    be read and still names its state by colour; any other colour is returned as
+    given.
+    """
+    hue, lightness, saturation = rgb_to_hls(*to_rgb(color))
+    if lightness <= LIGHT_COLOR_LIGHTNESS:
+        return color
+    return to_hex(hls_to_rgb(hue, TEXT_LIGHTNESS, saturation))
+
+
+def text_color_on(fill: str) -> str:
+    """Black on a pale fill, white on any other: the colour of text drawn over ``fill``."""
+    return "black" if rgb_to_hls(*to_rgb(fill))[1] > LIGHT_COLOR_LIGHTNESS else "white"
+
 
 CONTFRAG_COLORS: dict[str, str] = {
     "Continuous": "#1b9e77",  # Teal green (smooth trajectory)

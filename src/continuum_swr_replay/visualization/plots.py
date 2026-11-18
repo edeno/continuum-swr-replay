@@ -673,6 +673,7 @@ def plot_linear_track_graph_strip(
     ax: Axes,
     max_position: float | None = None,
     node_size: int = 14,
+    edge_linewidth: float = 2,
 ) -> None:
     """Draw the linearized track graph as a vertical key beside a posterior.
 
@@ -697,6 +698,8 @@ def plot_linear_track_graph_strip(
         If given, the y-limit (cm) — match the adjacent posterior axis.
     node_size : int, default 14
         Marker size for reward-well node boundaries.
+    edge_linewidth : float, default 2
+        Width of each arm's line, points.
 
     """
     # ``plot_graph_as_1D`` (this module) already lays the linearized track
@@ -712,6 +715,7 @@ def plot_linear_track_graph_strip(
         reward_well_nodes=reward_well_nodes,
         other_axis_start=0.0,
         reward_well_size=node_size,
+        edge_linewidth=edge_linewidth,
     )
     # Put the colored track line (drawn at x=0) at the right edge of the
     # axes so it sits flush against the posterior it keys.
@@ -743,6 +747,7 @@ def plot_track_graph_2d(
     occupancy_color: str = "lightgrey",
     mark_wells: bool = True,
     reward_well_size: int = 22,
+    occupancy_linewidth: float = 0.3,
 ) -> None:
     """Draw the 2D track graph over the animal's 2D occupancy.
 
@@ -773,13 +778,15 @@ def plot_track_graph_2d(
         arm's color.
     reward_well_size : int, default 22
         Marker size for well nodes.
+    occupancy_linewidth : float, default 0.3
+        Width of the occupancy trace, points.
 
     """
     ax.plot(
         position_info["head_position_x"].to_numpy(),
         position_info["head_position_y"].to_numpy(),
         color=occupancy_color,
-        linewidth=0.3,
+        linewidth=occupancy_linewidth,
         alpha=0.6,
         rasterized=True,
         zorder=1,

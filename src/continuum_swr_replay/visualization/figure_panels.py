@@ -47,12 +47,6 @@ from continuum_swr_replay.visualization.figure_utilities import (
     save_figure,
 )
 from continuum_swr_replay.visualization.palettes import COLORS
-from continuum_swr_replay.visualization.plots import (
-    plot_acausal_probabilities,
-    plot_conditional_non_local_posterior,
-    plot_ripple_consensus_trace_zscore,
-    plot_spike_times,
-)
 
 
 def plot_event_duration_distribution(
@@ -813,108 +807,6 @@ def plot_state_fractions_by_movement(
         plt.tight_layout()
 
 
-def plot_event_example_stack(
-    data: dict,
-    results,
-    detector,
-    env,
-    time_slice: slice,
-    axes: list,
-    *,
-    column_title: str | None = None,
-    show_ylabels: bool = True,
-    relative_time_center: float | None = None,
-) -> None:
-    """Plot one stacked example event (SWR / raster / posterior / state probs).
-
-    Produces the 4-row visual used as a building block for panel a in
-    Figures 2 and 3. The caller is responsible for creating and arranging
-    the four axes (typically from a GridSpec).
-
-    Parameters
-    ----------
-    data : dict
-        Session data dictionary from :func:`load_data`.
-    results : xr.Dataset
-        Decoding results for the session.
-    detector : Detector
-        Fitted non-local detector, used by the raster and posterior plots.
-    env : Environment
-        Environment object matching the detector.
-    time_slice : slice
-        Time window to plot (absolute seconds).
-    axes : list of matplotlib.axes.Axes
-        Exactly four axes, ordered top-to-bottom: SWR trace, raster,
-        conditional non-local posterior, acausal state probabilities.
-    column_title : str, optional
-        Title to place above the top sub-row (SWR trace axis).
-    show_ylabels : bool, default True
-        If False, the y-axis labels are blanked — useful when this column
-        is to the right of another column that already carries the labels.
-    relative_time_center : float, optional
-        If provided, the x-axis tick labels on the bottom sub-row are
-        rewritten as offsets from this absolute time (e.g. the event
-        center). If None, absolute timestamps are kept.
-
-    """
-    if len(axes) != 4:
-        raise ValueError(
-            f"plot_event_example_stack needs exactly 4 axes, got {len(axes)}"
-        )
-    ax_swr, ax_raster, ax_post, ax_probs = axes
-
-    plot_ripple_consensus_trace_zscore(data, time_slice, ax_swr)
-    plot_spike_times(
-        data,
-        time_slice,
-        detector,
-        env,
-        results,
-        ax_raster,
-    )
-    plot_conditional_non_local_posterior(
-        data,
-        time_slice,
-        results,
-        env,
-        ax_post,
-    )
-    plot_acausal_probabilities(
-        results,
-        time_slice,
-        ax_probs,
-        plot_local=True,
-    )
-
-    # Tighten the x-limits to the requested window. The four sub-row
-    # plotters each autoscale to their own data with default margins,
-    # which leaves the window loose and asymmetric about the event
-    # center; pin it to the exact slice so the displayed time is tight.
-    for ax in (ax_swr, ax_raster, ax_post, ax_probs):
-        ax.set_xlim(time_slice.start, time_slice.stop)
-
-    # Hide x tick labels on every sub-row except the bottom one
-    for ax in (ax_swr, ax_raster, ax_post):
-        ax.tick_params(labelbottom=False)
-
-    if relative_time_center is not None:
-        # Place ticks at round offsets from the event center so the
-        # bottom row reads as clean ±s values within the tight window.
-        half = (time_slice.stop - time_slice.start) / 2.0
-        offsets = np.arange(-0.4, 0.4 + 1e-9, 0.2)
-        offsets = offsets[np.abs(offsets) <= half + 1e-9]
-        ax_probs.set_xticks(relative_time_center + offsets)
-        ax_probs.set_xticklabels([f"{o:.1f}" for o in offsets])
-        ax_probs.set_xlabel("Time from event center (s)")
-
-    if not show_ylabels:
-        for ax in (ax_swr, ax_raster, ax_post, ax_probs):
-            ax.set_ylabel("")
-
-    if column_title is not None:
-        ax_swr.set_title(column_title, fontsize=8, pad=6)
-
-
 def plot_swr_overlap_class_bar(
     counts: dict[str, int],
     percent_labels: dict[str, str],
@@ -956,7 +848,7 @@ def plot_swr_overlap_class_bar(
     order = ("swr_contained", "swr_partial", "non_swr")
     segment_colors = {
         "swr_contained": COLORS["SWR"],
-        "swr_partial": "#b5825a",  # neutral sand: overlap but not contained
+        "swr_partial": COLORS["SWR partial"],
         "non_swr": COLORS["Non-Local"],
     }
     segment_labels = {
@@ -1004,137 +896,6 @@ def plot_swr_overlap_class_bar(
     ax.spines["right"].set_visible(False)
     ax.spines["left"].set_visible(False)
     ax.tick_params(axis="y", length=0)
-
-    if standalone:
-        plt.tight_layout()
-
-
-def plot_event_timing_offsets(
-    offsets: pd.DataFrame,
-    medians: dict[str, float],
-    median_labels: dict[str, str],
-    axes: list[plt.Axes] | None = None,
-    *,
-    xlim_ms: tuple[float, float] = (-100.0, 100.0),
-    bin_width_ms: float = 5.0,
-) -> None:
-    """Two side-by-side histograms of non-local/SWR timing offsets.
-
-    Takes a per-event ``start_offset_s`` / ``end_offset_s`` DataFrame and
-    renders:
-
-        - Left axis:  non-local-start minus SWR-start (ms)
-        - Right axis: non-local-end   minus SWR-end   (ms)
-
-    The offsets are those of
-    :func:`~continuum_swr_replay.analysis.event_properties.event_statistics.boundary_offsets`
-    on the canonical event table: each immobile, SWR-overlapping event's
-    ``event_start_s`` / ``event_end_s`` minus its matched SWR's
-    ``matched_swr_start`` / ``matched_swr_end`` — one row per event.
-
-    Positive left-axis / negative right-axis means non-local events
-    are typically contained inside the SWR window. A long tail on
-    either side means a subset of events extend beyond the SWR
-    envelope.
-
-    Parameters
-    ----------
-    offsets : pd.DataFrame, shape (n_overlapping_events, 2)
-        ``start_offset_s`` and ``end_offset_s`` (seconds).
-    medians : dict
-        For each of those columns, its median in seconds
-        (:func:`~continuum_swr_replay.analysis.event_properties.event_statistics.boundary_offset_statistics`'s
-        ``start_offset_median_s`` / ``end_offset_median_s``). The dashed line
-        is drawn there; it is not computed here.
-    median_labels : dict
-        For each of those columns, its median in milliseconds, already rounded
-        and printed (``"+4"``). Written in the panel's corner as
-        ``median <label> ms``.
-    axes : list of matplotlib.axes.Axes, optional
-        Two axes [left, right]. If None, a standalone 1x2 figure
-        is created.
-    xlim_ms : tuple of float
-        X-axis limits in milliseconds. Default ±100 ms.
-    bin_width_ms : float
-        Histogram bin width in milliseconds.
-
-    """
-    standalone = axes is None
-    if standalone:
-        fig, axes = plt.subplots(
-            1,
-            2,
-            figsize=(5.0, 2.2),
-            sharey=True,
-            constrained_layout=True,
-        )
-        axes = list(axes)
-
-    if len(axes) != 2:
-        raise ValueError(
-            f"plot_event_timing_offsets needs exactly 2 axes, got {len(axes)}"
-        )
-    ax_start, ax_end = axes
-
-    bins = np.arange(xlim_ms[0], xlim_ms[1] + bin_width_ms, bin_width_ms)
-
-    for ax, col, xlabel, title in (
-        (
-            ax_start,
-            "start_offset_s",
-            "NL start − SWR start (ms)",
-            "Start alignment",
-        ),
-        (
-            ax_end,
-            "end_offset_s",
-            "NL end − SWR end (ms)",
-            "End alignment",
-        ),
-    ):
-        values_ms = offsets[col].to_numpy() * 1000.0
-        ax.hist(
-            values_ms,
-            bins=bins,
-            color=COLORS["Non-Local"],
-            alpha=0.7,
-            edgecolor="none",
-            density=True,
-        )
-
-        median_ms = 1000.0 * medians[col]
-        ax.axvline(
-            0.0,
-            color="grey",
-            linestyle="-",
-            linewidth=0.75,
-            alpha=0.6,
-        )
-        ax.axvline(
-            median_ms,
-            color="black",
-            linestyle="--",
-            linewidth=1.0,
-        )
-        # Annotate the median as plain text in a top corner rather than a
-        # legend. The median line sits near zero (panel centre), so a
-        # corner placement keeps the text clear of the dashed line.
-        ax.text(
-            0.97,
-            0.97,
-            f"median {median_labels[col]} ms",
-            transform=ax.transAxes,
-            ha="right",
-            va="top",
-            fontsize=6,
-        )
-
-        ax.set_xlabel(xlabel)
-        ax.set_xlim(xlim_ms)
-        ax.set_title(title, fontsize=8, pad=4)
-        sns.despine(ax=ax)
-
-    ax_start.set_ylabel("Density")
 
     if standalone:
         plt.tight_layout()

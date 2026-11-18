@@ -146,7 +146,7 @@ Canonical whole-event immobility rules for neural event cohorts.
 
 The non-local event rule and the SWR-overlap classification of those events.
 
-`nonlocal_probability`, `nonlocal_state_probability`, `get_confident_times`, `detect_nonlocal_events`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `nonlocal_event_bins_by_swr`, `get_overlap_times`, `classify_swr_overlap`, `classify_swr_overlap_geometry`, `select_typical_event_by_class`
+`nonlocal_probability`, `nonlocal_state_probability`, `get_confident_times`, `detect_nonlocal_events`, `positive_duration_interval_mask`, `strict_overlap_matrix`, `event_strict_overlap_keys`, `event_strict_overlap_mask`, `nonlocal_event_bins_by_swr`, `get_overlap_times`, `classify_swr_overlap`, `classify_swr_overlap_geometry`
 
 ### `src/continuum_swr_replay/analysis/event_definition/swr_source.py`
 

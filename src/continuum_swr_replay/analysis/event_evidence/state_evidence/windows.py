@@ -346,8 +346,14 @@ def build_windows(
     ).assign(kind="calib", state="")
     windows = pd.concat([*bouts, *matched, calibration], ignore_index=True)
     windows["clipped"] = windows["clipped"].astype("boolean")  # missing off bouts
-    windows["n_bins"] = windows.e - windows.s + 1
     windows["pool"] = windows.kind + "|" + windows.state + "|" + windows.regime
+    return _with_state_means(windows, probabilities)
+
+
+def _with_state_means(windows: pd.DataFrame, probabilities: NDArray) -> pd.DataFrame:
+    """The windows with ``n_bins`` and each state's mean posterior, ``p_{state}``,
+    and the leading columns the evidence reads first."""
+    windows["n_bins"] = windows.e - windows.s + 1
     cumulative = np.vstack(
         [np.zeros((1, len(STATES))), np.cumsum(probabilities, axis=0)]
     )
@@ -519,8 +525,9 @@ def event_windows(
         s=matched["s"].to_numpy(), e=matched["e"].to_numpy(),
         matched_bout_s=s[kept],
     )  # fmt: skip
-    windows = pd.concat([event_rows, matched_rows], ignore_index=True)
-    windows["n_bins"] = windows.e - windows.s + 1
+    windows = _with_state_means(
+        pd.concat([event_rows, matched_rows], ignore_index=True), probabilities
+    )
     ws, we = windows.s.to_numpy(), windows.e.to_numpy()
     in_event = np.zeros(n_time, dtype=bool)
     in_event[concat] = True
@@ -528,13 +535,6 @@ def event_windows(
     windows["event_bin_share"] = (
         cumulative_event[we + 1] - cumulative_event[ws]
     ) / windows.n_bins
-    cumulative = np.vstack(
-        [np.zeros((1, len(STATES))), np.cumsum(probabilities, axis=0)]
-    )
-    means = (cumulative[we + 1] - cumulative[ws]) / windows.n_bins.to_numpy()[:, None]
-    for j, state in enumerate(STATES):
-        windows[f"p_{state}"] = means[:, j]
-    first = ["kind", "state", "regime", "pool", "s", "e", "n_bins"]
     dropped = pd.DataFrame(
         {
             "event_id": events["event_id"].to_numpy()[~kept],
@@ -542,7 +542,7 @@ def event_windows(
             "reason": reason[~kept].astype(str),
         }
     )
-    return windows[first + [c for c in windows.columns if c not in first]], dropped
+    return windows, dropped
 
 
 def tetrode_halves(

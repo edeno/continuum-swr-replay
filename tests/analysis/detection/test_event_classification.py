@@ -8,14 +8,9 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
-import xarray as xr
 
 from continuum_swr_replay.analysis.detection.nonlocal_events import (
     get_event_types,
-)
-from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
-    select_typical_event_by_class,
 )
 
 
@@ -184,59 +179,3 @@ class TestGetEventTypes:
         assert 2 in (
             result["SWR_event_events_no_non_local_event"]["SWR_event"].unique()
         )
-
-
-class TestSelectTypicalEventByClass:
-    """select_typical_event_by_class precomputed-peak_prob path."""
-
-    @staticmethod
-    def _events_frame() -> pd.DataFrame:
-        # Three events per class with distinct durations so the
-        # median-duration pick is deterministic.
-        return pd.DataFrame(
-            {
-                "overlap_class": ["swr_contained"] * 3
-                + ["swr_partial"] * 3
-                + ["non_swr"] * 3,
-                "start_time": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
-                "end_time": [0.10, 1.20, 2.05, 3.10, 4.20, 5.05, 6.10, 7.20, 8.05],
-            }
-        ).assign(duration=lambda d: d["end_time"] - d["start_time"])
-
-    def _non_local_prob(self, events: pd.DataFrame) -> xr.DataArray:
-        # A fine time grid with a known peak inside each event window.
-        time = np.round(np.arange(0.0, 9.0, 0.01), 2)
-        prob = np.full(time.shape, 0.1)
-        # Give each event a unique peak height inside its window.
-        for i, ev in enumerate(events.itertuples()):
-            mask = (time >= ev.start_time) & (time <= ev.end_time)
-            prob[mask] = 0.92 + 0.001 * i
-        return xr.DataArray(prob, coords={"time": time}, dims=["time"])
-
-    def test_precomputed_peak_prob_matches_array_path(self):
-        events = self._events_frame()
-        non_local_prob = self._non_local_prob(events)
-
-        # Path A: compute peak_prob from the array (legacy).
-        from_array = select_typical_event_by_class(events, non_local_prob)
-
-        # Path B: precompute the identical peak_prob column, pass no array.
-        time_vals = non_local_prob.time.to_numpy()
-        prob_vals = non_local_prob.to_numpy()
-        peak = [
-            float(prob_vals[(time_vals >= s) & (time_vals <= e)].max())
-            for s, e in zip(events["start_time"], events["end_time"], strict=True)
-        ]
-        events_with_peak = events.assign(peak_prob=peak)
-        from_column = select_typical_event_by_class(events_with_peak)
-
-        assert set(from_array) == set(from_column)
-        for cls in from_array:
-            # Same event selected per class (compare the shared columns).
-            for col in ("start_time", "end_time", "duration"):
-                assert from_array[cls][col] == from_column[cls][col]
-
-    def test_missing_peak_prob_and_no_array_raises(self):
-        events = self._events_frame()  # no peak_prob column
-        with pytest.raises(ValueError, match="peak_prob"):
-            select_typical_event_by_class(events, non_local_prob=None)

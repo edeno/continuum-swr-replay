@@ -34,6 +34,7 @@ from continuum_swr_replay.analysis.detector_comparison.inventory_run import (
 from continuum_swr_replay.analysis.detector_comparison.pooling import (
     cells_by_animal,
     counts_by_animal,
+    ratio,
     session_tables,
 )
 from continuum_swr_replay.analysis.detector_comparison.schema import (
@@ -115,6 +116,38 @@ def check_against_directional(events: pd.DataFrame, directional: pd.DataFrame) -
         and (joined["n_matched"] == joined["n_matched_events"]).all()
     ):
         raise ValueError(f"memberships do not give the directional counts:\n{joined}")
+
+
+def nonlocal_events_overlapped(
+    directional: pd.DataFrame, detectors: tuple[str, ...]
+) -> pd.DataFrame:
+    """The share of the non-local events each detector's events overlap.
+
+    Parameters
+    ----------
+    directional : pd.DataFrame
+        The inventory comparison's ``directional_by_animal`` table: one row per
+        animal, source and target detector, with ``n_eligible`` and
+        ``n_matched``.
+    detectors : tuple of str
+        The target detectors, in the order returned.
+
+    Returns
+    -------
+    overlap : pd.DataFrame, shape (n_detectors, 2)
+        Indexed by detector: ``pooled``, the matched non-local events over the
+        eligible ones summed over animals, and ``animals``, each animal's own
+        share (an array; NaN where an animal has no eligible event).
+    """
+    mine = directional[directional["source_detector"] == STATE_SPACE]
+    rows = {}
+    for detector in detectors:
+        d = mine[mine["target_detector"] == detector]
+        rows[detector] = {
+            "pooled": d["n_matched"].sum() / d["n_eligible"].sum(),
+            "animals": ratio(d["n_matched"], d["n_eligible"]).to_numpy(),
+        }
+    return pd.DataFrame.from_dict(rows, orient="index").rename_axis("detector")
 
 
 def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:

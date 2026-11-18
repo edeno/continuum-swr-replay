@@ -428,3 +428,22 @@ def test_an_inventory_run_with_no_ok_epoch_is_refused(tmp_path):
     manifest.write_text(json.dumps(record))
     with pytest.raises(ValueError, match="marks no epoch ok"):
         comparison.inventory_animal_tables(tmp_path / "inventory")
+
+
+def test_nonlocal_events_overlapped_pools_animals_and_keeps_each_animals_share():
+    directional = pd.DataFrame(
+        {
+            "animal": ["a", "b", "a", "b", "a"],
+            "source_detector": ["state_space"] * 4 + ["kay"],
+            "target_detector": ["kay", "kay", "mua", "mua", "state_space"],
+            "n_eligible": [10, 30, 10, 0, 5],
+            "n_matched": [5, 15, 2, 0, 5],
+        }
+    )
+    overlap = comparison.nonlocal_events_overlapped(directional, ("kay", "mua"))
+    assert list(overlap.index) == ["kay", "mua"]
+    assert overlap.loc["kay", "pooled"] == pytest.approx(20 / 40)
+    np.testing.assert_allclose(overlap.loc["kay", "animals"], [0.5, 0.5])
+    assert overlap.loc["mua", "pooled"] == pytest.approx(0.2)
+    # an animal with no eligible event has no share, not a division by zero
+    assert np.isnan(overlap.loc["mua", "animals"][1])

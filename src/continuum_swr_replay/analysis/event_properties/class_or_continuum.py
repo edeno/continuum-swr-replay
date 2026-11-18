@@ -154,7 +154,6 @@ def nonlocal_share_by_power(
     """
     power = np.asarray(power, dtype=float)
     probability = np.asarray(nonlocal_probability, dtype=float)
-    group = np.asarray(group)
     edges = np.asarray(edges, dtype=float)
     keep = (
         np.isfinite(power)
@@ -162,32 +161,26 @@ def nonlocal_share_by_power(
         & (power >= edges[0])
         & (power <= edges[-1])
     )
+    n_power = edges.size - 1
     which = np.clip(
-        np.searchsorted(edges, power[keep], side="right") - 1, 0, edges.size - 2
+        np.searchsorted(edges, power[keep], side="right") - 1, 0, n_power - 1
     )
-    rows = []
-    for name in pd.unique(group):
-        mine = group[keep] == name
-        n_bins = np.bincount(which[mine], minlength=edges.size - 1)
-        n_above = np.bincount(
-            which[mine],
-            weights=probability[keep][mine] > threshold,
-            minlength=edges.size - 1,
-        )
-        with np.errstate(invalid="ignore", divide="ignore"):
-            share = np.where(n_bins > 0, n_above / n_bins, np.nan)
-        rows.append(
-            pd.DataFrame(
-                {
-                    "group": name,
-                    "power_low": edges[:-1],
-                    "power_high": edges[1:],
-                    "n_bins": n_bins,
-                    "share": share,
-                }
-            )
-        )
-    return pd.concat(rows, ignore_index=True)
+    codes, names = pd.factorize(np.asarray(group)[keep])
+    cell = codes * n_power + which
+    size = len(names) * n_power
+    n_bins = np.bincount(cell, minlength=size)
+    n_above = np.bincount(cell, weights=probability[keep] > threshold, minlength=size)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        share = np.where(n_bins > 0, n_above / n_bins, np.nan)
+    return pd.DataFrame(
+        {
+            "group": np.repeat(names, n_power),
+            "power_low": np.tile(edges[:-1], len(names)),
+            "power_high": np.tile(edges[1:], len(names)),
+            "n_bins": n_bins,
+            "share": share,
+        }
+    )
 
 
 def kde_modes(

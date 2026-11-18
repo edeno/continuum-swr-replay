@@ -90,6 +90,7 @@ from scipy.stats import t as student_t
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     REGIMES,
     STATES,
+    SWR_LABELS,
     Seed,
     _with_keys,
     keyed_rng,
@@ -1399,7 +1400,9 @@ def split_non_local_by_swr(windows: pd.DataFrame, swr: np.ndarray) -> pd.DataFra
     start = bouts["bout_s"].to_numpy(dtype=int)
     end = bouts["bout_e"].to_numpy(dtype=int)
     label = pd.Series(
-        np.where(in_swr[end + 1] - in_swr[start] > 0, "SWR", "no SWR"),
+        np.where(
+            in_swr[end + 1] - in_swr[start] > 0, SWR_LABELS[True], SWR_LABELS[False]
+        ),
         index=pd.MultiIndex.from_arrays(
             [bouts["state"], bouts["regime"], bouts["bout_s"].astype(int)]
         ),
