@@ -14,26 +14,32 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         the no-SWR share and the share of non-local time outside SWRs.
     d — The SWRs by content (donut): with a non-local event, mostly Local, or
         other.
-    e — Each SWR-overlapping event's start and end minus its SWR's, on a log
+    e — For each SWR definition, MUA and the Widloski detector: the share of
+        non-local events its events overlap, and the share of its own events
+        that overlap a non-local event.
+    f — Each SWR-overlapping event's start and end minus its SWR's, on a log
         count axis, with the share of pairs beyond 25 and 50 ms.
-    f — Tetrode participation (share of tetrodes with a spike) and spike rate of
+    g — Tetrode participation (share of tetrodes with a spike) and spike rate of
         each non-local event against a Local-rest window of its length, one line
         per animal, for no-SWR and SWR events
         (``event_evidence.participation``; ``Processed-Data/event_participation``).
-    g — Ripple power and MUA around non-local event starts, SWR vs no-SWR, with
+    h — Spike likelihood at decoded and actual positions: each event's stored
+        log-likelihood at the decoded position minus at the animal's, summed over
+        its bins, per spike; one point per animal, the animals' mean and its
+        interval (``event_evidence.likelihood_advantage``;
+        ``Processed-Data/event_likelihood_advantage``). The same spikes chose the
+        event and its positions, which favors positive scores.
+    i — Ripple power and MUA around non-local event starts, SWR vs no-SWR, with
         the epochs' rest level (rest bins in no event).
-    h — For each SWR definition, MUA and the Widloski detector: the share of
-        non-local events its events overlap, and the share of its own events
-        that overlap a non-local event.
-    i — The share of rest time bins decoded non-local by ripple power, one line
+    j — The share of rest time bins decoded non-local by ripple power, one line
         per animal: no step at the SWR threshold.
 
-Panels c and e are drawn from the canonical event table by the functions the
+Panels c and f are drawn from the canonical event table by the functions the
 events summary uses (``event_statistics.overlap_class_statistics``,
 ``boundary_offsets``); d from ``nonlocal_comparison.other_detector_statistics``
 on the event features run the summary reads, and c's time share from
-``left_out_statistics``; g's rest lines from ``event_statistics.reference_medians``
-of the brain-state reference. Panels g and i are per-time-bin signals no stored
+``left_out_statistics``; i's rest lines from ``event_statistics.reference_medians``
+of the brain-state reference. Panels i and j are per-time-bin signals no stored
 output holds, computed from the aggregated decode frames (cached), whose event
 counts by SWR overlap must equal the canonical table's.
 
@@ -84,6 +90,9 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_epoch_id,
     swr_source_name,
 )
+from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
+    likelihood_advantage_statistics,
+)
 from continuum_swr_replay.analysis.event_evidence.participation import (
     participation_statistics,
 )
@@ -120,6 +129,7 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
+    EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_PARTICIPATION_DIR,
     event_features_root,
     inventory_comparison_root,
@@ -230,13 +240,13 @@ EXAMPLES = {
 # The SWR with Local content: its start in the SWR source, seconds. No non-local
 # event overlaps it and the decode is Local through it.
 LOCAL_SWR_START_S = 1617036373.982971
-# Panel f: the triggered averages' window (``compute_triggered_average_curves``'s
+# Panel i: the triggered averages' window (``compute_triggered_average_curves``'s
 # window_sec; the curves span half of it either side of the start), seconds.
 TRIGGERED_WINDOW_S = 0.3
 TRIGGERED_SIGNALS = ["SWR_zscore", "MUA_zscore"]
-# Panel h: ripple-power bins, z.
+# Panel j: ripple-power bins, z.
 POWER_EDGES = np.arange(-2.0, 10.01, 0.25)
-# Panel g: the detectors, in the order drawn, and their labels.
+# Panel e: the detectors, in the order drawn, and their labels.
 DETECTOR_LABELS = {
     "kay": "Kay (SWR)",
     "karlsson": "Karlsson",
@@ -283,7 +293,7 @@ def frame_event_counts(event_types: dict) -> dict[str, int]:
 
 
 def rest_nonlocal_share(data_over_time: pd.DataFrame) -> pd.DataFrame:
-    """Panel h: the share of rest bins decoded non-local, by ripple power.
+    """Panel j: the share of rest bins decoded non-local, by ripple power.
 
     Rest bins are the immobile analysed ones (:func:`immobile_analysed_bins`);
     each animal is one group (:func:`nonlocal_share_by_power`).
@@ -380,7 +390,7 @@ def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) 
     )
     event_types = get_event_types(data_over_time)
     event_counts = frame_event_counts(event_types)
-    logging.info("Computing the triggered averages (panel f)...")
+    logging.info("Computing the triggered averages (panel i)...")
     triggered_curves = compute_triggered_average_curves(
         data_over_time,
         event_types,
@@ -388,7 +398,7 @@ def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) 
         time_col="start_time",
         window_sec=TRIGGERED_WINDOW_S,
     )
-    logging.info("Computing the non-local share by ripple power (panel h)...")
+    logging.info("Computing the non-local share by ripple power (panel j)...")
     share_by_power = rest_nonlocal_share(data_over_time)
     del data_over_time
     logging.info("Reading the detector comparison (panels d and g)...")
@@ -501,19 +511,18 @@ def detector_comparison() -> dict:
     }
 
 
-def read_participation(run_dir: Path) -> pd.DataFrame:
-    """Panel f: every epoch's windows (events and Local-rest controls).
+def read_event_run(run_dir: Path) -> pd.DataFrame:
+    """Every epoch's table of a per-event run (participation, likelihood).
 
     Raises
     ------
     ValueError
-        If an epoch of the run's manifest did not finish, or the windows are not
-        the canonical events'.
+        If an epoch of the run's manifest did not finish.
     """
     manifest = json.loads((run_dir / "manifest.json").read_text())
     failed = [e for e, r in manifest["epochs"].items() if r["status"] != "ok"]
     if failed:
-        raise ValueError(f"{len(failed)} participation epochs failed: {failed[:3]}")
+        raise ValueError(f"{len(failed)} epochs of {run_dir.name} failed: {failed[:3]}")
     return pd.concat(
         [pd.read_parquet(path) for path in sorted(run_dir.glob("*_HPC.parquet"))],
         ignore_index=True,
@@ -873,7 +882,7 @@ def draw_swr_donut(ax, kay: pd.Series) -> None:
 
 
 def draw_participation(ax_share, ax_rate, statistics: pd.DataFrame) -> None:
-    """Panel f: tetrode participation and spike rate, Local rest vs events.
+    """Panel g: tetrode participation and spike rate, Local rest vs events.
 
     One line per animal from its length-matched Local-rest controls to its
     events, for no-SWR events and for SWR events (``participation_statistics``).
@@ -904,8 +913,50 @@ def draw_participation(ax_share, ax_rate, statistics: pd.DataFrame) -> None:
     )
 
 
+def draw_likelihood_advantage(ax, statistics: pd.DataFrame) -> None:
+    """Panel h: each animal's D_spike for no-SWR and SWR events.
+
+    A line joins each animal's two groups; the bar is the animals' mean with its
+    95 % interval (``likelihood_advantage_statistics``).
+    """
+    groups = (("no SWR", C_NL), ("SWR", C_SWR))
+    values = np.vstack([statistics.loc[g, "animals"] for g, _ in groups])
+    for column in values.T:
+        ax.plot((0, 1), column, color="#999999", lw=0.5, zorder=1)
+    for x, (group, color) in enumerate(groups):
+        row = statistics.loc[group]
+        ax.scatter(
+            np.full(row["n_animals"], x),
+            row["animals"],
+            s=6,
+            color=color,
+            lw=0,
+            zorder=2,
+        )
+        ax.errorbar(
+            x + 0.25,
+            row["estimate"],
+            yerr=[
+                [row["estimate"] - row["ci_low"]],
+                [row["ci_high"] - row["estimate"]],
+            ],
+            fmt="_",
+            color="black",
+            ms=5,
+            lw=0.8,
+            capsize=0,
+        )
+    ax.set_xticks([0, 1], [g for g, _ in groups])
+    ax.set_xlim(-0.4, 1.5)
+    ax.set_ylim(0, None)
+    ax.set_ylabel("Log-likelihood advantage\nof decoded position\n(nats/spike)")
+    ax.set_title(
+        "Spike likelihood at\ndecoded and actual\npositions", fontsize=SMALL_SIZE
+    )
+
+
 def draw_triggered(ax_rip, ax_mua, curves: dict, rest: pd.DataFrame) -> None:
-    """Panel f: ripple power and MUA around event starts, SWR vs no-SWR."""
+    """Panel i: ripple power and MUA around event starts, SWR vs no-SWR."""
     for ax, signal, label, word in (
         (ax_rip, "SWR_zscore", "Ripple (z)", "ripple"),
         (ax_mua, "MUA_zscore", "MUA (z)", "mua"),
@@ -974,7 +1025,7 @@ def draw_detector_bars(
 def draw_detector_overlap(
     ax_caught, ax_content, overlap: pd.DataFrame, with_nonlocal: pd.DataFrame
 ) -> None:
-    """Panel h: what each detector catches, and what its events contain.
+    """Panel e: what each detector catches, and what its events contain.
 
     Bars pool all events; dots are animals (for the caption).
 
@@ -992,7 +1043,7 @@ def draw_detector_overlap(
 
 
 def draw_share_by_power(ax, shares: pd.DataFrame) -> None:
-    """Panel h: the share of rest bins decoded non-local, by ripple power.
+    """Panel j: the share of rest bins decoded non-local, by ripple power.
 
     One thin line per animal, their mean in bold.
     """
@@ -1012,7 +1063,7 @@ def draw_share_by_power(ax, shares: pd.DataFrame) -> None:
 
 
 def draw_offsets(ax_start, ax_end, offsets: pd.DataFrame) -> None:
-    """Panel e: event minus SWR start (top) and end (bottom), log counts.
+    """Panel f: event minus SWR start (top) and end (bottom), log counts.
 
     Each row prints the share of event-SWR pairs whose bound differs by more
     than 25 and 50 ms (``boundary_offset_statistics``).
@@ -1115,7 +1166,10 @@ def generate_figure(
         ["ripple", "mua"],
     )
     participation = participation_statistics(
-        read_participation(data_dir / EVENT_PARTICIPATION_DIR)
+        read_event_run(data_dir / EVENT_PARTICIPATION_DIR)
+    )
+    advantage = likelihood_advantage_statistics(
+        read_event_run(data_dir / EVENT_LIKELIHOOD_ADVANTAGE_DIR)
     )
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
@@ -1133,42 +1187,39 @@ def generate_figure(
     max_pos = float(np.ceil(inputs["data"]["position_info"].linear_position.max()))
     ax_a, ax_a_top = draw_overview(fig, outer[0], inputs, session_events, max_pos)
     ax_b = draw_examples(fig, outer[1], inputs, windows, max_pos)
-    row3 = outer[2].subgridspec(1, 3, width_ratios=[1.0, 1.0, 1.05], wspace=0.45)
+    row3 = outer[2].subgridspec(1, 4, width_ratios=[0.85, 0.85, 1.55, 1.0], wspace=0.5)
     ax_c = fig.add_subplot(row3[0])
     draw_events_donut(ax_c, classes, inputs["time_outside_swr"])
     ax_d = fig.add_subplot(row3[1])
     draw_swr_donut(ax_d, inputs["kay"])
-    offsets_grid = row3[2].subgridspec(2, 1, hspace=0.15)
-    ax_e1 = fig.add_subplot(offsets_grid[0])
-    ax_e2 = fig.add_subplot(offsets_grid[1], sharex=ax_e1)
-    draw_offsets(ax_e1, ax_e2, boundary_offsets(events))
-    row4 = outer[3].subgridspec(1, 4, width_ratios=[1.1, 0.95, 1.55, 0.95], wspace=0.75)
+    detectors = row3[2].subgridspec(1, 2, wspace=0.3)
+    ax_e = fig.add_subplot(detectors[0])
+    ax_e2 = fig.add_subplot(detectors[1])
+    draw_detector_overlap(ax_e, ax_e2, inputs["overlap"], inputs["with_nonlocal"])
+    offsets_grid = row3[3].subgridspec(2, 1, hspace=0.15)
+    ax_f1 = fig.add_subplot(offsets_grid[0])
+    ax_f2 = fig.add_subplot(offsets_grid[1], sharex=ax_f1)
+    draw_offsets(ax_f1, ax_f2, boundary_offsets(events))
+    row4 = outer[3].subgridspec(1, 4, width_ratios=[1.1, 0.9, 1.0, 1.0], wspace=0.8)
     participation_grid = row4[0].subgridspec(2, 1, hspace=0.15)
-    ax_f = fig.add_subplot(participation_grid[0])
-    ax_f2 = fig.add_subplot(participation_grid[1])
-    draw_participation(ax_f, ax_f2, participation)
-    triggered = row4[1].subgridspec(2, 1, hspace=0.15)
-    ax_g1 = fig.add_subplot(triggered[0])
-    ax_g2 = fig.add_subplot(triggered[1], sharex=ax_g1)
-    draw_triggered(ax_g1, ax_g2, inputs["triggered_curves"], reference)
-    detectors = row4[2].subgridspec(1, 2, wspace=0.3)
-    ax_h = fig.add_subplot(detectors[0])
-    ax_h2 = fig.add_subplot(detectors[1])
-    draw_detector_overlap(
-        ax_h,
-        ax_h2,
-        inputs["overlap"],
-        inputs["with_nonlocal"],
-    )
-    ax_i = fig.add_subplot(row4[3])
-    draw_share_by_power(ax_i, inputs["share_by_power"])
+    ax_g = fig.add_subplot(participation_grid[0])
+    ax_g2 = fig.add_subplot(participation_grid[1])
+    draw_participation(ax_g, ax_g2, participation)
+    ax_h = fig.add_subplot(row4[1])
+    draw_likelihood_advantage(ax_h, advantage)
+    triggered = row4[2].subgridspec(2, 1, hspace=0.15)
+    ax_i1 = fig.add_subplot(triggered[0])
+    ax_i2 = fig.add_subplot(triggered[1], sharex=ax_i1)
+    draw_triggered(ax_i1, ax_i2, inputs["triggered_curves"], reference)
+    ax_j = fig.add_subplot(row4[3])
+    draw_share_by_power(ax_j, inputs["share_by_power"])
 
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
     x_left = (
         min(
             ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted()).x0
-            for ax in (ax_b, ax_f)
+            for ax in (ax_b, ax_g)
         )
         - 0.004
     )
@@ -1178,11 +1229,12 @@ def generate_figure(
         (ax_b, "b", x_left),
         (ax_c, "c", x_left),
         (ax_d, "d", None),
-        (ax_e1, "e", None),
-        (ax_f, "f", x_left),
-        (ax_g1, "g", None),
+        (ax_e, "e", None),
+        (ax_f1, "f", None),
+        (ax_g, "g", x_left),
         (ax_h, "h", None),
-        (ax_i, "i", None),
+        (ax_i1, "i", None),
+        (ax_j, "j", None),
     ):
         letter(fig, renderer, ax, text, x=x)
     return fig
