@@ -449,3 +449,18 @@ def test_nonlocal_events_overlapped_pools_animals_and_keeps_each_animals_share()
     assert overlap.loc["mua", "pooled"] == pytest.approx(0.2)
     # an animal with no eligible event has no share, not a division by zero
     assert np.isnan(overlap.loc["mua", "animals"][1])
+
+
+def test_events_overlapping_nonlocal_reads_the_other_direction():
+    directional = pd.DataFrame(
+        {
+            "animal": ["a", "b", "a"],
+            "source_detector": ["kay", "kay", "state_space"],
+            "target_detector": ["state_space", "state_space", "kay"],
+            "n_eligible": [10, 30, 5],
+            "n_matched": [8, 21, 1],
+        }
+    )
+    shares = comparison.events_overlapping_nonlocal(directional, ("kay",))
+    assert shares.loc["kay", "pooled"] == pytest.approx(29 / 40)
+    np.testing.assert_allclose(shares.loc["kay", "animals"], [0.8, 0.7])

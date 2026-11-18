@@ -153,7 +153,8 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 # 6: the detector comparison's statistics (d, g) are cached; the event features
 #    run is part of the name.
 # 7: the comparison's share of non-local time outside Kay's SWRs is cached (c).
-FIGURE02_CACHE_VERSION = 7
+# 8: each detector's share of its events overlapping a non-local event (h).
+FIGURE02_CACHE_VERSION = 8
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -470,7 +471,9 @@ def detector_comparison() -> dict:
     dict
         ``kay``: :func:`nonlocal_comparison.other_detector_statistics`'s row of
         Kay's SWRs (d); ``overlap``: the share of non-local events each of
-        :data:`DETECTOR_LABELS` overlaps (g); from ``left_out_statistics``,
+        :data:`DETECTOR_LABELS` overlaps and ``with_nonlocal``, the share of
+        each one's events that overlap a non-local event (h); from
+        ``left_out_statistics``,
         ``any_swr_or_mua``, the share any SWR definition or MUA event overlaps
         (g), and ``time_outside_swr``, the share of non-local time outside Kay's
         SWRs (c).
@@ -487,6 +490,9 @@ def detector_comparison() -> dict:
     return {
         "kay": nonlocal_comparison.other_detector_statistics(others).loc["kay"],
         "overlap": nonlocal_comparison.nonlocal_events_overlapped(
+            directional, tuple(DETECTOR_LABELS)
+        ),
+        "with_nonlocal": nonlocal_comparison.events_overlapping_nonlocal(
             directional, tuple(DETECTOR_LABELS)
         ),
         "any_swr_or_mua": 1 - left_out["nonlocal_events_outside_trigger_fraction"],
@@ -961,14 +967,16 @@ def draw_triggered(ax_rip, ax_mua, curves: dict, rest: pd.DataFrame) -> None:
     ax_mua.set_xlabel("Time from event start (ms)")
 
 
-def draw_detector_overlap(ax, overlap: pd.DataFrame, any_swr_or_mua: float) -> None:
-    """Panel g: the share of non-local events each detector overlaps.
+def draw_detector_bars(
+    ax, shares: pd.DataFrame, n_rows: int, xlabel: str, show_labels: bool
+) -> None:
+    """One bar per detector (pooled share) with a dot per animal, top to bottom.
 
-    The SWR definitions other than Kay's are drawn faded.
+    The SWR definitions other than Kay's are drawn faded; row 0 is left for the
+    any-SWR-or-MUA bar.
     """
-    n = len(overlap) + 1
-    for i, (detector, row) in enumerate(overlap.iterrows()):
-        y = n - 1 - i
+    for i, (detector, row) in enumerate(shares.iterrows()):
+        y = n_rows - 1 - i
         faded = detector in SWR_DEFINITIONS and detector != "kay"
         ax.barh(
             y, 100 * row["pooled"], color=detector_color(detector), height=0.65,
@@ -979,17 +987,40 @@ def draw_detector_overlap(ax, overlap: pd.DataFrame, any_swr_or_mua: float) -> N
             animals, y + np.linspace(-0.18, 0.18, len(animals)), s=3, color="k", lw=0,
             zorder=3,
         )  # fmt: skip
-    ax.barh(0, 100 * any_swr_or_mua, color="#666666", height=0.65)
     ax.set_yticks(
-        range(n),
-        ["Any SWR/MUA", *[DETECTOR_LABELS[d] for d in overlap.index][::-1]],
+        range(n_rows),
+        ["Any SWR/MUA", *[DETECTOR_LABELS[d] for d in shares.index][::-1]],
     )
+    ax.tick_params(axis="y", labelleft=show_labels)
+    ax.set_ylim(-0.6, n_rows - 0.4)
     ax.tick_params(axis="y", length=0)
     ax.set_xlim(0, 100)
-    ax.set_xlabel("Non-local events it\noverlaps (%)")
-    ax.text(
-        1.0, 1.02, "bar: all events · dot: animal", transform=ax.transAxes,
-        ha="right", va="bottom", fontsize=SMALL_SIZE,
+    ax.set_xticks([0, 50, 100])
+    ax.set_xlabel(xlabel)
+
+
+def draw_detector_overlap(
+    ax_caught, ax_content, overlap: pd.DataFrame, with_nonlocal: pd.DataFrame,
+    any_swr_or_mua: float,
+) -> None:  # fmt: skip
+    """Panel h: what each detector catches, and what its events contain.
+
+    Left, the share of non-local events each detector's events overlap (and any
+    SWR or MUA event's); right, the share of its own events that overlap a
+    non-local event.
+    """
+    n_rows = len(overlap) + 1
+    draw_detector_bars(
+        ax_caught, overlap, n_rows, "Non-local events\nit overlaps (%)", True
+    )
+    ax_caught.barh(0, 100 * any_swr_or_mua, color="#666666", height=0.65)
+    draw_detector_bars(
+        ax_content, with_nonlocal, n_rows, "Its events with\nnon-local (%)", False
+    )
+    ax_content.spines["left"].set_visible(False)
+    ax_caught.text(
+        0.0, 1.02, "bar: all events · dot: animal", transform=ax_caught.transAxes,
+        ha="left", va="bottom", fontsize=SMALL_SIZE,
     )  # fmt: skip
 
 
@@ -1142,7 +1173,9 @@ def generate_figure(
     ax_e1 = fig.add_subplot(offsets_grid[0])
     ax_e2 = fig.add_subplot(offsets_grid[1], sharex=ax_e1)
     draw_offsets(ax_e1, ax_e2, boundary_offsets(events))
-    row4 = outer[3].subgridspec(1, 4, width_ratios=[1.25, 1.1, 0.95, 0.95], wspace=0.7)
+    row4 = outer[3].subgridspec(
+        1, 5, width_ratios=[1.1, 0.95, 0.72, 0.72, 0.95], wspace=0.9
+    )
     ax_f = fig.add_subplot(row4[0])
     draw_heldout(ax_f, heldout)
     triggered = row4[1].subgridspec(2, 1, hspace=0.15)
@@ -1150,8 +1183,15 @@ def generate_figure(
     ax_g2 = fig.add_subplot(triggered[1], sharex=ax_g1)
     draw_triggered(ax_g1, ax_g2, inputs["triggered_curves"], reference)
     ax_h = fig.add_subplot(row4[2])
-    draw_detector_overlap(ax_h, inputs["overlap"], inputs["any_swr_or_mua"])
-    ax_i = fig.add_subplot(row4[3])
+    ax_h2 = fig.add_subplot(row4[3])
+    draw_detector_overlap(
+        ax_h,
+        ax_h2,
+        inputs["overlap"],
+        inputs["with_nonlocal"],
+        inputs["any_swr_or_mua"],
+    )
+    ax_i = fig.add_subplot(row4[4])
     draw_share_by_power(ax_i, inputs["share_by_power"])
 
     fig.canvas.draw()

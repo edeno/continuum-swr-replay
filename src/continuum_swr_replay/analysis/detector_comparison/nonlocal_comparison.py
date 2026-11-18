@@ -118,6 +118,20 @@ def check_against_directional(events: pd.DataFrame, directional: pd.DataFrame) -
         raise ValueError(f"memberships do not give the directional counts:\n{joined}")
 
 
+def _matched_shares(
+    rows: pd.DataFrame, by: str, detectors: tuple[str, ...]
+) -> pd.DataFrame:
+    """Each detector's share of eligible events matched: pooled, and per animal."""
+    shares = {}
+    for detector in detectors:
+        d = rows[rows[by] == detector]
+        shares[detector] = {
+            "pooled": d["n_matched"].sum() / d["n_eligible"].sum(),
+            "animals": ratio(d["n_matched"], d["n_eligible"]).to_numpy(),
+        }
+    return pd.DataFrame.from_dict(shares, orient="index").rename_axis("detector")
+
+
 def nonlocal_events_overlapped(
     directional: pd.DataFrame, detectors: tuple[str, ...]
 ) -> pd.DataFrame:
@@ -139,15 +153,34 @@ def nonlocal_events_overlapped(
         eligible ones summed over animals, and ``animals``, each animal's own
         share (an array; NaN where an animal has no eligible event).
     """
-    mine = directional[directional["source_detector"] == STATE_SPACE]
-    rows = {}
-    for detector in detectors:
-        d = mine[mine["target_detector"] == detector]
-        rows[detector] = {
-            "pooled": d["n_matched"].sum() / d["n_eligible"].sum(),
-            "animals": ratio(d["n_matched"], d["n_eligible"]).to_numpy(),
-        }
-    return pd.DataFrame.from_dict(rows, orient="index").rename_axis("detector")
+    rows = directional[directional["source_detector"] == STATE_SPACE]
+    return _matched_shares(rows, "target_detector", detectors)
+
+
+def events_overlapping_nonlocal(
+    directional: pd.DataFrame, detectors: tuple[str, ...]
+) -> pd.DataFrame:
+    """The share of each detector's events that overlap a non-local event.
+
+    The other direction of :func:`nonlocal_events_overlapped`: 1 minus this is
+    :func:`other_detector_statistics`'s ``no_nonlocal_fraction`` when the
+    memberships give the directional counts (:func:`check_against_directional`).
+
+    Parameters
+    ----------
+    directional : pd.DataFrame
+        As for :func:`nonlocal_events_overlapped`.
+    detectors : tuple of str
+        The source detectors, in the order returned.
+
+    Returns
+    -------
+    overlap : pd.DataFrame, shape (n_detectors, 2)
+        Indexed by detector: ``pooled`` and ``animals``, as for
+        :func:`nonlocal_events_overlapped`.
+    """
+    rows = directional[directional["target_detector"] == STATE_SPACE]
+    return _matched_shares(rows, "source_detector", detectors)
 
 
 def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
