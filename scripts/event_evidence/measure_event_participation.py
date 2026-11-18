@@ -82,7 +82,7 @@ def epoch_table(epoch_id: str, events: pd.DataFrame, data_dir: Path) -> pd.DataF
     """One epoch's windows: its events and their Local-rest controls."""
     frame = read_dot_with_swr_source(decode_paths(epoch_id, data_dir).data_over_time)
     time = frame.index.to_numpy(dtype=float)
-    bin_s = float(np.median(np.diff(time)))
+    bin_s = float(np.median(np.diff(time)))  # for the margin only
     in_event = (frame["SWR_event"].to_numpy() > 0) | (
         frame["non_local_event"].to_numpy() > 0
     )
@@ -98,20 +98,22 @@ def epoch_table(epoch_id: str, events: pd.DataFrame, data_dir: Path) -> pd.DataF
     controls = pt.control_windows(s, e, local_rest, seed=(SEED, epoch_id))
     spike_times = load_spike_times(epoch_id)
     group = np.where(events["is_swr"].to_numpy(dtype=bool), "SWR", "no SWR")
+    has_control = controls["s"].to_numpy() >= 0
     parts = []
-    for kind, first, last in (
-        ("event", s, e),
-        ("control", controls["s"].to_numpy(), controls["e"].to_numpy()),
+    for kind, keep, first, last in (
+        ("event", np.ones(len(events), dtype=bool), s, e),
+        ("control", has_control, controls["s"].to_numpy(), controls["e"].to_numpy()),
     ):
-        start, stop = time[first], time[last] + bin_s
+        first, last = first[keep], last[keep]
+        start, stop = time[first], pt.window_stops(time, last)
         counts = pt.window_spike_counts(spike_times, start, stop)
         measures = pt.participation_and_rate(counts, stop - start)
         parts.append(
             measures.assign(
-                event_id=events["event_id"].to_numpy(),
-                animal=events["animal"].to_numpy(),
+                event_id=events["event_id"].to_numpy()[keep],
+                animal=events["animal"].to_numpy()[keep],
                 epoch_id=epoch_id,
-                group=group,
+                group=group[keep],
                 kind=kind,
                 n_bins=last - first + 1,
                 start_s=start,
@@ -130,6 +132,7 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
     return {
         "status": "ok",
         "n_events": len(events),
+        "n_without_control": int(len(events) - (table["kind"] == "control").sum()),
         "seconds": round(clock.time() - started, 1),
     }
 

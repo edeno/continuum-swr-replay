@@ -81,3 +81,23 @@ def test_participation_statistics_are_epoch_medians_averaged_over_animals():
     np.testing.assert_allclose(row["participation_animals"], [0.45, 0.6])
     assert row["spike_rate_hz_animal_mean"] == pytest.approx((125.0 + 20.0) / 2)
     assert row["n_animals"] == 2
+
+
+def test_an_event_longer_than_any_local_rest_stretch_has_no_control():
+    mask = np.zeros(100, dtype=bool)
+    mask[10:30] = True
+    windows = pt.control_windows(
+        np.array([0, 40, 60]), np.array([4, 69, 64]), mask, seed=(1, "epoch")
+    )
+    # the 30-bin event has no 30-bin stretch of Local rest; the 5-bin ones do
+    assert windows.loc[1, "s"] == -1
+    assert windows.loc[1, "e"] == -1
+    assert (windows.loc[[0, 2], "s"] >= 10).all()
+    assert (windows.loc[[0, 2], "e"] < 30).all()
+
+
+def test_window_stops_are_the_next_decoder_timestamp():
+    time = np.array([0.0, 0.002, 0.0041, 0.006])
+    np.testing.assert_allclose(
+        pt.window_stops(time, np.array([0, 1, 3])), [0.002, 0.0041, 0.008]
+    )

@@ -9,7 +9,9 @@ one control window of the same length drawn from Local rest in the same epoch:
 Local rest is a bin the decoder calls Local (above :data:`LOCAL_THRESHOLD`), with
 the animal immobile and outside excluded time (``analysed_time``), and no SWR or
 non-local event within :data:`MARGIN_S`. A control window is every bin of Local
-rest, drawn by :func:`~.state_evidence.windows.matched_windows`.
+rest, drawn as :func:`~.state_evidence.windows.matched_windows` draws a bout's
+(a seeded order of every valid start per length); an event longer than any
+Local-rest stretch of its epoch has no control.
 """
 
 from __future__ import annotations
@@ -22,7 +24,8 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     Seed,
-    matched_windows,
+    _valid_starts,
+    keyed_rng,
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_session_values
 
@@ -121,23 +124,49 @@ def local_rest_mask(
 def control_windows(
     s: NDArray, e: NDArray, local_rest: NDArray, *, seed: Seed
 ) -> pd.DataFrame:
-    """One Local-rest window of each event's length (``matched_windows``).
+    """One Local-rest window of each event's length, or none.
+
+    For each length, the windows of that length lying wholly in Local rest are
+    put in one seeded random order, and the events of that length take them in
+    that order, by start (``matched_windows``' rule). Events left without one
+    get -1.
 
     Returns
     -------
     pd.DataFrame
-        Aligned with the events: ``s`` and ``e``, the window's first and last bin.
-
-    Raises
-    ------
-    ValueError
-        If the epoch has too few Local-rest windows of some length.
+        Aligned with the events: ``s`` and ``e``, the window's first and last
+        bin, -1 for an event with no control.
     """
-    events = pd.DataFrame(
-        {"regime": LOCAL_REST, "bout_s": np.asarray(s), "s": s, "e": e}
+    s, e = np.asarray(s, dtype=np.int64), np.asarray(e, dtype=np.int64)
+    lengths = e - s + 1
+    mask = np.asarray(local_rest, dtype=bool)
+    starts = np.full(s.size, -1, dtype=np.int64)
+    for length in np.unique(lengths):
+        rows = np.flatnonzero(lengths == length)
+        rows = rows[np.argsort(s[rows], kind="stable")]
+        order = keyed_rng(seed, LOCAL_REST, int(length), "baseline").permutation(
+            _valid_starts(mask, int(length))
+        )
+        n = min(rows.size, order.size)
+        starts[rows[:n]] = order[:n]
+    return pd.DataFrame(
+        {"s": starts, "e": np.where(starts >= 0, starts + lengths - 1, -1)}
     )
-    regime = np.where(np.asarray(local_rest, dtype=bool), LOCAL_REST, "")
-    return matched_windows(events, regime, seed=seed)[["s", "e"]]
+
+
+def window_stops(time: NDArray, last: NDArray) -> NDArray:
+    """Each window's end: the decode time after its last bin.
+
+    A window holds the spikes of ``[time[first], time[last + 1])``, so its last
+    bin keeps the spikes up to the next decoder timestamp (the spike-evidence
+    run's convention); a window ending on the epoch's last bin ends one median
+    bin later.
+    """
+    time = np.asarray(time, dtype=float)
+    last = np.asarray(last, dtype=np.int64)
+    step = float(np.median(np.diff(time)))
+    padded = np.r_[time, time[-1] + step]
+    return padded[last + 1]
 
 
 def window_spike_counts(
