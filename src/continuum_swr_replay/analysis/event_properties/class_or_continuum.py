@@ -119,6 +119,77 @@ def dip_test(x: NDArray) -> tuple[float, float]:
     return float(dip), float(p_value)
 
 
+def nonlocal_share_by_power(
+    power: NDArray,
+    nonlocal_probability: NDArray,
+    group: NDArray,
+    edges: NDArray,
+    threshold: float,
+) -> pd.DataFrame:
+    """The share of time bins decoded non-local, by ripple power, in each group.
+
+    A view of test 1 that needs no SWR label: if the SWR threshold marked a
+    natural boundary, the share of non-local bins would step there; on a
+    continuum it rises smoothly through it.
+
+    Parameters
+    ----------
+    power : ndarray, shape (n_bins,)
+        Each time bin's z-scored ripple power.
+    nonlocal_probability : ndarray, shape (n_bins,)
+        Each bin's non-local probability (Continuous plus Fragmented).
+    group : ndarray, shape (n_bins,)
+        Each bin's group (an animal).
+    edges : ndarray, shape (n_edges,)
+        Ascending ripple-power bin edges; a bin outside them is left out, as is
+        one whose power or probability is not finite.
+    threshold : float
+        A bin counts as non-local when its probability is above this.
+
+    Returns
+    -------
+    shares : pd.DataFrame, shape (n_groups * (n_edges - 1), 5)
+        One row per group and power bin: ``group``, ``power_low``,
+        ``power_high``, ``n_bins`` and ``share`` (NaN where ``n_bins`` is 0).
+    """
+    power = np.asarray(power, dtype=float)
+    probability = np.asarray(nonlocal_probability, dtype=float)
+    group = np.asarray(group)
+    edges = np.asarray(edges, dtype=float)
+    keep = (
+        np.isfinite(power)
+        & np.isfinite(probability)
+        & (power >= edges[0])
+        & (power <= edges[-1])
+    )
+    which = np.clip(
+        np.searchsorted(edges, power[keep], side="right") - 1, 0, edges.size - 2
+    )
+    rows = []
+    for name in pd.unique(group):
+        mine = group[keep] == name
+        n_bins = np.bincount(which[mine], minlength=edges.size - 1)
+        n_above = np.bincount(
+            which[mine],
+            weights=probability[keep][mine] > threshold,
+            minlength=edges.size - 1,
+        )
+        with np.errstate(invalid="ignore", divide="ignore"):
+            share = np.where(n_bins > 0, n_above / n_bins, np.nan)
+        rows.append(
+            pd.DataFrame(
+                {
+                    "group": name,
+                    "power_low": edges[:-1],
+                    "power_high": edges[1:],
+                    "n_bins": n_bins,
+                    "share": share,
+                }
+            )
+        )
+    return pd.concat(rows, ignore_index=True)
+
+
 def kde_modes(
     x: NDArray,
     *,

@@ -383,3 +383,43 @@ def test_the_step_table_fits_every_setting_of_each_animal():
     duration = steps[(steps.property == "duration") & (steps.animal == "a")]
     assert (duration.n_property_events == n_animal).all()
     assert steps.rows_fraction.between(0, 1).all()
+
+
+def test_nonlocal_share_by_power_counts_each_group_and_bin():
+    from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
+        nonlocal_share_by_power,
+    )
+
+    power = np.array([0.5, 0.5, 0.5, 2.5, 2.5, 0.5, 2.5, 2.5])
+    probability = np.array([0.9, 0.1, 0.1, 0.9, 0.95, 0.85, 0.2, 0.9])
+    group = np.array(["a", "a", "a", "a", "a", "b", "b", "b"])
+    shares = nonlocal_share_by_power(
+        power, probability, group, edges=np.array([0.0, 1.0, 2.0, 3.0]), threshold=0.8
+    )
+    a = shares[shares["group"] == "a"].set_index("power_low")
+    assert a.loc[0.0, "n_bins"] == 3
+    assert a.loc[0.0, "share"] == pytest.approx(1 / 3)
+    assert a.loc[1.0, "n_bins"] == 0
+    assert np.isnan(a.loc[1.0, "share"])
+    assert a.loc[2.0, "share"] == pytest.approx(1.0)
+    b = shares[shares["group"] == "b"].set_index("power_low")
+    assert b.loc[0.0, "share"] == pytest.approx(1.0)
+    assert b.loc[2.0, "share"] == pytest.approx(0.5)
+
+
+def test_nonlocal_share_by_power_leaves_out_bins_outside_the_edges_and_not_finite():
+    from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
+        nonlocal_share_by_power,
+    )
+
+    power = np.array([-5.0, 0.5, np.nan, 0.5])
+    probability = np.array([0.9, 0.9, 0.9, np.nan])
+    shares = nonlocal_share_by_power(
+        power,
+        probability,
+        np.array(["a"] * 4),
+        edges=np.array([0.0, 1.0]),
+        threshold=0.8,
+    )
+    assert shares["n_bins"].tolist() == [1]
+    assert shares["share"].tolist() == [1.0]
