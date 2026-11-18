@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "0a6f37576b94",
+ "commit": "89bf46131b00",
  "code": {
-  "head": "0a6f37576b942d8d9563a5f93956133d2055cc46",
+  "head": "89bf46131b00a77241fb60fd51bf24e66fe7b8fe",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -235,8 +235,8 @@
     "code_sha256": "fed3960044eef999bcd623e28c8f10d47c9b8da8903006eb841bd82ac94599da"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py": {
-    "sha256": "e7e0cdfe9213ae9f11b555fd659f101d05b508fb1568765fc2b0f56af82b9b7c",
-    "code_sha256": "6f3f40856e023300d492a870d5f4419eaaf2fb61a700582af647087380cb2777"
+    "sha256": "71f9652e3867d17f75fbb1b7c125c88d7240de508fd8e00d59bc3ccc80e99f5a",
+    "code_sha256": "69932ba8094916609194c2559ee5b32ae18939096f61cf3854dadfb39ba45a06"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/windows.py": {
     "sha256": "8ed6644354ba05bf09a66b8f0f13759eb8626eae47a0d377cadc002a227d00a2",
@@ -247,8 +247,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
-    "sha256": "bbe3ee15ac37350bc1fc609a9b03cb5f34be364b214eb24435923d454fcd9c46",
-    "code_sha256": "9e824bf76670da659d8f7cefb5e0969a95febc3dcc8652f7956c61b65afec18f"
+    "sha256": "2059fe4f8b4d39840a9d8765c85a3d7e16a30324b9d0d0d27086a83d73bd83a2",
+    "code_sha256": "fa6af65ede721cd1dc3aa83278d560518e2cf22ba47291d6004e64a31cfed026"
    },
    "src/continuum_swr_replay/analysis/event_properties/property_contrast.py": {
     "sha256": "4989d4b201bbbbdd1551bb4ebd9c749e87f0bab6781cbfd6565296f28b4c8d1b",
@@ -319,16 +319,16 @@
     "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "4524be156c55e6a7bf46c8ab2d6bfbe4d40d7c08b23b451a097a3aafb0783281",
-    "code_sha256": "9659b3097c9a6bf42d3f7b9230aa98a02dc0da1fc1de2b0d314d1209c218e726"
+    "sha256": "b1427e5f23561c912261f7904d5b4c30dcd8fb52843f795087b014f6df028e8e",
+    "code_sha256": "bcb94fc861bcf6eb7658f4018308485ccfdc41158b33215d1b0fbe81d8b92e51"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "3d8a43935f1aa0e0e8ca9d47373dcb9d338f1448a85a56cbf8a2f57533f42e6e",
-    "code_sha256": "b107163cd60d677b434ff18b7ade178f0869fd85653aaecbf036fd3e7b8bcc0a"
+    "sha256": "72482f17276d27de110b8ec61df555b41f0b80015b905b45fe9cef5e9e05b182",
+    "code_sha256": "6e1839c71e1cb2cd02b0206e1952d17804e957835ae17ffcbec9d03b6253cf3f"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -3082,6 +3082,22 @@
    "function": "content_occupancy_values",
    "pending": null
   },
+  "non_swr_continuous_share": {
+   "value": 0.8369616675332106,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of no SWR event time in Continuous: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability",
+   "questions": [
+    "2d.10"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "state_composition_values",
+   "pending": null
+  },
   "non_swr_control_participation": {
    "value": 0.3508191808191808,
    "kind": "fraction",
@@ -3089,7 +3105,7 @@
    "unit": "",
    "description": "share of tetrodes with a spike of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -3105,7 +3121,7 @@
    "unit": "spikes per s",
    "description": "spike rate summed over tetrodes of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -3121,7 +3137,7 @@
    "unit": "",
    "description": "share of tetrodes with a spike of no SWR events: mean over animals of each animal's median over epochs of each epoch's median",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -3137,7 +3153,7 @@
    "unit": "spikes per s",
    "description": "spike rate summed over tetrodes of no SWR events: mean over animals of each animal's median over epochs of each epoch's median",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -3194,6 +3210,22 @@
    "function": "event_cohort_values",
    "pending": null
   },
+  "non_swr_fragmented_share": {
+   "value": 0.10828179314159811,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of no SWR event time in Fragmented: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability",
+   "questions": [
+    "2d.10"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "state_composition_values",
+   "pending": null
+  },
   "non_swr_likelihood_advantage_events": {
    "value": 42974,
    "kind": "count",
@@ -3201,10 +3233,10 @@
    "unit": "",
    "description": "no SWR events scored",
    "questions": [
-    "2c.2"
+    "2c.3"
    ],
    "figures": [
-    "2h"
+    "2i"
    ],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
@@ -3217,10 +3249,10 @@
    "unit": "",
    "description": "no SWR events with a per-spike score (at least one spike)",
    "questions": [
-    "2c.2"
+    "2c.3"
    ],
    "figures": [
-    "2h"
+    "2i"
    ],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
@@ -3233,10 +3265,10 @@
    "unit": "nats per spike",
    "description": "log-likelihood of no SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
    "questions": [
-    "2c.2"
+    "2c.3"
    ],
    "figures": [
-    "2h"
+    "2i"
    ],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
@@ -3249,10 +3281,10 @@
    "unit": "nats per spike",
    "description": "upper bound of that interval",
    "questions": [
-    "2c.2"
+    "2c.3"
    ],
    "figures": [
-    "2h"
+    "2i"
    ],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
@@ -3265,10 +3297,10 @@
    "unit": "nats per spike",
    "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
    "questions": [
-    "2c.2"
+    "2c.3"
    ],
    "figures": [
-    "2h"
+    "2i"
    ],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
@@ -3281,7 +3313,7 @@
    "unit": "",
    "description": "animals with no SWR events and Local-rest windows",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -3297,7 +3329,7 @@
    "unit": "",
    "description": "animals whose no SWR events' share of tetrodes with a spike is above their Local-rest windows'",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -3440,7 +3472,7 @@
    "unit": "",
    "description": "animals whose no SWR events' spike rate summed over tetrodes is above their Local-rest windows'",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -3824,7 +3856,7 @@
    "unit": "",
    "description": "events longer than any Local-rest stretch of their epoch (no control)",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -5151,6 +5183,22 @@
    "function": "content_occupancy_values",
    "pending": null
   },
+  "swr_continuous_share": {
+   "value": 0.7526816491352329,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR event time in Continuous: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability",
+   "questions": [
+    "2d.10"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "state_composition_values",
+   "pending": null
+  },
   "swr_control_participation": {
    "value": 0.4286713286713287,
    "kind": "fraction",
@@ -5158,7 +5206,7 @@
    "unit": "",
    "description": "share of tetrodes with a spike of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -5174,7 +5222,7 @@
    "unit": "spikes per s",
    "description": "spike rate summed over tetrodes of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -5190,7 +5238,7 @@
    "unit": "",
    "description": "share of tetrodes with a spike of SWR events: mean over animals of each animal's median over epochs of each epoch's median",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -5206,13 +5254,29 @@
    "unit": "spikes per s",
    "description": "spike rate summed over tetrodes of SWR events: mean over animals of each animal's median over epochs of each epoch's median",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
    ],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
+   "pending": null
+  },
+  "swr_fragmented_share": {
+   "value": 0.22552364419928916,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR event time in Fragmented: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability",
+   "questions": [
+    "2d.10"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "state_composition_values",
    "pending": null
   },
   "swr_likelihood_advantage_events": {
@@ -5222,10 +5286,10 @@
    "unit": "",
    "description": "SWR events scored",
    "questions": [
-    "2c.2"
+    "2c.3"
    ],
    "figures": [
-    "2h"
+    "2i"
    ],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
@@ -5238,10 +5302,10 @@
    "unit": "",
    "description": "SWR events with a per-spike score (at least one spike)",
    "questions": [
-    "2c.2"
+    "2c.3"
    ],
    "figures": [
-    "2h"
+    "2i"
    ],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
@@ -5254,10 +5318,10 @@
    "unit": "nats per spike",
    "description": "log-likelihood of SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
    "questions": [
-    "2c.2"
+    "2c.3"
    ],
    "figures": [
-    "2h"
+    "2i"
    ],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
@@ -5270,10 +5334,10 @@
    "unit": "nats per spike",
    "description": "upper bound of that interval",
    "questions": [
-    "2c.2"
+    "2c.3"
    ],
    "figures": [
-    "2h"
+    "2i"
    ],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
@@ -5286,10 +5350,10 @@
    "unit": "nats per spike",
    "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
    "questions": [
-    "2c.2"
+    "2c.3"
    ],
    "figures": [
-    "2h"
+    "2i"
    ],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
@@ -5334,7 +5398,7 @@
    "unit": "",
    "description": "animals with SWR events and Local-rest windows",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -5350,7 +5414,7 @@
    "unit": "",
    "description": "animals whose SWR events' share of tetrodes with a spike is above their Local-rest windows'",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
@@ -5493,7 +5557,7 @@
    "unit": "",
    "description": "animals whose SWR events' spike rate summed over tetrodes is above their Local-rest windows'",
    "questions": [
-    "2c.1"
+    "2d.9"
    ],
    "figures": [
     "2g"
