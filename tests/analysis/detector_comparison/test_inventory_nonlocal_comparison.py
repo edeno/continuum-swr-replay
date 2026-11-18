@@ -66,6 +66,8 @@ def test_other_detector_statistics_split_events_by_overlap_and_state():
     assert result["no_nonlocal_mostly_local_fraction"] == pytest.approx(3 / 6)
     assert result["no_nonlocal_mostly_no_spike_fraction"] == pytest.approx(1 / 6)
     assert result["no_nonlocal_mixed_fraction"] == pytest.approx(2 / 6)
+    # the same three mostly Local events as a share of all 13 compared events
+    assert result["mostly_local_fraction"] == pytest.approx(3 / 13)
     # of the five events with state shares that overlap a non-local event:
     # Local 0, 0, 0.05, 0.1, 0.2; No-Spike 0, 0.1, 0.1, 0.3, 0.4;
     # non-local 0.3, 0.35, 0.5, 0.9, 1; uncertain 0, 0, 0.2, 0.2, 0.3

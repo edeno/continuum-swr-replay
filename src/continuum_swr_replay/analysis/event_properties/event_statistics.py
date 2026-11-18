@@ -204,6 +204,11 @@ def boundary_offsets(events: pd.DataFrame) -> pd.DataFrame:
     return offsets
 
 
+OFFSET_TAILS_MS = (25, 50)
+"""How far (ms) an event's bound may sit from its SWR's before it counts in the
+tail (:func:`boundary_offset_statistics`)."""
+
+
 def boundary_offset_statistics(offsets: pd.DataFrame) -> dict[str, float]:
     """The typical offset of an SWR-overlapping event's bounds from its SWR's.
 
@@ -215,15 +220,25 @@ def boundary_offset_statistics(offsets: pd.DataFrame) -> dict[str, float]:
     Returns
     -------
     statistics : dict
-        ``n_overlapping``, the events overlapping an SWR, and
+        ``n_overlapping``, the events overlapping an SWR;
         ``start_offset_median_s`` and ``end_offset_median_s``, the medians of
-        their offsets.
+        their offsets; and, for each bound and each of :data:`OFFSET_TAILS_MS`,
+        ``{bound}_offset_beyond_{ms}ms_fraction``, the share of the events whose
+        offset is larger than that in magnitude.
     """
-    return {
+    statistics = {
         "n_overlapping": len(offsets),
         "start_offset_median_s": offsets["start_offset_s"].median(),
         "end_offset_median_s": offsets["end_offset_s"].median(),
     }
+    for bound in ("start", "end"):
+        # in whole microseconds, so a bound exactly at a tail's edge is not in it
+        magnitude_us = np.round(1e6 * offsets[f"{bound}_offset_s"].abs())
+        for ms in OFFSET_TAILS_MS:
+            statistics[f"{bound}_offset_beyond_{ms}ms_fraction"] = float(
+                (magnitude_us > 1000 * ms).mean()
+            )
+    return statistics
 
 
 # --- theta, ripple, MUA and gamma during events -----------------------------------

@@ -163,7 +163,7 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
 
     Returns
     -------
-    statistics : pd.DataFrame, shape (n_detectors, 14)
+    statistics : pd.DataFrame, shape (n_detectors, 15)
         Indexed by detector. "Mostly" a state is more than half the event's
         rows.
 
@@ -173,6 +173,9 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
           ``..._animal_max``, the lowest and highest of the animals' own
           shares, each event -> epoch -> animal: the mean over the animal's
           epochs of each epoch's share.
+        - ``mostly_local_fraction``: the events overlapping no non-local event
+          that are mostly Local, as a share of all its compared events (an
+          event without state shares is not mostly Local).
         - Of the events overlapping no non-local event:
           ``no_nonlocal_mostly_local_fraction``,
           ``no_nonlocal_mostly_no_spike_fraction`` and
@@ -203,6 +206,7 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
             "no_nonlocal_fraction": (~mine["matched"]).sum() / len(mine),
             "no_nonlocal_fraction_animal_min": 1 - matched_by_animal.max(),
             "no_nonlocal_fraction_animal_max": 1 - matched_by_animal.min(),
+            "mostly_local_fraction": mostly_local.sum() / len(mine),
             "no_nonlocal_mostly_local_fraction": mostly_local.mean(),
             "no_nonlocal_mostly_no_spike_fraction": mostly_no_spike.mean(),
             "no_nonlocal_mixed_fraction": (~mostly_local & ~mostly_no_spike).mean(),

@@ -379,12 +379,13 @@ def test_figure02_panel_c_prints_the_digits_of_the_events_summary(offline):
     figure02 = offline("scripts.figures.generate_figure02")
     events = _figure02_events()
     fig, ax = plt.subplots()
-    figure02.draw_events_donut(ax, overlap_class_statistics(events))
+    figure02.draw_events_donut(ax, overlap_class_statistics(events), 0.5)
     texts = [t.get_text() for t in ax.texts]
     assert "Inside SWR\n13%" in texts
     assert "Partly in SWR\n25%" in texts
     assert "No SWR\n63%" in texts
     assert "5" in texts
+    assert any("50% of non-local time outside SWRs" in t for t in texts)
     cohort = {v.key: v for v in event_cohort_values(events, "s")}
     assert formatted(cohort["non_swr_fraction"]) == "63 %"
     plt.close(fig)
@@ -460,9 +461,9 @@ def test_figure02_examples_are_checked_rows_of_the_event_table(offline):
     windows = figure02.example_windows(
         events, ripples, _figure02_local_results(figure02, 0.95)
     )
-    assert list(windows) == [*figure02.EXAMPLES, "SWR, Local only"]
+    assert list(windows) == [*figure02.EXAMPLES, "SWR, mostly Local"]
     assert windows["Inside SWR"] == (10.0, 10.1)
-    assert windows["SWR, Local only"] == (start, start + 0.1)
+    assert windows["SWR, mostly Local"] == (start, start + 0.1)
 
     # an example of another class than it is drawn as is refused
     wrong = events.assign(overlap_class=["non_swr", *events["overlap_class"][1:]])
