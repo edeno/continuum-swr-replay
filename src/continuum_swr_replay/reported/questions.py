@@ -102,9 +102,9 @@ FIGURES: dict[str, Figure] = {
         "abcdefghijk",
     ),
     "3": Figure(
-        "Non-local events outside SWRs",
+        "What SWR and no-SWR events are like",
         "scripts/figures/generate_figure03.py",
-        "abcdef",
+        "abcdefghi",
     ),
     "4": Figure(
         "mPFC responses to SWR and non-SWR events",
@@ -248,7 +248,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2b.5",
         "How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?",
-        figures=("3b", "3c"),
+        figures=("3i",),
     ),
     Question(
         "2c.3",
@@ -271,32 +271,36 @@ QUESTIONS: tuple[Question, ...] = (
         "Where does content sit relative to the animal and to the reward wells, SWR against non-SWR?",
         status="partly computed",
         reason="the own-well share waits for the wider-Local-kernel re-decode (question 2c.6)",
-        figures=("2", "3"),
+        figures=("3f", "3g", "3h"),
     ),
     Question(
         "2d.2",
         "How does replay speed differ between SWR and non-SWR events?",
-        figures=("3d", "3e"),
+        figures=("3c",),
     ),
     Question(
         "2d.3",
         "How does spatial extent differ between SWR and non-SWR events?",
-        figures=("3",),
+        figures=("3b", "3d"),
     ),
     Question(
         "2d.4",
         "How much does content move within an event (pauses, largest step, reversals), SWR against non-SWR?",
-        figures=("3",),
+        figures=("3e",),
     ),
     Question(
         "2d.5",
         "How concentrated is the posterior (peak, HPD coverage, multimodality), SWR against non-SWR?",
     ),
-    Question("2d.6", "How does event duration differ between SWR and non-SWR events?"),
+    Question(
+        "2d.6",
+        "How does event duration differ between SWR and non-SWR events?",
+        figures=("3a",),
+    ),
     Question(
         "2d.8",
         "How do theta z-score and speed compare across SWR events, non-SWR events and running?",
-        figures=("3c", "decoder_validation"),
+        figures=("3i", "decoder_validation"),
         note="Was question 2c.1: the state the events occur in, not evidence that their content is real.",
     ),
     Question(

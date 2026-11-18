@@ -698,7 +698,6 @@ def test_the_event_gallery_catalogs_against_the_source(source, tmp_path, offline
 
 FIGURE_SCRIPTS = (
     "scripts/figures/generate_figure02.py",
-    "scripts/figures/generate_figure03.py",
     "scripts/figures/generate_event_gallery.py",
 )
 
@@ -766,7 +765,6 @@ STORED_RIPPLE_READERS = {
     # The figures set ``data["ripple_times"]`` from the source before drawing
     # (test_the_figures_draw_the_sources_intervals pins that).
     "scripts/figures/generate_figure02.py": "replaced by swr_intervals",
-    "scripts/figures/generate_figure03.py": "replaced by swr_intervals",
     "scripts/figures/generate_event_gallery.py": "replaced by swr_intervals",
 }
 

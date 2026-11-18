@@ -1,44 +1,47 @@
 #!/usr/bin/env python
-"""Generate Figure 3: Non-local events exist outside detected SWRs.
+"""Generate Figure 3: what SWR and no-SWR non-local events are like.
 
-Composite figure with 6 panels:
+The immobile non-local events of the canonical event table, split by whether
+they overlap an SWR (Kay's detector, the SWR source). Each row asks one thing:
 
-    Row 1 (panel a — full width):
-        Real data example showing ~2s around a non-local event WITHOUT
-        SWR. Stacked sub-rows: SWR z-score (flat), spike raster,
-        non-local posterior (shows clear replay), state probabilities.
+    Size and movement
+        a — Duration.
+        b — Spatial extent of the decoded content.
+        c — Replay speed (each event's median).
+        d — Arms the decoded position visits.
+        e — Direction reversals of the decoded position.
+    Where the content is
+        f — Start distance: track distance from the animal to the event's first
+            decoded position.
+        g — Where on the track each kind's content is denser: the ratio of no-SWR
+            to SWR content time per cm along every arm.
+        h — Content time per cm from the centre out to the junctions (trunk
+            arms) and from the junctions out to the wells (leaf arms).
+    Brain state
+        i — Ripple power, MUA, theta and slow and fast gamma during the events,
+            against the same epochs' quiet rest and running.
 
-    Row 2 (panels b, c), ripple power:
-        b: SWR z-score density of immobile time bins confidently in the
-           Local vs the Non-Local state (probability > 0.8).
-        c: Ripple power of immobile non-local events (each event's mean
-           z), SWR-overlapping against non-SWR, with each class's median
-           and the running and quiet-rest references.
+Panels a–c and f draw each class's median and the SWR minus no-SWR difference
+(duration-matched, except for duration itself) with its interval from the
+property bootstrap (``bootstrap_event_properties.py``'s ``intervals.csv``): the
+events summary's ``<property>_*`` values (``paper/reported/events.json``). Panels
+g and h place every event time bin's MAP position on its arm
+(``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``) and
+draw ``content_along_arms.content_density_along_arms``, the animals' mean; h
+quotes the share of content time within ``AT_WELL_CM`` of a well, the summary's
+``*_content_at_well_fraction`` (``event_statistics.content_occupancy_shares``). Panel i's animal values are event -> epoch -> animal
+medians (``shared_statistics.animal_session_values``), as
+``event_statistics.event_signal_statistics`` makes them.
 
-    Row 3 (panels d, e, f), replay speed and position:
-        d: Replay (MAP) speed density of non-local event bins, split by
-           whether the event overlaps an SWR.
-        e: Replay speed of immobile non-local events (each event's
-           median), SWR-overlapping against non-SWR, with each class's
-           median; beside it, the SWR minus non-SWR difference of medians,
-           plain and at matched duration, with their 95 % nested-bootstrap
-           intervals.
-        f: Replayed position (MAP estimate over track length) density of
-           non-local event bins, split the same way.
+DRAFT: panel i's per-animal rest and running levels are computed here; no summary
+value holds them.
 
-Panels c and e draw the values of the events summary (``ripple_*`` and
-``speed_*`` of ``paper/reported/events.json``) from the files it reads
-(``reported.events.default_inputs``): the canonical event table, the
-brain-state reference and the property bootstrap's ``intervals.csv``. Their
-medians and references are computed by the functions the summary's builder
-calls (``analysis.event_properties.event_statistics``), and the intervals are the
-bootstrap's, as the summary reads them. Panels b, d and f are per-time-bin
-views of the decode frames; no summary value is drawn on them.
-
-Usage:
+Usage
+-----
     python scripts/figures/generate_figure03.py
-    python scripts/figures/generate_figure03.py --output-dir paper/figures/figure03
 """
+
+from __future__ import annotations
 
 import argparse
 import logging
@@ -46,426 +49,439 @@ import warnings
 from collections.abc import Sequence
 from pathlib import Path
 
+import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.detection.nonlocal_events import (
-    load_data_over_time,
-)
 from continuum_swr_replay.analysis.event_definition.analysed_time import (
     read_swr_table,
-    swr_intervals,
 )
-from continuum_swr_replay.analysis.event_definition.classified_table import (
-    assert_drawn_class_matches_ripples,
-)
-from continuum_swr_replay.analysis.event_definition.swr_source import (
-    ripple_power_inputs,
-    swr_epoch_id,
+from continuum_swr_replay.analysis.event_properties.content_along_arms import (
+    content_density_along_arms,
+    leaf_and_trunk_profiles,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    AT_WELL_CM,
     class_medians,
-    event_signal_statistics,
-    reference_medians,
+    content_occupancy_shares,
 )
-from continuum_swr_replay.data_loaders import load_data
-from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
-from continuum_swr_replay.decoding.results import load_results
-from continuum_swr_replay.paths import processed_data_dir
-from continuum_swr_replay.reported.events import EventsInputs, default_inputs
-from continuum_swr_replay.visualization.figure_panels import (
-    plot_event_ripple_by_swr,
-    plot_event_speed_by_swr,
-    plot_replay_position_by_swr,
-    plot_replay_speed_by_swr,
-    plot_swr_zscore_by_state,
+from continuum_swr_replay.analysis.shared_statistics import animal_session_values
+from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.paths import (
+    CONTENT_ALONG_ARMS_DIR,
+    content_occupancy_dir,
+    processed_data_dir,
 )
-from continuum_swr_replay.visualization.figure_utilities import (
-    PAGE_HEIGHT,
-    TWO_COLUMN,
-    label_panels,
-    save_figure,
-)
-from continuum_swr_replay.visualization.plots import (
-    plot_acausal_probabilities,
-    plot_conditional_non_local_posterior,
-    plot_ripple_consensus_trace_zscore,
-    plot_spike_times,
+from continuum_swr_replay.reported.events import default_inputs
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.visualization.figure_utilities import save_figure
+from continuum_swr_replay.visualization.palettes import COLORS
+from continuum_swr_replay.visualization.simulated_run_panels import (
+    LABEL_SIZE,
+    PANEL_LETTER_SIZE,
+    SMALL_SIZE,
+    check_journal_limits,
 )
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
 )
 figure_utilities.set_figure_defaults(context="paper")
+plt.rcParams.update(
+    {
+        "font.size": SMALL_SIZE,
+        "axes.labelsize": LABEL_SIZE,
+        "axes.titlesize": LABEL_SIZE,
+        "xtick.labelsize": SMALL_SIZE,
+        "ytick.labelsize": SMALL_SIZE,
+        "legend.fontsize": SMALL_SIZE,
+        "axes.linewidth": 0.6,
+        "xtick.major.width": 0.6,
+        "ytick.major.width": 0.6,
+        "xtick.minor.width": 0.5,
+        "ytick.minor.width": 0.5,
+        "xtick.major.size": 2.5,
+        "ytick.major.size": 2.5,
+        "lines.linewidth": 0.9,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        "figure.constrained_layout.use": False,
+    }
+)
 warnings.filterwarnings("ignore")
 
+# Inches: saved with 0.1 in margins, about 17.3 cm (Cell Press full width).
+WIDTH = 6.5
+HEIGHT = 6.6
+
+C_NL = COLORS["Non-Local"]
+C_SWR = COLORS["SWR"]
+C_REST = COLORS["Local"]
+C_RUN = COLORS["No-Spike"]
+KINDS = ((False, "no SWR", C_NL), (True, "SWR", C_SWR))
+_WITHIN_ANIMAL = [c for c in SESSION_COLUMNS if c != "animal"]
+
+# The track drawn in panel g: one epoch's track graph (every epoch's arms run the
+# same way, ``content_along_arms.check_arm_orientation``).
+TRACK_EPOCH = "wilbur20210329_02_r1_HPC"
+# Half the width of an arm drawn in panel g, track units (cm).
+ARM_HALF_WIDTH_CM = 9.0
+# Panels g and h: segments per arm, about 4 cm (two 2-cm place bins) each.
+N_SEGMENTS = 13
+# Panel g: the colour scale's limit, log2 of the no-SWR to SWR density ratio.
+RATIO_LIMIT_LOG2 = 2.0
+
+# Panels a-c and f: (column, bootstrap property, x label, scale, bin edges, log x).
+HISTOGRAMS = {
+    "duration": (
+        "event_duration_s", "duration", "Duration (ms)", 1e3,
+        np.arange(0, 401, 8), False,
+    ),
+    "extent": (
+        "spatial_extent_cm", "extent", "Spatial extent (cm)", 1.0,
+        np.linspace(0, 240, 41), False,
+    ),
+    "speed": (
+        "replay_speed_median_cm_s", "speed", "Replay speed (cm/s)", 1.0,
+        np.geomspace(1, 1e5, 41), True,
+    ),
+    "start_distance": (
+        "start_distance_cm", "start_distance", "Start distance\nfrom animal (cm)",
+        1.0, np.linspace(0, 240, 41), False,
+    ),
+}  # fmt: skip
+UNITS = {"duration": "ms", "extent": "cm", "speed": "cm/s", "start_distance": "cm"}
+
+# Panel i: (signal, event column, label).
+SIGNALS = (
+    ("ripple", "ripple_power_z", "Ripple"),
+    ("mua", "mua_rate_z", "MUA"),
+    ("theta", "theta_z", "Theta"),
+    ("slow_gamma", "slow_gamma_z", "Slow γ"),
+    ("fast_gamma", "fast_gamma_z", "Fast γ"),
+)
+
 
 # ---------------------------------------------------------------------------
-# Panel a — Real data example (non-SWR non-local event)
+# Inputs
 # ---------------------------------------------------------------------------
 
-# Round steps (s) for panel a's relative-time ticks, finest first.
-_TICK_STEPS_S = (0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0)
-_MAX_TICKS = 6
 
-
-def _relative_time_ticks(
-    t_lo: float, t_hi: float, t0: float
-) -> tuple[np.ndarray, list[str]]:
-    """Ticks for an axis showing ``[t_lo, t_hi]`` s, labelled in seconds from ``t0``.
-
-    The ticks sit at relative times that are multiples of a round step (0 at
-    ``t0``), the finest step that gives at most ``_MAX_TICKS`` ticks. Each label
-    is its tick's relative time, not that time rounded from an automatic tick.
-
-    Parameters
-    ----------
-    t_lo, t_hi : float
-        Axis limits, in absolute seconds.
-    t0 : float
-        The absolute time shown as 0, in seconds.
-
-    Returns
-    -------
-    ticks : np.ndarray, shape (n_ticks,)
-        Tick positions, in absolute seconds.
-    labels : list of str
-        The relative time of each tick, e.g. ``"0"``, ``"0.5"``.
-    """
-    rel_lo, rel_hi = t_lo - t0, t_hi - t0
-    for step in _TICK_STEPS_S:
-        first = int(np.ceil(rel_lo / step - 1e-9))
-        last = int(np.floor(rel_hi / step + 1e-9))
-        if last - first + 1 <= _MAX_TICKS:
-            break
-    relative = np.round(np.arange(first, last + 1) * step, 6)
-    return t0 + relative, [f"{r:g}" for r in relative]
-
-
-def _set_relative_time_ticks(axes, t0: float) -> None:
-    """Tick each axis of ``axes`` in seconds from ``t0``, leaving its limits."""
-    for ax in axes:
-        ticks, labels = _relative_time_ticks(*ax.get_xlim(), t0)
-        ax.set_xticks(ticks)
-        ax.set_xticklabels(labels)
-
-
-def find_non_swr_example_event(
-    events: pd.DataFrame,
-    ripple_times: pd.DataFrame,
-    nwb_file_name: str,
-    epoch_name: str,
-    window_sec: float = 1.0,
-) -> slice:
-    """Find a representative non-local event NOT co-occurring with SWR.
-
-    Selects the session's longest canonical non-SWR event: the event table's
-    rows (``replay_content/event_table.parquet``) with ``is_swr`` False, whose
-    events and classes already follow the one analysed-time rule and the
-    paper's SWR source.
-
-    Parameters
-    ----------
-    events : pd.DataFrame, shape (n_events, n_columns)
-        The canonical event table, with the session columns, ``is_swr``,
-        ``event_start_s``, ``event_end_s`` and ``event_duration_s``.
-    ripple_times : pd.DataFrame
-        The session's SWR source intervals (``start_time``, ``end_time``),
-        the ones panel a shades.
-    nwb_file_name, epoch_name : str
-        The session.
-    window_sec : float
-        Half the width of the returned window, in seconds.
-
-    Returns
-    -------
-    time_slice : slice
-        Time window centered on the event.
-
-    Raises
-    ------
-    ValueError
-        If the session has no non-SWR event.
-    """
-    animal, day = parse_nwb_filename(nwb_file_name)
-    session = events.loc[
-        events["animal"].eq(animal)
-        & events["session_date"].eq(day)
-        & events["epoch"].eq(epoch_name)
-    ].sort_values("event_start_s")
-    non_swr_events = session.loc[~session["is_swr"].astype(bool)]
-    if len(non_swr_events) == 0:
-        raise ValueError("No non-local events without SWR overlap found.")
-
-    # Pick longest event (likely the clearest example)
-    best = non_swr_events.loc[non_swr_events["event_duration_s"].idxmax()]
-    event = pd.Series(
-        {"start_time": best["event_start_s"], "end_time": best["event_end_s"]}
+def read_inputs() -> dict:
+    """The events with their start distances and gamma, and the other inputs."""
+    inputs = default_inputs()
+    events = read_swr_table(inputs.event_table)
+    n_events = len(events)
+    extras = pd.concat(
+        map(pd.read_parquet, sorted(inputs.event_start_rest_theta.glob("*.parquet")))
+    )[["event_id", "start_distance_cm"]]
+    gamma = pd.concat(
+        pd.read_parquet(path, columns=["event_id", "slow_gamma_z", "fast_gamma_z"])
+        for path in sorted(inputs.event_gamma.glob("*_events.parquet"))
     )
-    # Panel a shades ripple_times; fail if the example would be drawn with an
-    # SWR span that contradicts its "non-SWR" label.
-    assert_drawn_class_matches_ripples({"non_swr": event}, ripple_times)
+    events = events.merge(extras, on="event_id", how="left", validate="1:1").merge(
+        gamma, on="event_id", how="left", validate="1:1"
+    )
+    assert len(events) == n_events
+    missing = events[["start_distance_cm", "slow_gamma_z", "fast_gamma_z"]].isna()
+    if missing.any().any():
+        raise ValueError(f"events missing a joined value:\n{missing.sum()}")
 
-    center = (event.start_time + event.end_time) / 2
-    return slice(center - window_sec, center + window_sec)
-
-
-# ---------------------------------------------------------------------------
-# Panels c and e — per-event values of the events summary
-# ---------------------------------------------------------------------------
-
-_CONTRAST_COLUMNS = [
-    f"{word}{bound}"
-    for word in ("difference", "matched_difference")
-    for bound in ("", "_low", "_high")
-]
-
-
-def event_panels(
-    events: pd.DataFrame, reference: pd.DataFrame, intervals: pd.DataFrame
-) -> dict:
-    """Panels c and e: the events summary's ripple and speed values.
-
-    Parameters
-    ----------
-    events : pd.DataFrame, shape (n_events, n_columns)
-        The canonical event table (``replay_content/event_table.parquet``): one
-        row per immobile non-local event, with ``is_swr``, the session columns,
-        ``ripple_power_z`` and ``replay_speed_median_cm_s``.
-    reference : pd.DataFrame, shape (n_epochs, n_columns)
-        The brain-state reference, one row per epoch, with
-        ``ripple_running_median`` and ``ripple_rest_median``.
-    intervals : pd.DataFrame
-        The property bootstrap's ``intervals.csv``, indexed by property.
-
-    Returns
-    -------
-    panels : dict
-        - ``events``: ``events`` (the histograms).
-        - ``ripple_medians``: ``non_swr`` and ``swr``, each class's median event
-          ripple power (``ripple_median_*``), by
-          :func:`~continuum_swr_replay.analysis.event_properties.event_statistics.event_signal_statistics`.
-        - ``ripple_references``: ``running`` and ``rest``, the median over
-          epochs of each epoch's level (``ripple_running_reference``,
-          ``ripple_rest_reference``), by
-          :func:`~continuum_swr_replay.analysis.event_properties.event_statistics.reference_medians`.
-        - ``speed_medians``: ``non_swr`` and ``swr``, each class's median event
-          replay speed (``speed_median_*``), by
-          :func:`~continuum_swr_replay.analysis.event_properties.event_statistics.class_medians`.
-        - ``speed_contrasts``: the bootstrap's SWR minus non-SWR differences
-          and their interval bounds (``speed_difference_*``,
-          ``speed_matched_difference*``).
-    """
-    ripple = event_signal_statistics(events, reference, {"ripple": "ripple_power_z"})
-    levels = reference_medians(reference, ["ripple"])
-    speed = class_medians(events, "replay_speed_median_cm_s")
+    reference = pd.read_parquet(inputs.brain_state_reference)
+    gamma_reference = pd.read_parquet(inputs.event_gamma / "reference.parquet")
+    gamma_columns = [c for c in gamma_reference.columns if "gamma" in c]
+    reference = reference.merge(
+        gamma_reference[[*SESSION_COLUMNS, *gamma_columns]],
+        on=list(SESSION_COLUMNS),
+        how="inner",
+        validate="1:1",
+    )
+    occupancy = pd.read_csv(
+        content_occupancy_dir() / "content_occupancy_per_session.csv"
+    )
+    along = pd.concat(
+        pd.read_parquet(path, columns=["event_id", "arm", "fraction", "arm_length_cm"])
+        for path in sorted(
+            (processed_data_dir() / CONTENT_ALONG_ARMS_DIR).glob("*.parquet")
+        )
+    )
+    n_bins = len(along)
+    along = along.merge(
+        events[["event_id", "animal", "is_swr"]], on="event_id", validate="m:1"
+    )
+    if len(along) != n_bins or along["event_id"].nunique() != n_events:
+        raise ValueError("the content-along-arms bins do not cover the event table")
+    density = content_density_along_arms(along, N_SEGMENTS)
+    env = joblib.load(decode_paths(TRACK_EPOCH, processed_data_dir()).environment)
     return {
         "events": events,
-        "ripple_medians": {
-            "non_swr": ripple.loc[("ripple", False), "median"],
-            "swr": ripple.loc[("ripple", True), "median"],
-        },
-        "ripple_references": {
-            "running": levels.loc["ripple", "running"],
-            "rest": levels.loc["ripple", "rest"],
-        },
-        "speed_medians": {
-            "non_swr": speed["median_non_swr"],
-            "swr": speed["median_swr"],
-        },
-        "speed_contrasts": intervals.loc["speed", _CONTRAST_COLUMNS],
+        "intervals": pd.read_csv(
+            inputs.property_bootstrap / "intervals.csv", index_col=0
+        ),
+        "reference": reference,
+        "occupancy_shares": content_occupancy_shares(occupancy),
+        "density": density,
+        "profiles": leaf_and_trunk_profiles(density),
+        "track_graph": env.track_graph,
+        "edge_order": [tuple(edge) for edge in env.edge_order],
     }
 
 
-def read_event_panels(inputs: EventsInputs) -> dict:
-    """:func:`event_panels` of the files the events summary reads (``inputs``)."""
-    return event_panels(
-        read_swr_table(inputs.event_table),
-        pd.read_parquet(inputs.brain_state_reference),
-        pd.read_csv(inputs.property_bootstrap / "intervals.csv", index_col=0),
-    )
+def animal_signal_values(
+    events: pd.DataFrame, reference: pd.DataFrame, signal: str, column: str
+) -> pd.DataFrame:
+    """Each animal's rest, no-SWR, SWR and running value of one signal, z.
 
-
-# ---------------------------------------------------------------------------
-# Main Figure Assembly
-# ---------------------------------------------------------------------------
-
-
-def generate_figure(
-    # TODO: swap to a non-wilbur session so Fig 3a comes from a different
-    # animal than Fig 2a (cross-cutting narrative requirement). Candidates
-    # from other animals will be evaluated separately.
-    nwb_file_name="wilbur20210329_.nwb",
-    epoch_name="02_r1",
-    data_dir=None,
-):
-    """Generate composite Figure 3.
-
-    Parameters
-    ----------
-    nwb_file_name : str
-        NWB file for the real data example panel.
-    epoch_name : str
-        Epoch name for the real data example panel.
-    data_dir : Path
-        Directory containing processed data files.
-
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
+    Events: event -> epoch -> animal medians. Rest and running: the median over
+    the animal's epochs of each epoch's level.
     """
-    if data_dir is None:
-        data_dir = processed_data_dir()
-    # --- Load data ---
-    logging.info("Loading session data for example panel...")
-    epoch_id = swr_epoch_id(nwb_file_name, epoch_name)
-    # the ripple trace is the source's (the Kay consensus over R-T's tetrodes)
-    data = load_data(
-        nwb_file_name, epoch_name, ripple_power=ripple_power_inputs(epoch_id)
+    out = {}
+    for is_swr, name, _ in KINDS:
+        group = events[events["is_swr"] == is_swr]
+        out[name] = animal_session_values(
+            group[column], group["animal"], group[_WITHIN_ANIMAL], "median"
+        )
+    for state in ("rest", "running"):
+        out[state] = animal_session_values(
+            reference[f"{signal}_{state}_median"],
+            reference["animal"],
+            reference[_WITHIN_ANIMAL],
+            "median",
+        )
+    return pd.DataFrame(out)[["rest", "no SWR", "SWR", "running"]]
+
+
+# ---------------------------------------------------------------------------
+# Panels
+# ---------------------------------------------------------------------------
+
+
+def draw_histogram(ax, events: pd.DataFrame, intervals: pd.DataFrame, key: str):
+    """A property's distribution for each kind, its medians and the difference."""
+    column, prop, label, scale, edges, log_x = HISTOGRAMS[key]
+    medians = class_medians(events, column)
+    top = 0.0
+    for is_swr, _, color in KINDS:
+        values = scale * events.loc[events["is_swr"] == is_swr, column].to_numpy()
+        values = np.clip(values, edges[0], edges[-1])
+        counts, _ = np.histogram(values, bins=edges)
+        share = counts / counts.sum()
+        ax.stairs(share, edges, color=color, fill=True, alpha=0.25, lw=0)
+        ax.stairs(share, edges, color=color, lw=0.8)
+        top = max(top, share.max())
+    for (_, _, color), m in zip(
+        KINDS, (medians["median_non_swr"], medians["median_swr"]), strict=True
+    ):
+        ax.plot(scale * m, top * 1.08, marker="v", ms=3.5, color=color, lw=0)
+    row = intervals.loc[prop]
+    unit = UNITS[key]
+    word = "difference" if key == "duration" else "matched_difference"
+    heading = "SWR − no SWR" if key == "duration" else "Δ matched"
+    ax.set_title(
+        f"{heading}: {row[word]:+.0f} {unit}\n"
+        f"[{row[f'{word}_low']:.0f}, {row[f'{word}_high']:.0f}]",
+        fontsize=SMALL_SIZE,
+        pad=2,
+        linespacing=1.1,
     )
-    results, detector, env = load_results(
-        nwb_file_name, epoch_name, decoding_brain_area="HPC"
+    if log_x:
+        ax.set_xscale("log")
+    ax.set_xlim(edges[0], edges[-1])
+    ax.set_ylim(0, top * 1.15)
+    ax.set_xlabel(label)
+    if log_x:  # the end bins hold the clipped values
+        ax.set_xticks([1, 1e2, 1e4, 1e5], ["≤1", "$10^2$", "$10^4$", "≥$10^5$"])
+
+
+def draw_count_bars(ax, events: pd.DataFrame, column: str, cap: int, start: int):
+    """The share of each kind's events at each count, the last bin ``cap`` or more."""
+    values = np.arange(start, cap + 1)
+    for k, (is_swr, _, color) in enumerate(KINDS):
+        counts = events.loc[events["is_swr"] == is_swr, column].clip(upper=cap)
+        share = counts.value_counts(normalize=True).reindex(values, fill_value=0)
+        ax.bar(values + (k - 0.5) * 0.4, 100 * share, width=0.4, color=color, lw=0)
+    ax.set_xticks(values, [*map(str, values[:-1]), f"≥{cap}"])
+    ax.set_xlim(values[0] - 0.6, values[-1] + 0.6)
+
+
+def draw_ratio_track(ax, track_graph, edge_order, density: pd.DataFrame) -> None:
+    """Each segment of the track coloured by log2 of its no-SWR to SWR content
+    density, on a scale between the two kinds' colours."""
+    ratio = np.log2(
+        density.loc[False, "density_per_cm"] / density.loc[True, "density_per_cm"]
+    )
+    cmap = LinearSegmentedColormap.from_list("kinds", [C_SWR, "#f7f7f7", C_NL])
+    norm = TwoSlopeNorm(0.0, -RATIO_LIMIT_LOG2, RATIO_LIMIT_LOG2)
+    for first, second in edge_order:
+        arm = track_graph.edges[first, second]["edge_id"]
+        start = np.asarray(track_graph.nodes[first]["pos"], dtype=float)
+        step = np.asarray(track_graph.nodes[second]["pos"], dtype=float) - start
+        normal = np.array([-step[1], step[0]]) / np.hypot(*step) * ARM_HALF_WIDTH_CM
+        step = step / N_SEGMENTS
+        for segment in range(N_SEGMENTS):
+            a, b = start + step * segment, start + step * (segment + 1)
+            corners = np.array([a + normal, b + normal, b - normal, a - normal])
+            value = np.clip(ratio[(arm, segment)], -RATIO_LIMIT_LOG2, RATIO_LIMIT_LOG2)
+            # A filled band, not a thick line: the journal caps line width.
+            ax.fill(corners[:, 0], corners[:, 1], color=cmap(norm(value)), lw=0)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    bar = plt.colorbar(
+        plt.cm.ScalarMappable(norm, cmap), ax=ax, shrink=0.7, aspect=12, pad=0.02,
+        ticks=[-2, -1, 0, 1, 2],
+    )  # fmt: skip
+    bar.ax.set_yticklabels(["4× SWR", "2×", "equal", "2×", "4× no SWR"])
+    bar.ax.tick_params(length=2)
+    bar.outline.set_linewidth(0.5)
+    ax.set_title("Content time per cm,\nno SWR : SWR", fontsize=SMALL_SIZE, pad=2)
+
+
+def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame) -> None:
+    """Content time per cm along the trunk arms (centre to junction) and the
+    leaf arms (junction to well), each kind, with its share at a well."""
+    x = (np.arange(N_SEGMENTS) + 0.5) / N_SEGMENTS
+    for is_swr, name, color in KINDS:
+        trunk = profiles.loc[(is_swr, "trunk"), "density_per_cm"].to_numpy()
+        leaf = profiles.loc[(is_swr, "leaf"), "density_per_cm"].to_numpy()
+        ax.plot(x, 100 * trunk, color=color)
+        ax.plot(1 + x, 100 * leaf, color=color)
+        group = "SWR" if is_swr else "nonSWR"
+        ax.text(
+            0.03, 0.97 - 0.09 * is_swr,
+            f"{name}: {100 * shares.loc[group, 'at_well']:.0f}% at a well",
+            transform=ax.transAxes, color=color, ha="left", va="top",
+            fontsize=SMALL_SIZE,
+        )  # fmt: skip
+    ax.set_yscale("log")
+    ax.axvline(1, color="0.8", lw=0.5, zorder=0)
+    ax.set_xticks([0, 1, 2], ["centre", "junction", "well"])
+    ax.set_xlim(0, 2)
+    ax.set_ylabel("% content time per cm")
+    ax.set_title(
+        f"at a well: <{AT_WELL_CM:.0f} cm from one", fontsize=SMALL_SIZE, pad=8
     )
 
-    logging.info("Loading aggregated data for statistics panels...")
-    data_over_time = load_data_over_time(data_dir)
-    # Panel a's SWR selection and shading: the session's SWR source intervals,
-    # not load_data's stored ripples.
-    data["ripple_times"] = swr_intervals(
-        data_over_time, nwb_file_name=nwb_file_name, epoch_name=epoch_name
+
+def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
+    """Each animal's rest, no-SWR, SWR and running level of each signal."""
+    colors = (C_REST, C_NL, C_SWR, C_RUN)
+    for ax, (signal, column, label) in zip(axes, SIGNALS, strict=True):
+        values = animal_signal_values(events, reference, signal, column)
+        x = np.arange(4)
+        for _, row in values.iterrows():
+            ax.plot(x, row.to_numpy(), color="#999999", lw=0.5, zorder=1)
+        for i, color in enumerate(colors):
+            ax.scatter(
+                np.full(len(values), i), values.iloc[:, i], s=6, color=color,
+                lw=0, zorder=2,
+            )  # fmt: skip
+        ax.axhline(0, color="0.85", lw=0.5, zorder=0)
+        ax.set_title(label, fontsize=LABEL_SIZE, pad=2)
+        ax.set_xticks(x, values.columns, rotation=45, ha="right")
+        ax.set_xlim(-0.5, 3.5)
+    axes[0].set_ylabel("Power or rate (z)")
+
+
+def letter(fig, renderer, ax, text: str, x: float | None, y: float) -> None:
+    """A panel letter at figure height y, at the axes' drawn left or at x."""
+    box = ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
+    fig.text(
+        max(box.x0 - 0.004, 0.0) if x is None else x,
+        y,
+        text,
+        fontsize=PANEL_LETTER_SIZE,
+        fontweight="bold",
+        ha="left",
+        va="bottom",
     )
 
-    logging.info("Reading the events summary's inputs for panels c and e...")
-    events_panels = read_event_panels(default_inputs())
 
-    # Find example non-SWR event: the canonical event table's
-    logging.info("Selecting non-SWR example event...")
-    time_slice = find_non_swr_example_event(
-        events_panels["events"], data["ripple_times"], nwb_file_name, epoch_name
+# ---------------------------------------------------------------------------
+# Figure
+# ---------------------------------------------------------------------------
+
+
+def generate_figure(inputs: dict):
+    """Build Figure 3 from :func:`read_inputs`."""
+    events = inputs["events"]
+    fig = plt.figure(figsize=(WIDTH, HEIGHT))
+    outer = GridSpec(
+        3, 1, figure=fig, height_ratios=[1.0, 1.05, 1.0], hspace=0.75,
+        left=0.08, right=0.99, top=0.96, bottom=0.08,
+    )  # fmt: skip
+
+    row1 = outer[0].subgridspec(1, 5, wspace=0.6)
+    ax_a, ax_b, ax_c, ax_d, ax_e = (fig.add_subplot(row1[i]) for i in range(5))
+    for ax, key in ((ax_a, "duration"), (ax_b, "extent"), (ax_c, "speed")):
+        draw_histogram(ax, events, inputs["intervals"], key)
+    ax_a.set_ylabel("Share of events")
+    draw_count_bars(ax_d, events, "n_unique_arms", cap=6, start=1)
+    ax_d.set_xlabel("Arms visited")
+    ax_d.set_ylabel("% events")
+    draw_count_bars(ax_e, events, "n_reversals", cap=8, start=0)
+    ax_e.set_xlabel("Reversals")
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for _, _, c in KINDS]
+    ax_d.legend(
+        handles, [n for _, n, _ in KINDS], frameon=False, loc="upper right",
+        handlelength=0.8, borderaxespad=0,
+    )  # fmt: skip
+
+    row2 = outer[1].subgridspec(1, 3, width_ratios=[1.0, 1.6, 1.3], wspace=0.6)
+    ax_f = fig.add_subplot(row2[0])
+    draw_histogram(ax_f, events, inputs["intervals"], "start_distance")
+    ax_f.set_ylabel("Share of events")
+    ax_g = fig.add_subplot(row2[1])
+    draw_ratio_track(
+        ax_g, inputs["track_graph"], inputs["edge_order"], inputs["density"]
     )
+    ax_h = fig.add_subplot(row2[2])
+    draw_profiles(ax_h, inputs["profiles"], inputs["occupancy_shares"])
 
-    # --- Create figure ---
-    fig_height = PAGE_HEIGHT
-    fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450, constrained_layout=True)
+    row3 = outer[2].subgridspec(1, len(SIGNALS), wspace=0.55)
+    ax_i = [fig.add_subplot(row3[i]) for i in range(len(SIGNALS))]
+    draw_brain_state(ax_i, events, inputs["reference"])
 
-    # 3 rows: (a) example stack, (b, c) ripple power, (d, e, f) speed and position
-    gs = GridSpec(3, 1, figure=fig, height_ratios=[2.0, 1.0, 1.0], hspace=0.35)
-
-    # ── Row 1: Real data example (panel a) — 4 stacked sub-rows ──
-    gs_a = gs[0].subgridspec(4, 1, hspace=0.15, height_ratios=[0.6, 0.8, 1.2, 0.8])
-    ax_swr = fig.add_subplot(gs_a[0])
-    ax_raster = fig.add_subplot(gs_a[1], sharex=ax_swr)
-    ax_posterior = fig.add_subplot(gs_a[2], sharex=ax_swr)
-    ax_probs = fig.add_subplot(gs_a[3], sharex=ax_swr)
-
-    plot_ripple_consensus_trace_zscore(data, time_slice, ax_swr)
-    plot_spike_times(data, time_slice, detector, env, results, ax_raster)
-    plot_conditional_non_local_posterior(data, time_slice, results, env, ax_posterior)
-    plot_acausal_probabilities(results, time_slice, ax_probs, plot_local=True)
-
-    # Convert absolute timestamps to relative time (seconds from the window
-    # start, ``time_slice.start`` = the event centre minus 1 s)
-    _set_relative_time_ticks(
-        [ax_swr, ax_raster, ax_posterior, ax_probs], time_slice.start
-    )
-
-    # Remove x-labels from non-bottom sub-rows
-    for ax in [ax_swr, ax_raster, ax_posterior]:
-        ax.tick_params(labelbottom=False)
-    ax_probs.set_xlabel("Time (s)")
-
-    # ── Row 2: panels b, c (ripple power) ──
-    gs_bc = gs[1].subgridspec(1, 2, wspace=0.3)
-
-    # Panel b: SWR z-score of time bins by state
-    ax_b = fig.add_subplot(gs_bc[0])
-    plot_swr_zscore_by_state(data_over_time, ax=ax_b)
-
-    # Panel c: event ripple power by SWR overlap
-    ax_c = fig.add_subplot(gs_bc[1])
-    plot_event_ripple_by_swr(
-        events_panels["events"],
-        events_panels["ripple_medians"],
-        events_panels["ripple_references"],
-        ax=ax_c,
-    )
-
-    # ── Row 3: panels d, e, f (replay speed and position) ──
-    gs_def = gs[2].subgridspec(1, 3, wspace=0.4, width_ratios=[1.0, 1.4, 1.0])
-
-    # Panel d: replay speed of event bins by SWR overlap
-    ax_d = fig.add_subplot(gs_def[0])
-    plot_replay_speed_by_swr(data_over_time, ax=ax_d)
-    ax_d.set_xlim(0, 1500)  # Focus on meaningful range
-
-    # Panel e: event replay speed by SWR overlap, and the class difference
-    gs_e = gs_def[1].subgridspec(1, 2, wspace=0.5, width_ratios=[3, 1])
-    ax_e = fig.add_subplot(gs_e[0])
-    ax_e_difference = fig.add_subplot(gs_e[1])
-    plot_event_speed_by_swr(
-        events_panels["events"],
-        events_panels["speed_medians"],
-        events_panels["speed_contrasts"],
-        axes=[ax_e, ax_e_difference],
-    )
-    ax_e.set_xlim(0, 1500)
-
-    # Panel f: replay position by SWR
-    ax_f = fig.add_subplot(gs_def[2])
-    plot_replay_position_by_swr(data_over_time, ax=ax_f)
-
-    # ── Panel Labels ──
-    label_panels(
-        [ax_swr, ax_b, ax_c, ax_d, ax_e, ax_f],
-        labels=["a", "b", "c", "d", "e", "f"],
-        xpos=-0.08,
-        ypos=1.15,
-        fontsize=11,
-    )
-
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    x_left = 0.005
+    rows = (
+        ((ax_a, "a", x_left), (ax_b, "b", None), (ax_c, "c", None),
+         (ax_d, "d", None), (ax_e, "e", None)),
+        ((ax_f, "f", x_left), (ax_g, "g", None), (ax_h, "h", None)),
+        ((ax_i[0], "i", x_left),),
+    )  # fmt: skip
+    for row in rows:
+        top = max(
+            ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted()).y1
+            for ax, _, _ in row
+        )
+        for ax, text, x in row:
+            letter(fig, renderer, ax, text, x, min(top - 0.012, 0.985))
     return fig
 
 
-def main(argv: Sequence[str] | None = None):
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("paper/figures/figure03"),
-    )
-    parser.add_argument("--nwb-file-name", type=str, default="wilbur20210329_.nwb")
-    parser.add_argument("--epoch-name", type=str, default="02_r1")
-    parser.add_argument(
-        "--data-dir",
-        type=Path,
-        default=processed_data_dir(),
+        "--output-dir", type=Path, default=Path("paper/figures/figure03")
     )
     parser.add_argument("--show", action="store_true")
-
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
-
-    fig = generate_figure(
-        nwb_file_name=args.nwb_file_name,
-        epoch_name=args.epoch_name,
-        data_dir=args.data_dir,
-    )
-
+    fig = generate_figure(read_inputs())
+    check_journal_limits(fig)
     logging.info(f"Saving to {args.output_dir}...")
     save_figure(fig, "figure03", base_dir=args.output_dir)
-
     if args.show:
         plt.show()
     else:
         plt.close("all")
-
-    logging.info("Done.")
 
 
 if __name__ == "__main__":

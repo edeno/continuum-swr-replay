@@ -11,8 +11,8 @@ Figures it covers (``FIGURE_SCRIPTS``):
   (simulated example)
 - figure02 (``generate_figure02.py``): Model works on real data (example +
   distributions + triggered avg)
-- figure03 (``generate_figure03.py``): Events outside SWRs (non-SWR example +
-  SWR z-score by state + replay speed + replayed position, SWR vs non-SWR)
+- figure03 (``generate_figure03.py``): what SWR and no-SWR events are like
+  (size and movement, where the content is, brain state)
 - figure04 (``generate_figure04.py``): PFC responds regardless (GLM +
   population heatmaps + significance)
 
