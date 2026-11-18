@@ -15,6 +15,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from continuum_swr_replay.runs.io import (
@@ -22,6 +23,7 @@ from continuum_swr_replay.runs.io import (
     is_nonempty_file,
     json_ready,
     ok_table_paths,
+    read_complete_run,
     read_manifest,
     recorded_output,
     sha256_file,
@@ -228,3 +230,23 @@ class TestIsNonemptyFile:
         assert not is_nonempty_file(empty)
         assert not is_nonempty_file(tmp_path)
         assert is_nonempty_file(written)
+
+
+def test_read_complete_run_reads_every_epoch_and_refuses_a_failed_one(tmp_path):
+    for epoch in ("e1", "e2"):
+        pd.DataFrame({"epoch": [epoch, epoch]}).to_parquet(
+            tmp_path / f"{epoch}_scores.parquet"
+        )
+    manifest = tmp_path / "manifest.json"
+    epochs = {"e1": {"status": "ok"}, "e2": {"status": "ok"}}
+    manifest.write_text(json.dumps({"epochs": epochs}))
+    assert read_complete_run(tmp_path, "scores")["epoch"].tolist() == [
+        "e1",
+        "e1",
+        "e2",
+        "e2",
+    ]
+    epochs["e2"] = {"status": "failed"}
+    manifest.write_text(json.dumps({"epochs": epochs}))
+    with pytest.raises(ValueError, match="1 epochs"):
+        read_complete_run(tmp_path, "scores")

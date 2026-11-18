@@ -53,7 +53,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import logging
 import warnings
 from collections.abc import Sequence
@@ -138,7 +137,7 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.reported.formatting import format_number
-from continuum_swr_replay.runs.io import read_manifest
+from continuum_swr_replay.runs.io import read_complete_run, read_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.inventory_examples import detector_color
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
@@ -509,24 +508,6 @@ def detector_comparison() -> dict:
         ),
         "time_outside_swr": left_out["nonlocal_time_outside_kay_fraction"],
     }
-
-
-def read_event_run(run_dir: Path) -> pd.DataFrame:
-    """Every epoch's table of a per-event run (participation, likelihood).
-
-    Raises
-    ------
-    ValueError
-        If an epoch of the run's manifest did not finish.
-    """
-    manifest = json.loads((run_dir / "manifest.json").read_text())
-    failed = [e for e, r in manifest["epochs"].items() if r["status"] != "ok"]
-    if failed:
-        raise ValueError(f"{len(failed)} epochs of {run_dir.name} failed: {failed[:3]}")
-    return pd.concat(
-        [pd.read_parquet(path) for path in sorted(run_dir.glob("*_HPC.parquet"))],
-        ignore_index=True,
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -1171,10 +1152,12 @@ def generate_figure(
         ["ripple", "mua"],
     )
     participation = participation_statistics(
-        read_event_run(data_dir / EVENT_PARTICIPATION_DIR)
+        read_complete_run(data_dir / EVENT_PARTICIPATION_DIR, "participation")
     )
     advantage = likelihood_advantage_statistics(
-        read_event_run(data_dir / EVENT_LIKELIHOOD_ADVANTAGE_DIR)
+        read_complete_run(
+            data_dir / EVENT_LIKELIHOOD_ADVANTAGE_DIR, "likelihood_advantage"
+        )
     )
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))

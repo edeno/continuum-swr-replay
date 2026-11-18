@@ -172,6 +172,12 @@ def test_boundary_offset_values_are_in_milliseconds_start_and_end_apart():
     assert values["start_offset_median_ms"].value == pytest.approx(40.0)
     assert values["end_offset_median_ms"].value == pytest.approx(-25.0)
     assert values["start_offset_median_ms"].unit == "ms"
+    # starts beyond 25 ms: 30, 50, 60, 300; beyond 50: 60, 300 (of six)
+    assert values["start_offset_beyond_twenty_five_ms_fraction"].value == 4 / 6
+    assert values["start_offset_beyond_fifty_ms_fraction"].value == 2 / 6
+    # ends beyond 25 ms: -50, -40, -30, 900; beyond 50: 900
+    assert values["end_offset_beyond_twenty_five_ms_fraction"].value == 4 / 6
+    assert values["end_offset_beyond_fifty_ms_fraction"].value == 1 / 6
 
 
 def _other_detector_events() -> pd.DataFrame:
@@ -211,6 +217,7 @@ def test_other_detector_values_name_each_detector_and_each_state():
         "no_nonlocal_fraction": 0.75,
         "no_nonlocal_fraction_animal_min": 0.0,
         "no_nonlocal_fraction_animal_max": 1.0,
+        "mostly_local_fraction": 0.5,
         "no_nonlocal_mostly_local_fraction": pytest.approx(2 / 3),
         "no_nonlocal_mostly_no_spike_fraction": pytest.approx(1 / 3),
         "no_nonlocal_mixed_fraction": 0.0,
@@ -232,6 +239,8 @@ def test_other_detector_values_name_each_detector_and_each_state():
     assert "yu_no_nonlocal_fraction_animal_min" not in numbers
     assert values["kay_events"].figures == ("2",)
     assert values["yu_events"].figures == ()
+    # the main detector's mostly-Local share is Figure 2d's
+    assert values["kay_mostly_local_fraction"].figures == ("2d",)
 
 
 def test_left_out_values_name_each_covering_and_each_rate(tmp_path):
@@ -672,3 +681,59 @@ def test_spike_evidence_metrics_read_every_epoch_and_refuse_a_missing_one(tmp_pa
     )
     with pytest.raises(ValueError, match="holds epochs \\['a1'\\]"):
         builder.spike_evidence_metrics(tmp_path, n_epochs=2)
+
+
+def _windows(rows) -> pd.DataFrame:
+    """One epoch per animal: (animal, group, kind, participation, spike rate)."""
+    return pd.DataFrame(
+        rows, columns=["animal", "group", "kind", "participation", "spike_rate_hz"]
+    ).assign(epoch_id=lambda t: t["animal"] + "1")
+
+
+def test_participation_values_name_each_group_window_and_measure():
+    table = _windows(
+        [
+            ("a", "no SWR", "event", 0.6, 300.0),
+            ("a", "no SWR", "control", 0.3, 100.0),
+            ("b", "no SWR", "event", 0.4, 200.0),
+            ("b", "no SWR", "control", 0.5, 100.0),
+            ("a", "SWR", "event", 0.8, 900.0),
+            ("a", "SWR", "control", 0.3, 100.0),
+            ("b", "SWR", "event", 0.6, 700.0),
+            ("b", "SWR", "control", 0.4, 100.0),
+            # an event with no control
+            ("b", "SWR", "event", 0.6, 700.0),
+        ]
+    )
+    numbers = _numbers(builder.participation_values(table, "s"))
+    assert numbers["non_swr_event_participation"] == pytest.approx(0.5)
+    assert numbers["non_swr_control_participation"] == pytest.approx(0.4)
+    assert numbers["non_swr_participation_animals_above_rest"] == 1
+    assert numbers["non_swr_spike_rate_hz_animals_above_rest"] == 2
+    assert numbers["swr_event_spike_rate_hz"] == pytest.approx(800.0)
+    assert numbers["swr_participation_animals"] == 2
+    assert numbers["participation_events_without_control"] == 1
+
+
+def test_likelihood_advantage_values_are_the_animal_mean_and_its_interval():
+    table = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b", "b", "c", "a", "b", "c"],
+            "epoch_id": ["a1", "a1", "b1", "b1", "c1", "a1", "b1", "c1"],
+            "group": ["no SWR"] * 5 + ["SWR"] * 3,
+            "D_spike": [0.2, 0.4, 0.5, np.nan, 0.9, 1.0, 1.2, 1.4],
+        }
+    )
+    numbers = _numbers(builder.likelihood_advantage_values(table, "s"))
+    # no SWR: a 0.3, b 0.5 (its NaN unscored), c 0.9
+    assert numbers["non_swr_likelihood_advantage_per_spike"] == pytest.approx(
+        (0.3 + 0.5 + 0.9) / 3
+    )
+    assert numbers["non_swr_likelihood_advantage_events"] == 5
+    assert numbers["non_swr_likelihood_advantage_events_scored"] == 4
+    assert numbers["swr_likelihood_advantage_per_spike"] == pytest.approx(1.2)
+    assert (
+        numbers["swr_likelihood_advantage_per_spike_ci_low"]
+        < 1.2
+        < numbers["swr_likelihood_advantage_per_spike_ci_high"]
+    )

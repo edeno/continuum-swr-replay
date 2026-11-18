@@ -66,6 +66,10 @@ from continuum_swr_replay.analysis.detector_comparison.feature_run import (
     STATE_SPACE_FEATURES_RUN,
 )
 from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
+from continuum_swr_replay.analysis.event_evidence import (
+    likelihood_advantage,
+    participation,
+)
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
 )
@@ -81,6 +85,8 @@ from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     DECODER_QUALITY_DIR,
     EVENT_GAMMA_DIR,
+    EVENT_LIKELIHOOD_ADVANTAGE_DIR,
+    EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_START_REST_THETA_DIR,
     NL_BOUTS_BY_SWR_STEM,
@@ -111,24 +117,32 @@ from continuum_swr_replay.reported.values import (
     rel,
     value_factory,
 )
-from continuum_swr_replay.runs.io import ok_table_paths, read_manifest
+from continuum_swr_replay.runs.io import (
+    files_sha256,
+    ok_table_paths,
+    read_complete_run,
+    read_manifest,
+)
 from continuum_swr_replay.runs.staleness import read_output_manifest, recorded_sha256
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 TAGS = {
-    "decoding_error": Tags(("2a.1",), ("2e",)),
+    "decoding_error": Tags(("2a.1",), ("decoder_validation",)),
     "calibration": Tags(("2a.1",), ("decoder_validation",)),
     "state_fractions": Tags(("2a.6",), ("decoder_validation",)),
-    "cohort": Tags(("2b.2",), ("2b",)),
+    "cohort": Tags(("2b.2",), ("2c",)),
     "left_out": Tags(("2b.2",), ("2",)),
     "other_detectors_main": Tags(("2b.3",), ("2",)),
     "other_detectors": Tags(("2b.3",)),
-    "boundaries": Tags(("2b.4",), ("2d",)),
+    "swr_content": Tags(("2b.3",), ("2d",)),
+    "boundaries": Tags(("2b.4",), ("2f",)),
     "ripple": Tags(("2d.8", "2b.5"), ("3c",)),
     "brain_state": Tags(("2d.8",)),
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
+    "participation": Tags(("2c.1",), ("2g",)),
+    "likelihood_advantage": Tags(("2c.2",), ("2h",)),
     "spike": Tags(("2d.9", "2c.3"), ("2",)),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -173,6 +187,8 @@ class EventsInputs:
     event_start_rest_theta: Path
     property_bootstrap: Path
     decoder_quality: Path
+    event_participation: Path
+    likelihood_advantage: Path
 
 
 def default_inputs() -> EventsInputs:
@@ -193,6 +209,8 @@ def default_inputs() -> EventsInputs:
         event_start_rest_theta=processed_data_dir() / EVENT_START_REST_THETA_DIR,
         property_bootstrap=processed_data_dir() / EVENT_PROPERTY_BOOTSTRAP_DIR,
         decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
+        event_participation=processed_data_dir() / EVENT_PARTICIPATION_DIR,
+        likelihood_advantage=processed_data_dir() / EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     )
 
 
@@ -450,6 +468,10 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
     ]
 
 
+#: The offset tails' thresholds (``event_statistics.OFFSET_TAILS_MS``) as key words.
+_MS_WORDS = {25: "twenty_five", 50: "fifty"}
+
+
 def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.4: non-local event bounds against the matched SWR's (Figure 2d)."""
     make = value_factory(boundary_offset_values, source, TAGS["boundaries"])
@@ -479,6 +501,18 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
             "int",
             "median of event end minus matched SWR end",
             "ms",
+        ),
+        *(
+            make(
+                f"{bound}_offset_beyond_{_MS_WORDS[ms]}_ms_fraction",
+                stats[f"{bound}_offset_beyond_{ms}ms_fraction"],
+                "fraction",
+                "pct",
+                f"share of SWR-overlapping events whose {bound} differs from the "
+                f"matched SWR's {bound} by more than {ms} ms",
+            )
+            for bound in ("start", "end")
+            for ms in event_statistics.OFFSET_TAILS_MS
         ),
     ]
 
@@ -515,6 +549,15 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events that overlap no non-local event",
+            ),
+            make(
+                f"{word}_mostly_local_fraction",
+                stats["mostly_local_fraction"],
+                "fraction",
+                "pct",
+                f"share of {detector} events that overlap no non-local event and have "
+                "Local above 0.8 in more than half their rows",
+                tags=TAGS["swr_content"] if main else None,
             ),
             make(
                 f"{word}_no_nonlocal_mostly_local_fraction",
@@ -1123,6 +1166,129 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 "animals in that test",
+            ),
+        ]
+    return values
+
+
+# --- population events and spatial evidence --------------------------------------
+
+#: The event groups of the per-event runs, by the word their keys use.
+_RUN_GROUPS = {"non_swr": "no SWR", "swr": "SWR"}
+
+
+def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2c.1: tetrode participation and spike rate of the events against
+    Local-rest windows of their length (Figure 2g)."""
+    make = value_factory(participation_values, source, TAGS["participation"])
+    statistics = participation.participation_statistics(table)
+    differences = participation.participation_differences(statistics)
+    values = []
+    for word, group in _RUN_GROUPS.items():
+        for measure, style, what, unit in (
+            ("participation", "pct", "share of tetrodes with a spike", ""),
+            ("spike_rate_hz", "int", "spike rate summed over tetrodes", "spikes per s"),
+        ):
+            kind = "fraction" if measure == "participation" else "quantity"
+            for window, label in (
+                ("event", "events"),
+                ("control", "Local-rest windows"),
+            ):
+                values.append(
+                    make(
+                        f"{word}_{window}_{measure}",
+                        statistics.loc[(group, window), f"{measure}_animal_mean"],
+                        kind,
+                        style,
+                        f"{what} of {group} {label}: mean over animals of each "
+                        "animal's median over epochs of each epoch's median",
+                        unit,
+                    )
+                )
+            values.append(
+                make(
+                    f"{word}_{measure}_animals_above_rest",
+                    differences.loc[group, f"{measure}_n_animals_above"],
+                    "count",
+                    "count",
+                    f"animals whose {group} events' {what} is above their "
+                    "Local-rest windows'",
+                )
+            )
+        values.append(
+            make(
+                f"{word}_participation_animals",
+                differences.loc[group, "n_animals"],
+                "count",
+                "count",
+                f"animals with {group} events and Local-rest windows",
+            )
+        )
+    values.append(
+        make(
+            "participation_events_without_control",
+            int((table["kind"] == "event").sum() - (table["kind"] == "control").sum()),
+            "count",
+            "count",
+            "events longer than any Local-rest stretch of their epoch (no control)",
+        )
+    )
+    return values
+
+
+def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2c.2: the spike likelihood at the decoded positions minus at the
+    animal's, per spike, over each whole event (Figure 2h)."""
+    make = value_factory(
+        likelihood_advantage_values, source, TAGS["likelihood_advantage"]
+    )
+    statistics = likelihood_advantage.likelihood_advantage_statistics(table)
+    values = []
+    for word, group in _RUN_GROUPS.items():
+        row = statistics.loc[group]
+        values += [
+            make(
+                f"{word}_likelihood_advantage_per_spike",
+                row["estimate"],
+                "quantity",
+                "dec2",
+                f"log-likelihood of {group} events' spikes at the decoded positions "
+                "minus at the animal's, summed over each event and divided by its "
+                "spikes: mean over animals of each animal's median over epochs of "
+                "each epoch's median",
+                "nats per spike",
+            ),
+            make(
+                f"{word}_likelihood_advantage_per_spike_ci_low",
+                row["ci_low"],
+                "quantity",
+                "dec2",
+                "lower bound of its 95 % interval (nested bootstrap of the animals "
+                f"and their epochs, small-sample t correction over the "
+                f"{row['n_animals']} animals)",
+                "nats per spike",
+            ),
+            make(
+                f"{word}_likelihood_advantage_per_spike_ci_high",
+                row["ci_high"],
+                "quantity",
+                "dec2",
+                "upper bound of that interval",
+                "nats per spike",
+            ),
+            make(
+                f"{word}_likelihood_advantage_events_scored",
+                row["n_scored"],
+                "count",
+                "count",
+                f"{group} events with a per-spike score (at least one spike)",
+            ),
+            make(
+                f"{word}_likelihood_advantage_events",
+                row["n_events"],
+                "count",
+                "count",
+                f"{group} events scored",
             ),
         ]
     return values
@@ -1857,6 +2023,61 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     occupancy = pd.read_csv(inputs.content_occupancy)
     summary.add(*content_occupancy_values(occupancy, rel(inputs.content_occupancy)))
     summary.inputs.append(file_record(inputs.content_occupancy, ROOT_DIR))
+
+    analysed = set(analysed_epoch_ids())
+    participation_table = read_complete_run(inputs.event_participation, "participation")
+    advantage_table = read_complete_run(
+        inputs.likelihood_advantage, "likelihood_advantage"
+    )
+    for folder, table in (
+        (inputs.event_participation, participation_table),
+        (inputs.likelihood_advantage, advantage_table),
+    ):
+        if set(table["epoch_id"]) != analysed:
+            raise ValueError(
+                f"{folder} holds {table['epoch_id'].nunique()} epochs, not the "
+                f"{n_epochs} analysed ones"
+            )
+    participation_paths = ok_table_paths(inputs.event_participation, "participation")
+    summary.add(
+        *pend(
+            participation_values(
+                participation_table,
+                f"{rel(inputs.event_participation)} "
+                "(scripts/event_evidence/measure_event_participation.py)",
+            ),
+            stale(inputs.event_participation),
+        )
+    )
+    advantage_manifest = read_output_manifest(inputs.likelihood_advantage)
+    summary.add(
+        *pend(
+            likelihood_advantage_values(
+                advantage_table,
+                f"{rel(inputs.likelihood_advantage)} "
+                "(scripts/event_evidence/score_event_likelihood_advantage.py)",
+            ),
+            stale(inputs.likelihood_advantage),
+            _input_staleness(
+                advantage_manifest,
+                "event_participation",
+                files_sha256(participation_paths),
+                rel(inputs.likelihood_advantage),
+                "participation",
+                "participation run",
+            ),
+        )
+    )
+    summary.inputs += [
+        files_record("*_participation.parquet", participation_paths, ROOT_DIR),
+        file_record(inputs.event_participation / "manifest.json", ROOT_DIR),
+        files_record(
+            "*_likelihood_advantage.parquet",
+            ok_table_paths(inputs.likelihood_advantage, "likelihood_advantage"),
+            ROOT_DIR,
+        ),
+        file_record(inputs.likelihood_advantage / "manifest.json", ROOT_DIR),
+    ]
 
     folder = inputs.decoder_quality
     quality_sessions = pd.read_parquet(folder / "sessions.parquet")

@@ -43,6 +43,7 @@ __all__ = [
     "json_ready",
     "ok_epochs",
     "ok_table_paths",
+    "read_complete_run",
     "output_path",
     "read_manifest",
     "recorded_output",
@@ -304,3 +305,22 @@ def ok_table_paths(run_dir: Path, name: str) -> list[Path]:
         output_path(identifier, run_dir, name)
         for identifier in ok_epochs(read_manifest(run_dir))
     ]
+
+
+def read_complete_run(run_dir: Path, name: str) -> pd.DataFrame:
+    """Table ``name`` of every epoch of a run whose manifest marks each one ok.
+
+    Raises
+    ------
+    ValueError
+        If the run has no readable manifest, its manifest marks an epoch other
+        than ok, or it marks none.
+    """
+    manifest = read_manifest(run_dir)
+    failed = sorted(set(manifest["epochs"]) - set(ok_epochs(manifest)))
+    if failed:
+        raise ValueError(f"{len(failed)} epochs of {run_dir} are not ok: {failed[:3]}")
+    paths = ok_table_paths(run_dir, name)
+    if not paths:
+        raise ValueError(f"the manifest of {run_dir} marks no epoch")
+    return pd.concat(map(pd.read_parquet, paths), ignore_index=True)

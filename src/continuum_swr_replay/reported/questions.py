@@ -97,7 +97,9 @@ FIGURES: dict[str, Figure] = {
         "abcde",
     ),
     "2": Figure(
-        "Non-local events and SWRs", "scripts/figures/generate_figure02.py", "abcde"
+        "Non-local events and SWRs",
+        "scripts/figures/generate_figure02.py",
+        "abcdefghij",
     ),
     "3": Figure(
         "Non-local events outside SWRs",
@@ -196,7 +198,7 @@ QUESTIONS: tuple[Question, ...] = (
         "Is the decoder accurate, in sample and on held-out data?",
         status="partly computed",
         reason="in sample only: no script measures the held-out decoding error",
-        figures=("2e", "decoder_validation"),
+        figures=("decoder_validation",),
     ),
     Question(
         "2a.3",
@@ -225,28 +227,39 @@ QUESTIONS: tuple[Question, ...] = (
         "Do non-local events occur without an SWR? (examples)",
         status="no numbers",
         reason="example events, one per overlap class",
-        figures=("2a",),
+        figures=("2b",),
     ),
     Question(
         "2b.2",
         "How many immobile non-local events overlap no SWR, and what fraction of them is that?",
-        figures=("2", "2b"),
+        figures=("2", "2c"),
         note="The retired claims table (in git history) read these as the events SWR-triggered detection misses; that reading belongs in the Results.",
     ),
     Question(
         "2b.3",
         "How do SWR detection and non-local detection overlap: for each other detector, what share of its events overlaps no non-local event, how do those divide by decoder state, and, for the ones that do overlap, what share of their time bins does each state take?",
-        figures=("2",),
+        figures=("2", "2d", "2e"),
     ),
     Question(
         "2b.4",
         "How do non-local event starts and ends differ from those of the matched SWR?",
-        figures=("2d",),
+        figures=("2f",),
     ),
     Question(
         "2b.5",
         "How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?",
         figures=("3b", "3c"),
+    ),
+    Question(
+        "2c.1",
+        "Are the events population events: what share of tetrodes fires, and at what rate, against Local-rest windows of the same length?",
+        figures=("2g",),
+    ),
+    Question(
+        "2c.2",
+        "During a detected event, how much more strongly does the population activity favor the decoded positions than the animal's measured positions?",
+        figures=("2h",),
+        note="The same spikes detected the event and estimated its positions, which favors positive scores: the values give the size of the advantage within detected events, not a test against chance.",
     ),
     Question(
         "2c.3",
