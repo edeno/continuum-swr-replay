@@ -1,6 +1,13 @@
 #!/usr/bin/env python
 """Held-out spike evidence in each canonical non-local event, split by SWR.
 
+A reference copy (2026-11-18): this leave-one-tetrode-out test was set aside for
+Figure 2 in favour of the whole-event score
+(``scripts/event_evidence/score_event_likelihood_advantage.py``), which answers
+the descriptive question with all tetrodes; this one is kept for a claim of
+independent population support. Its 2026-11-18 run is in
+``Processed-Data/event_heldout_evidence``.
+
 Are the SWR and the non-SWR non-local events real, judged by spikes that did
 not choose their remote location? ``run_state_evidence.py`` asks it of the
 decoder's confident state bouts; this runner asks it of the events the paper
@@ -53,9 +60,9 @@ It runs on the CPU only, one epoch per dask worker.
 
 Usage::
 
-    uv run --frozen python scripts/event_evidence/run_event_heldout_evidence.py \\
+    uv run --frozen python scripts/exploratory/_run_event_heldout_evidence.py \\
         --n-workers 16
-    uv run --frozen python scripts/event_evidence/run_event_heldout_evidence.py \\
+    uv run --frozen python scripts/exploratory/_run_event_heldout_evidence.py \\
         --summary-only
 """
 

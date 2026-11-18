@@ -61,7 +61,7 @@ Per epoch (a dask CPU worker each):
 labels from another decode, scored by chosen tetrode pairs, their rows stacked
 (Task 13's half decodes used this; their runner is removed, see git history),
 or other windows (``LabelSet.windows``: the canonical events'
-``run_event_heldout_evidence.py`` scores).
+``scripts/exploratory/_run_event_heldout_evidence.py`` scores).
 
 It writes ``per_epoch/{epoch}_windows.parquet`` (one row per window; columns
 ``runcv_*`` for the primary, time-held-out running-only encoding, ``run_*`` for

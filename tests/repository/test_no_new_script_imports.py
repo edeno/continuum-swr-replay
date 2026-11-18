@@ -29,6 +29,16 @@ ALLOWED: dict[tuple[str, str], str] = {
         "scripts.replay_models.content.fit_swr_contrast_content",
     ): "an unsupported one-off that drives the runner's main with the cohort "
     "rule bypassed",
+    (
+        "scripts/exploratory/_run_event_heldout_evidence.py",
+        "scripts.event_evidence.run_state_evidence",
+    ): "a reference copy of the leave-one-tetrode-out run on the canonical events "
+    "(2026-11-18), set aside for Figure 2 in favour of the whole-event score; it "
+    "drives the state-evidence engine's epoch loop",
+    (
+        "scripts/exploratory/_run_event_heldout_evidence.py",
+        "scripts.event_evidence.split_state_evidence_by_swr",
+    ): "the same reference copy, for the engine's metric names",
 }
 
 

@@ -18,8 +18,8 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
 )
 from continuum_swr_replay.intervals import contiguous_true_runs
 from continuum_swr_replay.tables.io import read_table, write_table
-from scripts.event_evidence import run_event_heldout_evidence as events_runner
 from scripts.event_evidence import run_state_evidence as engine
+from scripts.exploratory import _run_event_heldout_evidence as events_runner
 from tests.scripts.event_evidence.test_run_state_evidence import (  # noqa: F401
     EPOCH,
     TIME,
