@@ -1005,23 +1005,19 @@ def draw_detector_overlap(
 ) -> None:  # fmt: skip
     """Panel h: what each detector catches, and what its events contain.
 
+    Bars pool all events; dots are animals (for the caption).
+
     Left, the share of non-local events each detector's events overlap (and any
     SWR or MUA event's); right, the share of its own events that overlap a
     non-local event.
     """
     n_rows = len(overlap) + 1
-    draw_detector_bars(
-        ax_caught, overlap, n_rows, "Non-local events\nit overlaps (%)", True
-    )
+    draw_detector_bars(ax_caught, overlap, n_rows, "%", True)
+    ax_caught.set_title("Catches\nnon-local events", fontsize=SMALL_SIZE, pad=3)
     ax_caught.barh(0, 100 * any_swr_or_mua, color="#666666", height=0.65)
-    draw_detector_bars(
-        ax_content, with_nonlocal, n_rows, "Its events with\nnon-local (%)", False
-    )
+    draw_detector_bars(ax_content, with_nonlocal, n_rows, "%", False)
+    ax_content.set_title("Its events\nare non-local", fontsize=SMALL_SIZE, pad=3)
     ax_content.spines["left"].set_visible(False)
-    ax_caught.text(
-        0.0, 1.02, "bar: all events · dot: animal", transform=ax_caught.transAxes,
-        ha="left", va="bottom", fontsize=SMALL_SIZE,
-    )  # fmt: skip
 
 
 def draw_share_by_power(ax, shares: pd.DataFrame) -> None:
@@ -1173,17 +1169,16 @@ def generate_figure(
     ax_e1 = fig.add_subplot(offsets_grid[0])
     ax_e2 = fig.add_subplot(offsets_grid[1], sharex=ax_e1)
     draw_offsets(ax_e1, ax_e2, boundary_offsets(events))
-    row4 = outer[3].subgridspec(
-        1, 5, width_ratios=[1.1, 0.95, 0.72, 0.72, 0.95], wspace=0.9
-    )
+    row4 = outer[3].subgridspec(1, 4, width_ratios=[1.1, 0.95, 1.55, 0.95], wspace=0.75)
     ax_f = fig.add_subplot(row4[0])
     draw_heldout(ax_f, heldout)
     triggered = row4[1].subgridspec(2, 1, hspace=0.15)
     ax_g1 = fig.add_subplot(triggered[0])
     ax_g2 = fig.add_subplot(triggered[1], sharex=ax_g1)
     draw_triggered(ax_g1, ax_g2, inputs["triggered_curves"], reference)
-    ax_h = fig.add_subplot(row4[2])
-    ax_h2 = fig.add_subplot(row4[3])
+    detectors = row4[2].subgridspec(1, 2, wspace=0.3)
+    ax_h = fig.add_subplot(detectors[0])
+    ax_h2 = fig.add_subplot(detectors[1])
     draw_detector_overlap(
         ax_h,
         ax_h2,
@@ -1191,7 +1186,7 @@ def generate_figure(
         inputs["with_nonlocal"],
         inputs["any_swr_or_mua"],
     )
-    ax_i = fig.add_subplot(row4[4])
+    ax_i = fig.add_subplot(row4[3])
     draw_share_by_power(ax_i, inputs["share_by_power"])
 
     fig.canvas.draw()
