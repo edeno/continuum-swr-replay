@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "d7d80592187f",
+ "commit": "0a6f37576b94",
  "code": {
-  "head": "d7d80592187f107822e6ec400938c4c14acc980d",
+  "head": "0a6f37576b942d8d9563a5f93956133d2055cc46",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -123,8 +123,8 @@
     "code_sha256": "c2ae19e1ac232cbae8972e3d53aed273daf662ad2099637e447a804161991a40"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/nonlocal_comparison.py": {
-    "sha256": "47ba290ae1c5e5b86ec50667d2f3b959ffd445a078b133ae717de8526ff15772",
-    "code_sha256": "8a800f833b5ac0aef379717cbe0bcc685026f0aa80a2a557468e68214a18d193"
+    "sha256": "8dfbbd7db2d9d994a317a93d4a60b36cab30ef63971009bf597fd3e90d256e71",
+    "code_sha256": "87c96af0df012af3eada5eafcd7648ecae7aeb912b509e1bed45f64ce77e3f84"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/overlap.py": {
     "sha256": "a0eeab4df008e1021e79a025ad27f3c8c3d91844ec59d1c69f568f1922afb39f",
@@ -195,8 +195,8 @@
     "code_sha256": "35ba5dcd3a19acacfb58ab22b22fd61299cd44fc0071d0d99f8e30e27f930744"
    },
    "src/continuum_swr_replay/analysis/event_definition/nonlocal_event_rule.py": {
-    "sha256": "f131c65a466c44ac7efb2a455a8a03e74596ce4fd35948fadcbeb29b7950f557",
-    "code_sha256": "10bb8f6079350b4969bdf01f70e0a5faf085ecaf99035b26af76f94d0faf1c28"
+    "sha256": "006d0bbf2d5028c3db82062d3d3bddc6fc0c9770517b61e78b80c29d3199a1b2",
+    "code_sha256": "63b363c841a79e429a0da49cb52089feaf0f3c030b07583d94c91f47ec91df6e"
    },
    "src/continuum_swr_replay/analysis/event_definition/swr_source.py": {
     "sha256": "3a7bf9c9470c4734f876e01eda1ae04305684939318ac7412ab3d47e3d3f0f23",
@@ -206,13 +206,21 @@
     "sha256": "17f2a00de94db68321afa77521d8be4362150438c005e9b8c019cc3e079ebce8",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
+   "src/continuum_swr_replay/analysis/event_evidence/likelihood_advantage.py": {
+    "sha256": "43c044483e1f5242c76d9277bce9f11a78b74e547b244fd907a78a93313a89be",
+    "code_sha256": "30969d71bf4ce09f372f823ec2d7286cbcc0a2db381e727434f0f7d6a49b7227"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/participation.py": {
+    "sha256": "1d2ba64ca3b98d9714bace144e0dae3616fcfb84954064a325a27e7d8ceb6f55",
+    "code_sha256": "c26c6c2edc58369353e7cae1393c345cf4b738012be902df1fb80c7c92efb601"
+   },
    "src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py": {
     "sha256": "64b21ed6aafd6b777bfd727dba6ddf08adca9519005ded9623fa53b25a09e36b",
     "code_sha256": "dfab1f934e1a1c9251efdc12440d04da7d756c7edd42c99210531dfe5870839b"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/__init__.py": {
-    "sha256": "9e0c326f5c2d789aebd4aac1ef4f0ca1221f4ea6112b0341955177f731625365",
-    "code_sha256": "fa0d6e0ad73d00974a5999cf038a0205995fde9a02909a029081b6046bbc6de6"
+    "sha256": "f55c4d4006da0ab9a739363208c2f12977db4466817b5e98e1b710fd84ab2b91",
+    "code_sha256": "510c06e8a3e599b9c1d5f1a2a3f934594e43a8dcfba48325e50bbda6f972e987"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/evidence.py": {
     "sha256": "48f8bc2ebe4730d220df02fbb87b243a69615a33b5d894bfd98e75c4d5b22297",
@@ -223,24 +231,24 @@
     "code_sha256": "bc5234303fc14c6e17855f10f14cb60af613dd0d1f2dd009acabdf9a823e3824"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/summary.py": {
-    "sha256": "9f0ab90c78857caf1603c65ab4fbc9b198f8d051d253c27d2c03f63fbc5c0bbe",
-    "code_sha256": "f46cde33bdebd183605dc3f4b60e889000cfb3cfc6f9f2a46cd248761855befc"
+    "sha256": "e7856075bb9982074683802d4a080969c1ab1cbce1739a678c83dbffe5f708a2",
+    "code_sha256": "fed3960044eef999bcd623e28c8f10d47c9b8da8903006eb841bd82ac94599da"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py": {
     "sha256": "e7e0cdfe9213ae9f11b555fd659f101d05b508fb1568765fc2b0f56af82b9b7c",
     "code_sha256": "6f3f40856e023300d492a870d5f4419eaaf2fb61a700582af647087380cb2777"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/windows.py": {
-    "sha256": "0ec3281b988dd789b912e369e1373fe112d1a0285ee7e0b74ad5d5f3abbc6287",
-    "code_sha256": "d2a3a18be600d6c521dabaaf4b35381fa04df77e963a746cf8cfc44cd4532422"
+    "sha256": "8ed6644354ba05bf09a66b8f0f13759eb8626eae47a0d377cadc002a227d00a2",
+    "code_sha256": "c7f1dbcb79a20083ea2e52a033a239ba73f793a6492853f3956d8c23e4a76137"
    },
    "src/continuum_swr_replay/analysis/event_properties/__init__.py": {
     "sha256": "933f33706b5999a73702c0b687a36d8b0ca295a29f84600df0ec994258fec27a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
-    "sha256": "ad5629c28badb46368ee55e98d356195fb2eb8fcaaa7a524b050d49ae1778d60",
-    "code_sha256": "5a22f13a75c673063afbdedc1b4adb92720bffa1c8cce50b8abc0082a4597e74"
+    "sha256": "bbe3ee15ac37350bc1fc609a9b03cb5f34be364b214eb24435923d454fcd9c46",
+    "code_sha256": "9e824bf76670da659d8f7cefb5e0969a95febc3dcc8652f7956c61b65afec18f"
    },
    "src/continuum_swr_replay/analysis/event_properties/property_contrast.py": {
     "sha256": "4989d4b201bbbbdd1551bb4ebd9c749e87f0bab6781cbfd6565296f28b4c8d1b",
@@ -311,16 +319,16 @@
     "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "678fb7f162967c34f56cb2ec593430196a1b6a848888b6ab3161cb29f97fd7f5",
-    "code_sha256": "841cbba5d2c59156bfccab1860530e8c21100891789305741cf8a0148251ff3f"
+    "sha256": "4524be156c55e6a7bf46c8ab2d6bfbe4d40d7c08b23b451a097a3aafb0783281",
+    "code_sha256": "9659b3097c9a6bf42d3f7b9230aa98a02dc0da1fc1de2b0d314d1209c218e726"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "6ae386d0425cacedd5965e77b8b900956fddf0323f4010878d904b3810d6e2ec",
-    "code_sha256": "3affe45ed47dc2713351877e25ad7db5467caaa54c2bef335e39c1d67b67afcc"
+    "sha256": "3d8a43935f1aa0e0e8ca9d47373dcb9d338f1448a85a56cbf8a2f57533f42e6e",
+    "code_sha256": "b107163cd60d677b434ff18b7ade178f0869fd85653aaecbf036fd3e7b8bcc0a"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -335,8 +343,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/runs/io.py": {
-    "sha256": "ae17c4d6c7e288ac82eb79b5c6577271f2c3d3d64c1a50c830f304f5f219f77e",
-    "code_sha256": "9106f76d94004883709997b495ad97bc2a0901b7588c8b2d24c22f4166bd8f19"
+    "sha256": "8e2db0f4e5cc66cc6a3e39cbbd73730b7e45960830f455fe4d11ae8d24d9706f",
+    "code_sha256": "560971e338e3f63a03a53b1c5bdc03e6fdbdd77b0e66af12bff804d680f62289"
    },
    "src/continuum_swr_replay/runs/provenance.py": {
     "sha256": "46207e3212c139ffc797b749bfa73f6202c8870d558b0883f6f70b08ff1d1ab5",
@@ -471,6 +479,24 @@
    "sha256": "b0fd39ceeee50b3f1332b411528c442e5b0eed82b9027aa8ca549dc949276872"
   },
   {
+   "path": "Processed-Data/event_participation/*_participation.parquet",
+   "n_files": 242,
+   "sha256": "7ac62779cacb1e6177ac9515b135a4e3a97534b266b151ba6009edc698620c0f"
+  },
+  {
+   "path": "Processed-Data/event_participation/manifest.json",
+   "sha256": "8bb8f49efecf9bd9d3d7637375849697ac74c812378f1ce86afd7b47109aa34b"
+  },
+  {
+   "path": "Processed-Data/event_likelihood_advantage/*_likelihood_advantage.parquet",
+   "n_files": 242,
+   "sha256": "219cdd99800bffdfbada7d672ec788b7be9f18c8c3f1adebeb1f938d36a888bf"
+  },
+  {
+   "path": "Processed-Data/event_likelihood_advantage/manifest.json",
+   "sha256": "54c72a429607c3a44964e5844a36ab35114432d56c6273a72b416f31c5e825d0"
+  },
+  {
    "path": "Processed-Data/decoder_quality/sessions.parquet",
    "sha256": "c6821595f171ffc314c1aaa49d0bfc17e4a59bfe7f4eb004529fe7e178fe1cc5"
   },
@@ -506,7 +532,7 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
@@ -522,7 +548,7 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
@@ -554,7 +580,7 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
@@ -941,6 +967,20 @@
    "function": "other_detector_values",
    "pending": null
   },
+  "carey_mostly_local_fraction": {
+   "value": 0.16172562697226375,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of carey events that overlap no non-local event and have Local above 0.8 in more than half their rows",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "function": "other_detector_values",
+   "pending": null
+  },
   "carey_no_nonlocal_fraction": {
    "value": 0.19789071582793555,
    "kind": "fraction",
@@ -1105,7 +1145,7 @@
     "2a.1"
    ],
    "figures": [
-    "2e"
+    "decoder_validation"
    ],
    "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "decoding_error_values",
@@ -1121,7 +1161,7 @@
     "2a.1"
    ],
    "figures": [
-    "2e"
+    "decoder_validation"
    ],
    "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "decoding_error_values",
@@ -1197,6 +1237,38 @@
    "function": "property_values",
    "pending": null
   },
+  "end_offset_beyond_fifty_ms_fraction": {
+   "value": 0.1362649460261154,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR-overlapping events whose end differs from the matched SWR's end by more than 50 ms",
+   "questions": [
+    "2b.4"
+   ],
+   "figures": [
+    "2f"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "boundary_offset_values",
+   "pending": null
+  },
+  "end_offset_beyond_twenty_five_ms_fraction": {
+   "value": 0.23708755083942387,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR-overlapping events whose end differs from the matched SWR's end by more than 25 ms",
+   "questions": [
+    "2b.4"
+   ],
+   "figures": [
+    "2f"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "boundary_offset_values",
+   "pending": null
+  },
   "end_offset_median_ms": {
    "value": -3.999948501586914,
    "kind": "quantity",
@@ -1207,7 +1279,7 @@
     "2b.4"
    ],
    "figures": [
-    "2d"
+    "2f"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
@@ -1223,7 +1295,7 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
@@ -1845,6 +1917,20 @@
    "function": "other_detector_values",
    "pending": null
   },
+  "karlsson_mostly_local_fraction": {
+   "value": 0.3088536843497817,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of karlsson events that overlap no non-local event and have Local above 0.8 in more than half their rows",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "function": "other_detector_values",
+   "pending": null
+  },
   "karlsson_no_nonlocal_fraction": {
    "value": 0.38153194867045903,
    "kind": "fraction",
@@ -2010,6 +2096,22 @@
    ],
    "figures": [
     "2"
+   ],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "function": "other_detector_values",
+   "pending": null
+  },
+  "kay_mostly_local_fraction": {
+   "value": 0.1263395786250638,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of kay events that overlap no non-local event and have Local above 0.8 in more than half their rows",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [
+    "2d"
    ],
    "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
    "function": "other_detector_values",
@@ -2463,6 +2565,20 @@
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
+   "pending": null
+  },
+  "mua_mostly_local_fraction": {
+   "value": 0.11887459491309045,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of mua events that overlap no non-local event and have Local above 0.8 in more than half their rows",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "function": "other_detector_values",
    "pending": null
   },
   "mua_no_nonlocal_fraction": {
@@ -2966,6 +3082,70 @@
    "function": "content_occupancy_values",
    "pending": null
   },
+  "non_swr_control_participation": {
+   "value": 0.3508191808191808,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of tetrodes with a spike of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
+   "pending": null
+  },
+  "non_swr_control_spike_rate_hz": {
+   "value": 282.58336543674983,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "spikes per s",
+   "description": "spike rate summed over tetrodes of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
+   "pending": null
+  },
+  "non_swr_event_participation": {
+   "value": 0.5218340431498326,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of tetrodes with a spike of no SWR events: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
+   "pending": null
+  },
+  "non_swr_event_spike_rate_hz": {
+   "value": 749.3130117899957,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "spikes per s",
+   "description": "spike rate summed over tetrodes of no SWR events: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
+   "pending": null
+  },
   "non_swr_fraction": {
    "value": 0.5678757846052197,
    "kind": "fraction",
@@ -2976,7 +3156,7 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
@@ -2992,7 +3172,7 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
@@ -3008,10 +3188,122 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
+   "pending": null
+  },
+  "non_swr_likelihood_advantage_events": {
+   "value": 42974,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "no SWR events scored",
+   "questions": [
+    "2c.2"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "function": "likelihood_advantage_values",
+   "pending": null
+  },
+  "non_swr_likelihood_advantage_events_scored": {
+   "value": 42974,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "no SWR events with a per-spike score (at least one spike)",
+   "questions": [
+    "2c.2"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "function": "likelihood_advantage_values",
+   "pending": null
+  },
+  "non_swr_likelihood_advantage_per_spike": {
+   "value": 0.6996706483701308,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "log-likelihood of no SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.2"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "function": "likelihood_advantage_values",
+   "pending": null
+  },
+  "non_swr_likelihood_advantage_per_spike_ci_high": {
+   "value": 0.8817995122142743,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.2"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "function": "likelihood_advantage_values",
+   "pending": null
+  },
+  "non_swr_likelihood_advantage_per_spike_ci_low": {
+   "value": 0.5175417845259873,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.2"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "function": "likelihood_advantage_values",
+   "pending": null
+  },
+  "non_swr_participation_animals": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals with no SWR events and Local-rest windows",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
+   "pending": null
+  },
+  "non_swr_participation_animals_above_rest": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose no SWR events' share of tetrodes with a spike is above their Local-rest windows'",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
    "pending": null
   },
   "non_swr_remote_animals_above_baseline": {
@@ -3141,6 +3433,22 @@
    "function": "spike_evidence_values",
    "pending": null
   },
+  "non_swr_spike_rate_hz_animals_above_rest": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose no SWR events' spike rate summed over tetrodes is above their Local-rest windows'",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
+   "pending": null
+  },
   "nonlocal_events": {
    "value": 75675,
    "kind": "count",
@@ -3151,7 +3459,7 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
@@ -3167,7 +3475,7 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
@@ -3327,7 +3635,7 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
@@ -3343,7 +3651,7 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
@@ -3507,6 +3815,22 @@
    ],
    "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
+   "pending": null
+  },
+  "participation_events_without_control": {
+   "value": 8,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "events longer than any Local-rest stretch of their epoch (no control)",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
    "pending": null
   },
   "pause_animals_in_direction": {
@@ -4495,6 +4819,38 @@
    "function": "start_distance_values",
    "pending": null
   },
+  "start_offset_beyond_fifty_ms_fraction": {
+   "value": 0.09244365615730406,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR-overlapping events whose start differs from the matched SWR's start by more than 50 ms",
+   "questions": [
+    "2b.4"
+   ],
+   "figures": [
+    "2f"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "boundary_offset_values",
+   "pending": null
+  },
+  "start_offset_beyond_twenty_five_ms_fraction": {
+   "value": 0.20406103788874957,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR-overlapping events whose start differs from the matched SWR's start by more than 25 ms",
+   "questions": [
+    "2b.4"
+   ],
+   "figures": [
+    "2f"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "function": "boundary_offset_values",
+   "pending": null
+  },
   "start_offset_median_ms": {
    "value": 4.000186920166016,
    "kind": "quantity",
@@ -4505,7 +4861,7 @@
     "2b.4"
    ],
    "figures": [
-    "2d"
+    "2f"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
@@ -4709,7 +5065,7 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
@@ -4795,6 +5151,150 @@
    "function": "content_occupancy_values",
    "pending": null
   },
+  "swr_control_participation": {
+   "value": 0.4286713286713287,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of tetrodes with a spike of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
+   "pending": null
+  },
+  "swr_control_spike_rate_hz": {
+   "value": 282.59480835187867,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "spikes per s",
+   "description": "spike rate summed over tetrodes of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
+   "pending": null
+  },
+  "swr_event_participation": {
+   "value": 0.7151515151515151,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of tetrodes with a spike of SWR events: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
+   "pending": null
+  },
+  "swr_event_spike_rate_hz": {
+   "value": 1101.4346693163802,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "spikes per s",
+   "description": "spike rate summed over tetrodes of SWR events: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
+   "pending": null
+  },
+  "swr_likelihood_advantage_events": {
+   "value": 32701,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "SWR events scored",
+   "questions": [
+    "2c.2"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "function": "likelihood_advantage_values",
+   "pending": null
+  },
+  "swr_likelihood_advantage_events_scored": {
+   "value": 32701,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "SWR events with a per-spike score (at least one spike)",
+   "questions": [
+    "2c.2"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "function": "likelihood_advantage_values",
+   "pending": null
+  },
+  "swr_likelihood_advantage_per_spike": {
+   "value": 1.0598957583466868,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "log-likelihood of SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.2"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "function": "likelihood_advantage_values",
+   "pending": null
+  },
+  "swr_likelihood_advantage_per_spike_ci_high": {
+   "value": 1.320568900411907,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.2"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "function": "likelihood_advantage_values",
+   "pending": null
+  },
+  "swr_likelihood_advantage_per_spike_ci_low": {
+   "value": 0.7992226162814665,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.2"
+   ],
+   "figures": [
+    "2h"
+   ],
+   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "function": "likelihood_advantage_values",
+   "pending": null
+  },
   "swr_overlapping_events": {
    "value": 32701,
    "kind": "count",
@@ -4805,7 +5305,7 @@
     "2b.4"
    ],
    "figures": [
-    "2d"
+    "2f"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
@@ -4821,10 +5321,42 @@
     "2b.2"
    ],
    "figures": [
-    "2b"
+    "2c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
+   "pending": null
+  },
+  "swr_participation_animals": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals with SWR events and Local-rest windows",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
+   "pending": null
+  },
+  "swr_participation_animals_above_rest": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose SWR events' share of tetrodes with a spike is above their Local-rest windows'",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
    "pending": null
   },
   "swr_remote_animals_above_baseline": {
@@ -4952,6 +5484,22 @@
    ],
    "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
+   "pending": null
+  },
+  "swr_spike_rate_hz_animals_above_rest": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose SWR events' spike rate summed over tetrodes is above their Local-rest windows'",
+   "questions": [
+    "2c.1"
+   ],
+   "figures": [
+    "2g"
+   ],
+   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "function": "participation_values",
    "pending": null
   },
   "theta_animals_above_rest_non_swr": {
@@ -5164,6 +5712,20 @@
    "function": "other_detector_values",
    "pending": null
   },
+  "widloski_criteria_mostly_local_fraction": {
+   "value": 0.030063291139240507,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of memoryless_criteria events that overlap no non-local event and have Local above 0.8 in more than half their rows",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "function": "other_detector_values",
+   "pending": null
+  },
   "widloski_criteria_no_nonlocal_fraction": {
    "value": 0.04707278481012658,
    "kind": "fraction",
@@ -5324,6 +5886,20 @@
    "style": "count",
    "unit": "",
    "description": "memoryless events compared with the non-local detector",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "function": "other_detector_values",
+   "pending": null
+  },
+  "widloski_mostly_local_fraction": {
+   "value": 0.027456027456027456,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of memoryless events that overlap no non-local event and have Local above 0.8 in more than half their rows",
    "questions": [
     "2b.3"
    ],
@@ -5500,6 +6076,20 @@
    "function": "other_detector_values",
    "pending": null
   },
+  "yu_mostly_local_fraction": {
+   "value": 0.460154836034858,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of yu events that overlap no non-local event and have Local above 0.8 in more than half their rows",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "function": "other_detector_values",
+   "pending": null
+  },
   "yu_no_nonlocal_fraction": {
    "value": 0.5607902856732816,
    "kind": "fraction",
@@ -5660,6 +6250,20 @@
    "style": "count",
    "unit": "",
    "description": "zugaro events compared with the non-local detector",
+   "questions": [
+    "2b.3"
+   ],
+   "figures": [],
+   "source": "event features run e2331f976fd1: pair_membership against state_space and state_shares (scripts/detector_comparison/add_state_shares.py)",
+   "function": "other_detector_values",
+   "pending": null
+  },
+  "zugaro_mostly_local_fraction": {
+   "value": 0.2843235564468956,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of zugaro events that overlap no non-local event and have Local above 0.8 in more than half their rows",
    "questions": [
     "2b.3"
    ],

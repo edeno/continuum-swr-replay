@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
 | `detection.json` | `3455b5a13f61` | yes | 172 | 0 |
-| `events.json` | `d7d80592187f` | yes | 353 | 0 |
+| `events.json` | `0a6f37576b94` | yes | 390 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
 
@@ -246,7 +246,7 @@ Sources:
 
 ### 2a.1. Is the decoder accurate, in sample and on held-out data?
 
-Status: partly computed; in sample only: no script measures the held-out decoding error. Figures: 2e, decoder_validation. Values: 12.
+Status: partly computed; in sample only: no script measures the held-out decoding error. Figures: decoder_validation. Values: 12.
 
 Sources:
 
@@ -264,8 +264,8 @@ Sources:
 | `\EventsCalibrationErrorBinTen` | 3.0 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.95 (bin 10 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
 | `\EventsCalibrationErrorBinThree` | 7.5 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.25 (bin 3 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
 | `\EventsCalibrationErrorBinTwo` | 8.8 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.15 (bin 2 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
-| `\EventsDecodingErrorMedianCm` | 3.0 | cm | median over sessions of each session's median Local-state decoding error (the track-graph distance from the decoded to the actual position, over time bins with Local probability above 0.5 outside excluded time), sessions pooled | `events.decoding_error_values` | 2e |
-| `\EventsDecodingErrorSessions` | 242 |  | sessions with a Local-state decoding error | `events.decoding_error_values` | 2e |
+| `\EventsDecodingErrorMedianCm` | 3.0 | cm | median over sessions of each session's median Local-state decoding error (the track-graph distance from the decoded to the actual position, over time bins with Local probability above 0.5 outside excluded time), sessions pooled | `events.decoding_error_values` | decoder_validation |
+| `\EventsDecodingErrorSessions` | 242 |  | sessions with a Local-state decoding error | `events.decoding_error_values` | decoder_validation |
 
 ### 2a.3. On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?
 
@@ -364,11 +364,11 @@ Status: dropped; wrongly framed as a false-positive rate: shuffles, thinned spik
 
 ### 2b.1. Do non-local events occur without an SWR? (examples)
 
-Status: no numbers; example events, one per overlap class. Figures: 2a. Values: 0.
+Status: no numbers; example events, one per overlap class. Figures: 2b. Values: 0.
 
 ### 2b.2. How many immobile non-local events overlap no SWR, and what fraction of them is that?
 
-Status: computed. Figures: 2, 2b. Values: 33.
+Status: computed. Figures: 2, 2c. Values: 33.
 
 *Note:* The retired claims table (in git history) read these as the events SWR-triggered detection misses; that reading belongs in the Results.
 
@@ -379,16 +379,16 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsAnimals` | 5 |  | animals in the event table | `events.event_cohort_values` | 2b |
-| `\EventsAnimalsNonSwrMajority` | 4 |  | animals whose share of non-SWR events (the mean over their epochs) is above one half | `events.event_cohort_values` | 2b |
-| `\EventsAnimalsNonSwrPlurality` | 5 |  | animals whose share of non-SWR events is the largest of their three overlap-class shares (each the mean over the animal's epochs) | `events.event_cohort_values` | 2b |
-| `\EventsEpochs` | 242 |  | epochs in the event table | `events.event_cohort_values` | 2b |
+| `\EventsAnimals` | 5 |  | animals in the event table | `events.event_cohort_values` | 2c |
+| `\EventsAnimalsNonSwrMajority` | 4 |  | animals whose share of non-SWR events (the mean over their epochs) is above one half | `events.event_cohort_values` | 2c |
+| `\EventsAnimalsNonSwrPlurality` | 5 |  | animals whose share of non-SWR events is the largest of their three overlap-class shares (each the mean over the animal's epochs) | `events.event_cohort_values` | 2c |
+| `\EventsEpochs` | 242 |  | epochs in the event table | `events.event_cohort_values` | 2c |
 | `\EventsKayTimeS` | 4127 | s | seconds Kay's SWRs span (compared events): what an SWR-triggered analysis examines | `events.left_out_values` | 2 |
-| `\EventsNonSwrFraction` | 57 % |  | share of immobile non-local events overlapping no SWR, pooled over animals | `events.event_cohort_values` | 2b |
-| `\EventsNonSwrFractionAnimalMax` | 65 % |  | highest per-animal share of non-SWR events (the mean over the animal's epochs) | `events.event_cohort_values` | 2b |
-| `\EventsNonSwrFractionAnimalMin` | 46 |  | lowest per-animal share of non-SWR events (an animal's share is the mean over its epochs of the epoch's share) | `events.event_cohort_values` | 2b |
-| `\EventsNonlocalEvents` | 75,675 |  | immobile non-local events in the canonical event table (whole event below 4 cm/s) | `events.event_cohort_values` | 2b |
-| `\EventsNonlocalEventsNonSwr` | 42,974 |  | of those, events overlapping no SWR (overlap_class non_swr) | `events.event_cohort_values` | 2b |
+| `\EventsNonSwrFraction` | 57 % |  | share of immobile non-local events overlapping no SWR, pooled over animals | `events.event_cohort_values` | 2c |
+| `\EventsNonSwrFractionAnimalMax` | 65 % |  | highest per-animal share of non-SWR events (the mean over the animal's epochs) | `events.event_cohort_values` | 2c |
+| `\EventsNonSwrFractionAnimalMin` | 46 |  | lowest per-animal share of non-SWR events (an animal's share is the mean over its epochs of the epoch's share) | `events.event_cohort_values` | 2c |
+| `\EventsNonlocalEvents` | 75,675 |  | immobile non-local events in the canonical event table (whole event below 4 cm/s) | `events.event_cohort_values` | 2c |
+| `\EventsNonlocalEventsNonSwr` | 42,974 |  | of those, events overlapping no SWR (overlap_class non_swr) | `events.event_cohort_values` | 2c |
 | `\EventsNonlocalEventsOutsideKay` | 42,962 |  | non-local events no Kay SWR overlaps (detector comparison memberships) | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideKayFraction` | 57 % |  | share of the non-local events with a known membership that no Kay SWR overlaps | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideKayPerHour` | 1100 | per h | non-local events no Kay SWR overlaps, per hour of analysed immobility | `events.left_out_values` | 2 |
@@ -398,8 +398,8 @@ Sources:
 | `\EventsNonlocalEventsOutsideWidloski` | 70,924 |  | non-local events no Widloski event overlaps (detector comparison memberships) | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideWidloskiFraction` | 94 % |  | share of the non-local events with a known membership that no Widloski event overlaps | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideWidloskiPerHour` | 1800 | per h | non-local events no Widloski event overlaps, per hour of analysed immobility | `events.left_out_values` | 2 |
-| `\EventsNonlocalEventsSwrContained` | 16,037 |  | events lying inside an SWR (overlap_class swr_contained) | `events.event_cohort_values` | 2b |
-| `\EventsNonlocalEventsSwrPartial` | 16,664 |  | events partly overlapping an SWR (overlap_class swr_partial) | `events.event_cohort_values` | 2b |
+| `\EventsNonlocalEventsSwrContained` | 16,037 |  | events lying inside an SWR (overlap_class swr_contained) | `events.event_cohort_values` | 2c |
+| `\EventsNonlocalEventsSwrPartial` | 16,664 |  | events partly overlapping an SWR (overlap_class swr_partial) | `events.event_cohort_values` | 2c |
 | `\EventsNonlocalTimeOutsideKayFraction` | 53 % |  | share of non-local event time that Kay's SWRs do not cover | `events.left_out_values` | 2 |
 | `\EventsNonlocalTimeOutsideKayS` | 3485 | s | seconds of non-local event time that Kay's SWRs do not cover | `events.left_out_values` | 2 |
 | `\EventsNonlocalTimeOutsideSwrFraction` | 31 % |  | share of non-local event time that the five SWR definitions together do not cover | `events.left_out_values` | 2 |
@@ -410,12 +410,12 @@ Sources:
 | `\EventsNonlocalTimeOutsideWidloskiS` | 6004 | s | seconds of non-local event time that the Widloski detector's events do not cover | `events.left_out_values` | 2 |
 | `\EventsNonlocalTimeS` | 6562 | s | seconds of non-local event time (compared events), summed over epochs | `events.left_out_values` | 2 |
 | `\EventsRestHours` | 40 | h | hours of analysed immobility the non-local detector observed (exposure), summed over epochs | `events.left_out_values` | 2 |
-| `\EventsSwrContainedFraction` | 21 % |  | share of immobile non-local events lying inside an SWR, pooled over animals | `events.event_cohort_values` | 2b |
-| `\EventsSwrPartialFraction` | 22 % |  | share of immobile non-local events partly overlapping an SWR, pooled over animals | `events.event_cohort_values` | 2b |
+| `\EventsSwrContainedFraction` | 21 % |  | share of immobile non-local events lying inside an SWR, pooled over animals | `events.event_cohort_values` | 2c |
+| `\EventsSwrPartialFraction` | 22 % |  | share of immobile non-local events partly overlapping an SWR, pooled over animals | `events.event_cohort_values` | 2c |
 
 ### 2b.3. How do SWR detection and non-local detection overlap: for each other detector, what share of its events overlaps no non-local event, how do those divide by decoder state, and, for the ones that do overlap, what share of their time bins does each state take?
 
-Status: computed. Figures: 2. Values: 98.
+Status: computed. Figures: 2, 2d, 2e. Values: 106.
 
 Sources:
 
@@ -424,6 +424,7 @@ Sources:
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsCareyEvents` | 24,084 |  | carey events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsCareyMostlyLocalFraction` | 16 % |  | share of carey events that overlap no non-local event and have Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
 | `\EventsCareyNoNonlocalFraction` | 20 % |  | share of carey events that overlap no non-local event | `events.other_detector_values` |  |
 | `\EventsCareyNoNonlocalMixedFraction` | 18 % |  | of carey events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
 | `\EventsCareyNoNonlocalMostlyLocalFraction` | 82 % |  | of carey events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
@@ -436,6 +437,7 @@ Sources:
 | `\EventsCareyOverlapNonlocalShareMedian` | 87 % |  | median over carey events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
 | `\EventsCareyOverlapUncertainShareMedian` | 9 % |  | median over carey events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
 | `\EventsKarlssonEvents` | 60,472 |  | karlsson events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsKarlssonMostlyLocalFraction` | 31 % |  | share of karlsson events that overlap no non-local event and have Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
 | `\EventsKarlssonNoNonlocalFraction` | 38 % |  | share of karlsson events that overlap no non-local event | `events.other_detector_values` |  |
 | `\EventsKarlssonNoNonlocalMixedFraction` | 18 % |  | of karlsson events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
 | `\EventsKarlssonNoNonlocalMostlyLocalFraction` | 81 % |  | of karlsson events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
@@ -448,6 +450,7 @@ Sources:
 | `\EventsKarlssonOverlapNonlocalShareMedian` | 77 % |  | median over karlsson events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
 | `\EventsKarlssonOverlapUncertainShareMedian` | 13 % |  | median over karlsson events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
 | `\EventsKayEvents` | 41,151 |  | kay events compared with the non-local detector | `events.other_detector_values` | 2 |
+| `\EventsKayMostlyLocalFraction` | 13 % |  | share of kay events that overlap no non-local event and have Local above 0.8 in more than half their rows | `events.other_detector_values` | 2d |
 | `\EventsKayNoNonlocalFraction` | 17 % |  | share of kay events that overlap no non-local event | `events.other_detector_values` | 2 |
 | `\EventsKayNoNonlocalFractionAnimalMax` | 29 % |  | highest per-animal share of kay events overlapping no non-local event (the mean over the animal's epochs) | `events.other_detector_values` | 2 |
 | `\EventsKayNoNonlocalFractionAnimalMin` | 8 |  | lowest per-animal share of kay events overlapping no non-local event (an animal's share is the mean over its epochs of the epoch's share) | `events.other_detector_values` | 2 |
@@ -462,6 +465,7 @@ Sources:
 | `\EventsKayOverlapNonlocalShareMedian` | 88 % |  | median over kay events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` | 2 |
 | `\EventsKayOverlapUncertainShareMedian` | 9 % |  | median over kay events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` | 2 |
 | `\EventsMuaEvents` | 40,732 |  | mua events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsMuaMostlyLocalFraction` | 12 % |  | share of mua events that overlap no non-local event and have Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
 | `\EventsMuaNoNonlocalFraction` | 15 % |  | share of mua events that overlap no non-local event | `events.other_detector_values` |  |
 | `\EventsMuaNoNonlocalMixedFraction` | 22 % |  | of mua events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
 | `\EventsMuaNoNonlocalMostlyLocalFraction` | 78 % |  | of mua events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
@@ -474,6 +478,7 @@ Sources:
 | `\EventsMuaOverlapNonlocalShareMedian` | 81 % |  | median over mua events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
 | `\EventsMuaOverlapUncertainShareMedian` | 13 % |  | median over mua events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
 | `\EventsWidloskiCriteriaEvents` | 5,056 |  | memoryless_criteria events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaMostlyLocalFraction` | 3 % |  | share of memoryless_criteria events that overlap no non-local event and have Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
 | `\EventsWidloskiCriteriaNoNonlocalFraction` | 5 % |  | share of memoryless_criteria events that overlap no non-local event | `events.other_detector_values` |  |
 | `\EventsWidloskiCriteriaNoNonlocalMixedFraction` | 36 % |  | of memoryless_criteria events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
 | `\EventsWidloskiCriteriaNoNonlocalMostlyLocalFraction` | 64 % |  | of memoryless_criteria events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
@@ -486,6 +491,7 @@ Sources:
 | `\EventsWidloskiCriteriaOverlapNonlocalShareMedian` | 82 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
 | `\EventsWidloskiCriteriaOverlapUncertainShareMedian` | 8 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
 | `\EventsWidloskiEvents` | 4,662 |  | memoryless events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsWidloskiMostlyLocalFraction` | 3 % |  | share of memoryless events that overlap no non-local event and have Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
 | `\EventsWidloskiNoNonlocalFraction` | 4 % |  | share of memoryless events that overlap no non-local event | `events.other_detector_values` |  |
 | `\EventsWidloskiNoNonlocalMixedFraction` | 37 % |  | of memoryless events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
 | `\EventsWidloskiNoNonlocalMostlyLocalFraction` | 63 % |  | of memoryless events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
@@ -498,6 +504,7 @@ Sources:
 | `\EventsWidloskiOverlapNonlocalShareMedian` | 81 % |  | median over memoryless events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
 | `\EventsWidloskiOverlapUncertainShareMedian` | 8 % |  | median over memoryless events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
 | `\EventsYuEvents` | 125,423 |  | yu events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsYuMostlyLocalFraction` | 46 % |  | share of yu events that overlap no non-local event and have Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
 | `\EventsYuNoNonlocalFraction` | 56 % |  | share of yu events that overlap no non-local event | `events.other_detector_values` |  |
 | `\EventsYuNoNonlocalMixedFraction` | 17 % |  | of yu events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
 | `\EventsYuNoNonlocalMostlyLocalFraction` | 82 % |  | of yu events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
@@ -510,6 +517,7 @@ Sources:
 | `\EventsYuOverlapNonlocalShareMedian` | 79 % |  | median over yu events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
 | `\EventsYuOverlapUncertainShareMedian` | 13 % |  | median over yu events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
 | `\EventsZugaroEvents` | 23,934 |  | zugaro events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsZugaroMostlyLocalFraction` | 28 % |  | share of zugaro events that overlap no non-local event and have Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
 | `\EventsZugaroNoNonlocalFraction` | 35 % |  | share of zugaro events that overlap no non-local event | `events.other_detector_values` |  |
 | `\EventsZugaroNoNonlocalMixedFraction` | 18 % |  | of zugaro events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
 | `\EventsZugaroNoNonlocalMostlyLocalFraction` | 81 % |  | of zugaro events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
@@ -524,7 +532,7 @@ Sources:
 
 ### 2b.4. How do non-local event starts and ends differ from those of the matched SWR?
 
-Status: computed. Figures: 2d. Values: 3.
+Status: computed. Figures: 2f. Values: 7.
 
 Sources:
 
@@ -532,9 +540,13 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsEndOffsetMedianMs` | −4 | ms | median of event end minus matched SWR end | `events.boundary_offset_values` | 2d |
-| `\EventsStartOffsetMedianMs` | 4 | ms | median of event start minus matched SWR start | `events.boundary_offset_values` | 2d |
-| `\EventsSwrOverlappingEvents` | 32,701 |  | immobile non-local events overlapping an SWR | `events.boundary_offset_values` | 2d |
+| `\EventsEndOffsetBeyondFiftyMsFraction` | 14 % |  | share of SWR-overlapping events whose end differs from the matched SWR's end by more than 50 ms | `events.boundary_offset_values` | 2f |
+| `\EventsEndOffsetBeyondTwentyFiveMsFraction` | 24 % |  | share of SWR-overlapping events whose end differs from the matched SWR's end by more than 25 ms | `events.boundary_offset_values` | 2f |
+| `\EventsEndOffsetMedianMs` | −4 | ms | median of event end minus matched SWR end | `events.boundary_offset_values` | 2f |
+| `\EventsStartOffsetBeyondFiftyMsFraction` | 9 % |  | share of SWR-overlapping events whose start differs from the matched SWR's start by more than 50 ms | `events.boundary_offset_values` | 2f |
+| `\EventsStartOffsetBeyondTwentyFiveMsFraction` | 20 % |  | share of SWR-overlapping events whose start differs from the matched SWR's start by more than 25 ms | `events.boundary_offset_values` | 2f |
+| `\EventsStartOffsetMedianMs` | 4 | ms | median of event start minus matched SWR start | `events.boundary_offset_values` | 2f |
+| `\EventsSwrOverlappingEvents` | 32,701 |  | immobile non-local events overlapping an SWR | `events.boundary_offset_values` | 2f |
 
 ### 2b.5. How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?
 
@@ -572,6 +584,55 @@ Status: dropped; contradicted by the ripple-power bump at non-local onset; refra
 Status: dropped; framing with no values: the introduction's argument, not a measurement. Values: 0.
 
 ## Part 2: the events are real
+
+### 2c.1. Are the events population events: what share of tetrodes fires, and at what rate, against Local-rest windows of the same length?
+
+Status: computed. Figures: 2g. Values: 15.
+
+Sources:
+
+- Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)
+
+| Macro | Value | Unit | What it is | Builder function | Figures |
+|---|---|---|---|---|---|
+| `\EventsNonSwrControlParticipation` | 35 % |  | share of tetrodes with a spike of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsNonSwrControlSpikeRateHz` | 283 | spikes per s | spike rate summed over tetrodes of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsNonSwrEventParticipation` | 52 % |  | share of tetrodes with a spike of no SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsNonSwrEventSpikeRateHz` | 749 | spikes per s | spike rate summed over tetrodes of no SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsNonSwrParticipationAnimals` | 5 |  | animals with no SWR events and Local-rest windows | `events.participation_values` | 2g |
+| `\EventsNonSwrParticipationAnimalsAboveRest` | 5 |  | animals whose no SWR events' share of tetrodes with a spike is above their Local-rest windows' | `events.participation_values` | 2g |
+| `\EventsNonSwrSpikeRateHzAnimalsAboveRest` | 5 |  | animals whose no SWR events' spike rate summed over tetrodes is above their Local-rest windows' | `events.participation_values` | 2g |
+| `\EventsParticipationEventsWithoutControl` | 8 |  | events longer than any Local-rest stretch of their epoch (no control) | `events.participation_values` | 2g |
+| `\EventsSwrControlParticipation` | 43 % |  | share of tetrodes with a spike of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsSwrControlSpikeRateHz` | 283 | spikes per s | spike rate summed over tetrodes of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsSwrEventParticipation` | 72 % |  | share of tetrodes with a spike of SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsSwrEventSpikeRateHz` | 1101 | spikes per s | spike rate summed over tetrodes of SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsSwrParticipationAnimals` | 5 |  | animals with SWR events and Local-rest windows | `events.participation_values` | 2g |
+| `\EventsSwrParticipationAnimalsAboveRest` | 5 |  | animals whose SWR events' share of tetrodes with a spike is above their Local-rest windows' | `events.participation_values` | 2g |
+| `\EventsSwrSpikeRateHzAnimalsAboveRest` | 5 |  | animals whose SWR events' spike rate summed over tetrodes is above their Local-rest windows' | `events.participation_values` | 2g |
+
+### 2c.2. During a detected event, how much more strongly does the population activity favor the decoded positions than the animal's measured positions?
+
+Status: computed. Figures: 2h. Values: 10.
+
+*Note:* The same spikes detected the event and estimated its positions, which favors positive scores: the values give the size of the advantage within detected events, not a test against chance.
+
+Sources:
+
+- Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)
+
+| Macro | Value | Unit | What it is | Builder function | Figures |
+|---|---|---|---|---|---|
+| `\EventsNonSwrLikelihoodAdvantageEvents` | 42,974 |  | no SWR events scored | `events.likelihood_advantage_values` | 2h |
+| `\EventsNonSwrLikelihoodAdvantageEventsScored` | 42,974 |  | no SWR events with a per-spike score (at least one spike) | `events.likelihood_advantage_values` | 2h |
+| `\EventsNonSwrLikelihoodAdvantagePerSpike` | 0.70 | nats per spike | log-likelihood of no SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median | `events.likelihood_advantage_values` | 2h |
+| `\EventsNonSwrLikelihoodAdvantagePerSpikeCiHigh` | 0.88 | nats per spike | upper bound of that interval | `events.likelihood_advantage_values` | 2h |
+| `\EventsNonSwrLikelihoodAdvantagePerSpikeCiLow` | 0.52 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.likelihood_advantage_values` | 2h |
+| `\EventsSwrLikelihoodAdvantageEvents` | 32,701 |  | SWR events scored | `events.likelihood_advantage_values` | 2h |
+| `\EventsSwrLikelihoodAdvantageEventsScored` | 32,701 |  | SWR events with a per-spike score (at least one spike) | `events.likelihood_advantage_values` | 2h |
+| `\EventsSwrLikelihoodAdvantagePerSpike` | 1.06 | nats per spike | log-likelihood of SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median | `events.likelihood_advantage_values` | 2h |
+| `\EventsSwrLikelihoodAdvantagePerSpikeCiHigh` | 1.32 | nats per spike | upper bound of that interval | `events.likelihood_advantage_values` | 2h |
+| `\EventsSwrLikelihoodAdvantagePerSpikeCiLow` | 0.80 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.likelihood_advantage_values` | 2h |
 
 ### 2c.3. Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?
 
@@ -2789,15 +2850,19 @@ Script: `scripts/figures/generate_figure01.py`. Questions: 1.1.
 
 ### Figure 2: Non-local events and SWRs
 
-Script: `scripts/figures/generate_figure02.py`. Questions: 2a.1, 2b.1, 2b.2, 2b.3, 2b.4, 2c.3, 2d.1, 2d.9.
+Script: `scripts/figures/generate_figure02.py`. Questions: 2b.1, 2b.2, 2b.3, 2b.4, 2c.1, 2c.2, 2c.3, 2d.1, 2d.9.
 
 Unlettered: `\EventsAnimalsNonSwrMoreAtWell`, `\EventsBaselineDllPerSpikeMedian`, `\EventsBaselineScored`, `\EventsBaselineSpikesMedian`, `\EventsBaselineTetrodesMedian`, `\EventsEvidenceAnimals`, `\EventsEvidenceEpochs`, `\EventsHeldoutNonSwrAnimalsPositive`, `\EventsHeldoutNonSwrAnimals`, `\EventsHeldoutNonSwrPerSpikeCiHigh`, `\EventsHeldoutNonSwrPerSpikeCiLow`, `\EventsHeldoutNonSwrPerSpike`, `\EventsHeldoutSwrAnimalsPositive`, `\EventsHeldoutSwrAnimals`, `\EventsHeldoutSwrPerSpikeCiHigh`, `\EventsHeldoutSwrPerSpikeCiLow`, `\EventsHeldoutSwrPerSpike`, `\EventsKayEvents`, `\EventsKayNoNonlocalFractionAnimalMax`, `\EventsKayNoNonlocalFractionAnimalMin`, `\EventsKayNoNonlocalFraction`, `\EventsKayNoNonlocalMixedFraction`, `\EventsKayNoNonlocalMostlyLocalFraction`, `\EventsKayNoNonlocalMostlyNoSpikeFraction`, `\EventsKayOverlapAllNonlocalFraction`, `\EventsKayOverlapAnyLocalFraction`, `\EventsKayOverlapAnyNoSpikeFraction`, `\EventsKayOverlapLocalShareMedian`, `\EventsKayOverlapNoSpikeShareMedian`, `\EventsKayOverlapNonlocalShareMedian`, `\EventsKayOverlapUncertainShareMedian`, `\EventsKayTimeS`, `\EventsNonSwrCloseAnimalsAboveBaseline`, `\EventsNonSwrCloseDllPerSpikeMedian`, `\EventsNonSwrCloseEpochsAboveBaseline`, `\EventsNonSwrCloseEpochsScored`, `\EventsNonSwrCloseScored`, `\EventsNonSwrCloseSpikesMedian`, `\EventsNonSwrCloseTetrodesMedian`, `\EventsNonSwrContentAtWellFraction`, `\EventsNonSwrContentNearOffFraction`, `\EventsNonSwrContentOwnWellFraction`, `\EventsNonSwrContentRemotePathFraction`, `\EventsNonSwrContentRemoteWellFraction`, `\EventsNonSwrRemoteAnimalsAboveBaseline`, `\EventsNonSwrRemoteDllPerSpikeMedian`, `\EventsNonSwrRemoteEpochsAboveBaseline`, `\EventsNonSwrRemoteEpochsScored`, `\EventsNonSwrRemoteScored`, `\EventsNonSwrRemoteSpikesMedian`, `\EventsNonSwrRemoteTetrodesMedian`, `\EventsNonlocalEventsOutsideKayFraction`, `\EventsNonlocalEventsOutsideKayPerHour`, `\EventsNonlocalEventsOutsideKay`, `\EventsNonlocalEventsOutsideTriggerFraction`, `\EventsNonlocalEventsOutsideTriggerPerHour`, `\EventsNonlocalEventsOutsideTrigger`, `\EventsNonlocalEventsOutsideWidloskiFraction`, `\EventsNonlocalEventsOutsideWidloskiPerHour`, `\EventsNonlocalEventsOutsideWidloski`, `\EventsNonlocalTimeOutsideKayFraction`, `\EventsNonlocalTimeOutsideKayS`, `\EventsNonlocalTimeOutsideSwrFraction`, `\EventsNonlocalTimeOutsideSwrS`, `\EventsNonlocalTimeOutsideTriggerFraction`, `\EventsNonlocalTimeOutsideTriggerS`, `\EventsNonlocalTimeOutsideWidloskiFraction`, `\EventsNonlocalTimeOutsideWidloskiS`, `\EventsNonlocalTimeS`, `\EventsOccupancyEpochs`, `\EventsRestHours`, `\EventsSwrContentAtWellFraction`, `\EventsSwrContentNearOffFraction`, `\EventsSwrContentOwnWellFraction`, `\EventsSwrContentRemotePathFraction`, `\EventsSwrContentRemoteWellFraction`, `\EventsSwrRemoteAnimalsAboveBaseline`, `\EventsSwrRemoteDllPerSpikeMedian`, `\EventsSwrRemoteEpochsAboveBaseline`, `\EventsSwrRemoteEpochsScored`, `\EventsSwrRemoteScored`, `\EventsSwrRemoteSpikesMedian`, `\EventsSwrRemoteTetrodesMedian`
 
-Panel b: `\EventsAnimalsNonSwrMajority`, `\EventsAnimalsNonSwrPlurality`, `\EventsAnimals`, `\EventsEpochs`, `\EventsNonSwrFractionAnimalMax`, `\EventsNonSwrFractionAnimalMin`, `\EventsNonSwrFraction`, `\EventsNonlocalEventsNonSwr`, `\EventsNonlocalEventsSwrContained`, `\EventsNonlocalEventsSwrPartial`, `\EventsNonlocalEvents`, `\EventsSwrContainedFraction`, `\EventsSwrPartialFraction`
+Panel c: `\EventsAnimalsNonSwrMajority`, `\EventsAnimalsNonSwrPlurality`, `\EventsAnimals`, `\EventsEpochs`, `\EventsNonSwrFractionAnimalMax`, `\EventsNonSwrFractionAnimalMin`, `\EventsNonSwrFraction`, `\EventsNonlocalEventsNonSwr`, `\EventsNonlocalEventsSwrContained`, `\EventsNonlocalEventsSwrPartial`, `\EventsNonlocalEvents`, `\EventsSwrContainedFraction`, `\EventsSwrPartialFraction`
 
-Panel d: `\EventsEndOffsetMedianMs`, `\EventsStartOffsetMedianMs`, `\EventsSwrOverlappingEvents`
+Panel d: `\EventsKayMostlyLocalFraction`
 
-Panel e: `\EventsDecodingErrorMedianCm`, `\EventsDecodingErrorSessions`
+Panel f: `\EventsEndOffsetBeyondFiftyMsFraction`, `\EventsEndOffsetBeyondTwentyFiveMsFraction`, `\EventsEndOffsetMedianMs`, `\EventsStartOffsetBeyondFiftyMsFraction`, `\EventsStartOffsetBeyondTwentyFiveMsFraction`, `\EventsStartOffsetMedianMs`, `\EventsSwrOverlappingEvents`
+
+Panel g: `\EventsNonSwrControlParticipation`, `\EventsNonSwrControlSpikeRateHz`, `\EventsNonSwrEventParticipation`, `\EventsNonSwrEventSpikeRateHz`, `\EventsNonSwrParticipationAnimalsAboveRest`, `\EventsNonSwrParticipationAnimals`, `\EventsNonSwrSpikeRateHzAnimalsAboveRest`, `\EventsParticipationEventsWithoutControl`, `\EventsSwrControlParticipation`, `\EventsSwrControlSpikeRateHz`, `\EventsSwrEventParticipation`, `\EventsSwrEventSpikeRateHz`, `\EventsSwrParticipationAnimalsAboveRest`, `\EventsSwrParticipationAnimals`, `\EventsSwrSpikeRateHzAnimalsAboveRest`
+
+Panel h: `\EventsNonSwrLikelihoodAdvantageEventsScored`, `\EventsNonSwrLikelihoodAdvantageEvents`, `\EventsNonSwrLikelihoodAdvantagePerSpikeCiHigh`, `\EventsNonSwrLikelihoodAdvantagePerSpikeCiLow`, `\EventsNonSwrLikelihoodAdvantagePerSpike`, `\EventsSwrLikelihoodAdvantageEventsScored`, `\EventsSwrLikelihoodAdvantageEvents`, `\EventsSwrLikelihoodAdvantagePerSpikeCiHigh`, `\EventsSwrLikelihoodAdvantagePerSpikeCiLow`, `\EventsSwrLikelihoodAdvantagePerSpike`
 
 ### Figure 3: Non-local events outside SWRs
 
@@ -2821,7 +2886,7 @@ Panel d: `\MpfcBestModelConstantFraction`, `\MpfcBestModelJointFraction`, `\Mpfc
 
 Script: `scripts/figures/generate_supp_decoder_validation.py`. Questions: 2a.1, 2a.6, 2d.8.
 
-Unlettered: `\EventsCalibrationErrorBinEight`, `\EventsCalibrationErrorBinFive`, `\EventsCalibrationErrorBinFour`, `\EventsCalibrationErrorBinNine`, `\EventsCalibrationErrorBinOne`, `\EventsCalibrationErrorBinSeven`, `\EventsCalibrationErrorBinSix`, `\EventsCalibrationErrorBinTen`, `\EventsCalibrationErrorBinThree`, `\EventsCalibrationErrorBinTwo`, `\EventsStateFractionImmobileContinuous`, `\EventsStateFractionImmobileFragmented`, `\EventsStateFractionImmobileLocal`, `\EventsStateFractionImmobileNoSpike`, `\EventsStateFractionMovingContinuous`, `\EventsStateFractionMovingFragmented`, `\EventsStateFractionMovingLocal`, `\EventsStateFractionMovingNoSpike`
+Unlettered: `\EventsCalibrationErrorBinEight`, `\EventsCalibrationErrorBinFive`, `\EventsCalibrationErrorBinFour`, `\EventsCalibrationErrorBinNine`, `\EventsCalibrationErrorBinOne`, `\EventsCalibrationErrorBinSeven`, `\EventsCalibrationErrorBinSix`, `\EventsCalibrationErrorBinTen`, `\EventsCalibrationErrorBinThree`, `\EventsCalibrationErrorBinTwo`, `\EventsDecodingErrorMedianCm`, `\EventsDecodingErrorSessions`, `\EventsStateFractionImmobileContinuous`, `\EventsStateFractionImmobileFragmented`, `\EventsStateFractionImmobileLocal`, `\EventsStateFractionImmobileNoSpike`, `\EventsStateFractionMovingContinuous`, `\EventsStateFractionMovingFragmented`, `\EventsStateFractionMovingLocal`, `\EventsStateFractionMovingNoSpike`
 
 ### Figure memoryless_comparison: Our detector and the Widloski & Foster detector on simulated replays
 
@@ -2876,7 +2941,9 @@ without being called, is not listed.
 | `events.gamma_z_values` | `reported/events.py` | `analysis.event_properties.event_statistics.event_signal_statistics`, `analysis.event_properties.event_statistics.reference_medians` |  |
 | `events.heldout_by_swr_values` | `reported/events.py` | none |  |
 | `events.left_out_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.left_out_statistics` |  |
+| `events.likelihood_advantage_values` | `reported/events.py` | `analysis.event_evidence.likelihood_advantage.likelihood_advantage_statistics` |  |
 | `events.other_detector_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.other_detector_statistics` |  |
+| `events.participation_values` | `reported/events.py` | `analysis.event_evidence.participation.participation_differences`, `analysis.event_evidence.participation.participation_statistics` |  |
 | `events.property_interval_values` | `reported/events.py` | none |  |
 | `events.property_values` | `reported/events.py` | `analysis.event_properties.event_statistics.class_medians`, `analysis.event_properties.event_statistics.n_animals_in_direction` |  |
 | `events.rest_theta_values` | `reported/events.py` | `analysis.event_properties.event_statistics.rest_matched_theta_statistics` |  |

@@ -210,7 +210,7 @@
 \newcommand{\DetectionSweepTimingStateSpaceOnsetMinMs}{\ensuremath{-}20}  % detection.sweep_timing_state_space_onset_min_ms: smallest onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 \newcommand{\DetectionSweepTimingStateSpaceOnsetUpperQuartileMs}{\ensuremath{-}2}  % detection.sweep_timing_state_space_onset_upper_quartile_ms: upper quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 
-% --- events (commit d7d80592187f)
+% --- events (commit 0a6f37576b94)
 \newcommand{\EventsAnimals}{5}  % events.animals: animals in the event table
 \newcommand{\EventsAnimalsNonSwrMajority}{4}  % events.animals_non_swr_majority: animals whose share of non-SWR events (the mean over their epochs) is above one half
 \newcommand{\EventsAnimalsNonSwrMoreAtWell}{5}  % events.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's sessions of the session's share
@@ -239,6 +239,7 @@
 \newcommand{\EventsCalibrationErrorBinThree}{7.5}  % events.calibration_error_bin_three: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.25 (bin 3 of 10), outside excluded time, sessions pooled
 \newcommand{\EventsCalibrationErrorBinTwo}{8.8}  % events.calibration_error_bin_two: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.15 (bin 2 of 10), outside excluded time, sessions pooled
 \newcommand{\EventsCareyEvents}{24{,}084}  % events.carey_events: carey events compared with the non-local detector
+\newcommand{\EventsCareyMostlyLocalFraction}{16}  % events.carey_mostly_local_fraction: share of carey events that overlap no non-local event and have Local above 0.8 in more than half their rows
 \newcommand{\EventsCareyNoNonlocalFraction}{20}  % events.carey_no_nonlocal_fraction: share of carey events that overlap no non-local event
 \newcommand{\EventsCareyNoNonlocalMixedFraction}{18}  % events.carey_no_nonlocal_mixed_fraction: of carey events overlapping no non-local event, the share with neither state in more than half their rows
 \newcommand{\EventsCareyNoNonlocalMostlyLocalFraction}{82}  % events.carey_no_nonlocal_mostly_local_fraction: of carey events overlapping no non-local event, the share with Local above 0.8 in more than half their rows
@@ -257,6 +258,8 @@
 \newcommand{\EventsDurationDifferenceLow}{+34}  % events.duration_difference_low: lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median event duration
 \newcommand{\EventsDurationMedianNonSwr}{48}  % events.duration_median_non_swr: median event duration of immobile non-SWR non-local events
 \newcommand{\EventsDurationMedianSwr}{94}  % events.duration_median_swr: median event duration of immobile SWR-overlapping non-local events
+\newcommand{\EventsEndOffsetBeyondFiftyMsFraction}{14}  % events.end_offset_beyond_fifty_ms_fraction: share of SWR-overlapping events whose end differs from the matched SWR's end by more than 50 ms
+\newcommand{\EventsEndOffsetBeyondTwentyFiveMsFraction}{24}  % events.end_offset_beyond_twenty_five_ms_fraction: share of SWR-overlapping events whose end differs from the matched SWR's end by more than 25 ms
 \newcommand{\EventsEndOffsetMedianMs}{\ensuremath{-}4}  % events.end_offset_median_ms: median of event end minus matched SWR end
 \newcommand{\EventsEpochs}{242}  % events.epochs: epochs in the event table
 \newcommand{\EventsEvidenceAnimals}{5}  % events.evidence_animals: animals in the spike-evidence run
@@ -300,6 +303,7 @@
 \newcommand{\EventsHpdMedianNonSwr}{44}  % events.hpd_median_non_swr: median highest-density-region coverage of immobile non-SWR non-local events
 \newcommand{\EventsHpdMedianSwr}{80}  % events.hpd_median_swr: median highest-density-region coverage of immobile SWR-overlapping non-local events
 \newcommand{\EventsKarlssonEvents}{60{,}472}  % events.karlsson_events: karlsson events compared with the non-local detector
+\newcommand{\EventsKarlssonMostlyLocalFraction}{31}  % events.karlsson_mostly_local_fraction: share of karlsson events that overlap no non-local event and have Local above 0.8 in more than half their rows
 \newcommand{\EventsKarlssonNoNonlocalFraction}{38}  % events.karlsson_no_nonlocal_fraction: share of karlsson events that overlap no non-local event
 \newcommand{\EventsKarlssonNoNonlocalMixedFraction}{18}  % events.karlsson_no_nonlocal_mixed_fraction: of karlsson events overlapping no non-local event, the share with neither state in more than half their rows
 \newcommand{\EventsKarlssonNoNonlocalMostlyLocalFraction}{81}  % events.karlsson_no_nonlocal_mostly_local_fraction: of karlsson events overlapping no non-local event, the share with Local above 0.8 in more than half their rows
@@ -312,6 +316,7 @@
 \newcommand{\EventsKarlssonOverlapNonlocalShareMedian}{77}  % events.karlsson_overlap_nonlocal_share_median: median over karlsson events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\EventsKarlssonOverlapUncertainShareMedian}{13}  % events.karlsson_overlap_uncertain_share_median: median over karlsson events overlapping a non-local event of the share of their rows with no state above 0.8
 \newcommand{\EventsKayEvents}{41{,}151}  % events.kay_events: kay events compared with the non-local detector
+\newcommand{\EventsKayMostlyLocalFraction}{13}  % events.kay_mostly_local_fraction: share of kay events that overlap no non-local event and have Local above 0.8 in more than half their rows
 \newcommand{\EventsKayNoNonlocalFraction}{17}  % events.kay_no_nonlocal_fraction: share of kay events that overlap no non-local event
 \newcommand{\EventsKayNoNonlocalFractionAnimalMax}{29}  % events.kay_no_nonlocal_fraction_animal_max: highest per-animal share of kay events overlapping no non-local event (the mean over the animal's epochs)
 \newcommand{\EventsKayNoNonlocalFractionAnimalMin}{8}  % events.kay_no_nonlocal_fraction_animal_min: lowest per-animal share of kay events overlapping no non-local event (an animal's share is the mean over its epochs of the epoch's share)
@@ -341,6 +346,7 @@
 \newcommand{\EventsMuaEvents}{40{,}732}  % events.mua_events: mua events compared with the non-local detector
 \newcommand{\EventsMuaMedianNonSwr}{0.79}  % events.mua_median_non_swr: median z-scored MUA rate of immobile non-SWR non-local events (event mean)
 \newcommand{\EventsMuaMedianSwr}{2.37}  % events.mua_median_swr: median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean)
+\newcommand{\EventsMuaMostlyLocalFraction}{12}  % events.mua_mostly_local_fraction: share of mua events that overlap no non-local event and have Local above 0.8 in more than half their rows
 \newcommand{\EventsMuaNoNonlocalFraction}{15}  % events.mua_no_nonlocal_fraction: share of mua events that overlap no non-local event
 \newcommand{\EventsMuaNoNonlocalMixedFraction}{22}  % events.mua_no_nonlocal_mixed_fraction: of mua events overlapping no non-local event, the share with neither state in more than half their rows
 \newcommand{\EventsMuaNoNonlocalMostlyLocalFraction}{78}  % events.mua_no_nonlocal_mostly_local_fraction: of mua events overlapping no non-local event, the share with Local above 0.8 in more than half their rows
@@ -375,9 +381,20 @@
 \newcommand{\EventsNonSwrContentOwnWellFraction}{13}  % events.non_swr_content_own_well_fraction: share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions
 \newcommand{\EventsNonSwrContentRemotePathFraction}{41}  % events.non_swr_content_remote_path_fraction: share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions
 \newcommand{\EventsNonSwrContentRemoteWellFraction}{45}  % events.non_swr_content_remote_well_fraction: share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions
+\newcommand{\EventsNonSwrControlParticipation}{35}  % events.non_swr_control_participation: share of tetrodes with a spike of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median
+\newcommand{\EventsNonSwrControlSpikeRateHz}{283}  % events.non_swr_control_spike_rate_hz: spike rate summed over tetrodes of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median
+\newcommand{\EventsNonSwrEventParticipation}{52}  % events.non_swr_event_participation: share of tetrodes with a spike of no SWR events: mean over animals of each animal's median over epochs of each epoch's median
+\newcommand{\EventsNonSwrEventSpikeRateHz}{749}  % events.non_swr_event_spike_rate_hz: spike rate summed over tetrodes of no SWR events: mean over animals of each animal's median over epochs of each epoch's median
 \newcommand{\EventsNonSwrFraction}{57}  % events.non_swr_fraction: share of immobile non-local events overlapping no SWR, pooled over animals
 \newcommand{\EventsNonSwrFractionAnimalMax}{65}  % events.non_swr_fraction_animal_max: highest per-animal share of non-SWR events (the mean over the animal's epochs)
 \newcommand{\EventsNonSwrFractionAnimalMin}{46}  % events.non_swr_fraction_animal_min: lowest per-animal share of non-SWR events (an animal's share is the mean over its epochs of the epoch's share)
+\newcommand{\EventsNonSwrLikelihoodAdvantageEvents}{42{,}974}  % events.non_swr_likelihood_advantage_events: no SWR events scored
+\newcommand{\EventsNonSwrLikelihoodAdvantageEventsScored}{42{,}974}  % events.non_swr_likelihood_advantage_events_scored: no SWR events with a per-spike score (at least one spike)
+\newcommand{\EventsNonSwrLikelihoodAdvantagePerSpike}{0.70}  % events.non_swr_likelihood_advantage_per_spike: log-likelihood of no SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median
+\newcommand{\EventsNonSwrLikelihoodAdvantagePerSpikeCiHigh}{0.88}  % events.non_swr_likelihood_advantage_per_spike_ci_high: upper bound of that interval
+\newcommand{\EventsNonSwrLikelihoodAdvantagePerSpikeCiLow}{0.52}  % events.non_swr_likelihood_advantage_per_spike_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
+\newcommand{\EventsNonSwrParticipationAnimals}{5}  % events.non_swr_participation_animals: animals with no SWR events and Local-rest windows
+\newcommand{\EventsNonSwrParticipationAnimalsAboveRest}{5}  % events.non_swr_participation_animals_above_rest: animals whose no SWR events' share of tetrodes with a spike is above their Local-rest windows'
 \newcommand{\EventsNonSwrRemoteAnimalsAboveBaseline}{5}  % events.non_swr_remote_animals_above_baseline: animals whose median nonSWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsNonSwrRemoteDllPerSpikeMedian}{0.71}  % events.non_swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events
 \newcommand{\EventsNonSwrRemoteEpochsAboveBaseline}{242}  % events.non_swr_remote_epochs_above_baseline: epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike
@@ -386,6 +403,7 @@
 \newcommand{\EventsNonSwrRemoteScored}{24{,}079}  % events.non_swr_remote_scored: nonSWR-remote events scored
 \newcommand{\EventsNonSwrRemoteSpikesMedian}{36}  % events.non_swr_remote_spikes_median: median spike count of nonSWR-remote events
 \newcommand{\EventsNonSwrRemoteTetrodesMedian}{11}  % events.non_swr_remote_tetrodes_median: median number of tetrodes with a spike in nonSWR-remote events
+\newcommand{\EventsNonSwrSpikeRateHzAnimalsAboveRest}{5}  % events.non_swr_spike_rate_hz_animals_above_rest: animals whose no SWR events' spike rate summed over tetrodes is above their Local-rest windows'
 \newcommand{\EventsNonlocalEvents}{75{,}675}  % events.nonlocal_events: immobile non-local events in the canonical event table (whole event below 4 cm/s)
 \newcommand{\EventsNonlocalEventsNonSwr}{42{,}974}  % events.nonlocal_events_non_swr: of those, events overlapping no SWR (overlap_class non_swr)
 \newcommand{\EventsNonlocalEventsOutsideKay}{42{,}962}  % events.nonlocal_events_outside_kay: non-local events no Kay SWR overlaps (detector comparison memberships)
@@ -409,6 +427,7 @@
 \newcommand{\EventsNonlocalTimeOutsideWidloskiS}{6004}  % events.nonlocal_time_outside_widloski_s: seconds of non-local event time that the Widloski detector's events do not cover
 \newcommand{\EventsNonlocalTimeS}{6562}  % events.nonlocal_time_s: seconds of non-local event time (compared events), summed over epochs
 \newcommand{\EventsOccupancyEpochs}{242}  % events.occupancy_epochs: epochs in the content-occupancy table
+\newcommand{\EventsParticipationEventsWithoutControl}{8}  % events.participation_events_without_control: events longer than any Local-rest stretch of their epoch (no control)
 \newcommand{\EventsPauseAnimalsInDirection}{5}  % events.pause_animals_in_direction: animals whose non-SWR median pause fraction is higher than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsPauseDifferenceHigh}{\ensuremath{-}0.047}  % events.pause_difference_high: upper bound of that interval
 \newcommand{\EventsPauseDifferenceLow}{\ensuremath{-}0.098}  % events.pause_difference_low: lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median pause fraction
@@ -473,6 +492,8 @@
 \newcommand{\EventsStartDistanceMatchedDifferenceLow}{\ensuremath{-}39}  % events.start_distance_matched_difference_low: lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate
 \newcommand{\EventsStartDistanceMedianNonSwr}{110}  % events.start_distance_median_non_swr: median start distance (track-graph distance from the animal to the event's first decoded position) of immobile non-SWR non-local events
 \newcommand{\EventsStartDistanceMedianSwr}{120}  % events.start_distance_median_swr: median start distance (track-graph distance from the animal to the event's first decoded position) of immobile SWR-overlapping non-local events
+\newcommand{\EventsStartOffsetBeyondFiftyMsFraction}{9}  % events.start_offset_beyond_fifty_ms_fraction: share of SWR-overlapping events whose start differs from the matched SWR's start by more than 50 ms
+\newcommand{\EventsStartOffsetBeyondTwentyFiveMsFraction}{20}  % events.start_offset_beyond_twenty_five_ms_fraction: share of SWR-overlapping events whose start differs from the matched SWR's start by more than 25 ms
 \newcommand{\EventsStartOffsetMedianMs}{4}  % events.start_offset_median_ms: median of event start minus matched SWR start
 \newcommand{\EventsStateFractionImmobileContinuous}{6.0}  % events.state_fraction_immobile_continuous: median over sessions of each session's mean Non-Local_Continuous_prob over its bins slower than 4 cm/s outside excluded time, sessions pooled
 \newcommand{\EventsStateFractionImmobileFragmented}{0.9}  % events.state_fraction_immobile_fragmented: median over sessions of each session's mean Non-Local_Fragmented_prob over its bins slower than 4 cm/s outside excluded time, sessions pooled
@@ -492,8 +513,19 @@
 \newcommand{\EventsSwrContentOwnWellFraction}{5}  % events.swr_content_own_well_fraction: share of SWR non-local time bins whose content is own well, weighted by time bins over sessions
 \newcommand{\EventsSwrContentRemotePathFraction}{73}  % events.swr_content_remote_path_fraction: share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions
 \newcommand{\EventsSwrContentRemoteWellFraction}{21}  % events.swr_content_remote_well_fraction: share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions
+\newcommand{\EventsSwrControlParticipation}{43}  % events.swr_control_participation: share of tetrodes with a spike of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median
+\newcommand{\EventsSwrControlSpikeRateHz}{283}  % events.swr_control_spike_rate_hz: spike rate summed over tetrodes of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median
+\newcommand{\EventsSwrEventParticipation}{72}  % events.swr_event_participation: share of tetrodes with a spike of SWR events: mean over animals of each animal's median over epochs of each epoch's median
+\newcommand{\EventsSwrEventSpikeRateHz}{1101}  % events.swr_event_spike_rate_hz: spike rate summed over tetrodes of SWR events: mean over animals of each animal's median over epochs of each epoch's median
+\newcommand{\EventsSwrLikelihoodAdvantageEvents}{32{,}701}  % events.swr_likelihood_advantage_events: SWR events scored
+\newcommand{\EventsSwrLikelihoodAdvantageEventsScored}{32{,}701}  % events.swr_likelihood_advantage_events_scored: SWR events with a per-spike score (at least one spike)
+\newcommand{\EventsSwrLikelihoodAdvantagePerSpike}{1.06}  % events.swr_likelihood_advantage_per_spike: log-likelihood of SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median
+\newcommand{\EventsSwrLikelihoodAdvantagePerSpikeCiHigh}{1.32}  % events.swr_likelihood_advantage_per_spike_ci_high: upper bound of that interval
+\newcommand{\EventsSwrLikelihoodAdvantagePerSpikeCiLow}{0.80}  % events.swr_likelihood_advantage_per_spike_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
 \newcommand{\EventsSwrOverlappingEvents}{32{,}701}  % events.swr_overlapping_events: immobile non-local events overlapping an SWR
 \newcommand{\EventsSwrPartialFraction}{22}  % events.swr_partial_fraction: share of immobile non-local events partly overlapping an SWR, pooled over animals
+\newcommand{\EventsSwrParticipationAnimals}{5}  % events.swr_participation_animals: animals with SWR events and Local-rest windows
+\newcommand{\EventsSwrParticipationAnimalsAboveRest}{5}  % events.swr_participation_animals_above_rest: animals whose SWR events' share of tetrodes with a spike is above their Local-rest windows'
 \newcommand{\EventsSwrRemoteAnimalsAboveBaseline}{5}  % events.swr_remote_animals_above_baseline: animals whose median SWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsSwrRemoteDllPerSpikeMedian}{1.18}  % events.swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events
 \newcommand{\EventsSwrRemoteEpochsAboveBaseline}{242}  % events.swr_remote_epochs_above_baseline: epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike
@@ -502,6 +534,7 @@
 \newcommand{\EventsSwrRemoteScored}{20{,}879}  % events.swr_remote_scored: SWR-remote events scored
 \newcommand{\EventsSwrRemoteSpikesMedian}{118}  % events.swr_remote_spikes_median: median spike count of SWR-remote events
 \newcommand{\EventsSwrRemoteTetrodesMedian}{15}  % events.swr_remote_tetrodes_median: median number of tetrodes with a spike in SWR-remote events
+\newcommand{\EventsSwrSpikeRateHzAnimalsAboveRest}{5}  % events.swr_spike_rate_hz_animals_above_rest: animals whose SWR events' spike rate summed over tetrodes is above their Local-rest windows'
 \newcommand{\EventsThetaAnimalsAboveRestNonSwr}{1}  % events.theta_animals_above_rest_non_swr: animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
 \newcommand{\EventsThetaAnimalsAboveRestSwr}{1}  % events.theta_animals_above_rest_swr: animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
 \newcommand{\EventsThetaAnimalsBelowRunningNonSwr}{5}  % events.theta_animals_below_running_non_swr: animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
@@ -517,6 +550,7 @@
 \newcommand{\EventsThetaRestReference}{\ensuremath{-}0.60}  % events.theta_rest_reference: median over epochs of the epoch's median z-scored theta power in quiet rest
 \newcommand{\EventsThetaRunningReference}{0.42}  % events.theta_running_reference: median over epochs of the epoch's median z-scored theta power while running
 \newcommand{\EventsWidloskiCriteriaEvents}{5{,}056}  % events.widloski_criteria_events: memoryless_criteria events compared with the non-local detector
+\newcommand{\EventsWidloskiCriteriaMostlyLocalFraction}{3}  % events.widloski_criteria_mostly_local_fraction: share of memoryless_criteria events that overlap no non-local event and have Local above 0.8 in more than half their rows
 \newcommand{\EventsWidloskiCriteriaNoNonlocalFraction}{5}  % events.widloski_criteria_no_nonlocal_fraction: share of memoryless_criteria events that overlap no non-local event
 \newcommand{\EventsWidloskiCriteriaNoNonlocalMixedFraction}{36}  % events.widloski_criteria_no_nonlocal_mixed_fraction: of memoryless_criteria events overlapping no non-local event, the share with neither state in more than half their rows
 \newcommand{\EventsWidloskiCriteriaNoNonlocalMostlyLocalFraction}{64}  % events.widloski_criteria_no_nonlocal_mostly_local_fraction: of memoryless_criteria events overlapping no non-local event, the share with Local above 0.8 in more than half their rows
@@ -529,6 +563,7 @@
 \newcommand{\EventsWidloskiCriteriaOverlapNonlocalShareMedian}{82}  % events.widloski_criteria_overlap_nonlocal_share_median: median over memoryless_criteria events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\EventsWidloskiCriteriaOverlapUncertainShareMedian}{8}  % events.widloski_criteria_overlap_uncertain_share_median: median over memoryless_criteria events overlapping a non-local event of the share of their rows with no state above 0.8
 \newcommand{\EventsWidloskiEvents}{4{,}662}  % events.widloski_events: memoryless events compared with the non-local detector
+\newcommand{\EventsWidloskiMostlyLocalFraction}{3}  % events.widloski_mostly_local_fraction: share of memoryless events that overlap no non-local event and have Local above 0.8 in more than half their rows
 \newcommand{\EventsWidloskiNoNonlocalFraction}{4}  % events.widloski_no_nonlocal_fraction: share of memoryless events that overlap no non-local event
 \newcommand{\EventsWidloskiNoNonlocalMixedFraction}{37}  % events.widloski_no_nonlocal_mixed_fraction: of memoryless events overlapping no non-local event, the share with neither state in more than half their rows
 \newcommand{\EventsWidloskiNoNonlocalMostlyLocalFraction}{63}  % events.widloski_no_nonlocal_mostly_local_fraction: of memoryless events overlapping no non-local event, the share with Local above 0.8 in more than half their rows
@@ -541,6 +576,7 @@
 \newcommand{\EventsWidloskiOverlapNonlocalShareMedian}{81}  % events.widloski_overlap_nonlocal_share_median: median over memoryless events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\EventsWidloskiOverlapUncertainShareMedian}{8}  % events.widloski_overlap_uncertain_share_median: median over memoryless events overlapping a non-local event of the share of their rows with no state above 0.8
 \newcommand{\EventsYuEvents}{125{,}423}  % events.yu_events: yu events compared with the non-local detector
+\newcommand{\EventsYuMostlyLocalFraction}{46}  % events.yu_mostly_local_fraction: share of yu events that overlap no non-local event and have Local above 0.8 in more than half their rows
 \newcommand{\EventsYuNoNonlocalFraction}{56}  % events.yu_no_nonlocal_fraction: share of yu events that overlap no non-local event
 \newcommand{\EventsYuNoNonlocalMixedFraction}{17}  % events.yu_no_nonlocal_mixed_fraction: of yu events overlapping no non-local event, the share with neither state in more than half their rows
 \newcommand{\EventsYuNoNonlocalMostlyLocalFraction}{82}  % events.yu_no_nonlocal_mostly_local_fraction: of yu events overlapping no non-local event, the share with Local above 0.8 in more than half their rows
@@ -553,6 +589,7 @@
 \newcommand{\EventsYuOverlapNonlocalShareMedian}{79}  % events.yu_overlap_nonlocal_share_median: median over yu events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\EventsYuOverlapUncertainShareMedian}{13}  % events.yu_overlap_uncertain_share_median: median over yu events overlapping a non-local event of the share of their rows with no state above 0.8
 \newcommand{\EventsZugaroEvents}{23{,}934}  % events.zugaro_events: zugaro events compared with the non-local detector
+\newcommand{\EventsZugaroMostlyLocalFraction}{28}  % events.zugaro_mostly_local_fraction: share of zugaro events that overlap no non-local event and have Local above 0.8 in more than half their rows
 \newcommand{\EventsZugaroNoNonlocalFraction}{35}  % events.zugaro_no_nonlocal_fraction: share of zugaro events that overlap no non-local event
 \newcommand{\EventsZugaroNoNonlocalMixedFraction}{18}  % events.zugaro_no_nonlocal_mixed_fraction: of zugaro events overlapping no non-local event, the share with neither state in more than half their rows
 \newcommand{\EventsZugaroNoNonlocalMostlyLocalFraction}{81}  % events.zugaro_no_nonlocal_mostly_local_fraction: of zugaro events overlapping no non-local event, the share with Local above 0.8 in more than half their rows
