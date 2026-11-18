@@ -16,9 +16,10 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         other.
     e — Each SWR-overlapping event's start and end minus its SWR's, on a log
         count axis, with the share of pairs beyond 25 and 50 ms.
-    f — Held-out spike evidence, SWR vs no-SWR, each against matched quiet
-        windows. PLACEHOLDER: today the Continuous-state bouts of the
-        2026-10-16 run; to be replaced by the run on the canonical events.
+    f — Tetrode participation (share of tetrodes with a spike) and spike rate of
+        each non-local event against a Local-rest window of its length, one line
+        per animal, for no-SWR and SWR events
+        (``event_evidence.participation``; ``Processed-Data/event_participation``).
     g — Ripple power and MUA around non-local event starts, SWR vs no-SWR, with
         the epochs' rest level (rest bins in no event).
     h — For each SWR definition, MUA and the Widloski detector: the share of
@@ -46,6 +47,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import logging
 import warnings
 from collections.abc import Sequence
@@ -82,6 +84,9 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_epoch_id,
     swr_source_name,
 )
+from continuum_swr_replay.analysis.event_evidence.participation import (
+    participation_statistics,
+)
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
     nonlocal_share_by_power,
@@ -115,9 +120,7 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
-    NL_BOUTS_BY_SWR_STEM,
-    STATE_EVIDENCE_DIR,
-    STATE_EVIDENCE_RUN,
+    EVENT_PARTICIPATION_DIR,
     event_features_root,
     inventory_comparison_root,
     processed_data_dir,
@@ -498,34 +501,23 @@ def detector_comparison() -> dict:
     }
 
 
-def heldout_placeholder(run_dir: Path) -> dict:
-    """Panel e PLACEHOLDER: the Continuous-bout held-out evidence by SWR."""
-    bouts = pd.read_parquet(
-        run_dir / f"{NL_BOUTS_BY_SWR_STEM}.parquet",
-        columns=[
-            "epoch_id",
-            "animal",
-            "kind",
-            "state",
-            "regime",
-            "runcv_nl_anim_mark_ps",
-        ],
+def read_participation(run_dir: Path) -> pd.DataFrame:
+    """Panel f: every epoch's windows (events and Local-rest controls).
+
+    Raises
+    ------
+    ValueError
+        If an epoch of the run's manifest did not finish, or the windows are not
+        the canonical events'.
+    """
+    manifest = json.loads((run_dir / "manifest.json").read_text())
+    failed = [e for e, r in manifest["epochs"].items() if r["status"] != "ok"]
+    if failed:
+        raise ValueError(f"{len(failed)} participation epochs failed: {failed[:3]}")
+    return pd.concat(
+        [pd.read_parquet(path) for path in sorted(run_dir.glob("*_HPC.parquet"))],
+        ignore_index=True,
     )
-    stats = pd.read_csv(run_dir / f"{NL_BOUTS_BY_SWR_STEM}_stats.csv")
-    immobile = bouts[
-        (bouts["regime"] == "immobile")
-        & bouts["state"].str.startswith("Non-Local Continuous")
-    ]
-    epoch = immobile.groupby(["animal", "epoch_id", "kind", "state"])[
-        "runcv_nl_anim_mark_ps"
-    ].median()
-    animal = (
-        epoch.groupby(["animal", "kind", "state"]).mean().unstack(["kind", "state"])
-    )
-    stats = stats[
-        (stats["metric"] == "runcv_nl_anim_mark_ps") & (stats["regime"] == "immobile")
-    ].set_index("state")
-    return {"animal": animal, "stats": stats}
 
 
 # ---------------------------------------------------------------------------
@@ -880,49 +872,35 @@ def draw_swr_donut(ax, kay: pd.Series) -> None:
     )
 
 
-def draw_heldout(ax, heldout: dict) -> None:
-    """Panel e PLACEHOLDER: evidence per held-out spike, each group vs quiet."""
-    animal, stats = heldout["animal"], heldout["stats"]
-    groups = (
-        ("Non-Local Continuous | SWR", C_SWR),
-        ("Non-Local Continuous | no SWR", C_NL),
-    )
-    for g, (state, color) in enumerate(groups):
-        for k, (kind, bar_color) in enumerate((("bout", color), ("baseline", C_QUIET))):
-            x = g * 2.6 + k
-            values = animal[(kind, state)]
-            if kind == "bout":
-                est, lo, hi = stats.loc[
-                    state, ["animal_estimate", "animal_ci_lo", "animal_ci_hi"]
-                ]
-                ax.bar(x, est, color=bar_color, width=0.8)
-                ax.errorbar(
-                    x,
-                    est,
-                    yerr=[[est - lo], [hi - est]],
-                    color="k",
-                    lw=0.7,
-                    capsize=1.5,
-                )
-            else:
-                ax.bar(x, values.mean(), color=bar_color, width=0.8)
+def draw_participation(ax_share, ax_rate, statistics: pd.DataFrame) -> None:
+    """Panel f: tetrode participation and spike rate, Local rest vs events.
+
+    One line per animal from its length-matched Local-rest controls to its
+    events, for no-SWR events and for SWR events (``participation_statistics``).
+    """
+    for ax, measure, label in (
+        (ax_share, "participation", "Tetrodes\nactive (%)"),
+        (ax_rate, "spike_rate_hz", "Spike rate\n(spikes/s)"),
+    ):
+        scale = 100 if measure == "participation" else 1
+        for g, (group, color) in enumerate((("no SWR", C_NL), ("SWR", C_SWR))):
+            x = (2.4 * g, 2.4 * g + 1)
+            rest = scale * statistics.loc[(group, "control"), f"{measure}_animals"]
+            event = scale * statistics.loc[(group, "event"), f"{measure}_animals"]
+            for a, b in zip(rest, event, strict=True):
+                ax.plot(x, (a, b), color="#999999", lw=0.5, zorder=1)
             ax.scatter(
-                x + np.linspace(-0.18, 0.18, len(values)),
-                values,
-                s=4,
-                color="k",
-                lw=0,
-                zorder=3,
+                np.full(rest.size, x[0]), rest, s=6, color=C_LOCAL, lw=0, zorder=2
             )
-    ax.axhline(0, color="k", lw=0.5)
-    ax.set_xticks(
-        [0, 1, 2.6, 3.6], ["SWR", "quiet", "No SWR", "quiet"], rotation=45, ha="right"
-    )
-    ax.set_ylabel("Evidence for decoded\nposition (nats/spike)")
-    ax.set_title(
-        "PLACEHOLDER: held-out spikes,\nContinuous bouts (not events)",
-        fontsize=SMALL_SIZE,
-        color="#b00000",
+            ax.scatter(
+                np.full(event.size, x[1]), event, s=6, color=color, lw=0, zorder=2
+            )
+        ax.set_ylabel(label)
+        ax.set_xlim(-0.5, 3.9)
+        ax.set_ylim(0, None)
+    ax_share.tick_params(labelbottom=False)
+    ax_rate.set_xticks(
+        [0, 1, 2.4, 3.4], ["rest", "no SWR", "rest", "SWR"], rotation=45, ha="right"
     )
 
 
@@ -1136,7 +1114,9 @@ def generate_figure(
         pd.read_parquet(data_dir / BRAIN_STATE_REFERENCE_DIR / "reference.parquet"),
         ["ripple", "mua"],
     )
-    heldout = heldout_placeholder(data_dir / STATE_EVIDENCE_RUN / STATE_EVIDENCE_DIR)
+    participation = participation_statistics(
+        read_participation(data_dir / EVENT_PARTICIPATION_DIR)
+    )
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     outer = GridSpec(
@@ -1163,8 +1143,10 @@ def generate_figure(
     ax_e2 = fig.add_subplot(offsets_grid[1], sharex=ax_e1)
     draw_offsets(ax_e1, ax_e2, boundary_offsets(events))
     row4 = outer[3].subgridspec(1, 4, width_ratios=[1.1, 0.95, 1.55, 0.95], wspace=0.75)
-    ax_f = fig.add_subplot(row4[0])
-    draw_heldout(ax_f, heldout)
+    participation_grid = row4[0].subgridspec(2, 1, hspace=0.15)
+    ax_f = fig.add_subplot(participation_grid[0])
+    ax_f2 = fig.add_subplot(participation_grid[1])
+    draw_participation(ax_f, ax_f2, participation)
     triggered = row4[1].subgridspec(2, 1, hspace=0.15)
     ax_g1 = fig.add_subplot(triggered[0])
     ax_g2 = fig.add_subplot(triggered[1], sharex=ax_g1)
