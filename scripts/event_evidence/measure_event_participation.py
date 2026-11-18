@@ -148,6 +148,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)
 
+    provenance = provenance_record(ROOT_DIR)
     data_dir = args.data_dir or processed_data_dir()
     output = args.output_dir or data_dir / EVENT_PARTICIPATION_DIR
     output.mkdir(parents=True, exist_ok=True)
@@ -184,7 +185,7 @@ def main(argv: list[str] | None = None) -> None:
         output / "manifest.json",
         {
             "produced_by": PRODUCED_BY,
-            "provenance": provenance_record(ROOT_DIR),
+            "provenance": provenance,
             "settings": {
                 "event_table": str(event_table),
                 "seed": SEED,
