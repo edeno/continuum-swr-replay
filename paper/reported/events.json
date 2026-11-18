@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "89bf46131b00",
+ "commit": "0ed0ca1b96de",
  "code": {
-  "head": "89bf46131b00a77241fb60fd51bf24e66fe7b8fe",
+  "head": "0ed0ca1b96de9e2547d27422c2372f4affb1a34a",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -319,16 +319,16 @@
     "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "b1427e5f23561c912261f7904d5b4c30dcd8fb52843f795087b014f6df028e8e",
-    "code_sha256": "bcb94fc861bcf6eb7658f4018308485ccfdc41158b33215d1b0fbe81d8b92e51"
+    "sha256": "52373bc0c9252be728455f3efec68885d15d85c28b0c765d7fb67d7250a8fdb0",
+    "code_sha256": "7afd53dca280bbf239bc912d95837941066025d73eb79c895104174477bd8fa2"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "72482f17276d27de110b8ec61df555b41f0b80015b905b45fe9cef5e9e05b182",
-    "code_sha256": "6e1839c71e1cb2cd02b0206e1952d17804e957835ae17ffcbec9d03b6253cf3f"
+    "sha256": "aa947f943a237b01b9ce044abe3952b8a219436787a8125149e54aeed819e45e",
+    "code_sha256": "2ba01c417b471f959c35bcfd4a4e24d01dd92459b7030dcdacbfdf135722b341"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -386,138 +386,138 @@
  },
  "inputs": [
   {
-   "path": "Processed-Data/replay_content/event_table.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet",
    "sha256": "19d407a6bdd381b86d71a5cff2e904665431d35dec2d490cbadb4dee19452f48"
   },
   {
-   "path": "Processed-Data/event_start_rest_theta/*.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta/*.parquet",
    "n_files": 242,
    "sha256": "7703cce2df66ed957c7c160e0050f2dc8c0bc0eba2add4e9fc0af4047c3f7d10"
   },
   {
-   "path": "Processed-Data/event_start_rest_theta/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta/manifest.json",
    "sha256": "7af49df1193c02c031e972bb380c8e0696132de58043530a3ee22813dc611fb0"
   },
   {
-   "path": "Processed-Data/event_property_bootstrap/intervals.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap/intervals.csv",
    "sha256": "4cb5c2db9174519fcac9a17d632255d5cca9a4e5ef003342d4cc340ff2cc5335"
   },
   {
-   "path": "Processed-Data/event_property_bootstrap/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap/manifest.json",
    "sha256": "e9d8f238865e0f98cca06235e2152e3c590be9efd979bf816511ace6e1fc768f"
   },
   {
-   "path": "Processed-Data/brain_state_reference/reference.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet",
    "sha256": "f7120f54f539fc6afe114f9c25b60487822c6f25b3347ee083566dc7bb2e4f54"
   },
   {
-   "path": "Processed-Data/event_gamma/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/manifest.json",
    "sha256": "1b3bc6f40e5c4a53969d83fd8113ac4cd3969a21909f40967fd6ff44f865c7d8"
   },
   {
-   "path": "Processed-Data/event_gamma/reference.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/reference.parquet",
    "sha256": "253abe749df602af0f91aad47c93778765cd0188ec5c0c7a77810e883eb6fd29"
   },
   {
-   "path": "Processed-Data/event_gamma/*_events.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/*_events.parquet",
    "n_files": 242,
    "sha256": "4c7fabece8e648c85f0da19f623c16b798414bf38073098deb925fddb0332d50"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/event_features/e2331f976fd1/*_features.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/event_features/e2331f976fd1/*_features.parquet",
    "n_files": 242,
    "sha256": "e51bb4ab78e0a565970dcde8d0d2993fe285009c1364b9c623620254fc5553cb"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/manifest.json",
    "sha256": "10166120f5cc153033a6b2431d9606aa38c48c4129b7dca1337fd0ce1334947a"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/*_observations.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/*_observations.parquet",
    "n_files": 242,
    "sha256": "aeaa31d7ce083bb75be205eeedbc8fe9a0b6a3bce15c2c02b16597ee8d7762c0"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/*_counts.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/*_counts.parquet",
    "n_files": 242,
    "sha256": "f21b01c8b138dc9d40704edbfd524ef987114d2a0c4f2d6e5269ae17444eb604"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/*_cells.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/*_cells.parquet",
    "n_files": 242,
    "sha256": "b9d8115aa450315d1ce3e803531710621b58f88a30f4894c3c5b52b449a7341b"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/event_features/e2331f976fd1/*_state_shares.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/event_features/e2331f976fd1/*_state_shares.parquet",
    "n_files": 242,
    "sha256": "85027fcb6c506a8af9dd290d00701a595387e24a5518eda801439c881e3c9b18"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/event_features/e2331f976fd1/*_pair_membership.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/event_features/e2331f976fd1/*_pair_membership.parquet",
    "n_files": 242,
    "sha256": "011cb930c1aff0b166668e077594113c4d499e6a63f43e780c8acd59a64d368a"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/report/directional_by_animal.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/e2331f976fd1/report/directional_by_animal.csv",
    "sha256": "94298e8efcf440db68ebd7d553818d8b965f8a2851440f50a688afc7d3611364"
   },
   {
-   "path": "Processed-Data/event_spike_evidence/chimi20200212_02_r1_HPC/event_spike_evidence_metrics.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/chimi20200212_02_r1_HPC/event_spike_evidence_metrics.parquet",
    "n_files": 242,
    "sha256": "c985e57fe55be40732bb1b3bc31515d04777bfbc1d5efce334ce149280e2b861"
   },
   {
-   "path": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "sha256": "20b6f9a8f78b9730548c6b6a65c424f9eaeb26ae56b43485144040b2c9617297"
   },
   {
-   "path": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr.provenance.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr.provenance.json",
    "sha256": "c271a902f07b5eab5ea3cbb1691ae726741f58028f21aac8b9417ccd5d116dcf"
   },
   {
-   "path": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "sha256": "b0fd39ceeee50b3f1332b411528c442e5b0eed82b9027aa8ca549dc949276872"
   },
   {
-   "path": "Processed-Data/event_participation/*_participation.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation/*_participation.parquet",
    "n_files": 242,
    "sha256": "7ac62779cacb1e6177ac9515b135a4e3a97534b266b151ba6009edc698620c0f"
   },
   {
-   "path": "Processed-Data/event_participation/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation/manifest.json",
    "sha256": "8bb8f49efecf9bd9d3d7637375849697ac74c812378f1ce86afd7b47109aa34b"
   },
   {
-   "path": "Processed-Data/event_likelihood_advantage/*_likelihood_advantage.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage/*_likelihood_advantage.parquet",
    "n_files": 242,
    "sha256": "219cdd99800bffdfbada7d672ec788b7be9f18c8c3f1adebeb1f938d36a888bf"
   },
   {
-   "path": "Processed-Data/event_likelihood_advantage/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage/manifest.json",
    "sha256": "54c72a429607c3a44964e5844a36ab35114432d56c6273a72b416f31c5e825d0"
   },
   {
-   "path": "Processed-Data/decoder_quality/sessions.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality/sessions.parquet",
    "sha256": "c6821595f171ffc314c1aaa49d0bfc17e4a59bfe7f4eb004529fe7e178fe1cc5"
   },
   {
-   "path": "Processed-Data/decoder_quality/calibration.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality/calibration.parquet",
    "sha256": "db9609ca6b1c048eb3d05a7c1a81ad6f7d1091d042c2c7bba43d22ce39555ffb"
   },
   {
-   "path": "Processed-Data/decoder_quality/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality/manifest.json",
    "sha256": "4587fe6b978c79a2a3578a3a8f740b5a83e3d7a3119384e066e50959c5472862"
   },
   {
-   "path": "Processed-Data/ripple_class_structure/distribution.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure/distribution.csv",
    "sha256": "57f6c311acca5da0023d27ec607d14799fff07d5449fee947ffda70ed74d4903"
   },
   {
-   "path": "Processed-Data/ripple_class_structure/step_fits.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure/step_fits.csv",
    "sha256": "63b4c1cd34e0b2ec55739a1665d415f31449e727f1b58eacb9adbfb9c5d92152"
   },
   {
-   "path": "Processed-Data/ripple_class_structure/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure/manifest.json",
    "sha256": "8756ababb8d26e05261876a13939d0275cf4dedcfea3b95e1cc1a4c90bf34824"
   }
  ],
@@ -534,7 +534,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -550,7 +550,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -564,9 +564,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -582,7 +582,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -596,9 +596,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -612,9 +613,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -628,9 +630,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -644,9 +647,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -660,9 +664,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -676,9 +681,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -692,9 +698,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -708,9 +715,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -726,7 +734,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -740,7 +748,7 @@
     "2c.4"
    ],
    "figures": [],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -757,7 +765,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -773,7 +781,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -789,7 +797,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -805,7 +813,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "calibration_values",
    "pending": null
   },
@@ -821,7 +829,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "calibration_values",
    "pending": null
   },
@@ -837,7 +845,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "calibration_values",
    "pending": null
   },
@@ -853,7 +861,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "calibration_values",
    "pending": null
   },
@@ -869,7 +877,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "calibration_values",
    "pending": null
   },
@@ -885,7 +893,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "calibration_values",
    "pending": null
   },
@@ -901,7 +909,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "calibration_values",
    "pending": null
   },
@@ -917,7 +925,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "calibration_values",
    "pending": null
   },
@@ -933,7 +941,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "calibration_values",
    "pending": null
   },
@@ -949,7 +957,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "calibration_values",
    "pending": null
   },
@@ -1147,7 +1155,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "decoding_error_values",
    "pending": null
   },
@@ -1163,7 +1171,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "decoding_error_values",
    "pending": null
   },
@@ -1176,8 +1184,10 @@
    "questions": [
     "2d.6"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "figures": [
+    "3a"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1190,8 +1200,10 @@
    "questions": [
     "2d.6"
    ],
-   "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "figures": [
+    "3a"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1204,8 +1216,10 @@
    "questions": [
     "2d.6"
    ],
-   "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "figures": [
+    "3a"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1218,8 +1232,10 @@
    "questions": [
     "2d.6"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "figures": [
+    "3a"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1232,8 +1248,10 @@
    "questions": [
     "2d.6"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "figures": [
+    "3a"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1249,7 +1267,7 @@
    "figures": [
     "2f"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
    "pending": null
   },
@@ -1265,7 +1283,7 @@
    "figures": [
     "2f"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
    "pending": null
   },
@@ -1281,7 +1299,7 @@
    "figures": [
     "2f"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
    "pending": null
   },
@@ -1297,7 +1315,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -1314,7 +1332,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -1331,7 +1349,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -1345,9 +1363,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1361,9 +1380,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1377,9 +1397,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1393,9 +1414,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1409,9 +1431,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1425,9 +1448,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1441,9 +1465,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1457,9 +1482,10 @@
     "2d.3"
    ],
    "figures": [
-    "3"
+    "3b",
+    "3d"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1472,8 +1498,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1486,8 +1514,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1500,8 +1530,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1514,8 +1546,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1528,8 +1562,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -1542,8 +1578,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -1556,8 +1594,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -1570,8 +1610,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -1584,8 +1626,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1598,8 +1642,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1612,8 +1658,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1626,8 +1674,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -1643,7 +1693,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "function": "heldout_by_swr_values",
    "pending": null
   },
@@ -1659,7 +1709,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "function": "heldout_by_swr_values",
    "pending": null
   },
@@ -1675,7 +1725,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "function": "heldout_by_swr_values",
    "pending": null
   },
@@ -1691,7 +1741,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "function": "heldout_by_swr_values",
    "pending": null
   },
@@ -1707,7 +1757,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "function": "heldout_by_swr_values",
    "pending": null
   },
@@ -1723,7 +1773,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "function": "heldout_by_swr_values",
    "pending": null
   },
@@ -1739,7 +1789,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "function": "heldout_by_swr_values",
    "pending": null
   },
@@ -1755,7 +1805,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "function": "heldout_by_swr_values",
    "pending": null
   },
@@ -1771,7 +1821,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "function": "heldout_by_swr_values",
    "pending": null
   },
@@ -1787,7 +1837,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "function": "heldout_by_swr_values",
    "pending": null
   },
@@ -1801,7 +1851,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1815,7 +1865,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1829,7 +1879,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1843,7 +1893,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1857,7 +1907,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1871,7 +1921,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -1885,7 +1935,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -1899,7 +1949,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2351,9 +2401,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2367,9 +2417,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2383,9 +2433,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2399,9 +2449,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2415,9 +2465,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2431,9 +2481,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2447,9 +2497,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2463,9 +2513,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2478,8 +2528,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2492,8 +2544,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2506,8 +2560,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2520,8 +2576,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2548,8 +2606,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2562,8 +2622,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2744,8 +2806,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2758,8 +2822,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -2773,7 +2839,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2787,7 +2853,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2801,7 +2867,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2815,7 +2881,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2829,7 +2895,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2843,7 +2909,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -2857,7 +2923,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2871,7 +2937,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -2887,7 +2953,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2903,7 +2969,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2919,7 +2985,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2935,7 +3001,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2949,7 +3015,7 @@
     "2c.4"
    ],
    "figures": [],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2966,7 +3032,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2982,7 +3048,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2998,7 +3064,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -3012,9 +3078,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -3028,9 +3094,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -3044,9 +3110,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -3060,9 +3126,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -3076,9 +3142,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -3094,7 +3160,7 @@
    "figures": [
     "2h"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
    "pending": null
   },
@@ -3110,7 +3176,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -3126,7 +3192,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -3142,7 +3208,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -3158,7 +3224,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -3174,7 +3240,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -3190,7 +3256,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -3206,7 +3272,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -3222,7 +3288,7 @@
    "figures": [
     "2h"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
    "pending": null
   },
@@ -3238,7 +3304,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
   },
@@ -3254,7 +3320,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
   },
@@ -3270,7 +3336,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
   },
@@ -3286,7 +3352,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
   },
@@ -3302,7 +3368,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
   },
@@ -3318,7 +3384,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -3334,7 +3400,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -3350,7 +3416,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -3366,7 +3432,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -3382,7 +3448,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -3398,7 +3464,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -3412,7 +3478,7 @@
     "2c.4"
    ],
    "figures": [],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -3429,7 +3495,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -3445,7 +3511,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -3461,7 +3527,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -3477,7 +3543,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -3493,7 +3559,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -3509,7 +3575,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -3669,7 +3735,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -3685,7 +3751,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -3843,9 +3909,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -3861,7 +3927,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -3875,9 +3941,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3891,9 +3957,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3907,9 +3973,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3923,9 +3989,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3939,9 +4005,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3955,9 +4021,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -3971,9 +4037,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -3987,9 +4053,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4003,7 +4069,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4017,7 +4083,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4031,7 +4097,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4045,7 +4111,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4059,7 +4125,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4073,7 +4139,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4087,7 +4153,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4101,7 +4167,7 @@
     "2d.5"
    ],
    "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4131,9 +4197,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4147,9 +4213,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4163,9 +4229,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4179,9 +4245,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4195,9 +4261,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4211,9 +4277,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4227,9 +4293,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4243,9 +4309,9 @@
     "2d.4"
    ],
    "figures": [
-    "3"
+    "3e"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4260,9 +4326,9 @@
     "2b.5"
    ],
    "figures": [
-    "3c"
+    "3i"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -4277,9 +4343,9 @@
     "2b.5"
    ],
    "figures": [
-    "3c"
+    "3i"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -4294,9 +4360,9 @@
     "2b.5"
    ],
    "figures": [
-    "3c"
+    "3i"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -4311,9 +4377,9 @@
     "2b.5"
    ],
    "figures": [
-    "3c"
+    "3i"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -4328,9 +4394,9 @@
     "2b.5"
    ],
    "figures": [
-    "3c"
+    "3i"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -4345,9 +4411,9 @@
     "2b.5"
    ],
    "figures": [
-    "3c"
+    "3i"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -4361,7 +4427,7 @@
     "2b.5"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_distribution_values",
    "pending": null
   },
@@ -4375,7 +4441,7 @@
     "2b.5"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_distribution_values",
    "pending": null
   },
@@ -4389,7 +4455,7 @@
     "2b.5"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_distribution_values",
    "pending": null
   },
@@ -4404,9 +4470,9 @@
     "2b.5"
    ],
    "figures": [
-    "3c"
+    "3i"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -4421,9 +4487,9 @@
     "2b.5"
    ],
    "figures": [
-    "3c"
+    "3i"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -4436,8 +4502,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4450,8 +4518,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4464,8 +4534,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4478,8 +4550,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4492,8 +4566,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -4506,8 +4582,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -4520,8 +4598,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -4534,8 +4614,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_db_values",
    "pending": null
   },
@@ -4548,8 +4630,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4562,8 +4646,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4576,8 +4662,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4590,8 +4678,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
@@ -4605,9 +4695,9 @@
     "2d.2"
    ],
    "figures": [
-    "3e"
+    "3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4621,9 +4711,9 @@
     "2d.2"
    ],
    "figures": [
-    "3e"
+    "3c"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4637,9 +4727,9 @@
     "2d.2"
    ],
    "figures": [
-    "3e"
+    "3c"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4653,9 +4743,9 @@
     "2d.2"
    ],
    "figures": [
-    "3e"
+    "3c"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4669,9 +4759,9 @@
     "2d.2"
    ],
    "figures": [
-    "3e"
+    "3c"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4685,9 +4775,9 @@
     "2d.2"
    ],
    "figures": [
-    "3e"
+    "3c"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4701,9 +4791,9 @@
     "2d.2"
    ],
    "figures": [
-    "3e"
+    "3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4717,9 +4807,9 @@
     "2d.2"
    ],
    "figures": [
-    "3e"
+    "3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
   },
@@ -4733,9 +4823,9 @@
     "2d.1"
    ],
    "figures": [
-    "3"
+    "3f"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "start_distance_values",
    "pending": null
   },
@@ -4749,9 +4839,9 @@
     "2d.1"
    ],
    "figures": [
-    "3"
+    "3f"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4765,9 +4855,9 @@
     "2d.1"
    ],
    "figures": [
-    "3"
+    "3f"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4781,9 +4871,9 @@
     "2d.1"
    ],
    "figures": [
-    "3"
+    "3f"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4797,9 +4887,9 @@
     "2d.1"
    ],
    "figures": [
-    "3"
+    "3f"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4813,9 +4903,9 @@
     "2d.1"
    ],
    "figures": [
-    "3"
+    "3f"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
   },
@@ -4829,9 +4919,9 @@
     "2d.1"
    ],
    "figures": [
-    "3"
+    "3f"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "start_distance_values",
    "pending": null
   },
@@ -4845,9 +4935,9 @@
     "2d.1"
    ],
    "figures": [
-    "3"
+    "3f"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "start_distance_values",
    "pending": null
   },
@@ -4863,7 +4953,7 @@
    "figures": [
     "2f"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
    "pending": null
   },
@@ -4879,7 +4969,7 @@
    "figures": [
     "2f"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
    "pending": null
   },
@@ -4895,7 +4985,7 @@
    "figures": [
     "2f"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
    "pending": null
   },
@@ -4911,7 +5001,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "state_fraction_values",
    "pending": null
   },
@@ -4927,7 +5017,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "state_fraction_values",
    "pending": null
   },
@@ -4943,7 +5033,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "state_fraction_values",
    "pending": null
   },
@@ -4959,7 +5049,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "state_fraction_values",
    "pending": null
   },
@@ -4975,7 +5065,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "state_fraction_values",
    "pending": null
   },
@@ -4991,7 +5081,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "state_fraction_values",
    "pending": null
   },
@@ -5007,7 +5097,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "state_fraction_values",
    "pending": null
   },
@@ -5023,7 +5113,7 @@
    "figures": [
     "decoder_validation"
    ],
-   "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "state_fraction_values",
    "pending": null
   },
@@ -5037,7 +5127,7 @@
     "2b.5"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_step_evidence_values",
    "pending": null
   },
@@ -5051,7 +5141,7 @@
     "2b.5"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_step_evidence_values",
    "pending": null
   },
@@ -5065,7 +5155,7 @@
     "2b.5"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_step_evidence_values",
    "pending": null
   },
@@ -5083,7 +5173,7 @@
     "2d.6"
    ],
    "figures": [],
-   "source": "Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "function": "class_step_values",
    "pending": null
   },
@@ -5099,7 +5189,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -5113,9 +5203,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -5129,9 +5219,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -5145,9 +5235,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -5161,9 +5251,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -5177,9 +5267,9 @@
     "2d.1"
    ],
    "figures": [
-    "2"
+    "3h"
    ],
-   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -5195,7 +5285,7 @@
    "figures": [
     "2h"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
    "pending": null
   },
@@ -5211,7 +5301,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -5227,7 +5317,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -5243,7 +5333,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -5259,7 +5349,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -5275,7 +5365,7 @@
    "figures": [
     "2h"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
    "pending": null
   },
@@ -5291,7 +5381,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
   },
@@ -5307,7 +5397,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
   },
@@ -5323,7 +5413,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
   },
@@ -5339,7 +5429,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
   },
@@ -5355,7 +5445,7 @@
    "figures": [
     "2i"
    ],
-   "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
   },
@@ -5371,7 +5461,7 @@
    "figures": [
     "2f"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "boundary_offset_values",
    "pending": null
   },
@@ -5387,7 +5477,7 @@
    "figures": [
     "2c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
    "pending": null
   },
@@ -5403,7 +5493,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -5419,7 +5509,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -5435,7 +5525,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -5451,7 +5541,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -5467,7 +5557,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -5483,7 +5573,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -5497,7 +5587,7 @@
     "2c.4"
    ],
    "figures": [],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -5514,7 +5604,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -5530,7 +5620,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -5546,7 +5636,7 @@
    "figures": [
     "2"
    ],
-   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -5562,7 +5652,7 @@
    "figures": [
     "2g"
    ],
-   "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
   },
@@ -5575,8 +5665,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5589,8 +5681,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5603,8 +5697,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5617,8 +5713,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5631,8 +5729,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "rest_theta_values",
    "pending": null
   },
@@ -5645,8 +5745,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "rest_theta_values",
    "pending": null
   },
@@ -5659,8 +5761,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5673,8 +5777,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "rest_theta_values",
    "pending": null
   },
@@ -5687,8 +5793,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "rest_theta_values",
    "pending": null
   },
@@ -5701,8 +5809,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5715,8 +5825,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5729,8 +5841,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5743,8 +5857,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
@@ -5757,8 +5873,10 @@
    "questions": [
     "2d.8"
    ],
-   "figures": [],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "figures": [
+    "3i"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "brain_state_values",
    "pending": null
   },
