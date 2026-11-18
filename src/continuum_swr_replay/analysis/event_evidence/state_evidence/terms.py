@@ -5,6 +5,7 @@ The loaders are shared with ``scripts/event_evidence/analyze_event_spike_evidenc
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,8 +14,13 @@ from typing import Any, cast
 import numpy as np
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.event_definition.decode_masks import (
+    hpc_artifact_intervals,
+    hpc_decode_masks,
+)
 from continuum_swr_replay.decoding.encoding_model import CLUSTERLESS_LIKELIHOOD_KEYS
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.decoding.results import ENCODING_KEY, load_saved_detector
 from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
@@ -694,3 +700,72 @@ def spikes_in_bins(
         kept_times.append(st[mine])
         kept_marks.append(np.asarray(mk)[mine])
     return kept_times, kept_marks
+
+
+def load_marks_and_training_mask(epoch_id: str) -> dict:
+    """Marks, the position axis and the decode's masks, from ``load_data``.
+
+    The masks are ``decode_masks.hpc_decode_masks``' for a ``no_ripple``
+    decode, from the configured SWR source, as the decoder built them.
+
+    Returns
+    -------
+    dict
+        ``time`` (the loader's position axis, s), ``spike_times`` and
+        ``marks`` (per tetrode), ``is_training`` and ``is_missing`` (bool per
+        time bin).
+    """
+    from continuum_swr_replay.data_loaders import load_data
+    from continuum_swr_replay.data_types import SessionDataKeys as K
+
+    key = parse_epoch_identifier(epoch_id)
+    nwb_file_name, epoch_name, brain_area = (
+        key.nwb_file_name,
+        key.epoch_name,
+        key.brain_area,
+    )
+    data = load_data(
+        nwb_file_name,
+        epoch_name,
+        include=frozenset({K.SPIKE_TIMES, K.SPIKE_WAVEFORM_FEATURES}),
+    )
+    masks = hpc_decode_masks(
+        nwb_file_name,
+        epoch_name,
+        data["position_info"],
+        hpc_artifact_intervals(nwb_file_name, epoch_name),
+        "no_ripple",
+    )
+    return {
+        "time": data["position_info"].index.to_numpy(dtype=float),
+        "spike_times": [np.asarray(x) for x in data["spike_times"][brain_area]],
+        "marks": [np.asarray(x) for x in data["spike_waveform_features"][brain_area]],
+        "is_training": masks.is_training,
+        "is_missing": masks.is_missing,
+    }
+
+
+def refit_encoding(
+    detector: Any,
+    time: NDArray,
+    position: NDArray,
+    spike_times: list[NDArray],
+    marks: list[NDArray],
+    is_training: NDArray,
+) -> dict:
+    """The decode's own encoding model, refit on other training bins.
+
+    A copy of the detector is refit (``fit_encoding_model``: the same
+    clusterless KDE, settings and environment); the detector is not changed.
+    """
+    refit = copy.deepcopy(detector)
+    refit.clusterless_algorithm_params = {
+        **(refit.clusterless_algorithm_params or {}),
+        "disable_progress_bar": True,
+    }
+    refit.fit_encoding_model(
+        time, position, spike_times, marks, is_training=is_training
+    )
+    encoding: dict = refit.encoding_model_[ENCODING_KEY]
+    encoding["environment"]._is_fitted = True
+    return encoding

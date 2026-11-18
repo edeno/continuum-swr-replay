@@ -106,7 +106,6 @@ os.environ["JAX_PLATFORMS"] = "cpu"
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 import argparse  # noqa: E402
-import copy  # noqa: E402
 import functools  # noqa: E402
 import json  # noqa: E402
 import resource  # noqa: E402
@@ -124,10 +123,6 @@ import pandas as pd  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
 from continuum_swr_replay.analysis.event_definition import analysed_time  # noqa: E402
-from continuum_swr_replay.analysis.event_definition.decode_masks import (  # noqa: E402
-    hpc_artifact_intervals,
-    hpc_decode_masks,
-)
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (  # noqa: E402
     CV_BLOCK_S,
     ENCODING_HELD_OUT,
@@ -163,6 +158,10 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence import (  # noq
     training_spike_bins,
     window_evidence,
     window_folds,
+)
+from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (  # noqa: E402
+    load_marks_and_training_mask,
+    refit_encoding,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
@@ -409,49 +408,6 @@ def canonical_epochs(decode_dir: Path) -> list[str]:
     ]
 
 
-def load_marks_and_training_mask(epoch_id: str) -> dict:
-    """Marks, the position axis and the decode's masks, from ``load_data``.
-
-    The masks are ``decode_masks.hpc_decode_masks``' for a ``no_ripple``
-    decode, from the configured SWR source, as the decoder built them.
-
-    Returns
-    -------
-    dict
-        ``time`` (the loader's position axis, s), ``spike_times`` and
-        ``marks`` (per tetrode), ``is_training`` and ``is_missing`` (bool per
-        time bin).
-    """
-    from continuum_swr_replay.data_loaders import load_data
-    from continuum_swr_replay.data_types import SessionDataKeys as K
-
-    key = parse_epoch_identifier(epoch_id)
-    nwb_file_name, epoch_name, brain_area = (
-        key.nwb_file_name,
-        key.epoch_name,
-        key.brain_area,
-    )
-    data = load_data(
-        nwb_file_name,
-        epoch_name,
-        include=frozenset({K.SPIKE_TIMES, K.SPIKE_WAVEFORM_FEATURES}),
-    )
-    masks = hpc_decode_masks(
-        nwb_file_name,
-        epoch_name,
-        data["position_info"],
-        hpc_artifact_intervals(nwb_file_name, epoch_name),
-        "no_ripple",
-    )
-    return {
-        "time": data["position_info"].index.to_numpy(dtype=float),
-        "spike_times": [np.asarray(x) for x in data["spike_times"][brain_area]],
-        "marks": [np.asarray(x) for x in data["spike_waveform_features"][brain_area]],
-        "is_training": masks.is_training,
-        "is_missing": masks.is_missing,
-    }
-
-
 def stored_log_likelihood(
     path: Path, time_bins: NDArray, interior: NDArray[np.bool_]
 ) -> NDArray:
@@ -473,32 +429,6 @@ def stored_log_likelihood(
             .values
         )
     return np.asarray(stored, dtype=np.float64)[:, interior]
-
-
-def refit_encoding(
-    detector: Any,
-    time: NDArray,
-    position: NDArray,
-    spike_times: list[NDArray],
-    marks: list[NDArray],
-    is_training: NDArray,
-) -> dict:
-    """The decode's own encoding model, refit on other training bins.
-
-    A copy of the detector is refit (``fit_encoding_model``: the same
-    clusterless KDE, settings and environment); the detector is not changed.
-    """
-    refit = copy.deepcopy(detector)
-    refit.clusterless_algorithm_params = {
-        **(refit.clusterless_algorithm_params or {}),
-        "disable_progress_bar": True,
-    }
-    refit.fit_encoding_model(
-        time, position, spike_times, marks, is_training=is_training
-    )
-    encoding: dict = refit.encoding_model_[ENCODING_KEY]
-    encoding["environment"]._is_fitted = True
-    return encoding
 
 
 def relative_error(mine: NDArray, reference: NDArray) -> dict:
