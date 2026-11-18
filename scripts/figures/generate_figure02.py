@@ -972,8 +972,7 @@ def draw_detector_bars(
 ) -> None:
     """One bar per detector (pooled share) with a dot per animal, top to bottom.
 
-    The SWR definitions other than Kay's are drawn faded; row 0 is left for the
-    any-SWR-or-MUA bar.
+    The SWR definitions other than Kay's are drawn faded.
     """
     for i, (detector, row) in enumerate(shares.iterrows()):
         y = n_rows - 1 - i
@@ -987,10 +986,7 @@ def draw_detector_bars(
             animals, y + np.linspace(-0.18, 0.18, len(animals)), s=3, color="k", lw=0,
             zorder=3,
         )  # fmt: skip
-    ax.set_yticks(
-        range(n_rows),
-        ["Any SWR/MUA", *[DETECTOR_LABELS[d] for d in shares.index][::-1]],
-    )
+    ax.set_yticks(range(n_rows), [DETECTOR_LABELS[d] for d in shares.index][::-1])
     ax.tick_params(axis="y", labelleft=show_labels)
     ax.set_ylim(-0.6, n_rows - 0.4)
     ax.tick_params(axis="y", length=0)
@@ -1007,14 +1003,18 @@ def draw_detector_overlap(
 
     Bars pool all events; dots are animals (for the caption).
 
-    Left, the share of non-local events each detector's events overlap (and any
-    SWR or MUA event's); right, the share of its own events that overlap a
-    non-local event.
+    Left, the share of non-local events each detector's events overlap, with a
+    dashed line at the share any SWR definition or MUA event overlaps; right,
+    the share of its own events that overlap a non-local event.
     """
-    n_rows = len(overlap) + 1
+    n_rows = len(overlap)
     draw_detector_bars(ax_caught, overlap, n_rows, "% events", True)
     ax_caught.set_title("Non-local\nevents found", fontsize=SMALL_SIZE, pad=3)
-    ax_caught.barh(0, 100 * any_swr_or_mua, color="#666666", height=0.65)
+    ax_caught.axvline(100 * any_swr_or_mua, color="k", lw=0.6, ls="--")
+    ax_caught.text(
+        100 * any_swr_or_mua - 3, 0, "any SWR\nor MUA", ha="right", va="center",
+        fontsize=SMALL_SIZE,
+    )  # fmt: skip
     draw_detector_bars(ax_content, with_nonlocal, n_rows, "% events", False)
     ax_content.set_title(
         "Detections with\nnon-local activity", fontsize=SMALL_SIZE, pad=3
