@@ -2,7 +2,7 @@
 
 An event's content at a time bin is its MAP position. On the track graph every
 arm runs from the first to the second node of its edge in the linearization
-order, which all epochs share: the three trunk arms from the centre junction out
+order, which all epochs share: the three trunk arms from the center junction out
 to a patch junction, the six leaf arms from their patch junction to their well.
 A bin's place on its arm is the fraction of the arm behind it, so 1 on a leaf
 arm is the well, and arms of slightly different length in different animals line
@@ -19,15 +19,15 @@ import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import LEAF_ARMS
 
-CENTRE_NODE = 9
-"""The track graph's centre junction."""
+CENTER_NODE = 9
+"""The track graph's center junction."""
 
 WELL_NODES = frozenset(range(6))
 """The track graph's well nodes."""
 
 
 def check_arm_orientation(edge_order: list[tuple[int, int]]) -> None:
-    """Raise unless every arm runs outward: trunks from the centre, leaf arms to
+    """Raise unless every arm runs outward: trunks from the center, leaf arms to
     their well.
 
     Parameters
@@ -39,14 +39,14 @@ def check_arm_orientation(edge_order: list[tuple[int, int]]) -> None:
     Raises
     ------
     ValueError
-        If a trunk arm does not start at :data:`CENTRE_NODE`, or a leaf arm does
+        If a trunk arm does not start at :data:`CENTER_NODE`, or a leaf arm does
         not end at a well node.
     """
     for first, second in edge_order:
-        trunk = first == CENTRE_NODE or second == CENTRE_NODE
-        if trunk and first != CENTRE_NODE:
+        trunk = first == CENTER_NODE or second == CENTER_NODE
+        if trunk and first != CENTER_NODE:
             raise ValueError(
-                f"trunk arm {(first, second)} does not start at the centre"
+                f"trunk arm {(first, second)} does not start at the center"
             )
         if not trunk and second not in WELL_NODES:
             raise ValueError(f"leaf arm {(first, second)} does not end at a well")
@@ -57,14 +57,14 @@ def arm_positions(position_cm: np.ndarray, bin_nodes: pd.DataFrame) -> pd.DataFr
 
     A position goes to its nearest real place bin (``edge_id`` >= 0; junction
     placeholder bins, ``edge_id`` -1, are left out). The arm spans its real bin
-    centres, from the lowest linear position to the highest.
+    centers, from the lowest linear position to the highest.
 
     Parameters
     ----------
     position_cm : np.ndarray, shape (n_bins,)
         Linear positions, cm (a decode's ``map_estimate``).
     bin_nodes : pd.DataFrame, shape (n_place_bins, n_columns)
-        The place-bin centres (``Environment.place_bin_centers_nodes_df_``), with
+        The place-bin centers (``Environment.place_bin_centers_nodes_df_``), with
         ``edge_id`` and ``linear_position``.
 
     Returns
@@ -72,7 +72,7 @@ def arm_positions(position_cm: np.ndarray, bin_nodes: pd.DataFrame) -> pd.DataFr
     positions : pd.DataFrame, shape (n_bins, 3)
         ``arm`` (the edge id), ``fraction`` (0 at the arm's first node, 1 at its
         second, clipped to [0, 1]) and ``arm_length_cm`` (the span of the arm's
-        bin centres).
+        bin centers).
 
     Raises
     ------
@@ -86,12 +86,12 @@ def arm_positions(position_cm: np.ndarray, bin_nodes: pd.DataFrame) -> pd.DataFr
     spans = real.groupby("edge_id")["linear_position"].agg(["min", "max", "size"])
     if (spans["size"] < 2).any():
         raise ValueError("an arm has fewer than two real place bins")
-    centres = real["linear_position"].to_numpy()
-    order = np.argsort(centres)
-    centres = centres[order]
+    centers = real["linear_position"].to_numpy()
+    order = np.argsort(centers)
+    centers = centers[order]
     edge = real["edge_id"].to_numpy()[order]
-    right = np.clip(np.searchsorted(centres, position_cm), 1, len(centres) - 1)
-    nearer_left = position_cm - centres[right - 1] <= centres[right] - position_cm
+    right = np.clip(np.searchsorted(centers, position_cm), 1, len(centers) - 1)
+    nearer_left = position_cm - centers[right - 1] <= centers[right] - position_cm
     arm = edge[np.where(nearer_left, right - 1, right)]
     low = spans.loc[arm, "min"].to_numpy()
     length = spans.loc[arm, "max"].to_numpy() - low

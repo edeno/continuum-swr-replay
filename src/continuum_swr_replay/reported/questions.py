@@ -104,7 +104,7 @@ FIGURES: dict[str, Figure] = {
     "3": Figure(
         "What SWR and no-SWR events are like",
         "scripts/figures/generate_figure03.py",
-        "abcdefghi",
+        "abcdefgh",
     ),
     "4": Figure(
         "mPFC responses to SWR and non-SWR events",
@@ -248,7 +248,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2b.5",
         "How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?",
-        figures=("3i",),
+        figures=("2j",),
     ),
     Question(
         "2c.3",
@@ -271,7 +271,7 @@ QUESTIONS: tuple[Question, ...] = (
         "Where does content sit relative to the animal and to the reward wells, SWR against non-SWR?",
         status="partly computed",
         reason="the own-well share waits for the wider-Local-kernel re-decode (question 2c.6)",
-        figures=("3f", "3g", "3h"),
+        figures=("3e", "3f", "3g"),
     ),
     Question(
         "2d.2",
@@ -286,7 +286,6 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.4",
         "How much does content move within an event (pauses, largest step, reversals), SWR against non-SWR?",
-        figures=("3e",),
     ),
     Question(
         "2d.5",
@@ -300,7 +299,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.8",
         "How do theta z-score and speed compare across SWR events, non-SWR events and running?",
-        figures=("3i", "decoder_validation"),
+        figures=("2j", "3h", "decoder_validation"),
         note="Was question 2c.1: the state the events occur in, not evidence that their content is real.",
     ),
     Question(

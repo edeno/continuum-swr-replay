@@ -136,8 +136,9 @@ TAGS = {
     "other_detectors": Tags(("2b.3",)),
     "swr_content": Tags(("2b.3",), ("2d",)),
     "boundaries": Tags(("2b.4",), ("2f",)),
-    "ripple": Tags(("2d.8", "2b.5"), ("3i",)),
-    "brain_state": Tags(("2d.8",), ("3i",)),
+    "ripple": Tags(("2d.8", "2b.5"), ("2j",)),
+    "mua": Tags(("2d.8",), ("2j",)),
+    "brain_state": Tags(("2d.8",), ("3h",)),
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
@@ -148,13 +149,13 @@ TAGS = {
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
     "spike_gpi": Tags(("2c.4",)),
-    "content_occupancy": Tags(("2d.1",), ("3h",)),
+    "content_occupancy": Tags(("2d.1",), ("3g",)),
     "duration": Tags(("2d.6",), ("3a",)),
     "extent": Tags(("2d.3",), ("3b", "3d")),
     "speed": Tags(("2d.2",), ("3c",)),
     "certainty": Tags(("2d.5",)),
-    "stillness": Tags(("2d.4",), ("3e",)),
-    "location": Tags(("2d.1",), ("3f",)),
+    "stillness": Tags(("2d.4",)),
+    "location": Tags(("2d.1",), ("3e",)),
 }
 """Each group of values: the questions it answers and the figures that show it."""
 
@@ -817,7 +818,9 @@ def brain_state_values(
         word: value_factory(
             brain_state_values,
             source,
-            TAGS["ripple"] if word == "ripple" else TAGS["brain_state"],
+            {"ripple": TAGS["ripple"], "mua": TAGS["mua"]}.get(
+                word, TAGS["brain_state"]
+            ),
         )
         for word in ("theta", "ripple", "mua")
     }

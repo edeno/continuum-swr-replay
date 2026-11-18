@@ -16,8 +16,8 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
 
 @pytest.fixture
 def bin_nodes() -> pd.DataFrame:
-    """Two arms: edge 6 with bin centres 1..9 cm, a junction placeholder at 15,
-    edge 0 with centres 21..41 cm."""
+    """Two arms: edge 6 with bin centers 1..9 cm, a junction placeholder at 15,
+    edge 0 with centers 21..41 cm."""
     return pd.DataFrame(
         {
             "edge_id": [6] * 5 + [-1] + [0] * 6,
@@ -34,7 +34,7 @@ def test_a_position_takes_its_nearest_real_bins_arm_and_fraction(bin_nodes):
 
 
 def test_a_junction_placeholder_is_never_an_arm(bin_nodes):
-    # 15 cm is the placeholder's centre: nearest real bins are 9 (edge 6) and 21.
+    # 15 cm is the placeholder's center: nearest real bins are 9 (edge 6) and 21.
     positions = arm_positions(np.array([14.0, 16.0]), bin_nodes)
     assert positions["arm"].tolist() == [6, 0]
     np.testing.assert_allclose(positions["fraction"], [1, 0])  # clipped

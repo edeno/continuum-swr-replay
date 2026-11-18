@@ -8,32 +8,32 @@ they overlap an SWR (Kay's detector, the SWR source). Each row asks one thing:
         a — Duration.
         b — Spatial extent of the decoded content.
         c — Replay speed (each event's median).
-        d — Arms the decoded position visits.
-        e — Direction reversals of the decoded position.
+        d — Arms the decoded position visits (of the track's nine).
     Where the content is
-        f — Start distance: track distance from the animal to the event's first
+        e — Start distance: track distance from the animal to the event's first
             decoded position.
-        g — Where on the track each kind's content is denser: the ratio of no-SWR
+        f — Where on the track each kind's content is denser: the ratio of no-SWR
             to SWR content time per cm along every arm.
-        h — Content time per cm from the centre out to the junctions (trunk
+        g — Content time per cm from the center out to the junctions (trunk
             arms) and from the junctions out to the wells (leaf arms).
     Brain state
-        i — Ripple power, MUA, theta and slow and fast gamma during the events,
-            against the same epochs' quiet rest and running.
+        h — Theta and slow and fast gamma during the events, against the same
+            epochs' quiet rest and running. (Ripple power and MUA around the
+            events are Figure 2's.)
 
-Panels a–c and f draw each class's median and the SWR minus no-SWR difference
+Panels a–c and e draw each class's median and the SWR minus no-SWR difference
 (duration-matched, except for duration itself) with its interval from the
 property bootstrap (``bootstrap_event_properties.py``'s ``intervals.csv``): the
 events summary's ``<property>_*`` values (``paper/reported/events.json``). Panels
-g and h place every event time bin's MAP position on its arm
+f and g place every event time bin's MAP position on its arm
 (``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``) and
-draw ``content_along_arms.content_density_along_arms``, the animals' mean; h
+draw ``content_along_arms.content_density_along_arms``, the animals' mean; g
 quotes the share of content time within ``AT_WELL_CM`` of a well, the summary's
-``*_content_at_well_fraction`` (``event_statistics.content_occupancy_shares``). Panel i's animal values are event -> epoch -> animal
-medians (``shared_statistics.animal_session_values``), as
+``*_content_at_well_fraction`` (``event_statistics.content_occupancy_shares``). Panel h's animal values are
+event -> epoch -> animal medians (``shared_statistics.animal_session_values``), as
 ``event_statistics.event_signal_statistics`` makes them.
 
-DRAFT: panel i's per-animal rest and running levels are computed here; no summary
+DRAFT: panel h's per-animal rest and running levels are computed here; no summary
 value holds them.
 
 Usage
@@ -70,6 +70,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     content_occupancy_shares,
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_session_values
+from continuum_swr_replay.data_loaders.constants import ALL_ARMS
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
     CONTENT_ALONG_ARMS_DIR,
@@ -116,7 +117,7 @@ warnings.filterwarnings("ignore")
 
 # Inches: saved with 0.1 in margins, about 17.3 cm (Cell Press full width).
 WIDTH = 6.5
-HEIGHT = 6.6
+HEIGHT = 6.3
 
 C_NL = COLORS["Non-Local"]
 C_SWR = COLORS["SWR"]
@@ -125,15 +126,17 @@ C_RUN = COLORS["No-Spike"]
 KINDS = ((False, "no SWR", C_NL), (True, "SWR", C_SWR))
 _WITHIN_ANIMAL = [c for c in SESSION_COLUMNS if c != "animal"]
 
-# The track drawn in panel g: one epoch's track graph (every epoch's arms run the
+# The track drawn in panel f: one epoch's track graph (every epoch's arms run the
 # same way, ``content_along_arms.check_arm_orientation``).
 TRACK_EPOCH = "wilbur20210329_02_r1_HPC"
-# Half the width of an arm drawn in panel g, track units (cm).
+# Half the width of an arm drawn in panel f, track units (cm).
 ARM_HALF_WIDTH_CM = 9.0
-# Panels g and h: segments per arm, about 4 cm (two 2-cm place bins) each.
+# Panels f and g: segments per arm, about 4 cm (two 2-cm place bins) each.
 N_SEGMENTS = 13
-# Panel g: the colour scale's limit, log2 of the no-SWR to SWR density ratio.
+# Panel f: the color scale's limit, log2 of the no-SWR to SWR density ratio.
 RATIO_LIMIT_LOG2 = 2.0
+# Panel d: the track's arms.
+N_ARMS = len(ALL_ARMS)
 
 # Panels a-c and f: (column, bootstrap property, x label, scale, bin edges, log x).
 HISTOGRAMS = {
@@ -156,10 +159,8 @@ HISTOGRAMS = {
 }  # fmt: skip
 UNITS = {"duration": "ms", "extent": "cm", "speed": "cm/s", "start_distance": "cm"}
 
-# Panel i: (signal, event column, label).
+# Panel h: (signal, event column, label).
 SIGNALS = (
-    ("ripple", "ripple_power_z", "Ripple"),
-    ("mua", "mua_rate_z", "MUA"),
     ("theta", "theta_z", "Theta"),
     ("slow_gamma", "slow_gamma_z", "Slow γ"),
     ("fast_gamma", "fast_gamma_z", "Fast γ"),
@@ -297,20 +298,22 @@ def draw_histogram(ax, events: pd.DataFrame, intervals: pd.DataFrame, key: str):
         ax.set_xticks([1, 1e2, 1e4, 1e5], ["≤1", "$10^2$", "$10^4$", "≥$10^5$"])
 
 
-def draw_count_bars(ax, events: pd.DataFrame, column: str, cap: int, start: int):
-    """The share of each kind's events at each count, the last bin ``cap`` or more."""
-    values = np.arange(start, cap + 1)
+def draw_arm_counts(ax, events: pd.DataFrame) -> None:
+    """The share of each kind's events visiting each number of the nine arms."""
+    values = np.arange(1, N_ARMS + 1)
     for k, (is_swr, _, color) in enumerate(KINDS):
-        counts = events.loc[events["is_swr"] == is_swr, column].clip(upper=cap)
+        counts = events.loc[events["is_swr"] == is_swr, "n_unique_arms"]
+        if not counts.between(1, N_ARMS).all():
+            raise ValueError(f"an event visits no arm or more than {N_ARMS}")
         share = counts.value_counts(normalize=True).reindex(values, fill_value=0)
         ax.bar(values + (k - 0.5) * 0.4, 100 * share, width=0.4, color=color, lw=0)
-    ax.set_xticks(values, [*map(str, values[:-1]), f"≥{cap}"])
-    ax.set_xlim(values[0] - 0.6, values[-1] + 0.6)
+    ax.set_xticks(values)
+    ax.set_xlim(0.4, N_ARMS + 0.6)
 
 
 def draw_ratio_track(ax, track_graph, edge_order, density: pd.DataFrame) -> None:
-    """Each segment of the track coloured by log2 of its no-SWR to SWR content
-    density, on a scale between the two kinds' colours."""
+    """Each segment of the track colored by log2 of its no-SWR to SWR content
+    density, on a scale between the two kinds' colors."""
     ratio = np.log2(
         density.loc[False, "density_per_cm"] / density.loc[True, "density_per_cm"]
     )
@@ -341,7 +344,7 @@ def draw_ratio_track(ax, track_graph, edge_order, density: pd.DataFrame) -> None
 
 
 def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame) -> None:
-    """Content time per cm along the trunk arms (centre to junction) and the
+    """Content time per cm along the trunk arms (center to junction) and the
     leaf arms (junction to well), each kind, with its share at a well."""
     x = (np.arange(N_SEGMENTS) + 0.5) / N_SEGMENTS
     for is_swr, name, color in KINDS:
@@ -358,7 +361,7 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame) -> None:
         )  # fmt: skip
     ax.set_yscale("log")
     ax.axvline(1, color="0.8", lw=0.5, zorder=0)
-    ax.set_xticks([0, 1, 2], ["centre", "junction", "well"])
+    ax.set_xticks([0, 1, 2], ["center", "junction", "well"])
     ax.set_xlim(0, 2)
     ax.set_ylabel("% content time per cm")
     ax.set_title(
@@ -383,7 +386,7 @@ def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> Non
         ax.set_title(label, fontsize=LABEL_SIZE, pad=2)
         ax.set_xticks(x, values.columns, rotation=45, ha="right")
         ax.set_xlim(-0.5, 3.5)
-    axes[0].set_ylabel("Power or rate (z)")
+    axes[0].set_ylabel("Power (z)")
 
 
 def letter(fig, renderer, ax, text: str, x: float | None, y: float) -> None:
@@ -414,16 +417,14 @@ def generate_figure(inputs: dict):
         left=0.08, right=0.99, top=0.96, bottom=0.08,
     )  # fmt: skip
 
-    row1 = outer[0].subgridspec(1, 5, wspace=0.6)
-    ax_a, ax_b, ax_c, ax_d, ax_e = (fig.add_subplot(row1[i]) for i in range(5))
+    row1 = outer[0].subgridspec(1, 4, width_ratios=[1, 1, 1, 1.3], wspace=0.5)
+    ax_a, ax_b, ax_c, ax_d = (fig.add_subplot(row1[i]) for i in range(4))
     for ax, key in ((ax_a, "duration"), (ax_b, "extent"), (ax_c, "speed")):
         draw_histogram(ax, events, inputs["intervals"], key)
     ax_a.set_ylabel("Share of events")
-    draw_count_bars(ax_d, events, "n_unique_arms", cap=6, start=1)
+    draw_arm_counts(ax_d, events)
     ax_d.set_xlabel("Arms visited")
     ax_d.set_ylabel("% events")
-    draw_count_bars(ax_e, events, "n_reversals", cap=8, start=0)
-    ax_e.set_xlabel("Reversals")
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for _, _, c in KINDS]
     ax_d.legend(
         handles, [n for _, n, _ in KINDS], frameon=False, loc="upper right",
@@ -431,28 +432,28 @@ def generate_figure(inputs: dict):
     )  # fmt: skip
 
     row2 = outer[1].subgridspec(1, 3, width_ratios=[1.0, 1.6, 1.3], wspace=0.6)
-    ax_f = fig.add_subplot(row2[0])
-    draw_histogram(ax_f, events, inputs["intervals"], "start_distance")
-    ax_f.set_ylabel("Share of events")
-    ax_g = fig.add_subplot(row2[1])
+    ax_e = fig.add_subplot(row2[0])
+    draw_histogram(ax_e, events, inputs["intervals"], "start_distance")
+    ax_e.set_ylabel("Share of events")
+    ax_f = fig.add_subplot(row2[1])
     draw_ratio_track(
-        ax_g, inputs["track_graph"], inputs["edge_order"], inputs["density"]
+        ax_f, inputs["track_graph"], inputs["edge_order"], inputs["density"]
     )
-    ax_h = fig.add_subplot(row2[2])
-    draw_profiles(ax_h, inputs["profiles"], inputs["occupancy_shares"])
+    ax_g = fig.add_subplot(row2[2])
+    draw_profiles(ax_g, inputs["profiles"], inputs["occupancy_shares"])
 
-    row3 = outer[2].subgridspec(1, len(SIGNALS), wspace=0.55)
-    ax_i = [fig.add_subplot(row3[i]) for i in range(len(SIGNALS))]
-    draw_brain_state(ax_i, events, inputs["reference"])
+    row3 = outer[2].subgridspec(1, 4, width_ratios=[1, 1, 1, 1.3], wspace=0.5)
+    ax_h = [fig.add_subplot(row3[i]) for i in range(len(SIGNALS))]
+    draw_brain_state(ax_h, events, inputs["reference"])
 
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
     x_left = 0.005
     rows = (
         ((ax_a, "a", x_left), (ax_b, "b", None), (ax_c, "c", None),
-         (ax_d, "d", None), (ax_e, "e", None)),
-        ((ax_f, "f", x_left), (ax_g, "g", None), (ax_h, "h", None)),
-        ((ax_i[0], "i", x_left),),
+         (ax_d, "d", None)),
+        ((ax_e, "e", x_left), (ax_f, "f", None), (ax_g, "g", None)),
+        ((ax_h[0], "h", x_left),),
     )  # fmt: skip
     for row in rows:
         top = max(
