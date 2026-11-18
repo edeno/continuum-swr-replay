@@ -707,3 +707,27 @@ def test_arm_occupancy_shares_normalize_posterior_mass_within_each_group():
     # an arm a group has no row for is NaN, not zero
     assert np.isnan(shares.loc[1, "SWR"])
     assert np.isnan(shares.loc[6, "nonSWR"])
+
+
+def test_state_composition_is_the_mean_share_by_epoch_then_animal():
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "b", "b"],
+            "session_date": ["d1", "d1", "d2", "d1", "d1"],
+            "epoch": ["02_r1"] * 5,
+            "is_swr": [False, False, False, False, True],
+            "continuous_prob_mean": [0.9, 0.7, 0.5, 0.6, 0.2],
+            "fragmented_prob_mean": [0.05, 0.25, 0.4, 0.3, 0.7],
+        }
+    )
+    composition = stats.state_composition_statistics(events)
+    no_swr = composition.loc["no SWR"]
+    # a: epochs 0.8 and 0.5 -> 0.65; b: 0.6; the animals' mean 0.625
+    np.testing.assert_allclose(no_swr["continuous_animals"], [0.65, 0.6])
+    assert no_swr["continuous_animal_mean"] == pytest.approx(0.625)
+    # a: 0.15 and 0.4 -> 0.275; b: 0.3
+    assert no_swr["fragmented_animal_mean"] == pytest.approx((0.275 + 0.3) / 2)
+    assert no_swr["n_events"] == 4
+    swr = composition.loc["SWR"]
+    assert swr["n_animals"] == 1
+    assert swr["fragmented_animal_mean"] == pytest.approx(0.7)

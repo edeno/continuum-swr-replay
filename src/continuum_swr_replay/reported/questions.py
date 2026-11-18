@@ -99,7 +99,7 @@ FIGURES: dict[str, Figure] = {
     "2": Figure(
         "Non-local events and SWRs",
         "scripts/figures/generate_figure02.py",
-        "abcdefghij",
+        "abcdefghijk",
     ),
     "3": Figure(
         "Non-local events outside SWRs",
@@ -251,20 +251,9 @@ QUESTIONS: tuple[Question, ...] = (
         figures=("3b", "3c"),
     ),
     Question(
-        "2c.1",
-        "Are the events population events: what share of tetrodes fires, and at what rate, against Local-rest windows of the same length?",
-        figures=("2g",),
-    ),
-    Question(
-        "2c.2",
-        "During a detected event, how much more strongly does the population activity favor the decoded positions than the animal's measured positions?",
-        figures=("2h",),
-        note="The same spikes detected the event and estimated its positions, which favors positive scores: the values give the size of the advantage within detected events, not a test against chance.",
-    ),
-    Question(
         "2c.3",
         "Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?",
-        figures=("2",),
+        figures=("2", "2i"),
         note="The held-out test split by SWR (the heldout_* values) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
     ),
     Question(
@@ -313,8 +302,13 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.9",
         "How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?",
-        figures=("2",),
+        figures=("2", "2g"),
         note="Was question 2c.2: events are detected from spiking, so more spikes than a quiet window is not evidence of spatial content.",
+    ),
+    Question(
+        "2d.10",
+        "How much of SWR and non-SWR event time is Continuous, and how much Fragmented?",
+        figures=("2h",),
     ),
     Question(
         "3.1",

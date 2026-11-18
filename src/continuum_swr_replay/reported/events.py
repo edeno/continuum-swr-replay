@@ -141,8 +141,9 @@ TAGS = {
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
-    "participation": Tags(("2c.1",), ("2g",)),
-    "likelihood_advantage": Tags(("2c.2",), ("2h",)),
+    "participation": Tags(("2d.9",), ("2g",)),
+    "state_composition": Tags(("2d.10",), ("2h",)),
+    "likelihood_advantage": Tags(("2c.3",), ("2i",)),
     "spike": Tags(("2d.9", "2c.3"), ("2",)),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -1171,6 +1172,31 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
+# --- what the events are -----------------------------------------------------------
+
+
+def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2d.10: the share of SWR and no-SWR event time in Continuous and in
+    Fragmented (Figure 2h)."""
+    make = value_factory(state_composition_values, source, TAGS["state_composition"])
+    statistics = event_statistics.state_composition_statistics(events)
+    values = []
+    for word, group in (("non_swr", "no SWR"), ("swr", "SWR")):
+        for state in event_statistics.STATE_SHARE_COLUMNS:
+            values.append(
+                make(
+                    f"{word}_{state}_share",
+                    statistics.loc[group, f"{state}_animal_mean"],
+                    "fraction",
+                    "pct",
+                    f"share of {group} event time in {state.capitalize()}: the mean "
+                    "over animals of each animal's mean over epochs of each epoch's "
+                    "mean over events of the event's mean state probability",
+                )
+            )
+    return values
+
+
 # --- population events and spatial evidence --------------------------------------
 
 #: The event groups of the per-event runs, by the word their keys use.
@@ -1178,7 +1204,7 @@ _RUN_GROUPS = {"non_swr": "no SWR", "swr": "SWR"}
 
 
 def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.1: tetrode participation and spike rate of the events against
+    """Question 2d.9: tetrode participation and spike rate of the events against
     Local-rest windows of their length (Figure 2g)."""
     make = value_factory(participation_values, source, TAGS["participation"])
     statistics = participation.participation_statistics(table)
@@ -1237,8 +1263,8 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
 
 
 def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2c.2: the spike likelihood at the decoded positions minus at the
-    animal's, per spike, over each whole event (Figure 2h)."""
+    """Question 2c.3: the spike likelihood at the decoded positions minus at the
+    animal's, per spike, over each whole event (Figure 2i)."""
     make = value_factory(
         likelihood_advantage_values, source, TAGS["likelihood_advantage"]
     )
@@ -1847,6 +1873,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     source = f"{rel(inputs.event_table)} (canonical event table)"
     summary.add(*event_cohort_values(events, source))
     summary.add(*boundary_offset_values(events, source))
+    summary.add(*state_composition_values(events, source))
     summary.inputs.append(event_table_record)
     extra_paths = sorted(inputs.event_start_rest_theta.glob("*.parquet"))
     if len(extra_paths) != n_epochs:

@@ -167,6 +167,55 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
     }
 
 
+#: The non-local states whose share of event time :func:`state_composition_statistics`
+#: reports, by the event table's mean-probability column.
+STATE_SHARE_COLUMNS = {
+    "continuous": "continuous_prob_mean",
+    "fragmented": "fragmented_prob_mean",
+}
+
+
+def state_composition_statistics(events: pd.DataFrame) -> pd.DataFrame:
+    """The share of SWR and no-SWR event time in each non-local state, by animal.
+
+    An event's share in a state is its mean probability of that state over its
+    bins (the event table's ``continuous_prob_mean`` and
+    ``fragmented_prob_mean``). An animal's share is the mean over its epochs of
+    each epoch's mean over events (``animal_session_values(..., "mean")``): the
+    shares of one animal then add up as its events' do. The summary is the mean
+    over animals.
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        The canonical event table: ``is_swr``, the session columns
+        (:data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`) and
+        the columns of :data:`STATE_SHARE_COLUMNS`.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by group (``"no SWR"``, ``"SWR"``): for each state,
+        ``{state}_animals`` (the animals' shares, in sorted animal order) and
+        ``{state}_animal_mean``; ``animal_names``, ``n_animals`` and
+        ``n_events``.
+    """
+    rows = {}
+    is_swr = events["is_swr"].astype(bool)
+    for group, mine in (("no SWR", events[~is_swr]), ("SWR", events[is_swr])):
+        row: dict[str, object] = {"n_events": len(mine)}
+        for state, column in STATE_SHARE_COLUMNS.items():
+            per_animal = animal_session_values(
+                mine[column], mine["animal"], mine[list(SESSION_COLUMNS)], "mean"
+            )
+            row[f"{state}_animals"] = per_animal.to_numpy()
+            row[f"{state}_animal_mean"] = float(per_animal.mean())
+        row["animal_names"] = per_animal.index.to_numpy()
+        row["n_animals"] = len(per_animal)
+        rows[group] = row
+    return pd.DataFrame.from_dict(rows, orient="index").rename_axis("group")
+
+
 def boundary_offsets(events: pd.DataFrame) -> pd.DataFrame:
     """Each SWR-overlapping event's bounds against its matched SWR's.
 

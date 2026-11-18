@@ -737,3 +737,21 @@ def test_likelihood_advantage_values_are_the_animal_mean_and_its_interval():
         < 1.2
         < numbers["swr_likelihood_advantage_per_spike_ci_high"]
     )
+
+
+def test_state_composition_values_name_each_group_and_state():
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "b", "b"],
+            "session_date": ["d1"] * 4,
+            "epoch": ["02_r1"] * 4,
+            "is_swr": [False, True, False, True],
+            "continuous_prob_mean": [0.9, 0.6, 0.7, 0.8],
+            "fragmented_prob_mean": [0.05, 0.3, 0.2, 0.1],
+        }
+    )
+    values = _by_key(builder.state_composition_values(events, "s"))
+    assert values["non_swr_continuous_share"].value == pytest.approx(0.8)
+    assert values["swr_fragmented_share"].value == pytest.approx(0.2)
+    assert values["swr_fragmented_share"].figures == ("2h",)
+    assert len(values) == 4
