@@ -19,14 +19,24 @@ event's, or for a control the event it matches), ``kind`` (``"event"`` or ``"con
 table and the participation tables, provenance, each epoch's record).
 
 Spike times and waveform features are read through ``load_data`` (read-only).
-Each worker claims one GPU (``runs.device.configure_jax_gpu``).
+Each worker is given one GPU, ``--workers-per-gpu`` to a card, each allowed
+that share of its memory, and checks that JAX is on it
+(``runs.device.verify_jax_device``).
+
+Several hosts split the epochs with ``--shards``/``--n-shards``: the epochs
+(sorted) whose position modulo ``n`` is one of the host's shards. Each host
+writes ``manifest_shards{...}of{n}.json``; ``--merge-shards n`` then writes
+``manifest.json`` from every shard's, refusing shards made from other code,
+inputs or settings, or a shard missing.
 
 Usage::
 
     uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py \\
         --epochs wilbur20210329_02_r1_HPC --gpus 1
     uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py \\
-        --gpus 1 2
+        --gpus 1 4 5 --workers-per-gpu 2 --shards 0 1 --n-shards 5
+    uv run --frozen python scripts/event_evidence/score_tetrode_holdout.py \\
+        --merge-shards 5
 """
 
 from __future__ import annotations
@@ -176,11 +186,69 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
     }
 
 
-def _claim_gpu(queue) -> None:
-    """Worker initializer: claim the next GPU from ``queue``."""
-    from continuum_swr_replay.runs.device import configure_jax_gpu
+def _use_gpu(queue, mem_fraction: float) -> None:
+    """Worker initializer: run JAX on the next card from ``queue``.
 
-    configure_jax_gpu(gpu=queue.get())
+    Cards are assigned, several workers to a card, so the card is set here
+    rather than claimed (``configure_jax_gpu`` allows one process per card).
+    """
+    import os
+
+    from continuum_swr_replay.runs.device import query_gpus, verify_jax_device
+
+    index = queue.get()
+    card = {c.index: c for c in query_gpus()}[index]
+    os.environ["CUDA_VISIBLE_DEVICES"] = card.uuid
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(mem_fraction)
+    verify_jax_device(
+        {
+            "jax_backend": "gpu",
+            "gpu_index": card.index,
+            "gpu_uuid": card.uuid,
+            "gpu_name": card.name,
+        }
+    )
+
+
+def merge_shards(output: Path, n_shards: int) -> None:
+    """Write ``manifest.json`` from every shard's manifest.
+
+    Raises
+    ------
+    ValueError
+        If a shard is missing, two shards record other code, inputs or
+        settings, or an epoch is in two shards.
+    """
+    import json
+
+    paths = sorted(output.glob(f"manifest_shards*of{n_shards}.json"))
+    manifests = [json.loads(p.read_text()) for p in paths]
+    covered = sorted(i for m in manifests for i in m["shards"])
+    if covered != list(range(n_shards)):
+        raise ValueError(f"shards {covered} of {n_shards} found")
+    for key in ("inputs", "settings"):
+        if any(m[key] != manifests[0][key] for m in manifests):
+            raise ValueError(f"the shards record different {key}")
+    if any(m["provenance"]["commit"] != manifests[0]["provenance"]["commit"]
+           for m in manifests):  # fmt: skip
+        raise ValueError("the shards ran different commits")
+    epochs: dict[str, dict] = {}
+    for m in manifests:
+        if set(m["epochs"]) & set(epochs):
+            raise ValueError("an epoch is in two shards")
+        epochs.update(m["epochs"])
+    write_json(
+        output / "manifest.json",
+        {
+            **{k: manifests[0][k] for k in ("produced_by", "inputs", "settings")},
+            "provenance": [m["provenance"] for m in manifests],
+            "shards": [m["shards"] for m in manifests],
+            "epochs": epochs,
+        },
+        indent=1,
+        sort_keys=True,
+    )
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -188,17 +256,24 @@ def main(argv: list[str] | None = None) -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--epochs", nargs="+", help="epoch ids; default every epoch")
-    parser.add_argument(
-        "--gpus", type=int, nargs="+", required=True, help="one worker per card"
-    )
+    parser.add_argument("--gpus", type=int, nargs="+", help="the cards to use")
+    parser.add_argument("--workers-per-gpu", type=int, default=1)
+    parser.add_argument("--shards", type=int, nargs="+", help="this host's shards")
+    parser.add_argument("--n-shards", type=int, default=1)
+    parser.add_argument("--merge-shards", type=int, metavar="N")
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)
 
-    provenance = provenance_record(ROOT_DIR)
     data_dir = args.data_dir or processed_data_dir()
     output = args.output_dir or data_dir / EVENT_TETRODE_HOLDOUT_DIR
+    if args.merge_shards:
+        merge_shards(output, args.merge_shards)
+        return
+    if not args.gpus:
+        parser.error("--gpus is required")
+    provenance = provenance_record(ROOT_DIR)
     output.mkdir(parents=True, exist_ok=True)
     event_table = table_path(
         "event_table", data_dir / replay_content_dir().relative_to(processed_data_dir())
@@ -213,6 +288,12 @@ def main(argv: list[str] | None = None) -> None:
         },
     }
     epochs = args.epochs or ok_epochs(read_manifest(participation_dir))
+    shards = args.shards if args.shards is not None else list(range(args.n_shards))
+    epochs = [
+        epoch_id
+        for i, epoch_id in enumerate(sorted(epochs))
+        if i % args.n_shards in shards
+    ]
     to_run = [
         epoch_id
         for epoch_id in epochs
@@ -221,13 +302,14 @@ def main(argv: list[str] | None = None) -> None:
     context = multiprocessing.get_context("spawn")
     queue = context.Queue()
     for gpu in args.gpus:
-        queue.put(gpu)
+        for _ in range(args.workers_per_gpu):
+            queue.put(gpu)
     records: dict[str, dict] = {}
     with ProcessPoolExecutor(
-        max_workers=len(args.gpus),
+        max_workers=len(args.gpus) * args.workers_per_gpu,
         mp_context=context,
-        initializer=_claim_gpu,
-        initargs=(queue,),
+        initializer=_use_gpu,
+        initargs=(queue, round(0.9 / args.workers_per_gpu, 3)),
     ) as pool:
         futures = {
             pool.submit(run_epoch, epoch_id, event_table, data_dir, output): epoch_id
@@ -240,11 +322,17 @@ def main(argv: list[str] | None = None) -> None:
             except Exception as error:  # noqa: BLE001 - recorded per epoch
                 records[epoch_id] = {"status": "failed", "error": repr(error)}
             logging.info(f"[{k}/{len(to_run)}] {epoch_id}: {records[epoch_id]}")
+    name = (
+        "manifest.json"
+        if args.n_shards == 1
+        else f"manifest_shards{'-'.join(map(str, shards))}of{args.n_shards}.json"
+    )
     write_json(
-        output / "manifest.json",
+        output / name,
         {
             "produced_by": PRODUCED_BY,
             "provenance": provenance,
+            "shards": shards,
             "inputs": inputs,
             "settings": {
                 "event_table": str(event_table),
