@@ -59,7 +59,9 @@ Per epoch (a dask CPU worker each):
 
 ``epoch_table`` and ``run_epoch`` also take other label sets (``LabelSet``):
 labels from another decode, scored by chosen tetrode pairs, their rows stacked
-(Task 13's half decodes used this; their runner is removed, see git history).
+(Task 13's half decodes used this; their runner is removed, see git history),
+or other windows (``LabelSet.windows``: the canonical events'
+``run_event_heldout_evidence.py`` scores).
 
 It writes ``per_epoch/{epoch}_windows.parquet`` (one row per window; columns
 ``runcv_*`` for the primary, time-held-out running-only encoding, ``run_*`` for
@@ -542,6 +544,14 @@ class LabelSet:
         ``window_evidence``'s: False when each pair's first half made the labels.
     columns : mapping
         Constant columns put on the set's rows, after ``animal``.
+    windows : callable, optional
+        Builds the set's windows, ``windows(time, probabilities, regime)``,
+        from the decode's time axis, the set's state probabilities and
+        ``analysed_regimes``' regimes, with the columns of ``build_windows``
+        that the evidence and ``label_set_table`` read (``kind``, ``state``,
+        ``regime``, ``pool``, ``s``, ``e``, ``n_bins``; ``n_found`` on bouts);
+        it seeds its own draws. None (default) for ``build_windows``, seeded by
+        ``(SEED, epoch_id)``.
     """
 
     name: str = "all"
@@ -550,6 +560,7 @@ class LabelSet:
     halves: Sequence[tuple[NDArray, NDArray]] | None = None
     both_directions: bool = True
     columns: Mapping[str, Any] = field(default_factory=dict)
+    windows: Callable[[NDArray, NDArray, NDArray], pd.DataFrame] | None = None
 
 
 def label_probabilities(label_set: LabelSet, time: NDArray) -> NDArray:
@@ -682,7 +693,11 @@ def epoch_table(
             if label_set.probabilities is None
             else label_probabilities(label_set, time)
         )
-        windows[label_set.name] = build_windows(labels, regime, seed=(SEED, epoch_id))
+        windows[label_set.name] = (
+            build_windows(labels, regime, seed=(SEED, epoch_id))
+            if label_set.windows is None
+            else label_set.windows(time, labels, regime)
+        )
         log(f"{label_set.name}: {len(windows[label_set.name])} windows")
 
     detector = load_detector(epoch_id, decode_dir)
@@ -1015,6 +1030,7 @@ def run_epoch(
     load_inputs: Callable[[str], dict] = load_marks_and_training_mask,
     log: Callable[[str], None] = print,
     label_sets: Callable[[str], Sequence[LabelSet]] | None = None,
+    settings: dict | None = None,
 ) -> dict:
     """Compute and write one epoch; return its record (strict JSON types).
 
@@ -1025,6 +1041,8 @@ def run_epoch(
     work tree's) and ``decode_files`` (``decode_file_stats``, taken before the
     files are read). ``label_sets`` gives an epoch's label sets
     (``epoch_table``'s); default the canonical decode's labels alone.
+    ``settings`` is the run settings an ``"ok"`` record holds (default
+    ``run_settings()``).
     """
     require_cpu()
     if code is None:
@@ -1052,7 +1070,12 @@ def run_epoch(
             None if label_sets is None else label_sets(epoch_id),
         )
         write_table(table, paths["windows"])
-        record = {"status": "ok", "settings": run_settings(), **stamp, **checks}
+        record = {
+            "status": "ok",
+            "settings": run_settings() if settings is None else settings,
+            **stamp,
+            **checks,
+        }
     except Exception as error:  # noqa: BLE001 - recorded; the run goes on
         for path in paths.values():
             path.unlink(missing_ok=True)

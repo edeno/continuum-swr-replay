@@ -24,6 +24,9 @@ Units (per epoch; regimes per 2 ms bin, :func:`regimes`)
 - **Calibration windows** (:func:`calibration_windows`): 2000 random 10-bin
   windows per regime, independent of the decode; each carries the mean
   posterior of every state.
+- **Event windows** (:func:`event_windows`, a runner's other label set): one
+  window per canonical non-local event, every bin of it, labelled by its
+  ``is_swr``, each with one matched window drawn as a bout's is.
 
 Evidence (:func:`window_evidence`; ``_mark`` = spike-mark part, the primary;
 ``_full`` = the full clusterless log-likelihood, the secondary)
@@ -189,12 +192,15 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
     training_spike_bins,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
+    EVENT_STATE,
     HALVES_SEED,
     REGIMES,
     STATES,
+    SWR_LABELS,
     analysed_regimes,
     build_windows,
     calibration_windows,
+    event_windows,
     keyed_rng,
     matched_windows,
     null_partners,
@@ -211,6 +217,7 @@ __all__ = [
     "ENCODING_HELD_OUT",
     "ENCODING_LABELS",
     "EVENT_MARGIN_BINS",
+    "EVENT_STATE",
     "EPOCH_SUMMARY",
     "HALVES_SEED",
     "MIN_BIN_WINDOWS",
@@ -221,6 +228,7 @@ __all__ = [
     "SECONDARY_METRICS",
     "SPLIT_COLUMN",
     "STATES",
+    "SWR_LABELS",
     "UNDERFLOW_OCCUPANCY_FLOOR",
     "TetrodeTerms",
     "analysed_regimes",
@@ -238,6 +246,7 @@ __all__ = [
     "epoch_summaries",
     "epoch_summary_kind",
     "event_likelihood",
+    "event_windows",
     "held_out_evidence",
     "interior_bin_mask",
     "keyed_rng",

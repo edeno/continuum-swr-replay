@@ -165,6 +165,10 @@ NL_BOUTS_BY_SWR_STEM = "nl_bouts_by_swr"
 """The stem of the files the SWR split of a held-out tetrode run writes in the
 run's folder (``scripts/event_evidence/split_state_evidence_by_swr.py``); the events
 summary reads ``<stem>_stats.csv`` and ``<stem>.provenance.json``."""
+EVENT_HELDOUT_EVIDENCE_DIR = "event_heldout_evidence"
+"""The held-out tetrode evidence of the canonical non-local events, one window
+per event, under the processed-data root
+(``scripts/event_evidence/run_event_heldout_evidence.py``)."""
 
 # The behavior summary's inputs that are not one of MODEL_SUBDIRS: each folder is
 # written by its script and read by the behavior summary.

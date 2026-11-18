@@ -359,6 +359,192 @@ def build_windows(
     return windows[first + [c for c in windows.columns if c not in first]]
 
 
+EVENT_STATE = "Non-Local"
+"""The ``state`` stem of an event window (:func:`event_windows`); the SWR label
+is appended to it."""
+
+SWR_LABELS = {True: "SWR", False: "no SWR"}
+"""An event's SWR label by its ``is_swr``, as :func:`~.summary.split_non_local_by_swr`
+names them."""
+
+ON_GRID_ATOL_S = 1e-6
+"""How far (s) an event's first or last time may be from its decode bin's time."""
+
+
+def event_windows(
+    time: NDArray,
+    probabilities: NDArray,
+    regime: NDArray,
+    events: pd.DataFrame,
+    *,
+    regime_name: str = "immobile",
+    threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
+    seed: Seed,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """One window per canonical event, every bin of it, and a matched window each.
+
+    An event's window is its decode bins from ``event_start_s`` to
+    ``event_end_s``, inclusive (the classified table's times are its first and
+    last labelled bins). It is kept when every bin is in ``regime_name``, and
+    its matched window is then drawn as :func:`matched_windows` draws a bout's
+    (every bin in the regime, the same length, a seeded order per length), so
+    the event - matched difference is paired. A matched window may overlap an
+    event, even its own (``event_bin_share`` says how much), as a bout's may. The windows have the columns of :func:`build_windows`
+    that the evidence and its statistics read: an event is a ``"bout"`` and its
+    matched window a ``"baseline"``, and ``state`` is ``"Non-Local | SWR"`` or
+    ``"Non-Local | no SWR"`` by the event's ``is_swr``, so
+    :func:`~.summary.bout_statistics` reads each label as a state. The partner
+    pools (``pool``) do not split by the label, as the bouts' do not.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode's time axis, s.
+    probabilities : ndarray, shape (n_time, 4)
+        The decode's state probabilities, in :data:`STATES` order.
+    regime : ndarray of str, shape (n_time,)
+        From :func:`analysed_regimes`.
+    events : pd.DataFrame
+        One epoch's events: ``event_id``, ``event_start_s``, ``event_end_s``
+        and ``is_swr``. Every other column is copied onto the event's two
+        windows; none may be one this function writes.
+    regime_name : str, optional
+        The regime every bin of a kept event, and of its matched window, is in.
+    threshold : float, optional
+        The non-local event rule's: every bin of an event must have a summed
+        Non-Local probability above it, else the events are not this decode's.
+    seed : int or sequence
+        The epoch's stream, ``(base, epoch_id)`` in the runner.
+
+    Returns
+    -------
+    windows : pd.DataFrame
+        Kept events by start, then their matched windows in the same order:
+        ``kind``, ``state``, ``regime``, ``pool``, ``s``, ``e``, ``n_bins``,
+        ``event_id``, ``is_swr``, ``bout_s``, ``bout_e``, ``bout_len`` and
+        ``n_found`` (the label's events in ``events``) on events,
+        ``matched_bout_s`` on matched windows, ``event_bin_share`` (the share
+        of the window's bins in any of ``events``) and ``p_{state}``, the mean
+        posterior of every state.
+    dropped : pd.DataFrame
+        ``event_id``, ``is_swr`` and ``reason`` of every event not kept: "a bin
+        in no regime" (excluded time, no finite linear position, or a speed
+        between the regimes or not finite) or "a running bin".
+
+    Raises
+    ------
+    ValueError
+        An event does not start and end on a decode bin, two events share a
+        bin, or an event has a bin at or below ``threshold``.
+    """
+    time = np.asarray(time, dtype=float)
+    probabilities = np.asarray(probabilities, dtype=float)
+    regime = np.asarray(regime)
+    n_time = time.size
+    if probabilities.shape != (n_time, len(STATES)) or regime.shape != (n_time,):
+        raise ValueError(
+            f"probabilities are {probabilities.shape} and regime {regime.shape}; "
+            f"expected ({n_time}, {len(STATES)}) and ({n_time},)"
+        )
+    written = {"kind", "state", "regime", "pool", "s", "e", "n_bins", "bout_s",
+               "bout_e", "bout_len", "n_found", "matched_bout_s", "event_bin_share",
+               *(f"p_{state}" for state in STATES)}  # fmt: skip
+    if clash := written & set(events):
+        raise ValueError(f"events carry columns this function writes: {sorted(clash)}")
+    events = events.sort_values("event_start_s", kind="stable").reset_index(drop=True)
+    start = events["event_start_s"].to_numpy(dtype=float)
+    end = events["event_end_s"].to_numpy(dtype=float)
+    s = np.minimum(np.searchsorted(time, start), n_time - 1)
+    e = np.minimum(np.searchsorted(time, end), n_time - 1)
+    on_grid = (np.abs(time[s] - start) <= ON_GRID_ATOL_S) & (
+        np.abs(time[e] - end) <= ON_GRID_ATOL_S
+    )
+    if not on_grid.all():
+        raise ValueError(
+            f"{int((~on_grid).sum())} events do not start and end on the decode's "
+            "time bins"
+        )
+    if (e < s).any() or (s[1:] <= e[:-1]).any():
+        raise ValueError("events must be disjoint, each with start <= end")
+    lens = e - s + 1
+
+    # every bin of every event must be the decode's non-local event bin
+    non_local = (
+        probabilities[:, STATES.index("Non-Local Continuous")]
+        + probabilities[:, STATES.index("Non-Local Fragmented")]
+    )
+    offsets = np.cumsum(lens) - lens
+    concat = np.repeat(s, lens) + (np.arange(lens.sum()) - np.repeat(offsets, lens))
+    if (
+        len(events)
+        and (np.minimum.reduceat(non_local[concat], offsets) <= threshold).any()
+    ):
+        raise ValueError(
+            f"an event has a bin with P(Non-Local) <= {threshold:g}: the events "
+            "are not this decode's"
+        )
+
+    def count_in(mask: NDArray) -> NDArray:
+        cumulative = np.r_[0, np.cumsum(mask, dtype=np.int64)]
+        return cumulative[e + 1] - cumulative[s]
+
+    reason = np.full(len(events), "", dtype=object)
+    reason[count_in(regime == "") > 0] = "a bin in no regime"
+    for other in REGIMES:
+        if other != regime_name:
+            reason[(reason == "") & (count_in(regime == other) > 0)] = f"a {other} bin"
+    # each kept event is itself a valid window of its length, so the matched
+    # draw never runs out (it may draw an event, even the window's own)
+    kept = reason == ""
+
+    is_swr = events["is_swr"].to_numpy(dtype=bool)
+    label = np.where(is_swr, f"{EVENT_STATE} | {SWR_LABELS[True]}",
+                     f"{EVENT_STATE} | {SWR_LABELS[False]}")  # fmt: skip
+    n_found = np.where(is_swr, is_swr.sum(), (~is_swr).sum())
+    carried = events.drop(columns=["event_start_s", "event_end_s"])[kept].reset_index(
+        drop=True
+    )
+    found = pd.DataFrame(
+        {"regime": regime_name, "bout_s": s[kept], "s": s[kept], "e": e[kept]}
+    )
+    matched = matched_windows(found, regime, seed=seed)
+    event_rows = carried.assign(
+        kind="bout", state=label[kept], regime=regime_name,
+        pool=f"bout|{EVENT_STATE}|{regime_name}", s=s[kept], e=e[kept],
+        bout_s=s[kept], bout_e=e[kept], bout_len=lens[kept], n_found=n_found[kept],
+    )  # fmt: skip
+    matched_rows = carried.assign(
+        kind="baseline", state=label[kept], regime=regime_name,
+        pool=f"baseline|{EVENT_STATE}|{regime_name}",
+        s=matched["s"].to_numpy(), e=matched["e"].to_numpy(),
+        matched_bout_s=s[kept],
+    )  # fmt: skip
+    windows = pd.concat([event_rows, matched_rows], ignore_index=True)
+    windows["n_bins"] = windows.e - windows.s + 1
+    ws, we = windows.s.to_numpy(), windows.e.to_numpy()
+    in_event = np.zeros(n_time, dtype=bool)
+    in_event[concat] = True
+    cumulative_event = np.r_[0, np.cumsum(in_event)]
+    windows["event_bin_share"] = (
+        cumulative_event[we + 1] - cumulative_event[ws]
+    ) / windows.n_bins
+    cumulative = np.vstack(
+        [np.zeros((1, len(STATES))), np.cumsum(probabilities, axis=0)]
+    )
+    means = (cumulative[we + 1] - cumulative[ws]) / windows.n_bins.to_numpy()[:, None]
+    for j, state in enumerate(STATES):
+        windows[f"p_{state}"] = means[:, j]
+    first = ["kind", "state", "regime", "pool", "s", "e", "n_bins"]
+    dropped = pd.DataFrame(
+        {
+            "event_id": events["event_id"].to_numpy()[~kept],
+            "is_swr": is_swr[~kept],
+            "reason": reason[~kept].astype(str),
+        }
+    )
+    return windows[first + [c for c in windows.columns if c not in first]], dropped
+
+
 def tetrode_halves(
     n_tetrodes: int, *, n_partitions: int = 10, seed: Seed = 0
 ) -> list[tuple[NDArray, NDArray]]:
