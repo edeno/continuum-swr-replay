@@ -149,6 +149,9 @@ RIPPLE_CLASS_STRUCTURE_DIR = "ripple_class_structure"
 EVENT_START_REST_THETA_DIR = "event_start_rest_theta"
 """Each event's start distance and rest-theta share
 (``scripts/event_properties/measure_event_start_and_rest_theta.py``)."""
+CONTENT_ALONG_ARMS_DIR = "content_along_arms"
+"""Each event time bin's arm and place along it
+(``scripts/event_properties/measure_content_along_arms.py``)."""
 EVENT_PROPERTY_BOOTSTRAP_DIR = "event_property_bootstrap"
 """The event properties' bootstrap intervals
 (``scripts/event_properties/bootstrap_event_properties.py``)."""
