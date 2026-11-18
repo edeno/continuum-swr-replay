@@ -1013,10 +1013,10 @@ def draw_detector_overlap(
     """
     n_rows = len(overlap) + 1
     draw_detector_bars(ax_caught, overlap, n_rows, "%", True)
-    ax_caught.set_title("Catches\nnon-local events", fontsize=SMALL_SIZE, pad=3)
+    ax_caught.set_title("Non-local\nevents found", fontsize=SMALL_SIZE, pad=3)
     ax_caught.barh(0, 100 * any_swr_or_mua, color="#666666", height=0.65)
     draw_detector_bars(ax_content, with_nonlocal, n_rows, "%", False)
-    ax_content.set_title("Its events\nare non-local", fontsize=SMALL_SIZE, pad=3)
+    ax_content.set_title("Detections with\nnon-local activity", fontsize=SMALL_SIZE, pad=3)
     ax_content.spines["left"].set_visible(False)
 
 
