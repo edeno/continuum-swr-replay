@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
 | `detection.json` | `3455b5a13f61` | yes | 172 | 0 |
-| `events.json` | `95dfea9d779d` | yes | 394 | 0 |
+| `events.json` | `500ae257014e` | yes | 394 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
 
