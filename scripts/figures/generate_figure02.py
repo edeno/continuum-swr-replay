@@ -60,7 +60,7 @@ import argparse
 import hashlib
 import logging
 import warnings
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import joblib
@@ -72,6 +72,7 @@ from matplotlib.axes import Axes
 from matplotlib.backend_bases import RendererBase
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec, SubplotSpec
+from matplotlib.transforms import Bbox
 from non_local_detector.environment import Environment
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
@@ -1167,29 +1168,43 @@ def draw_offsets(ax_start: Axes, ax_end: Axes, offsets: pd.DataFrame) -> None:
     ax_start.yaxis.set_label_coords(-0.3, 0.0)
 
 
-def letter(
+def panel_extent(fig: Figure, renderer: RendererBase, axes: Sequence[Axes]) -> Bbox:
+    """The drawn extent of a panel's axes (labels, titles and legends included),
+    in figure coordinates."""
+    return Bbox.union(
+        [
+            ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
+            for ax in axes
+        ]
+    )
+
+
+def place_letters(
     fig: Figure,
     renderer: RendererBase,
-    ax: Axes,
-    text: str,
-    x: float | None = None,
-    y: float | None = None,
-) -> None:
-    """A panel letter at the axes' drawn top-left, or at the given figure x / y.
+    panels: Mapping[str, Sequence[Axes]],
+    rows: Sequence[str],
+    columns: Sequence[str],
+) -> dict[str, tuple[float, float]]:
+    """Each panel letter's figure position, aligned by row and by column.
 
-    ``renderer`` is the canvas's after one draw; adding the letters moves no
-    axes (the figure has no layout engine), so one draw serves them all.
+    The letters of a row (each string of ``rows``, such as ``"cdef"``) share the
+    height just above the highest of their panels' drawn tops; the letters of a
+    column (each string of ``columns``, such as ``"dh"``) share the left edge of
+    the leftmost of their panels' drawn extents.
     """
-    box = ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
-    fig.text(
-        max(box.x0 - 0.004, 0.0) if x is None else x,
-        min(box.y1 + 0.002, 0.985) if y is None else y,
-        text,
-        fontsize=PANEL_LETTER_SIZE,
-        fontweight="bold",
-        ha="left",
-        va="bottom",
-    )
+    extents = {name: panel_extent(fig, renderer, axes) for name, axes in panels.items()}
+    y = {
+        name: min(max(extents[n].y1 for n in row) + 0.002, 0.985)
+        for row in rows
+        for name in row
+    }
+    x = {
+        name: max(min(extents[n].x0 for n in column) - 0.004, 0.0)
+        for column in columns
+        for name in column
+    }
+    return {name: (x[name], y[name]) for name in panels}
 
 
 # ---------------------------------------------------------------------------
@@ -1269,7 +1284,7 @@ def generate_figure(
         4,
         1,
         figure=fig,
-        height_ratios=[1.95, 1.75, 1.35, 1.55],
+        height_ratios=[1.8, 1.9, 1.3, 1.55],
         hspace=0.55,
         left=0.1,
         right=0.99,
@@ -1286,9 +1301,8 @@ def generate_figure(
     ax_d = fig.add_subplot(swr_grid[0])
     draw_swr_donut(ax_d, inputs["kay"])
     histogram_slot = swr_grid[1].subgridspec(1, 2, width_ratios=[0.25, 1.0])
-    draw_swr_share_histogram(
-        fig.add_subplot(histogram_slot[1]), inputs["kay_nonlocal_share"]
-    )
+    ax_d_shares = fig.add_subplot(histogram_slot[1])
+    draw_swr_share_histogram(ax_d_shares, inputs["kay_nonlocal_share"])
     detectors = row3[2].subgridspec(1, 2, wspace=0.3)
     ax_e = fig.add_subplot(detectors[0])
     ax_e2 = fig.add_subplot(detectors[1])
@@ -1324,19 +1338,32 @@ def generate_figure(
         - 0.004
     )
     fit_track_to_height(fig, ax_a, x_left + 0.02)
-    letter(fig, renderer, ax_a, "a", x=x_left, y=ax_a_top.get_position().y1 + 0.004)
-    for ax, text, x in (
-        (ax_b, "b", x_left),
-        (ax_c, "c", x_left),
-        (ax_d, "d", None),
-        (ax_e, "e", None),
-        (ax_f1, "f", None),
-        (ax_g, "g", x_left),
-        (ax_h, "h", None),
-        (ax_i, "i", None),
-        (ax_j, "j", None),
-    ):
-        letter(fig, renderer, ax, text, x=x)
+    fig.canvas.draw()
+    positions = place_letters(
+        fig,
+        renderer,
+        {
+            "a": [ax_a],
+            "b": [ax_b],
+            "c": [ax_c],
+            "d": [ax_d, ax_d_shares],
+            "e": [ax_e, ax_e2],
+            "f": [ax_f1, ax_f2],
+            "g": [ax_g, ax_g2],
+            "h": [ax_h],
+            "i": triggered_axes,
+            "j": [ax_j],
+        },
+        rows=["a", "b", "cdef", "ghij"],
+        columns=["abcg", "dh", "ei", "fj"],
+    )
+    # panel a's letter sits at the top of its decode, not of the track drawing
+    positions["a"] = (positions["a"][0], ax_a_top.get_position().y1 + 0.004)
+    for name, (x, y) in positions.items():
+        fig.text(
+            x, y, name, fontsize=PANEL_LETTER_SIZE, fontweight="bold", ha="left",
+            va="bottom",
+        )  # fmt: skip
     return fig
 
 
