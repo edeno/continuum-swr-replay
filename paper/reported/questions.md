@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `099b9dbb32c0` | yes | 32 | 0 |
 | `detection.json` | `099b9dbb32c0` | yes | 172 | 0 |
-| `events.json` | `9cb45dbdebfa` | yes | 414 | 0 |
+| `events.json` | `e9b777f04c38` | yes | 414 | 0 |
 | `behavior.json` | `9cb45dbdebfa` | yes | 922 | 0 |
 | `mpfc.json` | `099b9dbb32c0` | yes | 604 | 0 |
 
@@ -601,9 +601,9 @@ Sources:
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsBaselineDllPerSpikeMedian` | 0.00 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows | `events.spike_evidence_values` | 2 |
-| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` | 2 |
-| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | `events.spike_evidence_values` | 2 |
-| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | `events.spike_evidence_values` | 2 |
+| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` |  |
+| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | `events.spike_evidence_values` |  |
+| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | `events.spike_evidence_values` |  |
 | `\EventsHeldoutNonSwrAnimals` | 5 |  | animals in that test | `events.heldout_by_swr_values` | 2 |
 | `\EventsHeldoutNonSwrAnimalsPositive` | 5 |  | animals with a positive mean | `events.heldout_by_swr_values` | 2 |
 | `\EventsHeldoutNonSwrPerSpike` | 0.20 | nats per spike | held-out evidence per held-out spike for immobile Non-Local Continuous bouts without an SWR, against the animal's position: mean over animals | `events.heldout_by_swr_values` | 2 |
@@ -618,7 +618,7 @@ Sources:
 | `\EventsNonSwrCloseDllPerSpikeMedian` | 0.49 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrCloseEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrCloseEpochsScored` | 242 |  | epochs with a scored nonSWR-close event | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` |  |
 | `\EventsNonSwrHeldoutControlGainPerSpike` | 0.00 | nats per spike | held-out tetrode score of no SWR Local-rest controls: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median | `events.tetrode_holdout_values` | 2h |
 | `\EventsNonSwrHeldoutControlGainPerSpikeCiHigh` | 0.00 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2h |
 | `\EventsNonSwrHeldoutControlGainPerSpikeCiLow` | 0.00 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2h |
@@ -638,7 +638,7 @@ Sources:
 | `\EventsNonSwrRemoteDllPerSpikeMedian` | 0.71 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteEpochsScored` | 242 |  | epochs with a scored nonSWR-remote event | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` |  |
 | `\EventsSwrHeldoutControlGainPerSpike` | 0.00 | nats per spike | held-out tetrode score of SWR Local-rest controls: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median | `events.tetrode_holdout_values` | 2h |
 | `\EventsSwrHeldoutControlGainPerSpikeCiHigh` | 0.00 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2h |
 | `\EventsSwrHeldoutControlGainPerSpikeCiLow` | 0.00 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2h |
@@ -658,7 +658,7 @@ Sources:
 | `\EventsSwrRemoteDllPerSpikeMedian` | 1.18 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteEpochsScored` | 242 |  | epochs with a scored SWR-remote event | `events.spike_evidence_values` | 2 |
-| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` |  |
 
 ### 2c.4. Where do event MAPs sit relative to the GPI peak, against matched quiet windows?
 
@@ -957,12 +957,12 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` | 2 |
+| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` |  |
 | `\EventsBaselineSpikesMedian` | 11 | spikes | median spike count of matched quiet windows | `events.spike_evidence_values` | 2 |
 | `\EventsBaselineTetrodesMedian` | 6 | tetrodes | median number of tetrodes with a spike in matched quiet windows | `events.spike_evidence_values` | 2 |
-| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | `events.spike_evidence_values` | 2 |
-| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` | 2 |
+| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | `events.spike_evidence_values` |  |
+| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | `events.spike_evidence_values` |  |
+| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` |  |
 | `\EventsNonSwrCloseSpikesMedian` | 44 | spikes | median spike count of nonSWR-close events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrCloseTetrodesMedian` | 12 | tetrodes | median number of tetrodes with a spike in nonSWR-close events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrControlParticipation` | 35 % |  | share of tetrodes with a spike of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
@@ -971,7 +971,7 @@ Sources:
 | `\EventsNonSwrEventSpikeRateHz` | 749 | spikes per s | spike rate summed over tetrodes of no SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
 | `\EventsNonSwrParticipationAnimals` | 5 |  | animals with no SWR events and Local-rest windows | `events.participation_values` | 2g |
 | `\EventsNonSwrParticipationAnimalsAboveRest` | 5 |  | animals whose no SWR events' share of tetrodes with a spike is above their Local-rest windows' | `events.participation_values` | 2g |
-| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` |  |
 | `\EventsNonSwrRemoteSpikesMedian` | 36 | spikes | median spike count of nonSWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteTetrodesMedian` | 11 | tetrodes | median number of tetrodes with a spike in nonSWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrSpikeRateHzAnimalsAboveRest` | 5 |  | animals whose no SWR events' spike rate summed over tetrodes is above their Local-rest windows' | `events.participation_values` | 2g |
@@ -982,7 +982,7 @@ Sources:
 | `\EventsSwrEventSpikeRateHz` | 1101 | spikes per s | spike rate summed over tetrodes of SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
 | `\EventsSwrParticipationAnimals` | 5 |  | animals with SWR events and Local-rest windows | `events.participation_values` | 2g |
 | `\EventsSwrParticipationAnimalsAboveRest` | 5 |  | animals whose SWR events' share of tetrodes with a spike is above their Local-rest windows' | `events.participation_values` | 2g |
-| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` |  |
 | `\EventsSwrRemoteSpikesMedian` | 118 | spikes | median spike count of SWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteTetrodesMedian` | 15 | tetrodes | median number of tetrodes with a spike in SWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsSwrSpikeRateHzAnimalsAboveRest` | 5 |  | animals whose SWR events' spike rate summed over tetrodes is above their Local-rest windows' | `events.participation_values` | 2g |
@@ -2866,7 +2866,7 @@ Script: `scripts/figures/generate_figure01.py`. Questions: 1.1.
 
 Script: `scripts/figures/generate_figure02.py`. Questions: 2b.1, 2b.2, 2b.3, 2b.4, 2b.5, 2c.3, 2d.8, 2d.9.
 
-Unlettered: `\EventsBaselineDllPerSpikeMedian`, `\EventsBaselineScored`, `\EventsBaselineSpikesMedian`, `\EventsBaselineTetrodesMedian`, `\EventsEvidenceAnimals`, `\EventsEvidenceEpochs`, `\EventsHeldoutNonSwrAnimalsPositive`, `\EventsHeldoutNonSwrAnimals`, `\EventsHeldoutNonSwrPerSpikeCiHigh`, `\EventsHeldoutNonSwrPerSpikeCiLow`, `\EventsHeldoutNonSwrPerSpike`, `\EventsHeldoutSwrAnimalsPositive`, `\EventsHeldoutSwrAnimals`, `\EventsHeldoutSwrPerSpikeCiHigh`, `\EventsHeldoutSwrPerSpikeCiLow`, `\EventsHeldoutSwrPerSpike`, `\EventsKayEvents`, `\EventsKayNoNonlocalFractionAnimalMax`, `\EventsKayNoNonlocalFractionAnimalMin`, `\EventsKayNoNonlocalFraction`, `\EventsKayNoNonlocalMixedFraction`, `\EventsKayNoNonlocalMostlyLocalFraction`, `\EventsKayNoNonlocalMostlyNoSpikeFraction`, `\EventsKayOverlapAllNonlocalFraction`, `\EventsKayOverlapAnyLocalFraction`, `\EventsKayOverlapAnyNoSpikeFraction`, `\EventsKayOverlapLocalShareMedian`, `\EventsKayOverlapNoSpikeShareMedian`, `\EventsKayOverlapNonlocalShareMedian`, `\EventsKayOverlapUncertainShareMedian`, `\EventsNonSwrCloseAnimalsAboveBaseline`, `\EventsNonSwrCloseDllPerSpikeMedian`, `\EventsNonSwrCloseEpochsAboveBaseline`, `\EventsNonSwrCloseEpochsScored`, `\EventsNonSwrCloseScored`, `\EventsNonSwrCloseSpikesMedian`, `\EventsNonSwrCloseTetrodesMedian`, `\EventsNonSwrRemoteAnimalsAboveBaseline`, `\EventsNonSwrRemoteDllPerSpikeMedian`, `\EventsNonSwrRemoteEpochsAboveBaseline`, `\EventsNonSwrRemoteEpochsScored`, `\EventsNonSwrRemoteScored`, `\EventsNonSwrRemoteSpikesMedian`, `\EventsNonSwrRemoteTetrodesMedian`, `\EventsSwrRemoteAnimalsAboveBaseline`, `\EventsSwrRemoteDllPerSpikeMedian`, `\EventsSwrRemoteEpochsAboveBaseline`, `\EventsSwrRemoteEpochsScored`, `\EventsSwrRemoteScored`, `\EventsSwrRemoteSpikesMedian`, `\EventsSwrRemoteTetrodesMedian`
+Unlettered: `\EventsBaselineDllPerSpikeMedian`, `\EventsBaselineSpikesMedian`, `\EventsBaselineTetrodesMedian`, `\EventsHeldoutNonSwrAnimalsPositive`, `\EventsHeldoutNonSwrAnimals`, `\EventsHeldoutNonSwrPerSpikeCiHigh`, `\EventsHeldoutNonSwrPerSpikeCiLow`, `\EventsHeldoutNonSwrPerSpike`, `\EventsHeldoutSwrAnimalsPositive`, `\EventsHeldoutSwrAnimals`, `\EventsHeldoutSwrPerSpikeCiHigh`, `\EventsHeldoutSwrPerSpikeCiLow`, `\EventsHeldoutSwrPerSpike`, `\EventsKayEvents`, `\EventsKayNoNonlocalFractionAnimalMax`, `\EventsKayNoNonlocalFractionAnimalMin`, `\EventsKayNoNonlocalFraction`, `\EventsKayNoNonlocalMixedFraction`, `\EventsKayNoNonlocalMostlyLocalFraction`, `\EventsKayNoNonlocalMostlyNoSpikeFraction`, `\EventsKayOverlapAllNonlocalFraction`, `\EventsKayOverlapAnyLocalFraction`, `\EventsKayOverlapAnyNoSpikeFraction`, `\EventsKayOverlapLocalShareMedian`, `\EventsKayOverlapNoSpikeShareMedian`, `\EventsKayOverlapNonlocalShareMedian`, `\EventsKayOverlapUncertainShareMedian`, `\EventsNonSwrCloseAnimalsAboveBaseline`, `\EventsNonSwrCloseDllPerSpikeMedian`, `\EventsNonSwrCloseEpochsAboveBaseline`, `\EventsNonSwrCloseEpochsScored`, `\EventsNonSwrCloseSpikesMedian`, `\EventsNonSwrCloseTetrodesMedian`, `\EventsNonSwrRemoteAnimalsAboveBaseline`, `\EventsNonSwrRemoteDllPerSpikeMedian`, `\EventsNonSwrRemoteEpochsAboveBaseline`, `\EventsNonSwrRemoteEpochsScored`, `\EventsNonSwrRemoteSpikesMedian`, `\EventsNonSwrRemoteTetrodesMedian`, `\EventsSwrRemoteAnimalsAboveBaseline`, `\EventsSwrRemoteDllPerSpikeMedian`, `\EventsSwrRemoteEpochsAboveBaseline`, `\EventsSwrRemoteEpochsScored`, `\EventsSwrRemoteSpikesMedian`, `\EventsSwrRemoteTetrodesMedian`
 
 Panel c: `\EventsKayMostlyLocalFraction`
 
