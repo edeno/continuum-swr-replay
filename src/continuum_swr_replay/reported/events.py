@@ -99,7 +99,6 @@ from continuum_swr_replay.paths import (
     content_occupancy_dir,
     event_features_root,
     event_spike_evidence_dir,
-    inventory_comparison_root,
     processed_data_dir,
     replay_content_dir,
     table_path,
@@ -123,7 +122,6 @@ from continuum_swr_replay.runs.io import (
     files_sha256,
     ok_table_paths,
     read_complete_run,
-    read_manifest,
 )
 from continuum_swr_replay.runs.staleness import read_output_manifest, recorded_sha256
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
@@ -2041,10 +2039,12 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     )
 
     run = inputs.event_features_run
-    others = nonlocal_comparison.other_detector_events(run)
-    inventory_dir = inventory_comparison_root() / _input_run(run, "inventory")
-    directional_path = inventory_dir / "report" / "directional_by_animal.csv"
-    nonlocal_comparison.check_against_directional(others, pd.read_csv(directional_path))
+    comparison = nonlocal_comparison.read_comparison(run)
+    others = comparison.others
+    inventory_dir, directional_path = (
+        comparison.inventory_dir,
+        comparison.directional_path,
+    )
     summary.add(
         *other_detector_values(
             others,
@@ -2234,9 +2234,3 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     )
     summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]
     return summary
-
-
-def _input_run(run_dir: Path, name: str) -> str:
-    """The id of the input run ``name`` that the event features run read."""
-    run: str = read_manifest(run_dir)["settings"]["input_runs"][name]
-    return run

@@ -17,6 +17,7 @@ an event's state shares are the shares of its rows in each state, and in none
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -43,6 +44,7 @@ from continuum_swr_replay.analysis.detector_comparison.schema import (
     typed_table,
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_session_values
+from continuum_swr_replay.paths import inventory_comparison_root
 from continuum_swr_replay.runs.io import ok_table_paths, read_manifest
 from continuum_swr_replay.tables.io import read_table
 
@@ -116,6 +118,42 @@ def check_against_directional(events: pd.DataFrame, directional: pd.DataFrame) -
         and (joined["n_matched"] == joined["n_matched_events"]).all()
     ):
         raise ValueError(f"memberships do not give the directional counts:\n{joined}")
+
+
+@dataclass(frozen=True)
+class Comparison:
+    """An event features run's comparison, as the figure and the summary read it.
+
+    Attributes
+    ----------
+    others : pd.DataFrame
+        Each other detector's compared events (:func:`other_detector_events`).
+    inventory_dir : Path
+        The inventory comparison run the features run read.
+    directional_path : Path
+        Its ``report/directional_by_animal.csv``.
+    directional : pd.DataFrame
+        That table, checked against ``others`` (:func:`check_against_directional`).
+    """
+
+    others: pd.DataFrame
+    inventory_dir: Path
+    directional_path: Path
+    directional: pd.DataFrame
+
+
+def read_comparison(run_dir: Path) -> Comparison:
+    """The features run's compared events and its inventory run's directional
+    table, checked against each other."""
+    others = other_detector_events(run_dir)
+    inventory_dir = (
+        inventory_comparison_root()
+        / read_manifest(run_dir)["settings"]["input_runs"]["inventory"]
+    )
+    directional_path = inventory_dir / "report" / "directional_by_animal.csv"
+    directional = pd.read_csv(directional_path)
+    check_against_directional(others, directional)
+    return Comparison(others, inventory_dir, directional_path, directional)
 
 
 def _matched_shares(

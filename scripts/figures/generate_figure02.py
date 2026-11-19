@@ -138,13 +138,12 @@ from continuum_swr_replay.paths import (
     EVENT_PARTICIPATION_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
     event_features_root,
-    inventory_comparison_root,
     processed_data_dir,
     replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.reported.formatting import format_number
-from continuum_swr_replay.runs.io import read_complete_run, read_manifest
+from continuum_swr_replay.runs.io import read_complete_run
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.inventory_examples import detector_color
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
@@ -498,14 +497,9 @@ def detector_comparison() -> dict:
         time outside Kay's SWRs (c).
     """
     run = event_features_root() / EVENT_FEATURES_RUN
-    others = nonlocal_comparison.other_detector_events(run)
-    inventory_dir = (
-        inventory_comparison_root()
-        / read_manifest(run)["settings"]["input_runs"]["inventory"]
-    )
-    directional = pd.read_csv(inventory_dir / "report" / "directional_by_animal.csv")
-    nonlocal_comparison.check_against_directional(others, directional)
-    left_out = nonlocal_comparison.left_out_statistics(run, inventory_dir)
+    comparison = nonlocal_comparison.read_comparison(run)
+    others, directional = comparison.others, comparison.directional
+    left_out = nonlocal_comparison.left_out_statistics(run, comparison.inventory_dir)
     return {
         "kay": nonlocal_comparison.other_detector_statistics(others).loc["kay"],
         "overlap": nonlocal_comparison.nonlocal_events_overlapped(
