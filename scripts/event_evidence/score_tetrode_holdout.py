@@ -45,6 +45,7 @@ import argparse
 import logging
 import multiprocessing
 import time as clock
+from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -211,39 +212,50 @@ def _use_gpu(queue, mem_fraction: float) -> None:
     )
 
 
-def merge_shards(output: Path, n_shards: int) -> None:
+def merge_shards(output: Path, n_shards: int, retries: Sequence[str] = ()) -> None:
     """Write ``manifest.json`` from every shard's manifest.
+
+    ``retries`` name manifests of later runs of failed epochs (in ``output``);
+    their records replace the shards' for those epochs.
 
     Raises
     ------
     ValueError
-        If a shard is missing, two shards record other code, inputs or
-        settings, or an epoch is in two shards.
+        If a shard is missing, a shard or retry records other code, inputs or
+        settings, an epoch is in two shards, or a retry scores an epoch the
+        shards did not fail.
     """
     import json
 
     paths = sorted(output.glob(f"manifest_shards*of{n_shards}.json"))
     manifests = [json.loads(p.read_text()) for p in paths]
+    retried = [json.loads((output / name).read_text()) for name in retries]
     covered = sorted(i for m in manifests for i in m["shards"])
     if covered != list(range(n_shards)):
         raise ValueError(f"shards {covered} of {n_shards} found")
     for key in ("inputs", "settings"):
-        if any(m[key] != manifests[0][key] for m in manifests):
+        if any(m[key] != manifests[0][key] for m in manifests + retried):
             raise ValueError(f"the shards record different {key}")
     if any(m["provenance"]["commit"] != manifests[0]["provenance"]["commit"]
-           for m in manifests):  # fmt: skip
+           for m in manifests + retried):  # fmt: skip
         raise ValueError("the shards ran different commits")
     epochs: dict[str, dict] = {}
     for m in manifests:
         if set(m["epochs"]) & set(epochs):
             raise ValueError("an epoch is in two shards")
         epochs.update(m["epochs"])
+    for m in retried:
+        for epoch_id, record in m["epochs"].items():
+            if epochs.get(epoch_id, {}).get("status") != "failed":
+                raise ValueError(f"{epoch_id} was not a failed epoch of the shards")
+            epochs[epoch_id] = {**record, "retried": True}
     write_json(
         output / "manifest.json",
         {
             **{k: manifests[0][k] for k in ("produced_by", "inputs", "settings")},
-            "provenance": [m["provenance"] for m in manifests],
+            "provenance": [m["provenance"] for m in manifests + retried],
             "shards": [m["shards"] for m in manifests],
+            "retries": list(retries),
             "epochs": epochs,
         },
         indent=1,
@@ -261,6 +273,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--shards", type=int, nargs="+", help="this host's shards")
     parser.add_argument("--n-shards", type=int, default=1)
     parser.add_argument("--merge-shards", type=int, metavar="N")
+    parser.add_argument(
+        "--retries", nargs="*", default=(), help="retry manifests, for the merge"
+    )
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--overwrite", action="store_true")
@@ -269,7 +284,7 @@ def main(argv: list[str] | None = None) -> None:
     data_dir = args.data_dir or processed_data_dir()
     output = args.output_dir or data_dir / EVENT_TETRODE_HOLDOUT_DIR
     if args.merge_shards:
-        merge_shards(output, args.merge_shards)
+        merge_shards(output, args.merge_shards, args.retries)
         return
     if not args.gpus:
         parser.error("--gpus is required")
