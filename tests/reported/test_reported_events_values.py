@@ -321,9 +321,9 @@ def test_brain_state_values_name_each_signal_class_and_reference():
             # of the SWR events, 7 reaches the running level and 3 does not
             expected |= {"like_fraction_non_swr": 0.0, "like_fraction_swr": 0.5}
         assert own == pytest.approx(expected), signal
-    assert values["ripple_median_swr"].figures == ("2j",)
-    assert values["mua_median_swr"].figures == ("2j",)
-    assert values["theta_median_swr"].figures == ("3h",)
+    assert values["ripple_median_swr"].figures == ("2i",)
+    assert values["mua_median_swr"].figures == ("2i",)
+    assert values["theta_median_swr"].figures == ("2i",)
 
 
 def test_gamma_db_values_name_each_band_and_class():
@@ -769,7 +769,7 @@ def test_state_composition_values_name_each_group_and_state():
     values = _by_key(builder.state_composition_values(events, "s"))
     assert values["non_swr_continuous_share"].value == pytest.approx(0.8)
     assert values["swr_fragmented_share"].value == pytest.approx(0.2)
-    assert values["swr_fragmented_share"].figures == ("2h",)
+    assert values["swr_fragmented_share"].figures == ("3e",)
     assert len(values) == 4
 
 
