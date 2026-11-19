@@ -805,5 +805,3 @@ def plot_state_fractions_by_movement(
 
     if standalone:
         plt.tight_layout()
-
-

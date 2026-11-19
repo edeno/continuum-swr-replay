@@ -165,10 +165,6 @@ NL_BOUTS_BY_SWR_STEM = "nl_bouts_by_swr"
 """The stem of the files the SWR split of a held-out tetrode run writes in the
 run's folder (``scripts/event_evidence/split_state_evidence_by_swr.py``); the events
 summary reads ``<stem>_stats.csv`` and ``<stem>.provenance.json``."""
-EVENT_HELDOUT_EVIDENCE_DIR = "event_heldout_evidence"
-"""The held-out tetrode evidence of the canonical non-local events, one window
-per event, under the processed-data root
-(``scripts/exploratory/_run_event_heldout_evidence.py``, a reference copy)."""
 EVENT_LIKELIHOOD_ADVANTAGE_DIR = "event_likelihood_advantage"
 """The spike likelihood at decoded and actual positions of the canonical
 non-local events, under the processed-data root
