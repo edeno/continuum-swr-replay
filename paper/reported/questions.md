@@ -15,11 +15,11 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `099b9dbb32c0` | yes | 32 | 0 |
-| `detection.json` | `099b9dbb32c0` | yes | 172 | 0 |
-| `events.json` | `099b9dbb32c0` | yes | 414 | 0 |
-| `behavior.json` | `099b9dbb32c0` | yes | 922 | 0 |
-| `mpfc.json` | `099b9dbb32c0` | yes | 604 | 0 |
+| `survey.json` | `719e04be1116` | yes | 32 | 0 |
+| `detection.json` | `719e04be1116` | yes | 172 | 0 |
+| `events.json` | `719e04be1116` | yes | 414 | 0 |
+| `behavior.json` | `719e04be1116` | yes | 922 | 0 |
+| `mpfc.json` | `719e04be1116` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -250,20 +250,20 @@ Status: partly computed; in sample only: no script measures the held-out decodin
 
 Sources:
 
-- Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)
+- Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analyzed epoch's decode)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsCalibrationErrorBinEight` | 5.0 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.75 (bin 8 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
-| `\EventsCalibrationErrorBinFive` | 6.8 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.45 (bin 5 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
-| `\EventsCalibrationErrorBinFour` | 7.2 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.35 (bin 4 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
-| `\EventsCalibrationErrorBinNine` | 4.9 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.85 (bin 9 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
-| `\EventsCalibrationErrorBinOne` | 14 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.05 (bin 1 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
-| `\EventsCalibrationErrorBinSeven` | 5.8 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.65 (bin 7 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
-| `\EventsCalibrationErrorBinSix` | 6.2 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.55 (bin 6 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
-| `\EventsCalibrationErrorBinTen` | 3.0 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.95 (bin 10 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
-| `\EventsCalibrationErrorBinThree` | 7.5 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.25 (bin 3 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
-| `\EventsCalibrationErrorBinTwo` | 8.8 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.15 (bin 2 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
+| `\EventsCalibrationErrorBinEight` | 5.0 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.75 (bin 8 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
+| `\EventsCalibrationErrorBinFive` | 6.8 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.45 (bin 5 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
+| `\EventsCalibrationErrorBinFour` | 7.2 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.35 (bin 4 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
+| `\EventsCalibrationErrorBinNine` | 4.9 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.85 (bin 9 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
+| `\EventsCalibrationErrorBinOne` | 14 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.05 (bin 1 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
+| `\EventsCalibrationErrorBinSeven` | 5.8 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.65 (bin 7 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
+| `\EventsCalibrationErrorBinSix` | 6.2 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.55 (bin 6 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
+| `\EventsCalibrationErrorBinTen` | 3.0 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.95 (bin 10 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
+| `\EventsCalibrationErrorBinThree` | 7.5 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.25 (bin 3 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
+| `\EventsCalibrationErrorBinTwo` | 8.8 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.15 (bin 2 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
 | `\EventsDecodingErrorMedianCm` | 3.0 | cm | median over sessions of each session's median Local-state decoding error (the track-graph distance from the decoded to the actual position, over time bins with Local probability above 0.5 outside excluded time), sessions pooled | `events.decoding_error_values` |  |
 | `\EventsDecodingErrorSessions` | 242 |  | sessions with a Local-state decoding error | `events.decoding_error_values` |  |
 
@@ -293,7 +293,7 @@ Status: computed. Figures: decoder_validation. Values: 8.
 
 Sources:
 
-- Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)
+- Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analyzed epoch's decode)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -391,13 +391,13 @@ Sources:
 | `\EventsNonlocalEventsNonSwr` | 42,974 |  | of those, events overlapping no SWR (overlap_class non_swr) | `events.event_cohort_values` | 2c |
 | `\EventsNonlocalEventsOutsideKay` | 42,962 |  | non-local events no Kay SWR overlaps (detector comparison memberships) | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideKayFraction` | 57 % |  | share of the non-local events with a known membership that no Kay SWR overlaps | `events.left_out_values` | 2 |
-| `\EventsNonlocalEventsOutsideKayPerHour` | 1100 | per h | non-local events no Kay SWR overlaps, per hour of analysed immobility | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideKayPerHour` | 1100 | per h | non-local events no Kay SWR overlaps, per hour of analyzed immobility | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideTrigger` | 19,221 |  | non-local events no SWR definition and no MUA event overlaps (cell sequence_matched_by_no_trigger) | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideTriggerFraction` | 25 % |  | share of the non-local events with a known membership that no SWR definition and no MUA event overlaps | `events.left_out_values` | 2 |
-| `\EventsNonlocalEventsOutsideTriggerPerHour` | 480 | per h | non-local events no SWR definition and no MUA event overlaps, per hour of analysed immobility | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideTriggerPerHour` | 480 | per h | non-local events no SWR definition and no MUA event overlaps, per hour of analyzed immobility | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideWidloski` | 70,924 |  | non-local events no Widloski event overlaps (detector comparison memberships) | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsOutsideWidloskiFraction` | 94 % |  | share of the non-local events with a known membership that no Widloski event overlaps | `events.left_out_values` | 2 |
-| `\EventsNonlocalEventsOutsideWidloskiPerHour` | 1800 | per h | non-local events no Widloski event overlaps, per hour of analysed immobility | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideWidloskiPerHour` | 1800 | per h | non-local events no Widloski event overlaps, per hour of analyzed immobility | `events.left_out_values` | 2 |
 | `\EventsNonlocalEventsSwrContained` | 16,037 |  | events lying inside an SWR (overlap_class swr_contained) | `events.event_cohort_values` | 2c |
 | `\EventsNonlocalEventsSwrPartial` | 16,664 |  | events partly overlapping an SWR (overlap_class swr_partial) | `events.event_cohort_values` | 2c |
 | `\EventsNonlocalTimeOutsideKayFraction` | 53 % |  | share of non-local event time that Kay's SWRs do not cover | `events.left_out_values` | 2 |
@@ -409,7 +409,7 @@ Sources:
 | `\EventsNonlocalTimeOutsideWidloskiFraction` | 91 % |  | share of non-local event time that the Widloski detector's events do not cover | `events.left_out_values` | 2 |
 | `\EventsNonlocalTimeOutsideWidloskiS` | 6004 | s | seconds of non-local event time that the Widloski detector's events do not cover | `events.left_out_values` | 2 |
 | `\EventsNonlocalTimeS` | 6562 | s | seconds of non-local event time (compared events), summed over epochs | `events.left_out_values` | 2 |
-| `\EventsRestHours` | 40 | h | hours of analysed immobility the non-local detector observed (exposure), summed over epochs | `events.left_out_values` | 2 |
+| `\EventsRestHours` | 40 | h | hours of analyzed immobility the non-local detector observed (exposure), summed over epochs | `events.left_out_values` | 2 |
 | `\EventsSwrContainedFraction` | 21 % |  | share of immobile non-local events lying inside an SWR, pooled over animals | `events.event_cohort_values` | 2c |
 | `\EventsSwrPartialFraction` | 22 % |  | share of immobile non-local events partly overlapping an SWR, pooled over animals | `events.event_cohort_values` | 2c |
 
@@ -1379,10 +1379,10 @@ Sources:
 | `\BehaviorPerStopAnimalsChildBetterNonLocalSwr` | 4 |  | non-local with SWR: animals whose median step is negative | `behavior.per_stop_values` |  |
 | `\BehaviorPerStopAnimalsChildBetterSwr` | 4 |  | detected SWR: animals whose median step is negative | `behavior.per_stop_values` |  |
 | `\BehaviorPerStopAuditStopsCommonDrop` | 0 |  | all_models_cohort_audit.csv: stops dropped by the common-cohort freeze (another rung's covariate, here the arrival clock) | `behavior.cohort_audit_values` |  |
-| `\BehaviorPerStopAuditStopsFull` | 93,215 |  | all_models_cohort_audit.csv: stops modelled on R1 | `behavior.cohort_audit_values` |  |
+| `\BehaviorPerStopAuditStopsFull` | 93,215 |  | all_models_cohort_audit.csv: stops modeled on R1 | `behavior.cohort_audit_values` |  |
 | `\BehaviorPerStopAuditStopsFullSessionExcluded` | 340 |  | all_models_cohort_audit.csv: stops in sessions R1 gates out | `behavior.cohort_audit_values` |  |
 | `\BehaviorPerStopAuditStopsIn` | 93,560 |  | all_models_cohort_audit.csv: stops entering the cohort | `behavior.cohort_audit_values` |  |
-| `\BehaviorPerStopAuditStopsModeled` | 93,555 |  | all_models_cohort_audit.csv: stops modelled on R0 | `behavior.cohort_audit_values` |  |
+| `\BehaviorPerStopAuditStopsModeled` | 93,555 |  | all_models_cohort_audit.csv: stops modeled on R0 | `behavior.cohort_audit_values` |  |
 | `\BehaviorPerStopAuditStopsModeledSessionExcluded` | 0 |  | all_models_cohort_audit.csv: stops in sessions R0 gates out | `behavior.cohort_audit_values` |  |
 | `\BehaviorPerStopAuditStopsOwnDrop` | 5 |  | all_models_cohort_audit.csv: stops dropped for a missing own predictor | `behavior.cohort_audit_values` |  |
 | `\BehaviorPerStopChildBetterFractionNonLocal` | 74 % |  | non-local (all): share of sessions in which R1 has the lower AIC | `behavior.per_stop_values` |  |
@@ -1511,7 +1511,7 @@ Sources:
 | `\BehaviorRateArrivalTimeSessionsSwr` | 235 |  | detected SWR: M5a_time_arrival fits with a finite AIC | `behavior.per_bin_detail_values` |  |
 | `\BehaviorRateAuditStopsCommonDrop` | 575 |  | per_bin_rate_cohort_audit.csv: stops dropped by the common-cohort freeze (another rung's covariate, here the arrival clock) | `behavior.cohort_audit_values` |  |
 | `\BehaviorRateAuditStopsIn` | 93,560 |  | per_bin_rate_cohort_audit.csv: stops entering the cohort | `behavior.cohort_audit_values` |  |
-| `\BehaviorRateAuditStopsModeled` | 92,942 |  | per_bin_rate_cohort_audit.csv: stops modelled on M0_const | `behavior.cohort_audit_values` |  |
+| `\BehaviorRateAuditStopsModeled` | 92,942 |  | per_bin_rate_cohort_audit.csv: stops modeled on M0_const | `behavior.cohort_audit_values` |  |
 | `\BehaviorRateAuditStopsModeledSessionExcluded` | 38 |  | per_bin_rate_cohort_audit.csv: stops in sessions M0_const gates out | `behavior.cohort_audit_values` |  |
 | `\BehaviorRateAuditStopsOwnDrop` | 5 |  | per_bin_rate_cohort_audit.csv: stops dropped for a missing own predictor | `behavior.cohort_audit_values` |  |
 | `\BehaviorRateBaselineLowerQuartileNonLocal` | 0.33 | events/s | non-local (all): 25th percentile over sessions of the M0_const rate | `behavior.per_bin_detail_values` |  |
@@ -1790,11 +1790,11 @@ Sources:
 | `\BehaviorRateTimeSessionsNonLocalSwr` | 242 |  | non-local with SWR: sessions with a fit of M5_time | `behavior.per_bin_values` |  |
 | `\BehaviorRateTimeSessionsSwr` | 242 |  | detected SWR: sessions with a fit of M5_time | `behavior.per_bin_values` |  |
 | `\BehaviorStopDurationMeanRatio` | 3.6 | ratio | ratio of those means | `behavior.stop_table_values` |  |
-| `\BehaviorStopDurationMeanRewarded` | 2.2 | s | well-anchored stops with a rewarded outcome: mean analysed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
-| `\BehaviorStopDurationMeanUnrewarded` | 0.60 | s | well-anchored stops with an omitted outcome: mean analysed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMeanRewarded` | 2.2 | s | well-anchored stops with a rewarded outcome: mean analyzed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMeanUnrewarded` | 0.60 | s | well-anchored stops with an omitted outcome: mean analyzed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
 | `\BehaviorStopDurationMedianRatio` | 3.6 | ratio | ratio of those medians | `behavior.stop_table_values` |  |
-| `\BehaviorStopDurationMedianRewarded` | 1.0 | s | well-anchored stops with a rewarded outcome: median analysed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
-| `\BehaviorStopDurationMedianUnrewarded` | 0.28 | s | well-anchored stops with an omitted outcome: median analysed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMedianRewarded` | 1.0 | s | well-anchored stops with a rewarded outcome: median analyzed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMedianUnrewarded` | 0.28 | s | well-anchored stops with an omitted outcome: median analyzed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
 | `\BehaviorStopSurvivalFourS` | 14 % |  | share of well-anchored stops still immobile 4 s after they began (stop_end - stop_start at least 4 s; excluded time inside the stop is not taken out) | `behavior.stop_table_values` |  |
 | `\BehaviorStopSurvivalTwoS` | 25 % |  | share of well-anchored stops still immobile 2 s after they began (stop_end - stop_start at least 2 s; excluded time inside the stop is not taken out) | `behavior.stop_table_values` |  |
 | `\BehaviorStopsCrossingOutcome` | 16,353 |  | stops with stop_start < outcome_known_time_s <= stop_end (all stops) | `behavior.stop_table_values` |  |
@@ -2179,15 +2179,15 @@ Sources:
 | `\BehaviorHorseraceValueSwr` | −0.0018 | arm fraction per SD | SWR events: within-arm coefficient of reward-belief mean (value), the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
 | `\BehaviorHorseraceValueSwrAnimals` | 5 |  | SWR events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median | `behavior.horserace_values` |  |
 | `\BehaviorLeafStepBoth` | +1.5 | AIC | leaf ladder Mu to Mvu: median per-session AIC(child) - AIC(parent); negative = child better | `behavior.leaf_values` | uncertainty_content |
-| `\BehaviorLeafStepBothAnimals` | 0 |  | leaf ladder Mu to Mvu: animals whose median step is negative (favours the child) | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepBothAnimals` | 0 |  | leaf ladder Mu to Mvu: animals whose median step is negative (favors the child) | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepBothClear` | 12 |  | leaf ladder Mu to Mvu: sessions in which the child's AIC is lower by more than 2 | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepBothSessions` | 242 |  | leaf ladder Mu to Mvu: sessions compared | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepUncertainty` | −1.3 | AIC | leaf ladder M4 to Mu: median per-session AIC(child) - AIC(parent); negative = child better | `behavior.leaf_values` | uncertainty_content |
-| `\BehaviorLeafStepUncertaintyAnimals` | 5 |  | leaf ladder M4 to Mu: animals whose median step is negative (favours the child) | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepUncertaintyAnimals` | 5 |  | leaf ladder M4 to Mu: animals whose median step is negative (favors the child) | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepUncertaintyClear` | 112 |  | leaf ladder M4 to Mu: sessions in which the child's AIC is lower by more than 2 | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepUncertaintySessions` | 242 |  | leaf ladder M4 to Mu: sessions compared | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepValue` | +2.4 | AIC | leaf ladder M4 to Mv: median per-session AIC(child) - AIC(parent); negative = child better | `behavior.leaf_values` | uncertainty_content |
-| `\BehaviorLeafStepValueAnimals` | 0 |  | leaf ladder M4 to Mv: animals whose median step is negative (favours the child) | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepValueAnimals` | 0 |  | leaf ladder M4 to Mv: animals whose median step is negative (favors the child) | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepValueClear` | 22 |  | leaf ladder M4 to Mv: sessions in which the child's AIC is lower by more than 2 | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafStepValueSessions` | 242 |  | leaf ladder M4 to Mv: sessions compared | `behavior.leaf_values` | uncertainty_content |
 | `\BehaviorLeafUncertainty` | +0.31 | log weight | leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: session median coefficient | `behavior.leaf_values` | uncertainty_content |
@@ -2251,7 +2251,7 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\MpfcAnalysedEpochs` | 242 |  | analysed epochs the PFC cohort is drawn from | `mpfc.cohort_values` |  |
+| `\MpfcAnalyzedEpochs` | 242 |  | analyzed epochs the PFC cohort is drawn from | `mpfc.cohort_values` |  |
 | `\MpfcAnimals` | 5 |  | animals in the mPFC population | `mpfc.cohort_values` |  |
 | `\MpfcBestModelConstantFraction` | 52 % |  | share of units whose best model by held-out deviance is constant | `mpfc.called_fraction_values` | 4d |
 | `\MpfcBestModelJointFraction` | 6 % |  | share of units whose best model by held-out deviance is SWR + non_local_no_SWR | `mpfc.called_fraction_values` | 4d |
@@ -2411,7 +2411,7 @@ Sources:
 | `\MpfcPriorMultiplierSustainedLow` | 0.17 | rate multiplier | lower end of the rate multiplier that sustained sd allows at 95 % | `mpfc.estimator_values` |  |
 | `\MpfcPriorSdPerLag` | 2.07 | log rate | the prior's implied standard deviation of a curve at one lag | `mpfc.estimator_values` |  |
 | `\MpfcPriorSdSustained` | 0.90 | log rate | the prior's implied standard deviation of a curve sustained over the reported window | `mpfc.estimator_values` |  |
-| `\MpfcSessions` | 75 |  | epochs with an mPFC unit bundle (the PFC cohort: analysed epochs with curated cortical spike sorting) | `mpfc.cohort_values` |  |
+| `\MpfcSessions` | 75 |  | epochs with an mPFC unit bundle (the PFC cohort: analyzed epochs with curated cortical spike sorting) | `mpfc.cohort_values` |  |
 | `\MpfcSplitBestModelFraction` | 10 % |  | share of units whose best model by held-out deviance (among constant, non_local, and the split) is the split by SWR status | `mpfc.overlap_and_effect_values` |  |
 | `\MpfcSplitImprovesFraction` | 21 % |  | share of units whose held-out deviance improves when the non-local response is split by SWR status (non_local_SWR + non_local_no_SWR vs. non_local) | `mpfc.overlap_and_effect_values` |  |
 | `\MpfcSplitSwrLargerFractionCalled` | 63 % |  | of units called for either, the share whose absolute peak modulation is larger for SWR-coupled replay than for non-SWR replay | `mpfc.overlap_and_effect_values` |  |
@@ -2494,7 +2494,7 @@ Sources:
 | `\MpfcSwrNoReplayEvents` | 2,290 |  | Kay SWRs (kept, in the stop cohort) that overlap no non-local event, summed over sessions | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayEventsFraction` | 20 % |  | share of the kept, cohort Kay SWRs that overlap no non-local event | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayEventsSessionMedian` | 29 | events | median per session of those SWRs | `mpfc.swr_without_replay_values` |  |
-| `\MpfcSwrNoReplayEventsUnknown` | 0 |  | kept SWRs left out of the class because they overlap a window the analysed-time rule dropped | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEventsUnknown` | 0 |  | kept SWRs left out of the class because they overlap a window the analyzed-time rule dropped | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayOverlapBothAll` | 438 |  | of those, units called for both (every session) | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayOverlapBothMinEvents` | 362 |  | of those, units called for both (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayOverlapExpectedAll` | 359 | units | units called for both expected if the two calls were independent (every session) | `mpfc.swr_without_replay_values` |  |
@@ -2993,7 +2993,7 @@ without being called, is not listed.
 | `behavior.rate_contrast_separation_values` | `reported/behavior/rate.py` | `analysis.replay_models.coefficient_statistics.fit_rows`, `analysis.replay_models.coefficient_statistics.fits_carrying`, `analysis.replay_models.coefficient_statistics.rung_separation_range`, `analysis.replay_models.coefficient_statistics.separated_fraction`, `analysis.replay_models.coefficient_statistics.term_separation_statistics` |  |
 | `behavior.stay_leave_values` | `reported/behavior/choice.py` | `analysis.replay_models.choice.stay_leave.cross_session_role_summary`, `analysis.replay_models.choice.stay_leave.fit_status_counts`, `analysis.replay_models.choice.stay_leave.pooled_gee_role_summary`, `analysis.replay_models.choice.stay_leave.smallest_adjusted_p`, `analysis.replay_models.rate.stop_statistics.stop_cohort_counts` |  |
 | `behavior.stop_table_values` | `reported/behavior/stops.py` | `analysis.event_definition.cohort_selection.select_stop_cohort`, `analysis.replay_models.rate.stop_statistics.dwell_statistics`, `analysis.replay_models.rate.stop_statistics.onset_time_statistics`, `analysis.replay_models.rate.stop_statistics.outcome_boundary_statistics`, `analysis.replay_models.rate.stop_statistics.reward_history_incomplete_statistics`, `analysis.replay_models.rate.stop_statistics.still_immobile_fraction`, `analysis.replay_models.rate.stop_statistics.stop_cohort_counts` |  |
-| `behavior.summarize` | `reported/behavior/__init__.py` | `analysis.event_definition.analysed_time.read_swr_table`, `analysis.event_definition.cohort_selection.select_event_cohort`, `analysis.replay_models.coefficient_statistics.fit_rows` | `behavior.breadth_derived_values`, `behavior.choice_values`, `behavior.cohort_audit_values`, `behavior.content_contrast_values`, `behavior.current_arm_paired_values`, `behavior.duration_aware_history_values`, `behavior.estimator_values`, `behavior.horserace_values`, `behavior.leaf_values`, `behavior.per_bin_detail_values`, `behavior.per_bin_values`, `behavior.per_stop_values`, `behavior.power_values`, `behavior.rate_contrast_audit_values`, `behavior.rate_contrast_separation_values`, `behavior.stay_leave_values`, `behavior.stop_table_values`, `behavior.trunk_values` |
+| `behavior.summarize` | `reported/behavior/__init__.py` | `analysis.event_definition.analyzed_time.read_swr_table`, `analysis.event_definition.cohort_selection.select_event_cohort`, `analysis.replay_models.coefficient_statistics.fit_rows` | `behavior.breadth_derived_values`, `behavior.choice_values`, `behavior.cohort_audit_values`, `behavior.content_contrast_values`, `behavior.current_arm_paired_values`, `behavior.duration_aware_history_values`, `behavior.estimator_values`, `behavior.horserace_values`, `behavior.leaf_values`, `behavior.per_bin_detail_values`, `behavior.per_bin_values`, `behavior.per_stop_values`, `behavior.power_values`, `behavior.rate_contrast_audit_values`, `behavior.rate_contrast_separation_values`, `behavior.stay_leave_values`, `behavior.stop_table_values`, `behavior.trunk_values` |
 | `behavior.trunk_values` | `reported/behavior/content.py` | `analysis.replay_models.content.content_statistics.current_patch_trunk_fraction`, `analysis.replay_models.content.content_statistics.trunk_share_statistics`, `analysis.replay_models.content.content_statistics.trunk_shares` |  |
 | `mpfc.called_fraction_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.best_model_fractions`, `analysis.pfc.population_statistics.bh_called_fraction`, `analysis.pfc.population_statistics.called_fraction_by_animal`, `analysis.pfc.population_statistics.called_fractions` |  |
 | `mpfc.cohort_values` | `reported/mpfc/population.py` | `analysis.pfc.population_statistics.cohort_count_statistics` |  |
