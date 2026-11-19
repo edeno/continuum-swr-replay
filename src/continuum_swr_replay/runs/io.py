@@ -307,19 +307,34 @@ def ok_table_paths(run_dir: Path, name: str) -> list[Path]:
     ]
 
 
-def read_complete_run(run_dir: Path, name: str) -> pd.DataFrame:
+def read_complete_run(
+    run_dir: Path, name: str, expected: Iterable[str] | None = None
+) -> pd.DataFrame:
     """Table ``name`` of every epoch of a run whose manifest marks each one ok.
+
+    Parameters
+    ----------
+    run_dir : Path
+    name : str
+    expected : iterable of str, optional
+        The epochs the run must hold, no more and no fewer (the analysed
+        epochs, for a reader that reports on the cohort).
 
     Raises
     ------
     ValueError
         If the run has no readable manifest, its manifest marks an epoch other
-        than ok, or it marks none.
+        than ok, it marks none, or its epochs are not ``expected``.
     """
     manifest = read_manifest(run_dir)
     failed = sorted(set(manifest["epochs"]) - set(ok_epochs(manifest)))
     if failed:
         raise ValueError(f"{len(failed)} epochs of {run_dir} are not ok: {failed[:3]}")
+    if expected is not None and set(manifest["epochs"]) != set(expected):
+        raise ValueError(
+            f"{run_dir} holds {len(manifest['epochs'])} epochs, not the "
+            f"{len(set(expected))} expected"
+        )
     paths = ok_table_paths(run_dir, name)
     if not paths:
         raise ValueError(f"the manifest of {run_dir} marks no epoch")

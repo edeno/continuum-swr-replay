@@ -310,7 +310,7 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     Question(
         "2d.10",
-        "How much of SWR and non-SWR event time is Continuous, and how much Fragmented?",
+        "On average, how much of an SWR or non-SWR event is Continuous, and how much Fragmented?",
         figures=("2h",),
     ),
     Question(

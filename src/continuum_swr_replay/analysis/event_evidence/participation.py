@@ -28,6 +28,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import 
     keyed_rng,
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_session_values
+from continuum_swr_replay.intervals import sample_step
 
 LOCAL_THRESHOLD = 0.8
 """A Local-rest bin's Local probability is above this (the event rule's 0.8)."""
@@ -35,50 +36,11 @@ LOCAL_THRESHOLD = 0.8
 MARGIN_S = 0.1
 """Local rest keeps this far (s) from every SWR and non-local event."""
 
-ON_GRID_ATOL_S = 1e-6
-"""How far (s) an event's first or last time may be from its decode bin."""
-
 LOCAL_REST = "local_rest"
 """The regime label of a Local-rest bin, for ``matched_windows``."""
 
 MEASURES = ("participation", "spike_rate_hz")
 """The per-window measures :func:`participation_statistics` summarizes."""
-
-
-def event_bins(
-    time: NDArray, starts_s: NDArray, ends_s: NDArray
-) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
-    """Each event's first and last decode bin.
-
-    Parameters
-    ----------
-    time : ndarray, shape (n_time,)
-        The decode's time axis, s.
-    starts_s, ends_s : ndarray, shape (n_events,)
-        The events' first and last labelled bins' times (the event table's
-        ``event_start_s`` and ``event_end_s``).
-
-    Returns
-    -------
-    s, e : ndarray of int, shape (n_events,)
-
-    Raises
-    ------
-    ValueError
-        If an event does not start and end on a decode bin.
-    """
-    time = np.asarray(time, dtype=float)
-    s = np.minimum(np.searchsorted(time, starts_s), time.size - 1)
-    e = np.minimum(np.searchsorted(time, ends_s), time.size - 1)
-    on_grid = (np.abs(time[s] - starts_s) <= ON_GRID_ATOL_S) & (
-        np.abs(time[e] - ends_s) <= ON_GRID_ATOL_S
-    )
-    if not on_grid.all():
-        raise ValueError(
-            f"{int((~on_grid).sum())} events do not start and end on the decode's "
-            "time bins"
-        )
-    return s.astype(np.int64), e.astype(np.int64)
 
 
 def local_rest_mask(
@@ -164,12 +126,12 @@ def window_stops(time: NDArray, last: NDArray) -> NDArray:
     """
     time = np.asarray(time, dtype=float)
     last = np.asarray(last, dtype=np.int64)
-    step = float(np.median(np.diff(time)))
+    step = sample_step(time)
     padded = np.r_[time, time[-1] + step]
     return padded[last + 1]
 
 
-def window_spike_counts(
+def tetrode_spike_counts(
     spike_times: Sequence[NDArray], starts_s: NDArray, stops_s: NDArray
 ) -> NDArray[np.int64]:
     """Each tetrode's spikes in each half-open window [start, stop).

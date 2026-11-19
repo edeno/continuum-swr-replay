@@ -10,10 +10,15 @@ The score's two contrasts are checked on every kind of content:
   tetrodes share content and negative for a burst whose tetrodes each follow
   their own random place, which the gain and the in-sample score still credit.
 
-Also: the rebuilt likelihood is the decoder's; a tetrode with no field at
+Also: the rebuilt likelihood is the decoder's, and with a tetrode left out it
+is the likelihood (and the smoothed states) of a decoder that never had that
+tetrode; no scored spike is in the training spikes of the encoding that scores
+it, even when every bin is a training bin; a tetrode with no field at
 either place contributes nothing; an event across a time-block boundary, a
 window with missing bins and a silent window are scored as specified.
 """
+
+import copy
 
 import numpy as np
 import pandas as pd
@@ -21,6 +26,10 @@ import pytest
 from non_local_detector.likelihoods.no_spike import predict_no_spike_log_likelihood
 
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
+from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
+    refit_encoding,
+    training_spike_bins,
+)
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from tests.support import tetrode_holdout_simulation as sim
 
@@ -223,3 +232,116 @@ def test_bursts_without_shared_content_gain_but_do_not_agree(chance):
     # ...the agreement only content the tetrodes share
     assert (nonspatial["agreement_per_spike"] < 0).all()
     assert (shared["agreement_per_spike"] > 0).all()
+
+
+def _pieces(detector, recording, spike_times):
+    """The decoder's No-Spike term and Local kernel for ``spike_times``."""
+    environment = detector.encoding_model_[ENCODING_KEY]["environment"]
+    no_spike = np.asarray(
+        predict_no_spike_log_likelihood(
+            recording.time, spike_times, detector.no_spike_rate
+        )
+    )[:, 0]
+    kernel = np.asarray(
+        detector._compute_local_position_kernel(
+            recording.time, recording.time, recording.position[:, None], environment
+        )
+    )
+    return no_spike, kernel
+
+
+def test_leaving_a_tetrode_out_is_the_decoder_without_it(recording):
+    recording, detector = recording
+    k = 2
+    keep = [j for j in range(len(recording.spike_times)) if j != k]
+    spikes = [recording.spike_times[j] for j in keep]
+    marks = [recording.marks[j] for j in keep]
+    position = recording.position[:, None]
+    encoding = detector.encoding_model_[ENCODING_KEY]
+    environment = encoding["environment"]
+    interior = np.asarray(environment.is_track_interior_).ravel()
+    terms = th.fold_terms(
+        [encoding],
+        recording.spike_times,
+        recording.marks,
+        recording.time,
+        np.asarray(environment.place_bin_centers_)[interior],
+        np.zeros(recording.time.size, dtype=np.int64),
+    )
+    no_spike_all, kernel = _pieces(detector, recording, recording.spike_times)
+    no_spike_k, _ = _pieces(detector, recording, [recording.spike_times[k]])
+    state_ind = np.asarray(detector.state_ind_)[detector.is_track_interior_state_bins_]
+    mine = th.state_log_likelihood(
+        terms.total() - terms.tetrode_terms(k),
+        no_spike_all - no_spike_k,
+        kernel,
+        state_ind,
+        detector.state_names,
+        np.zeros(recording.time.size, dtype=bool),
+    )
+    # a decoder whose encoding never saw tetrode k
+    reduced = copy.deepcopy(detector)
+    reduced.encoding_model_[ENCODING_KEY] = refit_encoding(
+        detector, recording.time, position, spikes, marks, recording.is_running
+    )
+    theirs = np.asarray(
+        reduced.compute_log_likelihood(
+            recording.time, recording.time, position, spikes, marks
+        )
+    )
+    np.testing.assert_allclose(mine, theirs, atol=1e-3)
+    states_mine = np.asarray(
+        detector._predict(time=recording.time, log_likelihoods=mine)[1]
+    )
+    states_theirs = reduced.predict(
+        spike_times=spikes,
+        spike_waveform_features=marks,
+        time=recording.time,
+        position=position,
+        position_time=recording.time,
+    )["acausal_state_probabilities"].values
+    np.testing.assert_allclose(states_mine, states_theirs, atol=1e-3)
+
+
+def test_no_scored_spike_trained_the_encoding_that_scores_it(recording, monkeypatch):
+    recording, detector = recording
+    # every bin trains, rest included (the real decodes train on all non-SWR
+    # time), so only the folds keep a scored spike out of its encoding
+    is_training = np.ones(recording.time.size, dtype=bool)
+    position = recording.position[:, None]
+    masks, scored = {}, []
+
+    def refit(det, time, pos, spike_times, marks, mask):
+        encoding = refit_encoding(det, time, pos, spike_times, marks, mask)
+        masks[id(encoding)] = mask
+        return encoding
+
+    library_terms = th.per_tetrode_terms
+
+    def per_tetrode_terms(encoding, spike_times, marks, time, centers):
+        scored.append((id(encoding), np.concatenate(spike_times)))
+        return library_terms(encoding, spike_times, marks, time, centers)
+
+    monkeypatch.setattr(th, "per_tetrode_terms", per_tetrode_terms)
+    window = recording.events[recording.events.kind == "stationary"].iloc[:1]
+    th.holdout_scores(
+        detector,
+        recording.time,
+        position,
+        recording.position,
+        recording.spike_times,
+        recording.marks,
+        is_training,
+        np.zeros(recording.time.size, dtype=bool),
+        window.assign(window_id=0),
+        refit=refit,
+        log=_quiet,
+    )
+    assert len(masks) == th.N_FOLDS and len(scored) == th.N_FOLDS
+    n_scored = 0
+    for encoding_id, spike_times in scored:
+        trained = training_spike_bins(recording.time, position, masks[encoding_id])
+        bins = np.digitize(spike_times, recording.time[1:-1])
+        assert not trained[bins].any()
+        n_scored += bins.size
+    assert n_scored == sum(s.size for s in recording.spike_times)

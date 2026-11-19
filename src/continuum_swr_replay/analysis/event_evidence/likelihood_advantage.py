@@ -39,11 +39,7 @@ from continuum_swr_replay.analysis.shared_statistics import (
     bootstrap_interval,
     nested_bootstrap_draws,
     nested_codes,
-    weighted_median,
 )
-
-GROUPS = ("no SWR", "SWR")
-"""The event groups, by the event table's ``is_swr``."""
 
 
 def advantage_from_bins(
@@ -134,37 +130,98 @@ def event_scores(delta: NDArray, lengths: NDArray, n_spikes: NDArray) -> pd.Data
     )
 
 
-def _animal_median_mean(
-    epoch_values: NDArray, animal_codes: NDArray, weights: NDArray, animal_weights
-) -> float:
-    """The mean over animals of each animal's weighted median of its epochs."""
-    total, mass = 0.0, 0.0
-    for a in np.flatnonzero(animal_weights > 0):
-        mine = animal_codes == a
-        order = np.argsort(epoch_values[mine])
-        w = weights[mine][order]
-        if w.sum() == 0:
-            continue
-        total += animal_weights[a] * weighted_median(epoch_values[mine][order], w)
-        mass += animal_weights[a]
-    return total / mass if mass else float("nan")
+def _weighted_medians(values: NDArray, weights: NDArray) -> NDArray:
+    """The median of each row's values, each value repeated by its weight.
+
+    ``weighted_median`` row by row: with whole weights, ``np.median`` of the
+    repeated sample (the mean of the two middle values when the total is even).
+
+    Parameters
+    ----------
+    values : ndarray, shape (n_rows, n_values)
+        Ascending along each row.
+    weights : ndarray of int, shape (n_rows, n_values)
+
+    Returns
+    -------
+    ndarray, shape (n_rows,)
+        NaN where a row's weights sum to 0.
+    """
+    cumulative = np.cumsum(weights, axis=1)
+    total = cumulative[:, -1:]
+    low = np.argmax(cumulative > (total - 1) // 2, axis=1)
+    high = np.argmax(cumulative > total // 2, axis=1)
+    rows = np.arange(values.shape[0])
+    medians = (values[rows, low] + values[rows, high]) / 2
+    return np.where(total[:, 0] > 0, medians, np.nan)
+
+
+def _replicates(
+    values: NDArray, animal: NDArray, epoch: NDArray, rng: np.random.Generator, n: int
+) -> NDArray:
+    """The statistic on ``n`` nested bootstrap replicates of the events.
+
+    Each replicate (``nested_bootstrap_draws``: the animals with replacement,
+    then each drawn animal's epochs, then each drawn epoch's events) gives each
+    epoch the median of its drawn events, each animal the median of its drawn
+    epochs' medians (an epoch drawn twice counting twice) and the replicate the
+    mean of its drawn animals' (an animal drawn twice counting twice).
+
+    Parameters
+    ----------
+    values : ndarray, shape (n_events,)
+    animal, epoch : ndarray of int, shape (n_events,)
+        Codes (``nested_codes``).
+
+    Returns
+    -------
+    ndarray, shape (n,)
+    """
+    draws = nested_bootstrap_draws(animal, epoch, rng, n)
+    n_epochs = int(epoch.max()) + 1
+    epoch_medians = np.full((n, n_epochs), np.nan)
+    for e in range(n_epochs):
+        mine = np.flatnonzero(epoch == e)
+        order = mine[np.argsort(values[mine], kind="stable")]
+        epoch_medians[:, e] = _weighted_medians(
+            np.broadcast_to(values[order], (n, order.size)), draws.rows[:, order]
+        )
+    epoch_animal = np.zeros(n_epochs, dtype=np.int64)
+    epoch_animal[epoch] = animal
+    total = np.zeros(n)
+    for a in range(int(animal.max()) + 1):
+        mine = np.flatnonzero(epoch_animal == a)
+        medians = epoch_medians[:, mine]
+        order = np.argsort(np.where(np.isnan(medians), np.inf, medians), axis=1)
+        sorted_medians = np.take_along_axis(medians, order, axis=1)
+        sorted_weights = np.take_along_axis(draws.sessions[:, mine], order, axis=1)
+        animal_median = _weighted_medians(
+            np.nan_to_num(sorted_medians, nan=0.0), sorted_weights
+        )
+        total += draws.animals[:, a] * np.nan_to_num(animal_median)
+    return total / draws.animals.sum(axis=1)
 
 
 def likelihood_advantage_statistics(
-    table: pd.DataFrame, *, n_boot: int = 1000, seed: int = 0
+    table: pd.DataFrame,
+    *,
+    column: str = "D_spike",
+    n_boot: int = 1000,
+    seed: int = 0,
 ) -> pd.DataFrame:
-    """Each group's ``D_spike``: one value per animal, their mean and its interval.
+    """Each group's ``column``: one value per animal, their mean and its interval.
 
     An animal's value is the median over its epochs of each epoch's median
-    ``D_spike`` (``animal_session_values(..., "median")``). The estimate is the
+    ``column`` (``animal_session_values(..., "median")``). The estimate is the
     mean over animals; its 95 % interval is ``bootstrap_interval`` of the same
-    statistic on nested bootstrap replicates of the epochs' medians (animals,
-    then their epochs).
+    statistic on nested bootstrap replicates of the events (:func:`_replicates`:
+    the animals, then their epochs, then each epoch's events).
 
     Parameters
     ----------
     table : pd.DataFrame
-        One row per event: ``animal``, ``epoch_id``, ``group`` and ``D_spike``.
+        One row per event: ``animal``, ``epoch_id``, ``group`` and ``column``
+        (``D_spike`` by default; the held-out score's ``gain_per_spike`` too).
     n_boot : int, optional
     seed : int, optional
 
@@ -173,29 +230,21 @@ def likelihood_advantage_statistics(
     pd.DataFrame
         Indexed by group: ``animals`` (the animals' values, sorted animal
         order), ``animal_names``, ``estimate``, ``ci_low``, ``ci_high``,
-        ``n_events``, ``n_scored`` (events with a ``D_spike``) and ``n_animals``.
+        ``n_events``, ``n_scored`` (events with a value) and ``n_animals``.
     """
     rows = {}
     for group, mine in table.groupby("group"):
-        scored = mine.dropna(subset=["D_spike"])
+        scored = mine.dropna(subset=[column])
         per_animal = animal_session_values(
-            scored["D_spike"], scored["animal"], scored["epoch_id"], "median"
+            scored[column], scored["animal"], scored["epoch_id"], "median"
         )
-        epochs = (
-            scored.groupby(["animal", "epoch_id"])["D_spike"].median().reset_index()
-        )
-        animal_codes, epoch_codes = nested_codes(epochs["animal"], epochs["epoch_id"])
-        draws = nested_bootstrap_draws(
-            animal_codes, epoch_codes, np.random.default_rng(seed), n_boot
-        )
-        values = epochs["D_spike"].to_numpy()
-        replicate = np.array(
-            [
-                _animal_median_mean(
-                    values, animal_codes, draws.rows[i], draws.animals[i]
-                )
-                for i in range(n_boot)
-            ]
+        animal_codes, epoch_codes = nested_codes(scored["animal"], scored["epoch_id"])
+        replicate = _replicates(
+            scored[column].to_numpy(dtype=float),
+            animal_codes,
+            epoch_codes,
+            np.random.default_rng(seed),
+            n_boot,
         )
         estimate = float(per_animal.mean())
         interval = bootstrap_interval(estimate, replicate, len(per_animal))

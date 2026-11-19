@@ -246,6 +246,8 @@ def test_read_complete_run_reads_every_epoch_and_refuses_a_failed_one(tmp_path):
         "e2",
         "e2",
     ]
+    with pytest.raises(ValueError, match="not the 3 expected"):
+        read_complete_run(tmp_path, "scores", expected=["e1", "e2", "e3"])
     epochs["e2"] = {"status": "failed"}
     manifest.write_text(json.dumps({"epochs": epochs}))
     with pytest.raises(ValueError, match="1 epochs"):

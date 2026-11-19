@@ -1,6 +1,7 @@
 """Tests for the held-out tetrode score's pieces."""
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
@@ -109,3 +110,43 @@ def test_window_rows_and_sums():
         th.window_sums(values, rows, np.array([2, 5, 3]), np.array([4, 6, 3])),
         [6.0, 9.0, 2.0],
     )
+
+
+def test_window_scores_sum_over_tetrodes_and_divide_by_the_windows_spikes():
+    rows = pd.DataFrame(
+        {
+            "epoch_id": "e1",
+            "animal": "a",
+            "window_id": [0, 0, 1, 1],
+            "event_id": [7, 7, 7, 7],
+            "kind": ["event", "event", "control", "control"],
+            "group": "no SWR",
+            "gain": [3.0, 1.0, 0.5, -0.5],
+            "gain_silent": [-1.0, 0.0, 0.0, 0.0],
+            "agreement": [1.0, 1.0, 0.0, 0.0],
+            "agreement_silent": [0.0, 0.0, 0.0, 0.0],
+            "n_spikes": [3, 1, 0, 0],
+            "spread_cm": [40.0, 60.0, 5.0, 7.0],
+            "nonlocal_prob": [0.9, 1.0, 0.0, 0.0],
+        }
+    )
+    windows = th.window_scores(rows).set_index("window_id")
+    event = windows.loc[0]
+    assert event["gain_per_spike"] == pytest.approx(4.0 / 4)
+    # the spiking bins' gain: 4 - (-1) = 5 over 4 spikes
+    assert event["spiking_gain_per_spike"] == pytest.approx(5.0 / 4)
+    assert event["agreement_per_spike"] == pytest.approx(0.5)
+    assert event["spread_cm"] == pytest.approx(50.0)
+    assert np.isnan(windows.loc[1, "gain_per_spike"])
+    assert windows.loc[1, "gain"] == pytest.approx(0.0)
+
+
+def test_add_rows_is_np_add_at_to_the_bit():
+    rng = np.random.default_rng(0)
+    index = rng.integers(0, 50, size=2000)
+    values = rng.normal(size=(2000, 7)).astype(np.float32)
+    expected = rng.normal(size=(50, 7))
+    out = expected.copy()
+    np.add.at(expected, index, values)
+    th._add_rows(out, index, values)
+    np.testing.assert_array_equal(out, expected)

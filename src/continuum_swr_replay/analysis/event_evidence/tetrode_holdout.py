@@ -55,11 +55,17 @@ import pandas as pd
 from numpy.typing import NDArray
 from scipy.special import logsumexp
 
+from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
+    likelihood_advantage_statistics,
+)
 from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
+    interior_bin_mask,
     nearest_interior_bins,
     per_tetrode_terms,
     refit_encoding,
+    spikes_in_bins,
 )
+from continuum_swr_replay.decoding.results import ENCODING_KEY
 
 N_FOLDS = 5
 """Contiguous time blocks per epoch; each block's encodings are fit on the others."""
@@ -117,6 +123,28 @@ def fold_training_masks(
     return masks
 
 
+def _add_rows(out: NDArray, index: NDArray, values: NDArray) -> None:
+    """``np.add.at(out, index, values)`` in passes of distinct rows.
+
+    Pass r adds every row's r-th value (in the order given), so each row of
+    ``out`` receives its values in the same order as ``np.add.at`` and the sums
+    are the same to the bit; plain fancy-index addition per pass replaces the
+    slow unbuffered ``add.at``.
+    """
+    if index.size == 0:
+        return
+    order = np.argsort(index, kind="stable")
+    sorted_index = index[order]
+    first = np.r_[0, np.flatnonzero(np.diff(sorted_index)) + 1]
+    rank = np.empty(index.size, dtype=np.int64)
+    rank[order] = np.arange(index.size) - np.repeat(
+        first, np.diff(np.r_[first, index.size])
+    )
+    for r in range(int(rank.max()) + 1):
+        mine = rank == r
+        out[index[mine]] += values[mine]
+
+
 @dataclass(frozen=True)
 class FoldTerms:
     """Per-tetrode spatial log-likelihood terms, each bin under its block's
@@ -146,15 +174,17 @@ class FoldTerms:
 
     def tetrode_terms(self, k: int) -> NDArray:
         """``l_k(t, x)`` at every bin, shape (n_time, n_bins)."""
-        out = -self.ground[self.block, k].astype(np.float64)
+        out = self.ground[self.block, k].astype(np.float64, copy=False)
+        np.negative(out, out=out)
         mine = self.tetrode == k
-        np.add.at(out, self.time_bin[mine], self.log_intensity[mine])
+        _add_rows(out, self.time_bin[mine], self.log_intensity[mine])
         return out
 
     def total(self) -> NDArray:
         """``sum_j l_j(t, x)`` at every bin, shape (n_time, n_bins)."""
-        out = -self.ground.sum(axis=1)[self.block].astype(np.float64)
-        np.add.at(out, self.time_bin, self.log_intensity)
+        out = self.ground.sum(axis=1)[self.block].astype(np.float64, copy=False)
+        np.negative(out, out=out)
+        _add_rows(out, self.time_bin, self.log_intensity)
         return out
 
     def spike_counts(self) -> NDArray[np.int64]:
@@ -180,14 +210,9 @@ def fold_terms(
     time = np.asarray(time, dtype=float)
     grounds, intensities, time_bins, tetrodes = [], [], [], []
     for b, encoding in enumerate(encodings):
-        kept_times, kept_marks = [], []
-        for st, mk in zip(spike_times, marks, strict=True):
-            st = np.asarray(st)
-            in_bounds = (st >= time[0]) & (st <= time[-1])
-            mine = np.zeros(st.size, dtype=bool)
-            mine[in_bounds] = blocks[np.digitize(st[in_bounds], time[1:-1])] == b
-            kept_times.append(st[mine])
-            kept_marks.append(np.asarray(mk)[mine])
+        kept_times, kept_marks = spikes_in_bins(
+            list(spike_times), list(marks), time, keep=np.asarray(blocks) == b
+        )
         terms = per_tetrode_terms(encoding, kept_times, kept_marks, time, centers)
         grounds.append(terms.ground)
         intensities.append(terms.log_intensity)
@@ -232,11 +257,16 @@ def state_log_likelihood(
     """
     out = np.zeros((spatial.shape[0], state_ind.size), dtype=np.float32)
     for s, name in enumerate(state_names):
-        columns = state_ind == s
+        # the library lays each state's bins out together (``state_ind_`` is
+        # built by concatenating the states), so a slice writes them in place
+        where = np.flatnonzero(state_ind == s)
+        columns = slice(where[0], where[-1] + 1)
+        if where.size != columns.stop - columns.start:
+            raise ValueError(f"the bins of state {name!r} are not contiguous")
         if name == NO_SPIKE:
             out[:, columns] = np.asarray(no_spike)[:, None]
         elif name == LOCAL:
-            out[:, columns] = spatial + kernel
+            np.add(spatial, kernel, out=out[:, columns], casting="unsafe")
         else:
             out[:, columns] = spatial
     out[np.asarray(is_missing, dtype=bool)] = 0.0
@@ -368,8 +398,8 @@ def holdout_scores(
     started = clock.time()
     time = np.asarray(time, dtype=float)
     is_missing = np.asarray(is_missing, dtype=bool)
-    environment = next(iter(detector.encoding_model_.values()))["environment"]
-    interior = np.asarray(environment.is_track_interior_).ravel()
+    environment = detector.encoding_model_[ENCODING_KEY]["environment"]
+    interior = interior_bin_mask(environment)
     centers = np.asarray(environment.place_bin_centers_)[interior]
     state_ind = np.asarray(detector.state_ind_)[detector.is_track_interior_state_bins_]
     state_names = list(detector.state_names)
@@ -387,6 +417,7 @@ def holdout_scores(
 
     t0 = clock.time()
     terms = fold_terms(encodings, spike_times, marks, time, centers, blocks)
+    del encodings  # their terms are all the scoring needs
     record["terms_s"] = round(clock.time() - t0, 1)
     record["n_spikes"] = int(terms.time_bin.size)
     log(f"terms: {terms.time_bin.size} spikes, {record['terms_s']} s")
@@ -407,9 +438,8 @@ def holdout_scores(
     s = windows["s"].to_numpy(dtype=np.int64)
     e = windows["e"].to_numpy(dtype=np.int64)
     rows = window_rows(s, e)
-    local_weights = np.exp(
-        kernel[rows] - logsumexp(kernel[rows], axis=1, keepdims=True)
-    )
+    # the decoder's Local kernel at each scored bin, normalized over the bins
+    log_local_weights = kernel[rows] - logsumexp(kernel[rows], axis=1, keepdims=True)
     animal_bin = nearest_interior_bins(environment, np.asarray(linear_position)[rows])
     counts = terms.spike_counts()[rows]
     bin_cm = float(np.median(np.diff(np.sort(centers.ravel()))))
@@ -421,8 +451,10 @@ def holdout_scores(
     for k in range(terms.n_tetrodes):
         t1 = clock.time()
         tetrode = terms.tetrode_terms(k)
+        mine = tetrode[rows]
+        reduced = np.subtract(total, tetrode, out=tetrode)  # the others' terms
         likelihood = state_log_likelihood(
-            total - tetrode,
+            reduced,
             no_spike.sum(axis=1) - no_spike[:, k],
             kernel,
             state_ind,
@@ -434,11 +466,10 @@ def holdout_scores(
         )
         posterior = np.asarray(smoothed[0][rows])
         state_probability = np.asarray(smoothed[1][rows])
-        del smoothed, likelihood
+        del smoothed, likelihood, reduced, tetrode
         distribution = spatial_distribution(posterior, state_ind, state_names)
-        mine = tetrode[rows]
         population = predictive_log_score(mine, distribution)
-        local = predictive_log_score(mine, local_weights)
+        local = logsumexp(mine + log_local_weights, axis=1)
         local_bin = mine[np.arange(rows.size), animal_bin]
         uniform = logsumexp(mine, axis=1) - np.log(mine.shape[1])
         scored = np.isfinite(population) & ~missing
@@ -448,37 +479,42 @@ def holdout_scores(
                 np.where(distribution > 0, distribution * np.log(distribution), 0.0),
                 axis=1,
             )
-        per_bin = np.column_stack(
-            [
-                np.where(scored, population, 0.0),
-                np.where(scored, local, 0.0),
-                np.where(scored, local_bin, 0.0),
-                scored,
-                np.where(scored, uniform, 0.0),
-                counts[:, k],
-                state_probability[:, nonlocal_states].sum(axis=1),
-                np.where(silent, population - local, 0.0),
-                np.where(silent, population - uniform, 0.0),
-                np.where(scored, np.exp(entropy) * bin_cm, 0.0),
-            ]
+        per_bin = {
+            "population": np.where(scored, population, 0.0),
+            "local": np.where(scored, local, 0.0),
+            "local_bin": np.where(scored, local_bin, 0.0),
+            "n_scored_bins": scored,
+            "uniform": np.where(scored, uniform, 0.0),
+            "n_spikes": counts[:, k],
+            "nonlocal_prob": state_probability[:, nonlocal_states].sum(axis=1),
+            "gain_silent": np.where(silent, population - local, 0.0),
+            "agreement_silent": np.where(silent, population - uniform, 0.0),
+            "spread_cm": np.where(scored, np.exp(entropy) * bin_cm, 0.0),
+        }
+        sums = dict(
+            zip(
+                per_bin,
+                window_sums(np.column_stack(list(per_bin.values())), rows, s, e).T,
+                strict=True,
+            )
         )
-        sums = window_sums(per_bin, rows, s, e)
         parts.append(
             pd.DataFrame(
                 {
                     "window_id": windows["window_id"].to_numpy(),
                     "tetrode": k,
                     "n_bins": n_bins,
-                    "n_scored_bins": sums[:, 3].astype(np.int64),
-                    "n_spikes": sums[:, 5].astype(np.int64),
-                    "population": sums[:, 0],
-                    "local": sums[:, 1],
-                    "local_bin": sums[:, 2],
-                    "uniform": sums[:, 4],
-                    "nonlocal_prob": sums[:, 6] / n_bins,
-                    "gain_silent": sums[:, 7],
-                    "agreement_silent": sums[:, 8],
-                    "spread_cm": sums[:, 9] / np.maximum(sums[:, 3], 1),
+                    "n_scored_bins": sums["n_scored_bins"].astype(np.int64),
+                    "n_spikes": sums["n_spikes"].astype(np.int64),
+                    "population": sums["population"],
+                    "local": sums["local"],
+                    "local_bin": sums["local_bin"],
+                    "uniform": sums["uniform"],
+                    "nonlocal_prob": sums["nonlocal_prob"] / n_bins,
+                    "gain_silent": sums["gain_silent"],
+                    "agreement_silent": sums["agreement_silent"],
+                    "spread_cm": sums["spread_cm"]
+                    / np.maximum(sums["n_scored_bins"], 1),
                 }
             )
         )
@@ -490,3 +526,53 @@ def holdout_scores(
     scores["agreement"] = scores["population"] - scores["uniform"]
     record["total_s"] = round(clock.time() - started, 1)
     return scores, record
+
+
+#: The per-tetrode sums :func:`window_scores` adds over a window's tetrodes.
+_SUMMED = ("gain", "gain_silent", "agreement", "agreement_silent", "n_spikes")
+
+
+def window_scores(table: pd.DataFrame) -> pd.DataFrame:
+    """Each window's score over its tetrodes.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The run's rows, one per window and tetrode (:func:`holdout_scores` with
+        the runner's ``epoch_id``, ``animal``, ``event_id``, ``kind`` and
+        ``group``).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per window: the keys, the sums over tetrodes of
+        :data:`_SUMMED`, the mean over tetrodes of ``spread_cm`` and
+        ``nonlocal_prob``, and per spike of the window (NaN without spikes):
+        ``gain_per_spike``, ``spiking_gain_per_spike`` (the gain of the bins
+        where the scored tetrode spiked) and ``agreement_per_spike``.
+    """
+    keys = ["epoch_id", "animal", "window_id", "event_id", "kind", "group"]
+    grouped = table.groupby(keys, sort=False)
+    windows = grouped[list(_SUMMED)].sum()
+    windows[["spread_cm", "nonlocal_prob"]] = grouped[
+        ["spread_cm", "nonlocal_prob"]
+    ].mean()
+    windows = windows.reset_index()
+    spikes = windows["n_spikes"].where(windows["n_spikes"] > 0)
+    windows["gain_per_spike"] = windows["gain"] / spikes
+    windows["spiking_gain_per_spike"] = (
+        windows["gain"] - windows["gain_silent"]
+    ) / spikes
+    windows["agreement_per_spike"] = windows["agreement"] / spikes
+    return windows
+
+
+def holdout_statistics(
+    windows: pd.DataFrame, kind: str, column: str = "gain_per_spike"
+) -> pd.DataFrame:
+    """Each group's ``column`` over the windows of ``kind`` (``"event"`` or
+    ``"control"``): one value per animal, their mean and its interval
+    (``likelihood_advantage_statistics``)."""
+    return likelihood_advantage_statistics(
+        windows[windows["kind"] == kind], column=column
+    )

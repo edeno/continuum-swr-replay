@@ -152,13 +152,31 @@ The non-local event rule and the SWR-overlap classification of those events.
 
 The paper's one SWR source: the direct ripple_detection 2.0 Kay inventory.
 
-`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `swr_epoch_id`, `swr_inventory_paths`, `inventory_manifest`, `swr_epoch_id_of_session`, `swr_source_files`, `swr_inventory_record`, `ripple_power_inputs`, `read_observed`, `artifact_intervals`, `EpochSource`, `epoch_source`, `read_swr_inventory`, `classify`, `swr_events`
+`SwrSourceError`, `swr_inventory_dir`, `artifact_intervals_dir`, `swr_source_name`, `artifact_run_of`, `swr_epoch_id`, `swr_inventory_paths`, `inventory_manifest`, `swr_epoch_id_of_session`, `event_epoch_ids`, `event_table_epochs`, `swr_source_files`, `swr_inventory_record`, `ripple_power_inputs`, `read_observed`, `artifact_intervals`, `EpochSource`, `epoch_source`, `read_swr_inventory`, `classify`, `swr_events`
+
+### `src/continuum_swr_replay/analysis/event_evidence/likelihood_advantage.py`
+
+Spike likelihood at decoded and actual positions, over each whole non-local event.
+
+`advantage_from_bins`, `per_bin_advantage`, `event_scores`, `likelihood_advantage_statistics`
+
+### `src/continuum_swr_replay/analysis/event_evidence/participation.py`
+
+Tetrode participation and spike rate of non-local events, against Local rest.
+
+`local_rest_mask`, `control_windows`, `window_stops`, `tetrode_spike_counts`, `participation_and_rate`, `participation_statistics`, `participation_differences`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
 Spike evidence of non-local events: does the prior-excluded spike likelihood favour the decoded location over the animal's?
 
 `build_session_events`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `event_metrics`
+
+### `src/continuum_swr_replay/analysis/event_evidence/tetrode_holdout.py`
+
+Held-out tetrode score of each non-local event: does the rest of the population's position estimate predict a tetrode it never saw better than local coding does?
+
+`time_blocks`, `fold_training_masks`, `FoldTerms`, `fold_terms`, `state_log_likelihood`, `spatial_distribution`, `predictive_log_score`, `window_rows`, `window_sums`, `holdout_scores`, `window_scores`, `holdout_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_properties/brain_state_reference.py`
 
@@ -170,7 +188,7 @@ Theta, ripple and MUA levels of running and of quiet rest, the references for an
 
 One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
-`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
+`sarle_bimodality`, `dip_test`, `nonlocal_share_by_power`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
 
 ### `src/continuum_swr_replay/analysis/event_properties/content_occupancy.py`
 
@@ -188,7 +206,7 @@ Analysis functions for manipulating and characterizing detected events.
 
 Summary statistics of the immobile non-local events.
 
-`compute_swr_overlap_class_counts`, `overlap_class_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
+`compute_swr_overlap_class_counts`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
 
 ### `src/continuum_swr_replay/analysis/event_properties/gamma_power.py`
 
@@ -820,17 +838,41 @@ Does each detector's content reproduce in cells it never saw?
 
 `main`
 
+### `scripts/event_evidence/_per_event_run.py`
+
+What the per-event runners share: their arguments, the canonical event table, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
+
+`event_table_path`, `event_table_input`, `add_run_arguments`, `select_epochs`, `run`
+
 ### `scripts/event_evidence/analyze_event_spike_evidence.py`
 
 Spike-evidence reality analysis for non-SWR non-local events.
 
 `find_sessions`, `load_marks`, `events_with_map_in_left_out_bins`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
 
+### `scripts/event_evidence/measure_event_participation.py`
+
+Tetrode participation and spike rate of each non-local event, against Local rest.
+
+`epoch_events`, `load_spike_times`, `epoch_table`, `run_epoch`, `main`
+
 ### `scripts/event_evidence/run_state_evidence.py`
 
 Held-out spike evidence for each decoder state, on every canonical HPC decode.
 
-`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `refit_encoding`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
+`caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `stored_log_likelihood`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
+
+### `scripts/event_evidence/score_event_likelihood_advantage.py`
+
+Spike likelihood at decoded and actual positions, for every canonical non-local event.
+
+`epoch_events`, `epoch_scores`, `run_epoch`, `main`
+
+### `scripts/event_evidence/score_tetrode_holdout.py`
+
+Held-out tetrode score of every canonical non-local event and its Local-rest control.
+
+`epoch_windows`, `run_epoch`, `main`
 
 ### `scripts/event_evidence/split_state_evidence_by_swr.py`
 
@@ -980,13 +1022,13 @@ Summary statistics of the per-window table, over epochs nested in animals.
 
 Per-tetrode likelihood terms, and the encodings and decode files they come from.
 
-`load_detector`, `encoding_inputs`, `load_encoding`, `encoding_comparison`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `subnormal_occupancy_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `time_folds`, `training_spike_bins`, `running_only_masks`, `spikes_in_bins`
+`load_detector`, `encoding_inputs`, `load_encoding`, `encoding_comparison`, `event_likelihood`, `nearest_interior_bins`, `interior_bin_mask`, `subnormal_occupancy_bin_mask`, `TetrodeTerms`, `per_tetrode_terms`, `time_folds`, `training_spike_bins`, `running_only_masks`, `spikes_in_bins`, `load_marks_and_training_mask`, `refit_encoding`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/state_evidence/windows.py`
 
 Speed regimes and the windows scored: bouts, matched windows, calibration windows.
 
-`keyed_rng`, `regimes`, `analysed_regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `tetrode_halves`, `null_partners`, `window_folds`
+`keyed_rng`, `regimes`, `analysed_regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `event_bins`, `tetrode_halves`, `null_partners`, `window_folds`
 
 ### `src/continuum_swr_replay/analysis/replay_models/content/fit_outputs.py`
 

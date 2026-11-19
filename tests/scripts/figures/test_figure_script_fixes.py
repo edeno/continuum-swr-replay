@@ -381,9 +381,9 @@ def test_figure02_panel_c_prints_the_digits_of_the_events_summary(offline):
     fig, ax = plt.subplots()
     figure02.draw_events_donut(ax, overlap_class_statistics(events), 0.5)
     texts = [t.get_text() for t in ax.texts]
-    assert "Inside SWR\n13%" in texts
-    assert "Partly in SWR\n25%" in texts
-    assert "No SWR\n63%" in texts
+    assert "Inside SWR 13%" in texts
+    assert "Partly in SWR 25%" in texts
+    assert "No SWR 63%" in texts
     assert "5" in texts
     assert any("50% of non-local time outside SWRs" in t for t in texts)
     cohort = {v.key: v for v in event_cohort_values(events, "s")}
