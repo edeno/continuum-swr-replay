@@ -1181,7 +1181,7 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
 
 
 def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2d.10: the share of SWR and no-SWR event time in Continuous and in
+    """Question 2d.10: the mean share of an SWR or no-SWR event in Continuous and in
     Fragmented (Figure 2h)."""
     make = value_factory(state_composition_values, source, TAGS["state_composition"])
     statistics = event_statistics.state_composition_statistics(events)
@@ -1194,7 +1194,8 @@ def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
                     statistics.loc[group, f"{state}_animal_mean"],
                     "fraction",
                     "pct",
-                    f"share of {group} event time in {state.capitalize()}: the mean "
+                    f"mean share of a {group} event in {state.capitalize()} (each "
+                    "event weighted alike, whatever its length): the mean "
                     "over animals of each animal's mean over epochs of each epoch's "
                     "mean over events of the event's mean state probability",
                 )

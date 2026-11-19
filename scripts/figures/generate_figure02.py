@@ -23,8 +23,8 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         each non-local event against a Local-rest window of its length, one line
         per animal, for no-SWR and SWR events
         (``event_evidence.participation``; ``Processed-Data/event_participation``).
-    h — The share of event time in Continuous and in Fragmented (each event's
-        mean state probability), no-SWR and SWR events; bars the animals' mean,
+    h — The mean share of an event in Continuous and in Fragmented (each event's
+        mean state probability, each event weighted alike), no-SWR and SWR events; bars the animals' mean,
         dots the animals (``event_statistics.state_composition_statistics``).
     i — Held-out tetrode score: each tetrode left out of the decoder's smoother in
         turn and scored at every bin of each event under the other tetrodes'
@@ -887,10 +887,17 @@ def draw_participation(ax_share, ax_rate, statistics: pd.DataFrame) -> None:
         scale = 100 if measure == "participation" else 1
         for g, (group, color) in enumerate((("no SWR", C_NL), ("SWR", C_SWR))):
             x = (2.4 * g, 2.4 * g + 1)
-            rest = scale * statistics.loc[(group, "control"), f"{measure}_animals"]
-            event = scale * statistics.loc[(group, "event"), f"{measure}_animals"]
-            for a, b in zip(rest, event, strict=True):
-                ax.plot(x, (a, b), color="#999999", lw=0.5, zorder=1)
+            rest, event = (
+                scale
+                * pd.Series(
+                    statistics.loc[(group, kind), f"{measure}_animals"],
+                    index=statistics.loc[(group, kind), "animal_names"],
+                )
+                for kind in ("control", "event")
+            )
+            for animal in event.index:  # paired by animal, not by position
+                ax.plot(x, (rest[animal], event[animal]), color="#999999", lw=0.5,
+                        zorder=1)  # fmt: skip
             ax.scatter(
                 np.full(rest.size, x[0]), rest, s=6, color=C_LOCAL, lw=0, zorder=2
             )
@@ -907,7 +914,7 @@ def draw_participation(ax_share, ax_rate, statistics: pd.DataFrame) -> None:
 
 
 def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
-    """Panel h: the share of event time in Continuous and in Fragmented.
+    """Panel h: the mean share of an event in Continuous and in Fragmented.
 
     Bars are the animals' mean, dots the animals
     (``event_statistics.state_composition_statistics``).
@@ -926,7 +933,7 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
     ax.set_xlim(-0.55, 1.55)
     ax.set_ylim(0, 100)
     ax.set_yticks([0, 50, 100])
-    ax.set_ylabel("% event time")
+    ax.set_ylabel("% of event\n(mean over events)")
     handles = [plt.Rectangle((0, 0), 1, 1, color=color) for color in (C_NL, C_SWR)]
     ax.legend(
         handles,

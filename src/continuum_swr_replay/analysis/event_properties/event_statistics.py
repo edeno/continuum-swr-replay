@@ -167,7 +167,7 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
     }
 
 
-#: The non-local states whose share of event time :func:`state_composition_statistics`
+#: The non-local states whose mean share of an event :func:`state_composition_statistics`
 #: reports, by the event table's mean-probability column.
 STATE_SHARE_COLUMNS = {
     "continuous": "continuous_prob_mean",
@@ -176,7 +176,10 @@ STATE_SHARE_COLUMNS = {
 
 
 def state_composition_statistics(events: pd.DataFrame) -> pd.DataFrame:
-    """The share of SWR and no-SWR event time in each non-local state, by animal.
+    """The mean share of an SWR or no-SWR event in each non-local state, by animal.
+
+    Each event counts alike, whatever its length: this is the mean over events of
+    each event's share, not the share of all event time.
 
     An event's share in a state is its mean probability of that state over its
     bins (the event table's ``continuous_prob_mean`` and
