@@ -190,6 +190,12 @@ One class or two: do SWR-coupled and non-SWR non-local events differ by kind or 
 
 `sarle_bimodality`, `dip_test`, `nonlocal_share_by_power`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
 
+### `src/continuum_swr_replay/analysis/event_properties/content_along_arms.py`
+
+Where along the track event content sits: each time bin's arm and place on it.
+
+`check_arm_orientation`, `arm_positions`, `distance_to_nearest_well`, `content_density_along_arms`, `leaf_and_trunk_profiles`, `log2_density_ratio`, `distance_from_animal_shares`, `content_place_shares`, `place_share_statistics`
+
 ### `src/continuum_swr_replay/analysis/event_properties/content_occupancy.py`
 
 Where non-local content sits: each content time bin's track distance to the animal and to the nearest reward well.
@@ -206,7 +212,7 @@ Analysis functions for manipulating and characterizing detected events.
 
 Summary statistics of the immobile non-local events.
 
-`compute_swr_overlap_class_counts`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
+`compute_swr_overlap_class_counts`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
 
 ### `src/continuum_swr_replay/analysis/event_properties/gamma_power.py`
 
@@ -891,6 +897,12 @@ Bootstrap the SWR against non-SWR property contrasts: class medians, their diffe
 Measure each epoch's theta, ripple and MUA levels during running and during quiet rest.
 
 `main`
+
+### `scripts/event_properties/measure_content_along_arms.py`
+
+Place every event time bin's content on its arm of the track.
+
+`measure_epoch`, `main`
 
 ### `scripts/event_properties/measure_event_gamma.py`
 
