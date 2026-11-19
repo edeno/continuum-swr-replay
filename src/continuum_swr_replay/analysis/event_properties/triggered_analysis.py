@@ -279,7 +279,7 @@ def compute_triggered_average_curves(
     time_col: str = "start_time",
     window_sec: float = 2.0,
 ) -> dict:
-    """Reduce ``data_over_time`` to event-triggered mean/SEM curves.
+    """Reduce ``data_over_time`` to event-triggered curves: mean, SEM and quartiles.
 
     Splits the work that :func:`plot_triggered_averages` used to do inline
     into a small, cacheable product: for each signal, the time axis and the
@@ -304,7 +304,9 @@ def compute_triggered_average_curves(
     -------
     dict
         ``{signal: {"time", "no_overlap_mean", "no_overlap_sem",
-        "overlap_mean", "overlap_sem"}}`` with numpy-array values.
+        "overlap_mean", "overlap_sem", and for each class the quartiles over
+        events "{class}_q25", "{class}_median", "{class}_q75"}}`` with
+        numpy-array values (a lag where no event has a value is NaN).
 
     """
     signal_types = list(signals)
@@ -340,7 +342,15 @@ def compute_triggered_average_curves(
     curves: dict = {}
     for signal_type in signal_types:
         no_mean = no_mean_all.sel(signal=signal_type)
+        quartiles = {
+            f"{name}_{label}": np.nanquantile(
+                windows.sel(signal=signal_type).values, q, axis=0
+            )
+            for name, windows in (("no_overlap", windows_no), ("overlap", windows_ov))
+            for label, q in (("q25", 0.25), ("median", 0.5), ("q75", 0.75))
+        }
         curves[signal_type] = {
+            **quartiles,
             "time": no_mean["time"].values,
             "no_overlap_mean": no_mean.values,
             "no_overlap_sem": sem(
