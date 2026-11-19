@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
 | `detection.json` | `3455b5a13f61` | yes | 172 | 0 |
-| `events.json` | `d15c21e7f826` | yes | 394 | 0 |
+| `events.json` | `b30594aad96b` | yes | 394 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
 
@@ -695,14 +695,14 @@ Sources:
 | `\EventsNonSwrContentRemotePathFraction` | 41 % |  | share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
 | `\EventsNonSwrContentRemoteWellFraction` | 45 % |  | share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
 | `\EventsOccupancyEpochs` | 242 |  | epochs in the content-occupancy table | `events.content_occupancy_values` | 3g |
-| `\EventsStartDistanceAnimalsInDirection` | 3 |  | animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.start_distance_values` | 3e |
-| `\EventsStartDistanceDifferenceHigh` | +28 | cm | upper bound of that interval | `events.property_interval_values` | 3e |
-| `\EventsStartDistanceDifferenceLow` | −15 | cm | lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) | `events.property_interval_values` | 3e |
-| `\EventsStartDistanceMatchedDifference` | −13 | cm | SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3e |
-| `\EventsStartDistanceMatchedDifferenceHigh` | +13 | cm | upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) | `events.property_interval_values` | 3e |
-| `\EventsStartDistanceMatchedDifferenceLow` | −39 | cm | lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3e |
-| `\EventsStartDistanceMedianNonSwr` | 110 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile non-SWR non-local events | `events.start_distance_values` | 3e |
-| `\EventsStartDistanceMedianSwr` | 120 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile SWR-overlapping non-local events | `events.start_distance_values` | 3e |
+| `\EventsStartDistanceAnimalsInDirection` | 3 |  | animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.start_distance_values` |  |
+| `\EventsStartDistanceDifferenceHigh` | +28 | cm | upper bound of that interval | `events.property_interval_values` |  |
+| `\EventsStartDistanceDifferenceLow` | −15 | cm | lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) | `events.property_interval_values` |  |
+| `\EventsStartDistanceMatchedDifference` | −13 | cm | SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` |  |
+| `\EventsStartDistanceMatchedDifferenceHigh` | +13 | cm | upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) | `events.property_interval_values` |  |
+| `\EventsStartDistanceMatchedDifferenceLow` | −39 | cm | lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` |  |
+| `\EventsStartDistanceMedianNonSwr` | 110 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile non-SWR non-local events | `events.start_distance_values` |  |
+| `\EventsStartDistanceMedianSwr` | 120 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile SWR-overlapping non-local events | `events.start_distance_values` |  |
 | `\EventsSwrContentAtWellFraction` | 26 % |  | share of SWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
 | `\EventsSwrContentNearOffFraction` | 0 % |  | share of SWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
 | `\EventsSwrContentOwnWellFraction` | 5 % |  | share of SWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
@@ -2872,8 +2872,6 @@ Panel b: `\EventsArmsAnimalsInDirection`, `\EventsArmsDifferenceHigh`, `\EventsA
 Panel c: `\EventsSpeedAnimalsInDirection`, `\EventsSpeedDifferenceHigh`, `\EventsSpeedDifferenceLow`, `\EventsSpeedMatchedDifferenceHigh`, `\EventsSpeedMatchedDifferenceLow`, `\EventsSpeedMatchedDifference`, `\EventsSpeedMedianNonSwr`, `\EventsSpeedMedianSwr`
 
 Panel d: `\EventsArmsAnimalsInDirection`, `\EventsArmsDifferenceHigh`, `\EventsArmsDifferenceLow`, `\EventsArmsMatchedDifferenceHigh`, `\EventsArmsMatchedDifferenceLow`, `\EventsArmsMatchedDifference`, `\EventsArmsMedianNonSwr`, `\EventsArmsMedianSwr`, `\EventsExtentAnimalsInDirection`, `\EventsExtentDifferenceHigh`, `\EventsExtentDifferenceLow`, `\EventsExtentMatchedDifferenceHigh`, `\EventsExtentMatchedDifferenceLow`, `\EventsExtentMatchedDifference`, `\EventsExtentMedianNonSwr`, `\EventsExtentMedianSwr`
-
-Panel e: `\EventsStartDistanceAnimalsInDirection`, `\EventsStartDistanceDifferenceHigh`, `\EventsStartDistanceDifferenceLow`, `\EventsStartDistanceMatchedDifferenceHigh`, `\EventsStartDistanceMatchedDifferenceLow`, `\EventsStartDistanceMatchedDifference`, `\EventsStartDistanceMedianNonSwr`, `\EventsStartDistanceMedianSwr`
 
 Panel g: `\EventsAnimalsNonSwrMoreAtWell`, `\EventsNonSwrContentAtWellFraction`, `\EventsNonSwrContentNearOffFraction`, `\EventsNonSwrContentOwnWellFraction`, `\EventsNonSwrContentRemotePathFraction`, `\EventsNonSwrContentRemoteWellFraction`, `\EventsOccupancyEpochs`, `\EventsSwrContentAtWellFraction`, `\EventsSwrContentNearOffFraction`, `\EventsSwrContentOwnWellFraction`, `\EventsSwrContentRemotePathFraction`, `\EventsSwrContentRemoteWellFraction`
 

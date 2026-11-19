@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "d15c21e7f826",
+ "commit": "b30594aad96b",
  "code": {
-  "head": "d15c21e7f8263ed3dd25526688b1b97fa8450da9",
+  "head": "b30594aad96be22ea1c799146c1a572e44219bad",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -327,8 +327,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "9a25ca5c0d1211e2ea47dabd52ac0192020a2d3575953cfa63ec75593a5a7979",
-    "code_sha256": "d7899105178fe9cbbe50959137dc460ddfee87f2823a076e4af4f10dacc8fb40"
+    "sha256": "cdf9a437a1c5bcbd1d85f0b7070566b7692d89b42f01b5e2aa0188e5949f3ca2",
+    "code_sha256": "05452b772746a999062c120148f5babf91506b1291f77c2696f1e068539232dd"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -485,7 +485,7 @@
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation/manifest.json",
-   "sha256": "8bb8f49efecf9bd9d3d7637375849697ac74c812378f1ce86afd7b47109aa34b"
+   "sha256": "604dc6d820bff3b76be36848ca4533af2e52cda9503fe9285926a46f5fc090d6"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage/*_likelihood_advantage.parquet",
@@ -494,7 +494,7 @@
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage/manifest.json",
-   "sha256": "54c72a429607c3a44964e5844a36ab35114432d56c6273a72b416f31c5e825d0"
+   "sha256": "d676417edf77ab7bfd7801be4ba87db7647a69ef7b79670b38d13ec9932abd8a"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality/sessions.parquet",
@@ -4758,9 +4758,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e"
-   ],
+   "figures": [],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "start_distance_values",
    "pending": null
@@ -4774,9 +4772,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e"
-   ],
+   "figures": [],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -4790,9 +4786,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e"
-   ],
+   "figures": [],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -4806,9 +4800,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e"
-   ],
+   "figures": [],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -4822,9 +4814,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e"
-   ],
+   "figures": [],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -4838,9 +4828,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e"
-   ],
+   "figures": [],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -4854,9 +4842,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e"
-   ],
+   "figures": [],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "start_distance_values",
    "pending": null
@@ -4870,9 +4856,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e"
-   ],
+   "figures": [],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "start_distance_values",
    "pending": null
