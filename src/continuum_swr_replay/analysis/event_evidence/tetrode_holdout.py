@@ -490,3 +490,42 @@ def holdout_scores(
     scores["agreement"] = scores["population"] - scores["uniform"]
     record["total_s"] = round(clock.time() - started, 1)
     return scores, record
+
+
+#: The per-tetrode sums :func:`window_scores` adds over a window's tetrodes.
+_SUMMED = ("gain", "gain_silent", "agreement", "agreement_silent", "n_spikes")
+
+
+def window_scores(table: pd.DataFrame) -> pd.DataFrame:
+    """Each window's score over its tetrodes.
+
+    Parameters
+    ----------
+    table : pd.DataFrame
+        The run's rows, one per window and tetrode (:func:`holdout_scores` with
+        the runner's ``epoch_id``, ``animal``, ``event_id``, ``kind`` and
+        ``group``).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per window: the keys, the sums over tetrodes of
+        :data:`_SUMMED`, the mean over tetrodes of ``spread_cm`` and
+        ``nonlocal_prob``, and per spike of the window (NaN without spikes):
+        ``gain_per_spike``, ``spiking_gain_per_spike`` (the gain of the bins
+        where the scored tetrode spiked) and ``agreement_per_spike``.
+    """
+    keys = ["epoch_id", "animal", "window_id", "event_id", "kind", "group"]
+    grouped = table.groupby(keys, sort=False)
+    windows = grouped[list(_SUMMED)].sum()
+    windows[["spread_cm", "nonlocal_prob"]] = grouped[
+        ["spread_cm", "nonlocal_prob"]
+    ].mean()
+    windows = windows.reset_index()
+    spikes = windows["n_spikes"].where(windows["n_spikes"] > 0)
+    windows["gain_per_spike"] = windows["gain"] / spikes
+    windows["spiking_gain_per_spike"] = (
+        windows["gain"] - windows["gain_silent"]
+    ) / spikes
+    windows["agreement_per_spike"] = windows["agreement"] / spikes
+    return windows

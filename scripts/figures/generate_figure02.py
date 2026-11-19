@@ -26,12 +26,14 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     h — The share of event time in Continuous and in Fragmented (each event's
         mean state probability), no-SWR and SWR events; bars the animals' mean,
         dots the animals (``event_statistics.state_composition_statistics``).
-    i — Spike likelihood at decoded and actual positions: each event's stored
-        log-likelihood at the decoded position minus at the animal's, summed over
-        its bins, per spike; one point per animal, the animals' mean and its
-        interval (``event_evidence.likelihood_advantage``;
-        ``Processed-Data/event_likelihood_advantage``). The same spikes chose the
-        event and its positions, which favors positive scores.
+    i — Held-out tetrode score: each tetrode left out of the decoder's smoother in
+        turn and scored at every bin of each event under the other tetrodes'
+        position distribution against local coding around the animal (time-fold
+        encodings); the gain summed over tetrodes and bins, per spike. One line
+        per animal from its Local-rest controls to its events, for no-SWR and
+        SWR events, and the animals' mean with its interval
+        (``event_evidence.tetrode_holdout``;
+        ``Processed-Data/event_tetrode_holdout``).
     j — Ripple power and MUA around non-local event starts, SWR vs no-SWR, with
         the epochs' rest level (rest bins in no event).
     k — The share of rest time bins decoded non-local by ripple power, one line
@@ -98,6 +100,7 @@ from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
 from continuum_swr_replay.analysis.event_evidence.participation import (
     participation_statistics,
 )
+from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import window_scores
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
     nonlocal_share_by_power,
@@ -132,8 +135,8 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
-    EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_PARTICIPATION_DIR,
+    EVENT_TETRODE_HOLDOUT_DIR,
     event_features_root,
     inventory_comparison_root,
     processed_data_dir,
@@ -936,46 +939,38 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
     )
 
 
-def draw_likelihood_advantage(ax, statistics: pd.DataFrame) -> None:
-    """Panel i: each animal's D_spike for no-SWR and SWR events.
+def draw_heldout_gain(ax, events: pd.DataFrame, controls: pd.DataFrame) -> None:
+    """Panel i: the held-out tetrode gain over local coding, per spike.
 
-    A line joins each animal's two groups; the bar is the animals' mean with its
-    95 % interval (``likelihood_advantage_statistics``).
+    One line per animal from its Local-rest controls to its events; the bar is
+    the events' animal mean with its 95 % interval
+    (``likelihood_advantage_statistics`` of ``gain_per_spike``).
     """
-    groups = (("no SWR", C_NL), ("SWR", C_SWR))
-    values = np.vstack([statistics.loc[g, "animals"] for g, _ in groups])
-    for column in values.T:
-        ax.plot((0, 1), column, color="#999999", lw=0.5, zorder=1)
-    for x, (group, color) in enumerate(groups):
-        row = statistics.loc[group]
-        ax.scatter(
-            np.full(row["n_animals"], x),
-            row["animals"],
-            s=6,
-            color=color,
-            lw=0,
-            zorder=2,
-        )
+    for g, (group, color) in enumerate((("no SWR", C_NL), ("SWR", C_SWR))):
+        x = (2.4 * g, 2.4 * g + 1)
+        rest, event = controls.loc[group], events.loc[group]
+        rest_values = pd.Series(rest["animals"], index=rest["animal_names"])
+        event_values = pd.Series(event["animals"], index=event["animal_names"])
+        for animal in event_values.index:
+            ax.plot(x, (rest_values[animal], event_values[animal]), color="#999999",
+                    lw=0.5, zorder=1)  # fmt: skip
+        ax.scatter(np.full(rest_values.size, x[0]), rest_values, s=6, color=C_LOCAL,
+                   lw=0, zorder=2)  # fmt: skip
+        ax.scatter(np.full(event_values.size, x[1]), event_values, s=6, color=color,
+                   lw=0, zorder=2)  # fmt: skip
         ax.errorbar(
-            x + 0.25,
-            row["estimate"],
-            yerr=[
-                [row["estimate"] - row["ci_low"]],
-                [row["ci_high"] - row["estimate"]],
-            ],
-            fmt="_",
-            color="black",
-            ms=5,
-            lw=0.8,
-            capsize=0,
-        )
-    ax.set_xticks([0, 1], [g for g, _ in groups])
-    ax.set_xlim(-0.4, 1.5)
-    ax.set_ylim(0, None)
-    ax.set_ylabel("Log-likelihood advantage\nof decoded position\n(nats/spike)")
-    ax.set_title(
-        "Spike likelihood at\ndecoded and actual\npositions", fontsize=SMALL_SIZE
+            x[1] + 0.3, event["estimate"],
+            yerr=[[event["estimate"] - event["ci_low"]],
+                  [event["ci_high"] - event["estimate"]]],
+            fmt="_", color="black", ms=5, lw=0.8, capsize=0,
+        )  # fmt: skip
+    ax.axhline(0, color="#999999", lw=0.5, ls=":", zorder=0)
+    ax.set_xlim(-0.5, 3.9)
+    ax.set_xticks(
+        [0, 1, 2.4, 3.4], ["rest", "no SWR", "rest", "SWR"], rotation=45, ha="right"
     )
+    ax.set_ylabel("Held-out gain\nover local (nats/spike)")
+    ax.set_title("Held-out tetrode", fontsize=SMALL_SIZE, pad=3)
 
 
 def draw_triggered(ax_rip, ax_mua, curves: dict, rest: pd.DataFrame) -> None:
@@ -1191,10 +1186,14 @@ def generate_figure(
     participation = participation_statistics(
         read_complete_run(data_dir / EVENT_PARTICIPATION_DIR, "participation")
     )
-    advantage = likelihood_advantage_statistics(
-        read_complete_run(
-            data_dir / EVENT_LIKELIHOOD_ADVANTAGE_DIR, "likelihood_advantage"
+    heldout = window_scores(
+        read_complete_run(data_dir / EVENT_TETRODE_HOLDOUT_DIR, "tetrode_holdout")
+    )
+    heldout_events, heldout_controls = (
+        likelihood_advantage_statistics(
+            heldout[heldout["kind"] == kind], column="gain_per_spike"
         )
+        for kind in ("event", "control")
     )
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
@@ -1235,7 +1234,7 @@ def generate_figure(
     ax_h = fig.add_subplot(row4[1])
     draw_state_composition(ax_h, state_composition_statistics(events))
     ax_i = fig.add_subplot(row4[2])
-    draw_likelihood_advantage(ax_i, advantage)
+    draw_heldout_gain(ax_i, heldout_events, heldout_controls)
     triggered = row4[3].subgridspec(2, 1, hspace=0.15)
     ax_j1 = fig.add_subplot(triggered[0])
     ax_j2 = fig.add_subplot(triggered[1], sharex=ax_j1)

@@ -69,6 +69,7 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import read_sw
 from continuum_swr_replay.analysis.event_evidence import (
     likelihood_advantage,
     participation,
+    tetrode_holdout,
 )
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
@@ -89,6 +90,7 @@ from continuum_swr_replay.paths import (
     EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_START_REST_THETA_DIR,
+    EVENT_TETRODE_HOLDOUT_DIR,
     NL_BOUTS_BY_SWR_STEM,
     RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
@@ -143,7 +145,8 @@ TAGS = {
     "class_step_evidence": Tags(("2b.5",)),
     "participation": Tags(("2d.9",), ("2g",)),
     "state_composition": Tags(("2d.10",), ("2h",)),
-    "likelihood_advantage": Tags(("2c.3",), ("2i",)),
+    "likelihood_advantage": Tags(("2c.3",)),
+    "tetrode_holdout": Tags(("2c.3",), ("2i",)),
     "spike": Tags(("2d.9", "2c.3"), ("2",)),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -190,6 +193,7 @@ class EventsInputs:
     decoder_quality: Path
     event_participation: Path
     likelihood_advantage: Path
+    tetrode_holdout: Path
 
 
 def default_inputs() -> EventsInputs:
@@ -212,6 +216,7 @@ def default_inputs() -> EventsInputs:
         decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
         event_participation=processed_data_dir() / EVENT_PARTICIPATION_DIR,
         likelihood_advantage=processed_data_dir() / EVENT_LIKELIHOOD_ADVANTAGE_DIR,
+        tetrode_holdout=processed_data_dir() / EVENT_TETRODE_HOLDOUT_DIR,
     )
 
 
@@ -1264,7 +1269,8 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
 
 def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the spike likelihood at the decoded positions minus at the
-    animal's, per spike, over each whole event (Figure 2i)."""
+    animal's, per spike, over each whole event (in sample; Figure 2i shows the
+    held-out score)."""
     make = value_factory(
         likelihood_advantage_values, source, TAGS["likelihood_advantage"]
     )
@@ -1317,6 +1323,71 @@ def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]
                 f"{group} events scored",
             ),
         ]
+    return values
+
+
+def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2c.3: the held-out tetrode gain over local coding, per spike, of
+    the events and their Local-rest controls (Figure 2i)."""
+    make = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
+    values = []
+    estimates = (
+        ("gain", "event", "gain_per_spike", "events"),
+        ("spiking_gain", "event", "spiking_gain_per_spike", "events"),
+        ("control_gain", "control", "gain_per_spike", "Local-rest controls"),
+    )
+    for name, kind, column, label in estimates:
+        statistics = likelihood_advantage.likelihood_advantage_statistics(
+            windows[windows["kind"] == kind], column=column
+        )
+        spiking = " in the bins where the scored tetrode spiked" if (
+            name == "spiking_gain"
+        ) else ""  # fmt: skip
+        for word, group in _RUN_GROUPS.items():
+            row = statistics.loc[group]
+            values += [
+                make(
+                    f"{word}_heldout_{name}_per_spike",
+                    row["estimate"],
+                    "quantity",
+                    "dec2",
+                    f"held-out tetrode score of {group} {label}: each tetrode's "
+                    "log predictive score under the other tetrodes' position "
+                    "distribution minus under local coding around the animal"
+                    f"{spiking}, summed over tetrodes and bins and divided by the "
+                    "window's spikes; mean over animals of each animal's median "
+                    "over epochs of each epoch's median",
+                    "nats per spike",
+                ),
+                make(
+                    f"{word}_heldout_{name}_per_spike_ci_low",
+                    row["ci_low"],
+                    "quantity",
+                    "dec2",
+                    "lower bound of its 95 % interval (nested bootstrap of the "
+                    "animals and their epochs, small-sample t correction over the "
+                    f"{row['n_animals']} animals)",
+                    "nats per spike",
+                ),
+                make(
+                    f"{word}_heldout_{name}_per_spike_ci_high",
+                    row["ci_high"],
+                    "quantity",
+                    "dec2",
+                    "upper bound of that interval",
+                    "nats per spike",
+                ),
+            ]
+            if name == "gain":
+                values.append(
+                    make(
+                        f"{word}_heldout_events_scored",
+                        row["n_scored"],
+                        "count",
+                        "count",
+                        f"{group} events with a held-out score per spike",
+                    )
+                )
     return values
 
 
@@ -2095,7 +2166,38 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             ),
         )
     )
+    holdout_table = read_complete_run(inputs.tetrode_holdout, "tetrode_holdout")
+    if set(holdout_table["epoch_id"]) != analysed:
+        raise ValueError(
+            f"{inputs.tetrode_holdout} holds {holdout_table['epoch_id'].nunique()} "
+            f"epochs, not the {n_epochs} analysed ones"
+        )
+    holdout_manifest = read_output_manifest(inputs.tetrode_holdout)
+    summary.add(
+        *pend(
+            tetrode_holdout_values(
+                tetrode_holdout.window_scores(holdout_table),
+                f"{rel(inputs.tetrode_holdout)} "
+                "(scripts/event_evidence/score_tetrode_holdout.py)",
+            ),
+            stale(inputs.tetrode_holdout),
+            _input_staleness(
+                holdout_manifest,
+                "event_participation",
+                files_sha256(participation_paths),
+                rel(inputs.tetrode_holdout),
+                "participation",
+                "participation run",
+            ),
+        )
+    )
     summary.inputs += [
+        files_record(
+            "*_tetrode_holdout.parquet",
+            ok_table_paths(inputs.tetrode_holdout, "tetrode_holdout"),
+            ROOT_DIR,
+        ),
+        file_record(inputs.tetrode_holdout / "manifest.json", ROOT_DIR),
         files_record("*_participation.parquet", participation_paths, ROOT_DIR),
         file_record(inputs.event_participation / "manifest.json", ROOT_DIR),
         files_record(

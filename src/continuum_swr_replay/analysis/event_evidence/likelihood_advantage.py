@@ -151,12 +151,16 @@ def _animal_median_mean(
 
 
 def likelihood_advantage_statistics(
-    table: pd.DataFrame, *, n_boot: int = 1000, seed: int = 0
+    table: pd.DataFrame,
+    *,
+    column: str = "D_spike",
+    n_boot: int = 1000,
+    seed: int = 0,
 ) -> pd.DataFrame:
-    """Each group's ``D_spike``: one value per animal, their mean and its interval.
+    """Each group's ``column``: one value per animal, their mean and its interval.
 
     An animal's value is the median over its epochs of each epoch's median
-    ``D_spike`` (``animal_session_values(..., "median")``). The estimate is the
+    ``column`` (``animal_session_values(..., "median")``). The estimate is the
     mean over animals; its 95 % interval is ``bootstrap_interval`` of the same
     statistic on nested bootstrap replicates of the epochs' medians (animals,
     then their epochs).
@@ -164,7 +168,8 @@ def likelihood_advantage_statistics(
     Parameters
     ----------
     table : pd.DataFrame
-        One row per event: ``animal``, ``epoch_id``, ``group`` and ``D_spike``.
+        One row per event: ``animal``, ``epoch_id``, ``group`` and ``column``
+        (``D_spike`` by default; the held-out score's ``gain_per_spike`` too).
     n_boot : int, optional
     seed : int, optional
 
@@ -173,22 +178,20 @@ def likelihood_advantage_statistics(
     pd.DataFrame
         Indexed by group: ``animals`` (the animals' values, sorted animal
         order), ``animal_names``, ``estimate``, ``ci_low``, ``ci_high``,
-        ``n_events``, ``n_scored`` (events with a ``D_spike``) and ``n_animals``.
+        ``n_events``, ``n_scored`` (events with a value) and ``n_animals``.
     """
     rows = {}
     for group, mine in table.groupby("group"):
-        scored = mine.dropna(subset=["D_spike"])
+        scored = mine.dropna(subset=[column])
         per_animal = animal_session_values(
-            scored["D_spike"], scored["animal"], scored["epoch_id"], "median"
+            scored[column], scored["animal"], scored["epoch_id"], "median"
         )
-        epochs = (
-            scored.groupby(["animal", "epoch_id"])["D_spike"].median().reset_index()
-        )
+        epochs = scored.groupby(["animal", "epoch_id"])[column].median().reset_index()
         animal_codes, epoch_codes = nested_codes(epochs["animal"], epochs["epoch_id"])
         draws = nested_bootstrap_draws(
             animal_codes, epoch_codes, np.random.default_rng(seed), n_boot
         )
-        values = epochs["D_spike"].to_numpy()
+        values = epochs[column].to_numpy()
         replicate = np.array(
             [
                 _animal_median_mean(

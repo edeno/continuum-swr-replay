@@ -755,3 +755,26 @@ def test_state_composition_values_name_each_group_and_state():
     assert values["swr_fragmented_share"].value == pytest.approx(0.2)
     assert values["swr_fragmented_share"].figures == ("2h",)
     assert len(values) == 4
+
+
+def test_tetrode_holdout_values_name_each_estimate_and_group():
+    rows = []
+    for animal, epoch, gain in (("a", "a1", 0.4), ("b", "b1", 0.6), ("c", "c1", 0.8)):
+        for group in ("no SWR", "SWR"):
+            for kind, value in (("event", gain), ("control", 0.0)):
+                rows.append(
+                    {
+                        "animal": animal,
+                        "epoch_id": epoch,
+                        "group": group,
+                        "kind": kind,
+                        "gain_per_spike": value,
+                        "spiking_gain_per_spike": value + 0.1,
+                    }
+                )
+    numbers = _numbers(builder.tetrode_holdout_values(pd.DataFrame(rows), "s"))
+    assert numbers["non_swr_heldout_gain_per_spike"] == pytest.approx(0.6)
+    assert numbers["swr_heldout_spiking_gain_per_spike"] == pytest.approx(0.7)
+    assert numbers["non_swr_heldout_control_gain_per_spike"] == pytest.approx(0.0)
+    assert numbers["swr_heldout_events_scored"] == 3
+    assert len(numbers) == 3 * 3 * 2 + 2
