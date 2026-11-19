@@ -139,7 +139,7 @@ TAGS = {
     "calibration": Tags(("2a.1",), ("decoder_validation",)),
     "state_fractions": Tags(("2a.6",), ("decoder_validation",)),
     "cohort": Tags(("2b.2",), ("2d",)),
-    "left_out": Tags(("2b.2",), ("2",)),
+    "left_out": Tags(("2b.2",)),
     "other_detectors_main": Tags(("2b.3",), ("2",)),
     "other_detectors": Tags(("2b.3",)),
     "swr_content": Tags(("2b.3",), ("2c",)),

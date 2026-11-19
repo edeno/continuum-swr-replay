@@ -13,8 +13,8 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     c — The SWRs by content (bars pooled over SWRs, dots one per animal): with a
         non-local event, mostly Local, or other. The decoder finds the replay
         SWRs are known for.
-    d — The non-local events by SWR overlap (bars and animal dots as in c), and
-        the share of non-local time outside SWRs: most events have no SWR.
+    d — The non-local events by SWR overlap (bars and animal dots as in c): most
+        events have no SWR.
     e — For each SWR definition, MUA and the Widloski detector, c's and d's
         questions: the share of its own events that overlap a non-local event,
         and the share of non-local events its events overlap.
@@ -43,8 +43,7 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
 Panels d and f are drawn from the canonical event table by the functions the
 events summary uses (``event_statistics.overlap_class_statistics``,
 ``boundary_offsets``); c from ``nonlocal_comparison.other_detector_statistics``
-on the event features run the summary reads, and d's time share from
-``left_out_statistics``; i's rest and running lines from ``event_statistics.reference_medians``
+on the event features run the summary reads; i's rest and running lines from ``event_statistics.reference_medians``
 of the brain-state reference. Panels i and j are per-time-bin signals no stored
 output holds, computed from the aggregated decode frames (cached), whose event
 counts by SWR overlap must equal the canonical table's.
@@ -185,7 +184,8 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 #    events (i); each Kay SWR's share of time non-local (d).
 # 10: each animal's share of Kay's SWRs in each content class (d).
 # 11: no per-SWR non-local share (d's histogram removed).
-FIGURE02_CACHE_VERSION = 11
+# 12: no share of non-local time outside SWRs (d's note removed).
+FIGURE02_CACHE_VERSION = 12
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -418,7 +418,7 @@ def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) 
     logging.info("Computing the non-local share by ripple power (panel j)...")
     share_by_power = rest_nonlocal_share(data_over_time)
     del data_over_time
-    logging.info("Reading the detector comparison (panels c, d and e)...")
+    logging.info("Reading the detector comparison (panels c and e)...")
     comparison = detector_comparison()
     return {
         "nwb_file_name": nwb_file_name,
@@ -495,7 +495,7 @@ def example_windows(
 
 
 def detector_comparison() -> dict:
-    """Panels c, d and e: the event features run's comparison, as the summary reads it.
+    """Panels c and e: the event features run's comparison, as the summary reads it.
 
     Returns
     -------
@@ -503,14 +503,13 @@ def detector_comparison() -> dict:
         ``kay``: :func:`nonlocal_comparison.other_detector_statistics`'s row of
         Kay's SWRs (c); ``overlap``: the share of non-local events each of
         :data:`DETECTOR_LABELS` overlaps and ``with_nonlocal``, the share of
-        each one's events that overlap a non-local event (e); and, from
-        ``left_out_statistics``, ``time_outside_swr``, the share of non-local
-        time outside Kay's SWRs (d).
+        each one's events that overlap a non-local event (e); and
+        ``kay_content_animals``, each animal's share of Kay's SWRs in each
+        content class (c).
     """
     run = event_features_root() / EVENT_FEATURES_RUN
     comparison = nonlocal_comparison.read_comparison(run)
     others, directional = comparison.others, comparison.directional
-    left_out = nonlocal_comparison.left_out_statistics(run, comparison.inventory_dir)
     return {
         "kay": nonlocal_comparison.other_detector_statistics(others).loc["kay"],
         "kay_content_animals": nonlocal_comparison.content_class_animal_shares(
@@ -522,7 +521,6 @@ def detector_comparison() -> dict:
         "with_nonlocal": nonlocal_comparison.events_overlapping_nonlocal(
             directional, tuple(DETECTOR_LABELS)
         ),
-        "time_outside_swr": left_out["nonlocal_time_outside_kay_fraction"],
     }
 
 
@@ -831,10 +829,8 @@ def draw_class_bars(
     ax.set_title(title, fontsize=SMALL_SIZE, pad=3, loc="right")
 
 
-def draw_events_bars(
-    ax: Axes, classes: dict, animals: pd.DataFrame, time_outside_swr: float
-) -> None:
-    """Panel d: the non-local events by SWR overlap, and the time outside SWRs.
+def draw_events_bars(ax: Axes, classes: dict, animals: pd.DataFrame) -> None:
+    """Panel d: the non-local events by SWR overlap.
 
     Bars pool the events (``overlap_class_statistics``); dots are the animals
     (``overlap_class_animal_shares``).
@@ -850,11 +846,7 @@ def draw_events_bars(
         for c in CLASS_ORDER
     ]
     draw_class_bars(
-        ax,
-        rows,
-        f"Non-local events (n = {classes['n_events']:,})\n"
-        f"{format_number(time_outside_swr, 'pctnum')}% of their time outside SWRs",
-        "% events",
+        ax, rows, f"Non-local events (n = {classes['n_events']:,})", "% events"
     )
 
 
@@ -1267,9 +1259,7 @@ def generate_figure(
     ax_c = fig.add_subplot(row3[0])
     draw_swr_bars(ax_c, inputs["kay"], inputs["kay_content_animals"])
     ax_d = fig.add_subplot(row3[1])
-    draw_events_bars(
-        ax_d, classes, overlap_class_animal_shares(events), inputs["time_outside_swr"]
-    )
+    draw_events_bars(ax_d, classes, overlap_class_animal_shares(events))
     detectors = row3[2].subgridspec(1, 2, wspace=0.3)
     ax_e = fig.add_subplot(detectors[0])
     ax_e2 = fig.add_subplot(detectors[1])
