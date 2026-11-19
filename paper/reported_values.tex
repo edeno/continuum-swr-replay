@@ -210,7 +210,7 @@
 \newcommand{\DetectionSweepTimingStateSpaceOnsetMinMs}{\ensuremath{-}20}  % detection.sweep_timing_state_space_onset_min_ms: smallest onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 \newcommand{\DetectionSweepTimingStateSpaceOnsetUpperQuartileMs}{\ensuremath{-}2}  % detection.sweep_timing_state_space_onset_upper_quartile_ms: upper quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 
-% --- events (commit 5a63b6cee911)
+% --- events (commit a236f07a5c99)
 \newcommand{\EventsAnimals}{5}  % events.animals: animals in the event table
 \newcommand{\EventsAnimalsNonSwrMajority}{4}  % events.animals_non_swr_majority: animals whose share of non-SWR events (the mean over their epochs) is above one half
 \newcommand{\EventsAnimalsNonSwrMoreAtWell}{5}  % events.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's sessions of the session's share
@@ -395,10 +395,10 @@
 \newcommand{\EventsNonSwrHeldoutControlGainPerSpikeCiLow}{0.00}  % events.non_swr_heldout_control_gain_per_spike_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
 \newcommand{\EventsNonSwrHeldoutEventsScored}{42{,}974}  % events.non_swr_heldout_events_scored: no SWR events with a held-out score per spike
 \newcommand{\EventsNonSwrHeldoutGainPerSpike}{0.43}  % events.non_swr_heldout_gain_per_spike: held-out tetrode score of no SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median
-\newcommand{\EventsNonSwrHeldoutGainPerSpikeCiHigh}{0.56}  % events.non_swr_heldout_gain_per_spike_ci_high: upper bound of that interval
+\newcommand{\EventsNonSwrHeldoutGainPerSpikeCiHigh}{0.55}  % events.non_swr_heldout_gain_per_spike_ci_high: upper bound of that interval
 \newcommand{\EventsNonSwrHeldoutGainPerSpikeCiLow}{0.31}  % events.non_swr_heldout_gain_per_spike_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
 \newcommand{\EventsNonSwrHeldoutSpikingGainPerSpike}{0.64}  % events.non_swr_heldout_spiking_gain_per_spike: held-out tetrode score of no SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median
-\newcommand{\EventsNonSwrHeldoutSpikingGainPerSpikeCiHigh}{0.74}  % events.non_swr_heldout_spiking_gain_per_spike_ci_high: upper bound of that interval
+\newcommand{\EventsNonSwrHeldoutSpikingGainPerSpikeCiHigh}{0.75}  % events.non_swr_heldout_spiking_gain_per_spike_ci_high: upper bound of that interval
 \newcommand{\EventsNonSwrHeldoutSpikingGainPerSpikeCiLow}{0.54}  % events.non_swr_heldout_spiking_gain_per_spike_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
 \newcommand{\EventsNonSwrLikelihoodAdvantageEvents}{42{,}974}  % events.non_swr_likelihood_advantage_events: no SWR events scored
 \newcommand{\EventsNonSwrLikelihoodAdvantageEventsScored}{42{,}974}  % events.non_swr_likelihood_advantage_events_scored: no SWR events with a per-spike score (at least one spike)
@@ -539,8 +539,8 @@
 \newcommand{\EventsSwrHeldoutGainPerSpikeCiHigh}{0.88}  % events.swr_heldout_gain_per_spike_ci_high: upper bound of that interval
 \newcommand{\EventsSwrHeldoutGainPerSpikeCiLow}{0.57}  % events.swr_heldout_gain_per_spike_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
 \newcommand{\EventsSwrHeldoutSpikingGainPerSpike}{0.91}  % events.swr_heldout_spiking_gain_per_spike: held-out tetrode score of SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median
-\newcommand{\EventsSwrHeldoutSpikingGainPerSpikeCiHigh}{1.07}  % events.swr_heldout_spiking_gain_per_spike_ci_high: upper bound of that interval
-\newcommand{\EventsSwrHeldoutSpikingGainPerSpikeCiLow}{0.76}  % events.swr_heldout_spiking_gain_per_spike_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
+\newcommand{\EventsSwrHeldoutSpikingGainPerSpikeCiHigh}{1.08}  % events.swr_heldout_spiking_gain_per_spike_ci_high: upper bound of that interval
+\newcommand{\EventsSwrHeldoutSpikingGainPerSpikeCiLow}{0.75}  % events.swr_heldout_spiking_gain_per_spike_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
 \newcommand{\EventsSwrLikelihoodAdvantageEvents}{32{,}701}  % events.swr_likelihood_advantage_events: SWR events scored
 \newcommand{\EventsSwrLikelihoodAdvantageEventsScored}{32{,}701}  % events.swr_likelihood_advantage_events_scored: SWR events with a per-spike score (at least one spike)
 \newcommand{\EventsSwrLikelihoodAdvantagePerSpike}{1.06}  % events.swr_likelihood_advantage_per_spike: log-likelihood of SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median

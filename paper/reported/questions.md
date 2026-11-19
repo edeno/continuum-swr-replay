@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
 | `detection.json` | `3455b5a13f61` | yes | 172 | 0 |
-| `events.json` | `5a63b6cee911` | yes | 414 | 0 |
+| `events.json` | `a236f07a5c99` | yes | 414 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
 
@@ -264,8 +264,8 @@ Sources:
 | `\EventsCalibrationErrorBinTen` | 3.0 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.95 (bin 10 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
 | `\EventsCalibrationErrorBinThree` | 7.5 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.25 (bin 3 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
 | `\EventsCalibrationErrorBinTwo` | 8.8 | cm | median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.15 (bin 2 of 10), outside excluded time, sessions pooled | `events.calibration_values` | decoder_validation |
-| `\EventsDecodingErrorMedianCm` | 3.0 | cm | median over sessions of each session's median Local-state decoding error (the track-graph distance from the decoded to the actual position, over time bins with Local probability above 0.5 outside excluded time), sessions pooled | `events.decoding_error_values` | decoder_validation |
-| `\EventsDecodingErrorSessions` | 242 |  | sessions with a Local-state decoding error | `events.decoding_error_values` | decoder_validation |
+| `\EventsDecodingErrorMedianCm` | 3.0 | cm | median over sessions of each session's median Local-state decoding error (the track-graph distance from the decoded to the actual position, over time bins with Local probability above 0.5 outside excluded time), sessions pooled | `events.decoding_error_values` |  |
+| `\EventsDecodingErrorSessions` | 242 |  | sessions with a Local-state decoding error | `events.decoding_error_values` |  |
 
 ### 2a.3. On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?
 
@@ -624,10 +624,10 @@ Sources:
 | `\EventsNonSwrHeldoutControlGainPerSpikeCiLow` | 0.00 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
 | `\EventsNonSwrHeldoutEventsScored` | 42,974 |  | no SWR events with a held-out score per spike | `events.tetrode_holdout_values` | 2i |
 | `\EventsNonSwrHeldoutGainPerSpike` | 0.43 | nats per spike | held-out tetrode score of no SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median | `events.tetrode_holdout_values` | 2i |
-| `\EventsNonSwrHeldoutGainPerSpikeCiHigh` | 0.56 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrHeldoutGainPerSpikeCiHigh` | 0.55 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
 | `\EventsNonSwrHeldoutGainPerSpikeCiLow` | 0.31 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
 | `\EventsNonSwrHeldoutSpikingGainPerSpike` | 0.64 | nats per spike | held-out tetrode score of no SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median | `events.tetrode_holdout_values` | 2i |
-| `\EventsNonSwrHeldoutSpikingGainPerSpikeCiHigh` | 0.74 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrHeldoutSpikingGainPerSpikeCiHigh` | 0.75 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
 | `\EventsNonSwrHeldoutSpikingGainPerSpikeCiLow` | 0.54 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
 | `\EventsNonSwrLikelihoodAdvantageEvents` | 42,974 |  | no SWR events scored | `events.likelihood_advantage_values` |  |
 | `\EventsNonSwrLikelihoodAdvantageEventsScored` | 42,974 |  | no SWR events with a per-spike score (at least one spike) | `events.likelihood_advantage_values` |  |
@@ -647,8 +647,8 @@ Sources:
 | `\EventsSwrHeldoutGainPerSpikeCiHigh` | 0.88 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
 | `\EventsSwrHeldoutGainPerSpikeCiLow` | 0.57 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
 | `\EventsSwrHeldoutSpikingGainPerSpike` | 0.91 | nats per spike | held-out tetrode score of SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median | `events.tetrode_holdout_values` | 2i |
-| `\EventsSwrHeldoutSpikingGainPerSpikeCiHigh` | 1.07 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
-| `\EventsSwrHeldoutSpikingGainPerSpikeCiLow` | 0.76 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrHeldoutSpikingGainPerSpikeCiHigh` | 1.08 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrHeldoutSpikingGainPerSpikeCiLow` | 0.75 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
 | `\EventsSwrLikelihoodAdvantageEvents` | 32,701 |  | SWR events scored | `events.likelihood_advantage_values` |  |
 | `\EventsSwrLikelihoodAdvantageEventsScored` | 32,701 |  | SWR events with a per-spike score (at least one spike) | `events.likelihood_advantage_values` |  |
 | `\EventsSwrLikelihoodAdvantagePerSpike` | 1.06 | nats per spike | log-likelihood of SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median | `events.likelihood_advantage_values` |  |
@@ -2902,7 +2902,7 @@ Panel d: `\MpfcBestModelConstantFraction`, `\MpfcBestModelJointFraction`, `\Mpfc
 
 Script: `scripts/figures/generate_supp_decoder_validation.py`. Questions: 2a.1, 2a.6, 2d.8.
 
-Unlettered: `\EventsCalibrationErrorBinEight`, `\EventsCalibrationErrorBinFive`, `\EventsCalibrationErrorBinFour`, `\EventsCalibrationErrorBinNine`, `\EventsCalibrationErrorBinOne`, `\EventsCalibrationErrorBinSeven`, `\EventsCalibrationErrorBinSix`, `\EventsCalibrationErrorBinTen`, `\EventsCalibrationErrorBinThree`, `\EventsCalibrationErrorBinTwo`, `\EventsDecodingErrorMedianCm`, `\EventsDecodingErrorSessions`, `\EventsStateFractionImmobileContinuous`, `\EventsStateFractionImmobileFragmented`, `\EventsStateFractionImmobileLocal`, `\EventsStateFractionImmobileNoSpike`, `\EventsStateFractionMovingContinuous`, `\EventsStateFractionMovingFragmented`, `\EventsStateFractionMovingLocal`, `\EventsStateFractionMovingNoSpike`
+Unlettered: `\EventsCalibrationErrorBinEight`, `\EventsCalibrationErrorBinFive`, `\EventsCalibrationErrorBinFour`, `\EventsCalibrationErrorBinNine`, `\EventsCalibrationErrorBinOne`, `\EventsCalibrationErrorBinSeven`, `\EventsCalibrationErrorBinSix`, `\EventsCalibrationErrorBinTen`, `\EventsCalibrationErrorBinThree`, `\EventsCalibrationErrorBinTwo`, `\EventsStateFractionImmobileContinuous`, `\EventsStateFractionImmobileFragmented`, `\EventsStateFractionImmobileLocal`, `\EventsStateFractionImmobileNoSpike`, `\EventsStateFractionMovingContinuous`, `\EventsStateFractionMovingFragmented`, `\EventsStateFractionMovingLocal`, `\EventsStateFractionMovingNoSpike`
 
 ### Figure memoryless_comparison: Our detector and the Widloski & Foster detector on simulated replays
 

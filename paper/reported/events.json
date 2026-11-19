@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "5a63b6cee911",
+ "commit": "a236f07a5c99",
  "code": {
-  "head": "5a63b6cee911adb8fba2cbf67f4dba9f34a6ae12",
+  "head": "a236f07a5c99541295d789daf2c545ffef328901",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -199,20 +199,20 @@
     "code_sha256": "63b363c841a79e429a0da49cb52089feaf0f3c030b07583d94c91f47ec91df6e"
    },
    "src/continuum_swr_replay/analysis/event_definition/swr_source.py": {
-    "sha256": "3a7bf9c9470c4734f876e01eda1ae04305684939318ac7412ab3d47e3d3f0f23",
-    "code_sha256": "4e39c4fede7d06b90f55b570b9ee38a03ed094ada174193df93d807562da8361"
+    "sha256": "de4873b578f49250499e337602423fbc73199d12ddc7f05ce52e7618a6a15891",
+    "code_sha256": "fa3869299a888376e65e0c06591a05538d8e3e3e47f7644dbfe193df058c78c9"
    },
    "src/continuum_swr_replay/analysis/event_evidence/__init__.py": {
     "sha256": "17f2a00de94db68321afa77521d8be4362150438c005e9b8c019cc3e079ebce8",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_evidence/likelihood_advantage.py": {
-    "sha256": "64c6ca0c338577f029f3d097b5970dc79c8d9671d9f405b185122dc6ef063753",
-    "code_sha256": "213c9db0ed98a8ea7c44566864d6f6ea3dcce28996c17a7890507e8d57a79836"
+    "sha256": "2954482100df7f5ba699a11621080512a8902a72f74a8af1074c764d63db404f",
+    "code_sha256": "5614fe932b5e718f9523f7ef02f2bdc54f2cc029835f648d38d20a3f22fb918c"
    },
    "src/continuum_swr_replay/analysis/event_evidence/participation.py": {
-    "sha256": "939f84e341fea71e3327afc3520afccc2840b2273e02dd66fd882d881835e4f5",
-    "code_sha256": "0d222ea92d575c535487bd5372717cb84a0c7e7884cc865ef2a5a9bd8a137fdf"
+    "sha256": "ad40d513b8f8ab6d69d4dc9d8facd25520561e77e106fcabfdbcec9b7ee74573",
+    "code_sha256": "67fa3346d3581ace12d77b545071aaaf3c01a5ddf7f5bed4285a5c3f222d4248"
    },
    "src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py": {
     "sha256": "64b21ed6aafd6b777bfd727dba6ddf08adca9519005ded9623fa53b25a09e36b",
@@ -235,24 +235,24 @@
     "code_sha256": "fed3960044eef999bcd623e28c8f10d47c9b8da8903006eb841bd82ac94599da"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/terms.py": {
-    "sha256": "71f9652e3867d17f75fbb1b7c125c88d7240de508fd8e00d59bc3ccc80e99f5a",
-    "code_sha256": "69932ba8094916609194c2559ee5b32ae18939096f61cf3854dadfb39ba45a06"
+    "sha256": "7ca7e5ae86f5cce8bc03f9de3555d0c34fef9c2d8b9e0923649604137a5d33d4",
+    "code_sha256": "bb8ba2d938d37eccaad4007334c7447affe9fc08a0030086cc2d7fe1bfce9d17"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/windows.py": {
-    "sha256": "bc3a7f5a410f7f72ba3b94c0c11a9fda3e60bf7de0c00d7e4c647ba9b8a85611",
-    "code_sha256": "0acf0da12c93c9bd46188f1d73e69a42a7f36d6620ea10e9eca2039fd1feb0ff"
+    "sha256": "c054ee999d924e46bedb74b79ba99545101d09a2252f634158246bd466716541",
+    "code_sha256": "b80c4ce5ba09db6c201d8038139a1a02c170a29a2c31112a9a2ea89f8f29b01a"
    },
    "src/continuum_swr_replay/analysis/event_evidence/tetrode_holdout.py": {
-    "sha256": "0024fc81711f8ba3c83a1c4d925bb643c8f8efe6af9b1be0c58945f83b4bd44b",
-    "code_sha256": "70c694dbd7d96ef42c7a3fb704f34b8d730826d60bc2f13d57f2649147b0d88d"
+    "sha256": "6ce3366275681b8e071317158249e1ed0b055588e63b917b07ffb2c9df0bfa81",
+    "code_sha256": "695588b4c3a03e40243d92b77d9c87a6f534df412b1cc02d70f868d45edf3231"
    },
    "src/continuum_swr_replay/analysis/event_properties/__init__.py": {
     "sha256": "933f33706b5999a73702c0b687a36d8b0ca295a29f84600df0ec994258fec27a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
-    "sha256": "796d15a1d573140bc3aaa6a195f53da0a178544b4e5184fefb8ad9a27505851c",
-    "code_sha256": "fa6af65ede721cd1dc3aa83278d560518e2cf22ba47291d6004e64a31cfed026"
+    "sha256": "7f004857e9256adfc70c92f8bca9b2809e189db984c1b894e8c56e5bba8b111b",
+    "code_sha256": "fb57470271c708cbb1c2240ad92e8ff16e3f2af76e7db90788b0e837ec320604"
    },
    "src/continuum_swr_replay/analysis/event_properties/property_contrast.py": {
     "sha256": "4989d4b201bbbbdd1551bb4ebd9c749e87f0bab6781cbfd6565296f28b4c8d1b",
@@ -331,8 +331,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "d976a709d45f6349c233d5d32fb593f5cd06fd25c8b6f13b885a32ff786ed6b7",
-    "code_sha256": "5022f5465bc6a1af6a705cb9358469a143768a865b244cd67407632ecd99746c"
+    "sha256": "f48a0f88a4fac8c4474b289d8c208167b3381eea775d26b9f9e6e70526e71c6e",
+    "code_sha256": "40632200804661a2a9653a0bf9cbe46e22b1b79a852daf0c06b1bb736f699811"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -1157,9 +1157,7 @@
    "questions": [
     "2a.1"
    ],
-   "figures": [
-    "decoder_validation"
-   ],
+   "figures": [],
    "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "decoding_error_values",
    "pending": null
@@ -1173,9 +1171,7 @@
    "questions": [
     "2a.1"
    ],
-   "figures": [
-    "decoder_validation"
-   ],
+   "figures": [],
    "source": "Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)",
    "function": "decoding_error_values",
    "pending": null
@@ -3256,7 +3252,7 @@
    "pending": null
   },
   "non_swr_heldout_control_gain_per_spike_ci_high": {
-   "value": 0.001269654969592681,
+   "value": 0.0012945288505767415,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -3272,7 +3268,7 @@
    "pending": null
   },
   "non_swr_heldout_control_gain_per_spike_ci_low": {
-   "value": 4.303398590215814e-05,
+   "value": 1.816010491809746e-05,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -3320,7 +3316,7 @@
    "pending": null
   },
   "non_swr_heldout_gain_per_spike_ci_high": {
-   "value": 0.5553944906759918,
+   "value": 0.5536648046529498,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -3336,7 +3332,7 @@
    "pending": null
   },
   "non_swr_heldout_gain_per_spike_ci_low": {
-   "value": 0.30598410208853455,
+   "value": 0.30771378811157657,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -3368,7 +3364,7 @@
    "pending": null
   },
   "non_swr_heldout_spiking_gain_per_spike_ci_high": {
-   "value": 0.7444525117593225,
+   "value": 0.7454805004284053,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -3384,7 +3380,7 @@
    "pending": null
   },
   "non_swr_heldout_spiking_gain_per_spike_ci_low": {
-   "value": 0.5418725442322755,
+   "value": 0.5408445555631927,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -3442,7 +3438,7 @@
    "pending": null
   },
   "non_swr_likelihood_advantage_per_spike_ci_high": {
-   "value": 0.8817995122142743,
+   "value": 0.8818196288148155,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -3456,7 +3452,7 @@
    "pending": null
   },
   "non_swr_likelihood_advantage_per_spike_ci_low": {
-   "value": 0.5175417845259873,
+   "value": 0.5175216679254462,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -5459,7 +5455,7 @@
    "pending": null
   },
   "swr_heldout_control_gain_per_spike_ci_high": {
-   "value": 0.001245791803689795,
+   "value": 0.0012710186389461222,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -5475,7 +5471,7 @@
    "pending": null
   },
   "swr_heldout_control_gain_per_spike_ci_low": {
-   "value": 8.04727246865825e-05,
+   "value": 5.524588943025524e-05,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -5523,7 +5519,7 @@
    "pending": null
   },
   "swr_heldout_gain_per_spike_ci_high": {
-   "value": 0.8813159195167803,
+   "value": 0.8846306532948418,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -5539,7 +5535,7 @@
    "pending": null
   },
   "swr_heldout_gain_per_spike_ci_low": {
-   "value": 0.5683320005191528,
+   "value": 0.5650172667410913,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -5571,7 +5567,7 @@
    "pending": null
   },
   "swr_heldout_spiking_gain_per_spike_ci_high": {
-   "value": 1.0736571980341412,
+   "value": 1.0756653871673632,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -5587,7 +5583,7 @@
    "pending": null
   },
   "swr_heldout_spiking_gain_per_spike_ci_low": {
-   "value": 0.7552993443626809,
+   "value": 0.7532911552294588,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -5645,7 +5641,7 @@
    "pending": null
   },
   "swr_likelihood_advantage_per_spike_ci_high": {
-   "value": 1.320568900411907,
+   "value": 1.3236043097898404,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -5659,7 +5655,7 @@
    "pending": null
   },
   "swr_likelihood_advantage_per_spike_ci_low": {
-   "value": 0.7992226162814665,
+   "value": 0.7961872069035333,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
