@@ -17,8 +17,8 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     e — For each SWR definition, MUA and the Widloski detector: the share of
         non-local events its events overlap, and the share of its own events
         that overlap a non-local event.
-    f — Each SWR-overlapping event's start and end minus its SWR's, on a log
-        count axis, with the share of pairs beyond 25 and 50 ms.
+    f — Each SWR-overlapping event's start and end minus its SWR's, as the
+        cumulative percent of event-SWR pairs, one line per animal.
     g — Tetrode participation (share of tetrodes with a spike) and spike rate of
         each non-local event against a Local-rest window of its length, one line
         per animal, for no-SWR and SWR events
@@ -112,8 +112,6 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     nonlocal_share_by_power,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
-    OFFSET_TAILS_S,
-    boundary_offset_statistics,
     boundary_offsets,
     overlap_class_animal_shares,
     overlap_class_statistics,
@@ -1094,33 +1092,46 @@ def draw_share_by_power(ax: Axes, shares: pd.DataFrame) -> None:
     ax.set_ylabel("Share of rest bins\nnon-local")
 
 
-def draw_offsets(ax_start: Axes, ax_end: Axes, offsets: pd.DataFrame) -> None:
-    """Panel f: event minus SWR start (top) and end (bottom), log counts.
+OFFSET_GRID_MS = np.arange(-100, 101)
+"""Panel f's offsets, ms: event bound minus SWR bound."""
 
-    Each row prints the share of event-SWR pairs whose bound differs by more
-    than 25 and 50 ms (``boundary_offset_statistics``).
+
+def cumulative_percent(values: np.ndarray, grid: np.ndarray) -> np.ndarray:
+    """The percent of ``values`` at or below each point of ``grid``."""
+    ordered = np.sort(values)
+    return 100 * np.searchsorted(ordered, grid, side="right") / len(ordered)
+
+
+def draw_offsets(
+    ax_start: Axes, ax_end: Axes, offsets: pd.DataFrame, animal: pd.Series
+) -> None:
+    """Panel f: the cumulative percent of event-SWR pairs by event minus SWR
+    start (top) and end (bottom).
+
+    One thin line per animal, their mean in bold, as in panel j. ``offsets`` are
+    ``boundary_offsets``; ``animal`` is the event table's column, matched on the
+    index.
     """
-    tails = boundary_offset_statistics(offsets)
-    bins = np.arange(-150, 151, 4)
     for ax, bound, label in ((ax_start, "start", "Start"), (ax_end, "end", "End")):
-        ax.hist(1000 * offsets[f"{bound}_offset_s"], bins=bins, color="#555555", lw=0)
-        ax.set_yscale("log")
-        ax.axvline(0, color="k", lw=0.5, ls=":")
-        ax.set_xlim(-150, 150)
-        ax.set_ylim(1, 2e6)
-        ax.set_yticks([1, 100, 10000], ["1", "$10^2$", "$10^4$"])
-        beyond = ", ".join(
-            f">{1000 * tail_s:g} ms "
-            f"{format_number(tails[f'{bound}_offset_beyond_{name}_fraction'], 'pctnum')}%"
-            for name, tail_s in OFFSET_TAILS_S.items()
+        offsets_ms = 1000 * offsets[f"{bound}_offset_s"]
+        curves = np.column_stack(
+            [
+                cumulative_percent(values.to_numpy(), OFFSET_GRID_MS)
+                for _, values in offsets_ms.groupby(animal)
+            ]
         )
+        ax.plot(OFFSET_GRID_MS, curves, color="k", lw=0.5, alpha=0.5)
+        ax.plot(OFFSET_GRID_MS, curves.mean(axis=1), color="k", lw=1.0)
+        ax.axvline(0, color="k", lw=0.5, ls=":")
+        ax.set_xlim(OFFSET_GRID_MS[0], OFFSET_GRID_MS[-1])
+        ax.set_ylim(0, 100)
+        ax.set_yticks([0, 50, 100])
         ax.text(
-            0.02, 0.97, f"{label}\n{beyond}", transform=ax.transAxes, va="top",
-            fontsize=SMALL_SIZE,
+            0.03, 0.95, label, transform=ax.transAxes, va="top", fontsize=SMALL_SIZE
         )  # fmt: skip
     ax_start.tick_params(labelbottom=False)
-    ax_end.set_xlabel("Event − SWR bound (ms)\n< 0: event first")
-    ax_start.set_ylabel("Event–SWR pairs")
+    ax_end.set_xlabel("Event − SWR bound (ms)")
+    ax_start.set_ylabel("Cumulative % of pairs")
     ax_start.yaxis.set_label_coords(-0.3, 0.0)
 
 
@@ -1261,10 +1272,10 @@ def generate_figure(
     ax_e = fig.add_subplot(detectors[0])
     ax_e2 = fig.add_subplot(detectors[1])
     draw_detector_overlap(ax_e, ax_e2, inputs["overlap"], inputs["with_nonlocal"])
-    offsets_grid = row3[3].subgridspec(2, 1, hspace=0.15)
+    offsets_grid = row3[3].subgridspec(2, 1, hspace=0.35)
     ax_f1 = fig.add_subplot(offsets_grid[0])
     ax_f2 = fig.add_subplot(offsets_grid[1], sharex=ax_f1)
-    draw_offsets(ax_f1, ax_f2, boundary_offsets(events))
+    draw_offsets(ax_f1, ax_f2, boundary_offsets(events), events["animal"])
     row4 = outer[3].subgridspec(1, 4, width_ratios=[1.05, 0.85, 1.0, 1.0], wspace=0.85)
     participation_grid = row4[0].subgridspec(2, 1, hspace=0.15)
     ax_g = fig.add_subplot(participation_grid[0])
