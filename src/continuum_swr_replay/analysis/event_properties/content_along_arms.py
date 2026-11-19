@@ -3,10 +3,11 @@
 An event's content at a time bin is its MAP position. On the track graph every
 arm runs from the first to the second node of its edge in the linearization
 order, which all epochs share: the three trunk arms from the center junction out
-to a patch junction, the six leaf arms from their patch junction to their well.
-A bin's place on its arm is the fraction of the arm behind it, so 1 on a leaf
-arm is the well, and arms of slightly different length in different animals line
-up when pooled.
+to a patch junction, the six leaf arms from their patch junction out to the well
+at their end. A well is a node of the graph, an arm's end point, not the arm. A
+bin's place on its arm is the fraction of the arm behind it, so 1 on a leaf arm
+is its end at the well, and arms of slightly different length in different
+animals line up when pooled.
 
 :func:`arm_positions` places bins on arms; :func:`content_density_along_arms`
 gives each kind's content time per cm along every arm, the animals' mean, and
@@ -15,38 +16,46 @@ gives each kind's content time per cm along every arm, the animals' mean, and
 
 from __future__ import annotations
 
+import networkx as nx
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.data_loaders.constants import LEAF_ARMS, WELL_ARMS
+from continuum_swr_replay.data_loaders.constants import LEAF_ARMS
 
 CENTER_NODE = 9
 """The track graph's center junction."""
 
 
-def check_arm_orientation(edge_order: list[tuple[int, int]]) -> None:
+def check_arm_orientation(
+    edge_order: list[tuple[int, int]], track_graph: nx.Graph
+) -> None:
     """Raise unless every arm runs outward: trunks from the center, leaf arms to
-    their well.
+    the well at their end.
+
+    The wells are the track graph's end points, its degree-1 nodes.
 
     Parameters
     ----------
     edge_order : list of (int, int)
         The linearization's edge order (``Environment.edge_order``), each edge as
         (first node, second node).
+    track_graph : nx.Graph
+        The track graph (``Environment.track_graph``).
 
     Raises
     ------
     ValueError
         If a trunk arm does not start at :data:`CENTER_NODE`, or a leaf arm does
-        not end at a well node (a well's node id is its arm's, ``WELL_ARMS``).
+        not end at a well node.
     """
+    wells = {node for node in track_graph.nodes if track_graph.degree(node) == 1}
     for first, second in edge_order:
         trunk = first == CENTER_NODE or second == CENTER_NODE
         if trunk and first != CENTER_NODE:
             raise ValueError(
                 f"trunk arm {(first, second)} does not start at the center"
             )
-        if not trunk and second not in WELL_ARMS:
+        if not trunk and second not in wells:
             raise ValueError(f"leaf arm {(first, second)} does not end at a well")
 
 

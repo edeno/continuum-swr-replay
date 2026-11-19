@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
@@ -46,12 +47,18 @@ def test_a_missing_position_is_refused(bin_nodes):
         arm_positions(np.array([1.0, np.nan]), bin_nodes)
 
 
-def test_arms_must_run_outward():
-    check_arm_orientation([(9, 6), (6, 0), (6, 1)])
+def test_arms_must_run_outward_to_the_graphs_end_points():
+    # Center 9, junction 6, wells 0 and 1: the wells are the degree-1 nodes.
+    graph = nx.Graph([(9, 6), (6, 0), (6, 1)])
+    check_arm_orientation([(9, 6), (6, 0), (6, 1)], graph)
     with pytest.raises(ValueError, match="trunk"):
-        check_arm_orientation([(6, 9), (6, 0)])
+        check_arm_orientation([(6, 9), (6, 0)], graph)
     with pytest.raises(ValueError, match="leaf"):
-        check_arm_orientation([(9, 6), (0, 6)])
+        check_arm_orientation([(9, 6), (0, 6)], graph)
+    # Node 0 is a well only because it is an end point: given another arm it is
+    # a junction, and an arm ending there does not end at a well.
+    with pytest.raises(ValueError, match="leaf"):
+        check_arm_orientation([(9, 6), (6, 0)], nx.Graph([(9, 6), (6, 0), (0, 2)]))
 
 
 def _bins(animal, is_swr, arm, fraction, length=10.0):

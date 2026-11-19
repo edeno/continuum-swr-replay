@@ -4,7 +4,7 @@ For every time bin of the canonical events (``event_sequence_table``), its
 epoch's decode MAP position (``map_estimate``, read through the SWR source; the
 decode's sha256 must be the one the event features run recorded) placed on the
 track by ``analysis/event_properties/content_along_arms.arm_positions``: its arm
-and the fraction of the arm behind it (1 on a leaf arm is the well).
+and the fraction of the arm behind it (1 on a leaf arm is its end at the well).
 
 One table per epoch, ``Processed-Data/content_along_arms/<epoch>.parquet``, and
 a ``manifest.json``.
@@ -60,7 +60,7 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
         paths.data_over_time, expected_sha256
     )
     env = pd.read_pickle(paths.environment)
-    check_arm_orientation([tuple(edge) for edge in env.edge_order])
+    check_arm_orientation([tuple(edge) for edge in env.edge_order], env.track_graph)
     rows = dot.index.get_indexer(bins["time"].to_numpy())
     if (rows < 0).any():
         raise ValueError(
@@ -141,7 +141,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "n_bins": len(bins),
                 "position": "the decode's map_estimate at each event bin, on its "
                 "nearest real place bin (edge_id >= 0); fraction 0 at the arm's first "
-                "node in the edge order, 1 at its second (a leaf arm's well)",
+                "node in the edge order, 1 at its second (a leaf arm's end, the well node)",
             },
             indent=1,
             final_newline=True,
