@@ -464,3 +464,37 @@ def test_events_overlapping_nonlocal_reads_the_other_direction():
     shares = comparison.events_overlapping_nonlocal(directional, ("kay",))
     assert shares.loc["kay", "pooled"] == pytest.approx(29 / 40)
     np.testing.assert_allclose(shares.loc["kay", "animals"], [0.8, 0.7])
+
+
+def test_content_classes_and_their_animal_shares():
+    from continuum_swr_replay.analysis.detector_comparison.nonlocal_comparison import (
+        content_class_animal_shares,
+        content_classes,
+    )
+
+    events = pd.DataFrame(
+        {
+            "detector": ["kay"] * 5 + ["yu"],
+            "animal": ["a", "a", "a", "b", "b", "a"],
+            "day": ["d1", "d1", "d2", "d1", "d1", "d1"],
+            "epoch": ["e1"] * 6,
+            "matched": [True, False, False, True, False, True],
+            LOCAL: [0.0, 0.9, 0.2, 0.0, np.nan, 0.0],
+            NO_SPIKE: [0.0, 0.1, 0.8, 0.0, np.nan, 0.0],
+            NON_LOCAL: [1.0, 0.0, 0.0, 1.0, np.nan, 1.0],
+            UNCERTAIN: [0.0, 0.0, 0.0, 0.0, np.nan, 0.0],
+        }
+    )
+    # an unmatched event without state shares is "other"
+    assert content_classes(events).tolist() == [
+        "with_nonlocal",
+        "mostly_local",
+        "other",
+        "with_nonlocal",
+        "other",
+        "with_nonlocal",
+    ]
+    shares = content_class_animal_shares(events, "kay")
+    # a: epoch (d1) 1/2 with, 1/2 mostly Local; epoch (d2) all other -> means
+    assert shares.loc["a"].tolist() == pytest.approx([0.25, 0.25, 0.5])
+    assert shares.loc["b"].tolist() == pytest.approx([0.5, 0.0, 0.5])

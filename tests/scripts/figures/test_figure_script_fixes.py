@@ -366,11 +366,13 @@ def test_figure02_refuses_an_event_table_that_is_not_the_frames(offline):
 
 
 def test_figure02_panel_c_prints_the_digits_of_the_events_summary(offline):
-    """The percents written on the donut are rounded by the summary's rule (a
-    half rounds away from zero: 12.5 % is 13), and the middle gives the count."""
+    """The percents beside the bars are rounded by the summary's rule (a half
+    rounds away from zero: 12.5 % is 13), the title gives the count and the time
+    outside SWRs, and each animal is one dot per bar."""
     import matplotlib.pyplot as plt
 
     from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        overlap_class_animal_shares,
         overlap_class_statistics,
     )
     from continuum_swr_replay.reported.events import event_cohort_values
@@ -378,14 +380,17 @@ def test_figure02_panel_c_prints_the_digits_of_the_events_summary(offline):
 
     figure02 = offline("scripts.figures.generate_figure02")
     events = _figure02_events()
+    animals = overlap_class_animal_shares(events)
     fig, ax = plt.subplots()
-    figure02.draw_events_donut(ax, overlap_class_statistics(events), 0.5)
+    figure02.draw_events_bars(ax, overlap_class_statistics(events), animals, 0.5)
     texts = [t.get_text() for t in ax.texts]
-    assert "Inside SWR 13%" in texts
-    assert "Partly in SWR 25%" in texts
-    assert "No SWR 63%" in texts
-    assert "5" in texts
-    assert any("50% of non-local time outside SWRs" in t for t in texts)
+    assert texts == ["13%", "25%", "63%"]
+    labels = [t.get_text() for t in ax.get_yticklabels()]
+    assert labels == ["No SWR", "Partly in SWR", "Inside SWR"]  # bottom to top
+    title = ax.get_title(loc="right")
+    assert "(n = 8)" in title
+    assert "50% of their time outside SWRs" in title
+    assert all(len(dots.get_offsets()) == len(animals) for dots in ax.collections)
     cohort = {v.key: v for v in event_cohort_values(events, "s")}
     assert formatted(cohort["non_swr_fraction"]) == "63 %"
     plt.close(fig)

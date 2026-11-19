@@ -221,6 +221,56 @@ def events_overlapping_nonlocal(
     return _matched_shares(rows, "source_detector", detectors)
 
 
+CONTENT_CLASSES = ("with_nonlocal", "mostly_local", "other")
+"""What a detector's event holds: it overlaps a non-local event; it does not and
+Local is above 0.8 in more than half its rows; or neither."""
+
+
+def content_classes(events: pd.DataFrame) -> pd.Series:
+    """Each compared event's :data:`CONTENT_CLASSES` class.
+
+    An event that overlaps no non-local event and has no state shares is
+    ``"other"``, as :func:`other_detector_statistics` counts it.
+    """
+    local = STATE_SHARE_COLUMNS[0]
+    mostly_local = ~events["matched"] & (events[local] > 0.5)
+    return pd.Series(
+        np.select(
+            [events["matched"].to_numpy(dtype=bool), mostly_local.to_numpy()],
+            ["with_nonlocal", "mostly_local"],
+            "other",
+        ),
+        index=events.index,
+    )
+
+
+def content_class_animal_shares(events: pd.DataFrame, detector: str) -> pd.DataFrame:
+    """Each animal's share of one detector's events in each content class.
+
+    An animal's share is the mean over its epochs of each epoch's share of the
+    detector's events (event -> epoch -> animal), as
+    :func:`other_detector_statistics` takes the animals' range.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_animals, 3)
+        Indexed by animal; one column per :data:`CONTENT_CLASSES`.
+    """
+    mine = events[events["detector"] == detector]
+    classes = content_classes(mine)
+    return pd.DataFrame(
+        {
+            name: animal_session_values(
+                (classes == name).astype(float),
+                mine["animal"],
+                mine[["day", "epoch"]],
+                "mean",
+            )
+            for name in CONTENT_CLASSES
+        }
+    )
+
+
 def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
     """For each other detector, how its events sit against the non-local events.
 
@@ -266,12 +316,7 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
         overlapping = mine[mine["matched"]].dropna(subset=list(STATE_SHARE_COLUMNS))
         mostly_local = alone[local] > 0.5
         mostly_no_spike = alone[no_spike] > 0.5
-        matched_by_animal = animal_session_values(
-            mine["matched"].astype(float),
-            mine["animal"],
-            mine[["day", "epoch"]],
-            "mean",
-        )
+        matched_by_animal = content_class_animal_shares(mine, detector)["with_nonlocal"]
         rows[detector] = {
             "n_events": len(mine),
             "no_nonlocal_fraction": (~mine["matched"]).sum() / len(mine),

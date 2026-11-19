@@ -10,11 +10,11 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     b — Six examples: a non-local event inside an SWR, one that starts before
         its SWR, one that ends after it, two with no SWR (a trajectory and a
         stationary event), and an SWR whose content is Local.
-    c — The non-local events by SWR overlap (donut), with the animals' range of
-        the no-SWR share and the share of non-local time outside SWRs.
-    d — The SWRs by content (donut): with a non-local event, mostly Local, or
-        other; below, each SWR's share of time decoded non-local (no "mostly"
-        rule).
+    c — The non-local events by SWR overlap (bars pooled over events, dots one
+        per animal), and the share of non-local time outside SWRs.
+    d — The SWRs by content (bars and animal dots as in c): with a non-local
+        event, mostly Local, or other; below, each SWR's share of time decoded
+        non-local (no "mostly" rule).
     e — For each SWR definition, MUA and the Widloski detector: the share of
         non-local events its events overlap, and the share of its own events
         that overlap a non-local event.
@@ -116,6 +116,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     OFFSET_TAILS_S,
     boundary_offset_statistics,
     boundary_offsets,
+    overlap_class_animal_shares,
     overlap_class_statistics,
     reference_medians,
 )
@@ -182,7 +183,8 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 # 8: each detector's share of its events overlapping a non-local event (h).
 # 9: theta and head speed around event starts, with each class's quartiles over
 #    events (i); each Kay SWR's share of time non-local (d).
-FIGURE02_CACHE_VERSION = 9
+# 10: each animal's share of Kay's SWRs in each content class (d).
+FIGURE02_CACHE_VERSION = 10
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -510,6 +512,9 @@ def detector_comparison() -> dict:
     left_out = nonlocal_comparison.left_out_statistics(run, comparison.inventory_dir)
     return {
         "kay": nonlocal_comparison.other_detector_statistics(others).loc["kay"],
+        "kay_content_animals": nonlocal_comparison.content_class_animal_shares(
+            others, "kay"
+        ),
         "overlap": nonlocal_comparison.nonlocal_events_overlapped(
             directional, tuple(DETECTOR_LABELS)
         ),
@@ -790,118 +795,85 @@ def draw_examples(
     return first[0]
 
 
-def draw_donut(
+def draw_class_bars(
     ax: Axes,
-    wedges: list[tuple[str, float, str, bool]],
-    centre: tuple[str, str],
+    rows: Sequence[tuple[str, float, pd.Series, str, bool]],
     title: str,
-    label_space: float = 2.2,
+    xlabel: str,
 ) -> None:
-    """A donut of (label, fraction, colour, highlighted) wedges.
+    """Classes as horizontal bars, top to bottom: the pooled share as a bar with
+    its percent in a column past the axis's 100, each animal's share as a dot.
 
-    The wedges with a label are listed, one line each, to the right of the
-    donut in their colours, the highlighted ones in bold; the others are faded. ``centre`` is
-    a number and its caption, written in the hole. ``label_space`` is the room
-    kept right of the donut for the labels, in donut radii: the labels' width
-    over the donut's sets the donut's size in its axes.
+    ``rows`` are (label, pooled share, the animals' shares, colour, bold label).
     """
-    patches, _ = ax.pie(
-        [w[1] for w in wedges],
-        colors=[w[2] for w in wedges],
-        startangle=90,
-        counterclock=False,
-        wedgeprops={"width": 0.28, "edgecolor": "white", "linewidth": 0.6},
-    )
-    k = 0
-    for patch, (label, _, color, highlighted) in zip(patches, wedges, strict=True):
-        if not highlighted:
-            patch.set_alpha(0.5)
-        if label:
-            ax.text(
-                1.2, 0.4 - 0.4 * k, label, ha="left", va="center",
-                fontsize=SMALL_SIZE, fontweight="bold" if highlighted else "normal",
-                color=readable_text_color(color),
-            )  # fmt: skip
-            k += 1
-    number, caption = centre
-    ax.text(
-        0,
-        0.17,
-        number,
-        ha="center",
-        va="center",
-        fontsize=SMALL_SIZE,
-        fontweight="bold",
-    )
-    ax.text(0, -0.19, caption, ha="center", va="center", fontsize=SMALL_SIZE)
-    ax.set_xlim(-1.05, 1.2 + label_space)
-    ax.set_ylim(-1.1, 1.1)
-    ax.set_aspect("equal")
-    # an equal-aspect box narrower than its slot is drawn at the slot's top
-    # left, under the panel letter, not centred in it
-    ax.set_anchor("NW")
-    ax.set_title(title, fontsize=SMALL_SIZE, pad=2, loc="left")
+    n_rows = len(rows)
+    for i, (_, pooled, animals, color, _) in enumerate(rows):
+        y = n_rows - 1 - i
+        ax.barh(y, 100 * pooled, color=color, height=0.65)
+        ax.scatter(
+            100 * animals.to_numpy(), y + np.linspace(-0.18, 0.18, len(animals)),
+            s=3, color="k", lw=0, zorder=3,
+        )  # fmt: skip
+        ax.text(
+            1.0, y, f"{format_number(pooled, 'pctnum')}%",
+            transform=ax.get_yaxis_transform(), ha="right", va="center",
+            fontsize=SMALL_SIZE, fontweight="bold" if rows[i][4] else "normal",
+        )  # fmt: skip
+    ax.set_yticks(range(n_rows), [label for label, *_ in rows][::-1])
+    for tick, (*_, bold) in zip(ax.get_yticklabels()[::-1], rows, strict=True):
+        tick.set_fontweight("bold" if bold else "normal")
+    ax.tick_params(axis="y", length=0)
+    ax.set_ylim(-0.6, n_rows - 0.4)
+    ax.set_xlim(0, 125)  # 100 to 125 holds the percents
+    ax.spines["bottom"].set_bounds(0, 100)
+    ax.set_xticks([0, 50, 100])
+    ax.set_xlabel(xlabel)
+    # right-aligned, so a title wider than the bars runs over the class labels
+    # rather than under the next panel's letter
+    ax.set_title(title, fontsize=SMALL_SIZE, pad=3, loc="right")
 
 
-def draw_events_donut(ax: Axes, classes: dict, time_outside_swr: float) -> None:
-    """Panel c: the non-local events by SWR overlap, and the time outside SWRs."""
-    wedges = [
+def draw_events_bars(
+    ax: Axes, classes: dict, animals: pd.DataFrame, time_outside_swr: float
+) -> None:
+    """Panel c: the non-local events by SWR overlap, and the time outside SWRs.
+
+    Bars pool the events (``overlap_class_statistics``); dots are the animals
+    (``overlap_class_animal_shares``).
+    """
+    rows = [
         (
-            f"{CLASS_LABELS[c]} {format_number(classes[f'{c}_fraction'], 'pctnum')}%",
+            CLASS_LABELS[c],
             classes[f"{c}_fraction"],
+            animals[c],
             CLASS_COLORS[c],
             c == "non_swr",
         )
         for c in CLASS_ORDER
     ]
-    draw_donut(
+    draw_class_bars(
         ax,
-        wedges,
-        (f"{classes['n_non_swr']:,}", "no SWR"),
-        f"Non-local events (n = {classes['n_events']:,})",
-        label_space=1.6,
+        rows,
+        f"Non-local events (n = {classes['n_events']:,})\n"
+        f"{format_number(time_outside_swr, 'pctnum')}% of their time outside SWRs",
+        "% events",
     )
-    low = format_number(classes["non_swr_fraction_animal_min"], "pctnum")
-    high = format_number(classes["non_swr_fraction_animal_max"], "pctnum")
-    ax.text(
-        -1.05, -1.2,
-        f"No SWR: {low}–{high}% across animals\n"
-        f"{format_number(time_outside_swr, 'pctnum')}% of non-local time outside SWRs",
-        ha="left", va="top", fontsize=SMALL_SIZE,
-    )  # fmt: skip
 
 
-def draw_swr_donut(ax: Axes, kay: pd.Series) -> None:
-    """Panel d: the SWRs by content."""
+def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
+    """Panel d: the SWRs by content.
+
+    Bars pool Kay's SWRs (``other_detector_statistics``); dots are the animals
+    (``content_class_animal_shares``).
+    """
     no_nonlocal = kay["no_nonlocal_fraction"]
     mostly_local = kay["mostly_local_fraction"]
-    wedges = [
-        (
-            f"With non-local {format_number(1 - no_nonlocal, 'pctnum')}%",
-            1 - no_nonlocal,
-            C_NL,
-            False,
-        ),
-        (
-            f"Mostly Local {format_number(mostly_local, 'pctnum')}%",
-            mostly_local,
-            C_LOCAL,
-            True,
-        ),
-        (
-            f"Other {format_number(no_nonlocal - mostly_local, 'pctnum')}%",
-            no_nonlocal - mostly_local,
-            C_NOSPIKE,
-            False,
-        ),
+    rows = [
+        ("With non-local", 1 - no_nonlocal, animals["with_nonlocal"], C_NL, False),
+        ("Mostly Local", mostly_local, animals["mostly_local"], C_LOCAL, True),
+        ("Other", no_nonlocal - mostly_local, animals["other"], C_NOSPIKE, False),
     ]
-    draw_donut(
-        ax,
-        wedges,
-        (f"{format_number(no_nonlocal, 'pctnum')}%", "no non-local"),
-        f"SWRs (n = {int(kay['n_events']):,})",
-        label_space=2.9,
-    )
+    draw_class_bars(ax, rows, f"SWRs (n = {int(kay['n_events']):,})", "% SWRs")
 
 
 REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
@@ -1055,7 +1027,7 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
 
 
 def draw_swr_share_histogram(ax: Axes, shares: np.ndarray) -> None:
-    """Panel d, below the donut: each Kay SWR's share of time non-local.
+    """Panel d, below the bars: each Kay SWR's share of time non-local.
 
     The bins with non-local probability above 0.8 as a share of the SWR's bins,
     pooled over the SWRs: no "mostly" rule.
@@ -1299,12 +1271,13 @@ def generate_figure(
     ax_b = draw_examples(fig, outer[1], inputs, windows, max_pos)
     row3 = outer[2].subgridspec(1, 4, width_ratios=[1.1, 1.3, 1.3, 1.05], wspace=0.7)
     ax_c = fig.add_subplot(row3[0])
-    draw_events_donut(ax_c, classes, inputs["time_outside_swr"])
-    swr_grid = row3[1].subgridspec(2, 1, height_ratios=[1.6, 1.0], hspace=0.55)
+    draw_events_bars(
+        ax_c, classes, overlap_class_animal_shares(events), inputs["time_outside_swr"]
+    )
+    swr_grid = row3[1].subgridspec(2, 1, height_ratios=[1.45, 1.0], hspace=1.0)
     ax_d = fig.add_subplot(swr_grid[0])
-    draw_swr_donut(ax_d, inputs["kay"])
-    histogram_slot = swr_grid[1].subgridspec(1, 2, width_ratios=[0.25, 1.0])
-    ax_d_shares = fig.add_subplot(histogram_slot[1])
+    draw_swr_bars(ax_d, inputs["kay"], inputs["kay_content_animals"])
+    ax_d_shares = fig.add_subplot(swr_grid[1])
     draw_swr_share_histogram(ax_d_shares, inputs["kay_nonlocal_share"])
     detectors = row3[2].subgridspec(1, 2, wspace=0.3)
     ax_e = fig.add_subplot(detectors[0])
@@ -1341,11 +1314,6 @@ def generate_figure(
         - 0.004
     )
     fit_track_to_height(fig, ax_a, x_left + 0.02)
-    # panel c has no axis labels to fill the left margin: start its donut where
-    # panel a's track drawing starts, just right of the letter column, and keep
-    # its right edge, so the donut takes the freed width
-    box = ax_c.get_position(original=True)  # the slot, not the drawn box
-    ax_c.set_position([x_left + 0.02, box.y0, box.x1 - x_left - 0.02, box.height])
     fig.canvas.draw()
     positions = place_letters(
         fig,

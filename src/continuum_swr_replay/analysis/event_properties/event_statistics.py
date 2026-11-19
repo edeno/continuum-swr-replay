@@ -88,6 +88,41 @@ def compute_swr_overlap_class_counts(
     }
 
 
+OVERLAP_CLASSES = ("swr_contained", "swr_partial", "non_swr")
+"""The SWR-overlap classes, inside an SWR first."""
+
+
+def overlap_class_animal_shares(events: pd.DataFrame) -> pd.DataFrame:
+    """Each animal's share of its events in each SWR-overlap class.
+
+    An animal's share of a class is the mean over its epochs of each epoch's
+    share of its events (event -> epoch -> animal); an epoch with no event of a
+    class has a share of 0 in it.
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        The canonical event table: ``overlap_class``, ``animal`` and the session
+        columns.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_animals, 3)
+        Indexed by animal; one column per :data:`OVERLAP_CLASSES`.
+    """
+    return pd.DataFrame(
+        {
+            overlap_class: animal_session_values(
+                (events["overlap_class"] == overlap_class).astype(float),
+                events["animal"],
+                events[_WITHIN_ANIMAL],
+                "mean",
+            )
+            for overlap_class in OVERLAP_CLASSES
+        }
+    )
+
+
 def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
     """How the immobile non-local events divide among the SWR-overlap classes.
 
@@ -136,17 +171,7 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
             f"{counts['total'] - n_classed} events have an overlap_class that is "
             "none of non_swr, swr_contained and swr_partial"
         )
-    shares = pd.DataFrame(
-        {
-            overlap_class: animal_session_values(
-                (events["overlap_class"] == overlap_class).astype(float),
-                events["animal"],
-                events[_WITHIN_ANIMAL],
-                "mean",
-            )
-            for overlap_class in ("non_swr", "swr_contained", "swr_partial")
-        }
-    )
+    shares = overlap_class_animal_shares(events)
     non_swr = shares["non_swr"]
     return {
         "n_events": counts["total"],
