@@ -345,7 +345,7 @@ FIGURE02_FRAME_COUNTS = {"swr": 3, "non_swr": 5, "total": 8}
 
 
 def test_figure02_refuses_an_event_table_that_is_not_the_frames(offline):
-    """Panel c's counts come from the event table the summary cites, and the
+    """Panel d's counts come from the event table the summary cites, and the
     figure is refused when that table's event counts by SWR overlap are not the
     decode frames', or the table holds an event that is not immobile."""
     from continuum_swr_replay.analysis.event_properties.event_statistics import (
@@ -365,7 +365,7 @@ def test_figure02_refuses_an_event_table_that_is_not_the_frames(offline):
         overlap_class_statistics(moving)
 
 
-def test_figure02_panel_c_prints_the_digits_of_the_events_summary(offline):
+def test_figure02_panel_d_prints_the_digits_of_the_events_summary(offline):
     """The percents beside the bars are rounded by the summary's rule (a half
     rounds away from zero: 12.5 % is 13), the title gives the count and the time
     outside SWRs, and each animal is one dot per bar."""

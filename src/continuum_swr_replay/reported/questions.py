@@ -232,13 +232,13 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2b.2",
         "How many immobile non-local events overlap no SWR, and what fraction of them is that?",
-        figures=("2", "2c"),
+        figures=("2", "2d"),
         note="The retired claims table (in git history) read these as the events SWR-triggered detection misses; that reading belongs in the Results.",
     ),
     Question(
         "2b.3",
         "How do SWR detection and non-local detection overlap: for each other detector, what share of its events overlaps no non-local event, how do those divide by decoder state, and, for the ones that do overlap, what share of their time bins does each state take?",
-        figures=("2", "2d", "2e"),
+        figures=("2", "2c", "2e"),
     ),
     Question(
         "2b.4",

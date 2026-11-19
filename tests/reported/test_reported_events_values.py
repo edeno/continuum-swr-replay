@@ -240,7 +240,7 @@ def test_other_detector_values_name_each_detector_and_each_state():
     assert values["kay_events"].figures == ("2",)
     assert values["yu_events"].figures == ()
     # the main detector's mostly-Local share is Figure 2d's
-    assert values["kay_mostly_local_fraction"].figures == ("2d",)
+    assert values["kay_mostly_local_fraction"].figures == ("2c",)
 
 
 def test_left_out_values_name_each_covering_and_each_rate(tmp_path):

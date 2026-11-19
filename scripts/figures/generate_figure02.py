@@ -10,15 +10,17 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     b — Six examples: a non-local event inside an SWR, one that starts before
         its SWR, one that ends after it, two with no SWR (a trajectory and a
         stationary event), and an SWR whose content is Local.
-    c — The non-local events by SWR overlap (bars pooled over events, dots one
-        per animal), and the share of non-local time outside SWRs.
-    d — The SWRs by content (bars and animal dots as in c): with a non-local
-        event, mostly Local, or other.
-    e — For each SWR definition, MUA and the Widloski detector: the share of
-        non-local events its events overlap, and the share of its own events
-        that overlap a non-local event.
-    f — Each SWR-overlapping event's start and end minus its SWR's, as the
-        cumulative percent of event-SWR pairs, one line per animal.
+    c — The SWRs by content (bars pooled over SWRs, dots one per animal): with a
+        non-local event, mostly Local, or other. The decoder finds the replay
+        SWRs are known for.
+    d — The non-local events by SWR overlap (bars and animal dots as in c), and
+        the share of non-local time outside SWRs: most events have no SWR.
+    e — For each SWR definition, MUA and the Widloski detector, c's and d's
+        questions: the share of its own events that overlap a non-local event,
+        and the share of non-local events its events overlap.
+    f — Each SWR-overlapping event's start and end minus its SWR's: the percent
+        of event-SWR pairs per 5 ms on a log axis, bars the animals' mean and
+        outlines the animals.
     g — Tetrode participation (share of tetrodes with a spike) and spike rate of
         each non-local event against a Local-rest window of its length, one line
         per animal, for no-SWR and SWR events
@@ -38,10 +40,10 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     j — The share of rest time bins decoded non-local by ripple power, one line
         per animal: no step at the SWR threshold.
 
-Panels c and f are drawn from the canonical event table by the functions the
+Panels d and f are drawn from the canonical event table by the functions the
 events summary uses (``event_statistics.overlap_class_statistics``,
-``boundary_offsets``); d from ``nonlocal_comparison.other_detector_statistics``
-on the event features run the summary reads, and c's time share from
+``boundary_offsets``); c from ``nonlocal_comparison.other_detector_statistics``
+on the event features run the summary reads, and d's time share from
 ``left_out_statistics``; i's rest and running lines from ``event_statistics.reference_medians``
 of the brain-state reference. Panels i and j are per-time-bin signals no stored
 output holds, computed from the aggregated decode frames (cached), whose event
@@ -71,6 +73,7 @@ from matplotlib.axes import Axes
 from matplotlib.backend_bases import RendererBase
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec, SubplotSpec
+from matplotlib.ticker import NullLocator
 from matplotlib.transforms import Bbox
 from non_local_detector.environment import Environment
 
@@ -498,11 +501,11 @@ def detector_comparison() -> dict:
     -------
     dict
         ``kay``: :func:`nonlocal_comparison.other_detector_statistics`'s row of
-        Kay's SWRs (d); ``overlap``: the share of non-local events each of
+        Kay's SWRs (c); ``overlap``: the share of non-local events each of
         :data:`DETECTOR_LABELS` overlaps and ``with_nonlocal``, the share of
         each one's events that overlap a non-local event (e); and, from
         ``left_out_statistics``, ``time_outside_swr``, the share of non-local
-        time outside Kay's SWRs (c).
+        time outside Kay's SWRs (d).
     """
     run = event_features_root() / EVENT_FEATURES_RUN
     comparison = nonlocal_comparison.read_comparison(run)
@@ -831,7 +834,7 @@ def draw_class_bars(
 def draw_events_bars(
     ax: Axes, classes: dict, animals: pd.DataFrame, time_outside_swr: float
 ) -> None:
-    """Panel c: the non-local events by SWR overlap, and the time outside SWRs.
+    """Panel d: the non-local events by SWR overlap, and the time outside SWRs.
 
     Bars pool the events (``overlap_class_statistics``); dots are the animals
     (``overlap_class_animal_shares``).
@@ -856,7 +859,7 @@ def draw_events_bars(
 
 
 def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
-    """Panel d: the SWRs by content.
+    """Panel c: the SWRs by content.
 
     Bars pool Kay's SWRs (``other_detector_statistics``); dots are the animals
     (``content_class_animal_shares``).
@@ -1050,26 +1053,27 @@ def draw_detector_bars(
 
 
 def draw_detector_overlap(
-    ax_caught: Axes,
     ax_content: Axes,
+    ax_caught: Axes,
     overlap: pd.DataFrame,
     with_nonlocal: pd.DataFrame,
 ) -> None:
-    """Panel e: what each detector catches, and what its events contain.
+    """Panel e: what each detector's events contain, and what it catches.
 
     Bars pool all events; dots are animals (for the caption).
 
-    Left, the share of non-local events each detector's events overlap; right,
-    the share of its own events that overlap a non-local event.
+    Left, panel c's question for every detector: the share of its own events
+    that overlap a non-local event; right, panel d's: the share of non-local
+    events its events overlap. Both tables list the detectors in one order.
     """
     n_rows = len(overlap)
-    draw_detector_bars(ax_caught, overlap, n_rows, "% events", True)
-    ax_caught.set_title("Non-local\nevents found", fontsize=SMALL_SIZE, pad=3)
-    draw_detector_bars(ax_content, with_nonlocal, n_rows, "% events", False)
+    draw_detector_bars(ax_content, with_nonlocal, n_rows, "% events", True)
     ax_content.set_title(
         "Detections with\nnon-local activity", fontsize=SMALL_SIZE, pad=3
     )
-    ax_content.spines["left"].set_visible(False)
+    draw_detector_bars(ax_caught, overlap, n_rows, "% events", False)
+    ax_caught.set_title("Non-local\nevents found", fontsize=SMALL_SIZE, pad=3)
+    ax_caught.spines["left"].set_visible(False)
 
 
 def draw_share_by_power(ax: Axes, shares: pd.DataFrame) -> None:
@@ -1092,46 +1096,44 @@ def draw_share_by_power(ax: Axes, shares: pd.DataFrame) -> None:
     ax.set_ylabel("Share of rest bins\nnon-local")
 
 
-OFFSET_GRID_MS = np.arange(-100, 101)
-"""Panel f's offsets, ms: event bound minus SWR bound."""
-
-
-def cumulative_percent(values: np.ndarray, grid: np.ndarray) -> np.ndarray:
-    """The percent of ``values`` at or below each point of ``grid``."""
-    ordered = np.sort(values)
-    return 100 * np.searchsorted(ordered, grid, side="right") / len(ordered)
+OFFSET_BINS_MS = np.arange(-100, 101, 5)
+"""Panel f's bins, ms: event bound minus SWR bound."""
 
 
 def draw_offsets(
     ax_start: Axes, ax_end: Axes, offsets: pd.DataFrame, animal: pd.Series
 ) -> None:
-    """Panel f: the cumulative percent of event-SWR pairs by event minus SWR
-    start (top) and end (bottom).
+    """Panel f: event minus SWR start (top) and end (bottom), as the percent of
+    event-SWR pairs in each 5 ms bin on a log axis.
 
-    One thin line per animal, their mean in bold, as in panel j. ``offsets`` are
+    Bars are the animals' mean, outlines the animals. ``offsets`` are
     ``boundary_offsets``; ``animal`` is the event table's column, matched on the
-    index.
+    index. An animal's percent counts all its pairs, those beyond the bins too.
     """
+    width = np.diff(OFFSET_BINS_MS)[0]
+    centres = OFFSET_BINS_MS[:-1] + width / 2
     for ax, bound, label in ((ax_start, "start", "Start"), (ax_end, "end", "End")):
         offsets_ms = 1000 * offsets[f"{bound}_offset_s"]
-        curves = np.column_stack(
+        shares = np.column_stack(
             [
-                cumulative_percent(values.to_numpy(), OFFSET_GRID_MS)
+                100 * np.histogram(values, OFFSET_BINS_MS)[0] / len(values)
                 for _, values in offsets_ms.groupby(animal)
             ]
         )
-        ax.plot(OFFSET_GRID_MS, curves, color="k", lw=0.5, alpha=0.5)
-        ax.plot(OFFSET_GRID_MS, curves.mean(axis=1), color="k", lw=1.0)
+        ax.bar(centres, shares.mean(axis=1), width=width, color="#bbbbbb", lw=0)
+        ax.step(centres, shares, where="mid", color="k", lw=0.5, alpha=0.35)
         ax.axvline(0, color="k", lw=0.5, ls=":")
-        ax.set_xlim(OFFSET_GRID_MS[0], OFFSET_GRID_MS[-1])
-        ax.set_ylim(0, 100)
-        ax.set_yticks([0, 50, 100])
+        ax.set_xlim(OFFSET_BINS_MS[0], OFFSET_BINS_MS[-1])
+        ax.set_yscale("log")
+        ax.set_ylim(0.03, 60)
+        ax.set_yticks([0.1, 1, 10], ["0.1", "1", "10"])
+        ax.yaxis.set_minor_locator(NullLocator())
         ax.text(
             0.03, 0.95, label, transform=ax.transAxes, va="top", fontsize=SMALL_SIZE
         )  # fmt: skip
     ax_start.tick_params(labelbottom=False)
     ax_end.set_xlabel("Event − SWR bound (ms)")
-    ax_start.set_ylabel("Cumulative % of pairs")
+    ax_start.set_ylabel("% of pairs per 5 ms")
     ax_start.yaxis.set_label_coords(-0.3, 0.0)
 
 
@@ -1263,11 +1265,11 @@ def generate_figure(
     ax_b = draw_examples(fig, outer[1], inputs, windows, max_pos)
     row3 = outer[2].subgridspec(1, 4, width_ratios=[1.1, 1.1, 1.4, 1.15], wspace=0.7)
     ax_c = fig.add_subplot(row3[0])
-    draw_events_bars(
-        ax_c, classes, overlap_class_animal_shares(events), inputs["time_outside_swr"]
-    )
+    draw_swr_bars(ax_c, inputs["kay"], inputs["kay_content_animals"])
     ax_d = fig.add_subplot(row3[1])
-    draw_swr_bars(ax_d, inputs["kay"], inputs["kay_content_animals"])
+    draw_events_bars(
+        ax_d, classes, overlap_class_animal_shares(events), inputs["time_outside_swr"]
+    )
     detectors = row3[2].subgridspec(1, 2, wspace=0.3)
     ax_e = fig.add_subplot(detectors[0])
     ax_e2 = fig.add_subplot(detectors[1])
