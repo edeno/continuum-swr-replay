@@ -144,23 +144,23 @@ TAGS = {
     "other_detectors": Tags(("2b.3",)),
     "swr_content": Tags(("2b.3",), ("2d",)),
     "boundaries": Tags(("2b.4",), ("2f",)),
-    "ripple": Tags(("2d.8", "2b.5"), ("2j",)),
-    "mua": Tags(("2d.8",), ("2j",)),
-    "theta": Tags(("2d.8",), ("3h",)),
-    "gamma_z": Tags(("2d.8",), ("3h",)),
+    "ripple": Tags(("2d.8", "2b.5"), ("2i",)),
+    "mua": Tags(("2d.8",), ("2i",)),
+    "theta": Tags(("2d.8",), ("2i",)),
+    "gamma_z": Tags(("2d.8",), ("3i",)),
     "brain_state": Tags(("2d.8",)),
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
     "participation": Tags(("2d.9",), ("2g",)),
-    "state_composition": Tags(("2d.10",), ("2h",)),
+    "state_composition": Tags(("2d.10",), ("3e",)),
     "likelihood_advantage": Tags(("2c.3",)),
-    "tetrode_holdout": Tags(("2c.3",), ("2i",)),
+    "tetrode_holdout": Tags(("2c.3",), ("2h",)),
     "spike": Tags(("2d.9", "2c.3"), ("2",)),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
     "spike_gpi": Tags(("2c.4",)),
-    "content_occupancy": Tags(("2d.1",), ("3g",)),
+    "content_occupancy": Tags(("2d.1",), ("3h",)),
     "duration": Tags(("2d.6",), ("3a",)),
     "extent": Tags(("2d.3",), ("3b", "3d")),
     "speed": Tags(("2d.2",), ("3c",)),
@@ -1192,7 +1192,7 @@ _RUN_GROUPS = {"non_swr": SWR_LABELS[False], "swr": SWR_LABELS[True]}
 
 def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.10: the mean share of an SWR or no-SWR event in Continuous and in
-    Fragmented (Figure 2h)."""
+    Fragmented (Figure 3e)."""
     make = value_factory(state_composition_values, source, TAGS["state_composition"])
     statistics = event_statistics.state_composition_statistics(events)
     values = []
@@ -1306,7 +1306,7 @@ def _per_spike_interval(
 
 def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the spike likelihood at the decoded positions minus at the
-    animal's, per spike, over each whole event (in sample; Figure 2i shows the
+    animal's, per spike, over each whole event (in sample; Figure 2h shows the
     held-out score)."""
     make = value_factory(
         likelihood_advantage_values, source, TAGS["likelihood_advantage"]
@@ -1345,7 +1345,7 @@ def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]
 
 def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode gain over local coding, per spike, of
-    the events and their Local-rest controls (Figure 2i)."""
+    the events and their Local-rest controls (Figure 2h)."""
     make = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
     values = []
     estimates = (

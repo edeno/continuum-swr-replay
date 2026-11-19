@@ -896,6 +896,7 @@ def draw_swr_donut(ax: Axes, kay: pd.Series) -> None:
         wedges,
         (f"{format_number(no_nonlocal, 'pctnum')}%", "no non-local"),
         f"SWRs (n = {int(kay['n_events']):,})",
+        label_space=2.9,
     )
 
 
@@ -989,9 +990,9 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     """
     ax_rip, ax_mua, ax_theta, ax_speed = axes
     groups = (("overlap", C_SWR, "SWR"), ("no_overlap", C_NL, "No SWR"))
-    for ax, signal, label, word in (
-        (ax_rip, "SWR_zscore", "Ripple (z)", "ripple"),
-        (ax_mua, "MUA_zscore", "MUA (z)", "mua"),
+    for ax, signal, word in (
+        (ax_rip, "SWR_zscore", "ripple"),
+        (ax_mua, "MUA_zscore", "mua"),
     ):
         curve = curves[signal]
         t_ms = 1000 * np.asarray(curve["time"])
@@ -1003,11 +1004,11 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
             ax.fill_between(t_ms, mean - sem, mean + sem, color=color, alpha=0.3, lw=0)
             ax.plot(t_ms, mean, color=color, lw=1.0, label=name)
         ax.axhline(rest.loc[word, "rest"], color=C_NOSPIKE, lw=0.6, ls="--")
-        ax.set_ylabel(label)
-        ax.set_ylim(rest.loc[word, "rest"] - 0.3, None)
-    for ax, signal, label in (
-        (ax_theta, "theta_power_zscore", "Theta (z)"),
-        (ax_speed, "head_speed", "Speed\n(cm/s)"),
+        top = max(np.nanmax(curve[f"{key}_mean"]) for key, _, _ in groups)
+        ax.set_ylim(rest.loc[word, "rest"] - 0.3, top + 1.2)
+    for ax, signal in (
+        (ax_theta, "theta_power_zscore"),
+        (ax_speed, "head_speed"),
     ):
         curve = curves[signal]
         t_ms = 1000 * np.asarray(curve["time"])
@@ -1017,26 +1018,34 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
                 alpha=0.25, lw=0,
             )  # fmt: skip
             ax.plot(t_ms, curve[f"{key}_median"], color=color, lw=1.0)
-        ax.set_ylabel(label)
     ax_theta.axhline(rest.loc["theta", "rest"], color=C_NOSPIKE, lw=0.6, ls="--")
     ax_theta.axhline(rest.loc["theta", "running"], color="k", lw=0.6, ls="--")
     ax_theta.text(
-        t_ms[-1], rest.loc["theta", "running"], "running", ha="right", va="bottom",
-        fontsize=SMALL_SIZE,
+        t_ms[-1] - 5, rest.loc["theta", "running"], "running", ha="right",
+        va="bottom", fontsize=SMALL_SIZE,
     )  # fmt: skip
+    ax_theta.set_ylim(None, rest.loc["theta", "running"] + 1.3)
     ax_speed.axhline(DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, color="k", lw=0.6, ls=":")
-    ax_speed.set_ylim(0, 1.25 * DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC)
-    for ax in axes:
+    ax_speed.set_ylim(0, 1.6 * DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC)
+    ax_speed.set_yticks([0, DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC])
+    for ax, label in zip(
+        axes, ("Ripple (z)", "MUA (z)", "Theta (z)", "Speed (cm/s)"), strict=True
+    ):
         ax.axvline(0, color="k", lw=0.5, ls=":")
         ax.set_xlim(t_ms[0], t_ms[-1])
+        ax.text(
+            0.03, 1.0, label, transform=ax.transAxes, ha="left", va="top",
+            fontsize=SMALL_SIZE,
+        )  # fmt: skip
     for ax in axes[:-1]:
         ax.tick_params(labelbottom=False)
     handles, labels = ax_rip.get_legend_handles_labels()
     handles.append(plt.Line2D([], [], color=C_NOSPIKE, ls="--", lw=0.6))
     labels.append("rest")
     ax_rip.legend(
-        handles, labels, frameon=False, loc="upper left", handlelength=0.8,
-        borderaxespad=0.1, labelspacing=0.2,
+        handles, labels, frameon=False, loc="lower center", ncol=3,
+        bbox_to_anchor=(0.5, 1.0), handlelength=0.8, columnspacing=0.8,
+        borderaxespad=0.1,
     )  # fmt: skip
     ax_speed.set_xlabel("Time from event start (ms)")
 
@@ -1235,7 +1244,7 @@ def generate_figure(
 
     reference = reference_medians(
         pd.read_parquet(data_dir / BRAIN_STATE_REFERENCE_DIR / "reference.parquet"),
-        ["ripple", "mua"],
+        ["ripple", "mua", "theta"],
     )
     # every analysed epoch with an event: an epoch with none has no table
     event_epochs = event_table_epochs(events, analysed_epoch_ids())
@@ -1260,7 +1269,7 @@ def generate_figure(
         4,
         1,
         figure=fig,
-        height_ratios=[2.2, 1.95, 1.1, 1.2],
+        height_ratios=[1.95, 1.75, 1.35, 1.55],
         hspace=0.55,
         left=0.1,
         right=0.99,
@@ -1270,13 +1279,16 @@ def generate_figure(
     max_pos = float(np.ceil(inputs["data"]["position_info"].linear_position.max()))
     ax_a, ax_a_top = draw_overview(fig, outer[0], inputs, session_events, max_pos)
     ax_b = draw_examples(fig, outer[1], inputs, windows, max_pos)
-    row3 = outer[2].subgridspec(1, 4, width_ratios=[1.1, 1.3, 1.3, 1.05], wspace=0.5)
+    row3 = outer[2].subgridspec(1, 4, width_ratios=[1.1, 1.3, 1.3, 1.05], wspace=0.7)
     ax_c = fig.add_subplot(row3[0])
     draw_events_donut(ax_c, classes, inputs["time_outside_swr"])
     swr_grid = row3[1].subgridspec(2, 1, height_ratios=[1.6, 1.0], hspace=0.55)
     ax_d = fig.add_subplot(swr_grid[0])
     draw_swr_donut(ax_d, inputs["kay"])
-    draw_swr_share_histogram(fig.add_subplot(swr_grid[1]), inputs["kay_nonlocal_share"])
+    histogram_slot = swr_grid[1].subgridspec(1, 2, width_ratios=[0.25, 1.0])
+    draw_swr_share_histogram(
+        fig.add_subplot(histogram_slot[1]), inputs["kay_nonlocal_share"]
+    )
     detectors = row3[2].subgridspec(1, 2, wspace=0.3)
     ax_e = fig.add_subplot(detectors[0])
     ax_e2 = fig.add_subplot(detectors[1])
