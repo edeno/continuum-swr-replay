@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
 | `detection.json` | `3455b5a13f61` | yes | 172 | 0 |
-| `events.json` | `b30594aad96b` | yes | 394 | 0 |
+| `events.json` | `6c788c024944` | yes | 394 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
 
@@ -682,19 +682,19 @@ Status: partly computed; the own-well share waits for the wider-Local-kernel re-
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/content_occupancy/content_occupancy_per_session.csv
+- /cumulus/edeno/continuum-swr-replay/Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)
 - /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
 - /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's sessions of the session's share | `events.content_occupancy_values` | 3g |
-| `\EventsNonSwrContentAtWellFraction` | 58 % |  | share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
-| `\EventsNonSwrContentNearOffFraction` | 1 % |  | share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
-| `\EventsNonSwrContentOwnWellFraction` | 13 % |  | share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
-| `\EventsNonSwrContentRemotePathFraction` | 41 % |  | share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
-| `\EventsNonSwrContentRemoteWellFraction` | 45 % |  | share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
-| `\EventsOccupancyEpochs` | 242 |  | epochs in the content-occupancy table | `events.content_occupancy_values` | 3g |
+| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's epochs | `events.content_occupancy_values` | 3g |
+| `\EventsNonSwrContentAtWellFraction` | 51 % |  | share of non-SWR non-local content time at well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3g |
+| `\EventsNonSwrContentNearOffFraction` | 1 % |  | share of non-SWR non-local content time near off (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3g |
+| `\EventsNonSwrContentOwnWellFraction` | 11 % |  | share of non-SWR non-local content time own well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3g |
+| `\EventsNonSwrContentRemotePathFraction` | 48 % |  | share of non-SWR non-local content time remote path (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3g |
+| `\EventsNonSwrContentRemoteWellFraction` | 40 % |  | share of non-SWR non-local content time remote well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3g |
+| `\EventsOccupancyEpochs` | 242 |  | epochs whose event time bins place content on the track | `events.content_occupancy_values` | 3g |
 | `\EventsStartDistanceAnimalsInDirection` | 3 |  | animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.start_distance_values` |  |
 | `\EventsStartDistanceDifferenceHigh` | +28 | cm | upper bound of that interval | `events.property_interval_values` |  |
 | `\EventsStartDistanceDifferenceLow` | −15 | cm | lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) | `events.property_interval_values` |  |
@@ -703,11 +703,11 @@ Sources:
 | `\EventsStartDistanceMatchedDifferenceLow` | −39 | cm | lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` |  |
 | `\EventsStartDistanceMedianNonSwr` | 110 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile non-SWR non-local events | `events.start_distance_values` |  |
 | `\EventsStartDistanceMedianSwr` | 120 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile SWR-overlapping non-local events | `events.start_distance_values` |  |
-| `\EventsSwrContentAtWellFraction` | 26 % |  | share of SWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
-| `\EventsSwrContentNearOffFraction` | 0 % |  | share of SWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
-| `\EventsSwrContentOwnWellFraction` | 5 % |  | share of SWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
-| `\EventsSwrContentRemotePathFraction` | 73 % |  | share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
-| `\EventsSwrContentRemoteWellFraction` | 21 % |  | share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions | `events.content_occupancy_values` | 3g |
+| `\EventsSwrContentAtWellFraction` | 23 % |  | share of SWR non-local content time at well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3g |
+| `\EventsSwrContentNearOffFraction` | 0 % |  | share of SWR non-local content time near off (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3g |
+| `\EventsSwrContentOwnWellFraction` | 4 % |  | share of SWR non-local content time own well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3g |
+| `\EventsSwrContentRemotePathFraction` | 77 % |  | share of SWR non-local content time remote path (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3g |
+| `\EventsSwrContentRemoteWellFraction` | 19 % |  | share of SWR non-local content time remote well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3g |
 
 ### 2d.2. How does replay speed differ between SWR and non-SWR events?
 
@@ -2937,7 +2937,7 @@ without being called, is not listed.
 | `events.class_distribution_values` | `reported/events.py` | `analysis.event_properties.event_statistics.peak_ripple_mode_statistics` |  |
 | `events.class_step_evidence_values` | `reported/events.py` | `analysis.event_properties.event_statistics.threshold_step_statistics` |  |
 | `events.class_step_values` | `reported/events.py` | `analysis.event_properties.event_statistics.most_steps`, `analysis.event_properties.event_statistics.threshold_step_statistics` |  |
-| `events.content_occupancy_values` | `reported/events.py` | `analysis.event_properties.event_statistics.content_occupancy_shares`, `analysis.event_properties.event_statistics.n_animals_non_swr_more_at_well` |  |
+| `events.content_occupancy_values` | `reported/events.py` | `analysis.event_properties.content_along_arms.content_place_shares`, `analysis.event_properties.content_along_arms.place_share_statistics` |  |
 | `events.decoding_error_values` | `reported/events.py` | `analysis.decode_quality.quality_metrics.local_decoding_error_statistics` |  |
 | `events.event_cohort_values` | `reported/events.py` | `analysis.event_properties.event_statistics.overlap_class_statistics` |  |
 | `events.gamma_db_values` | `reported/events.py` | `analysis.event_properties.event_statistics.power_change_statistics` |  |
