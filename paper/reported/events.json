@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "9c806c5fbc2c",
+ "commit": "5a63b6cee911",
  "code": {
-  "head": "9c806c5fbc2c620034dccc34a34358d21911a506",
+  "head": "5a63b6cee911adb8fba2cbf67f4dba9f34a6ae12",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -123,8 +123,8 @@
     "code_sha256": "c2ae19e1ac232cbae8972e3d53aed273daf662ad2099637e447a804161991a40"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/nonlocal_comparison.py": {
-    "sha256": "8dfbbd7db2d9d994a317a93d4a60b36cab30ef63971009bf597fd3e90d256e71",
-    "code_sha256": "87c96af0df012af3eada5eafcd7648ecae7aeb912b509e1bed45f64ce77e3f84"
+    "sha256": "ed6156e077fa5e0dc4763f754a5e42dbf5853fa9cf0995ae46ce61be16a7387f",
+    "code_sha256": "9607314190da69466e4d92d21c4a096259cd7d26968c2b4881a94292e11fa690"
    },
    "src/continuum_swr_replay/analysis/detector_comparison/overlap.py": {
     "sha256": "a0eeab4df008e1021e79a025ad27f3c8c3d91844ec59d1c69f568f1922afb39f",
@@ -219,8 +219,8 @@
     "code_sha256": "dfab1f934e1a1c9251efdc12440d04da7d756c7edd42c99210531dfe5870839b"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/__init__.py": {
-    "sha256": "f55c4d4006da0ab9a739363208c2f12977db4466817b5e98e1b710fd84ab2b91",
-    "code_sha256": "510c06e8a3e599b9c1d5f1a2a3f934594e43a8dcfba48325e50bbda6f972e987"
+    "sha256": "1f41e3a3f741e1bc42e0aee890504c011f614225fd0a6b5c546327bd0a2ba11f",
+    "code_sha256": "4b78e6269ff2f3785d9c903d0694f94d120f2aaaf4eab4e01c467942cc94223a"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/evidence.py": {
     "sha256": "48f8bc2ebe4730d220df02fbb87b243a69615a33b5d894bfd98e75c4d5b22297",
@@ -239,8 +239,8 @@
     "code_sha256": "69932ba8094916609194c2559ee5b32ae18939096f61cf3854dadfb39ba45a06"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/windows.py": {
-    "sha256": "7f80d466fa812f0863f12c2cb3a946cec8de9e0badfe2c1713ae0214cdfeb863",
-    "code_sha256": "588d2cca834dc7beb0b569a6e1fc53472e37ffb89f704ebbeb59eeb600d9cae4"
+    "sha256": "bc3a7f5a410f7f72ba3b94c0c11a9fda3e60bf7de0c00d7e4c647ba9b8a85611",
+    "code_sha256": "0acf0da12c93c9bd46188f1d73e69a42a7f36d6620ea10e9eca2039fd1feb0ff"
    },
    "src/continuum_swr_replay/analysis/event_evidence/tetrode_holdout.py": {
     "sha256": "0024fc81711f8ba3c83a1c4d925bb643c8f8efe6af9b1be0c58945f83b4bd44b",
@@ -323,16 +323,16 @@
     "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "b1427e5f23561c912261f7904d5b4c30dcd8fb52843f795087b014f6df028e8e",
-    "code_sha256": "bcb94fc861bcf6eb7658f4018308485ccfdc41158b33215d1b0fbe81d8b92e51"
+    "sha256": "b1cacab0c325a1816e2e1bab4b6c98c2dcb88aee0f4612dde73f5609ebe96a10",
+    "code_sha256": "5daba7c9e2095b42449d8435f1c49a4da4646c8bc4085f7dcd42cbeeeec5b106"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "3f45afdbc06bced9a714538caee8dcc8f88bc10b751e4df0db3f6d546b04320b",
-    "code_sha256": "92ad093c431e7560df6653d938250a10f4e08c215563113a2d2e44aa4fe93a4f"
+    "sha256": "d976a709d45f6349c233d5d32fb593f5cd06fd25c8b6f13b885a32ff786ed6b7",
+    "code_sha256": "5022f5465bc6a1af6a705cb9358469a143768a865b244cd67407632ecd99746c"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -489,7 +489,7 @@
   },
   {
    "path": "Processed-Data/event_tetrode_holdout/manifest.json",
-   "sha256": "303e27febe2b57937c263bb07603d11087c4a46fb0d58583a0e7ef6b0717dfc0"
+   "sha256": "6dea19f678d2e6a4cce89f3a2213a72fe8b7d8783b0acf2e3295e6ec08271a04"
   },
   {
    "path": "Processed-Data/event_participation/*_participation.parquet",
@@ -498,7 +498,7 @@
   },
   {
    "path": "Processed-Data/event_participation/manifest.json",
-   "sha256": "8bb8f49efecf9bd9d3d7637375849697ac74c812378f1ce86afd7b47109aa34b"
+   "sha256": "604dc6d820bff3b76be36848ca4533af2e52cda9503fe9285926a46f5fc090d6"
   },
   {
    "path": "Processed-Data/event_likelihood_advantage/*_likelihood_advantage.parquet",
@@ -507,7 +507,7 @@
   },
   {
    "path": "Processed-Data/event_likelihood_advantage/manifest.json",
-   "sha256": "54c72a429607c3a44964e5844a36ab35114432d56c6273a72b416f31c5e825d0"
+   "sha256": "d676417edf77ab7bfd7801be4ba87db7647a69ef7b79670b38d13ec9932abd8a"
   },
   {
    "path": "Processed-Data/decoder_quality/sessions.parquet",
