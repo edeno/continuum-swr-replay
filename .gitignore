@@ -206,6 +206,8 @@ paper/figures/**/*.svg
 # --- tracked deliverables (override the ignores above) ---
 !paper/figures/figure01/figure01.pdf
 !paper/figures/figure01/figure01.png
+!paper/figures/figure02/figure02.pdf
+!paper/figures/figure02/figure02.png
 !paper/figures/figure03/figure03.pdf
 !paper/figures/figure03/figure03.png
 !paper/figures/supp_memoryless_comparison/supp_memoryless_comparison.pdf
