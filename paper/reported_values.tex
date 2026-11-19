@@ -210,7 +210,7 @@
 \newcommand{\DetectionSweepTimingStateSpaceOnsetMinMs}{\ensuremath{-}20}  % detection.sweep_timing_state_space_onset_min_ms: smallest onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 \newcommand{\DetectionSweepTimingStateSpaceOnsetUpperQuartileMs}{\ensuremath{-}2}  % detection.sweep_timing_state_space_onset_upper_quartile_ms: upper quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 
-% --- events (commit 00fd27775fcc)
+% --- events (commit 68c3f78643a5)
 \newcommand{\EventsAnimals}{5}  % events.animals: animals in the event table
 \newcommand{\EventsAnimalsNonSwrMajority}{4}  % events.animals_non_swr_majority: animals whose share of non-SWR events (the mean over their epochs) is above one half
 \newcommand{\EventsAnimalsNonSwrMoreAtWell}{5}  % events.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's sessions of the session's share
@@ -381,7 +381,7 @@
 \newcommand{\EventsNonSwrContentOwnWellFraction}{13}  % events.non_swr_content_own_well_fraction: share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions
 \newcommand{\EventsNonSwrContentRemotePathFraction}{41}  % events.non_swr_content_remote_path_fraction: share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions
 \newcommand{\EventsNonSwrContentRemoteWellFraction}{45}  % events.non_swr_content_remote_well_fraction: share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions
-\newcommand{\EventsNonSwrContinuousShare}{84}  % events.non_swr_continuous_share: share of no SWR event time in Continuous: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability
+\newcommand{\EventsNonSwrContinuousShare}{84}  % events.non_swr_continuous_share: mean share of a no SWR event in Continuous (each event weighted alike, whatever its length): the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability
 \newcommand{\EventsNonSwrControlParticipation}{35}  % events.non_swr_control_participation: share of tetrodes with a spike of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median
 \newcommand{\EventsNonSwrControlSpikeRateHz}{283}  % events.non_swr_control_spike_rate_hz: spike rate summed over tetrodes of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median
 \newcommand{\EventsNonSwrEventParticipation}{52}  % events.non_swr_event_participation: share of tetrodes with a spike of no SWR events: mean over animals of each animal's median over epochs of each epoch's median
@@ -389,7 +389,7 @@
 \newcommand{\EventsNonSwrFraction}{57}  % events.non_swr_fraction: share of immobile non-local events overlapping no SWR, pooled over animals
 \newcommand{\EventsNonSwrFractionAnimalMax}{65}  % events.non_swr_fraction_animal_max: highest per-animal share of non-SWR events (the mean over the animal's epochs)
 \newcommand{\EventsNonSwrFractionAnimalMin}{46}  % events.non_swr_fraction_animal_min: lowest per-animal share of non-SWR events (an animal's share is the mean over its epochs of the epoch's share)
-\newcommand{\EventsNonSwrFragmentedShare}{11}  % events.non_swr_fragmented_share: share of no SWR event time in Fragmented: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability
+\newcommand{\EventsNonSwrFragmentedShare}{11}  % events.non_swr_fragmented_share: mean share of a no SWR event in Fragmented (each event weighted alike, whatever its length): the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability
 \newcommand{\EventsNonSwrHeldoutControlGainPerSpike}{0.00}  % events.non_swr_heldout_control_gain_per_spike: held-out tetrode score of no SWR Local-rest controls: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median
 \newcommand{\EventsNonSwrHeldoutControlGainPerSpikeCiHigh}{0.00}  % events.non_swr_heldout_control_gain_per_spike_ci_high: upper bound of that interval
 \newcommand{\EventsNonSwrHeldoutControlGainPerSpikeCiLow}{0.00}  % events.non_swr_heldout_control_gain_per_spike_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)
@@ -525,12 +525,12 @@
 \newcommand{\EventsSwrContentOwnWellFraction}{5}  % events.swr_content_own_well_fraction: share of SWR non-local time bins whose content is own well, weighted by time bins over sessions
 \newcommand{\EventsSwrContentRemotePathFraction}{73}  % events.swr_content_remote_path_fraction: share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions
 \newcommand{\EventsSwrContentRemoteWellFraction}{21}  % events.swr_content_remote_well_fraction: share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions
-\newcommand{\EventsSwrContinuousShare}{75}  % events.swr_continuous_share: share of SWR event time in Continuous: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability
+\newcommand{\EventsSwrContinuousShare}{75}  % events.swr_continuous_share: mean share of a SWR event in Continuous (each event weighted alike, whatever its length): the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability
 \newcommand{\EventsSwrControlParticipation}{43}  % events.swr_control_participation: share of tetrodes with a spike of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median
 \newcommand{\EventsSwrControlSpikeRateHz}{283}  % events.swr_control_spike_rate_hz: spike rate summed over tetrodes of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median
 \newcommand{\EventsSwrEventParticipation}{72}  % events.swr_event_participation: share of tetrodes with a spike of SWR events: mean over animals of each animal's median over epochs of each epoch's median
 \newcommand{\EventsSwrEventSpikeRateHz}{1101}  % events.swr_event_spike_rate_hz: spike rate summed over tetrodes of SWR events: mean over animals of each animal's median over epochs of each epoch's median
-\newcommand{\EventsSwrFragmentedShare}{23}  % events.swr_fragmented_share: share of SWR event time in Fragmented: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability
+\newcommand{\EventsSwrFragmentedShare}{23}  % events.swr_fragmented_share: mean share of a SWR event in Fragmented (each event weighted alike, whatever its length): the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability
 \newcommand{\EventsSwrHeldoutControlGainPerSpike}{0.00}  % events.swr_heldout_control_gain_per_spike: held-out tetrode score of SWR Local-rest controls: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median
 \newcommand{\EventsSwrHeldoutControlGainPerSpikeCiHigh}{0.00}  % events.swr_heldout_control_gain_per_spike_ci_high: upper bound of that interval
 \newcommand{\EventsSwrHeldoutControlGainPerSpikeCiLow}{0.00}  % events.swr_heldout_control_gain_per_spike_ci_low: lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)

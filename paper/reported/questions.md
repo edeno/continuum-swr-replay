@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
 | `detection.json` | `3455b5a13f61` | yes | 172 | 0 |
-| `events.json` | `00fd27775fcc` | yes | 414 | 0 |
+| `events.json` | `68c3f78643a5` | yes | 414 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
 
@@ -987,7 +987,7 @@ Sources:
 | `\EventsSwrRemoteTetrodesMedian` | 15 | tetrodes | median number of tetrodes with a spike in SWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsSwrSpikeRateHzAnimalsAboveRest` | 5 |  | animals whose SWR events' spike rate summed over tetrodes is above their Local-rest windows' | `events.participation_values` | 2g |
 
-### 2d.10. How much of SWR and non-SWR event time is Continuous, and how much Fragmented?
+### 2d.10. On average, how much of an SWR or non-SWR event is Continuous, and how much Fragmented?
 
 Status: computed. Figures: 2h. Values: 4.
 
@@ -997,10 +997,10 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsNonSwrContinuousShare` | 84 % |  | share of no SWR event time in Continuous: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability | `events.state_composition_values` | 2h |
-| `\EventsNonSwrFragmentedShare` | 11 % |  | share of no SWR event time in Fragmented: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability | `events.state_composition_values` | 2h |
-| `\EventsSwrContinuousShare` | 75 % |  | share of SWR event time in Continuous: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability | `events.state_composition_values` | 2h |
-| `\EventsSwrFragmentedShare` | 23 % |  | share of SWR event time in Fragmented: the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability | `events.state_composition_values` | 2h |
+| `\EventsNonSwrContinuousShare` | 84 % |  | mean share of a no SWR event in Continuous (each event weighted alike, whatever its length): the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability | `events.state_composition_values` | 2h |
+| `\EventsNonSwrFragmentedShare` | 11 % |  | mean share of a no SWR event in Fragmented (each event weighted alike, whatever its length): the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability | `events.state_composition_values` | 2h |
+| `\EventsSwrContinuousShare` | 75 % |  | mean share of a SWR event in Continuous (each event weighted alike, whatever its length): the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability | `events.state_composition_values` | 2h |
+| `\EventsSwrFragmentedShare` | 23 % |  | mean share of a SWR event in Fragmented (each event weighted alike, whatever its length): the mean over animals of each animal's mean over epochs of each epoch's mean over events of the event's mean state probability | `events.state_composition_values` | 2h |
 
 ### 2d.7. Are non-SWR events a different kind of event, with a different function?
 
