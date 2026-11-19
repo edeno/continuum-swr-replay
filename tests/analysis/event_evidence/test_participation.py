@@ -5,17 +5,20 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.event_evidence import participation as pt
+from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
+    event_bins,
+)
 
 BIN_S = 0.002
 
 
 def test_event_bins_map_times_to_the_decode_grid():
     time = np.arange(100) * BIN_S
-    s, e = pt.event_bins(time, np.array([0.010, 0.050]), np.array([0.020, 0.050]))
+    s, e = event_bins(time, np.array([0.010, 0.050]), np.array([0.020, 0.050]))
     np.testing.assert_array_equal(s, [5, 25])
     np.testing.assert_array_equal(e, [10, 25])
     with pytest.raises(ValueError, match="decode's time bins"):
-        pt.event_bins(time, np.array([0.0105]), np.array([0.020]))
+        event_bins(time, np.array([0.0105]), np.array([0.020]))
 
 
 def test_local_rest_needs_local_immobile_and_no_event_nearby():

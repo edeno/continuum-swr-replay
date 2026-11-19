@@ -94,13 +94,13 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_epoch_id,
     swr_source_name,
 )
-from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
-    likelihood_advantage_statistics,
-)
 from continuum_swr_replay.analysis.event_evidence.participation import (
     participation_statistics,
 )
-from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import window_scores
+from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
+    holdout_statistics,
+    window_scores,
+)
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
     nonlocal_share_by_power,
@@ -155,6 +155,7 @@ from continuum_swr_replay.visualization.plots import (
     plot_track_graph_2d,
 )
 from continuum_swr_replay.visualization.simulated_run_panels import (
+    ANIMAL_POS_COLOR,
     LABEL_SIZE,
     LINE_WIDTH_LIMITS_PT,
     PANEL_LETTER_SIZE,
@@ -387,7 +388,7 @@ def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) 
     results, detector, env = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC", root=data_dir
     )
-    logging.info("Loading the aggregated decode frames (panels f and h)...")
+    logging.info("Loading the aggregated decode frames (panels j and k)...")
     data_over_time = load_data_over_time(data_dir)
     # The SWRs drawn: the session's SWR source intervals, the ones the event
     # table's classes are computed against.
@@ -556,7 +557,7 @@ def draw_posterior(ax, data, results, env, sl: slice, t_offset: float, max_pos: 
     ax.scatter(
         position.index - t_offset,
         position.linear_position,
-        color="magenta",
+        color=ANIMAL_POS_COLOR,
         s=0.4,
         lw=0,
         rasterized=True,
@@ -623,7 +624,7 @@ def draw_overview(fig, spec, inputs, session_events, max_pos: float):
     add_track_strip(ax_pos, data, max_pos)
     ax_pos.text(
         0.48, 0.45, "animal's position", transform=ax_pos.transAxes,
-        color="magenta", fontsize=SMALL_SIZE, ha="left", va="top",
+        color=ANIMAL_POS_COLOR, fontsize=SMALL_SIZE, ha="left", va="top",
     )  # fmt: skip
 
     position = data["position_info"].loc[sl]
@@ -874,6 +875,32 @@ def draw_swr_donut(ax, kay: pd.Series) -> None:
     )
 
 
+REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
+"""Panels g and i: each group's Local-rest and event positions on the x axis."""
+
+
+def animal_values(row: pd.Series, column: str, scale: float = 1.0) -> pd.Series:
+    """A statistics row's per-animal values, indexed by animal."""
+    return scale * pd.Series(row[column], index=row["animal_names"])
+
+
+def draw_rest_to_event(ax, rest: pd.Series, event: pd.Series, group: str, color):
+    """One line per animal from its Local-rest value to its event value."""
+    x = REST_EVENT_X[group]
+    for animal in event.index:  # paired by animal, not by position
+        ax.plot(x, (rest[animal], event[animal]), color="#999999", lw=0.5, zorder=1)
+    ax.scatter(np.full(rest.size, x[0]), rest, s=6, color=C_LOCAL, lw=0, zorder=2)
+    ax.scatter(np.full(event.size, x[1]), event, s=6, color=color, lw=0, zorder=2)
+
+
+def rest_event_axis(ax, labels: bool = True) -> None:
+    """Panels g and i's x axis: rest and event positions for each group."""
+    ax.set_xlim(-0.5, 3.9)
+    ticks = [x for pair in REST_EVENT_X.values() for x in pair]
+    ax.set_xticks(ticks, ["rest", "no SWR", "rest", "SWR"], rotation=45, ha="right")
+    ax.tick_params(labelbottom=labels)
+
+
 def draw_participation(ax_share, ax_rate, statistics: pd.DataFrame) -> None:
     """Panel g: tetrode participation and spike rate, Local rest vs events.
 
@@ -885,32 +912,17 @@ def draw_participation(ax_share, ax_rate, statistics: pd.DataFrame) -> None:
         (ax_rate, "spike_rate_hz", "Spike rate\n(spikes/s)"),
     ):
         scale = 100 if measure == "participation" else 1
-        for g, (group, color) in enumerate((("no SWR", C_NL), ("SWR", C_SWR))):
-            x = (2.4 * g, 2.4 * g + 1)
+        for group, color in (("no SWR", C_NL), ("SWR", C_SWR)):
             rest, event = (
-                scale
-                * pd.Series(
-                    statistics.loc[(group, kind), f"{measure}_animals"],
-                    index=statistics.loc[(group, kind), "animal_names"],
+                animal_values(
+                    statistics.loc[(group, kind)], f"{measure}_animals", scale
                 )
                 for kind in ("control", "event")
             )
-            for animal in event.index:  # paired by animal, not by position
-                ax.plot(x, (rest[animal], event[animal]), color="#999999", lw=0.5,
-                        zorder=1)  # fmt: skip
-            ax.scatter(
-                np.full(rest.size, x[0]), rest, s=6, color=C_LOCAL, lw=0, zorder=2
-            )
-            ax.scatter(
-                np.full(event.size, x[1]), event, s=6, color=color, lw=0, zorder=2
-            )
+            draw_rest_to_event(ax, rest, event, group, color)
         ax.set_ylabel(label)
-        ax.set_xlim(-0.5, 3.9)
         ax.set_ylim(0, None)
-    ax_share.tick_params(labelbottom=False)
-    ax_rate.set_xticks(
-        [0, 1, 2.4, 3.4], ["rest", "no SWR", "rest", "SWR"], rotation=45, ha="right"
-    )
+        rest_event_axis(ax, labels=ax is ax_rate)
 
 
 def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
@@ -951,31 +963,25 @@ def draw_heldout_gain(ax, events: pd.DataFrame, controls: pd.DataFrame) -> None:
 
     One line per animal from its Local-rest controls to its events; the bar is
     the events' animal mean with its 95 % interval
-    (``likelihood_advantage_statistics`` of ``gain_per_spike``).
+    (``tetrode_holdout.holdout_statistics``).
     """
-    for g, (group, color) in enumerate((("no SWR", C_NL), ("SWR", C_SWR))):
-        x = (2.4 * g, 2.4 * g + 1)
-        rest, event = controls.loc[group], events.loc[group]
-        rest_values = pd.Series(rest["animals"], index=rest["animal_names"])
-        event_values = pd.Series(event["animals"], index=event["animal_names"])
-        for animal in event_values.index:
-            ax.plot(x, (rest_values[animal], event_values[animal]), color="#999999",
-                    lw=0.5, zorder=1)  # fmt: skip
-        ax.scatter(np.full(rest_values.size, x[0]), rest_values, s=6, color=C_LOCAL,
-                   lw=0, zorder=2)  # fmt: skip
-        ax.scatter(np.full(event_values.size, x[1]), event_values, s=6, color=color,
-                   lw=0, zorder=2)  # fmt: skip
+    for group, color in (("no SWR", C_NL), ("SWR", C_SWR)):
+        event = events.loc[group]
+        draw_rest_to_event(
+            ax,
+            animal_values(controls.loc[group], "animals"),
+            animal_values(event, "animals"),
+            group,
+            color,
+        )
         ax.errorbar(
-            x[1] + 0.3, event["estimate"],
+            REST_EVENT_X[group][1] + 0.3, event["estimate"],
             yerr=[[event["estimate"] - event["ci_low"]],
                   [event["ci_high"] - event["estimate"]]],
             fmt="_", color="black", ms=5, lw=0.8, capsize=0,
         )  # fmt: skip
     ax.axhline(0, color="#999999", lw=0.5, ls=":", zorder=0)
-    ax.set_xlim(-0.5, 3.9)
-    ax.set_xticks(
-        [0, 1, 2.4, 3.4], ["rest", "no SWR", "rest", "SWR"], rotation=45, ha="right"
-    )
+    rest_event_axis(ax)
     ax.set_ylabel("Held-out gain\nover local (nats/spike)")
     ax.set_title("Held-out tetrode", fontsize=SMALL_SIZE, pad=3)
 
@@ -1191,16 +1197,19 @@ def generate_figure(
         ["ripple", "mua"],
     )
     participation = participation_statistics(
-        read_complete_run(data_dir / EVENT_PARTICIPATION_DIR, "participation")
+        read_complete_run(
+            data_dir / EVENT_PARTICIPATION_DIR, "participation", analysed_epoch_ids()
+        )
     )
     heldout = window_scores(
-        read_complete_run(data_dir / EVENT_TETRODE_HOLDOUT_DIR, "tetrode_holdout")
+        read_complete_run(
+            data_dir / EVENT_TETRODE_HOLDOUT_DIR,
+            "tetrode_holdout",
+            analysed_epoch_ids(),
+        )
     )
     heldout_events, heldout_controls = (
-        likelihood_advantage_statistics(
-            heldout[heldout["kind"] == kind], column="gain_per_spike"
-        )
-        for kind in ("event", "control")
+        holdout_statistics(heldout, kind) for kind in ("event", "control")
     )
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))

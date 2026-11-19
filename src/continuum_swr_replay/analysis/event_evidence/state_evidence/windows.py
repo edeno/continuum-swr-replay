@@ -377,6 +377,42 @@ ON_GRID_ATOL_S = 1e-6
 """How far (s) an event's first or last time may be from its decode bin's time."""
 
 
+def event_bins(
+    time: NDArray, starts_s: NDArray, ends_s: NDArray
+) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    """Each event's first and last decode bin.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode's time axis, s.
+    starts_s, ends_s : ndarray, shape (n_events,)
+        The events' first and last labelled bins' times (the event table's
+        ``event_start_s`` and ``event_end_s``).
+
+    Returns
+    -------
+    s, e : ndarray of int, shape (n_events,)
+
+    Raises
+    ------
+    ValueError
+        If an event does not start and end on a decode bin.
+    """
+    time = np.asarray(time, dtype=float)
+    s = np.minimum(np.searchsorted(time, starts_s), time.size - 1)
+    e = np.minimum(np.searchsorted(time, ends_s), time.size - 1)
+    on_grid = (np.abs(time[s] - starts_s) <= ON_GRID_ATOL_S) & (
+        np.abs(time[e] - ends_s) <= ON_GRID_ATOL_S
+    )
+    if not on_grid.all():
+        raise ValueError(
+            f"{int((~on_grid).sum())} events do not start and end on the decode's "
+            "time bins"
+        )
+    return s.astype(np.int64), e.astype(np.int64)
+
+
 def event_windows(
     time: NDArray,
     probabilities: NDArray,
@@ -460,16 +496,7 @@ def event_windows(
     events = events.sort_values("event_start_s", kind="stable").reset_index(drop=True)
     start = events["event_start_s"].to_numpy(dtype=float)
     end = events["event_end_s"].to_numpy(dtype=float)
-    s = np.minimum(np.searchsorted(time, start), n_time - 1)
-    e = np.minimum(np.searchsorted(time, end), n_time - 1)
-    on_grid = (np.abs(time[s] - start) <= ON_GRID_ATOL_S) & (
-        np.abs(time[e] - end) <= ON_GRID_ATOL_S
-    )
-    if not on_grid.all():
-        raise ValueError(
-            f"{int((~on_grid).sum())} events do not start and end on the decode's "
-            "time bins"
-        )
+    s, e = event_bins(time, start, end)
     if (e < s).any() or (s[1:] <= e[:-1]).any():
         raise ValueError("events must be disjoint, each with start <= end")
     lens = e - s + 1

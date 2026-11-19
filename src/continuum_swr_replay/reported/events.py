@@ -1179,6 +1179,9 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
 
 # --- what the events are -----------------------------------------------------------
 
+#: The event groups of the per-event runs, by the word their keys use.
+_RUN_GROUPS = {"non_swr": "no SWR", "swr": "SWR"}
+
 
 def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.10: the mean share of an SWR or no-SWR event in Continuous and in
@@ -1186,7 +1189,7 @@ def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
     make = value_factory(state_composition_values, source, TAGS["state_composition"])
     statistics = event_statistics.state_composition_statistics(events)
     values = []
-    for word, group in (("non_swr", "no SWR"), ("swr", "SWR")):
+    for word, group in _RUN_GROUPS.items():
         for state in event_statistics.STATE_SHARE_COLUMNS:
             values.append(
                 make(
@@ -1204,9 +1207,6 @@ def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 
 # --- population events and spatial evidence --------------------------------------
-
-#: The event groups of the per-event runs, by the word their keys use.
-_RUN_GROUPS = {"non_swr": "no SWR", "swr": "SWR"}
 
 
 def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
@@ -1268,6 +1268,35 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
+def _per_spike_interval(
+    make, key: str, row: pd.Series, description: str
+) -> list[Value]:
+    """A per-animal per-spike estimate and the bounds of its 95 % interval
+    (``likelihood_advantage_statistics``' ``estimate``, ``ci_low``, ``ci_high``)."""
+    unit = "nats per spike"
+    return [
+        make(key, row["estimate"], "quantity", "dec2", description, unit),
+        make(
+            f"{key}_ci_low",
+            row["ci_low"],
+            "quantity",
+            "dec2",
+            "lower bound of its 95 % interval (nested bootstrap of the animals "
+            "and their epochs, small-sample t correction over the "
+            f"{row['n_animals']} animals)",
+            unit,
+        ),
+        make(
+            f"{key}_ci_high",
+            row["ci_high"],
+            "quantity",
+            "dec2",
+            "upper bound of that interval",
+            unit,
+        ),
+    ]
+
+
 def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the spike likelihood at the decoded positions minus at the
     animal's, per spike, over each whole event (in sample; Figure 2i shows the
@@ -1279,36 +1308,16 @@ def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]
     values = []
     for word, group in _RUN_GROUPS.items():
         row = statistics.loc[group]
+        values += _per_spike_interval(
+            make,
+            f"{word}_likelihood_advantage_per_spike",
+            row,
+            f"log-likelihood of {group} events' spikes at the decoded positions "
+            "minus at the animal's, summed over each event and divided by its "
+            "spikes: mean over animals of each animal's median over epochs of "
+            "each epoch's median",
+        )
         values += [
-            make(
-                f"{word}_likelihood_advantage_per_spike",
-                row["estimate"],
-                "quantity",
-                "dec2",
-                f"log-likelihood of {group} events' spikes at the decoded positions "
-                "minus at the animal's, summed over each event and divided by its "
-                "spikes: mean over animals of each animal's median over epochs of "
-                "each epoch's median",
-                "nats per spike",
-            ),
-            make(
-                f"{word}_likelihood_advantage_per_spike_ci_low",
-                row["ci_low"],
-                "quantity",
-                "dec2",
-                "lower bound of its 95 % interval (nested bootstrap of the animals "
-                f"and their epochs, small-sample t correction over the "
-                f"{row['n_animals']} animals)",
-                "nats per spike",
-            ),
-            make(
-                f"{word}_likelihood_advantage_per_spike_ci_high",
-                row["ci_high"],
-                "quantity",
-                "dec2",
-                "upper bound of that interval",
-                "nats per spike",
-            ),
             make(
                 f"{word}_likelihood_advantage_events_scored",
                 row["n_scored"],
@@ -1333,52 +1342,31 @@ def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     make = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
     values = []
     estimates = (
-        ("gain", "event", "gain_per_spike", "events"),
-        ("spiking_gain", "event", "spiking_gain_per_spike", "events"),
-        ("control_gain", "control", "gain_per_spike", "Local-rest controls"),
+        ("gain", "event", "gain_per_spike", "events", ""),
+        (
+            "spiking_gain",
+            "event",
+            "spiking_gain_per_spike",
+            "events",
+            " in the bins where the scored tetrode spiked",
+        ),
+        ("control_gain", "control", "gain_per_spike", "Local-rest controls", ""),
     )
-    for name, kind, column, label in estimates:
-        statistics = likelihood_advantage.likelihood_advantage_statistics(
-            windows[windows["kind"] == kind], column=column
-        )
-        spiking = " in the bins where the scored tetrode spiked" if (
-            name == "spiking_gain"
-        ) else ""  # fmt: skip
+    for name, kind, column, label, spiking in estimates:
+        statistics = tetrode_holdout.holdout_statistics(windows, kind, column)
         for word, group in _RUN_GROUPS.items():
             row = statistics.loc[group]
-            values += [
-                make(
-                    f"{word}_heldout_{name}_per_spike",
-                    row["estimate"],
-                    "quantity",
-                    "dec2",
-                    f"held-out tetrode score of {group} {label}: each tetrode's "
-                    "log predictive score under the other tetrodes' position "
-                    "distribution minus under local coding around the animal"
-                    f"{spiking}, summed over tetrodes and bins and divided by the "
-                    "window's spikes; mean over animals of each animal's median "
-                    "over epochs of each epoch's median",
-                    "nats per spike",
-                ),
-                make(
-                    f"{word}_heldout_{name}_per_spike_ci_low",
-                    row["ci_low"],
-                    "quantity",
-                    "dec2",
-                    "lower bound of its 95 % interval (nested bootstrap of the "
-                    "animals and their epochs, small-sample t correction over the "
-                    f"{row['n_animals']} animals)",
-                    "nats per spike",
-                ),
-                make(
-                    f"{word}_heldout_{name}_per_spike_ci_high",
-                    row["ci_high"],
-                    "quantity",
-                    "dec2",
-                    "upper bound of that interval",
-                    "nats per spike",
-                ),
-            ]
+            values += _per_spike_interval(
+                make,
+                f"{word}_heldout_{name}_per_spike",
+                row,
+                f"held-out tetrode score of {group} {label}: each tetrode's "
+                "log predictive score under the other tetrodes' position "
+                "distribution minus under local coding around the animal"
+                f"{spiking}, summed over tetrodes and bins and divided by the "
+                "window's spikes; mean over animals of each animal's median "
+                "over epochs of each epoch's median",
+            )
             if name == "gain":
                 values.append(
                     make(
@@ -2123,21 +2111,30 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.add(*content_occupancy_values(occupancy, rel(inputs.content_occupancy)))
     summary.inputs.append(file_record(inputs.content_occupancy, ROOT_DIR))
 
-    analysed = set(analysed_epoch_ids())
-    participation_table = read_complete_run(inputs.event_participation, "participation")
-    advantage_table = read_complete_run(
-        inputs.likelihood_advantage, "likelihood_advantage"
+    analysed = analysed_epoch_ids()
+    participation_table = read_complete_run(
+        inputs.event_participation, "participation", analysed
     )
-    for folder, table in (
-        (inputs.event_participation, participation_table),
-        (inputs.likelihood_advantage, advantage_table),
-    ):
-        if set(table["epoch_id"]) != analysed:
-            raise ValueError(
-                f"{folder} holds {table['epoch_id'].nunique()} epochs, not the "
-                f"{n_epochs} analysed ones"
-            )
+    advantage_table = read_complete_run(
+        inputs.likelihood_advantage, "likelihood_advantage", analysed
+    )
+    holdout_table = read_complete_run(
+        inputs.tetrode_holdout, "tetrode_holdout", analysed
+    )
     participation_paths = ok_table_paths(inputs.event_participation, "participation")
+    participation_sha256 = files_sha256(participation_paths)
+
+    def participation_staleness(folder: Path) -> str | None:
+        """Why a run made from the participation tables is stale, or None."""
+        return _input_staleness(
+            read_output_manifest(folder),
+            "event_participation",
+            participation_sha256,
+            rel(folder),
+            "participation",
+            "participation run",
+        )
+
     summary.add(
         *pend(
             participation_values(
@@ -2148,7 +2145,6 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             stale(inputs.event_participation),
         )
     )
-    advantage_manifest = read_output_manifest(inputs.likelihood_advantage)
     summary.add(
         *pend(
             likelihood_advantage_values(
@@ -2157,23 +2153,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 "(scripts/event_evidence/score_event_likelihood_advantage.py)",
             ),
             stale(inputs.likelihood_advantage),
-            _input_staleness(
-                advantage_manifest,
-                "event_participation",
-                files_sha256(participation_paths),
-                rel(inputs.likelihood_advantage),
-                "participation",
-                "participation run",
-            ),
+            participation_staleness(inputs.likelihood_advantage),
         )
     )
-    holdout_table = read_complete_run(inputs.tetrode_holdout, "tetrode_holdout")
-    if set(holdout_table["epoch_id"]) != analysed:
-        raise ValueError(
-            f"{inputs.tetrode_holdout} holds {holdout_table['epoch_id'].nunique()} "
-            f"epochs, not the {n_epochs} analysed ones"
-        )
-    holdout_manifest = read_output_manifest(inputs.tetrode_holdout)
     summary.add(
         *pend(
             tetrode_holdout_values(
@@ -2182,14 +2164,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 "(scripts/event_evidence/score_tetrode_holdout.py)",
             ),
             stale(inputs.tetrode_holdout),
-            _input_staleness(
-                holdout_manifest,
-                "event_participation",
-                files_sha256(participation_paths),
-                rel(inputs.tetrode_holdout),
-                "participation",
-                "participation run",
-            ),
+            participation_staleness(inputs.tetrode_holdout),
         )
     )
     summary.inputs += [

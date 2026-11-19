@@ -41,12 +41,14 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
     read_swr_table,
 )
 from continuum_swr_replay.analysis.event_evidence import likelihood_advantage as la
-from continuum_swr_replay.analysis.event_evidence.participation import event_bins
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     stored_likelihood_columns,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
     load_encoding,
+)
+from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
+    event_bins,
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.results import open_results

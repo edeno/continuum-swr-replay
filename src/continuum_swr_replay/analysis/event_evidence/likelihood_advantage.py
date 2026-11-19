@@ -42,9 +42,6 @@ from continuum_swr_replay.analysis.shared_statistics import (
     weighted_median,
 )
 
-GROUPS = ("no SWR", "SWR")
-"""The event groups, by the event table's ``is_swr``."""
-
 
 def advantage_from_bins(
     log_likelihood: NDArray, decoded_bin: NDArray, animal_bin: NDArray

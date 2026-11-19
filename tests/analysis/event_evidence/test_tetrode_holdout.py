@@ -139,3 +139,14 @@ def test_window_scores_sum_over_tetrodes_and_divide_by_the_windows_spikes():
     assert event["spread_cm"] == pytest.approx(50.0)
     assert np.isnan(windows.loc[1, "gain_per_spike"])
     assert windows.loc[1, "gain"] == pytest.approx(0.0)
+
+
+def test_add_rows_is_np_add_at_to_the_bit():
+    rng = np.random.default_rng(0)
+    index = rng.integers(0, 50, size=2000)
+    values = rng.normal(size=(2000, 7)).astype(np.float32)
+    expected = rng.normal(size=(50, 7))
+    out = expected.copy()
+    np.add.at(expected, index, values)
+    th._add_rows(out, index, values)
+    np.testing.assert_array_equal(out, expected)

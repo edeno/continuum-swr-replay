@@ -39,7 +39,13 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
     read_dot_with_swr_source,
     read_swr_table,
 )
+from continuum_swr_replay.analysis.event_definition.swr_source import (
+    swr_epoch_id_of_session,
+)
 from continuum_swr_replay.analysis.event_evidence import participation as pt
+from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
+    event_bins,
+)
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import ROOT_DIR
@@ -62,10 +68,16 @@ SEED = 20261118
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
 
+def epoch_ids(events: pd.DataFrame) -> pd.Series:
+    """Each event's epoch id (``swr_source.swr_epoch_id_of_session``)."""
+    keys = list(events[["animal", "session_date", "epoch"]].itertuples(index=False))
+    ids = {key: swr_epoch_id_of_session(*key) for key in set(keys)}
+    return pd.Series([ids[key] for key in keys], index=events.index)
+
+
 def epoch_events(events: pd.DataFrame, epoch_id: str) -> pd.DataFrame:
     """The table's events of one epoch, by start."""
-    key = events["animal"] + events["session_date"].astype(str) + "_" + events["epoch"]
-    mine = events[key + "_HPC" == epoch_id]
+    mine = events[epoch_ids(events) == epoch_id]
     return mine.sort_values("event_start_s").reset_index(drop=True)
 
 
@@ -95,7 +107,7 @@ def epoch_table(epoch_id: str, events: pd.DataFrame, data_dir: Path) -> pd.DataF
         in_event,
         margin_bins=int(round(pt.MARGIN_S / bin_s)),
     )
-    s, e = pt.event_bins(
+    s, e = event_bins(
         time, events["event_start_s"].to_numpy(), events["event_end_s"].to_numpy()
     )
     controls = pt.control_windows(s, e, local_rest, seed=(SEED, epoch_id))
@@ -160,12 +172,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     event_table_sha256 = sha256_file(event_table)
     events = read_swr_table(event_table)
-    all_epochs = sorted(
-        (events["animal"] + events["session_date"].astype(str) + "_")
-        .str.cat(events["epoch"])
-        .add("_HPC")
-        .unique()
-    )
+    all_epochs = sorted(epoch_ids(events).unique())
     epochs = args.epochs or all_epochs
     to_run = [
         epoch_id

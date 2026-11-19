@@ -57,8 +57,7 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
     read_swr_table,
 )
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
-from continuum_swr_replay.analysis.event_evidence.participation import (
-    ON_GRID_ATOL_S,
+from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     event_bins,
 )
 from continuum_swr_replay.decoding.files import decode_paths
@@ -109,10 +108,8 @@ def epoch_windows(
         time, events["event_start_s"].to_numpy(), events["event_end_s"].to_numpy()
     )
     controls = participation[participation["kind"] == "control"]
-    cs = np.searchsorted(time, controls["start_s"].to_numpy())
-    cs = np.minimum(cs, time.size - 1)
-    if not (np.abs(time[cs] - controls["start_s"].to_numpy()) <= ON_GRID_ATOL_S).all():
-        raise ValueError("a control window does not start on a decode bin")
+    control_start = controls["start_s"].to_numpy()
+    cs, _ = event_bins(time, control_start, control_start)
     return (
         pd.concat(
             [
