@@ -21,10 +21,9 @@ they overlap an SWR (Kay's detector, the SWR source). Each row asks one thing:
             epochs' quiet rest and running. (Ripple power and MUA around the
             events are Figure 2's.)
 
-Panels a–c and e draw each class's median and the SWR minus no-SWR difference
-(duration-matched, except for duration itself) with its interval from the
-property bootstrap (``bootstrap_event_properties.py``'s ``intervals.csv``): the
-events summary's ``<property>_*`` values (``paper/reported/events.json``). Panels
+Panels a–c and e mark each class's median (``event_statistics.class_medians``),
+the events summary's ``<property>_median_*`` values
+(``paper/reported/events.json``). Panels
 f and g place every event time bin's MAP position on its arm
 (``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``) and
 draw ``content_along_arms.content_density_along_arms``, the animals' mean; g
@@ -118,8 +117,9 @@ HEIGHT = 6.3
 
 C_NL = COLORS["Non-Local"]
 C_SWR = COLORS["SWR"]
-C_REST = COLORS["Local"]
-C_RUN = COLORS["No-Spike"]
+# Panel h's rest and running levels: neutral, not decoder-state colors.
+C_REST = "white"
+C_RUN = "black"
 KINDS = ((False, "no SWR", C_NL), (True, "SWR", C_SWR))
 
 # The track drawn in panel f: one epoch's track graph (every epoch's arms run the
@@ -134,26 +134,25 @@ RATIO_LIMIT_LOG2 = 2.0
 # Panel d: the track's arms.
 N_ARMS = len(ALL_ARMS)
 
-# Panels a-c and f: (column, bootstrap property, x label, scale, bin edges, log x).
+# Panels a-c and e: (column, x label, scale, bin edges, log x).
 HISTOGRAMS = {
     "duration": (
-        "event_duration_s", "duration", "Duration (ms)", 1e3,
+        "event_duration_s", "Duration (ms)", 1e3,
         np.arange(0, 401, 8), False,
     ),
     "extent": (
-        "spatial_extent_cm", "extent", "Spatial extent (cm)", 1.0,
+        "spatial_extent_cm", "Spatial extent (cm)", 1.0,
         np.linspace(0, 240, 41), False,
     ),
     "speed": (
-        "replay_speed_median_cm_s", "speed", "Replay speed (cm/s)", 1.0,
+        "replay_speed_median_cm_s", "Replay speed (cm/s)", 1.0,
         np.geomspace(1, 1e5, 41), True,
     ),
     "start_distance": (
-        "start_distance_cm", "start_distance", "Start distance\nfrom animal (cm)",
+        "start_distance_cm", "Start distance\nfrom animal (cm)",
         1.0, np.linspace(0, 240, 41), False,
     ),
 }  # fmt: skip
-UNITS = {"duration": "ms", "extent": "cm", "speed": "cm/s", "start_distance": "cm"}
 
 # Panel h: (signal, event column, label).
 SIGNALS = (
@@ -216,9 +215,6 @@ def read_inputs() -> dict:
     env = joblib.load(decode_paths(TRACK_EPOCH, processed_data_dir()).environment)
     return {
         "events": events,
-        "intervals": pd.read_csv(
-            inputs.property_bootstrap / "intervals.csv", index_col=0
-        ),
         "reference": reference,
         "occupancy_shares": content_occupancy_shares(occupancy),
         "density": density,
@@ -258,16 +254,17 @@ def animal_signal_values(
 # ---------------------------------------------------------------------------
 
 
-def draw_histogram(ax, events: pd.DataFrame, intervals: pd.DataFrame, key: str):
-    """A property's distribution for each kind, its medians and the difference."""
-    column, prop, label, scale, edges, log_x = HISTOGRAMS[key]
+def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
+    """A property's distribution for each kind, % of the kind's events per bin,
+    with each kind's median (triangle)."""
+    column, label, scale, edges, log_x = HISTOGRAMS[key]
     medians = class_medians(events, column)
     top = 0.0
     for is_swr, _, color in KINDS:
         values = scale * events.loc[events["is_swr"] == is_swr, column].to_numpy()
         values = np.clip(values, edges[0], edges[-1])
         counts, _ = np.histogram(values, bins=edges)
-        share = counts / counts.sum()
+        share = 100 * counts / counts.sum()
         ax.stairs(share, edges, color=color, fill=True, alpha=0.25, lw=0)
         ax.stairs(share, edges, color=color, lw=0.8)
         top = max(top, share.max())
@@ -275,17 +272,6 @@ def draw_histogram(ax, events: pd.DataFrame, intervals: pd.DataFrame, key: str):
         KINDS, (medians["median_non_swr"], medians["median_swr"]), strict=True
     ):
         ax.plot(scale * m, top * 1.08, marker="v", ms=3.5, color=color, lw=0)
-    row = intervals.loc[prop]
-    unit = UNITS[key]
-    word = "difference" if key == "duration" else "matched_difference"
-    heading = "SWR − no SWR" if key == "duration" else "Δ matched"
-    ax.set_title(
-        f"{heading}: {row[word]:+.0f} {unit}\n"
-        f"[{row[f'{word}_low']:.0f}, {row[f'{word}_high']:.0f}]",
-        fontsize=SMALL_SIZE,
-        pad=2,
-        linespacing=1.1,
-    )
     if log_x:
         ax.set_xscale("log")
     ax.set_xlim(edges[0], edges[-1])
@@ -360,6 +346,11 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame) -> None:
     ax.axvline(1, color="0.8", lw=0.5, zorder=0)
     ax.set_xticks([0, 1, 2], ["center", "junction", "well"])
     ax.set_xlim(0, 2)
+    for x_mid, name in ((0.5, "trunk arms"), (1.5, "leaf arms")):
+        ax.text(
+            x_mid, -0.17, name, transform=ax.get_xaxis_transform(), ha="center",
+            va="top", fontsize=SMALL_SIZE, color="0.35",
+        )  # fmt: skip
     ax.set_ylabel("% content time per cm")
     ax.set_title(
         f"at a well: <{AT_WELL_CM:.0f} cm from one", fontsize=SMALL_SIZE, pad=8
@@ -376,8 +367,8 @@ def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> Non
             ax.plot(x, row.to_numpy(), color="#999999", lw=0.5, zorder=1)
         for i, color in enumerate(colors):
             ax.scatter(
-                np.full(len(values), i), values.iloc[:, i], s=6, color=color,
-                lw=0, zorder=2,
+                np.full(len(values), i), values.iloc[:, i], s=7, color=color,
+                edgecolors="black", linewidths=0.5, zorder=2,
             )  # fmt: skip
         ax.axhline(0, color="0.85", lw=0.5, zorder=0)
         ax.set_title(label, fontsize=LABEL_SIZE, pad=2)
@@ -411,27 +402,27 @@ def generate_figure(inputs: dict):
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     outer = GridSpec(
         3, 1, figure=fig, height_ratios=[1.0, 1.05, 1.0], hspace=0.75,
-        left=0.08, right=0.99, top=0.96, bottom=0.08,
+        left=0.08, right=0.99, top=0.94, bottom=0.08,
     )  # fmt: skip
 
     row1 = outer[0].subgridspec(1, 4, width_ratios=[1, 1, 1, 1.3], wspace=0.5)
     ax_a, ax_b, ax_c, ax_d = (fig.add_subplot(row1[i]) for i in range(4))
     for ax, key in ((ax_a, "duration"), (ax_b, "extent"), (ax_c, "speed")):
-        draw_histogram(ax, events, inputs["intervals"], key)
-    ax_a.set_ylabel("Share of events")
+        draw_histogram(ax, events, key)
+    ax_a.set_ylabel("% events")
     draw_arm_counts(ax_d, events)
     ax_d.set_xlabel("Arms visited")
     ax_d.set_ylabel("% events")
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for _, _, c in KINDS]
-    ax_d.legend(
-        handles, [n for _, n, _ in KINDS], frameon=False, loc="upper right",
-        handlelength=0.8, borderaxespad=0,
+    fig.legend(
+        handles, [n for _, n, _ in KINDS], frameon=False, loc="upper center",
+        bbox_to_anchor=(0.5, 1.0), ncol=2, handlelength=0.8, columnspacing=1.5,
     )  # fmt: skip
 
     row2 = outer[1].subgridspec(1, 3, width_ratios=[1.0, 1.6, 1.3], wspace=0.6)
     ax_e = fig.add_subplot(row2[0])
-    draw_histogram(ax_e, events, inputs["intervals"], "start_distance")
-    ax_e.set_ylabel("Share of events")
+    draw_histogram(ax_e, events, "start_distance")
+    ax_e.set_ylabel("% events")
     ax_f = fig.add_subplot(row2[1])
     draw_ratio_track(
         ax_f, inputs["track_graph"], inputs["edge_order"], inputs["density"]
@@ -458,7 +449,7 @@ def generate_figure(inputs: dict):
             for ax, _, _ in row
         )
         for ax, text, x in row:
-            letter(fig, renderer, ax, text, x, min(top - 0.012, 0.985))
+            letter(fig, renderer, ax, text, x, min(top + 0.004, 0.985))
     return fig
 
 
