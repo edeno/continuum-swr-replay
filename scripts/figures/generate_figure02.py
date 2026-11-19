@@ -13,8 +13,7 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     c — The non-local events by SWR overlap (bars pooled over events, dots one
         per animal), and the share of non-local time outside SWRs.
     d — The SWRs by content (bars and animal dots as in c): with a non-local
-        event, mostly Local, or other; below, each SWR's share of time decoded
-        non-local (no "mostly" rule).
+        event, mostly Local, or other.
     e — For each SWR definition, MUA and the Widloski detector: the share of
         non-local events its events overlap, and the share of its own events
         that overlap a non-local event.
@@ -184,7 +183,8 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 # 9: theta and head speed around event starts, with each class's quartiles over
 #    events (i); each Kay SWR's share of time non-local (d).
 # 10: each animal's share of Kay's SWRs in each content class (d).
-FIGURE02_CACHE_VERSION = 10
+# 11: no per-SWR non-local share (d's histogram removed).
+FIGURE02_CACHE_VERSION = 11
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -522,9 +522,6 @@ def detector_comparison() -> dict:
             directional, tuple(DETECTOR_LABELS)
         ),
         "time_outside_swr": left_out["nonlocal_time_outside_kay_fraction"],
-        "kay_nonlocal_share": others.loc[
-            others["detector"] == "kay", "ss_frac_rows_nonlocal"
-        ].to_numpy(dtype=float),
     }
 
 
@@ -1026,22 +1023,6 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     ax_speed.set_xlabel("Time from event start (ms)")
 
 
-def draw_swr_share_histogram(ax: Axes, shares: np.ndarray) -> None:
-    """Panel d, below the bars: each Kay SWR's share of time non-local.
-
-    The bins with non-local probability above 0.8 as a share of the SWR's bins,
-    pooled over the SWRs: no "mostly" rule.
-    """
-    shares = shares[np.isfinite(shares)]
-    weights = np.full(shares.size, 100.0 / shares.size)
-    ax.hist(100 * shares, bins=np.linspace(0, 100, 21), weights=weights,
-            color=C_NL, lw=0)  # fmt: skip
-    ax.set_xlim(0, 100)
-    ax.set_xticks([0, 50, 100])
-    ax.set_xlabel("% of SWR non-local")
-    ax.set_ylabel("% SWRs")
-
-
 def draw_detector_bars(
     ax: Axes, shares: pd.DataFrame, n_rows: int, xlabel: str, show_labels: bool
 ) -> None:
@@ -1269,16 +1250,13 @@ def generate_figure(
     max_pos = float(np.ceil(inputs["data"]["position_info"].linear_position.max()))
     ax_a, ax_a_top = draw_overview(fig, outer[0], inputs, session_events, max_pos)
     ax_b = draw_examples(fig, outer[1], inputs, windows, max_pos)
-    row3 = outer[2].subgridspec(1, 4, width_ratios=[1.1, 1.3, 1.3, 1.05], wspace=0.7)
+    row3 = outer[2].subgridspec(1, 4, width_ratios=[1.1, 1.1, 1.4, 1.15], wspace=0.7)
     ax_c = fig.add_subplot(row3[0])
     draw_events_bars(
         ax_c, classes, overlap_class_animal_shares(events), inputs["time_outside_swr"]
     )
-    swr_grid = row3[1].subgridspec(2, 1, height_ratios=[1.45, 1.0], hspace=1.0)
-    ax_d = fig.add_subplot(swr_grid[0])
+    ax_d = fig.add_subplot(row3[1])
     draw_swr_bars(ax_d, inputs["kay"], inputs["kay_content_animals"])
-    ax_d_shares = fig.add_subplot(swr_grid[1])
-    draw_swr_share_histogram(ax_d_shares, inputs["kay_nonlocal_share"])
     detectors = row3[2].subgridspec(1, 2, wspace=0.3)
     ax_e = fig.add_subplot(detectors[0])
     ax_e2 = fig.add_subplot(detectors[1])
@@ -1322,7 +1300,7 @@ def generate_figure(
             "a": [ax_a],
             "b": [ax_b],
             "c": [ax_c],
-            "d": [ax_d, ax_d_shares],
+            "d": [ax_d],
             "e": [ax_e, ax_e2],
             "f": [ax_f1, ax_f2],
             "g": [ax_g, ax_g2],
