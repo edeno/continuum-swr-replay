@@ -9,12 +9,18 @@ bin's place on its arm is the fraction of the arm behind it, so 1 on a leaf arm
 is its end at the well, and arms of slightly different length in different
 animals line up when pooled.
 
+Every statistic here weighs animals the same: an epoch's value is over its own
+time bins, an animal's the mean over its epochs, and the result the mean over
+animals (event -> epoch -> animal, as the summaries' other animal values).
+
 :func:`arm_positions` places bins on arms and :func:`distance_to_nearest_well`
 measures how far along the track each one is from the nearest well;
 :func:`content_density_along_arms` gives each kind's content time per cm along
 every arm, the animals' mean, :func:`log2_density_ratio` the no-SWR to SWR ratio
-of it, and :func:`distance_from_animal_shares` each kind's content time by
-distance from the animal, at a well and elsewhere.
+of it, :func:`distance_from_animal_shares` each kind's content time by
+distance from the animal, at a well and elsewhere, and
+:func:`content_place_shares` and :func:`place_share_statistics` where content
+sits against the animal and the wells.
 """
 
 from __future__ import annotations
@@ -23,6 +29,10 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_properties.event_statistics import (
+    OCCUPANCY_PLACES,
+    quadrant_fractions,
+)
 from continuum_swr_replay.data_loaders.constants import LEAF_ARMS
 
 CENTER_NODE = 9
@@ -162,17 +172,17 @@ def distance_to_nearest_well(
 def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFrame:
     """Each kind's content time per cm along every arm, the animals' mean.
 
-    Each arm is cut into ``n_segments`` equal segments. For an animal and a kind,
+    Each arm is cut into ``n_segments`` equal segments. For an epoch and a kind,
     a segment's density is the share of the kind's time bins in it over the
     segment's length (the arm's median length over all of ``bins``, over
-    ``n_segments``), so an animal's densities integrate to 1 over the track.
-    The animals' densities are averaged, each animal weighing the same.
+    ``n_segments``), so an epoch's densities integrate to 1 over the track; an
+    animal's are the mean over its epochs, and the result the mean over animals.
 
     Parameters
     ----------
     bins : pd.DataFrame, shape (n_bins, n_columns)
-        One row per event time bin, with ``animal``, ``is_swr``, ``arm``,
-        ``fraction`` and ``arm_length_cm`` (:func:`arm_positions`).
+        One row per event time bin, with ``animal``, ``epoch_id``, ``is_swr``,
+        ``arm``, ``fraction`` and ``arm_length_cm`` (:func:`arm_positions`).
     n_segments : int
         Segments per arm.
 
@@ -191,7 +201,7 @@ def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFr
     )
     per_cm_of_cell = np.repeat(segment_cm.to_numpy(), n_segments)
     frames = []
-    for (is_swr, animal), group in bins.groupby(["is_swr", "animal"]):
+    for (is_swr, animal, epoch), group in bins.groupby(_EPOCH_KEYS):
         share = group.groupby(["arm", "segment"]).size().reindex(
             cells, fill_value=0
         ) / len(group)
@@ -200,13 +210,13 @@ def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFr
                 {
                     "is_swr": is_swr,
                     "animal": animal,
+                    "epoch_id": epoch,
                     "density_per_cm": share.to_numpy() / per_cm_of_cell,
                 },
                 index=cells,
             )
         )
-    by_animal = pd.concat(frames).reset_index()
-    return by_animal.groupby(["is_swr", "arm", "segment"])[["density_per_cm"]].mean()
+    return _animals_mean(pd.concat(frames).reset_index(), ["arm", "segment"])
 
 
 def leaf_and_trunk_profiles(density: pd.DataFrame) -> pd.DataFrame:
@@ -254,15 +264,15 @@ def distance_from_animal_shares(
     """Each kind's content time by distance from the animal, at a well and
     elsewhere, the animals' mean.
 
-    For an animal and a kind, each distance bin's share is its count of the
+    For an epoch and a kind, each distance bin's share is its count of the
     kind's time bins over all of them, split by whether the content is within
-    ``at_well_cm`` of a well (track distance); an animal's shares sum to 1. The
-    animals' shares are averaged, each animal weighing the same.
+    ``at_well_cm`` of a well (track distance); an epoch's shares sum to 1. An
+    animal's are the mean over its epochs, and the result the mean over animals.
 
     Parameters
     ----------
     bins : pd.DataFrame, shape (n_bins, n_columns)
-        One row per event time bin, with ``animal``, ``is_swr``,
+        One row per event time bin, with ``animal``, ``epoch_id``, ``is_swr``,
         ``distance_to_animal_cm`` and ``distance_to_well_cm``.
     edges_cm : np.ndarray, shape (n_edges,)
         The distance bins' edges, cm, covering every distance.
@@ -285,21 +295,88 @@ def distance_from_animal_shares(
         raise ValueError("a distance from the animal is missing or outside the bins")
     frame = bins.assign(at_well=bins["distance_to_well_cm"] < at_well_cm)
     frames = []
-    for (is_swr, _), group in frame.groupby(["is_swr", "animal"]):
+    for (is_swr, animal, epoch), group in frame.groupby(_EPOCH_KEYS):
         here = group["distance_to_animal_cm"].to_numpy()
         well = group["at_well"].to_numpy()
         frames.append(
             pd.DataFrame(
                 {
                     "is_swr": is_swr,
+                    "animal": animal,
+                    "epoch_id": epoch,
                     "distance_cm": edges_cm[:-1],
                     "at_well": np.histogram(here[well], edges_cm)[0] / len(group),
                     "elsewhere": np.histogram(here[~well], edges_cm)[0] / len(group),
                 }
             )
         )
-    return (
-        pd.concat(frames)
-        .groupby(["is_swr", "distance_cm"])[["at_well", "elsewhere"]]
-        .mean()
-    )
+    return _animals_mean(pd.concat(frames), ["distance_cm"])
+
+
+def content_place_shares(bins: pd.DataFrame) -> pd.DataFrame:
+    """Each animal's share of each kind's content time at each place.
+
+    The places are :data:`~.event_statistics.OCCUPANCY_PLACES`: at a remote
+    well, at the animal's own well, on a remote path, near the animal off the
+    wells (:func:`~.event_statistics.quadrant_fractions`, by track distance to
+    the animal and to the nearest well), and at either well (``at_well``). An
+    epoch's share is over its own time bins of the kind, an animal's the mean
+    over its epochs.
+
+    Parameters
+    ----------
+    bins : pd.DataFrame, shape (n_bins, n_columns)
+        One row per event time bin, with ``animal``, ``epoch_id``, ``is_swr``,
+        ``distance_to_animal_cm`` and ``distance_to_well_cm``.
+
+    Returns
+    -------
+    shares : pd.DataFrame, shape (n_kinds * n_animals, 5)
+        One column per place, indexed by ``is_swr`` and ``animal``.
+    """
+    rows = []
+    for (is_swr, animal, epoch), group in bins.groupby(_EPOCH_KEYS):
+        fractions = quadrant_fractions(
+            group["distance_to_animal_cm"].to_numpy(),
+            group["distance_to_well_cm"].to_numpy(),
+        )
+        fractions["at_well"] = fractions["remote_well"] + fractions["own_well"]
+        rows.append(
+            {"is_swr": is_swr, "animal": animal, "epoch_id": epoch, **fractions}
+        )
+    per_epoch = pd.DataFrame(rows)
+    return per_epoch.groupby(["is_swr", "animal"])[list(OCCUPANCY_PLACES)].mean()
+
+
+def place_share_statistics(shares: pd.DataFrame) -> dict:
+    """The animals' mean share at each place per kind, and the animals whose
+    no-SWR content is at a well more often than their SWR content.
+
+    Parameters
+    ----------
+    shares : pd.DataFrame
+        :func:`content_place_shares`'s output.
+
+    Returns
+    -------
+    statistics : dict
+        ``means``: a DataFrame, one row per ``is_swr``, one column per place;
+        ``n_animals_non_swr_more_at_well``: an int (an animal without both kinds
+        is not counted).
+    """
+    at_well = shares["at_well"].unstack("is_swr").dropna()
+    return {
+        "means": shares.groupby("is_swr").mean(),
+        "n_animals_non_swr_more_at_well": int((at_well[False] > at_well[True]).sum()),
+    }
+
+
+_EPOCH_KEYS = ["is_swr", "animal", "epoch_id"]
+
+
+def _animals_mean(per_epoch: pd.DataFrame, cells: list[str]) -> pd.DataFrame:
+    """Per kind and cell: the mean over epochs within each animal, then over
+    animals, of every value column of ``per_epoch``."""
+    values = [c for c in per_epoch.columns if c not in [*_EPOCH_KEYS, *cells]]
+    by_animal = per_epoch.groupby(["is_swr", "animal", *cells])[values].mean()
+    return by_animal.groupby(["is_swr", *cells]).mean()

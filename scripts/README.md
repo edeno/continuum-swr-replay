@@ -94,7 +94,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `fit_swr_contrast_content.py` — the HMM-harmonized content `is_swr`-contrast ladder (C / CP).
 - `compare_event_source_models.py` — choice (clogit) model comparison.
 - `compare_content_estimators.py` — three content estimators on one shared event set ([../docs/design/content_estimator_comparison.md](../docs/design/content_estimator_comparison.md)).
-- `analyze_content_occupancy.py` — where content sits relative to the animal and the reward wells; `--all` writes the table the events summary reads.
+- `analyze_content_occupancy.py` — where content sits relative to the animal and the reward wells, with its own plots (wells placed at the animal's median stopped position on each leaf arm). The events summary reads `scripts/event_properties/measure_content_along_arms.py`'s output instead, whose wells are the track graph's end points.
 - `quantify_swr_overlap_geometry.py`, `generate_replay_content_figures.py`.
 - `analyze_uncertainty_content.py` — reward-belief uncertainty profiles, content rates and response sensitivities.
 

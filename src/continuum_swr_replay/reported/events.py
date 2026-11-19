@@ -20,8 +20,9 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
 - the held-out tetrode test split by SWR (``nl_bouts_by_swr_stats.csv`` beside
   the state-evidence run the detection summary reads, from
   ``scripts/event_evidence/split_state_evidence_by_swr.py``);
-- the content-occupancy table (``Processed-Data/content_occupancy``, from
-  ``scripts/replay_models/content/analyze_content_occupancy.py``);
+- each event time bin's content placed on the track, with its track distance to
+  the animal and to the nearest well (``Processed-Data/content_along_arms``, from
+  ``scripts/event_properties/measure_content_along_arms.py``);
 - the one-class-or-two tests (``Processed-Data/ripple_class_structure``, from
   ``scripts/event_properties/measure_ripple_class_structure.py``);
 - each event's start distance and duration-matched quiet-rest theta
@@ -73,7 +74,10 @@ from continuum_swr_replay.analysis.event_evidence import (
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
 )
-from continuum_swr_replay.analysis.event_properties import event_statistics
+from continuum_swr_replay.analysis.event_properties import (
+    content_along_arms,
+    event_statistics,
+)
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
@@ -83,6 +87,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
 )
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
+    CONTENT_ALONG_ARMS_DIR,
     DECODER_QUALITY_DIR,
     EVENT_GAMMA_DIR,
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
@@ -94,7 +99,6 @@ from continuum_swr_replay.paths import (
     ROOT_DIR,
     STATE_EVIDENCE_DIR,
     STATE_EVIDENCE_RUN,
-    content_occupancy_dir,
     event_features_root,
     event_spike_evidence_dir,
     inventory_comparison_root,
@@ -184,7 +188,7 @@ class EventsInputs:
     event_features_run: Path
     spike_evidence_dir: Path
     heldout_by_swr: Path
-    content_occupancy: Path
+    content_along_arms: Path
     brain_state_reference: Path
     event_gamma: Path
     class_structure: Path
@@ -204,7 +208,7 @@ def default_inputs() -> EventsInputs:
         / STATE_EVIDENCE_RUN
         / STATE_EVIDENCE_DIR
         / f"{NL_BOUTS_BY_SWR_STEM}_stats.csv",
-        content_occupancy=content_occupancy_dir() / "content_occupancy_per_session.csv",
+        content_along_arms=processed_data_dir() / CONTENT_ALONG_ARMS_DIR,
         brain_state_reference=processed_data_dir()
         / BRAIN_STATE_REFERENCE_DIR
         / "reference.parquet",
@@ -1813,48 +1817,82 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
 # --- where content sits -------------------------------------------------------
 
 
-def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2d.1: where content sits against the animal and the reward wells.
+def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2d.1: where content sits against the animal and the wells.
 
-    Time-bin-weighted shares over all sessions (as the analysis prints them):
-    at a remote well, at the animal's own well, on a remote path, near the
-    animal off the wells.
+    ``bins``: each event time bin with its kind and its content's track distance
+    to the animal and to the nearest well (a track-graph end point), as
+    :func:`content_along_arms_bins` reads them. The shares at a remote well, at
+    the animal's own well, on a remote path and near the animal off the wells
+    (``content_along_arms.content_place_shares``): each epoch's share of its
+    time bins, averaged over the animal's epochs, then over animals.
     """
     make = value_factory(content_occupancy_values, source, TAGS["content_occupancy"])
-    shares = event_statistics.content_occupancy_shares(occupancy)
+    statistics = content_along_arms.place_share_statistics(
+        content_along_arms.content_place_shares(bins)
+    )
     values = [
         make(
             "occupancy_epochs",
-            occupancy["epoch_id"].nunique(),
+            bins["epoch_id"].nunique(),
             "count",
             "count",
-            "epochs in the content-occupancy table",
+            "epochs whose event time bins place content on the track",
         ),
     ]
-    for word, group in (("non_swr", "nonSWR"), ("swr", "SWR")):
+    for word, is_swr, name in (("non_swr", False, "non-SWR"), ("swr", True, "SWR")):
         for column in event_statistics.OCCUPANCY_PLACES:
             values.append(
                 make(
                     f"{word}_content_{column}_fraction",
-                    shares.loc[group, column],
+                    statistics["means"].loc[is_swr, column],
                     "fraction",
                     "pct",
-                    f"share of {group} non-local time bins whose content is "
-                    f"{column.replace('_', ' ')}, weighted by time bins over sessions",
+                    f"share of {name} non-local content time "
+                    f"{column.replace('_', ' ')} (wells are the track graph's end "
+                    "points; each epoch's share, averaged over the animal's epochs, "
+                    "then over animals)",
                 )
             )
     values.append(
         make(
             "animals_non_swr_more_at_well",
-            event_statistics.n_animals_non_swr_more_at_well(occupancy),
+            statistics["n_animals_non_swr_more_at_well"],
             "count",
             "count",
             "animals whose non-SWR content is at a well more often than their SWR "
-            "content, each share the mean over the animal's sessions of the session's "
-            "share",
+            "content, each share the mean over the animal's epochs",
         )
     )
     return values
+
+
+def content_along_arms_bins(
+    events: pd.DataFrame, folder: Path, n_epochs: int, columns: list[str]
+) -> tuple[pd.DataFrame, list[Path]]:
+    """Every event time bin of the content-along-arms run with ``columns``, each
+    with its event's ``animal`` and ``is_swr``; and the files read.
+
+    Raises
+    ------
+    ValueError
+        If ``folder`` does not hold ``n_epochs`` epochs, or its bins do not cover
+        exactly the events of ``events``.
+    """
+    paths = sorted(folder.glob("*.parquet"))
+    if len(paths) != n_epochs:
+        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    bins = pd.concat(
+        pd.read_parquet(path, columns=["event_id", "epoch_id", *columns])
+        for path in paths
+    )
+    n_bins = len(bins)
+    bins = bins.merge(
+        events[["event_id", "animal", "is_swr"]], on="event_id", validate="m:1"
+    )
+    if len(bins) != n_bins or bins["event_id"].nunique() != len(events):
+        raise ValueError(f"the bins of {folder} do not cover the event table's events")
+    return bins, paths
 
 
 # --- the summary ---------------------------------------------------------------
@@ -2082,9 +2120,26 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         ),
     ]
 
-    occupancy = pd.read_csv(inputs.content_occupancy)
-    summary.add(*content_occupancy_values(occupancy, rel(inputs.content_occupancy)))
-    summary.inputs.append(file_record(inputs.content_occupancy, ROOT_DIR))
+    along_bins, along_paths = content_along_arms_bins(
+        events,
+        inputs.content_along_arms,
+        n_epochs,
+        ["distance_to_animal_cm", "distance_to_well_cm"],
+    )
+    summary.add(
+        *pend(
+            content_occupancy_values(
+                along_bins,
+                f"{rel(inputs.content_along_arms)} "
+                "(scripts/event_properties/measure_content_along_arms.py)",
+            ),
+            stale(inputs.content_along_arms),
+        )
+    )
+    summary.inputs += [
+        files_record("*.parquet", along_paths, ROOT_DIR),
+        file_record(inputs.content_along_arms / "manifest.json", ROOT_DIR),
+    ]
 
     analysed = set(analysed_epoch_ids())
     participation_table = read_complete_run(inputs.event_participation, "participation")

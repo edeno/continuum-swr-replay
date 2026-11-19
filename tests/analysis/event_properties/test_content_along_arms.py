@@ -11,10 +11,12 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     arm_positions,
     check_arm_orientation,
     content_density_along_arms,
+    content_place_shares,
     distance_from_animal_shares,
     distance_to_nearest_well,
     leaf_and_trunk_profiles,
     log2_density_ratio,
+    place_share_statistics,
 )
 
 
@@ -63,10 +65,11 @@ def test_arms_must_run_outward_to_the_graphs_end_points():
         check_arm_orientation([(9, 6), (6, 0)], nx.Graph([(9, 6), (6, 0), (0, 2)]))
 
 
-def _bins(animal, is_swr, arm, fraction, length=10.0):
+def _bins(animal, is_swr, arm, fraction, length=10.0, epoch="e1"):
     return pd.DataFrame(
         {
             "animal": animal,
+            "epoch_id": epoch,
             "is_swr": is_swr,
             "arm": arm,
             "fraction": fraction,
@@ -141,6 +144,7 @@ def test_distance_shares_split_at_a_well_and_weigh_animals_the_same():
     bins = pd.DataFrame(
         {
             "animal": ["a", "a", "a", "a", "b"],
+            "epoch_id": "e1",
             "is_swr": False,
             "distance_to_animal_cm": [5.0, 15.0, 15.0, 25.0, 25.0],
             "distance_to_well_cm": [1.0, 50.0, 2.0, 3.0, 40.0],
@@ -155,3 +159,64 @@ def test_distance_shares_split_at_a_well_and_weigh_animals_the_same():
     assert no_swr.to_numpy().sum() == pytest.approx(1.0)
     with pytest.raises(ValueError, match="outside"):
         distance_from_animal_shares(bins, np.array([0, 10, 20]), 20.0)
+
+
+def test_an_animal_s_epochs_weigh_the_same_however_many_bins_they_hold():
+    # Animal a: epoch e1 has 3 bins on arm 0's far half, e2 one bin on its near
+    # half. Per epoch the shares are (0, 1) and (1, 0); a's mean is (0.5, 0.5),
+    # not the pooled (0.25, 0.75).
+    bins = pd.concat(
+        [
+            _bins("a", False, [0, 0, 0], [0.9, 0.9, 0.9], epoch="e1"),
+            _bins("a", False, [0], [0.1], epoch="e2"),
+        ],
+        ignore_index=True,
+    )
+    density = content_density_along_arms(bins, n_segments=2)["density_per_cm"]
+    assert density[(False, 0, 0)] == pytest.approx(0.5 / 5)
+    assert density[(False, 0, 1)] == pytest.approx(0.5 / 5)
+
+
+def test_place_shares_go_epoch_then_animal_and_count_animals_at_wells():
+    # 20 cm from the animal is remote, under 20 cm from a well is at a well.
+    def rows(animal, epoch, is_swr, d_animal, d_well):
+        return pd.DataFrame(
+            {
+                "animal": animal,
+                "epoch_id": epoch,
+                "is_swr": is_swr,
+                "distance_to_animal_cm": d_animal,
+                "distance_to_well_cm": d_well,
+            }
+        )
+
+    bins = pd.concat(
+        [
+            # a, no SWR: e1 one remote-well bin; e2 one own-well and one
+            # remote-path bin. Epoch shares: remote well 1 and 0, own well 0
+            # and 0.5, remote path 0 and 0.5.
+            rows("a", "e1", False, [100.0], [5.0]),
+            rows("a", "e2", False, [5.0, 100.0], [5.0, 50.0]),
+            # a, SWR: one remote-path bin. b: no SWR at a remote well, SWR
+            # near the animal off the wells.
+            rows("a", "e1", True, [100.0], [50.0]),
+            rows("b", "e1", False, [100.0], [5.0]),
+            rows("b", "e1", True, [5.0], [50.0]),
+        ],
+        ignore_index=True,
+    )
+    shares = content_place_shares(bins)
+    assert shares.loc[(False, "a")].to_dict() == pytest.approx(
+        {
+            "remote_well": 0.5,
+            "own_well": 0.25,
+            "at_well": 0.75,
+            "remote_path": 0.25,
+            "near_off": 0.0,
+        }
+    )
+    statistics = place_share_statistics(shares)
+    # no SWR at a well: a 0.75, b 1.0, mean 0.875; SWR: both 0.
+    assert statistics["means"].loc[False, "at_well"] == pytest.approx(0.875)
+    assert statistics["means"].loc[True, "at_well"] == 0.0
+    assert statistics["n_animals_non_swr_more_at_well"] == 2

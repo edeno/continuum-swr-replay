@@ -463,7 +463,8 @@ Each builder's statistics:
 
 - survey: `analysis/literature_survey.py` (the builder reads the survey's cells into numbers and trigger
   sets; the modes, ranges and shares are computed there);
-- events: `analysis/event_properties/event_statistics.py`, `analysis/decode_quality/quality_metrics.py` (the
+- events: `analysis/event_properties/event_statistics.py`, `analysis/event_properties/content_along_arms.py`
+  (where content sits on the track), `analysis/decode_quality/quality_metrics.py` (the
   decoder's accuracy, state fractions and calibration), `analysis/detector_comparison/nonlocal_comparison.py`;
 - mpfc: `analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`, and
   `analysis/pfc/marked_family_statistics.py` (through the marked-family summary

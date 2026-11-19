@@ -30,7 +30,9 @@ e–g place every event time bin's MAP position on its arm
 draws ``content_along_arms.distance_from_animal_shares``, f and g
 ``content_along_arms.content_density_along_arms``, each the animals' mean; g
 quotes the share of content time within ``AT_WELL_CM`` of a well, the summary's
-``*_content_at_well_fraction`` (``event_statistics.content_occupancy_shares``). Panel h's animal values are
+``*_content_at_well_fraction`` (``content_along_arms.content_place_shares``,
+``place_share_statistics``). Every one of them weighs each epoch of an animal the
+same and each animal the same. Panel h's animal values are
 ``event_statistics.animal_signal_levels``: the values the summary's
 ``<signal>_animals_*`` counts compare.
 
@@ -60,25 +62,25 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
 )
 from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     content_density_along_arms,
+    content_place_shares,
     distance_from_animal_shares,
     leaf_and_trunk_profiles,
     log2_density_ratio,
+    place_share_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     AT_WELL_CM,
     animal_signal_levels,
     class_medians,
-    content_occupancy_shares,
 )
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
-    CONTENT_ALONG_ARMS_DIR,
-    content_occupancy_dir,
     processed_data_dir,
 )
 from continuum_swr_replay.reported.events import (
+    content_along_arms_bins,
     default_inputs,
     with_brain_state,
 )
@@ -158,40 +160,26 @@ def read_inputs() -> dict:
     """The events with their gamma, their content's time bins, and the other inputs."""
     inputs = default_inputs()
     events = read_swr_table(inputs.event_table)
-    n_events = len(events)
     n_epochs = len(analysed_epoch_ids())
     events, reference, _ = with_brain_state(events, inputs, n_epochs)
-    occupancy = pd.read_csv(
-        content_occupancy_dir() / "content_occupancy_per_session.csv"
+    along, _ = content_along_arms_bins(
+        events,
+        inputs.content_along_arms,
+        n_epochs,
+        [
+            "arm",
+            "fraction",
+            "arm_length_cm",
+            "distance_to_well_cm",
+            "distance_to_animal_cm",
+        ],
     )
-    along = pd.concat(
-        pd.read_parquet(
-            path,
-            columns=[
-                "event_id",
-                "arm",
-                "fraction",
-                "arm_length_cm",
-                "distance_to_well_cm",
-                "distance_to_animal_cm",
-            ],
-        )
-        for path in sorted(
-            (processed_data_dir() / CONTENT_ALONG_ARMS_DIR).glob("*.parquet")
-        )
-    )
-    n_bins = len(along)
-    along = along.merge(
-        events[["event_id", "animal", "is_swr"]], on="event_id", validate="m:1"
-    )
-    if len(along) != n_bins or along["event_id"].nunique() != n_events:
-        raise ValueError("the content-along-arms bins do not cover the event table")
     density = content_density_along_arms(along, N_SEGMENTS)
     env = pd.read_pickle(decode_paths(TRACK_EPOCH, processed_data_dir()).environment)
     return {
         "events": events,
         "reference": reference,
-        "occupancy_shares": content_occupancy_shares(occupancy),
+        "place_shares": place_share_statistics(content_place_shares(along))["means"],
         "ratio": log2_density_ratio(density),
         "distance_shares": distance_from_animal_shares(
             along, DISTANCE_EDGES_CM, AT_WELL_CM
@@ -355,10 +343,9 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame) -> None:
         leaf = profiles.loc[(is_swr, "leaf"), "density_per_cm"].to_numpy()
         ax.plot(x, 100 * trunk, color=color)
         ax.plot(1 + x, 100 * leaf, color=color)
-        group = "SWR" if is_swr else "nonSWR"
         ax.text(
             0.03, 0.97 - 0.09 * is_swr,
-            f"{name}: {100 * shares.loc[group, 'at_well']:.0f}% at a well",
+            f"{name}: {100 * shares.loc[is_swr, 'at_well']:.0f}% at a well",
             transform=ax.transAxes, color=color, ha="left", va="top",
             fontsize=SMALL_SIZE,
         )  # fmt: skip
@@ -433,7 +420,7 @@ def generate_figure(inputs: dict):
     ax_f = fig.add_subplot(row2[1])
     draw_ratio_track(ax_f, inputs["track_graph"], inputs["edge_order"], inputs["ratio"])
     ax_g = fig.add_subplot(row2[2])
-    draw_profiles(ax_g, inputs["profiles"], inputs["occupancy_shares"])
+    draw_profiles(ax_g, inputs["profiles"], inputs["place_shares"])
 
     row3 = outer[2].subgridspec(1, 4, width_ratios=[1, 1, 1, 1.3], wspace=0.5)
     ax_h = [fig.add_subplot(row3[i]) for i in range(len(SIGNALS))]
