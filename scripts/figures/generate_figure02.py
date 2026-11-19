@@ -34,11 +34,10 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
         construction)
         (``event_evidence.tetrode_holdout``;
         ``Processed-Data/event_tetrode_holdout``).
-    i — Around non-local event starts, SWR vs no-SWR: ripple power and MUA (mean
-        and SEM, with the epochs' level between events), then theta power and
-        head speed (median and interquartile range over events, with theta's
-        running and between-event levels and the immobility threshold): not
-        theta sequences.
+    i — Around non-local event starts, SWR vs no-SWR: ripple power, MUA, theta
+        power and head speed, each the median and interquartile range over
+        events, with the epochs' level between events, theta's running level and
+        the immobility threshold: not theta sequences.
     j — The share of immobile time bins decoded non-local by ripple power, one
         line per animal: no step at the SWR threshold.
 
@@ -638,6 +637,7 @@ def draw_overview(
         edge_order=data["linear_edge_order"],
         occupancy_linewidth=TRACK_LINEWIDTH,
     )
+    label_reward_well(ax_track, data["track_graph"])
     rows = gs[1].subgridspec(
         5, 1, height_ratios=[1.5, 1.05, 0.42, 0.42, 0.42], hspace=0.14
     )
@@ -726,6 +726,21 @@ def draw_overview(
     for ax in (ax_pos, ax_lane, ax_rip, ax_st):
         ax.tick_params(labelbottom=False)
     return ax_track, ax_pos
+
+
+def label_reward_well(ax: Axes, track_graph) -> None:
+    """Name the wells once: label the top-left well (a degree-1 node) as a
+    reward well; the other well dots, here and on the decode's axis, match it."""
+    wells = [
+        track_graph.nodes[n]["pos"]
+        for n in track_graph.nodes
+        if track_graph.degree(n) == 1
+    ]
+    x, y = min(wells, key=lambda pos: (-round(pos[1]), pos[0]))
+    ax.annotate(
+        "Reward well", (x, y), xytext=(-5, 0), textcoords="offset points",
+        ha="right", va="center", fontsize=SMALL_SIZE,
+    )  # fmt: skip
 
 
 def fit_track_to_height(fig: Figure, ax_track: Axes, left: float) -> None:
@@ -963,43 +978,38 @@ def draw_heldout_gain(ax: Axes, events: pd.DataFrame, controls: pd.DataFrame) ->
 def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> None:
     """Panel i: ripple power, MUA, theta and head speed around event starts.
 
-    Ripple and MUA: the mean over events with its SEM (population activity rises
-    at the start). Theta and head speed: the median over events with the
-    interquartile band, so the spread is seen, not only the centre: theta at its
-    level between events, far below running, and the animal still. The dashed
-    "between events" line is the epochs' level in immobile bins outside every
-    non-local, SWR and MUA event (``reference_medians``).
+    Every row is the median over events with the interquartile band, so the
+    spread over events is seen, not only the centre, and the line is the
+    statistic the text quotes: ripple and MUA rise at the start, theta stays at
+    its level between events, far below running, and the animal is still. The
+    dashed "between events" line is the epochs' median in immobile bins outside
+    every non-local, SWR and MUA event (``reference_medians``).
     """
     ax_rip, ax_mua, ax_theta, ax_speed = axes
     groups = (("overlap", C_SWR, "SWR"), ("no_overlap", C_NL, "No SWR"))
-    for ax, signal, word in (
-        (ax_rip, "SWR_zscore", "ripple"),
-        (ax_mua, "MUA_zscore", "mua"),
-    ):
-        curve = curves[signal]
-        t_ms = 1000 * np.asarray(curve["time"])
-        for key, color, name in groups:
-            mean, sem = (
-                np.asarray(curve[f"{key}_mean"]),
-                np.asarray(curve[f"{key}_sem"]),
-            )
-            ax.fill_between(t_ms, mean - sem, mean + sem, color=color, alpha=0.3, lw=0)
-            ax.plot(t_ms, mean, color=color, lw=1.0, label=name)
-        ax.axhline(rest.loc[word, "rest"], color=C_NOSPIKE, lw=0.6, ls="--")
-        top = max(np.nanmax(curve[f"{key}_mean"]) for key, _, _ in groups)
-        ax.set_ylim(rest.loc[word, "rest"] - 0.3, top + 1.2)
     for ax, signal in (
+        (ax_rip, "SWR_zscore"),
+        (ax_mua, "MUA_zscore"),
         (ax_theta, "theta_power_zscore"),
         (ax_speed, "head_speed"),
     ):
         curve = curves[signal]
         t_ms = 1000 * np.asarray(curve["time"])
-        for key, color, _ in groups:
+        for key, color, name in groups:
             ax.fill_between(
                 t_ms, curve[f"{key}_q25"], curve[f"{key}_q75"], color=color,
                 alpha=0.25, lw=0,
             )  # fmt: skip
-            ax.plot(t_ms, curve[f"{key}_median"], color=color, lw=1.0)
+            ax.plot(t_ms, curve[f"{key}_median"], color=color, lw=1.0, label=name)
+    for ax, signal, word in (
+        (ax_rip, "SWR_zscore", "ripple"),
+        (ax_mua, "MUA_zscore", "mua"),
+    ):
+        curve = curves[signal]
+        ax.axhline(rest.loc[word, "rest"], color=C_NOSPIKE, lw=0.6, ls="--")
+        low = min(np.nanmin(curve[f"{key}_q25"]) for key, _, _ in groups)
+        top = max(np.nanmax(curve[f"{key}_q75"]) for key, _, _ in groups)
+        ax.set_ylim(min(low, rest.loc[word, "rest"]) - 0.3, top + 1.2)
     ax_theta.axhline(rest.loc["theta", "rest"], color=C_NOSPIKE, lw=0.6, ls="--")
     ax_theta.axhline(rest.loc["theta", "running"], color="k", lw=0.6, ls="--")
     ax_theta.text(
@@ -1311,7 +1321,7 @@ def generate_figure(
         )
         - 0.004
     )
-    fit_track_to_height(fig, ax_a, x_left + 0.02)
+    fit_track_to_height(fig, ax_a, x_left)
     fig.canvas.draw()
     positions = place_letters(
         fig,
