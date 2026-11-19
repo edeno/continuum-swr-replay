@@ -156,7 +156,7 @@ TAGS = {
     "state_composition": Tags(("2d.10",), ("3e",)),
     "likelihood_advantage": Tags(("2c.3",)),
     "tetrode_holdout": Tags(("2c.3",), ("2h",)),
-    "spike": Tags(("2d.9", "2c.3"), ("2",)),
+    "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
     "spike_gpi": Tags(("2c.4",)),

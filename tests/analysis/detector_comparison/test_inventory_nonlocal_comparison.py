@@ -432,38 +432,82 @@ def test_an_inventory_run_with_no_ok_epoch_is_refused(tmp_path):
         comparison.inventory_animal_tables(tmp_path / "inventory")
 
 
-def test_nonlocal_events_overlapped_pools_animals_and_keeps_each_animals_share():
-    directional = pd.DataFrame(
+def test_nonlocal_events_overlapped_pools_events_and_averages_each_animals_epochs():
+    # animal a: epoch 1 has 1 of 2 non-local events overlapped by Kay, epoch 2
+    # has 1 of 1, so its share is the epochs' mean, 0.75, not the pooled 2/3
+    memberships = pd.DataFrame(
         {
-            "animal": ["a", "b", "a", "b", "a"],
-            "source_detector": ["state_space"] * 4 + ["kay"],
-            "target_detector": ["kay", "kay", "mua", "mua", "state_space"],
-            "n_eligible": [10, 30, 10, 0, 5],
-            "n_matched": [5, 15, 2, 0, 5],
+            "animal": ["a", "a", "a", "b", "b", "a"],
+            "day": [1, 1, 2, 1, 1, 1],
+            "epoch": ["02_r1"] * 6,
+            "other_detector": ["kay"] * 5 + ["mua"],
+            "matched": [True, False, True, False, False, True],
         }
     )
-    overlap = comparison.nonlocal_events_overlapped(directional, ("kay", "mua"))
+    overlap = comparison.nonlocal_events_overlapped(memberships, ("kay", "mua"))
     assert list(overlap.index) == ["kay", "mua"]
-    assert overlap.loc["kay", "pooled"] == pytest.approx(20 / 40)
-    np.testing.assert_allclose(overlap.loc["kay", "animals"], [0.5, 0.5])
-    assert overlap.loc["mua", "pooled"] == pytest.approx(0.2)
-    # an animal with no eligible event has no share, not a division by zero
-    assert np.isnan(overlap.loc["mua", "animals"][1])
+    assert overlap.loc["kay", "pooled"] == pytest.approx(2 / 5)
+    np.testing.assert_allclose(overlap.loc["kay", "animals"], [0.75, 0.0])
+    # an animal with no event against a detector has no dot
+    np.testing.assert_allclose(overlap.loc["mua", "animals"], [1.0])
 
 
-def test_events_overlapping_nonlocal_reads_the_other_direction():
-    directional = pd.DataFrame(
+def test_events_overlapping_nonlocal_gives_the_content_classes_animal_shares():
+    from continuum_swr_replay.analysis.detector_comparison.nonlocal_comparison import (
+        content_class_animal_shares,
+    )
+
+    events = pd.DataFrame(
         {
-            "animal": ["a", "b", "a"],
-            "source_detector": ["kay", "kay", "state_space"],
-            "target_detector": ["state_space", "state_space", "kay"],
-            "n_eligible": [10, 30, 5],
-            "n_matched": [8, 21, 1],
+            "detector": ["kay"] * 4,
+            "animal": ["a", "a", "a", "b"],
+            "day": ["d1", "d1", "d2", "d1"],
+            "epoch": ["e1"] * 4,
+            "matched": [True, False, True, False],
+            LOCAL: [0.0, 0.9, 0.0, 0.2],
+            NO_SPIKE: 0.0,
+            NON_LOCAL: [1.0, 0.0, 1.0, 0.0],
+            UNCERTAIN: 0.0,
         }
     )
-    shares = comparison.events_overlapping_nonlocal(directional, ("kay",))
-    assert shares.loc["kay", "pooled"] == pytest.approx(29 / 40)
-    np.testing.assert_allclose(shares.loc["kay", "animals"], [0.8, 0.7])
+    shares = comparison.events_overlapping_nonlocal(events, ("kay",))
+    assert shares.loc["kay", "pooled"] == pytest.approx(2 / 4)
+    np.testing.assert_allclose(
+        shares.loc["kay", "animals"],
+        content_class_animal_shares(events, "kay")["with_nonlocal"].to_numpy(),
+    )
+
+
+def test_nonlocal_event_memberships_keep_what_the_directional_table_counts(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write_manifest(run_dir)
+    pd.DataFrame(
+        {
+            "animal": "a",
+            "day": 1,
+            "epoch": "02_r1",
+            "detector": "state_space",
+            "event_key": ["n1", "n2", "n3", "n4"],
+            "other_detector": "kay",
+            "membership": ["matched", "unmatched", "unknown", "matched"],
+            # n4 lies outside the two detectors' shared exposure
+            "within_shared_exposure": [True, True, True, False],
+        }
+    ).to_parquet(run_dir / "a_pair_membership.parquet")
+    directional = pd.DataFrame(
+        {
+            "source_detector": ["state_space"],
+            "target_detector": ["kay"],
+            "n_eligible": [2],
+            "n_matched": [1],
+        }
+    )
+    kept = comparison.nonlocal_event_memberships(run_dir, directional)
+    assert list(kept["event_key"]) == ["n1", "n2"]
+    assert list(kept["matched"]) == [True, False]
+    with pytest.raises(ValueError, match="directional counts"):
+        comparison.nonlocal_event_memberships(run_dir, directional.assign(n_matched=2))
 
 
 def test_content_classes_and_their_animal_shares():

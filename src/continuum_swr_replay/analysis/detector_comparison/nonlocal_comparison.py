@@ -35,7 +35,6 @@ from continuum_swr_replay.analysis.detector_comparison.inventory_run import (
 from continuum_swr_replay.analysis.detector_comparison.pooling import (
     cells_by_animal,
     counts_by_animal,
-    ratio,
     session_tables,
 )
 from continuum_swr_replay.analysis.detector_comparison.schema import (
@@ -104,14 +103,51 @@ def other_detector_events(run_dir: Path) -> pd.DataFrame:
     return events.assign(matched=events["membership"] == "matched")
 
 
+def nonlocal_event_memberships(
+    run_dir: Path, directional: pd.DataFrame
+) -> pd.DataFrame:
+    """Each non-local event's membership against each other detector: whether
+    that detector's events overlap it (``matched``).
+
+    Only the memberships the comparison's ``directional`` table counts are kept:
+    known ones (matched or unmatched) within the two detectors' shared exposure.
+
+    Raises
+    ------
+    ValueError
+        Unless the kept memberships give the directional table's counts.
+    """
+    memberships = _read_epochs(
+        run_dir, "pair_membership", filters=[("detector", "==", STATE_SPACE)]
+    )
+    kept = memberships[
+        memberships["membership"].isin(_KNOWN)
+        & memberships["within_shared_exposure"].astype(bool)
+    ]
+    kept = kept.assign(matched=kept["membership"] == "matched")
+    _check_counts(
+        kept.groupby("other_detector")["matched"].agg(
+            n_eligible="size", n_matched="sum"
+        ),
+        directional[directional["source_detector"] == STATE_SPACE]
+        .groupby("target_detector")[["n_eligible", "n_matched"]]
+        .sum(),
+    )
+    return kept
+
+
 def check_against_directional(events: pd.DataFrame, directional: pd.DataFrame) -> None:
     """Raise unless the per-event memberships give the comparison's own counts."""
-    mine = events.groupby("detector")["matched"].agg(n_eligible="size", n_matched="sum")
-    theirs = (
+    _check_counts(
+        events.groupby("detector")["matched"].agg(n_eligible="size", n_matched="sum"),
         directional[directional["target_detector"] == STATE_SPACE]
         .groupby("source_detector")[["n_eligible", "n_matched"]]
-        .sum()
+        .sum(),
     )
+
+
+def _check_counts(mine: pd.DataFrame, theirs: pd.DataFrame) -> None:
+    """Raise unless per-event counts (``mine``) equal the directional table's."""
     joined = theirs.join(mine, rsuffix="_events", how="outer")
     if not (
         (joined["n_eligible"] == joined["n_eligible_events"]).all()
@@ -142,6 +178,22 @@ class Comparison:
     directional: pd.DataFrame
 
 
+def comparison_files(run_dir: Path) -> list[Path]:
+    """Every file :func:`read_comparison` and :func:`nonlocal_event_memberships`
+    read: the run's manifest and per-epoch tables, and the inventory run's
+    directional table."""
+    inventory_dir = (
+        inventory_comparison_root()
+        / read_manifest(run_dir)["settings"]["input_runs"]["inventory"]
+    )
+    return [
+        run_dir / "manifest.json",
+        *_epoch_paths(run_dir, "state_shares"),
+        *_epoch_paths(run_dir, "pair_membership"),
+        inventory_dir / "report" / "directional_by_animal.csv",
+    ]
+
+
 def read_comparison(run_dir: Path) -> Comparison:
     """The features run's compared events and its inventory run's directional
     table, checked against each other."""
@@ -157,59 +209,64 @@ def read_comparison(run_dir: Path) -> Comparison:
 
 
 def _matched_shares(
-    rows: pd.DataFrame, by: str, detectors: tuple[str, ...]
+    events: pd.DataFrame, by: str, detectors: tuple[str, ...]
 ) -> pd.DataFrame:
-    """Each detector's share of eligible events matched: pooled, and per animal."""
+    """Each detector's share of its events matched: pooled over events, and per
+    animal as the mean over the animal's epochs of each epoch's share (event ->
+    epoch -> animal), as :func:`content_class_animal_shares` takes it."""
     shares = {}
     for detector in detectors:
-        d = rows[rows[by] == detector]
+        mine = events[events[by] == detector]
         shares[detector] = {
-            "pooled": d["n_matched"].sum() / d["n_eligible"].sum(),
-            "animals": ratio(d["n_matched"], d["n_eligible"]).to_numpy(),
+            "pooled": mine["matched"].mean(),
+            "animals": animal_session_values(
+                mine["matched"].astype(float),
+                mine["animal"],
+                mine[["day", "epoch"]],
+                "mean",
+            ).to_numpy(),
         }
     return pd.DataFrame.from_dict(shares, orient="index").rename_axis("detector")
 
 
 def nonlocal_events_overlapped(
-    directional: pd.DataFrame, detectors: tuple[str, ...]
+    memberships: pd.DataFrame, detectors: tuple[str, ...]
 ) -> pd.DataFrame:
     """The share of the non-local events each detector's events overlap.
 
     Parameters
     ----------
-    directional : pd.DataFrame
-        The inventory comparison's ``directional_by_animal`` table: one row per
-        animal, source and target detector, with ``n_eligible`` and
-        ``n_matched``.
+    memberships : pd.DataFrame
+        :func:`nonlocal_event_memberships`: one row per non-local event and
+        other detector, with ``matched`` and the session columns.
     detectors : tuple of str
-        The target detectors, in the order returned.
+        The other detectors, in the order returned.
 
     Returns
     -------
     overlap : pd.DataFrame, shape (n_detectors, 2)
         Indexed by detector: ``pooled``, the matched non-local events over the
-        eligible ones summed over animals, and ``animals``, each animal's own
-        share (an array; NaN where an animal has no eligible event).
+        eligible ones, and ``animals``, each animal's mean over its epochs of
+        the epoch's share (an array, in the animals' sorted order).
     """
-    rows = directional[directional["source_detector"] == STATE_SPACE]
-    return _matched_shares(rows, "target_detector", detectors)
+    return _matched_shares(memberships, "other_detector", detectors)
 
 
 def events_overlapping_nonlocal(
-    directional: pd.DataFrame, detectors: tuple[str, ...]
+    events: pd.DataFrame, detectors: tuple[str, ...]
 ) -> pd.DataFrame:
     """The share of each detector's events that overlap a non-local event.
 
     The other direction of :func:`nonlocal_events_overlapped`: 1 minus this is
-    :func:`other_detector_statistics`'s ``no_nonlocal_fraction`` when the
-    memberships give the directional counts (:func:`check_against_directional`).
+    :func:`other_detector_statistics`'s ``no_nonlocal_fraction``, and for each
+    animal it is :func:`content_class_animal_shares`' ``with_nonlocal``.
 
     Parameters
     ----------
-    directional : pd.DataFrame
-        As for :func:`nonlocal_events_overlapped`.
+    events : pd.DataFrame
+        :func:`other_detector_events`.
     detectors : tuple of str
-        The source detectors, in the order returned.
+        The detectors, in the order returned.
 
     Returns
     -------
@@ -217,8 +274,7 @@ def events_overlapping_nonlocal(
         Indexed by detector: ``pooled`` and ``animals``, as for
         :func:`nonlocal_events_overlapped`.
     """
-    rows = directional[directional["target_detector"] == STATE_SPACE]
-    return _matched_shares(rows, "source_detector", detectors)
+    return _matched_shares(events, "detector", detectors)
 
 
 CONTENT_CLASSES = ("with_nonlocal", "mostly_local", "other")

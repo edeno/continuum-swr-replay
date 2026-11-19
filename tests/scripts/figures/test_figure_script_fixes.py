@@ -429,15 +429,20 @@ def test_figure02_checks_the_event_table_against_the_cached_frame_counts(
 
 
 def _figure02_example_table(figure02) -> pd.DataFrame:
-    """One row per fixed example, each of its drawn class, and one other."""
+    """One row per fixed example, each of its drawn subclass, and one other.
+    The partial examples run past their SWR at the start (20 s) and at the end
+    (30 s)."""
     ids = [event_id for event_id, _ in figure02.EXAMPLES.values()]
-    classes = [overlap_class for _, overlap_class in figure02.EXAMPLES.values()]
+    subclasses = [subclass for _, subclass in figure02.EXAMPLES.values()]
+    nan = np.nan
     return pd.DataFrame(
         {
             "event_id": [*ids, 1],
-            "overlap_class": [*classes, "non_swr"],
+            "overlap_subclass": [*subclasses, "no_overlap"],
             "event_start_s": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
             "event_end_s": [10.1, 20.1, 30.1, 40.1, 50.1, 60.1],
+            "matched_swr_start": [9.9, 20.05, 29.9, nan, nan, nan],
+            "matched_swr_end": [10.2, 20.2, 30.05, nan, nan, nan],
         }
     )
 
@@ -468,12 +473,18 @@ def test_figure02_examples_are_checked_rows_of_the_event_table(offline):
     assert windows["Inside SWR"] == (10.0, 10.1)
     assert windows["SWR, mostly Local"] == (start, start + 0.1)
 
-    # an example of another class than it is drawn as is refused
-    wrong = events.assign(overlap_class=["non_swr", *events["overlap_class"][1:]])
+    # an example of another subclass than it is drawn as is refused
+    wrong = events.assign(
+        overlap_subclass=["no_overlap", *events["overlap_subclass"][1:]]
+    )
     with pytest.raises(AssertionError, match="Inside SWR"):
         figure02.example_windows(
             wrong, ripples, _figure02_local_results(figure02, 0.95)
         )
+    # a "starts before" example that also ends after its SWR is refused
+    both = events.assign(matched_swr_end=[10.2, 20.08, 30.05, *[np.nan] * 3])
+    with pytest.raises(AssertionError, match="Starts before SWR.*start alone"):
+        figure02.example_windows(both, ripples, _figure02_local_results(figure02, 0.95))
     # the Local SWR must be the source's, empty of events, and mostly Local
     with pytest.raises(AssertionError, match="not one of the source's"):
         figure02.example_windows(
@@ -487,7 +498,7 @@ def test_figure02_examples_are_checked_rows_of_the_event_table(offline):
             pd.DataFrame(
                 {
                     "event_id": [2],
-                    "overlap_class": ["swr_contained"],
+                    "overlap_subclass": ["swr_contains_event"],
                     "event_start_s": [start + 0.01],
                     "event_end_s": [start + 0.05],
                 }

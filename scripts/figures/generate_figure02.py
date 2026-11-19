@@ -21,7 +21,7 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     f — Each SWR-overlapping event's start and end minus its SWR's: the percent
         of event-SWR pairs per 5 ms on a log axis, bars the animals' mean and
         outlines the animals.
-    g — Tetrode participation (share of tetrodes with a spike) and spike rate of
+    g — Tetrode participation (share of tetrodes with a spike) and spike rate (summed over tetrodes) of
         each non-local event against a Local-rest window of its length, one line
         per animal, for no-SWR and SWR events
         (``event_evidence.participation``; ``Processed-Data/event_participation``).
@@ -43,9 +43,9 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
 
 Panels d and f are drawn from the canonical event table by the functions the
 events summary uses (``event_statistics.overlap_class_statistics``,
-``boundary_offsets``); c from ``nonlocal_comparison.other_detector_statistics``
-on the event features run the summary reads; i's rest and running lines from ``event_statistics.reference_medians``
-of the brain-state reference. Panels i and j are per-time-bin signals no stored
+``boundary_offsets``); c and e from ``nonlocal_comparison`` on the event
+features run the summary reads; i's between-events and running lines from
+``event_statistics.reference_medians`` of the brain-state reference. Panels i and j are per-time-bin signals no stored
 output holds, computed from the aggregated decode frames (cached), whose event
 counts by SWR overlap must equal the canonical table's.
 
@@ -150,7 +150,7 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.reported.formatting import format_number
-from continuum_swr_replay.runs.io import read_complete_run
+from continuum_swr_replay.runs.io import read_complete_run, read_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.inventory_examples import detector_color
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
@@ -170,23 +170,14 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 )
 
 # The render cache's version, part of its file name. The name also carries the
-# SWR source's name, a fingerprint of the epoch register's analysed epochs and
-# a fingerprint of the decode files read, so a new SWR inventory, artifact run,
-# register change or rewritten decode makes a new cache by itself. Bump this
-# whenever the cached values could change for any other reason.
-# 4: panel a's examples read from the event table when drawn; frame event counts.
-# 5: Figure 2 redrawn: triggered ripple and MUA (f) and the non-local share by
-#    ripple power (h) are cached; the decoding-error panel left the figure.
-# 6: the detector comparison's statistics (d, g) are cached; the event features
-#    run is part of the name.
-# 7: the comparison's share of non-local time outside Kay's SWRs is cached (c).
-# 8: each detector's share of its events overlapping a non-local event (h).
-# 9: theta and head speed around event starts, with each class's quartiles over
-#    events (i); each Kay SWR's share of time non-local (d).
-# 10: each animal's share of Kay's SWRs in each content class (d).
-# 11: no per-SWR non-local share (d's histogram removed).
-# 12: no share of non-local time outside SWRs (d's note removed).
-FIGURE02_CACHE_VERSION = 12
+# SWR source's name and fingerprints of the epoch register's analysed epochs, of
+# the decode files and the detector comparison's files read, and of the panel
+# settings (``_settings_fingerprint``), so a change to any of them makes a new
+# cache by itself. Bump this whenever the cached values could change for any
+# other reason; git history holds what each earlier bump was for.
+# 13: e's animal dots from per-event memberships, each animal's mean over its
+#     epochs, as c's and d's.
+FIGURE02_CACHE_VERSION = 13
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -221,6 +212,11 @@ HEIGHT = 7.72
 
 C_LOCAL = COLORS["Local"]
 C_NOSPIKE = COLORS["No-Spike"]
+C_OTHER = "white"
+"""Panel c's 'Other' SWRs: an outlined bar, no state's color (they are mostly
+mixed-state, not No-Spike)."""
+C_BETWEEN = "#777777"
+"""Panel i's between-events level: a neutral gray, not the No-Spike state's."""
 C_NL = COLORS["Non-Local"]
 C_SWR = COLORS["SWR"]
 C_QUIET = COLORS["All Events"]
@@ -247,14 +243,17 @@ EXAMPLE_HALF_WINDOW_S = 0.2
 # Panel b's examples, chosen by eye from contact sheets of the example session's
 # events with peak non-local probability >= 0.95, no other event and no other
 # SWR within the window, and a sharp posterior (small HPD coverage): each
-# title's event_id and the overlap class it is drawn as.
+# title's event_id and the overlap subclass it is drawn as, which
+# ``example_windows`` checks.
 EXAMPLES = {
-    "Inside SWR": (2185516843327500879, "swr_contained"),
-    "Starts before SWR": (63427667006281341, "swr_partial"),
-    "Ends after SWR": (3628740333881355820, "swr_partial"),
-    "No SWR, trajectory": (5216998177801911428, "non_swr"),
-    "No SWR, stationary": (8826983562067101773, "non_swr"),
+    "Inside SWR": (2185516843327500879, "swr_contains_event"),
+    "Starts before SWR": (63427667006281341, "single_swr_partial"),
+    "Ends after SWR": (3628740333881355820, "single_swr_partial"),
+    "No SWR, trajectory": (5216998177801911428, "no_overlap"),
+    "No SWR, stationary": (8826983562067101773, "no_overlap"),
 }
+# Panel b's partial examples: the one side on which the event runs past its SWR.
+PARTIAL_SIDE = {"Starts before SWR": "start", "Ends after SWR": "end"}
 # The SWR with Local content: its start in the SWR source, seconds. No non-local
 # event overlaps it and the decode is Local through it.
 LOCAL_SWR_START_S = 1617036373.982971
@@ -348,6 +347,11 @@ def _decode_files_fingerprint(
         example.results,
         example.detector,
     ]
+    return _stat_fingerprint(files)
+
+
+def _stat_fingerprint(files: Sequence[Path]) -> str:
+    """A hash of each file's path, size and ``st_mtime_ns`` (or ``missing``)."""
     lines = []
     for path in files:
         if path.exists():
@@ -356,6 +360,26 @@ def _decode_files_fingerprint(
         else:
             lines.append(f"{path}\tmissing")
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()
+
+
+def _comparison_fingerprint() -> str:
+    """A stat fingerprint of the detector comparison's files; a run without a
+    manifest is fingerprinted as missing (``detector_comparison`` then raises)."""
+    run = event_features_root() / EVENT_FEATURES_RUN
+    if not (run / "manifest.json").exists():
+        return _stat_fingerprint([run / "manifest.json"])
+    return _stat_fingerprint(nonlocal_comparison.comparison_files(run))
+
+
+def _settings_fingerprint() -> str:
+    """A hash of the module settings the cached inputs are computed with."""
+    settings = (
+        TRIGGERED_WINDOW_S,
+        TRIGGERED_SIGNALS,
+        POWER_EDGES.tolist(),
+        list(DETECTOR_LABELS),
+    )
+    return hashlib.sha256(repr(settings).encode()).hexdigest()
 
 
 def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) -> Path:
@@ -368,22 +392,52 @@ def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) ->
     """
     cohort = hashlib.sha256("\n".join(analysed_epoch_ids()).encode()).hexdigest()
     decodes = _decode_files_fingerprint(nwb_file_name, epoch_name, data_dir)
+    comparison = _comparison_fingerprint()
     return (
         data_dir
         / "intermediates"
         / f"{session_name(nwb_file_name, epoch_name)}_figure02_v{FIGURE02_CACHE_VERSION}_"
         f"{swr_source_name()}_register{cohort[:12]}_decodes{decodes[:12]}"
-        f"_features{EVENT_FEATURES_RUN}"
-        "_cache.joblib"
+        f"_features{EVENT_FEATURES_RUN}_comparison{comparison[:12]}"
+        f"_settings{_settings_fingerprint()[:12]}_cache.joblib"
     )
+
+
+def checked_reference(reference: pd.DataFrame) -> pd.DataFrame:
+    """The brain-state reference, if it was made from the decodes the event
+    features run records for every analysed epoch.
+
+    Raises
+    ------
+    ValueError
+        If an analysed epoch is missing or extra, or its decode hash differs.
+    """
+    manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
+    expected = {
+        epoch_id: manifest["epochs"][epoch_id]["decode"]["sha256"]
+        for epoch_id in analysed_epoch_ids()
+    }
+    recorded = dict(zip(reference["epoch_id"], reference["decode_sha256"], strict=True))
+    if recorded != expected:
+        differ = sorted(
+            epoch_id
+            for epoch_id in expected.keys() | recorded.keys()
+            if expected.get(epoch_id) != recorded.get(epoch_id)
+        )
+        raise ValueError(
+            f"the brain-state reference was not made from the decodes of event "
+            f"features run {EVENT_FEATURES_RUN}: {len(differ)} epochs differ, "
+            f"e.g. {differ[:3]}"
+        )
+    return reference
 
 
 def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) -> dict:
     """Run the expensive loads and derivations; return the cached render inputs.
 
     The example session's ``data``/``results``/``detector``/``env`` (panels a
-    and b), the triggered-average curves (j), the non-local share by ripple
-    power (k) and the frames' immobile non-local events by SWR overlap, which
+    and b), the triggered-average curves (i), the non-local share by ripple
+    power (j) and the frames' immobile non-local events by SWR overlap, which
     the canonical event table is checked against. The multi-GB
     ``data_over_time`` is consumed here and not returned.
     """
@@ -461,19 +515,32 @@ def example_windows(
     Raises
     ------
     AssertionError
-        If an example's ``event_id`` is not one row of the table or its class is
-        not the one it is drawn as; or if the Local SWR is not one of the
-        source's SWRs, a non-local event overlaps it, or the decode is not
-        mostly Local through it.
+        If an example's ``event_id`` is not one row of the table, its overlap
+        subclass is not the one it is drawn as, or a partial example does not
+        run past its SWR on its title's side alone; or if the Local SWR is not
+        one of the source's SWRs, a non-local event overlaps it, or the decode is
+        not mostly Local through it.
     """
     windows = {}
-    for title, (event_id, overlap_class) in EXAMPLES.items():
+    for title, (event_id, subclass) in EXAMPLES.items():
         rows = events[events["event_id"] == event_id]
         if len(rows) != 1:
             raise AssertionError(f"event_id {event_id} matches {len(rows)} rows")
         row = rows.iloc[0]
-        if row["overlap_class"] != overlap_class:
-            raise AssertionError(f"{title}: event {event_id} is {row['overlap_class']}")
+        if row["overlap_subclass"] != subclass:
+            raise AssertionError(
+                f"{title}: event {event_id} is {row['overlap_subclass']}"
+            )
+        side = PARTIAL_SIDE.get(title)
+        sides = (
+            row["event_start_s"] < row["matched_swr_start"],
+            row["event_end_s"] > row["matched_swr_end"],
+        )
+        if side is not None and sides != (side == "start", side == "end"):
+            raise AssertionError(
+                f"{title}: event {event_id} does not run past its SWR at the "
+                f"{side} alone"
+            )
         windows[title] = (float(row["event_start_s"]), float(row["event_end_s"]))
     starts = ripple_times["start_time"].to_numpy()
     k = int(np.argmin(np.abs(starts - LOCAL_SWR_START_S)))
@@ -517,10 +584,11 @@ def detector_comparison() -> dict:
             others, "kay"
         ),
         "overlap": nonlocal_comparison.nonlocal_events_overlapped(
-            directional, tuple(DETECTOR_LABELS)
+            nonlocal_comparison.nonlocal_event_memberships(run, directional),
+            tuple(DETECTOR_LABELS),
         ),
         "with_nonlocal": nonlocal_comparison.events_overlapping_nonlocal(
-            directional, tuple(DETECTOR_LABELS)
+            others, tuple(DETECTOR_LABELS)
         ),
     }
 
@@ -702,6 +770,10 @@ def draw_overview(
     ripple = ripple.iloc[:, 0] if ripple.ndim > 1 else ripple
     ax_rip.plot(ripple.index - start, ripple.to_numpy(), color="k", lw=0.5)
     ax_rip.axhline(KAY_ZSCORE_THRESHOLD, color=C_SWR, lw=0.5, ls="--")
+    ax_rip.text(
+        1.0, KAY_ZSCORE_THRESHOLD, "SWR threshold", transform=ax_rip.get_yaxis_transform(),
+        ha="right", va="bottom", fontsize=SMALL_SIZE, color=C_SWR,
+    )  # fmt: skip
     ax_rip.set_ylim(-2, 8)
     ax_rip.set_yticks([0, 5])
     draw_state_stack(ax_st, results, sl, start)
@@ -822,7 +894,10 @@ def draw_class_bars(
     n_rows = len(rows)
     for i, (_, pooled, animals, color, _) in enumerate(rows):
         y = n_rows - 1 - i
-        ax.barh(y, 100 * pooled, color=color, height=0.65)
+        ax.barh(
+            y, 100 * pooled, color=color, height=0.65, linewidth=0.5,
+            edgecolor="#777777" if color == C_OTHER else "none",
+        )  # fmt: skip
         ax.scatter(
             100 * animals.to_numpy(), y + np.linspace(-0.18, 0.18, len(animals)),
             s=3, color="k", lw=0, zorder=3,
@@ -876,9 +951,9 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
     no_nonlocal = kay["no_nonlocal_fraction"]
     mostly_local = kay["mostly_local_fraction"]
     rows = [
-        ("With non-local", 1 - no_nonlocal, animals["with_nonlocal"], C_NL, False),
-        ("Mostly Local", mostly_local, animals["mostly_local"], C_LOCAL, True),
-        ("Other", no_nonlocal - mostly_local, animals["other"], C_NOSPIKE, False),
+        ("With non-local", 1 - no_nonlocal, animals["with_nonlocal"], C_NL, True),
+        ("Mostly Local", mostly_local, animals["mostly_local"], C_LOCAL, False),
+        ("Other", no_nonlocal - mostly_local, animals["other"], C_OTHER, False),
     ]
     draw_class_bars(ax, rows, f"SWRs (n = {int(kay['n_events']):,})", "% SWRs")
 
@@ -911,7 +986,7 @@ def rest_event_axis(ax: Axes, labels: bool = True) -> None:
     ax.set_xlim(-0.5, 3.9)
     ticks = [x for pair in REST_EVENT_X.values() for x in pair]
     ax.set_xticks(
-        ticks, ["Local rest", "no SWR", "Local rest", "SWR"], rotation=45, ha="right"
+        ticks, ["Local rest", "No SWR", "Local rest", "SWR"], rotation=45, ha="right"
     )
     ax.tick_params(labelbottom=labels)
 
@@ -924,7 +999,7 @@ def draw_participation(ax_share: Axes, ax_rate: Axes, statistics: pd.DataFrame) 
     """
     for ax, measure, label in (
         (ax_share, "participation", "Tetrodes\nactive (%)"),
-        (ax_rate, "spike_rate_hz", "Spike rate\n(spikes/s)"),
+        (ax_rate, "spike_rate_hz", "Summed spike\nrate (spikes/s)"),
     ):
         scale = 100 if measure == "participation" else 1
         for group, color in (("no SWR", C_NL), ("SWR", C_SWR)):
@@ -938,6 +1013,7 @@ def draw_participation(ax_share: Axes, ax_rate: Axes, statistics: pd.DataFrame) 
         ax.set_ylabel(label)
         ax.set_ylim(0, None)
         rest_event_axis(ax, labels=ax is ax_rate)
+    ax_share.figure.align_ylabels([ax_share, ax_rate])
 
 
 def draw_heldout_gain(ax: Axes, events: pd.DataFrame, controls: pd.DataFrame) -> None:
@@ -969,7 +1045,7 @@ def draw_heldout_gain(ax: Axes, events: pd.DataFrame, controls: pd.DataFrame) ->
         "Local rest", va="top", fontsize=SMALL_SIZE, color="#555555",
     )  # fmt: skip
     ax.set_xlim(-0.6, 1.6)
-    ax.set_xticks(list(HELDOUT_X.values()), list(HELDOUT_X), rotation=45, ha="right")
+    ax.set_xticks(list(HELDOUT_X.values()), ["No SWR", "SWR"], rotation=45, ha="right")
     ax.set_ylim(-0.12, None)
     ax.set_ylabel("Held-out gain\nover local (nats/spike)")
     ax.set_title("Held-out tetrode", fontsize=SMALL_SIZE, pad=3)
@@ -1006,11 +1082,13 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
         (ax_mua, "MUA_zscore", "mua"),
     ):
         curve = curves[signal]
-        ax.axhline(rest.loc[word, "rest"], color=C_NOSPIKE, lw=0.6, ls="--")
+        ax.axhline(rest.loc[word, "rest"], color=C_BETWEEN, lw=0.6, ls="--", zorder=3)
         low = min(np.nanmin(curve[f"{key}_q25"]) for key, _, _ in groups)
         top = max(np.nanmax(curve[f"{key}_q75"]) for key, _, _ in groups)
         ax.set_ylim(min(low, rest.loc[word, "rest"]) - 0.3, top + 1.2)
-    ax_theta.axhline(rest.loc["theta", "rest"], color=C_NOSPIKE, lw=0.6, ls="--")
+    ax_theta.axhline(
+        rest.loc["theta", "rest"], color=C_BETWEEN, lw=0.6, ls="--", zorder=3
+    )
     ax_theta.axhline(rest.loc["theta", "running"], color="k", lw=0.6, ls="--")
     ax_theta.text(
         t_ms[-1] - 5, rest.loc["theta", "running"], "running", ha="right",
@@ -1032,7 +1110,7 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     for ax in axes[:-1]:
         ax.tick_params(labelbottom=False)
     handles, labels = ax_rip.get_legend_handles_labels()
-    handles.append(plt.Line2D([], [], color=C_NOSPIKE, ls="--", lw=0.6))
+    handles.append(plt.Line2D([], [], color=C_BETWEEN, ls="--", lw=0.6))
     labels.append("between events")
     ax_rip.legend(
         handles, labels, frameon=False, loc="lower center", ncol=2,
@@ -1065,7 +1143,8 @@ def draw_detector_bars(
     ax.tick_params(axis="y", labelleft=show_labels)
     ax.set_ylim(-0.6, n_rows - 0.4)
     ax.tick_params(axis="y", length=0)
-    ax.set_xlim(0, 100)
+    ax.set_xlim(0, 104)  # a dot at 100 % is drawn whole
+    ax.spines["bottom"].set_bounds(0, 100)
     ax.set_xticks([0, 50, 100])
     ax.set_xlabel(xlabel)
 
@@ -1095,7 +1174,7 @@ def draw_detector_overlap(
 
 
 def draw_share_by_power(ax: Axes, shares: pd.DataFrame) -> None:
-    """Panel j: the share of rest bins decoded non-local, by ripple power.
+    """Panel j: the share of immobile bins decoded non-local, by ripple power.
 
     One thin line per animal, their mean in bold.
     """
@@ -1246,7 +1325,9 @@ def generate_figure(
     )
 
     reference = reference_medians(
-        pd.read_parquet(data_dir / BRAIN_STATE_REFERENCE_DIR / "reference.parquet"),
+        checked_reference(
+            pd.read_parquet(data_dir / BRAIN_STATE_REFERENCE_DIR / "reference.parquet")
+        ),
         ["ripple", "mua", "theta"],
     )
     # every analysed epoch with an event: an epoch with none has no table
