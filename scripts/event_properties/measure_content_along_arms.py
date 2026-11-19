@@ -4,7 +4,10 @@ For every time bin of the canonical events (``event_sequence_table``), its
 epoch's decode MAP position (``map_estimate``, read through the SWR source; the
 decode's sha256 must be the one the event features run recorded) placed on the
 track by ``analysis/event_properties/content_along_arms.arm_positions``: its arm
-and the fraction of the arm behind it (1 on a leaf arm is its end at the well).
+and the fraction of the arm behind it (1 on a leaf arm is its end at the well);
+the content's track distance to the nearest well
+(``content_along_arms.distance_to_nearest_well``) and to the animal
+(``|ahead_behind_distance|``).
 
 One table per epoch, ``Processed-Data/content_along_arms/<epoch>.parquet``, and
 a ``manifest.json``.
@@ -21,6 +24,7 @@ import argparse
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 
+import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (
@@ -34,6 +38,7 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
 from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     arm_positions,
     check_arm_orientation,
+    distance_to_nearest_well,
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
@@ -60,7 +65,8 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
         paths.data_over_time, expected_sha256
     )
     env = pd.read_pickle(paths.environment)
-    check_arm_orientation([tuple(edge) for edge in env.edge_order], env.track_graph)
+    edge_order = [tuple(edge) for edge in env.edge_order]
+    check_arm_orientation(edge_order, env.track_graph)
     rows = dot.index.get_indexer(bins["time"].to_numpy())
     if (rows < 0).any():
         raise ValueError(
@@ -81,6 +87,15 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
             "arm": placed["arm"].to_numpy(),
             "fraction": placed["fraction"].to_numpy(),
             "arm_length_cm": placed["arm_length_cm"].to_numpy(),
+            "distance_to_well_cm": distance_to_nearest_well(
+                placed["arm"].to_numpy(),
+                placed["fraction"].to_numpy(),
+                env.track_graph,
+                edge_order,
+            ),
+            "distance_to_animal_cm": np.abs(
+                dot["ahead_behind_distance"].to_numpy()[rows]
+            ),
         }
     )
 
@@ -142,6 +157,9 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "position": "the decode's map_estimate at each event bin, on its "
                 "nearest real place bin (edge_id >= 0); fraction 0 at the arm's first "
                 "node in the edge order, 1 at its second (a leaf arm's end, the well node)",
+                "distance_to_well": "track-graph distance to the nearest degree-1 "
+                "node, out through either end of the arm (graph edge lengths)",
+                "distance_to_animal": "|ahead_behind_distance| of the decode frame",
             },
             indent=1,
             final_newline=True,

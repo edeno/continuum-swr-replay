@@ -9,9 +9,12 @@ bin's place on its arm is the fraction of the arm behind it, so 1 on a leaf arm
 is its end at the well, and arms of slightly different length in different
 animals line up when pooled.
 
-:func:`arm_positions` places bins on arms; :func:`content_density_along_arms`
-gives each kind's content time per cm along every arm, the animals' mean, and
-:func:`log2_density_ratio` the no-SWR to SWR ratio of it.
+:func:`arm_positions` places bins on arms and :func:`distance_to_nearest_well`
+measures how far along the track each one is from the nearest well;
+:func:`content_density_along_arms` gives each kind's content time per cm along
+every arm, the animals' mean, :func:`log2_density_ratio` the no-SWR to SWR ratio
+of it, and :func:`distance_from_animal_shares` each kind's content time by
+distance from the animal, at a well and elsewhere.
 """
 
 from __future__ import annotations
@@ -111,6 +114,51 @@ def arm_positions(position_cm: np.ndarray, bin_nodes: pd.DataFrame) -> pd.DataFr
     )
 
 
+def distance_to_nearest_well(
+    arm: np.ndarray,
+    fraction: np.ndarray,
+    track_graph: nx.Graph,
+    edge_order: list[tuple[int, int]],
+) -> np.ndarray:
+    """Each position's track distance to the nearest well, cm.
+
+    The wells are the graph's end points (degree-1 nodes). A position at
+    ``fraction`` of an arm (from the arm's first node in ``edge_order``) is
+    ``fraction`` times the arm's graph length from its first node; its distance
+    to the nearest well is the shorter way out through either end of the arm,
+    along the graph's ``distance`` weights.
+
+    Parameters
+    ----------
+    arm : np.ndarray of int, shape (n_bins,)
+        Each position's arm (edge id), as :func:`arm_positions` gives it.
+    fraction : np.ndarray, shape (n_bins,)
+        The fraction of the arm behind each position.
+    track_graph : nx.Graph
+        The track graph, each edge with ``edge_id`` and ``distance`` (cm).
+    edge_order : list of (int, int)
+        The linearization's edge order, each arm as (first node, second node).
+
+    Returns
+    -------
+    np.ndarray, shape (n_bins,)
+    """
+    wells = [node for node in track_graph.nodes if track_graph.degree(node) == 1]
+    to_well = nx.multi_source_dijkstra_path_length(
+        track_graph, wells, weight="distance"
+    )
+    n_arms = 1 + max(track_graph.edges[edge]["edge_id"] for edge in edge_order)
+    first_cm, second_cm, length = (np.full(n_arms, np.nan) for _ in range(3))
+    for first, second in edge_order:
+        edge = track_graph.edges[first, second]
+        first_cm[edge["edge_id"]] = to_well[first]
+        second_cm[edge["edge_id"]] = to_well[second]
+        length[edge["edge_id"]] = edge["distance"]
+    arm = np.asarray(arm, dtype=int)
+    along = np.asarray(fraction, dtype=float) * length[arm]
+    return np.minimum(along + first_cm[arm], length[arm] - along + second_cm[arm])
+
+
 def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFrame:
     """Each kind's content time per cm along every arm, the animals' mean.
 
@@ -198,3 +246,60 @@ def log2_density_ratio(density: pd.DataFrame) -> pd.Series:
     swr = density.loc[True, "density_per_cm"]
     both = (non_swr > 0) & (swr > 0)
     return np.log2(non_swr.where(both) / swr.where(both))
+
+
+def distance_from_animal_shares(
+    bins: pd.DataFrame, edges_cm: np.ndarray, at_well_cm: float
+) -> pd.DataFrame:
+    """Each kind's content time by distance from the animal, at a well and
+    elsewhere, the animals' mean.
+
+    For an animal and a kind, each distance bin's share is its count of the
+    kind's time bins over all of them, split by whether the content is within
+    ``at_well_cm`` of a well (track distance); an animal's shares sum to 1. The
+    animals' shares are averaged, each animal weighing the same.
+
+    Parameters
+    ----------
+    bins : pd.DataFrame, shape (n_bins, n_columns)
+        One row per event time bin, with ``animal``, ``is_swr``,
+        ``distance_to_animal_cm`` and ``distance_to_well_cm``.
+    edges_cm : np.ndarray, shape (n_edges,)
+        The distance bins' edges, cm, covering every distance.
+    at_well_cm : float
+        Content nearer than this to a well is at a well.
+
+    Returns
+    -------
+    shares : pd.DataFrame, shape (2 * (n_edges - 1), 2)
+        ``at_well`` and ``elsewhere``, indexed by ``is_swr`` and the bin's left
+        edge, ``distance_cm``.
+
+    Raises
+    ------
+    ValueError
+        If a distance is missing or outside ``edges_cm``.
+    """
+    distance = bins["distance_to_animal_cm"].to_numpy()
+    if not ((distance >= edges_cm[0]) & (distance < edges_cm[-1])).all():
+        raise ValueError("a distance from the animal is missing or outside the bins")
+    frame = bins.assign(at_well=bins["distance_to_well_cm"] < at_well_cm)
+    frames = []
+    for (is_swr, _), group in frame.groupby(["is_swr", "animal"]):
+        here = group["distance_to_animal_cm"].to_numpy()
+        well = group["at_well"].to_numpy()
+        frames.append(
+            pd.DataFrame(
+                {
+                    "is_swr": is_swr,
+                    "distance_cm": edges_cm[:-1],
+                    "at_well": np.histogram(here[well], edges_cm)[0] / len(group),
+                    "elsewhere": np.histogram(here[~well], edges_cm)[0] / len(group),
+                }
+            )
+        )
+    return (
+        pd.concat(frames)
+        .groupby(["is_swr", "distance_cm"])[["at_well", "elsewhere"]]
+        .mean()
+    )

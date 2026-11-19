@@ -11,6 +11,8 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     arm_positions,
     check_arm_orientation,
     content_density_along_arms,
+    distance_from_animal_shares,
+    distance_to_nearest_well,
     leaf_and_trunk_profiles,
     log2_density_ratio,
 )
@@ -112,3 +114,44 @@ def test_the_ratio_is_log2_no_swr_over_swr_and_undefined_without_content():
     ratio = log2_density_ratio(content_density_along_arms(bins, n_segments=2))
     assert np.isnan(ratio[(0, 0)])
     assert ratio[(0, 1)] == pytest.approx(-1.0)
+
+
+def test_distance_to_the_nearest_well_goes_out_through_either_end_of_the_arm():
+    # Center 9 -- trunk (edge 6, 30 cm) -- junction 6 -- leaf arms to wells 0
+    # (edge 0, 50 cm) and 1 (edge 1, 20 cm). The center joins two more trunks
+    # whose wells are 200 cm away, so it is a junction, not an end point.
+    graph = nx.Graph()
+    graph.add_edge(9, 6, edge_id=6, distance=30.0)
+    graph.add_edge(6, 0, edge_id=0, distance=50.0)
+    graph.add_edge(6, 1, edge_id=1, distance=20.0)
+    for trunk, junction, well in ((7, 7, 2), (8, 8, 4)):
+        graph.add_edge(9, junction, edge_id=trunk, distance=100.0)
+        graph.add_edge(junction, well, edge_id=well, distance=100.0)
+    order = [(9, 6), (6, 0), (6, 1), (9, 7), (7, 2), (9, 8), (8, 4)]
+    distance = distance_to_nearest_well(
+        np.array([0, 0, 0, 6, 1]), np.array([1.0, 0.2, 0.0, 0.0, 0.5]), graph, order
+    )
+    # On arm 0 at its end: 0. At 0.2 (10 cm from the junction): 40 cm to well 0,
+    # 10 + 20 = 30 cm to well 1 through the junction. At the junction: 20 cm.
+    # The center (start of the trunk): 30 + 20 = 50 cm. Halfway down arm 1: 10.
+    np.testing.assert_allclose(distance, [0.0, 30.0, 20.0, 50.0, 10.0])
+
+
+def test_distance_shares_split_at_a_well_and_weigh_animals_the_same():
+    bins = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "a", "b"],
+            "is_swr": False,
+            "distance_to_animal_cm": [5.0, 15.0, 15.0, 25.0, 25.0],
+            "distance_to_well_cm": [1.0, 50.0, 2.0, 3.0, 40.0],
+        }
+    )
+    shares = distance_from_animal_shares(bins, np.array([0, 10, 20, 30]), 20.0)
+    no_swr = shares.loc[False]
+    # a: [0, 10) one at a well (1/4); [10, 20) one at a well, one elsewhere;
+    # [20, 30) one at a well. b: its one bin is elsewhere in [20, 30).
+    np.testing.assert_allclose(no_swr["at_well"], [0.125, 0.125, 0.125])
+    np.testing.assert_allclose(no_swr["elsewhere"], [0.0, 0.125, 0.5])
+    assert no_swr.to_numpy().sum() == pytest.approx(1.0)
+    with pytest.raises(ValueError, match="outside"):
+        distance_from_animal_shares(bins, np.array([0, 10, 20]), 20.0)
