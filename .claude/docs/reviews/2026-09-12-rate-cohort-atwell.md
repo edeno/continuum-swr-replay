@@ -35,7 +35,7 @@ The published functional on the same population and rung (`rr_lag1`, the reconst
 
 SWR-coupled minus non-SWR immediate coefficient, paired within session: `at_well` 69.4% of 216 sessions, 5/5 animals, p=1.1e-11; `all_stops` 79.2% of 216 sessions, 5/5 animals, p=7.8e-22; `in_transit` 40.0% of 10 sessions, 2/4 animals, p=9.2e-01.
 
-Modelled non-local cohort: `at_well` 83,549 stops over 218 sessions; `all_stops` 106,058 stops over 218 sessions; `in_transit` 11,637 stops over 48 sessions.
+Modeled non-local cohort: `at_well` 83,549 stops over 218 sessions; `all_stops` 106,058 stops over 218 sessions; `in_transit` 11,637 stops over 48 sessions.
 
 ## Cohorts
 

@@ -1134,7 +1134,7 @@ class TestRerunReport:
 
 
 # ---------------------------------------------------------------------------
-# The estimator change: penalised fits, scored out of fold
+# The estimator change: penalized fits, scored out of fold
 # ---------------------------------------------------------------------------
 
 
@@ -1152,7 +1152,7 @@ def _write_ridge_bundle(
     suffix: str = "",
     sidecar_extra: dict | None = None,
 ) -> None:
-    """A bundle as the penalised, out-of-fold runner writes one."""
+    """A bundle as the penalized, out-of-fold runner writes one."""
     data_dir.mkdir(parents=True, exist_ok=True)
     frame = pd.DataFrame(
         {
@@ -1267,7 +1267,7 @@ def _write_ridge_bundle(
 
 @pytest.fixture
 def estimator_trees(tmp_path):
-    """A maximum-likelihood before tree and a penalised after tree."""
+    """A maximum-likelihood before tree and a penalized after tree."""
     before = tmp_path / "before"
     after = tmp_path / "after"
     for session in ("chimi20200223_02_r1", "j1620210710_02_r1"):
@@ -1304,7 +1304,7 @@ class TestPeakShrinkage:
         swr = frame[frame["curve"] == "SWR"]
         assert len(swr) == 4  # two sessions x two units
         np.testing.assert_allclose(swr["peak_mle"], 40.0)
-        np.testing.assert_allclose(swr["peak_penalised"], 1.5)
+        np.testing.assert_allclose(swr["peak_penalized"], 1.5)
         np.testing.assert_allclose(swr["delta"], -38.5)
         # A peak that moved by 38.5 on the log-rate scale moved by far more
         # than its own standard error, so the prior plainly binds.

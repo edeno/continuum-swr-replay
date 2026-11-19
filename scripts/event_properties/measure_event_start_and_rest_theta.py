@@ -31,8 +31,8 @@ import pandas as pd
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (
     STATE_SPACE_FEATURES_RUN,
 )
-from continuum_swr_replay.analysis.event_definition import analysed_time
-from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition import analyzed_time
+from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
 from continuum_swr_replay.analysis.event_definition.swr_source import (
     swr_epoch_id_of_session,
 )
@@ -63,7 +63,7 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame, int]) -> pd.DataFrame:
     """
     identifier, expected_sha256, events, n_windows = job
     paths = decode_paths(identifier, processed_data_dir())
-    dot = analysed_time.read_verified_dot_with_swr_source(
+    dot = analyzed_time.read_verified_dot_with_swr_source(
         paths.data_over_time, expected_sha256
     )
     env = pd.read_pickle(paths.environment)

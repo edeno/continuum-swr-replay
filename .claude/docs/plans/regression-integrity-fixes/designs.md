@@ -192,7 +192,7 @@ Keep the two reward-history windows distinct:
   `rate = reward_count / visit_count`;
 - `has_arm_history = (visit_count_arm_visits_k10 > 0)`.
 
-Use exact patch analogues with `patch` in place of `arm`. An unvisited target has counts/denominator
+Use exact patch analogs with `patch` in place of `arm`. An unvisited target has counts/denominator
 0, rate 0, and history 0; a visited but never-rewarded target has denominator >0, rate 0, and history
 1. Before any completed trial, all leaf/patch history fields are `NaN`. Trunk arms are marked
 `is_reward_site=0` and carry structural zeros. Primary experienced-rate models use the visit-window

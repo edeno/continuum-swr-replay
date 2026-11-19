@@ -58,7 +58,7 @@ def data_dir(tmp_path):
     return tmp_path
 
 
-def test_overlap_section_summarises_the_sessions_medians(data_dir):
+def test_overlap_section_summarizes_the_sessions_medians(data_dir):
     text, table = geometry.overlap_section(data_dir)
     assert list(table["session"]) == ["s1", "s2", "s3"]
     assert list(table["median_overlap_fraction"]) == [0.1, 0.4, 0.2]

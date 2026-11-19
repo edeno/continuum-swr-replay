@@ -54,7 +54,7 @@ get wrong:
   the caller's NaN-parameter check turns into the same failure it always was.
 
 **The penalty, and why separation stops being a special case.** Left
-unpenalised, a peri-event spline fit separates whenever one basis column's
+unpenalized, a peri-event spline fit separates whenever one basis column's
 support holds no spikes: that coefficient's maximum-likelihood estimate is at
 ``-inf``, the fitted means spread over so many orders of magnitude that no
 Gram-matrix solve can carry the information matrix, and the number that comes
@@ -73,23 +73,23 @@ carried across: with ``X = Q S V'`` and ``beta = V S^-1 c = B c``,
 
 ``P`` is added to the information and its gradient ``P c`` to the score, which
 in the IRLS form is exactly ``c <- (H + P)^+ r`` with the same working-response
-right-hand side ``r``: the Newton step of the penalised log-likelihood is a
+right-hand side ``r``: the Newton step of the penalized log-likelihood is a
 ridge-weighted least squares on the same working response. Nothing else about
 the iteration changes, so ``penalty=None`` (or a vector of zeros) reproduces
-the unpenalised fit bit for bit.
+the unpenalized fit bit for bit.
 
-Convergence is on the **penalised** deviance ``deviance + c' P c`` -- the
-quantity the iteration actually maximises -- on the same absolute ``1e-8``
-rule. The reported ``deviance`` and ``llf`` stay unpenalised, because they are
+Convergence is on the **penalized** deviance ``deviance + c' P c`` -- the
+quantity the iteration actually maximizes -- on the same absolute ``1e-8``
+rule. The reported ``deviance`` and ``llf`` stay unpenalized, because they are
 what a held-out score and a deviance fraction are read from. ``bse`` becomes
-the penalised posterior-mode standard error, ``sqrt(diag((X' W X + Lambda)^+))``
-(see :func:`_standard_errors`), which is narrower than the unpenalised one
+the penalized posterior-mode standard error, ``sqrt(diag((X' W X + Lambda)^+))``
+(see :func:`_standard_errors`), which is narrower than the unpenalized one
 wherever the prior binds.
 
-Against statsmodels, the unpenalised fit agrees to ~1e-12 for as long as the
+Against statsmodels, the unpenalized fit agrees to ~1e-12 for as long as the
 fitted means stay in range. statsmodels does not solve the normal equations at
 all -- each step is a least-squares solve on the weighted design ``W^{1/2} X``
-with a singular-value cutoff -- so where an unpenalised fit is driven into
+with a singular-value cutoff -- so where an unpenalized fit is driven into
 separation the two part company, and neither answer means anything. That is
 the regime the penalty removes.
 
@@ -156,7 +156,7 @@ def _in_float64(function: Callable[_P, _R]) -> Callable[_P, _R]:
 DEFAULT_MAXITER = 100
 DEFAULT_TOL = 1e-8
 
-#: Prior standard deviation of a penalised coefficient, on the log-rate scale.
+#: Prior standard deviation of a penalized coefficient, on the log-rate scale.
 #: Read what it means for a *curve* with :func:`implied_prior_sd`, not off this
 #: number: the coefficients are B-spline weights, so the prior on the kernel at
 #: one lag is wider than ``sigma`` by ``sqrt(sum_b B_b(lag)**2)`` (~0.69 on the
@@ -204,7 +204,7 @@ class UnitGLMResult:
     aic : float
         ``-2 llf + 2 rank``, statsmodels' ``-2 llf + 2 (df_model + 1)``.
     converged : bool
-        The penalised deviance settled inside ``tol`` before ``maxiter``.
+        The penalized deviance settled inside ``tol`` before ``maxiter``.
     n_iter : int
         IRLS steps taken, as statsmodels' ``fit_history["iteration"]``.
     rank : int
@@ -214,7 +214,7 @@ class UnitGLMResult:
     bse : NDArray, shape (n_features,)
         Standard errors of ``params``: the square root of the diagonal of
         ``(X' W X + Lambda)^+`` at the fitted weights, with Poisson's fixed
-        unit scale -- the penalised posterior-mode standard error, which is
+        unit scale -- the penalized posterior-mode standard error, which is
         statsmodels' ``bse`` exactly when the penalty is zero. Exactly zero in
         a direction the design does not span, where the parameter is itself
         exactly zero.
@@ -260,7 +260,7 @@ class BatchedGLMResults:
     rank, nobs, n_features : int
         Properties of the design, shared by every unit.
     bse : NDArray, shape (n_units, n_features)
-        Per-unit penalised posterior-mode standard errors of ``params``.
+        Per-unit penalized posterior-mode standard errors of ``params``.
     covariance : NDArray, shape (n_units, n_features, n_features)
         Per-unit ``(X' W X + Lambda)^+``, for the standard error of a curve
         read off the parameters.
@@ -337,7 +337,7 @@ def unusable_as_nan(values: NDArray, usable: NDArray) -> NDArray:
         One row per unit: parameters, a block of them, or their covariance.
     usable : NDArray of bool, shape (n_units,)
         Which units' fits are usable. What makes a fit usable is the caller's:
-        a penalised fit that converged, or an unpenalised one that converged
+        a penalized fit that converged, or an unpenalized one that converged
         and is not separated.
 
     Returns
@@ -489,7 +489,7 @@ def _sweep(
     deviance, llf_kernel : jnp.ndarray, shape (n_units,)
         ``llf_kernel`` is ``sum(y log mu - mu)``; the ``-log(y!)`` term is a
         constant of the data and is added once by the caller. Both are
-        unpenalised: the penalty is a function of the parameters alone and is
+        unpenalized: the penalty is a function of the parameters alone and is
         added by the caller, which holds them.
     """
     rank = design_chunks.shape[-1]
@@ -587,7 +587,7 @@ def _solve(information: jnp.ndarray, rhs: jnp.ndarray, rcond: float) -> jnp.ndar
     Parameters
     ----------
     information : jnp.ndarray, shape (..., n_units, rank, rank)
-        ``H``, or ``H + P`` when the fit is penalised. Leading axes (the
+        ``H``, or ``H + P`` when the fit is penalized. Leading axes (the
         flattened ``design x fold`` batch of the held-out fits) are batch axes.
     rhs : jnp.ndarray, shape (..., rank, n_units)
     rcond : float
@@ -610,7 +610,7 @@ def _parameter_covariance(
     The fit runs in an orthonormal basis ``Q`` with information ``H = Q' W Q``,
     and ``beta = B c`` with ``B = V S^-1`` (``back``). So
     ``cov(beta) = B (H + P)^+ B'`` -- Poisson's scale is fixed at one, which is
-    why no dispersion estimate enters. On a design of full rank that is exactly ``(X' W X + Lambda)^-1``, the penalised
+    why no dispersion estimate enters. On a design of full rank that is exactly ``(X' W X + Lambda)^-1``, the penalized
     posterior-mode covariance: ``B (H + B' Lambda B)^-1 B' =
     (A H A' + Lambda)^-1`` with ``A = B^-T = V S``, and ``A H A' = X' W X``.
     The pseudo-inverse is taken on the same eigenvalue cutoff the IRLS step
@@ -621,7 +621,7 @@ def _parameter_covariance(
     Parameters
     ----------
     information : jnp.ndarray, shape (n_units, rank, rank)
-        ``H + P`` at the fitted parameters (``H`` alone when unpenalised).
+        ``H + P`` at the fitted parameters (``H`` alone when unpenalized).
     back : NDArray, shape (n_features, rank)
         ``V S^-1``, the map out of the orthonormal basis.
     rcond : float
@@ -703,14 +703,14 @@ def make_ridge_penalty(
     both readings for a given basis; quote it rather than restating numbers.
 
     The intercept carries the unit's baseline rate, which the prior has nothing
-    to say about, so it is left unpenalised.
+    to say about, so it is left unpenalized.
 
     Parameters
     ----------
     n_features : int
         Columns of the design.
     sigma : float
-        Prior standard deviation of a penalised coefficient, on the log-rate
+        Prior standard deviation of a penalized coefficient, on the log-rate
         scale. Must be positive. See :data:`DEFAULT_PENALTY_SIGMA`.
     n_unpenalized : int
         Leading columns to leave free -- 1 for the designs here, whose first
@@ -750,7 +750,7 @@ def implied_prior_sd(
     spline_basis : NDArray, shape (n_lags, n_basis)
         The basis the coefficients weight.
     keep : NDArray of bool, shape (n_lags,), optional
-        Lags to summarise over -- the reported window, when it is narrower than
+        Lags to summarize over -- the reported window, when it is narrower than
         the fit window. Defaults to every lag, which is **not** what a reader
         usually wants: the basis sums to one only between the first and last
         internal knot, so over the full fit window ``per_lag_min`` is the value
@@ -802,7 +802,7 @@ def _penalty_matrix(back: NDArray, penalty: NDArray | None) -> NDArray | None:
         ``B = V S^-1``, the map ``beta = B c``.
     penalty : NDArray, shape (n_features,), optional
         Per-column ``lambda``. ``None`` or all-zero means no penalty, reported
-        as ``None`` so the unpenalised path adds nothing at all.
+        as ``None`` so the unpenalized path adds nothing at all.
 
     Returns
     -------
@@ -838,7 +838,7 @@ def _penalty_quadratic(params: jnp.ndarray, matrix: jnp.ndarray) -> jnp.ndarray:
 def _poisson_deviance_from_params(
     design: jnp.ndarray, counts: jnp.ndarray, params: jnp.ndarray
 ) -> jnp.ndarray:
-    """Held-out Poisson deviance without materialising predictions on host."""
+    """Held-out Poisson deviance without materializing predictions on host."""
     fitted_mean = jnp.exp(design @ params.T)
     ratio = jnp.where(counts > 0, counts / fitted_mean, 1.0)
     terms = counts * jnp.log(ratio) - (counts - fitted_mean)
@@ -867,7 +867,7 @@ def poisson_deviance_from_params(
     Returns
     -------
     NDArray, shape (n_units,)
-        Unpenalised Poisson deviance on these rows.
+        Unpenalized Poisson deviance on these rows.
     """
     require_configured_device()
     design = np.asarray(design, dtype=float)
@@ -1437,7 +1437,7 @@ def fit_poisson_designs(
     the stopping rule, rank rule and penalty of :func:`fit_poisson_glms`. It
     is meant for many refits of one design that differ in a few columns (a
     permutation reference), where ``initial_params`` -- typically the observed
-    fit's coefficients -- starts each refit near its answer. The penalised
+    fit's coefficients -- starts each refit near its answer. The penalized
     objective is strictly concave, so a warm start changes the iterations, not
     the optimum: the result agrees with a cold :func:`fit_poisson_glms` to
     within the convergence tolerance.
@@ -1662,7 +1662,7 @@ def fit_poisson_glms(
 ) -> BatchedGLMResults:
     """Fit one Poisson GLM per column of ``counts`` against a shared design.
 
-    Unpenalised, this reproduces ``statsmodels.api.GLM(y, X,
+    Unpenalized, this reproduces ``statsmodels.api.GLM(y, X,
     family=Poisson()).fit()`` unit by unit: same log link, same starting mean,
     same IRLS step, same convergence rule, same pseudo-inverse treatment of a
     rank-deficient design. With ``penalty``, it is the posterior mode of the
@@ -1678,14 +1678,14 @@ def fit_poisson_glms(
         Spike counts per bin and unit. A 1-D array is one unit.
     penalty : NDArray, shape (n_features,), optional
         Per-column ``lambda = 1 / sigma**2`` of a Gaussian prior on the
-        coefficients **in the design's own columns**, penalising
+        coefficients **in the design's own columns**, penalizing
         ``(1/2) sum_j lambda_j beta_j**2``. Zero on a column leaves it free;
-        ``None`` (the default) or an all-zero vector is the unpenalised fit,
+        ``None`` (the default) or an all-zero vector is the unpenalized fit,
         bit for bit. See :func:`make_ridge_penalty`.
     maxiter : int
         Maximum IRLS steps per unit.
     tol : float
-        Absolute change of the *penalised* deviance
+        Absolute change of the *penalized* deviance
         (``deviance + beta' Lambda beta``) below which a unit has converged.
         Equal to the deviance change when the penalty is zero.
     rcond : float
@@ -1784,7 +1784,7 @@ def fit_poisson_glms(
         design_chunks, count_chunks, valid_chunks, params, mean_count, True
     )
     # ``_fit_irls`` raises when the deviance at the starting mean is nan; the
-    # per-unit analogue is to mark the unit failed and leave the batch alone.
+    # per-unit analog is to mark the unit failed and leave the batch alone.
     failed = np.isnan(np.asarray(deviance))
     active = ~failed
     converged = np.zeros(n_units, dtype=bool)
@@ -1814,8 +1814,8 @@ def fit_poisson_glms(
             design_chunks, count_chunks, valid_chunks, params, mean_count, False
         )
         deviance_host = np.asarray(deviance)
-        # The iteration maximises the penalised log-likelihood, so that is what
-        # has to settle; the reported deviance stays the unpenalised one.
+        # The iteration maximizes the penalized log-likelihood, so that is what
+        # has to settle; the reported deviance stays the unpenalized one.
         penalized_host = deviance_host + penalty_of(params)
         deviance_at_params = np.where(active, deviance_host, deviance_at_params)
         llf_kernel = np.where(active, np.asarray(llf), llf_kernel)

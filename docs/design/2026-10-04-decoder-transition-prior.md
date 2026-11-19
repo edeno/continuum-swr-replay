@@ -198,7 +198,7 @@ were scratch analyses and are not in the repository.
 - **No awake source for the post-silence destination.** `NO_SPIKE_EXIT_TO_LOCAL` is a
   base-rate assumption.
 - **Running Non-Local Continuous is not supported by held-out spikes.** Under running-only
-  place fields, P30-B's held-out spikes favour the animal's own position in 65 % of running
+  place fields, P30-B's held-out spikes favor the animal's own position in 65 % of running
   Non-Local Continuous bouts. Our event analyses exclude these bouts through the whole-event
   immobility rule (every sample below 4 cm/s).
 - **Validated on HPC clusterless decodes only.** `create_detector` serves every brain area in

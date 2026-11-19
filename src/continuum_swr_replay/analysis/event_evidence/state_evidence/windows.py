@@ -76,10 +76,10 @@ def regimes(head_speed: NDArray) -> NDArray:
     return out
 
 
-def analysed_regimes(
+def analyzed_regimes(
     time: NDArray, head_speed: NDArray, linear_position: NDArray, excluded: pd.DataFrame
 ) -> tuple[NDArray, NDArray[np.bool_]]:
-    """Each bin's :func:`regimes`, with no regime where it is not analysed.
+    """Each bin's :func:`regimes`, with no regime where it is not analyzed.
 
     A bin whose linear position is not finite, or that lies in excluded time,
     is in no regime (``""``), so no window built on the regimes holds one.
@@ -377,7 +377,7 @@ def event_bins(
     time : ndarray, shape (n_time,)
         The decode's time axis, s.
     starts_s, ends_s : ndarray, shape (n_events,)
-        The events' first and last labelled bins' times (the event table's
+        The events' first and last labeled bins' times (the event table's
         ``event_start_s`` and ``event_end_s``).
 
     Returns
@@ -441,7 +441,7 @@ def tetrode_halves(
 
 def null_partners(
     pool: NDArray,
-    centre_bins: NDArray,
+    center_bins: NDArray,
     track_distance: NDArray,
     *,
     n_partners: int = 20,
@@ -454,8 +454,8 @@ def null_partners(
     ----------
     pool : ndarray, shape (n_windows,)
         The pool label of each window.
-    centre_bins : ndarray of int, shape (n_windows,)
-        The animal's real place bin at each window's centre bin.
+    center_bins : ndarray of int, shape (n_windows,)
+        The animal's real place bin at each window's center bin.
     track_distance : ndarray, shape (n_place_bins, n_place_bins)
         cm, between real place bins.
     n_partners : int, optional
@@ -468,12 +468,12 @@ def null_partners(
     remote : ndarray of int, shape (n_windows, n_partners)
         Other windows of the pool, uniformly with replacement (the MAP_S null).
     local : ndarray of int, shape (n_windows, n_partners)
-        Other windows of the pool whose centre bin is at least ``min_cm`` from
+        Other windows of the pool whose center bin is at least ``min_cm`` from
         this window's (the Local null). -1 throughout when there is none, and in
         both arrays for a pool of one window.
     """
     pool = np.asarray(pool)
-    centre = np.asarray(centre_bins, dtype=np.int64)
+    center = np.asarray(center_bins, dtype=np.int64)
     distance = np.asarray(track_distance, dtype=float)
     remote = np.full((pool.size, n_partners), -1, dtype=np.int64)
     local = np.full((pool.size, n_partners), -1, dtype=np.int64)
@@ -486,7 +486,7 @@ def null_partners(
         stream = keyed_rng(seed, name, "null")
         draw = stream.integers(0, n - 1, size=(n, n_partners))
         remote[idx] = idx[draw + (draw >= np.arange(n)[:, None])]
-        eligible = distance[np.ix_(centre[idx], centre[idx])] >= min_cm
+        eligible = distance[np.ix_(center[idx], center[idx])] >= min_cm
         np.fill_diagonal(eligible, False)
         k_eligible = eligible.sum(1)
         columns = np.argsort(~eligible, axis=1, kind="stable")  # eligible first
@@ -503,7 +503,7 @@ def null_partners(
 def window_folds(windows: pd.DataFrame, folds: NDArray) -> pd.DataFrame:
     """Each window's own fold and how much of it its scoring model was fit on.
 
-    A window belongs to the fold of its centre bin, ``s + n_bins // 2`` (the
+    A window belongs to the fold of its center bin, ``s + n_bins // 2`` (the
     prototype's rule), and is scored by the time-held-out encoding fit on the
     other fold (:func:`~.evidence.held_out_evidence`). A window that straddles
     a block edge has some bins in that model's blocks.

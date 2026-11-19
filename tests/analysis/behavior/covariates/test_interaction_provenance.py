@@ -12,7 +12,7 @@ the canonical table builders and the simulator, the product entries of
   table-parity slice (``scripts/checks/table_parity.py``), not here;
 * every covariate-timing verdict and every qvals answer, for every column of the
   table-parity slice's tables and fit cohorts, every ladder predictor and every
-  catalogued covariate, against ``data/interaction_provenance_answers.json`` --
+  cataloged covariate, against ``data/interaction_provenance_answers.json`` --
   the answers the code gave at 436c4538. That includes the 13 table products no
   ladder fits (:data:`UNFITTED_PRODUCTS`), which the timing check still refuses;
 * the one intended difference: ``timing_of`` now lists every factor of a
@@ -279,7 +279,7 @@ def test_every_fitted_product_is_declared():
     assert set(built) <= set(INTERACTION_FACTORS)
 
 
-def test_every_factor_resolves_to_a_catalogued_covariate():
+def test_every_factor_resolves_to_a_cataloged_covariate():
     for name, factors in INTERACTION_FACTORS.items():
         if name in UNFITTED_PRODUCTS:
             continue

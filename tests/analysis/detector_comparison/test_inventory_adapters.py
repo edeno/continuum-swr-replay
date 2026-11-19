@@ -38,7 +38,7 @@ from continuum_swr_replay.analysis.detector_comparison.schema import (
     from_classified_nonlocal_table,
     validate_inventory,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     artifact_event_drops,
     with_swr_source,
 )

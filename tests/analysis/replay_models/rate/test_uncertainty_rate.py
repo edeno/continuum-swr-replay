@@ -35,12 +35,12 @@ def test_the_register_s_first_exposure_sessions_are_dropped_and_no_other(
     _register(
         path,
         [
-            ("a20200101_.nwb", "02_r1", "analysed", "", True),
-            ("a20200101_.nwb", "04_r2", "analysed", "", False),
-            ("a20200102_.nwb", "02_r1", "analysed", "", False),
+            ("a20200101_.nwb", "02_r1", "analyzed", "", True),
+            ("a20200101_.nwb", "04_r2", "analyzed", "", False),
+            ("a20200102_.nwb", "02_r1", "analyzed", "", False),
             ("b20200104_.nwb", "02_r1", "excluded", "NO_TRIAL_INTERVALS", True),
-            ("b20200105_.nwb", "02_r1", "analysed", "", False),
-            ("b20200106_.nwb", "02_r1", "analysed", "", False),
+            ("b20200105_.nwb", "02_r1", "analyzed", "", False),
+            ("b20200106_.nwb", "02_r1", "analyzed", "", False),
         ],
     )
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)

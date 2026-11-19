@@ -275,7 +275,7 @@ def timebin_script(monkeypatch):
     The script imports ``load_data``, whose ``bandit_task`` imports
     ``spyglass.common.PositionIntervalMap`` at import time, which opens a
     DataJoint connection. The modules imported here that bind the stub are
-    forgotten afterwards, so a later import gets the real ones.
+    forgotten afterward, so a later import gets the real ones.
     """
     common = types.ModuleType("spyglass.common")
     common.PositionIntervalMap = type("PositionIntervalMap", (), {})

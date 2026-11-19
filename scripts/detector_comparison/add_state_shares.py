@@ -43,7 +43,7 @@ from continuum_swr_replay.analysis.detector_comparison.features import (
     PosteriorTraces,
     state_row_shares,
 )
-from continuum_swr_replay.analysis.event_definition import analysed_time
+from continuum_swr_replay.analysis.event_definition import analyzed_time
 from continuum_swr_replay.paths import event_features_root
 from continuum_swr_replay.runs.io import (
     ok_epochs,
@@ -73,7 +73,7 @@ def epoch_state_shares(
         The decode is not the one the run read, its grid is not the run's, or
         the recomputed non-local share differs from the stored one.
     """
-    dot = analysed_time.read_verified_dot_with_swr_source(
+    dot = analyzed_time.read_verified_dot_with_swr_source(
         inventory_run.decode_path(identifier), record["decode"]["sha256"]
     )
     if len(dot) != record["n_grid_rows"]:

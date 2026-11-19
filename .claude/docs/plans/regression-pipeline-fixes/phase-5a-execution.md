@@ -8,7 +8,7 @@ the anchors below were re-verified on 2026-09-06 and are still approximate — g
 
 ## Global Constraints
 
-- **Behaviour-preserving phase.** No fitted output, no persisted table value, no persisted name
+- **Behavior-preserving phase.** No fitted output, no persisted table value, no persisted name
   changes. The parity gate is the proof: freeze one cached session before the first edit
   (`scripts/qa/freeze_regression_baseline.py`), and after the last edit
   `scripts/qa/compare_to_golden_baseline.py` must report byte-identical tables; additionally one

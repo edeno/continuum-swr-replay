@@ -127,7 +127,7 @@ def brain_state_reference(
     ----------
     dot : pd.DataFrame
         A decode frame read through the SWR source
-        (``analysed_time.with_swr_source``), with ``head_speed``,
+        (``analyzed_time.with_swr_source``), with ``head_speed``,
         ``in_excluded_time``, :data:`EVENT_COLUMNS` and the columns of
         ``signals``.
     signals : Mapping[str, str]

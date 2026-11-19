@@ -161,7 +161,7 @@ doc-path test does not look for it. The source of truth is
 
 | Old module | New home |
 |---|---|
-| `analysis/hippocampus/swr_source.py` (removed: split) | `analysis/events/analysed_time.py` (the analysed-time read point: `excluded_intervals`, `with_swr_source`, `artifact_event_drops`, `swr_event_labels`, …) and `analysis/events/swr_source.py` (the SWR inventory read: `SWR_INVENTORY_RUN_ID`, `ARTIFACT_INTERVALS_RUN_ID`, `read_swr_inventory`, `swr_events`, `SwrSourceError`, …). `ARTIFACT_INTERVALS_ROOT` is now `paths.artifact_intervals_root()`; `SWR_INVENTORY_ROOT` is `paths.swr_inventory_root()`; `SWR_SOURCE_TABLES` is in `tables/io.py` |
+| `analysis/hippocampus/swr_source.py` (removed: split) | `analysis/events/analysed_time.py` (the analyzed-time read point: `excluded_intervals`, `with_swr_source`, `artifact_event_drops`, `swr_event_labels`, …) and `analysis/events/swr_source.py` (the SWR inventory read: `SWR_INVENTORY_RUN_ID`, `ARTIFACT_INTERVALS_RUN_ID`, `read_swr_inventory`, `swr_events`, `SwrSourceError`, …). `ARTIFACT_INTERVALS_ROOT` is now `paths.artifact_intervals_root()`; `SWR_INVENTORY_ROOT` is `paths.swr_inventory_root()`; `SWR_SOURCE_TABLES` is in `tables/io.py` |
 | `analysis/hippocampus/artifacts/io.py` (removed: moved) | `analysis/events/artifact_intervals.py` |
 | `analysis/hippocampus/artifacts/masks.py` (removed: split) | `analysis/events/artifact_masks.py` (`PADDING_S`, `core_class`, `artifact_intervals`, the signature sets); the generic interval functions (`merge_intervals`, `interval_mask`, `subtract_intervals`, `masked_seconds`, `pad_intervals`, `overlaps_intervals`, `covered_seconds`) are in `intervals.py` |
 | `analysis/hippocampus/event_table.py` (removed: moved) | `analysis/events/classified_table.py` |
@@ -320,7 +320,7 @@ An old path is marked "(removed: moved)" so the doc-path test does not look for 
 
 ## Runners renamed, 2026-10-17
 
-The two behaviour analyses left `scripts/pfc/` and took names for what they do. Their
+The two behavior analyses left `scripts/pfc/` and took names for what they do. Their
 output files keep the stage names.
 
 | Old path | New path |
@@ -651,7 +651,7 @@ values changed: every sweep was re-run.
 | `memoryless_sequence/sweep.py`: `build_recording`'s own recording (25 cells) and plain fit | `simulated_run.simulate_run` and `simulated_run.estimate_state_space_model` (30 cells, EM, the real decodes' settings) |
 | `memoryless_sequence/sweep.py`: `non_local_intervals`; `recording_statistics.state_space_intervals` | `event_definition/nonlocal_event_rule.py`: `detect_nonlocal_events`; the labeled recording's dict carries `state_space_intervals` |
 | `comparison_simulation`: `CONTINUOUS_OUTBOUND_EVENT`, `CONTINUOUS_INBOUND_EVENT`; reported values `recording_outbound_*`, `recording_inbound_*` | `SWEEP_EVENT` (the run has one sweep); `recording_sweep_*` |
-| `scripts/figures/generate_figure01.py`: colours, sizes, the decoded-position panel, the row layout | `visualization/simulated_run_panels.py`, shared with `generate_memoryless_comparison.py` |
+| `scripts/figures/generate_figure01.py`: colors, sizes, the decoded-position panel, the row layout | `visualization/simulated_run_panels.py`, shared with `generate_memoryless_comparison.py` |
 | `memoryless_sequence/simulation.py`: `stray_window_spikes`, `StrayWindowEvent`; `recording_statistics`: `stray_window_dispersions`, `outside_pieces`; reported values `recording_stray_window_*` | removed with the stray-window event of the labeled recording; the real-data pilot's outside-window values (`pilot_*`) remain |
 | `generate_memoryless_comparison.py`: the burst, carving and held-out panels and `check_controls_claims`, `check_heldout_claims` | removed from the figure; the sweeps and their reported values remain |
 
@@ -740,3 +740,25 @@ replay has at least five spikes. The sweep loses its firing-rate axis (`sweep.dr
 3,304 cells), and replicates differ only in where in the run the replay is placed. The four
 replays added to the comparison's recording are drawn the same way. The controls and the
 held-out check still sample their spikes (`sweep.replay_grid`, `inject_replay`).
+
+## American spellings, 2026-11-19
+
+Names took their American spellings (`scripts/checks/american_spelling.py` holds the word
+list; `tests/repository/test_american_spelling.py` keeps the repository American). Every
+module kept its place; one file was renamed. Paths are under `src/continuum_swr_replay/`.
+
+| Old name | New name |
+|---|---|
+| `analysis/event_definition/analysed_time.py` (removed: renamed) | `analysis/event_definition/analyzed_time.py` |
+| `analysed_time.analysed_bins`, `immobile_analysed_bins` | `analyzed_time.analyzed_bins`, `immobile_analyzed_bins` |
+| `epoch_register.analysed_epochs`, `analysed_epoch_ids`, `analysed_decode_files`, `analysed_animals` | `analyzed_epochs`, `analyzed_epoch_ids`, `analyzed_decode_files`, `analyzed_animals` |
+| `epoch_register.Status.ANALYSED`; the register's status `analysed` | `Status.ANALYZED`; `analyzed` |
+| `runs.cli.select_analysed_epochs` | `select_analyzed_epochs` |
+| `state_evidence.windows.analysed_regimes` | `analyzed_regimes` |
+| `detector_comparison.features.neighbour_gaps` | `neighbor_gaps` |
+| mpfc summary key `analysed_epochs` (macro `\MpfcAnalysedEpochs`) | `analyzed_epochs` (`\MpfcAnalyzedEpochs`) |
+| `run_retrospective_alignment.py` provenance key `n_sessions_analysed` | `n_sessions_analyzed` |
+| `compare_pfc_cohorts.py` columns `peak_penalised`, `median_abs_peak_penalised` | `peak_penalized`, `median_abs_peak_penalized` |
+
+The PFC cohort records keep their key `n_analysed`: the records on disk carry it, and
+`reported/mpfc/population.py` reads it.

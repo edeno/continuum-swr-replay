@@ -27,24 +27,24 @@ Event labels (integer event numbers):
     - non_local_event: Non-local event number (0 if not in event)
     - SWR_event: Sharp-wave ripple event number, from the stored Spyglass
       ``RippleTimesV1`` ripples. This is the decode's own provenance: analyses
-      read a saved frame through ``analysed_time.read_dot_with_swr_source``, which
+      read a saved frame through ``analyzed_time.read_dot_with_swr_source``, which
       replaces it with the paper's SWR source (the direct Kay inventory). An
       HPC decode saves its frame with the source's labels
-      (``analysed_time.with_swr_source(..., drop_masked_events=False)``): that
+      (``analyzed_time.with_swr_source(..., drop_masked_events=False)``): that
       frame keeps the SWRs in the 0.3-s reach of the artifact mask, while its
       ``swr_observed`` already excludes the reach, so both are provenance and
       analyses re-read the frame through the source.
-    - swr_observed: True where SWR detection was observed and is analysed (the
+    - swr_observed: True where SWR detection was observed and is analyzed (the
       stored band's stretches less excluded time); added to the saved frame
       with the source's labels, and again by every read through the source.
       In the saved frame it already excludes the 0.3-s reach whose SWR labels
       the frame keeps.
     - in_excluded_time: True where the row's time lies in the epoch's
       excluded time (the artifact mask widened by 0.3 s,
-      ``analysed_time.excluded_intervals``, closed); added by
-      ``analysed_time.with_swr_source`` in both its modes, so by every read
+      ``analyzed_time.excluded_intervals``, closed); added by
+      ``analyzed_time.with_swr_source`` in both its modes, so by every read
       through the source; all False with no artifact run. A reader that
-      summarises bins leaves these rows out.
+      summarizes bins leaves these rows out.
     - MUA_event: Multiunit activity high-synchrony event number
 
 State probabilities (0-1):
@@ -61,7 +61,7 @@ Spatial statistics:
     - run_speed_baseline: The epoch's run-speed baseline (cm/s), a percentile
       of head speed (``epoch_normalizers.run_speed_baseline``), one value per
       epoch. Taken over every bin by ``get_data_over_time``;
-      ``analysed_time.with_swr_source`` (every read, and a decoder saving its
+      ``analyzed_time.with_swr_source`` (every read, and a decoder saving its
       frame) takes it again over the bins outside the artifact mask.
     - max_coverage: Maximum HPD spatial coverage
     - max_distance: Maximum distance in posterior
@@ -70,7 +70,7 @@ Spatial statistics:
 Neural signals (z-scored or phase):
     - theta_phase: Theta oscillation phase (radians)
     - theta_power_zscore: Z-scored theta power. Z-scored over every bin by
-      ``get_data_over_time``; ``analysed_time.with_swr_source`` (every read, and
+      ``get_data_over_time``; ``analyzed_time.with_swr_source`` (every read, and
       a decoder saving its frame) re-z-scores it over the bins outside the
       artifact mask and sets it to NaN inside the mask. ``SWR_zscore`` is also
       NaN inside the mask; ``MUA_zscore`` leaves the mask out of its
@@ -79,8 +79,8 @@ Neural signals (z-scored or phase):
     - MUA_zscore: Z-scored multiunit firing rate
 
 Event counts (session-level; the ``*SWR*`` counts are of the stored ripples,
-and every count includes events the analysed-time rule drops, so all of them
-are dropped by ``analysed_time.with_swr_source``):
+and every count includes events the analyzed-time rule drops, so all of them
+are dropped by ``analyzed_time.with_swr_source``):
     - n_non_local, n_SWR, n_MUA: Whole-event-speed-eligible event counts
     - n_non_local_SWR, n_non_local_no_SWR: Non-local overlaps with/without SWR
     - n_non_local_MUA, n_non_local_no_MUA: Non-local overlaps with/without MUA
@@ -144,7 +144,7 @@ import xarray as xr
 from non_local_detector.environment import Environment
 from scipy.stats import zscore
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.epoch_normalizers import (
@@ -161,7 +161,7 @@ from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_probability,
     nonlocal_state_probability,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_decode_files
 from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.parameters import (
@@ -462,7 +462,7 @@ def validate_dot_event_contract(
     The table builders assume each ``data_over_time`` (``dot``) frame holds a
     single session, has a finite strictly increasing time axis, and labels each event as one
     contiguous run of timebins (``label > 0``; the builders take an event's span
-    from the first and last labelled bin). A violation silently corrupts the
+    from the first and last labeled bin). A violation silently corrupts the
     regenerated tables — wrong bout assignment, an event split across a gap, or
     rows attributed to the wrong session — so this **fails closed**.
 
@@ -506,7 +506,7 @@ def validate_dot_event_contract(
         if col not in dot.columns:
             continue
         lab = dot[col].to_numpy()
-        # One pass per column: group positions of labelled bins by label. The
+        # One pass per column: group positions of labeled bins by label. The
         # positions are ascending (flatnonzero), so per label first()/last() are
         # its min/max bin index; a contiguous run has last - first + 1 == count.
         pos = np.flatnonzero(lab > 0)
@@ -545,8 +545,8 @@ def get_data_over_time(
     ``n_non_local_SWR``, ``n_non_local_no_SWR``, ``n_SWR_MUA``,
     ``n_SWR_no_MUA``) come from ``data["ripple_times"]``, the stored Spyglass
     ``RippleTimesV1`` ripples, not from the paper's pinned SWR inventory. Read
-    through ``analysed_time.with_swr_source`` (or, for a saved file,
-    ``analysed_time.read_dot_with_swr_source``), ``SWR_event`` is replaced by
+    through ``analyzed_time.with_swr_source`` (or, for a saved file,
+    ``analyzed_time.read_dot_with_swr_source``), ``SWR_event`` is replaced by
     the pinned inventory's labels and every decode count column is dropped.
     Callers must read the frame that way; its own ``SWR_event`` and ``n_SWR``
     are provenance only.
@@ -665,7 +665,7 @@ def get_data_over_time(
     # percentile of head speed over every bin, intended as a per-session speed
     # normalizer for downstream replay-speed/compression measures. Constant
     # across the session. The read through the SWR source takes it again over
-    # the bins outside the artifact mask (``analysed_time.with_swr_source``).
+    # the bins outside the artifact mask (``analyzed_time.with_swr_source``).
     run_speed_baseline = epoch_run_speed_baseline(
         data["position_info"].head_speed.to_numpy()
     )
@@ -736,16 +736,16 @@ def get_data_over_time(
 
 
 def load_data_over_time(data_dir: Path) -> pd.DataFrame:
-    """Load and concatenate the analysed epochs' NonLocal processed data.
+    """Load and concatenate the analyzed epochs' NonLocal processed data.
 
     This loads data from the 4-state NonLocal detector only. For
     ContFrag (2-state) data, use
     :func:`continuum_swr_replay.analysis.contfrag.load_contfrag_data_over_time`.
 
-    The epochs are the epoch register's analysed ones
-    (``epoch_register.analysed_decode_files``), never a glob of `data_dir`, so a
+    The epochs are the epoch register's analyzed ones
+    (``epoch_register.analyzed_decode_files``), never a glob of `data_dir`, so a
     pending or excluded epoch's decode there is not read. Each is read through
-    the SWR source (``analysed_time.read_dot_with_swr_source``): ``SWR_event`` is
+    the SWR source (``analyzed_time.read_dot_with_swr_source``): ``SWR_event`` is
     the direct Kay inventory's labels, not the decode's stored ripples.
 
     Parameters
@@ -762,12 +762,12 @@ def load_data_over_time(data_dir: Path) -> pd.DataFrame:
     Raises
     ------
     FileNotFoundError
-        If an analysed epoch's file is not in `data_dir`.
+        If an analyzed epoch's file is not in `data_dir`.
     SwrSourceError
-        If the SWR source cannot serve an analysed epoch.
+        If the SWR source cannot serve an analyzed epoch.
 
     """
-    files = analysed_decode_files(data_dir, data_over_time_suffix(), require_all=True)
+    files = analyzed_decode_files(data_dir, data_over_time_suffix(), require_all=True)
     data_over_time = pd.concat([read_dot_with_swr_source(p) for p in files])
     data_over_time["Non-Local_prob"] = nonlocal_probability(data_over_time)
     data_over_time["distance"] = np.abs(data_over_time["ahead_behind_distance"])

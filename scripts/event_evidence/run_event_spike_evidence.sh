@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Score every non-local event of every analysed epoch with the decode's stored
+# Score every non-local event of every analyzed epoch with the decode's stored
 # likelihood, one process per epoch. This is the spike-evidence run that the
 # events summary and measure_ripple_class_structure.py read.
 #
@@ -32,7 +32,7 @@ export JAX_PLATFORMS=cpu OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 OPENBLAS_NUM_THREAD
 OUT="$(python -c 'from continuum_swr_replay.paths import event_spike_evidence_dir; print(event_spike_evidence_dir())')" || exit 1
 EPOCHS="$(python -c 'from scripts.event_evidence.analyze_event_spike_evidence import find_sessions; print("\n".join(find_sessions(None)))')" || exit 1
 if [ -z "$OUT" ] || [ -z "$EPOCHS" ]; then
-  echo "no output folder or no analysed epoch with a decode under the data root" >&2
+  echo "no output folder or no analyzed epoch with a decode under the data root" >&2
   exit 1
 fi
 export OUT

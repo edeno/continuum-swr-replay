@@ -55,7 +55,7 @@ def claims(tmp_path, monkeypatch):
     monkeypatch.setattr(gpu_module, "CLAIM_DIRECTORY", tmp_path / "claims")
     # Each test is its own process as far as the selector is concerned, and
     # the device check is exercised on its own below rather than by
-    # initialising a real JAX backend on a real card from the suite.
+    # initializing a real JAX backend on a real card from the suite.
     monkeypatch.setattr(gpu_module, "_CONFIGURED", None)
     monkeypatch.setattr(gpu_module, "verify_jax_device", lambda record: None)
     # The suite pins JAX to CPU so no test can take a card. The selection
@@ -254,7 +254,7 @@ class TestDeviceVerification:
         verify_jax_device(record, devices=[FakeDevice()])
 
     def test_seeing_every_card_is_an_error_not_a_silent_grab(self):
-        # The failure this exists for: the backend was initialised before
+        # The failure this exists for: the backend was initialized before
         # CUDA_VISIBLE_DEVICES was set, so the process is on all ten cards --
         # other people's included -- and nothing says so until their jobs die.
         record = {
@@ -314,7 +314,7 @@ def test_the_occupancy_table_names_every_card():
     table = occupancy_table(parse_gpu_query(OCCUPANCY))
 
     assert table.count("GPU ") == 6
-    assert "13097/81920 MiB used, 0% utilisation" in table
+    assert "13097/81920 MiB used, 0% utilization" in table
 
 
 class TestFittingRequiresAConfiguredDevice:

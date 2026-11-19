@@ -1,10 +1,10 @@
-# Cross-cutting simplification and the two behaviour changes
+# Cross-cutting simplification and the two behavior changes
 
 Status: complete 2026-10-19 — tasks 1–9 + final review fix wave on branch `simplify-repo-2026-10-19` (e70ab12..2b38381); not merged to master (awaiting the lead). Ledger: ledger.md; final review: final-review.md; code-organization review: ../../reviews/2026-10-19-code-organization-review.md.
 
 Source: the 2026-10-19 `/simplify` whole-repo review (reuse, simplification,
-efficiency, altitude agents). The local, behaviour-preserving fixes landed in
-e70ab12. This plan carries the cross-cutting refactors and the two behaviour
+efficiency, altitude agents). The local, behavior-preserving fixes landed in
+e70ab12. This plan carries the cross-cutting refactors and the two behavior
 changes the lead approved on 2026-10-19 ("commit and do the cross cutting
 refactors and changes to how things behave"). No spec document; the review
 findings quoted in each task are the requirements, and rulings are recorded
@@ -12,7 +12,7 @@ in the SDD ledger.
 
 ## Global Constraints
 
-1. **Outputs unchanged** except where a task is marked *Behaviour change*.
+1. **Outputs unchanged** except where a task is marked *Behavior change*.
    Scientific tables, frames and figures produced by the refactored code must
    be identical to before (bit-identical; float summation-order differences
    are NOT acceptable unless the task says so).
@@ -47,7 +47,7 @@ in the SDD ledger.
 8. **Commits.** One or more commits per task on the current branch, ending
    with the session attribution lines given in the dispatch.
 
-## Task 1: One `replace_outputs` with rollback, one run-id check (*Behaviour change*)
+## Task 1: One `replace_outputs` with rollback, one run-id check (*Behavior change*)
 
 `replace_outputs` exists in four runners:
 `scripts/decoding/run_carey_detection.py` (~l.406),
@@ -64,14 +64,14 @@ set. The `--run-id` validation
 - Put one `replace_outputs(paths, outputs, ...)` with rollback-on-failure
   always on in `src/continuum_swr_replay/table_io.py` (or `decoding_common.py`
   if its dependencies live there — say which and why), keeping every caller's
-  current success-path bytes identical. Behaviour change: the carey and swr
+  current success-path bytes identical. Behavior change: the carey and swr
   runners now also roll back on a failed write.
 - Put one run-id validator (an argparse `type=` callable plus the pattern) in
   `decoding_common.py` and use it at all five sites; error text may be unified.
 - Tests: a failing-write test proving rollback for the shared helper; the
   existing runner tests still pass.
 
-## Task 2: `aggregate_to_timebins` derives excluded time itself (*Behaviour change*)
+## Task 2: `aggregate_to_timebins` derives excluded time itself (*Behavior change*)
 
 `analysis/replay/per_bin_design.py` `aggregate_to_timebins(..., excluded_intervals=None)`
 treats `None` as "no mask", so every caller computes
@@ -82,7 +82,7 @@ treats `None` as "no mask", so every caller computes
 `scripts/rate/fit_cross_history_rate.py` (~l.166, via `common`),
 `scripts/rate/plot_model_checking.py` (~l.257),
 `scripts/qa/compare_fits.py` (~l.772); the same comment is copied into 4
-scripts. A caller that forgets the argument silently analyses excluded time.
+scripts. A caller that forgets the argument silently analyzes excluded time.
 
 - Make the default derive the intervals from the stop table it is given
   (the same `excluded_intervals_by_session` call the scripts make today), and
@@ -121,13 +121,13 @@ waveform features, `with_swr_source(drop_masked_events=False)`,
 `hpc_artifact_intervals`, `require_hpc_decode_sources`. They have drifted:
 bandit persists `return_outputs="log_likelihood"` and contfrag does not.
 
-- Factor the shared HPC behaviour (and as much of the shared runner flow as
+- Factor the shared HPC behavior (and as much of the shared runner flow as
   stays simple) into `src/continuum_swr_replay/decoding_common.py` (or a
   `scripts/decoding/_decode_runner.py` if it is script-only), with a small
   per-runner record for what differs (detector factory, config class,
   data-over-time function, loader, output suffix, `non_local_threshold`,
   figurl, and the log-likelihood output).
-- Preserve each runner's current behaviour exactly, including the
+- Preserve each runner's current behavior exactly, including the
   log-likelihood difference (record it explicitly in the per-runner record;
   do not unify it — the lead decides that).
 - `DecodingConfig.to_sorted_spikes_params` is called via
@@ -180,7 +180,7 @@ Production decode frames are time-indexed with no `time` column (comments at
 `scripts/figures/generate_inventory_examples.py:~399`.
 
 - Make `intervals_from_labels` read only the index, and make the decode-frame
-  reader (`swr_source.with_swr_source` / its frame helper) normalise to, or
+  reader (`swr_source.with_swr_source` / its frame helper) normalize to, or
   assert, a time index. Delete the caller branches.
 - Check every caller's real input (and tests/fixtures) really is
   time-indexed; a fixture that passes a `time` column gets updated, a real
@@ -189,7 +189,7 @@ Production decode frames are time-indexed with no `time` column (comments at
 
 ## Task 7: Speed gating and the label contract are applied once, at the read
 
-CLAUDE.md: the analysed-time rule "is applied once, where a decode frame is
+CLAUDE.md: the analyzed-time rule "is applied once, where a decode frame is
 read (`swr_source.with_swr_source`), so every table inherits it". In practice
 `validate_nonlocal_event_probability_contract` + `filter_event_labels_by_speed`
 are re-run downstream at ~12 sites:
@@ -253,7 +253,7 @@ and `scripts/content/analyze_content_occupancy.py:~106`;
 - Leave the untracked `generate_replay_story_figures.py` `.replace({"j": "j16"})`
   alone (lead's work in progress); mention it in the report.
 
-## Task 9: One decode-file path helper; the gallery reads the register (*Behaviour change*)
+## Task 9: One decode-file path helper; the gallery reads the register (*Behavior change*)
 
 `"_80_data_over_time.pkl"` is hard-coded ~12 times:
 `analysis/replay/prepare_data.py:~155`, `analysis/hippocampus/data_aggregation.py:~770`,
@@ -274,6 +274,6 @@ of `analysed_decode_files`, so pending/excluded epochs can appear.
   `DEFAULT_NON_LOCAL_THRESHOLD`) in `data_loaders/epoch_register.py` next to
   `analysed_decode_files` (or `decoding_common.py` — choose by dependency
   direction, say why). Route every site through it; paths must be identical.
-- Behaviour change: the event gallery enumerates epochs through
-  `analysed_decode_files` (analysed epochs only). Report how many epochs the
+- Behavior change: the event gallery enumerates epochs through
+  `analysed_decode_files` (analyzed epochs only). Report how many epochs the
   old glob found vs the register.

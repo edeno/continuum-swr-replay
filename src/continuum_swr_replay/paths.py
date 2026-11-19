@@ -87,7 +87,7 @@ def replay_content_dir() -> Path:
 
 
 def contfrag_replay_content_dir() -> Path:
-    """The ContFrag (SWR- and MUA-labelled) replay-content tables and their fits."""
+    """The ContFrag (SWR- and MUA-labeled) replay-content tables and their fits."""
     return processed_data_dir() / "contfrag_replay_content"
 
 
@@ -156,7 +156,7 @@ EVENT_PROPERTY_BOOTSTRAP_DIR = "event_property_bootstrap"
 """The event properties' bootstrap intervals
 (``scripts/event_properties/bootstrap_event_properties.py``)."""
 DECODER_QUALITY_DIR = "decoder_quality"
-"""Each analysed epoch's decoder quality
+"""Each analyzed epoch's decoder quality
 (``scripts/decoding/measure_decoder_quality.py``)."""
 STATE_EVIDENCE_DIR = "state_evidence"
 """A held-out tetrode run's folder inside its run directory

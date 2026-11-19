@@ -1,7 +1,7 @@
-"""The table scripts' ``--expected-sessions`` default is the register's analysed count.
+"""The table scripts' ``--expected-sessions`` default is the register's analyzed count.
 
 A literal default (218 until 2026-10-10) went stale whenever the register's
-cohort changed. Each script now reads the number of analysed epochs from the
+cohort changed. Each script now reads the number of analyzed epochs from the
 epoch register when it builds its parser. Here the register is a stand-in under
 ``tmp_path`` and each script's work is replaced by a recorder, so nothing is read
 or written but the stand-in.
@@ -65,11 +65,11 @@ class _Stop(Exception):
 
 
 @pytest.mark.parametrize("script", list(SCRIPTS))
-def test_the_default_expected_sessions_is_the_registers_analysed_count(
+def test_the_default_expected_sessions_is_the_registers_analyzed_count(
     script, tmp_path, monkeypatch
 ):
     rows = [
-        ["a20200101_.nwb", epoch, "analysed", "", "", "False"]
+        ["a20200101_.nwb", epoch, "analyzed", "", "", "False"]
         for epoch in ("02_r1", "04_r2")
     ]
     rows += [
@@ -120,4 +120,4 @@ def test_the_help_says_the_default_is_the_hpc_cohort(script, monkeypatch, capsys
     with pytest.raises(SystemExit):
         module.main(["--help"])
 
-    assert "analysed epochs (HPC cohort)" in " ".join(capsys.readouterr().out.split())
+    assert "analyzed epochs (HPC cohort)" in " ".join(capsys.readouterr().out.split())

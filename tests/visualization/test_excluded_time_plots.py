@@ -1,6 +1,6 @@
 """The per-bin figure panels leave excluded time out (task 26b, items 2 and 6).
 
-Each panel that summarises bins draws the same thing on a frame with excluded
+Each panel that summarizes bins draws the same thing on a frame with excluded
 time as on the same frame with those rows removed, and something else when the
 excluded rows are counted. The frames are ``tests/support/_excluded_time_frames.py``'s.
 """
@@ -114,8 +114,8 @@ STRICT = {
 
 @pytest.mark.parametrize("name", STRICT)
 def test_a_filter_refuses_a_column_that_is_not_boolean(name):
-    """The same check as the quality metrics (``analysed_time.analysed_bins``).
-    Cast to bool, a None would read as analysed and a NaN as excluded."""
+    """The same check as the quality metrics (``analyzed_time.analyzed_bins``).
+    Cast to bool, a None would read as analyzed and a NaN as excluded."""
     frame = two_sessions()
     frame["in_excluded_time"] = frame["in_excluded_time"].astype(object)
     frame.iloc[:10, frame.columns.get_loc("in_excluded_time")] = None

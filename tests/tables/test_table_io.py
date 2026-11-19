@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     publish_swr_table,
 )
 from continuum_swr_replay.tables.io import (
@@ -177,7 +177,7 @@ def test_umask_file_mode_respects_umask():
 
 def _valid_stop_frame() -> pd.DataFrame:
     """A stop table as its producer hands it over: stamped with the SWR source."""
-    from continuum_swr_replay.analysis.event_definition.analysed_time import (
+    from continuum_swr_replay.analysis.event_definition.analyzed_time import (
         stamp_swr_source,
     )
 

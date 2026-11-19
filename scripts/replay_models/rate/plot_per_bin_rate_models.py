@@ -97,7 +97,7 @@ def all_models_input_paths() -> dict[str, Path]:
 
 MODEL = "M7r_time_histcos_rew"
 
-# outcome key -> (display label, colour)
+# outcome key -> (display label, color)
 POP_STYLE = {
     "swr": ("detected SWR", "k"),
     "non_local": ("non-local (all)", "C2"),

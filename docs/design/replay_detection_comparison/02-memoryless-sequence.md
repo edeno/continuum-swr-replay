@@ -29,7 +29,7 @@ Port the Widloski & Foster sliding-window sequence detector so that it runs on o
 recordings, producing inventory 6 of the seven in [overview.md](overview.md).
 
 The detector is memoryless by construction: each 80 ms window is decoded independently
-under a uniform spatial prior, and sequences are assembled afterwards from continuity
+under a uniform spatial prior, and sequences are assembled afterward from continuity
 criteria. That is the substantive contrast with our state-space procedure, which infers
 position and representational state jointly across time. By default the port builds its
 encoding model by the paper's rule, running only (> 10 cm/s) with an 8 cm kernel (V4,
@@ -172,11 +172,11 @@ resolved.
   `zenodo_15199609/load_replayEvents_cellIDshuffle.m` the speed gate is
   `ind_good` at line 54, decoding is restricted to it at line 64
   (`numSpks = numSpks(:,ind_good)`), the results are scattered back into a
-  NaN-initialised `posteriorCOM` at lines 79-80, and only then are jumps taken
+  NaN-initialized `posteriorCOM` at lines 79-80, and only then are jumps taken
   from that NaN-padded trajectory at line 82. Speed therefore reaches a
-  neighbour's jump. The helper library does the opposite:
+  neighbor's jump. The helper library does the opposite:
   `compute_filtering_binDecoding_cm.m:12` computes `jumps` from the raw
-  ungated centre of mass and line 54 applies speed, spread and jump in one
+  ungated center of mass and line 54 applies speed, spread and jump in one
   `find`, so speed never propagates. A reader who checks only the helper will
   conclude this port invented the ordering; it did not, but the disagreement is
   real and worth stating.
@@ -261,7 +261,7 @@ required to implement this adaptation.
 **As built** (`shuffle.py`). The shuffle is run on every candidate that meets both
 replay criteria, as the reference tests every duration- and dispersion-accepted event;
 this project's whole-event immobility rule is a column (`whole_event_speed_eligible`) to
-filter on afterwards, so the published cohort and this project's are both readable from
+filter on afterward, so the published cohort and this project's are both readable from
 one table. A draw gives encoding spike `i` the position of spike `pi(i)`. The joint mark
 intensity of a decoding spike is a sum over encoding pairs, `sum_i K_mark(m, M_i)
 K_pos(x, X_pi(i))`, so per electrode the mark kernel against the candidate's spikes is
@@ -303,7 +303,7 @@ both nulls:
   not: breaking which mark goes with which place leaves a broad posterior, whose center
   sits near the middle of the track and barely moves, so the shuffled mean jumps are
   small and a trajectory that really moves sits inside their distribution (p about 0.25
-  at 80 Hz). "Observed jump below the shuffled" favours a decode that stands still, and
+  at 80 Hz). "Observed jump below the shuffled" favors a decode that stands still, and
   the candidate does not pass. Marks scrambled against their spike times, so the decode
   carries no place at all, fail the jump half further still (p about 0.9). A literal
   zero-jump rule on binned centers had turned the real trajectory into a pass by setting
@@ -319,7 +319,7 @@ The first is a property of the jump statistic against a broad null; the second, 
 permuting within electrodes when an electrode's identity carries position. CA1 tetrodes
 are not topographic, so the second should matter less on real data than in that
 simulation, but how much position a tetrode's identity carries has to be measured, not
-assumed. Whether the reference's cell-ID shuffle shows the first behaviour on its own
+assumed. Whether the reference's cell-ID shuffle shows the first behavior on its own
 data is not known. Both are pinned in the tests
 (`tests/analysis/detection/memoryless_sequence/test_memoryless_shuffle.py`,
 `tests/integration/test_memoryless_simulated_replay.py`) so a change to either statistic
@@ -352,9 +352,9 @@ the animal's own position rather than a replayed one.
 window, and carries no hypothesis that competes with a replay for a window. Local coding
 during immobility is smooth, narrow and slow, so it passes both criteria. The merge rule
 then does most of the work: with merging disabled the same data gives 1.4x and 2.1x
-inflation instead of <!--v:detection.recording_sweep_duration_ratio-->2.5<!--/v-->x. Absorption needs a travelling event *spatially near*
+inflation instead of <!--v:detection.recording_sweep_duration_ratio-->2.5<!--/v-->x. Absorption needs a traveling event *spatially near*
 the stationary one — here the replay begins at the animal's own place, which is the usual
-geometry for awake replay. The added remote stationary event has no travelling neighbour,
+geometry for awake replay. The added remote stationary event has no traveling neighbor,
 and is declined for going nowhere; that is the method working as designed, since extended
 trajectories are its stated target.
 
@@ -379,7 +379,7 @@ no driver gates on it.
   any single choice.
 - These are pre-shuffle candidates. The encoding-pair shuffle would not rescue the
   boundaries: a sequence that is mostly stationary local coding has *low* mean spread and
-  *low* mean jump, so it passes such a test more easily than a travelling replay does.
+  *low* mean jump, so it passes such a test more easily than a traveling replay does.
 - One simulation is not a calibration study. What transfers is that boundary agreement,
   not event count, is where the two procedures should be expected to differ.
 
@@ -579,7 +579,7 @@ same over-call the figure shows, measured as a rate.
 **What is being compared, and what is not.** Each procedure runs with its own
 acceptance criteria, the sliding window's as adapted here (graph RMS spread, binned
 centers, a 5 ms stride, a 4 cm/s immobility cutoff); those criteria are part of each
-pipeline and are not harmonised, so the sweep compares the event inventories of two
+pipeline and are not harmonized, so the sweep compares the event inventories of two
 complete pipelines, and a disagreement cannot be put down to the triggers alone. The
 figure caption leads with the shared target, where both are held to the published
 duration and dispersion criteria (`overall_in_domain`, `state_space_replay_matches`). What is held identical is the scoring: both detectors are asked
@@ -669,7 +669,7 @@ minus true:
 The sliding window starts early and ends late; its bounds are window midpoints, and its
 80 ms windows reach 40 ms past each. Its long errors are at the edge of a replay that lies
 within the jump limit of the animal's own place, where the sequence runs on into local
-coding; the sweep runs replays towards the animal and away from it, so both edges show it.
+coding; the sweep runs replays toward the animal and away from it, so both edges show it.
 
 **Absorption reaches about 80 cm.** Among events both reported, by the distance
 between the replay and the animal's own place:
@@ -790,7 +790,7 @@ shared events are in the summary under their own `detector`.
   ones: most additional detections are
   too short or too sparse for a dozen evaluation cells to judge, so an event without
   support is mostly one that cannot be judged, not one shown false.
-- Events are labelled by their time inside the injected activity's parts: half or
+- Events are labeled by their time inside the injected activity's parts: half or
   more, its truth; partly, mixed; wholly inside a chain's silent gap, content-free
   (none occurred); on the recording's own labeled events, kept apart.
 
@@ -897,7 +897,7 @@ ahead/behind - is therefore dominated by local coding rather than by the
 replay, so for downstream content analysis the event behaves as a false
 positive over most of its duration even though the event itself is real.
 
-**The same mechanism cuts both ways.** Absorbing neighbouring windows is also
+**The same mechanism cuts both ways.** Absorbing neighboring windows is also
 what lets a sub-100 ms replay clear the duration criterion at all. Removing the
 over-extension would lose those events. Sensitivity and boundary accuracy are
 not independent knobs here.
@@ -933,7 +933,7 @@ not a reassurance.
 
 | # | Original | Ours | Why | Effect |
 |---|---|---|---|---|
-| **V1** | Sorted units, per-cell rate maps | Clusterless KDE encoding model over waveform features × position | HPC in this project is decoded clusterless; there are no sorted units | The encoding model is not a set of place fields. Cell-level inclusion criteria (rate, spatial information, isolation, SNR) have no analogue and are not applied |
+| **V1** | Sorted units, per-cell rate maps | Clusterless KDE encoding model over waveform features × position | HPC in this project is decoded clusterless; there are no sorted units | The encoding model is not a set of place fields. Cell-level inclusion criteria (rate, spatial information, isolation, SNR) have no analog and are not applied |
 | **V2** | Cell-ID shuffle, p <= 0.05 on spread and jump | Within-tetrode encoding-pair shuffle; the reference's statistics, count and threshold unchanged, its zero-jump rule read from the spikes | Uses existing clusterless arrays without component fitting (D2) | Scrambling individual mark–position pairs can blur tuning; original cell-ID permutation exchanges intact curves. Null distributions and accepted cohorts can differ |
 | **V3** | Tuning curves get `+1e-3` before decoding | Clusterless KDE with its own `EPS` clipping of the ground-process intensity | Different likelihood construction | Low-occupancy bins are regularized differently. Not tunable to match for the clusterless decode. For sorted cells, as in the sweep and the figure, it is matched: the sliding window decodes with the floor (`with_reference_rate_floor`), and the state-space detector reads the fields as fitted. It matters: without it the sweep's significance test passed 69% of replay candidates rather than 88%, and the published-definition rate read 11% rather than 18% ("Against the reference's own arithmetic") |
 | **V4** | Rate maps fit on running periods (> 10 cm/s), smoothed with an 8 cm Gaussian | **Retained (2026-11-13), as the default.** The decode's saved detector refitted per epoch on the decode's own training bins (`hpc_decode_masks`, outside SWR events and the artifact mask) that are also running (head speed > 10 cm/s), with an 8 cm position kernel; spikes and marks unchanged (`memoryless_sequence/encoding.py`). `--encoding decoder` reads the decoder's saved model instead (all speeds, 3.5 cm kernel): the shared-input control | The paper's rate maps are out of sample for every immobile event, SWR or not; the decoder's model trains on immobile non-SWR time (open decision 8). The decoder's model stays selectable so that a difference between the two procedures can still be attributed to inference rather than input | Still not the paper's: the marks are clusterless, not sorted cells (V1); training still leaves out SWR events and the artifact mask, which the paper's running periods do not need to; the library keeps each training run's spikes from one 2 ms bin before it to one after, so a few spikes at the edges of a run enter; and the kernel smooths along the linearized track (V6), not over the paper's open-field 2D. Windows are still gated at 4 cm/s (D3). On `chimi20200212_02_r1_HPC` (5 ms step, no shuffle; 2026-11-13, no summary holds these numbers) the paper's rule trains on 1,138 s of the decoder's 2,702 s and gives 1,533 candidates and 330 replays against the decoder model's 1,650 and 206 |
@@ -952,7 +952,7 @@ not a reassurance.
 
 | # | Original | Ours | Why | Effect |
 |---|---|---|---|---|
-| **V10** | 5 ms step | 5 ms step, retained, on a 200 Hz likelihood grid of the detector's own (`likelihood.likelihood_grid`; one row per step) | 5 ms is 2.5 samples of the decode's 500 Hz grid, so the likelihood cannot be summed from the decode's rows; the reference itself counts spikes in 5 ms bins. The encoding model was fitted on the 2 ms grid and the library subtracts its ground-process term once per row, so on 5 ms rows that term is multiplied by 2.5 (`encoding_bins_per_row`); the per-spike terms need nothing, a constant rate scale cancelling in each window's normalization. A grid row is missing when any decode sample it spans is | None on the step. Every bin-count threshold is still **derived from the stride**, never carried over as the original's literal constants. Until 2026-11-13 the port stepped 4 ms on the 2 ms grid |
+| **V10** | 5 ms step | 5 ms step, retained, on a 200 Hz likelihood grid of the detector's own (`likelihood.likelihood_grid`; one row per step) | 5 ms is 2.5 samples of the decode's 500 Hz grid, so the likelihood cannot be summed from the decode's rows; the reference itself counts spikes in 5 ms bins. The encoding model was fitted on the 2 ms grid and the library subtracts its ground-process term once per row, so on 5 ms rows that term is multiplied by 2.5 (`encoding_bins_per_row`); the per-spike terms need nothing, a constant rate scale canceling in each window's normalization. A grid row is missing when any decode sample it spans is | None on the step. Every bin-count threshold is still **derived from the stride**, never carried over as the original's literal constants. Until 2026-11-13 the port stepped 4 ms on the 2 ms grid |
 | **V11** | 80 ms window | 80 ms window (16 rows of 5 ms) | Exact at 200 Hz | None |
 
 ### Deliberate, for comparability
@@ -1167,7 +1167,7 @@ once, in `MEMORYLESS_EVENT_TABLE_DTYPES`, and held for an empty epoch too.
   epoch are decided by kept windows outside every piece, and <!--v:detection.pilot_calls_decided_by_outside_window_passing-->0<!--/v--> of those pass
   the significance test; diagnostics, not criteria),
   `path_distance_cm` (summed track-graph distance along the retained
-  centers, bridges included; the analogue of the original's `compute_sequenceDistance`,
+  centers, bridges included; the analog of the original's `compute_sequenceDistance`,
   reported and not used as a criterion), `is_replay` (both replay criteria)
 - **Speed (cm/s)** — `animal_max_speed_cm_s`, `animal_mean_speed_cm_s`,
   `whole_event_speed_eligible`, over every native speed sample between the endpoints.
@@ -1232,7 +1232,7 @@ not additional acceptance criteria.
 | One-to-many/many-to-many overlaps count each event once per detector; matched events may have different SWR labels; disjoint and empty cohorts | Denominators, matching, and empty-cohort handling |
 | Rejection diagnostics and gate-specific reruns agree on synthetic examples | Explanations of selection follow the actual pipeline |
 | Encoding-pair shuffle preserves observed spike/mark arrays, encoding marginals, and ground intensity; identity permutation reproduces the original likelihood | The intended null operation and absence of accidental refitting or input mutation |
-| One permutation spans all windows in a draw; observed/null scores use identical bounds; any single draw regenerates from its key; ties and NaN are handled as the reference handles them; on sorted cells the set-aside pairs are the reference's, windows whose continuous center did not move, in every draw, and on clusterless marks those no spike entered or left; each shuffle's behaviour on a real trajectory and on scrambled marks is pinned | Reproducibility, fidelity to the reference's test, and the controls |
+| One permutation spans all windows in a draw; observed/null scores use identical bounds; any single draw regenerates from its key; ties and NaN are handled as the reference handles them; on sorted cells the set-aside pairs are the reference's, windows whose continuous center did not move, in every draw, and on clusterless marks those no spike entered or left; each shuffle's behavior on a real trajectory and on scrambled marks is pinned | Reproducibility, fidelity to the reference's test, and the controls |
 | The reference's sorted-cell arithmetic on hand-worked cases, and the port pinned to it on a sorted fixture: same posteriors on the port's fields, same kept windows, same candidates and verdicts (`test_memoryless_reference.py`) | That the port decides as the reference would, apart from the documented adaptations |
 | Simulated-data smoke test, then one real epoch | End-to-end |
 
@@ -1263,7 +1263,7 @@ value, so the runner adds each flag unless the last occurrence of that flag alre
 the value the runner needs. A flag that is already right is not added twice. XLA reads
 `XLA_FLAGS` once, when JAX starts in a process, so the runner sets them before that: in
 each worker's environment when the worker is started, and in its own environment while
-it runs an epoch. Its own environment is restored afterwards. The runner works the
+it runs an epoch. Its own environment is restored afterward. The runner works the
 flags out once and records them in the run manifest's settings (`xla_flags`). The
 workers and the runner get that same value, so the manifest says what they ran with. A
 resume under the same run id with other flags is refused, like any other change of

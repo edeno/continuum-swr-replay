@@ -376,7 +376,7 @@ def left_out_statistics(run_dir: Path, inventory_dir: Path) -> dict[str, float]:
     Returns
     -------
     statistics : dict
-        - ``rest_hours``: hours of analysed immobility the non-local detector
+        - ``rest_hours``: hours of analyzed immobility the non-local detector
           observed (its exposure), summed over epochs.
         - ``nonlocal_time_s``, ``kay_time_s``: seconds the non-local events, and
           Kay's SWRs, span (:func:`left_out_seconds`).

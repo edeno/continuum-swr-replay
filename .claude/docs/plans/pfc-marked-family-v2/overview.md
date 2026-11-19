@@ -47,7 +47,7 @@ No new dependencies. `statsmodels` (already present) is used for the per-unit pe
 
 ## Metrics
 
-- Phase 1a: with baseline columns included and every mark removed, the base-kernel curves equal the canonical Figure 4 curves to `atol 1e-8` on the three smoke sessions **only when the baseline is empty**; with well and reward columns present the intercept-only model's held-out deviance must not be worse than the single-intercept model on those sessions (baseline terms are unpenalised, so this is a rank check, not a tuning check).
+- Phase 1a: with baseline columns included and every mark removed, the base-kernel curves equal the canonical Figure 4 curves to `atol 1e-8` on the three smoke sessions **only when the baseline is empty**; with well and reward columns present the intercept-only model's held-out deviance must not be worse than the single-intercept model on those sessions (baseline terms are unpenalized, so this is a rank check, not a tuning check).
 - Phase 1b: on the adversarial mark fixture, distance and size marks match hand-computed values; centered interaction products have `|r| < 0.2` with each constituent on the corpus (median over session × class), against 0.81–0.95 today.
 - Phase 1c: 71 sessions × models, one contract, zero failed sessions, blow-up units under 10 corpus-wide for every model including the interactions (37 in the exploration model today).
 - Phase 2: joint and marginal estimates for every target on one table; the gap is reported, not interpreted.
@@ -59,8 +59,8 @@ No new dependencies. `statsmodels` (already present) is used for the per-unit pe
 
 | Risk | Mitigation |
 | --- | --- |
-| A well never visited in a session gives an all-zero, unpenalised baseline column and a rank-deficient design. | Drop empty baseline columns per session, record the kept names in the sidecar, and let `KernelDesign.__post_init__` verify the width (phase 1a). |
-| Baseline columns are unpenalised while everything else is ridge-shrunk, so a stop with few bins could carry an extreme coefficient. | Reward outcome and well indicators are session-wide (many stops each), never per-stop dummies; a per-stop random intercept is deliberately not attempted. |
+| A well never visited in a session gives an all-zero, unpenalized baseline column and a rank-deficient design. | Drop empty baseline columns per session, record the kept names in the sidecar, and let `KernelDesign.__post_init__` verify the width (phase 1a). |
+| Baseline columns are unpenalized while everything else is ridge-shrunk, so a stop with few bins could carry an extreme coefficient. | Reward outcome and well indicators are session-wide (many stops each), never per-stop dummies; a per-stop random intercept is deliberately not attempted. |
 | Contract 2 bundles silently mixed with contract 1 bundles in a summary. | The contract-1 tree is renamed with a `_v1_single_intercept` suffix before the refit; `load_bundles` refuses a directory whose sidecars disagree on `bundle_contract_version`. |
 | Marginal-tier bundles doubling the corpus footprint. | Marginal designs are compact (45–67 columns); their bundles carry the same layout under a `tier` key and a distinct artifact name; storage is about a fifth of the joint tree. |
 | Slope-permutation refits are R full-data fits per model per session. | Restricted to three models and R = 30 by default; the runner records draws so a second pass can extend R without refitting the first 30. |

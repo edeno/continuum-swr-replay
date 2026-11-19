@@ -197,7 +197,7 @@ def freeze_common_cohort(
 #:
 #: The two grains need DIFFERENT predicates to mean the same thing, because
 #: ``occupancy_state`` is not the same statement about a stop as it is about an
-#: event. A stop is labelled ``mixed`` whenever its sampled states differ, and
+#: event. A stop is labeled ``mixed`` whenever its sampled states differ, and
 #: 14,845 of the 107,400 canonical stops are -- but they are at-well bouts:
 #: every one that has a last-well arrival begins after it (median 0.73 s), their
 #: median nearest-well distance is 0 cm at both ends, and 96.8% of their events

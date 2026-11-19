@@ -33,7 +33,7 @@ SWR events do not show this (max 1.75 s, a single outlier; only 3 events
 A 23 s "MUA event" is almost certainly malformed — a real MUA burst is
 tens of milliseconds. These events:
 - inflate any per-event MUA content/duration summary,
-- span multiple behavioural states (immobility + locomotion), so they are
+- span multiple behavioral states (immobility + locomotion), so they are
   ill-defined as "replay during a stop."
 
 ## How it's currently handled (workaround, not a fix)

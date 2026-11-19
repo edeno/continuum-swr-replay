@@ -310,13 +310,13 @@ def in_process_cluster(tmp_path, monkeypatch):
 
 @pytest.fixture
 def register(monkeypatch):
-    """The register serves two analysed epochs, one pending one and one
+    """The register serves two analyzed epochs, one pending one and one
     excluded for an S block (``SUSTAINED_NOISE``); returns what each register
     function was asked."""
     asked = []
 
-    def analysed_epochs(include_pending=False, include_sustained_noise=False):
-        asked.append(("analysed", include_pending, include_sustained_noise))
+    def analyzed_epochs(include_pending=False, include_sustained_noise=False):
+        asked.append(("analyzed", include_pending, include_sustained_noise))
         epochs = [(NWB_FILE_NAME, "02_r1"), (NWB_FILE_NAME, "04_r2")]
         if include_pending:
             epochs.append((NWB_FILE_NAME, "06_r3"))
@@ -328,7 +328,7 @@ def register(monkeypatch):
         asked.append(("pending", None))
         return _epoch_info((NWB_FILE_NAME, "06_r3"))
 
-    monkeypatch.setattr(runner, "analysed_epochs", analysed_epochs)
+    monkeypatch.setattr(runner, "analyzed_epochs", analyzed_epochs)
     monkeypatch.setattr(runner, "pending_epochs", pending_epochs)
     return asked
 
@@ -375,15 +375,15 @@ def _cli(tmp_path, *extra: str) -> dict:
 @pytest.mark.parametrize(
     ("flags", "asked", "epochs"),
     [
-        ([], [("analysed", False, True)], ["02_r1", "04_r2", "08_r4"]),
+        ([], [("analyzed", False, True)], ["02_r1", "04_r2", "08_r4"]),
         (
             ["--include-pending"],
-            [("analysed", True, True)],
+            [("analyzed", True, True)],
             ["02_r1", "04_r2", "06_r3", "08_r4"],
         ),
         (["--pending-only"], [("pending", None)], ["06_r3"]),
     ],
-    ids=["analysed", "include-pending", "pending-only"],
+    ids=["analyzed", "include-pending", "pending-only"],
 )
 def test_the_epochs_come_from_the_register(
     tmp_path,
@@ -395,7 +395,7 @@ def test_the_epochs_come_from_the_register(
     asked,
     epochs,
 ):
-    """The analysed epochs, the pending ones on request, and always the ones
+    """The analyzed epochs, the pending ones on request, and always the ones
     excluded for an S block, so that a new run re-tests them."""
     ran = _with_fakes(monkeypatch)
 

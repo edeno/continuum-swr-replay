@@ -10,7 +10,7 @@ import pandas as pd
 import xarray as xr
 from scipy.stats import sem
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     excluded_intervals,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
@@ -74,9 +74,9 @@ def get_signal_windows(
 
     Notes
     -----
-    - Excluded time (the artifact mask widened by 0.3 s) is not analysed: an
+    - Excluded time (the artifact mask widened by 0.3 s) is not analyzed: an
       event whose window touches the epoch's excluded time
-      (``analysed_time.excluded_intervals``; closed) is dropped whole, and its row
+      (``analyzed_time.excluded_intervals``; closed) is dropped whole, and its row
       is not returned.
     - Windows are centered on event times
     - Missing data filled with NaN (occurs for events near data boundaries)
@@ -165,7 +165,7 @@ def get_signal_windows(
         # alone returns the insertion point (the next sample), which
         # for an event at 0.0025 s on a 2 ms grid centers the window
         # on 0.004 s instead of 0.002 s. Compare distances to the
-        # neighbours bracketing the insertion point and pick the
+        # neighbors bracketing the insertion point and pick the
         # closer one.
         right = np.searchsorted(time_index, times)
         right_clipped = np.clip(right, 0, len(time_index) - 1)

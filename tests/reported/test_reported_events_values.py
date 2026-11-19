@@ -1,7 +1,7 @@
 """The events summary's builder functions: each statistic reaches the key that names it.
 
 Each test calls one builder function on a hand-made input whose statistics all
-differ, so a value filed under a neighbouring key (the other class, the other
+differ, so a value filed under a neighboring key (the other class, the other
 bound, the other detector) fails.
 """
 
@@ -17,7 +17,7 @@ from continuum_swr_replay.analysis.detector_comparison.features import (
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
 from continuum_swr_replay.reported import events as builder
 from continuum_swr_replay.reported.values import Value
 from tests.analysis.detector_comparison.test_inventory_nonlocal_comparison import (
@@ -156,7 +156,7 @@ def test_calibration_values_are_each_bin_s_median_over_sessions_in_order():
         for word in builder.CALIBRATION_BINS
     ] == [11.0 - k for k in range(10)]
     assert (
-        "centred on 0.05 (bin 1 of 10)"
+        "centered on 0.05 (bin 1 of 10)"
         in values["calibration_error_bin_one"].description
     )
     with pytest.raises(ValueError, match="has 9 bins, not 10"):
@@ -459,7 +459,7 @@ def test_heldout_by_swr_values_read_the_immobile_per_spike_rows():
 
 
 def test_class_distribution_values_count_the_animals_with_one_mode():
-    animals = list(analysed_animals())
+    animals = list(analyzed_animals())
     distribution = pd.DataFrame(
         {
             "animal": [*animals, "pooled", animals[0]],
@@ -478,11 +478,11 @@ def test_class_distribution_values_count_the_animals_with_one_mode():
 
 
 def step_fits() -> pd.DataFrame:
-    """Step fits of every analysed animal at the main settings: 1 animal with a
+    """Step fits of every analyzed animal at the main settings: 1 animal with a
     step in duration, 3 in spatial extent and in replay speed, 2 in spike
     evidence, none in the other properties; spike evidence's shares are
     0.5, -0.1, 0.3, 0.2, 0.9 (median 0.3, 4 positive)."""
-    animals = list(analysed_animals())
+    animals = list(analyzed_animals())
     with_step = {"duration": 1, "extent": 3, "speed": 3, "evidence": 2}
     evidence_shares = [0.5, -0.1, 0.3, 0.2, 0.9]
     rows = []
@@ -501,7 +501,7 @@ def step_fits() -> pd.DataFrame:
 
 
 def test_class_step_values_name_the_properties_with_the_most_steps():
-    animals = list(analysed_animals())
+    animals = list(analyzed_animals())
     steps = step_fits()
     values = _by_key(builder.class_step_values(steps, "s"))
     assert {key: value.value for key, value in values.items()} == {

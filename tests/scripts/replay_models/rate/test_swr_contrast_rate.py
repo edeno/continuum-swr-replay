@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay_models.rate import (
@@ -119,7 +119,7 @@ def test_audited_bundle_carries_the_cohort_its_fits_were_made_on(
     # sessions, so the two synthetic sessions are replicated across three
     # animals. The coefficients repeat; what is under test is the label the
     # aggregate carries, not its value.
-    labelled = pd.concat(
+    labeled = pd.concat(
         [
             fits.assign(
                 stop_cohort="all_stops",
@@ -132,7 +132,7 @@ def test_audited_bundle_carries_the_cohort_its_fits_were_made_on(
     )
 
     n_rows = mod._write_aggregation(
-        labelled, out_dir, "_allstops", {}, ["fit_swr_contrast_rate.py"]
+        labeled, out_dir, "_allstops", {}, ["fit_swr_contrast_rate.py"]
     )
 
     assert n_rows > 0

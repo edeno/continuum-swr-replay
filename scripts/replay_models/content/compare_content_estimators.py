@@ -15,7 +15,7 @@ not agree about how much an event is worth:
     *fraction*, so every event weighs one, and the reported uncertainty is the
     event-clustered sandwich (``bse_cluster_<term>``) rather than the model SE.
     Its likelihood is a quasi-likelihood on the event scale: the AIC it implies
-    is not a count-scale AIC and is labelled as such here.
+    is not a count-scale AIC and is labeled as such here.
 ``dirichlet_multinomial``
     The overdispersion-aware model. It keeps the counts, keeps the softmax mean
     structure, and adds an explicit within-event concentration ``log phi_e = g0
@@ -162,7 +162,7 @@ def log_phi_figure_rung(rungs: Sequence[ComparisonRung]) -> str | None:
 
 
 def _animal_colors(animals: Sequence[str]) -> dict:
-    """A stable colour per animal, in sorted order."""
+    """A stable color per animal, in sorted order."""
     palette = plt.get_cmap("tab10")
     return {animal: palette(i % 10) for i, animal in enumerate(sorted(animals))}
 
@@ -335,7 +335,7 @@ the retired conditional Poisson on per-arm timebin counts; the left column's y
 axis is the shipped conditional Poisson on per-event allocation fractions
 (event-clustered standard errors), the right column's is the
 Dirichlet-multinomial on the same counts with an `is_swr` concentration
-modifier. The dashed line is the identity. Colour identifies the animal. All
+modifier. The dashed line is the identity. Color identifies the animal. All
 three estimators were fit on one shared per-(session, rung) event set, so a
 departure from the identity is a difference of likelihood, not of cohort.
 Unidentified fits are excluded, by the same rule the shipped aggregation uses:
@@ -353,8 +353,8 @@ non-SWR event's timebins cluster on a few arms; **bottom,** the additive shift
 of that log concentration on SWR events, where a value below zero means SWR
 events are *more* concentrated (more redundant bins) and above zero means their
 mass is spread over more arms. Each line is one animal, plotted in session order
-within that animal. The grey line is the median over animals of each animal's
-median, and the grey band its 95 % interval from a nested bootstrap: the animals
+within that animal. The gray line is the median over animals of each animal's
+median, and the gray band its 95 % interval from a nested bootstrap: the animals
 present are resampled with replacement, then each drawn animal's sessions, for
 2000 draws at **seed 0**, and each draw's statistic is the median over the drawn
 animals of each one's median over its drawn sessions. The band is the median plus

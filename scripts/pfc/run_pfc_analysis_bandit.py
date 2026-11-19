@@ -117,7 +117,7 @@ from continuum_swr_replay.analysis.pfc.scoring import (  # noqa: E402
     score_session,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
-    analysed_epochs,
+    analyzed_epochs,
 )
 from continuum_swr_replay.data_loaders.spikes import (  # noqa: E402
     pfc_sorted_nwb_file_names,
@@ -180,10 +180,10 @@ ESTIMATOR = "ridge_poisson_glm"
 INFERENCE = "blocked_heldout_deviance"
 
 #: Columns the maximum-likelihood ladder wrote that this estimator cannot
-#: produce. A penalised fit has no likelihood-ratio reference distribution and
+#: produce. A penalized fit has no likelihood-ratio reference distribution and
 #: no AIC at a stated number of parameters, so the statistics table must not
 #: carry either: a reader who found a ``: pval`` column beside a ridge fit
-#: would read an asymptotic test of a model that was never fit unpenalised.
+#: would read an asymptotic test of a model that was never fit unpenalized.
 RETIRED_STATISTIC_SUFFIXES = (": lr", ": pval", ": aic")
 RETIRED_STATISTIC_COLUMNS = ("min_aic_model", "min_aic_model_replay_split")
 
@@ -352,7 +352,7 @@ def results_exist(
 def drop_retired_statistics(neuron_stats: pd.DataFrame) -> pd.DataFrame:
     """Remove the maximum-likelihood ladder's columns from a statistics table.
 
-    The per-unit fits are penalised and the inference is out of fold, so the
+    The per-unit fits are penalized and the inference is out of fold, so the
     likelihood-ratio statistics, their asymptotic p-values and the AICs are not
     quantities this estimator produces. They are dropped before the bundle is
     written rather than shipped alongside the held-out columns, where a reader
@@ -421,7 +421,7 @@ def run_analysis(
     fitter : {"jax"}
         How the GLMs are fit: the batched backend, which fits every neuron of
         the session against each design at once and is the only one with a
-        penalised path. The sidecar records it.
+        penalized path. The sidecar records it.
     fit_diagnostics : bool
         Also write ``<artifact>.fit_diagnostics.npz`` -- per-neuron, per-model
         parameters and fit criteria, for the fitter equivalence audit. Forces
@@ -465,7 +465,7 @@ def run_analysis(
     With ``fitter="jax"`` the device is chosen before anything is loaded, and a
     device that cannot be chosen ends the session rather than degrading it: no
     free card (and no ``allow_cpu``) raises ``NoFreeGPUError``, and a process
-    that had already initialised a JAX backend on every card raises
+    that had already initialized a JAX backend on every card raises
     ``WrongJAXDeviceError``. Both propagate out of this function -- they are
     raised before the ``try`` that turns a per-session failure into a log line,
     because they are a fact about the host rather than about the session, and a
@@ -577,8 +577,8 @@ def run_analysis(
     # rather than on a second assembly of it.
     scoring_context: dict[str, object] = {}
 
-    # Before JAX initialises a backend -- later than the import, and checked
-    # afterwards -- pick the card this process will fit on and bound what it
+    # Before JAX initializes a backend -- later than the import, and checked
+    # afterward -- pick the card this process will fit on and bound what it
     # takes of it. Each Dask worker runs this for itself; the claim keeps two
     # of them off the same card, and a worker handed a second session gets the
     # card it is already on rather than a second one.
@@ -955,7 +955,7 @@ def get_command_line_arguments(argv: Sequence[str] | None = None) -> Namespace:
         help=(
             "How the GLMs are fit (default and only choice: jax, the batched "
             "IRLS that fits every neuron of a session against each design at "
-            "once). The per-neuron statsmodels IRLS has no penalised path, so "
+            "once). The per-neuron statsmodels IRLS has no penalized path, so "
             "a batch cannot be launched on it; it survives in the library as "
             "the control the fitter equivalence tests are read against."
         ),
@@ -1165,7 +1165,7 @@ def _filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFram
         if missing:
             raise ValueError(
                 f"{args.sessions} names {len(missing)} session(s) that are not "
-                "analysed epochs of the epoch register: "
+                "analyzed epochs of the epoch register: "
                 + ", ".join(f"{name} {epoch}" for name, epoch in missing[:10])
                 + (", ..." if len(missing) > 10 else "")
             )
@@ -1198,20 +1198,20 @@ NO_SORTED_UNITS_REASON = (
     "the session has no curated cortical spike sorting (CuratedSpikeSorting, "
     "mountainsort4), a PFC-level condition, not an epoch exclusion"
 )
-"""Why an analysed epoch is outside the PFC cohort."""
+"""Why an analyzed epoch is outside the PFC cohort."""
 
 
 def write_cohort_record(
     path: Path,
     *,
-    n_analysed: int,
+    n_analyzed: int,
     pfc_cohort: pd.DataFrame,
     ran: pd.DataFrame,
     left_out: pd.Index,
     git_hash: str,
 ) -> None:
     """Record the PFC cohort beside the bundles: what ran, and why the rest of
-    the register's analysed epochs did not.
+    the register's analyzed epochs did not.
 
     Every partition of a run computes the same cohort, so every field but
     ``ran`` is the same whichever partition writes it last. ``ran`` is per
@@ -1222,7 +1222,8 @@ def write_cohort_record(
     record = {
         "produced_by": produced_by(__file__),
         "git_hash": git_hash,
-        "n_analysed": n_analysed,
+        # The British key the records already on disk carry; reported/mpfc reads it.
+        "n_analysed": n_analyzed,
         "n_pfc_cohort": len(pfc_cohort),
         "ran": [f"{name} {epoch}" for name, epoch in ran.index],
         "left_out": {
@@ -1249,24 +1250,24 @@ def main(argv: Sequence[str] | None = None) -> None:
     # Read when this script imported its code, before any worker starts.
     git_hash = loaded_commit()
 
-    # The PFC cohort: the register's analysed epochs, whose session has sorted
-    # units. An analysed epoch without them is left out here, with that reason,
+    # The PFC cohort: the register's analyzed epochs, whose session has sorted
+    # units. An analyzed epoch without them is left out here, with that reason,
     # which pfc_cohort_<area>.json records beside the bundles.
-    analysed = analysed_epochs()
-    pfc_cohort, unsorted = split_sorted_epochs(analysed, pfc_sorted_nwb_file_names())
+    analyzed = analyzed_epochs()
+    pfc_cohort, unsorted = split_sorted_epochs(analyzed, pfc_sorted_nwb_file_names())
     if len(unsorted):
         print(
-            f"{len(unsorted)} analysed epoch(s) left out at the PFC level, "
+            f"{len(unsorted)} analyzed epoch(s) left out at the PFC level, "
             f"{NO_SORTED_UNITS_REASON}: "
             + ", ".join(f"{name} {epoch}" for name, epoch in unsorted)
         )
-    epoch_info = _filter_epoch_info(analysed, args)
+    epoch_info = _filter_epoch_info(analyzed, args)
     epoch_info = epoch_info[epoch_info.index.isin(pfc_cohort.index)]
     if args.max_sessions is not None:
         epoch_info = epoch_info.iloc[: args.max_sessions]
     write_cohort_record(
         args.output_dir / pfc_cohort_name(args.brain_area),
-        n_analysed=len(analysed),
+        n_analyzed=len(analyzed),
         pfc_cohort=pfc_cohort,
         ran=epoch_info,
         left_out=unsorted,

@@ -417,6 +417,6 @@ PANELS_CAPTION = (
     "(compared events solid, moving events light, events set aside outlined), "
     "colored by family as in the paper: SWR definitions orange, MUA purple, "
     "state-space green, memoryless blue. "
-    "Excluded time is shaded grey in every panel. " + PENDING_SENTENCE
+    "Excluded time is shaded gray in every panel. " + PENDING_SENTENCE
 )
 """What every figure's panels show, after the sampling rule in a caption."""

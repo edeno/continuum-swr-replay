@@ -67,12 +67,12 @@ __all__ = [
 _ATTRS_KEY = b"continuum_swr_replay.attrs"
 
 SWR_SOURCE_ATTR = "swr_source"
-"""The ``attrs`` key of a table's SWR-source stamp (``analysed_time.stamp_swr_source``)."""
+"""The ``attrs`` key of a table's SWR-source stamp (``analyzed_time.stamp_swr_source``)."""
 
 SWR_SOURCE_TABLES = frozenset(CANONICAL_TABLES) - {"qvals"}
 """The canonical tables (covariate-schema keys) built from decode frames read
-through the SWR source (``analysed_time``); ``publish_canonical`` refuses one
-without a source stamp, and ``analysed_time.publish_swr_table`` one without the
+through the SWR source (``analyzed_time``); ``publish_canonical`` refuses one
+without a source stamp, and ``analyzed_time.publish_swr_table`` one without the
 source's current stamp. qvals, built from behavior alone, is the
 one canonical table that is not among them. event_sequence holds no SWR column
 but is published with its atomic set, so it carries the set's stamp."""
@@ -124,9 +124,9 @@ def publish_canonical(
     and is written as-is; the stamp is the record that it was validated.
 
     A table built from SWR labels (:data:`SWR_SOURCE_TABLES`) is published
-    through ``analysed_time.publish_swr_table``, which refuses it unless it
+    through ``analyzed_time.publish_swr_table``, which refuses it unless it
     carries the SWR source's current stamp (only its producer can give it,
-    ``analysed_time.stamp_swr_source``) and then calls this function. Here, as
+    ``analyzed_time.stamp_swr_source``) and then calls this function. Here, as
     foundation code that imports no analysis code, such a table is refused only
     when it carries no stamp at all, so none lands without naming the SWRs it
     was built from.
@@ -142,7 +142,7 @@ def publish_canonical(
     ):
         raise TypeError(
             f"the {table} table is built from SWR labels but carries no SWR "
-            "source stamp; publish it with analysed_time.publish_swr_table"
+            "source stamp; publish it with analyzed_time.publish_swr_table"
         )
 
     already_stamped = (

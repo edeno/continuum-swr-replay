@@ -29,7 +29,7 @@ tables**, produced by the table **builders** (replay + contfrag) and the table
 Unchanged: `reward_lag{1..10}`, `p_reward_current`, `rpe`, `value_diff_patch`,
 `recent_switch_rate`, `is_after_switch`, `is_current`, `is_prev`,
 `is_last_rewarded_elsewhere`, `arm_fe_*`, `arm_dist_rank`, `bs(tc)`, `onset_lag*`,
-`hist_rcos*`, the patch analogues. **Both** the replay (`tables.py`) and contfrag
+`hist_rcos*`, the patch analogs. **Both** the replay (`tables.py`) and contfrag
 (`analysis/contfrag/tables.py`) builders use these definitions.
 
 ## where-the-covariates-live

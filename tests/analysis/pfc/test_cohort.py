@@ -88,11 +88,11 @@ def test_an_epoch_absent_from_the_stop_table_is_refused(stop_table_path):
         )
 
 
-def test_the_pfc_epoch_cohort_is_the_analysed_epochs_of_sorted_sessions():
+def test_the_pfc_epoch_cohort_is_the_analyzed_epochs_of_sorted_sessions():
     """Two sorted files of three; the unsorted one's epochs are left out, and
     both parts keep the register's order. A sorted file the register does not
-    analyse adds nothing."""
-    analysed = pd.DataFrame(
+    analyze adds nothing."""
+    analyzed = pd.DataFrame(
         {"animal": ["chimi", "chimi", "chimi", "wilbur"]},
         index=pd.MultiIndex.from_tuples(
             [
@@ -106,7 +106,7 @@ def test_the_pfc_epoch_cohort_is_the_analysed_epochs_of_sorted_sessions():
     )
 
     cohort, left_out = split_sorted_epochs(
-        analysed, ["wilbur20210329_.nwb", "chimi20200224_.nwb", "j1620210706_.nwb"]
+        analyzed, ["wilbur20210329_.nwb", "chimi20200224_.nwb", "j1620210706_.nwb"]
     )
 
     assert list(cohort.index) == [
@@ -119,14 +119,14 @@ def test_the_pfc_epoch_cohort_is_the_analysed_epochs_of_sorted_sessions():
 
 
 def test_no_sorted_session_leaves_every_epoch_out():
-    analysed = pd.DataFrame(
+    analyzed = pd.DataFrame(
         index=pd.MultiIndex.from_tuples(
             [("chimi20200223_.nwb", "02_r1"), ("chimi20200223_.nwb", "04_r2")],
             names=["nwb_file_name", "interval_list_name"],
         )
     )
 
-    cohort, left_out = split_sorted_epochs(analysed, [])
+    cohort, left_out = split_sorted_epochs(analyzed, [])
 
     assert cohort.empty
-    assert list(left_out) == list(analysed.index)
+    assert list(left_out) == list(analyzed.index)

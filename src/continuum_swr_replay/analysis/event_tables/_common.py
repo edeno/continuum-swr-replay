@@ -74,7 +74,7 @@ def _in_event_mask(dot: pd.DataFrame, nonlocal_threshold: float) -> pd.Series:
     """Return complete bins of Non-Local labels that satisfy their contract.
 
     Event labels are created upstream from probability-thresholded intervals
-    and whole-event immobility, and the read (``analysed_time.with_swr_source``)
+    and whole-event immobility, and the read (``analyzed_time.with_swr_source``)
     refuses a frame that breaks either. This guard checks the same contract
     again for a builder called on a frame read another way, then returns
     complete labeled events. It never clips individual bins, because doing so

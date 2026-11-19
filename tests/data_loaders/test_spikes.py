@@ -569,7 +569,7 @@ class TestSpikeDataIntegrity:
 
 
 # --- detect_coincident_spikes before its clusters were cumsum ids (frozen at ba2961a5)
-# The clusters were labelled with ``scipy.ndimage.label``, shifted back one spike,
+# The clusters were labeled with ``scipy.ndimage.label``, shifted back one spike,
 # and the kept spikes regrouped with ``groupby().apply``. This is that function as
 # it was, copied verbatim (docstring and comments dropped), so the rewrite can be
 # checked against it spike for spike: same spikes kept, same order, same dtype.

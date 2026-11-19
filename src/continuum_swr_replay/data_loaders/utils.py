@@ -140,9 +140,9 @@ def get_epoch_info() -> pd.DataFrame:
     ``PositionIntervalMap`` row of the sessions ``session_restriction`` admits:
     the regular sessions of ``NWB_FILES`` and, since 2026-10-05, the listed
     first-exposure sessions. That is what Spyglass holds, not the cohort: a stage
-    that enumerates epochs to analyse reads
-    ``epoch_register.analysed_epochs()``, which keeps the epochs the epoch
-    register analyses and raises on one it does not list.
+    that enumerates epochs to analyze reads
+    ``epoch_register.analyzed_epochs()``, which keeps the epochs the epoch
+    register analyzes and raises on one it does not list.
 
     Returns
     -------
@@ -225,8 +225,8 @@ def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
     """Create event labels for each time point.
 
     Loops over events; each event's index range is found by binary search
-    (``np.searchsorted``) and labelled with one slice assignment, so the cost
-    is O(n_events * log(n_times)) searches plus one write per labelled time
+    (``np.searchsorted``) and labeled with one slice assignment, so the cost
+    is O(n_events * log(n_times)) searches plus one write per labeled time
     point, rather than an O(n_times) boolean mask per event.
 
     Parameters

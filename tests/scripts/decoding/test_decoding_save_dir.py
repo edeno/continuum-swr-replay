@@ -67,7 +67,7 @@ import xarray as xr
 
 from continuum_swr_replay.analysis.contfrag import result_loading as contfrag_loading
 from continuum_swr_replay.analysis.event_definition import (
-    analysed_time,
+    analyzed_time,
     decode_masks,
     swr_source,
 )
@@ -173,7 +173,7 @@ def decoders(monkeypatch, tmp_path):
     """Both decoder scripts, imported offline with ``spyglass`` stubbed.
 
     The stub keeps anything they import from reaching the database. The
-    modules imported here that bind the stub are forgotten afterwards, so a
+    modules imported here that bind the stub are forgotten afterward, so a
     later import gets the real ones.
 
     The data root is a folder under ``tmp_path`` that holds only the
@@ -1253,7 +1253,7 @@ def test_an_hpc_decodes_swr_labels_are_the_sources(
         return
     np.testing.assert_array_equal(
         data_over_time["SWR_event"],
-        analysed_time.swr_event_labels(
+        analyzed_time.swr_event_labels(
             DECODE_TIME, SWR_EPOCH, speed=np.zeros(DECODE_TIME.size)
         ),
     )
@@ -1263,7 +1263,7 @@ def test_an_hpc_decodes_swr_labels_are_the_sources(
     # widened by 0.3 s, is not observed, and nothing after it is
     np.testing.assert_array_equal(
         data_over_time["swr_observed"],
-        analysed_time.swr_observed_mask(DECODE_TIME, SWR_EPOCH),
+        analyzed_time.swr_observed_mask(DECODE_TIME, SWR_EPOCH),
     )
     observed = data_over_time["swr_observed"].to_numpy()
     assert not observed[_on_decode_grid((103.4, 104.6))].any()
@@ -1311,7 +1311,7 @@ def test_an_hpc_decode_keeps_every_event_it_decoded(decoders, monkeypatch, key):
 
     column = next(iter(columns))
     np.testing.assert_array_equal(data_over_time[column], labels)
-    assert not analysed_time.with_swr_source(data_over_time)[column].any()
+    assert not analyzed_time.with_swr_source(data_over_time)[column].any()
 
 
 def test_an_hpc_decode_checks_its_labels_at_its_own_threshold(decoders, monkeypatch):
@@ -1519,12 +1519,12 @@ def test_run_batch_closes_nwb_files_only_on_one_task_workers(
 @pytest.mark.parametrize(
     ("flags", "pending_only"),
     [([], False), (["--pending-only"], True)],
-    ids=["analysed", "pending_only"],
+    ids=["analyzed", "pending_only"],
 )
 def test_run_batch_selects_its_epochs_through_the_register(
     monkeypatch, tmp_path, flags, pending_only
 ):
-    """The batch decodes the register's analysed epochs, or with
+    """The batch decodes the register's analyzed epochs, or with
     ``--pending-only`` its pending ones alone: never ``get_epoch_info`` as it is."""
     asked: list[bool] = []
     calls: list[dict[str, Any]] = []

@@ -260,7 +260,7 @@ def cross_validate_per_stop_rate_model(
     the training stops and the mean held-out per-stop Poisson log-likelihood is
     evaluated on the test stops; the returned ``cv_ll_per_stop_mean`` is the
     average across folds (higher = better predictive fit). This is the rate
-    analogue of :func:`model_checking.cross_validate_conditional_poisson`, which
+    analog of :func:`model_checking.cross_validate_conditional_poisson`, which
     only applies to the conditional (arm/patch) models.
 
     Returns None if columns are missing, too few stops, or any fold's training

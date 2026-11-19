@@ -84,7 +84,7 @@ cohort_stops)` and set `fit_mask = is_immobile & in_cohort`; restrict `non_local
 `ripple_times` (~1027–1041) with `events_in_stops` BEFORE `get_overlap_times`; log and return in
 the per-session result dict `n_bins_immobile`, `n_bins_fit`, `n_nonlocal_before/after`,
 `n_ripple_before/after`, `stop_cohort`. For `all_stops` the mask is all-True over stops (so a
-bin outside every stop is still dropped? — NO: `all_stops` must reproduce today's behaviour
+bin outside every stop is still dropped? — NO: `all_stops` must reproduce today's behavior
 exactly: `fit_mask = is_immobile`, events unrestricted; implement `all_stops` as "no cohort
 restriction" and say so in the docstring). `scripts/pfc/run_pfc_analysis_bandit.py` —
 `--stop-cohort {at_well,all_stops}` default `at_well`; suffix `_allstops` on every output name

@@ -349,7 +349,7 @@ PATCH_COLORS = {1: "#0072B2", 2: "#D55E00", 3: "#009E73"}  # Okabe-Ito
 
 fig, ax = plt.subplots(figsize=(15, 3.5))
 
-# spreadsheet-style alternating grey bands, one per trial
+# spreadsheet-style alternating gray bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
         trial["movement_start_time"], trial["end_time"],
@@ -394,7 +394,7 @@ well_axis.set_yticklabels([f"well {w}" for w in sorted(well_linear)], fontsize=8
 
 
 def _marker(marker, filled, label, color="0.35"):
-    """Neutral-grey proxy handle — real markers are colored by patch."""
+    """Neutral-gray proxy handle — real markers are colored by patch."""
     return Line2D(
         [], [], linestyle="none", marker=marker, ms=7,
         mfc=color if filled else "none", mec=color, mew=1.5, label=label,
@@ -476,7 +476,7 @@ PATCH_COLORS = {1: "#0072B2", 2: "#D55E00", 3: "#009E73"}  # Okabe-Ito
 
 fig, ax = plt.subplots(figsize=(15, 3.5))
 
-# spreadsheet-style alternating grey bands, one per trial
+# spreadsheet-style alternating gray bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
         trial["movement_start_time"], trial["end_time"],
@@ -521,7 +521,7 @@ well_axis.set_yticklabels([f"well {w}" for w in sorted(well_linear)], fontsize=8
 
 
 def _marker(marker, filled, label, color="0.35"):
-    """Neutral-grey proxy handle — real markers are colored by patch."""
+    """Neutral-gray proxy handle — real markers are colored by patch."""
     return Line2D(
         [], [], linestyle="none", marker=marker, ms=7,
         mfc=color if filled else "none", mec=color, mew=1.5, label=label,
@@ -712,7 +712,7 @@ fig, axs = plt.subplots(4, 1, figsize=(15, 9), sharex=True, gridspec_kw={"height
 
 ax = axs[0]
 
-# spreadsheet-style alternating grey bands, one per trial
+# spreadsheet-style alternating gray bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
         trial["movement_start_time"], trial["end_time"],
@@ -757,7 +757,7 @@ well_axis.set_yticklabels([f"well {w}" for w in sorted(well_linear)], fontsize=8
 
 
 def _marker(marker, filled, label, color="0.35"):
-    """Neutral-grey proxy handle — real markers are colored by patch."""
+    """Neutral-gray proxy handle — real markers are colored by patch."""
     return Line2D(
         [], [], linestyle="none", marker=marker, ms=7,
         mfc=color if filled else "none", mec=color, mew=1.5, label=label,
@@ -858,7 +858,7 @@ fig, axs = plt.subplots(4, 1, figsize=(15, 9), sharex=True, gridspec_kw={"height
 
 ax = axs[0]
 
-# spreadsheet-style alternating grey bands, one per trial
+# spreadsheet-style alternating gray bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
         trial["movement_start_time"], trial["end_time"],
@@ -903,7 +903,7 @@ well_axis.set_yticklabels([f"well {w}" for w in sorted(well_linear)], fontsize=8
 
 
 def _marker(marker, filled, label, color="0.35"):
-    """Neutral-grey proxy handle — real markers are colored by patch."""
+    """Neutral-gray proxy handle — real markers are colored by patch."""
     return Line2D(
         [], [], linestyle="none", marker=marker, ms=7,
         mfc=color if filled else "none", mec=color, mew=1.5, label=label,
@@ -2802,7 +2802,7 @@ else:
 # ### 7e. Next-arm choice — C_* (conditional logit)
 #
 # Is replay content associated with where the animal *goes next*, beyond a
-# behavioural baseline? `build_choice_dataset` makes a stop × candidate-arm
+# behavioral baseline? `build_choice_dataset` makes a stop × candidate-arm
 # table: six well arms minus the current arm = five alternatives, with trunk
 # arms excluded. The current production workflow fits a primary block
 # (`C_replay_only`, `C_behavior`, `C_full`) and a separate SWR/non-SWR replay

@@ -372,7 +372,7 @@ def stop_level_design_columns(spec, stop: pd.DataFrame) -> list[str]:
     """A spec's design columns as they exist on the stop table.
 
     A per-bin design column that the design *derives* from a stop column (the
-    arrival clock, built as bin centre minus ``last_well_arrival_time_s``) is
+    arrival clock, built as bin center minus ``last_well_arrival_time_s``) is
     resolved to that source, so a stop whose clock is missing is attributed to
     the rung that needs it instead of vanishing from the audit.
     """
@@ -393,7 +393,7 @@ def per_bin_cohort_records(
     """Stop-grain cohort record per (model, population) for the per-bin ladder.
 
     Family B has no qvals merge, and every rung shares one frozen cohort
-    (``freeze_per_bin_cohort``), so a stop leaves the modelled set for one of
+    (``freeze_per_bin_cohort``), so a stop leaves the modeled set for one of
     two reasons. It is an **own-predictor** drop when ``immobility_time<=0`` or
     one of *this* rung's stop-level required predictors is NaN; it is a
     **common-cohort** drop (``n_drop_common_cohort_other``) when this rung's own

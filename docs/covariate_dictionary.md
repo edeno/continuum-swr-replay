@@ -144,8 +144,8 @@ more than the data delivers:
 - **`is_periswitch_post = 0` does not mean "no switch yet".** It means the
   *nearest* switch is ahead rather than behind (`periswitch_index_trials < 0`).
   Of the 35.1% of trials
-  labelled 0, **94.75% already had a switch earlier in the session**. It is a
-  nearest-neighbour tie-break, not a causal ordering flag.
+  labeled 0, **94.75% already had a switch earlier in the session**. It is a
+  nearest-neighbor tie-break, not a causal ordering flag.
 - **`periswitch_index_trials` is signed and clipped.** 35.1% of trials are negative
   (counting down to a *future* switch) and **26.9% sit exactly on the ±20 clip**, so a
   linear slope is fit partly on a saturation plateau.
@@ -162,7 +162,7 @@ more than the data delivers:
   all decoded MAP bins — so every patch-level coefficient is partly about corridor
   representation.
 - **Choice-model `replay_fraction` does not sum to 1** over the candidate set: mean
-  **0.49**, because `arm_fraction` is normalised over nine arms and the choice set keeps
+  **0.49**, because `arm_fraction` is normalized over nine arms and the choice set keeps
   five. The excluded current arm alone holds mean 0.24.
 
 **Per-SD support: leaf-only is SHIPPED.** The candidate-arm belief mean, task
@@ -203,7 +203,7 @@ which inverts the reading; corrected 2026-08-19, though one stale label remains 
 `scripts/replay_models/rate/fit_swr_contrast_rate.py:23`.
 
 **`in_transit` does not mean "moving".** It labels the trip interval. The
-modelled cohort is speed-gated immobility throughout, and off-well events have
+modeled cohort is speed-gated immobility throughout, and off-well events have
 a median speed of 1.35 cm/s — they are animals standing still partway through a
 trip. The content models exclude them because the well-visit construct is
 undefined there (so `is_current_arm` and everything derived from it is NaN), not
@@ -364,7 +364,7 @@ distinction matters for what a coefficient licenses you to claim:
 | class | covariates | a coefficient means |
 | --- | --- | --- |
 | **experienced** | current/previous arm indicators, distance, stop time, known reward lags, omission streak, reward count/fraction, last-rewarded arm, completed-trip switch, visit recency, novelty | content covaries with something the animal directly underwent |
-| **inferred** (model belief) | candidate/chosen-arm reward-belief means and variance, Beta differential entropy, relative value, local leaky-Q margin, RPE, and belief updates | content covaries with a *hypothesised* internal state, conditional on the belief model being right |
+| **inferred** (model belief) | candidate/chosen-arm reward-belief means and variance, Beta differential entropy, relative value, local leaky-Q margin, RPE, and belief updates | content covaries with a *hypothesized* internal state, conditional on the belief model being right |
 | **scheduled** (experimenter-only) | candidate/current-arm task reward probability, `task_reward_probability_patch_mean_gap_best_vs_second`, `trials_since_block_change` | content covaries with the **programmed contingency** |
 
 The third row is the one that gets over-claimed. The animal never observes a
@@ -389,7 +389,7 @@ fixed on the qvals row entering the trial. The reward-history block
 from that lag vector) advances on
 the outcome clock. On **83.9 % of events** (54,537 / 65,020 matched) the event starts after its
 trial's `outcome_known_time`, and 54,451 of those trials were rewarded — so
-within a single design row the two blocks summarise history through
+within a single design row the two blocks summarize history through
 **different endpoints, differing by the just-received reward**.
 
 > **That 83.9 % must be re-derived.** It was measured against the *previous*
@@ -445,7 +445,7 @@ enter any SWR-vs-non-SWR contrast.
 Two consequences to state wherever those contrasts are reported:
 
 1. The estimand is "SWR vs non-SWR content **among at-well events**", not in
-   general. The contrast within the cohort is valid; the generalisation is not.
+   general. The contrast within the cohort is valid; the generalization is not.
 2. The exclusion rate is animal-dependent (senor 4.92 % → chimi 11.64 %), so
    per-animal consistency checks — the "5/5 animals" statements — compare
    differentially restricted populations.
@@ -454,7 +454,7 @@ Two consequences to state wherever those contrasts are reported:
 
 `event_table.time_since_stop_start_s` is the **median over the event's bins**, i.e.
 the event *midpoint* minus `stop_start`. The Family-B design's `tc` is the bin
-centre, and `event_onset_table.t_since_stop_onset` is the event *start* minus
+center, and `event_onset_table.t_since_stop_onset` is the event *start* minus
 `stop_start`. They agree on **0 of 65,913 events**, differing by exactly
 `event_duration_s / 2` (median 31 ms, max 1.71 s). Negligible for
 time-by-current-arm interactions, but they are not one construct.
@@ -502,7 +502,7 @@ contain a boundary begin a median 0.22 s *after* their own arrival and last
 Definitions for the base (non-interaction) covariates on the canonical tables.
 Interactions are products of a canonical base covariate with a modifier
 (`is_swr`, `is_mua`, the time course, a current-arm role, or a derived omission)
-and are not catalogued separately. `_patch` variants aggregate the per-arm column
+and are not cataloged separately. `_patch` variants aggregate the per-arm column
 to the 3 patches. Value/RL covariates (task reward probability, reward-belief
 mean/variance, RPE, relative value, entropy, and choice probability) are in
 [`behavior_model_covariates.md`](behavior_model_covariates.md).
@@ -662,7 +662,7 @@ clock; both are NaN for a bout with no completed trial, e.g. a pre-trial stop):
   **MAP** arm is this arm; despite the historical “soft” name, it is not a full
   posterior-mass allocation.
 - `arm_count_hard` — count of timebins whose MAP arm is this arm.
-- `patch_fraction` — the patch analogue of `arm_fraction`: the event's share of
+- `patch_fraction` — the patch analog of `arm_fraction`: the event's share of
   decoded content allocated to this patch, over the same denominator (the
   in-event timebins whose MAP landed on a real arm). A patch fraction is exactly
   the sum of its three arms' fractions, and an event's three patch fractions sum
@@ -695,20 +695,20 @@ content runner, not stored):
   product, also a `BASEc` member and also absent from the `nt` twins.
 
 **Per-bin clocks** (Family-B design; built by `aggregate_to_timebins` at fit
-time, not stored). All three are bin-centre quantities, so they are the per-bin
-analogues of the per-event columns above and must not be joined with them:
+time, not stored). All three are bin-center quantities, so they are the per-bin
+analogs of the per-event columns above and must not be joined with them:
 - `tc` — time (s) since **stop onset** (the speed-threshold crossing that opened
   the immobility bout), entered via a `bs(tc)` spline with fixed knots (1, 2, 3) s
   over `[0, TMAX = 4]`. The default time-course backbone of Family B. A stop is an
   immobility *fragment*, not a well visit (see §F.4), so `tc = 0` is the start of a
   fragment and need not be an arrival or a reward.
-- `time_since_last_well_arrival_s` — bin centre minus the stop's
+- `time_since_last_well_arrival_s` — bin center minus the stop's
   `last_well_arrival_time_s`; NaN where that clock is NaN. The arrival-anchored
   alternative to `tc`, entered via a `bs(...)` spline with knots (1, 2, 4, 6) s
   over `[0, TMAX_ARRIVAL = 8]` by the arrival rungs (`M0a_const_arrival`,
   `M5a_time_arrival`, `M7ra_time_arrival_histcos_rew`). Same *name* as the
   per-event column in the Timing / exposure block above and a different *grain*.
-- `time_since_outcome_known_s` — bin centre minus the stop's
+- `time_since_outcome_known_s` — bin center minus the stop's
   `outcome_known_time_s`; NaN where that clock is NaN, and **negative before the
   outcome is knowable**. Not a fitted predictor of the shipped ladder; it is the
   boundary the per-bin reward features are recomputed at (§F.4).
@@ -731,7 +731,7 @@ result):
   event's probability vector sits close to the model mean and its timebins are
   near-independent draws (φ → ∞ is exactly the count multinomial). **Smaller φ
   means the event's mass clumps onto a few arms and its bins are near-copies of
-  one another.** It is the DM analogue of `Intercept`: a **structural nuisance
+  one another.** It is the DM analog of `Intercept`: a **structural nuisance
   term**, excluded from the separation judgment (`_DM_NUISANCE_TERMS`) and
   **never aggregated or reported** as a scientific effect. Because it is a
   nuisance term it can **never appear in `separated_terms`** — that flag says
@@ -780,7 +780,7 @@ result):
   effect scale (`|coef| × sd`) like every other term. `sd_log_phi_intercept` is
   **NaN** by construction — a constant column has no spread — so the intercept
   is judged by the separation flag alone.
-- `n_events_swr` / `n_events_nonswr` — modelled events on each side of the
+- `n_events_swr` / `n_events_nonswr` — modeled events on each side of the
   `is_swr` modifier, on every DM row; **NaN** where the concentration design has
   no `is_swr` column (the within-SWR splits). A modifier resting on one or two
   SWR events is finite and unflagged, and no identifiability rule can see it —
@@ -788,7 +788,7 @@ result):
   minimum is 25 SWR events per fit.
 - `phi_source` — provenance of the concentration intercept used for that
   session's fit, one of `session` (the session estimated its own),
-  `animal_pooled` (fewer modelled events than `--min-events-session-phi`,
+  `animal_pooled` (fewer modeled events than `--min-events-session-phi`,
   default 40, so the median intercept of that animal's longer sessions was
   pinned), or `pooled_all_animals` (the animal had no qualifying session
   either, so the all-animal median was pinned). A pinned fit's

@@ -19,7 +19,7 @@ session, and on the same well-anchored population its SWR/non-SWR split (overlap
 fraction 0.447 both ways; an earlier 44.7 % vs 43.0 % comparison set the PFC split against the
 canonical fraction over all events, including off-well ones, and was wrong). The phases therefore
 buy traceability — Figure 4 carries the canonical `event_id`s, `is_swr`, and input hashes — and
-the matched control; they do not change which events are labelled SWR-coupled.
+the matched control; they do not change which events are labeled SWR-coupled.
 
 ## Decisions (binding)
 

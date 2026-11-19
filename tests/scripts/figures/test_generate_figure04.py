@@ -396,7 +396,7 @@ def test_the_modulation_axis_keeps_its_half_to_double_range_for_a_flat_neuron(
 
 
 def test_the_modulation_axis_ticks_are_fold_changes_inside_the_limits(paper_style):
-    """Each tick sits at the log of the fold change it is labelled with, the
+    """Each tick sits at the log of the fold change it is labeled with, the
     1x reference line is kept, and the labels are plain numbers."""
     fig, ax_mod = _draw_overlay(_synthetic_inputs(non_swr_peak=1.6))
     try:

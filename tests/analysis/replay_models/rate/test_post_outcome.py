@@ -72,7 +72,7 @@ def test_post_outcome_gate_requires_the_outcome_clock(stop_frame):
 def _with_mu_fit_columns(data: dict) -> pd.DataFrame:
     """Complete a tiny physical-gate fixture with the exact MU design schema."""
     design = pd.DataFrame(data)
-    # ``tc`` is the within-stop bin centre, not a filler: the gate audit
+    # ``tc`` is the within-stop bin center, not a filler: the gate audit
     # reports the retained time-course support, so a constant here would
     # make that report vacuous.
     if "tc" not in design and "binj" in design:

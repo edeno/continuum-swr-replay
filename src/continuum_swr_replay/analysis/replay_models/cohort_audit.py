@@ -122,7 +122,7 @@ def _is_built_from(name: object, bases: frozenset[str]) -> bool:
 def is_qvals_sourced_column(name: object) -> bool:
     """Whether design column ``name`` is built from a ``qvals_table`` covariate.
 
-    A column qualifies when it, or one of its factors, is catalogued as
+    A column qualifies when it, or one of its factors, is cataloged as
     ``qvals_sourced`` (:data:`QVALS_SOURCED_COVARIATES`), so it is NaN on every
     stop with no qvals row. A product's factors are the ones declared for it in
     :data:`~.covariates.interactions.INTERACTION_FACTORS` (``swr_x_<base>``,
@@ -147,7 +147,7 @@ def is_qvals_gap_column(name: object) -> bool:
 
     The qvals gap (mechanism B) is the set of stops with no ``qvals_table``
     row. A column is in it when it, or one of its factors, is a covariate
-    catalogued as ``qvals_row_gated`` (:data:`QVALS_ROW_GATED_COVARIATES`);
+    cataloged as ``qvals_row_gated`` (:data:`QVALS_ROW_GATED_COVARIATES`);
     factors and suffixes are resolved as in :func:`is_qvals_sourced_column`. The drop
     buckets do not use this: they book the gap per row from
     :data:`HAS_QVALS_ROW`. It names the columns whose NaN can stand in for that
@@ -355,7 +355,7 @@ def fitted_cohort_record(
     The units a rung leaves out are booked in order: the qvals gap (counted by
     the caller, already off ``own_missing``'s frame), the units ``own_missing``
     marks, the units ``common_missing`` marks that ``own_missing`` does not,
-    and the rest of the units not modelled, which are ``n_excluded_session``.
+    and the rest of the units not modeled, which are ``n_excluded_session``.
     ``n_modeled`` is the fits' own count of units.
 
     Parameters
@@ -368,7 +368,7 @@ def fitted_cohort_record(
     count_column : str
         The fits' column counting the units each fit used (``n_stops`` for a
         per-bin rate fit, ``n_events`` for the SWR-power fit). A fit table
-        without it modelled 0.
+        without it modeled 0.
     n_in : int
         The units that entered, the qvals gap included.
     sessions_in : int

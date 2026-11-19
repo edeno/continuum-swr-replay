@@ -70,7 +70,7 @@ __all__ = [
     "interval_rows",
     "middle_row",
     "ms_features",
-    "neighbour_gaps",
+    "neighbor_gaps",
     "ss_features",
     "stop_context",
 ]
@@ -884,10 +884,10 @@ def ms_features(
     )
 
 
-def neighbour_gaps(inventory: pd.DataFrame) -> pd.DataFrame:
-    """Each compared event's gaps to its neighbours in its own inventory.
+def neighbor_gaps(inventory: pd.DataFrame) -> pd.DataFrame:
+    """Each compared event's gaps to its neighbors in its own inventory.
 
-    Neighbours are the events of the same detector in the same epoch. One
+    Neighbors are the events of the same detector in the same epoch. One
     detector's events are disjoint (the inventory schema requires it), so the
     event before in onset order is the one ending last before the onset.
 
@@ -907,7 +907,7 @@ def neighbour_gaps(inventory: pd.DataFrame) -> pd.DataFrame:
     Raises
     ------
     ValueError
-        An event is not compared; its neighbours would not be the compared
+        An event is not compared; its neighbors would not be the compared
         events'.
     """
     if not inventory["whole_event_speed_eligible"].all():

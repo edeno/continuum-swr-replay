@@ -33,7 +33,7 @@ import pandas as pd
 import xarray as xr
 from non_local_detector.environment import Environment
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import with_swr_source
+from continuum_swr_replay.analysis.event_definition.analyzed_time import with_swr_source
 from continuum_swr_replay.analysis.event_definition.decode_masks import (
     hpc_artifact_intervals,
     hpc_decode_masks,
@@ -142,7 +142,7 @@ def organize_results(
     ``runner.aggregate`` gets ``non_local_threshold`` unless it is None.
 
     For HPC, ``data_over_time`` is then read through the SWR source
-    (``analysed_time.with_swr_source``): ``SWR_event`` holds the configured Kay
+    (``analyzed_time.with_swr_source``): ``SWR_event`` holds the configured Kay
     inventory's labels and ``swr_observed`` its coverage, and the stored
     ripples' labels and counts are gone.
     """

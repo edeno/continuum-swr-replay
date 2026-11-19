@@ -122,7 +122,7 @@ def test_restrict_takes_the_sessions_from_the_slice_register(tmp_path):
     cand.mkdir()
     pd.DataFrame(
         [
-            ["chimi20200212_.nwb", "02_r1", "analysed", "", "", "True"],
+            ["chimi20200212_.nwb", "02_r1", "analyzed", "", "", "True"],
             ["j1620210706_.nwb", "02_r1", "excluded", "MISSING_INPUT", "slice", "True"],
         ],
         columns=[
@@ -151,6 +151,6 @@ def test_restrict_refuses_a_root_without_a_slice_register(tmp_path):
 
 def test_regen_validates_sessions_before_creating_the_root(tmp_path):
     root = tmp_path / "slice"
-    with pytest.raises(ValueError, match="not analysed epochs"):
+    with pytest.raises(ValueError, match="not analyzed epochs"):
         tp.regen(root, ["nosuchanimal20200101_02_r1_HPC"])
     assert not root.exists()

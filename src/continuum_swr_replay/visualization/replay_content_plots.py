@@ -33,7 +33,7 @@ def plot_model_hierarchy_comparison(
     Bar chart showing median ΔAIC at each step (M0→M1, M1→M2, ...),
     with error bars for IQR and annotations for session counts. ΔAIC is the
     child's AIC minus the parent's, so a bar below zero, drawn in the
-    non-local colour, is a step whose child is better.
+    non-local color, is a step whose child is better.
 
     Parameters
     ----------

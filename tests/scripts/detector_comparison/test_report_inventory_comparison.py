@@ -189,7 +189,7 @@ def test_a_run_with_no_ok_epoch_gives_empty_tables(tmp_path, monkeypatch):
             }
         )
     )
-    monkeypatch.setattr(report, "analysed_epoch_ids", lambda: [])
+    monkeypatch.setattr(report, "analyzed_epoch_ids", lambda: [])
 
     written = report.write_report(run_dir, tmp_path / "figures")
 
@@ -234,7 +234,7 @@ def test_rows_with_a_memoryless_inventory_are_marked_pending():
 def written(run, tmp_path_factory, module_monkeypatch):  # noqa: F811
     module_monkeypatch.setattr(
         report,
-        "analysed_epoch_ids",
+        "analyzed_epoch_ids",
         lambda: [*EPOCHS.values(), SHIFTED, NO_DECODE, "sim20200101_10_r5_HPC"],
     )
     figure_root = tmp_path_factory.mktemp("figures")
@@ -275,7 +275,7 @@ class TestTheReportOnTheRunnersTables:
             SHIFTED: "failed",
             NO_DECODE: "failed",
         }
-        assert "1 analysed epochs of the epoch register outside the run" in (
+        assert "1 analyzed epochs of the epoch register outside the run" in (
             (report_dir / "report.md").read_text()
         )
         assert "position span" in epochs.reason[SHIFTED]

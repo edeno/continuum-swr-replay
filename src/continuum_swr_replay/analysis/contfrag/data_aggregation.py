@@ -23,7 +23,7 @@ from continuum_swr_replay.analysis.detection.nonlocal_events import (
     validate_required_session_data_keys,
     validate_results_position_time_alignment,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.epoch_normalizers import (
@@ -35,7 +35,7 @@ from continuum_swr_replay.analysis.event_definition.immobility import (
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     get_overlap_times,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_decode_files
 from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
@@ -206,11 +206,11 @@ def get_contfrag_data_over_time(
 
 
 def load_contfrag_data_over_time(data_dir: Path) -> pd.DataFrame:
-    """Load and concatenate the analysed epochs' ContFrag processed data.
+    """Load and concatenate the analyzed epochs' ContFrag processed data.
 
-    The epochs are the epoch register's analysed ones
-    (``epoch_register.analysed_decode_files``), never a glob of `data_dir`. Each
-    is read through the SWR source (``analysed_time.read_dot_with_swr_source``):
+    The epochs are the epoch register's analyzed ones
+    (``epoch_register.analyzed_decode_files``), never a glob of `data_dir`. Each
+    is read through the SWR source (``analyzed_time.read_dot_with_swr_source``):
     ``SWR_event`` is the direct Kay inventory's labels.
 
     Parameters
@@ -227,11 +227,11 @@ def load_contfrag_data_over_time(data_dir: Path) -> pd.DataFrame:
     Raises
     ------
     FileNotFoundError
-        If an analysed epoch's file is not in `data_dir`.
+        If an analyzed epoch's file is not in `data_dir`.
     SwrSourceError
-        If the SWR source cannot serve an analysed epoch.
+        If the SWR source cannot serve an analyzed epoch.
     """
-    files = analysed_decode_files(
+    files = analyzed_decode_files(
         data_dir, f"_contfrag{data_over_time_suffix(None)}", require_all=True
     )
     data_over_time = pd.concat([read_dot_with_swr_source(p) for p in files])

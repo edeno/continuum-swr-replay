@@ -1,6 +1,6 @@
 """The runners' shared command line: run ids, the decoders' options, epoch filters
 (:func:`add_epoch_filters`, read by :func:`filter_epoch_info`,
-:func:`select_analysed_epochs` and :func:`epoch_ids_matching`), and the fit
+:func:`select_analyzed_epochs` and :func:`epoch_ids_matching`), and the fit
 figures' ``--allow-stale``."""
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.decoding.identifiers import (
     DEFAULT_SWR_DEFINITION,
     DEFAULT_TRAINING_TYPE,
@@ -31,7 +31,7 @@ __all__ = [
     "fit_figure_parser",
     "parse_run_id",
     "read_session_list",
-    "select_analysed_epochs",
+    "select_analyzed_epochs",
 ]
 
 RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
@@ -185,10 +185,10 @@ def filter_epoch_info(
     return filtered
 
 
-def select_analysed_epochs(args: Namespace) -> list[str]:
-    """The analysed epochs the arguments name, as epoch ids.
+def select_analyzed_epochs(args: Namespace) -> list[str]:
+    """The analyzed epochs the arguments name, as epoch ids.
 
-    ``args.epoch_id`` names one epoch of the epoch register's analysed ones (any
+    ``args.epoch_id`` names one epoch of the epoch register's analyzed ones (any
     other exits with a message); otherwise ``args.animal``, ``args.date`` and
     ``args.epoch`` narrow them, ``None`` leaving a filter off. The detection
     comparison's runners select their epochs by it.
@@ -203,13 +203,13 @@ def select_analysed_epochs(args: Namespace) -> list[str]:
     list of str
         Epoch ids such as ``"chimi20200225_02_r1_HPC"``, sorted.
     """
-    analysed = analysed_epoch_ids()
+    analyzed = analyzed_epoch_ids()
     if args.epoch_id is not None:
-        if args.epoch_id not in analysed:
-            sys.exit(f"{args.epoch_id} is not an analysed epoch of the epoch register.")
+        if args.epoch_id not in analyzed:
+            sys.exit(f"{args.epoch_id} is not an analyzed epoch of the epoch register.")
         return [args.epoch_id]
     return epoch_ids_matching(
-        analysed, animal=args.animal, date=args.date, epoch=args.epoch
+        analyzed, animal=args.animal, date=args.date, epoch=args.epoch
     )
 
 
@@ -261,7 +261,7 @@ def epoch_ids_matching(
 def add_epoch_filters(parser: ArgumentParser, *, epoch_id: bool = False) -> None:
     """Add a runner's epoch filters: ``--animal``, ``--date`` and ``--epoch``.
 
-    They are what :func:`filter_epoch_info` and :func:`select_analysed_epochs`
+    They are what :func:`filter_epoch_info` and :func:`select_analyzed_epochs`
     read; each left out keeps every epoch.
 
     Parameters
@@ -269,7 +269,7 @@ def add_epoch_filters(parser: ArgumentParser, *, epoch_id: bool = False) -> None
     parser : ArgumentParser
     epoch_id : bool, optional
         Also add ``--epoch-id``, one epoch by its id, for the runners that select
-        through :func:`select_analysed_epochs`.
+        through :func:`select_analyzed_epochs`.
     """
     parser.add_argument("--animal", help="Only this animal's epochs, such as chimi.")
     parser.add_argument(
@@ -346,6 +346,6 @@ def add_common_args(parser: ArgumentParser) -> ArgumentParser:
         help="Decode only the epochs the epoch register holds pending a Spyglass "
         "populate (the incremental update, run after the populates), into a "
         "staging --save_dir; the canonical folder is refused. By default the "
-        "register's analysed epochs are decoded.",
+        "register's analyzed epochs are decoded.",
     )
     return parser

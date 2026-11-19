@@ -418,7 +418,7 @@ def _within_group_centered(X: np.ndarray, groups: np.ndarray) -> np.ndarray:
 def _within_group_null_directions(X: np.ndarray, groups: np.ndarray) -> np.ndarray:
     """Directions :func:`within_group_full_rank` finds missing, shape (p, k).
 
-    The right singular vectors of the within-group-centred design whose singular
+    The right singular vectors of the within-group-centered design whose singular
     value is zero by ``numpy.linalg.matrix_rank``'s tolerance, so they are the
     directions that make the rank fall short.
     """
@@ -843,14 +843,14 @@ def fit_conditional_poisson(
     # point change. The conditional likelihood sees only the variation within
     # each event, so the within-event SD is the scale its curvature is set by;
     # the global SD (the ``sd_*`` outputs) can be large for a column whose
-    # within-event variation is tiny. The columns are not centred: a per-event
-    # constant drops out of a conditional likelihood, so centring would change
+    # within-event variation is tiny. The columns are not centered: a per-event
+    # constant drops out of a conditional likelihood, so centering would change
     # nothing and would be one more step to undo.
     #
-    # within_group_full_rank counts a singular value of the centred design as
+    # within_group_full_rank counts a singular value of the centered design as
     # zero below numpy.linalg.matrix_rank's default tolerance,
     # sigma_max * max(n_rows, n_params) * machine epsilon. A column with no
-    # within-event variation is a zero column of the centred design, so the
+    # within-event variation is a zero column of the centered design, so the
     # check above has refused any that the exact test let through, and every
     # scale is positive.
     limit = _fit_to_the_limit(X_varying, y, groups, in_likelihood, names_varying)

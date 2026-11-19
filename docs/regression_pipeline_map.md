@@ -82,11 +82,11 @@ The simulated run of Figure 1, decoded by the switching state-space model.
 
 `splice_remote_stationary`, `make_example_detector`, `estimate_state_space_model`, `SimulatedRun`, `DecodedSimulation`, `spike_span`, `spike_free_span`, `simulate_run`, `StateSpaceDecode`, `read_state_space_decode`, `simulate_and_decode`
 
-### `src/continuum_swr_replay/analysis/event_definition/analysed_time.py`
+### `src/continuum_swr_replay/analysis/event_definition/analyzed_time.py`
 
-The analysed-time read point: a decode frame held to the one analysed-time rule.
+The analyzed-time read point: a decode frame held to the one analyzed-time rule.
 
-`stamp_swr_source`, `require_swr_source`, `read_swr_table`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot_with_swr_source`, `analysed_bins`, `immobile_analysed_bins`, `swr_intervals`
+`stamp_swr_source`, `require_swr_source`, `read_swr_table`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `read_verified_dot_with_swr_source`, `analyzed_bins`, `immobile_analyzed_bins`, `swr_intervals`
 
 ### `src/continuum_swr_replay/analysis/event_definition/artifact_intervals.py`
 
@@ -120,7 +120,7 @@ The HPC decode's masks, from the paper's SWR source.
 
 ### `src/continuum_swr_replay/analysis/event_definition/eligibility.py`
 
-One analysed-time rule for every event cohort, exposure, bin and window.
+One analyzed-time rule for every event cohort, exposure, bin and window.
 
 `DropReason`, `excluded_time`, `artifact_drop_reasons`, `overlaps_dropped_events`, `event_drop_reasons`, `label_drop_reasons`, `drop_labels`
 
@@ -168,7 +168,7 @@ Tetrode participation and spike rate of non-local events, against Local rest.
 
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
-Spike evidence of non-local events: does the prior-excluded spike likelihood favour the decoded location over the animal's?
+Spike evidence of non-local events: does the prior-excluded spike likelihood favor the decoded location over the animal's?
 
 `build_session_events`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `event_metrics`
 
@@ -516,7 +516,7 @@ Poisson rate model for replay event occurrence.
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/ridge_history_cv.py`
 
-Ridge-penalised, cross-validated self vs self+cross history comparison.
+Ridge-penalized, cross-validated self vs self+cross history comparison.
 
 `RidgeFit`, `ridge_design`, `fit_ridge_poisson`, `heldout_loglik`, `assign_stop_folds`, `fit_ridge_poisson_batch`, `nested_cv`, `ridge_kernels`, `compare_cross_history`
 
@@ -538,7 +538,7 @@ The flow both decode runners share, and the record of what differs.
 
 ### `scripts/decoding/measure_decoder_quality.py`
 
-Measure each analysed epoch's decoder quality: Local-state error, state fractions, calibration.
+Measure each analyzed epoch's decoder quality: Local-state error, state fractions, calibration.
 
 `measure_epoch`, `main`
 
@@ -699,6 +699,12 @@ The Widloski & Foster detector as its MATLAB computes it, for a sorted 1-D track
 Report helpers shared by the QA and PFC audit scripts: the run's command line, markdown tables.
 
 _No module-level public symbols._
+
+### `scripts/checks/american_spelling.py`
+
+Find, or fix, British spellings in the repository's tracked text.
+
+`americanize`, `americanize_prose`, `americanize_notebook`, `read_as`, `americanized`, `tracked_files`, `british_spellings`, `fix`, `main`
 
 ### `scripts/checks/audit_event_patch_fraction.py`
 
@@ -930,7 +936,7 @@ What the mPFC kernel estimator does to the timing and size of a known response.
 
 ### `scripts/pfc/check_pfc_ridge_lambda0.py`
 
-Check that the penalised solver reproduces maximum likelihood at lambda = 0.
+Check that the penalized solver reproduces maximum likelihood at lambda = 0.
 
 `audited_basis`, `audited_designs`, `rebuild_session`, `compare_session`, `build_report`, `main`
 
@@ -1040,7 +1046,7 @@ Per-tetrode likelihood terms, and the encodings and decode files they come from.
 
 Speed regimes and the windows scored: bouts, matched windows, calibration windows.
 
-`keyed_rng`, `regimes`, `analysed_regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `event_bins`, `tetrode_halves`, `null_partners`, `window_folds`
+`keyed_rng`, `regimes`, `analyzed_regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `event_bins`, `tetrode_halves`, `null_partners`, `window_folds`
 
 ### `src/continuum_swr_replay/analysis/replay_models/content/fit_outputs.py`
 

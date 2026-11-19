@@ -22,7 +22,7 @@ from continuum_swr_replay.analysis.event_tables.table_contracts import (
     validate_event_arm_table,
     validate_event_patch_table,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
@@ -137,9 +137,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--expected-sessions",
         type=int,
-        default=len(analysed_epoch_ids()),
+        default=len(analyzed_epoch_ids()),
         help="Epochs (sessions) the tables must hold; default: the epoch register's "
-        "analysed epochs (HPC cohort).",
+        "analyzed epochs (HPC cohort).",
     )
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")

@@ -32,7 +32,7 @@ typical content and typical duration in that class, while the content kernel
 is the lag-by-lag change in log firing rate per within-session/class SD of
 current-arm content.
 
-Since bundle contract 2 the design also carries unpenalised per-stop baseline
+Since bundle contract 2 the design also carries unpenalized per-stop baseline
 columns after the intercept -- a well indicator per kept well other than the
 reference well, `rewarded_outcome` and `outcome_unknown`
 (`marked_glm.build_baseline_columns`; `--no-baseline` drops them) -- so the
@@ -44,7 +44,7 @@ The fit uses the same 500 Hz axis, ±250 ms spline support, ±200 ms reporting
 window, at-well stop cohort, ridge-Poisson estimator, and support-separated
 blocked folds as the canonical PFC analysis. The session is assembled by the
 canonical PFC assembly (`analysis/pfc/session.py`), so the fit mask (with the
-analysed-time rule: no fitted bin's ±250 ms basis window reaches excluded
+analyzed-time rule: no fitted bin's ±250 ms basis window reaches excluded
 time) and the replay-class onsets are exactly the ones Figure 4 is fit on.
 
 ## Nested held-out comparisons

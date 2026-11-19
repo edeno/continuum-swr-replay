@@ -11,15 +11,15 @@ Per epoch (a dask CPU worker each):
 1. **Decode.** ``{epoch}_results.nc`` must carry the ``decode_masks`` of the
    configured SWR source's runs (``saved_decode_masks``): a decode made before
    R11 is refused before anything is loaded. ``{epoch}_80_data_over_time.pkl``,
-   read through the SWR source (``analysed_time.with_swr_source``), gives the time
+   read through the SWR source (``analyzed_time.with_swr_source``), gives the time
    axis, head position and speed, linear position and the four state
    probabilities; its own non-local event labels, as the decoder wrote them
-   (before the analysed-time rule), give the event bins the running-only
+   (before the analyzed-time rule), give the event bins the running-only
    encodings leave out. ``{epoch}_detector.pkl`` gives the fitted encoding
    model and ``no_spike_rate``. The probabilities must be finite and sum to 1.
 2. **Windows.** Each state's confident bouts and their matched windows, and the
    calibration windows (``build_windows``), seeded by ``(SEED, epoch_id)``. A
-   bin in excluded time (``analysed_time.excluded_intervals``: the artifact mask
+   bin in excluded time (``analyzed_time.excluded_intervals``: the artifact mask
    widened by 0.3 s) is in no regime, so every window lies wholly outside it:
    the decode set the mask's bins missing (their stored log-likelihood is 0),
    and their spikes are an artifact's.
@@ -33,7 +33,7 @@ Per epoch (a dask CPU worker each):
 4. **Encodings** (``state_evidence.running_only_masks``): running-only refits (head speed
    >= 4 cm/s), on every running bin and on each fold of alternating 30 s
    blocks (``time_folds``), leaving out running bins within two bins of a
-   decoded non-local event bin (one the analysed-time rule drops included) and
+   decoded non-local event bin (one the analyzed-time rule drops included) and
    the decode's missing bins; no event bin may be in the library's padded
    training span of any of them (``training_spike_bins``).
    The canonical encoding is the decode's own.
@@ -54,7 +54,7 @@ Per epoch (a dask CPU worker each):
    none, the outputs are unchanged.
 6. **Evidence** under every encoding (``window_evidence``), 10 seeded tetrode
    half-partitions x 2 directions. The primary, ``runcv_``, takes each window
-   from the fold model without its centre bin (``held_out_evidence``), so a
+   from the fold model without its center bin (``held_out_evidence``), so a
    window's own spikes are not in the model that scores it.
 
 ``epoch_table`` and ``run_epoch`` also take other label sets (``LabelSet``):
@@ -120,7 +120,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
-from continuum_swr_replay.analysis.event_definition import analysed_time  # noqa: E402
+from continuum_swr_replay.analysis.event_definition import analyzed_time  # noqa: E402
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (  # noqa: E402
     CV_BLOCK_S,
     ENCODING_HELD_OUT,
@@ -132,7 +132,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence import (  # noq
     PROBABILITY_BIN_LABELS,
     STATES,
     UNDERFLOW_OCCUPANCY_FLOOR,
-    analysed_regimes,
+    analyzed_regimes,
     bout_animal_summaries,
     build_windows,
     code_version,
@@ -162,7 +162,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import ( 
     refit_encoding,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
-    analysed_epoch_ids,
+    analyzed_epoch_ids,
 )
 from continuum_swr_replay.decoding.encoding_model import (  # noqa: E402
     interior_bin_distances_cm,
@@ -248,7 +248,7 @@ CAVEATS = [
     "devices agree there, and a silent window may still choose it. A window "
     "that would have chosen a left-out bin is scored on the remaining bins, and "
     "marked and counted in the epoch's validation record (underflowed_bins, "
-    "windows.left_out_selection). D1's scan of the 242 analysed epochs found one "
+    "windows.left_out_selection). D1's scan of the 242 analyzed epochs found one "
     "with such bins, chimi20200221_08_r4.",
     "Each epoch enters as one value (epoch_summary): its median over windows "
     "for the log-likelihood ratios (loc_*, nl_*, nlr_*, ns_logratio), which are "
@@ -393,15 +393,15 @@ def reuse_reason(
 
 
 def canonical_epochs(decode_dir: Path) -> list[str]:
-    """Every analysed HPC epoch with any canonical decode file in ``decode_dir``.
+    """Every analyzed HPC epoch with any canonical decode file in ``decode_dir``.
 
-    The epoch register's analysed epochs (``analysed_epoch_ids``), never a
+    The epoch register's analyzed epochs (``analyzed_epoch_ids``), never a
     glob, so a pending epoch's decode there is not read. An epoch missing one of
     its files is still listed, so that the run records why it skips it.
     """
     return [
         epoch_id
-        for epoch_id in analysed_epoch_ids()
+        for epoch_id in analyzed_epoch_ids()
         if any(path.exists() for path in decode_files(epoch_id, decode_dir).values())
     ]
 
@@ -573,17 +573,17 @@ def epoch_table(
     # a decode made with the configured source's masks, before anything loads
     decode_masks = saved_decode_masks(files["results"])
     saved = pd.read_pickle(files["data_over_time"])
-    # every event the decoder labelled, the ones the analysed-time rule drops
+    # every event the decoder labeled, the ones the analyzed-time rule drops
     # too: decoded non-local content stays out of the running-only encodings
     in_event = (
-        analysed_time.with_swr_source(saved, drop_masked_events=False)[
+        analyzed_time.with_swr_source(saved, drop_masked_events=False)[
             "non_local_event"
         ].to_numpy()
         > 0
     )
-    dot = analysed_time.with_swr_source(saved)
+    dot = analyzed_time.with_swr_source(saved)
     del saved
-    excluded = analysed_time.excluded_intervals_of(dot)
+    excluded = analyzed_time.excluded_intervals_of(dot)
     time = dot.index.to_numpy(dtype=float)
     speed = dot["head_speed"].to_numpy(dtype=float)
     linear = dot["linear_position"].to_numpy(dtype=float)
@@ -603,7 +603,7 @@ def epoch_table(
     }
 
     # windows: a bin with no finite position, or in excluded time, is in no regime
-    regime, in_excluded = analysed_regimes(time, speed, linear, excluded)
+    regime, in_excluded = analyzed_regimes(time, speed, linear, excluded)
     checks["decode"]["excluded_bins"] = int(in_excluded.sum())
     windows: dict[str, pd.DataFrame] = {}
     for label_set in sets:
@@ -835,7 +835,7 @@ def label_set_table(
     """One label set's rows, and what its windows are.
 
     The primary ``runcv`` evidence takes each window from the fold model
-    without its centre bin (``held_out_evidence``). Two identities the evidence
+    without its center bin (``held_out_evidence``). Two identities the evidence
     must meet are recorded: every encoding scored the same spikes and partners,
     and a silent window's No-Spike log-ratio is E_C minus the scoring halves'
     silence rate (their mean size over the runs times rho times the bins).
@@ -912,7 +912,7 @@ def run_settings() -> dict:
         "n_partitions": 10,
         # frozen: recorded in run manifests and compared on resume; do not
         # rename (``swr_source.excluded_intervals`` is now
-        # ``analysed_time.excluded_intervals``).
+        # ``analyzed_time.excluded_intervals``).
         "regimes": "immobile head_speed < 4 cm/s, running > 10 cm/s; none in "
         "excluded time (swr_source.excluded_intervals)",
         "bouts": "P(state) > 0.8, >= 5 bins, <= 1500 per state x regime, "
@@ -926,12 +926,12 @@ def run_settings() -> dict:
         "encodings": {
             "runcv": f"running-only (head_speed >= {DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC} "
             f"cm/s) refit on each fold of alternating {CV_BLOCK_S:g} s blocks; a "
-            "window is scored by the fold without its centre bin",
+            "window is scored by the fold without its center bin",
             "run": "running-only refit on every running bin",
             "can": "the decode's own (hpc_decode_masks' no_ripple training bins)",
             "running_only_leaves_out": f"running bins within {EVENT_MARGIN_BINS} "
             "bins of a decoded non-local event bin (the decoder's own labels, "
-            "before the analysed-time rule), and the decode's missing bins",
+            "before the analyzed-time rule), and the decode's missing bins",
         },
     }
 
@@ -1177,7 +1177,7 @@ def figure_bouts(windows: pd.DataFrame, bouts: pd.DataFrame, path: Path) -> None
         "Held-out spike evidence in confident bouts (P > 0.8), against matched "
         "random windows (same regime, same length)\nTime-held-out running-only "
         "encoding, spike-mark part; dot = an animal, diamond = mean over animals "
-        "with its 95 % interval; grey = the windows' 5-95 % and 25-75 %",
+        "with its 95 % interval; gray = the windows' 5-95 % and 25-75 %",
         fontsize=9,
     )
     fig.savefig(path, dpi=150)
@@ -1476,12 +1476,12 @@ def main(argv: list[str] | None = None) -> None:
     print(f"open-file soft limit {old_soft} -> {new_soft}", flush=True)
     epochs = args.epochs or canonical_epochs(decode_dir)
     if not epochs:
-        sys.exit(f"No analysed epoch's HPC decode in {decode_dir}.")
+        sys.exit(f"No analyzed epoch's HPC decode in {decode_dir}.")
     discovery: dict[str, Any] = {
         "rule": (
             "the epochs given with --epochs"
             if args.epochs
-            else "every epoch the epoch register analyses with a canonical HPC "
+            else "every epoch the epoch register analyzes with a canonical HPC "
             f"decode file in {decode_dir}"
         ),
         "n_epochs": len(epochs),

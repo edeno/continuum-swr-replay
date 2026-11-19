@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Are the long non-SWR non-local events concentrated in certain animals?
 
-For each animal, summarise the duration distribution of immobile non-SWR
+For each animal, summarize the duration distribution of immobile non-SWR
 non-local events (and compare to SWR-overlapping events), and quantify the long
 tail (counts/fractions above 0.5/1/2/5 s) plus where the single longest events
 live. Writes a per-animal table, the top-N longest events, and a histogram.

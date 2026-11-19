@@ -144,7 +144,7 @@ def _section_text(text: str, heading: str) -> str:
 
     A section runs from its heading to the next heading at the same or a
     shallower level, so a per-rung table row is only credited to the family it
-    is written under -- a row under a neighbouring family cannot satisfy this
+    is written under -- a row under a neighboring family cannot satisfy this
     family's check.
     """
     lines = text.splitlines()

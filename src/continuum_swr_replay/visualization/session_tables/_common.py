@@ -141,7 +141,7 @@ def _add_colorbar(
 def _format_arm_axis(ax: Axes, label: str) -> None:
     """Apply the shared nine-arm geometry and leaf/trunk distinction."""
     for arm in _ALL_ARMS:
-        ax.axhline(arm, color="lightgrey", linewidth=0.3, zorder=0)
+        ax.axhline(arm, color="lightgray", linewidth=0.3, zorder=0)
     ax.axhline(
         5.5,
         color="0.5",
@@ -324,7 +324,7 @@ def _draw_event_arm_heatmap(
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
 

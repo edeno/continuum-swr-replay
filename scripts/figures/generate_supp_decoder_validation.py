@@ -20,7 +20,7 @@ Panels:
 
     d — Event duration distributions (non-local, SWR, MUA).
         Non-local events have a different duration profile from SWR/MUA
-        events, which the main text alludes to but does not visualise.
+        events, which the main text alludes to but does not visualize.
 
     e — Full four-signal event-triggered averages.
         The reduced two-signal version sits in main Figure 2c; here we
@@ -48,8 +48,8 @@ from continuum_swr_replay.analysis.detection.nonlocal_events import (
     get_event_types,
     load_data_over_time,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
-    immobile_analysed_bins,
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    immobile_analyzed_bins,
 )
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.paths import processed_data_dir
@@ -87,7 +87,7 @@ def plot_non_local_prob_distribution(data_over_time, ax) -> None:
     Used to justify the 0.8 threshold applied throughout the paper. Bins in
     excluded time (``in_excluded_time``) are left out.
     """
-    is_immobile = immobile_analysed_bins(data_over_time)
+    is_immobile = immobile_analyzed_bins(data_over_time)
     ax.hist(
         data_over_time.loc[is_immobile, "Non-Local_prob"],
         bins=50,

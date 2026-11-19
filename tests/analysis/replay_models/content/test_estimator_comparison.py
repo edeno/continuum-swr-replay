@@ -129,7 +129,7 @@ def test_an_unidentified_row_drops_the_whole_estimator_triple():
 
 
 def test_the_fraction_fits_non_finite_sandwich_falls_back_to_the_model_se():
-    """A NaN clustered SE keeps the row on its model SE, labelled as such.
+    """A NaN clustered SE keeps the row on its model SE, labeled as such.
 
     This is the shipped aggregation's own rule (``session_se``): a predictor
     that is constant within one session has no sandwich, and dropping the

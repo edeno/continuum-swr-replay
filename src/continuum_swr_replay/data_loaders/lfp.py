@@ -230,7 +230,7 @@ def get_ripple(
     # Fail loudly and self-descriptively when a session has no matching CA1
     # ripple extraction, rather than the opaque `fetch1` "0 tuples found" error.
     # The epochs with none (wilbur20210404, a depletion session, and those
-    # pending a populate) are not analysed: see docs/epoch_register.md.
+    # pending a populate) are not analyzed: see docs/epoch_register.md.
     ripple_query = RippleTimesV1 & ripple_key
     if len(ripple_query) != 1:
         available_group_names = sorted(
@@ -251,7 +251,7 @@ def get_ripple(
             f"{epoch_name} (group_name='CA1', "
             f"ripple_param_name='{ripple_param_name}'), found {len(ripple_query)}. "
             f"group_name(s) present for this session: {available_group_names}. "
-            "An epoch with no CA1 ripple extraction is not analysed; the epoch "
+            "An epoch with no CA1 ripple extraction is not analyzed; the epoch "
             "register (docs/epoch_register.md) records why."
         )
     ripple_times = ripple_query.fetch1_dataframe()

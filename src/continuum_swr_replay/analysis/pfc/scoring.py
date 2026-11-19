@@ -5,7 +5,7 @@ folds and scores it on the fold left out, reads each event class's held-out
 improvement against redraws of the matched non-event control
 (:mod:`~continuum_swr_replay.analysis.pfc.heldout`), and picks each unit's best
 model per decomposition. :func:`maximum_likelihood_comparison` fits the
-curve-bearing models unpenalised, so the prior's effect on each peak can be
+curve-bearing models unpenalized, so the prior's effect on each peak can be
 read against the same curve fit without it. :func:`extended_curves` reads the
 extended event set's two curves off the three-class model. The batch runner
 (``scripts/pfc/run_pfc_analysis_bandit.py``) calls them after ``run_session``.
@@ -67,7 +67,7 @@ def separated_column_counts(design: NDArray, counts: NDArray) -> NDArray:
     """Basis columns with no spikes anywhere under their support, per unit.
 
     A column whose support holds no spikes is the configuration that drives an
-    unpenalised coefficient to minus infinity; under the prior it is finite but
+    unpenalized coefficient to minus infinity; under the prior it is finite but
     uninformed, so the count is reported beside the fit rather than acted on.
     The intercept is not counted -- its support is every bin.
 
@@ -128,7 +128,7 @@ def score_session(
         The session's fit material, as ``run_session`` hands it back through
         ``scoring_out``.
     modulation_curves : dict[str, NDArray]
-        The shipped penalised curves, keyed as :data:`CURVE_SOURCES` is, so the
+        The shipped penalized curves, keyed as :data:`CURVE_SOURCES` is, so the
         prior's effect on each can be read against the same curve fit without
         it.
     penalty_sigma : float
@@ -393,12 +393,12 @@ def maximum_likelihood_comparison(
 ) -> dict[str, NDArray]:
     """What the same curve looks like without the prior, and whether it binds.
 
-    The shipped curve is the penalised one; the question a prior has to answer
-    is where it did the work. So each curve-bearing model is fit unpenalised as
+    The shipped curve is the penalized one; the question a prior has to answer
+    is where it did the work. So each curve-bearing model is fit unpenalized as
     well, and the two peaks are differenced against the estimation error the
-    *unpenalised* fit itself reports -- the standard error of the kernel at its
+    *unpenalized* fit itself reports -- the standard error of the kernel at its
     own peak lag, off-diagonal terms included, which a diagonal ``bse`` cannot
-    give. A unit whose unpenalised fit ran away has no peak to difference
+    give. A unit whose unpenalized fit ran away has no peak to difference
     against: it is flagged instead, and left out of the binding count.
 
     Parameters
@@ -413,7 +413,7 @@ def maximum_likelihood_comparison(
         The session's fit material from ``run_session``; its ``spline_basis``
         and ``lag_time`` say what a coefficient block means.
     modulation_curves : dict[str, NDArray]
-        The shipped penalised curves, ``(n_report_lags, n_units)`` each, keyed
+        The shipped penalized curves, ``(n_report_lags, n_units)`` each, keyed
         as :data:`CURVE_SOURCES` is.
     logger : logging.Logger
     curve_sources : dict
@@ -424,16 +424,16 @@ def maximum_likelihood_comparison(
     Returns
     -------
     dict[str, NDArray]
-        Per curve: the penalised peak, the unpenalised peak and its standard
-        error, whether the unpenalised fit converged or separated, and whether
+        Per curve: the penalized peak, the unpenalized peak and its standard
+        error, whether the unpenalized fit converged or separated, and whether
         the prior binds.
     """
     spline_basis = context["spline_basis"]
     lag_time = context["lag_time"]
     n_basis = spline_basis.shape[1]
     wanted = sorted({model for model, _ in curve_sources.values()})
-    logger.info("Fitting %d models unpenalised, to read the prior against", len(wanted))
-    unpenalised = {
+    logger.info("Fitting %d models unpenalized, to read the prior against", len(wanted))
+    unpenalized = {
         model: fit_poisson_glms(designs[model][fit_rows], fit_counts, penalty=None)
         for model in wanted
     }
@@ -441,7 +441,7 @@ def maximum_likelihood_comparison(
     columns: dict[str, NDArray] = {}
     for curve in curve_sources:
         model, block = curve_coefficients(curve, n_basis, curve_sources)
-        result = unpenalised[model]
+        result = unpenalized[model]
         raw_params = np.asarray(result.params)
         model_separated = is_separated(raw_params[:, 1:])
         converged = np.asarray(result.converged, dtype=bool)
@@ -452,14 +452,14 @@ def maximum_likelihood_comparison(
         )
         mle = peak_log_modulation(params, spline_basis, lag_time)
         mle_se = peak_modulation_se(covariance, spline_basis, mle.index)
-        penalised_peak = curve_peaks(modulation_curves[curve])
-        columns[f"{curve}: peak_log_modulation"] = penalised_peak
+        penalized_peak = curve_peaks(modulation_curves[curve])
+        columns[f"{curve}: peak_log_modulation"] = penalized_peak
         columns[f"{curve}: peak_log_modulation_mle"] = mle.value
         columns[f"{curve}: peak_log_modulation_mle_se"] = mle_se
         columns[f"{curve}: mle_converged"] = converged
         columns[f"{curve}: mle_separated"] = model_separated
         columns[f"{curve}: prior_binds"] = prior_binds(
-            penalised_peak, mle.value, mle_se
+            penalized_peak, mle.value, mle_se
         )
     return columns
 

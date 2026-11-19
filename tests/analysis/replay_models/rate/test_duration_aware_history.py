@@ -543,7 +543,7 @@ def test_stack_sessions_labels_each_session_and_leaves_out_the_sparse_ones(
     monkeypatch,
 ):
     """Sessions with 3, 0 and 2 onsets: a gate of 2 keeps the first and last,
-    in order, each labelled by its keys; the default keeps all three."""
+    in order, each labeled by its keys; the default keeps all three."""
     from continuum_swr_replay.analysis.replay_models.rate import (
         duration_aware_history as dah,
     )

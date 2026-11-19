@@ -12,7 +12,7 @@ Pre-flight scan:
 | T2 event timing once | deleting `_merge_classified_and_verify_timing` removes the bit-for-bit check between the two derivations | Ruling 2: run the check on the cached session BEFORE deleting and record it passes; keep one `assert_event_label_alignment`; the parity gate (T4) is the ongoing proof |
 | T3 CLI relocation | `prepare_data --from-cache` invocation is quoted in three audits and the phase-5a/5b briefs | Ruling 3: historical audits are records — leave; update docs/README.md, scripts/README.md, the runner docstrings, the pipeline map, and CLAUDE.md's Development Setup if it quotes the module form |
 | T3 registry trim | `LEGACY_COLUMN_NAMES` frozenset extracted from the ledger | Ruling 4: record the extraction command + count in the report; the deny-list must reject every name the current ledger-derived list rejects (test: compute both at the pre-trim commit and assert set equality) |
-| T3 validators → table_contracts | runner science path < 200 lines | if unreachable without behaviour change, report the count and stop |
+| T3 validators → table_contracts | runner science path < 200 lines | if unreachable without behavior change, report the count and stop |
 | All | parity gate any diff = STOP | Ruling 5 |
 Tasks 0+1: dispatching one implementer (opus); BASE = cd06a31
 Tasks 0+1: implementer DONE (8832e33 532ba50 8237b7f); suite 2120 passed + 1 strict xfail (hippocampus rule, tripwire for Task 2); pre-move layering failures: 16 covariates→model_specs edges, 2 data_loaders→analysis, 3 hippocampus→replay._helpers; content smoke byte-identical vs _golden_baseline_pre5b run. Notes: _helpers.py was a 7th importer (now design_constants); RECENCY_SPLINE_* added to model_specs.__all__ (re-export explicit). Review dispatched (opus).

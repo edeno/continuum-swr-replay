@@ -41,17 +41,17 @@ Line numbers verified on branch `pfc-response-followups` at `d6b8e0fd` (2026-10-
 - Phase 0: the ported tests pass; the layering test passes; on one real session the marked context's fit mask and event onsets equal `run_session`'s exactly.
 - Phase 1: timing values in `part4.json`; the calibration recovers a planted response onset within the stated error on simulated data.
 - Phase 2: with the new class present, every canonical-class column of a smoke bundle equals the canonical bundle's within the fitter tolerance; 75 sessions, one contract, no failed sessions.
-- Phase 3: as in the v2 plan (baseline columns unpenalised; no-baseline run reproduces contract 1 bit for bit); every target has joint and marginal estimates and a null band.
+- Phase 3: as in the v2 plan (baseline columns unpenalized; no-baseline run reproduces contract 1 bit for bit); every target has joint and marginal estimates and a null band.
 
 ## Risks and Mitigations
 
 | Risk | Mitigation |
 | --- | --- |
-| Spline basis (50 ms knots) and the σ = 3 prior spread a post-onset response into negative lags, so "starts before onset" is partly an artefact. | Phase 1 measures the smear on simulated responses fit by the same basis and prior, and reports onsets beside that reference. |
+| Spline basis (50 ms knots) and the σ = 3 prior spread a post-onset response into negative lags, so "starts before onset" is partly an artifact. | Phase 1 measures the smear on simulated responses fit by the same basis and prior, and reports onsets beside that reference. |
 | Peak-sign alignment of noisy curves makes a population curve that peaks wherever noise peaks. | Population timing uses only units called for that class; the matched control's peak-lag distribution is reported as the floor. |
 | SWRs without replay are few per session (~17 % of Kay SWRs) and weaker than SWR-coupled ones; a smaller response could reflect strength, not content. | Their own count-matched null; counts reported per session; strength confound listed for the lead (Open Questions 4). |
 | The extended refit drifts from the canonical fit (code moved since `110c9ae`). | The smoke compares the canonical-class columns of the new bundles with the canonical bundles before the batch is launched. |
-| Context marks again carry stationary rate differences between stops (the v1 failure). | Every stop-level context mark has a matching unpenalised per-stop baseline column (phase 3a). |
+| Context marks again carry stationary rate differences between stops (the v1 failure). | Every stop-level context mark has a matching unpenalized per-stop baseline column (phase 3a). |
 | Marked-family code ported from a base 694 commits old silently uses the old session assembly (no excluded-time rule). | Phase 0 rewires it to the current helpers and checks equality with `run_session` on a real session. |
 | GPU contention with other jobs on breeze. | `nvidia-smi` before every launch; GPU 0 never used; one tmux worker per card. |
 

@@ -60,10 +60,10 @@ def _events(n_per_epoch: int, spread: float, seed: int = 0) -> pd.DataFrame:
     rows = []
     for animal in "abcde":
         for epoch in range(4):
-            centre = rng.normal()
+            center = rng.normal()
             for _ in range(n_per_epoch):
                 rows.append(
-                    (animal, f"{animal}{epoch}", centre + spread * rng.normal())
+                    (animal, f"{animal}{epoch}", center + spread * rng.normal())
                 )
     return pd.DataFrame(rows, columns=["animal", "epoch_id", "D_spike"]).assign(
         group="no SWR"

@@ -224,7 +224,7 @@ def test_the_scored_table_says_what_each_model_bought_out_of_fold(caplog):
 
 def test_the_null_avoids_the_events_the_session_dropped(monkeypatch):
     """The null's controls avoid what ``run_session``'s shipped control avoids:
-    the events the analysed-time rule dropped, handed back in the context."""
+    the events the analyzed-time rule dropped, handed back in the context."""
     context = _synthetic_context()
     context["artifact_dropped"] = pd.DataFrame(
         {"start_time": [3.0, 30.0], "end_time": [3.4, 30.2]}

@@ -9,7 +9,7 @@ and ``epoch_register.csv``, each between a pair of markers::
     ...
     <!-- END GENERATED: name -->
 
-so that a register edit (a pending epoch flipped to ``analysed``, say) needs only
+so that a register edit (a pending epoch flipped to ``analyzed``, say) needs only
 this script to bring the doc back in line.
 
 Usage:
@@ -86,7 +86,7 @@ def reason_codes() -> str:
 def counts(register: pd.DataFrame) -> str:
     by_reason = Counter(zip(register["status"], register["reason"], strict=True))
     lines = ["| status | reason | entries |", "|---|---|---|"]
-    lines.append(f"| analysed | — | {by_reason[(Status.ANALYSED.value, '')]} |")
+    lines.append(f"| analyzed | — | {by_reason[(Status.ANALYZED.value, '')]} |")
     for reason in REASON_ORDER:
         n = by_reason.get((reason_status(reason).value, reason.value), 0)
         if n:
@@ -101,7 +101,7 @@ def counts(register: pd.DataFrame) -> str:
         f"of sessions with no known run epoch: {len(register) - n_wide} run epochs "
         f"and {n_wide} session-wide entries in all.",
         "",
-        "| animal | analysed | pending |",
+        "| animal | analyzed | pending |",
         "|---|---|---|",
     ]
     animal = [
@@ -115,21 +115,21 @@ def counts(register: pd.DataFrame) -> str:
     )
     for name, row in per_animal.iterrows():
         lines.append(
-            f"| {name} | {row.get(Status.ANALYSED.value, 0)} | "
+            f"| {name} | {row.get(Status.ANALYZED.value, 0)} | "
             f"{row.get(Status.PENDING.value, 0)} |"
         )
-    n_analysed = by_reason[(Status.ANALYSED.value, "")]
+    n_analyzed = by_reason[(Status.ANALYZED.value, "")]
     n_pending = by_reason.get((Status.PENDING.value, Reason.PENDING_POPULATE.value), 0)
-    lines.append(f"| **all** | **{n_analysed}** | **{n_pending}** |")
+    lines.append(f"| **all** | **{n_analyzed}** | **{n_pending}** |")
     return "\n".join(lines)
 
 
 def entries(register: pd.DataFrame) -> str:
     """One row per session, status, reason and evidence, its epochs listed."""
     rank = {reason.value: i for i, reason in enumerate(REASON_ORDER)}
-    unanalysed = register[register["status"] != Status.ANALYSED].reset_index()
+    unanalyzed = register[register["status"] != Status.ANALYZED].reset_index()
     rows = []
-    for (name, status, reason, evidence), group in unanalysed.groupby(
+    for (name, status, reason, evidence), group in unanalyzed.groupby(
         ["nwb_file_name", "status", "reason", "evidence"]
     ):
         epochs = sorted(group["epoch"])

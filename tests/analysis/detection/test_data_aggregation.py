@@ -349,7 +349,7 @@ def test_validate_dot_contract_rejects_multiple_sessions():
 
 def test_validate_dot_contract_rejects_unsorted_time():
     dot = _clean_dot()
-    dot.index = [0.0, 1.0, 2.0, 1.5, 4.0, 5.0]  # time goes backwards once
+    dot.index = [0.0, 1.0, 2.0, 1.5, 4.0, 5.0]  # time goes backward once
     with pytest.raises(ValueError, match="unsorted_time|input-contract"):
         validate_dot_event_contract(dot)
 

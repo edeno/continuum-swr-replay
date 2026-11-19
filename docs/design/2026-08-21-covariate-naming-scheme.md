@@ -106,7 +106,7 @@ The supporting rules:
    `signed`, `log`, `_z`) follows it. So `rpe_postoutcome_abs` (abs transforms
    the scalar RPE) but `reward_belief_mean_update_l1_all_ports_postoutcome`
    (the L1 is the aggregation) — both correct, one rule.
-4. **Units and window parameters live in the name.** Seconds, centimetres,
+4. **Units and window parameters live in the name.** Seconds, centimeters,
    trials, visit count, log-scale. The failure mode is guessable-the-wrong-way:
    `reward_rate_arm_k10` counts the last 10 *visits*, not trials. **Digit
    boundary:** a numeric field takes a leading `_` when it identifies a member
@@ -335,7 +335,7 @@ family.
 
 ## Behavioral-model value and belief — correctness hazard
 
-**`q_arm` and `p_reward_arm` are not two flavours of value — one is belief,
+**`q_arm` and `p_reward_arm` are not two flavors of value — one is belief,
 the other is ground truth.** Verified: `q_arm` sources from `q_port*`, the
 Beta posterior *mean* (the animal's estimate, 96,431 distinct values).
 `p_reward_arm` sources from `p_reward_port*`, the *programmed contingency* —

@@ -8,7 +8,7 @@ The definitions are the prototype's:
 - J5(t) = median(x[t+1..t+5]) - median(x[t-5..t-1]);
 - L20(t) = mean(x[t+5..t+24]) - mean(x[t-24..t-5]);
 - spike lines on two 200-µs grids offset by half a bin;
-- a mark's nearest-neighbour distance to a reference set, its own event (the
+- a mark's nearest-neighbor distance to a reference set, its own event (the
   same tetrode's marks within 1 ms, itself included) left out.
 
 Offline and deterministic.
@@ -259,10 +259,10 @@ def _old_nearest_mark_distance(marks, is_reference):
     if reference_index.size == 0 or marks.shape[0] == 0:
         return distance
     tree = cKDTree(marks[reference_index])
-    found, neighbour = tree.query(marks, k=2)
+    found, neighbor = tree.query(marks, k=2)
     own = np.full(marks.shape[0], -1)
     own[reference_index] = np.arange(reference_index.size)
-    return np.where(neighbour[:, 0] == own, found[:, 1], found[:, 0])
+    return np.where(neighbor[:, 0] == own, found[:, 1], found[:, 0])
 
 
 def _brute_force(marks, is_reference, times, own_event_s):
@@ -310,10 +310,10 @@ class TestNearestMark:
             marks, is_reference, times, own_event_s=OWN_EVENT_S
         )
 
-        # 0 and 1 are exact duplicates: each the other's neighbour
+        # 0 and 1 are exact duplicates: each the other's neighbor
         np.testing.assert_allclose(distance, [0.0, 0.0, 10.0, 20.0])
 
-    def test_a_lone_reference_mark_has_no_neighbour(self):
+    def test_a_lone_reference_mark_has_no_neighbor(self):
         marks = np.array([[0.0, 0.0], [3.0, 4.0]])
 
         distance = nearest_mark_distance(
@@ -365,7 +365,7 @@ class TestNearestMark:
 
         np.testing.assert_allclose(distance[3:], [0.0, 0.0])
 
-    def test_a_close_neighbour_in_time_gives_way_to_a_matching_mark_farther_away(
+    def test_a_close_neighbor_in_time_gives_way_to_a_matching_mark_farther_away(
         self,
     ):
         # spike 0's twin (spike 1, 0.5 ms later) has its exact mark; spike 2,

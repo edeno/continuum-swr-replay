@@ -4,7 +4,7 @@ Covers ``build_classified_nonlocal_event_table`` and its
 ``intervals_from_labels`` helper in
 ``continuum_swr_replay.analysis.event_definition.classified_table``.
 
-The shared fixture synthesises a ``data_over_time``-shaped frame sampled
+The shared fixture synthesizes a ``data_over_time``-shaped frame sampled
 at 500 Hz with one event per interval-geometry case, plus a second
 session, so overlap classification, matched-SWR pairing, per-event speed
 summaries, peak non-local probability, event-id stability, and
@@ -56,7 +56,7 @@ EXPECTED_CLASSIFIED_COLUMNS = [
 ]
 
 # Session 1 event windows (inclusive sample ranges) and the SWR windows
-# arranged to realise each interval-geometry case. SWR label ids are
+# arranged to realize each interval-geometry case. SWR label ids are
 # deliberately distinct from the event ids (11+ vs 1-8) so a matched-SWR
 # assertion cannot pass by accidentally returning the event id.
 #

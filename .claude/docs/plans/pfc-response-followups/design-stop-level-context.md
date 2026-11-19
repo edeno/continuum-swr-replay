@@ -41,7 +41,7 @@ log mu_ue = log(b_us × 0.2 s) + alpha_u + beta_reward × rewarded_s + beta_swit
 
 ## Cost
 
-CPU only. The counts come from the canonical session assembly (`analysis/pfc/session.py`: fit mask, event sets, spike binning — no fitting), about 2 min per session to prepare, so about 2.5 h for 75 sessions; the GLMs are small (`statsmodels` with unit dummies, or `batched_glm.fit_poisson_glms` with the unit intercepts unpenalised).
+CPU only. The counts come from the canonical session assembly (`analysis/pfc/session.py`: fit mask, event sets, spike binning — no fitting), about 2 min per session to prepare, so about 2.5 h for 75 sessions; the GLMs are small (`statsmodels` with unit dummies, or `batched_glm.fit_poisson_glms` with the unit intercepts unpenalized).
 
 ## Decisions for the lead
 

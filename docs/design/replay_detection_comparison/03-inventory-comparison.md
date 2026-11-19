@@ -9,7 +9,7 @@ build coverage from recordings (`adapters.py`), Carey's runner
 (`scripts/detector_comparison/run_inventory_comparison.py`), the report
 (`scripts/detector_comparison/report_inventory_comparison.py`), the sampled examples
 (`scripts/figures/generate_inventory_examples.py`), and excluded time by reason for every
-comparison. Run: Carey on all 242 analysed epochs (run `fa6537e48bcf`), and the comparison
+comparison. Run: Carey on all 242 analyzed epochs (run `fa6537e48bcf`), and the comparison
 on all 242 (run `afeb897d850f`, every epoch `ok`), with its report and examples. The
 Widloski columns are pending the Phase 2 pilot checks.*
 *Governing rule and cross-cutting decisions: [overview.md](overview.md).*
@@ -88,9 +88,9 @@ sequence, or significance criterion is a detection outcome, not missing coverage
 Record the source masks and timing conventions in the manifest.
 
 The reader of the observation tables (`availability.coverage_from_observations`) first
-removes excluded time (`analysed_time.excluded_intervals`: the artifact mask widened by
+removes excluded time (`analyzed_time.excluded_intervals`: the artifact mask widened by
 0.3 s) from every detector's observed intervals, since no detector's events there are
-analysed; the tables themselves record what each detector read. Intersect each
+analyzed; the tables themselves record what each detector read. Intersect each
 detector's observed intervals with the shared finite-speed < 4 cm/s eligibility mask
 to obtain its comparison exposure, `E_d`. A comparison involving a
 set of detectors uses the intersection of their exposures. Pairwise summaries use

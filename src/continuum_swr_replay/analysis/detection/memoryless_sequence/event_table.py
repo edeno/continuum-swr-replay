@@ -11,7 +11,7 @@ replay criteria, as the reference tests every such candidate, so
 ``shuffle_pass & whole_event_speed_eligible`` selects this project's cohort,
 whose immobility rule is stricter than the reference's per-window gate. A
 candidate that was not shuffled has ``n_shuffles == 0``. A fourth column,
-``artifact_drop_reason``, applies the project's one analysed-time rule
+``artifact_drop_reason``, applies the project's one analyzed-time rule
 (``event_definition.eligibility``): a candidate sharing time with the artifact mask
 (``"artifact"``), within ``ARTIFACT_REACH_S`` of it (``"near_artifact"``), or
 overlapping an SWR or MUA event dropped for either (``"overlaps_dropped_event"``)
@@ -156,7 +156,7 @@ MEMORYLESS_EVENT_TABLE_DTYPES: Mapping[str, object] = MappingProxyType(
         "shuffle_testable": np.bool_,
         "shuffle_pass": np.bool_,
         "n_shuffles": np.int64,
-        # the analysed-time rule: "artifact", "near_artifact",
+        # the analyzed-time rule: "artifact", "near_artifact",
         # "overlaps_dropped_event" or None (kept)
         "artifact_drop_reason": object,
     }
@@ -271,7 +271,7 @@ def shuffle_eligible(candidates: CandidateSequences) -> NDArray:
     The reference tests every duration- and dispersion-accepted event, and so
     does the port, whether or not the animal was still over the whole event.
     This project's whole-event immobility rule is a column,
-    ``whole_event_speed_eligible``, to filter on afterwards; running the
+    ``whole_event_speed_eligible``, to filter on afterward; running the
     shuffle on the eligible subset only would bake that cohort choice into
     what was computed rather than into how it is read.
 
@@ -461,7 +461,7 @@ def canonical_swr_intervals(
     data_over_time : DataFrame
         One epoch, time-indexed, carrying
         ``SWR_event``, ``head_speed`` and the session columns: a frame read
-        through the SWR source (``analysed_time.read_dot_with_swr_source``), whose
+        through the SWR source (``analyzed_time.read_dot_with_swr_source``), whose
         ``SWR_event`` is the direct Kay inventory's, as the canonical table's is.
     speed_threshold : float
         cm/s; the canonical immobility threshold, or a stricter (lower) one.
@@ -498,7 +498,7 @@ def observed_intervals(data_over_time: pd.DataFrame, column: str) -> NDArray:
     Not for SWR labels: ``SWR_event`` is an integer and never NaN, so a
     stretch of missing LFP would read as observed and not an SWR. Where SWR
     detection was observed is the SWR source's
-    (``analysed_time.swr_observed_stretches``), which the runner passes.
+    (``analyzed_time.swr_observed_stretches``), which the runner passes.
 
     Returns
     -------
@@ -545,7 +545,7 @@ def build_memoryless_event_table(
         ``intervals_from_labels``; :func:`canonical_swr_intervals`). None when SWR labels are unavailable.
     swr_observed_intervals : ndarray, shape (n_intervals, 2), or None
         Closed intervals over which SWR labels were observed: the SWR source's
-        stretches (``analysed_time.swr_observed_stretches``). Required with
+        stretches (``analyzed_time.swr_observed_stretches``). Required with
         ``swr_intervals``; an event not wholly inside one is ``unknown``.
     swr_definition : str
         Which SWR source the labels come from: ``swr_source.swr_source_name()``,
@@ -562,7 +562,7 @@ def build_memoryless_event_table(
         ``ARTIFACT_REACH_S``). None masks nothing.
     dropped_events : DataFrame or None
         The SWR and MUA events dropped for excluded time
-        (``analysed_time.dropped_for_excluded_time``): a candidate otherwise kept
+        (``analyzed_time.dropped_for_excluded_time``): a candidate otherwise kept
         that overlaps one is ``"overlaps_dropped_event"``. None checks none.
 
     Returns

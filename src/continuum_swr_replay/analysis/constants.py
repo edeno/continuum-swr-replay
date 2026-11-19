@@ -1,4 +1,4 @@
-"""Constants the analyses share: windows, bin sizes, cohort and labelling settings.
+"""Constants the analyses share: windows, bin sizes, cohort and labeling settings.
 
 What belongs here is a setting of an analysis, read by more than one analysis
 package or figure. The decode's settings and the event thresholds

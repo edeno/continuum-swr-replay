@@ -2,12 +2,12 @@
 
 ``two_sessions`` holds two sessions on a 500 Hz grid, as ``load_data_over_time``
 concatenates them, each with the ``in_excluded_time`` column the read adds
-(``analysed_time.with_swr_source``). Session ``a`` has three excluded stretches,
+(``analyzed_time.with_swr_source``). Session ``a`` has three excluded stretches,
 filled with values that change every statistic if they are counted:
 
 - bins 200-249: moving and local, with a 200 cm error;
 - bins 400-499: the middle of a collapse run (``Local_prob`` 0.1 over bins
-  380-519), so the run's analysed parts are 380-399 and 500-519;
+  380-519), so the run's analyzed parts are 380-399 and 500-519;
 - bins 800-869: immobile, local (800-849) and then non-local (850-869).
 
 In all three, hpd is 500, theta phase 0.1, ``SWR_zscore`` 9, and ``MUA_zscore``

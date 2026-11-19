@@ -109,7 +109,7 @@ reuse, do not duplicate), `covariates/definitions.py` (two per-bin clocks),
 
 - When the stop frame carries `last_well_arrival_time_s` / `outcome_known_time_s`, emit
   `time_since_last_well_arrival_s` and `time_since_outcome_known_s` per bin exactly as designed
-  (bin centre minus clock; NaN where the clock is NaN).
+  (bin center minus clock; NaN where the clock is NaN).
 - When the spec carries the reward basis AND the outcome boundary falls inside the stop
   (`stop_start < outcome_known_time_s <= stop_end`) AND `occupancy_state == "at_well"`, shift the
   per-bin lag matrix at the boundary (lag_1 ← `completed_trial_reward`, lag_j ← lag_{j−1}) for bins
@@ -247,7 +247,7 @@ Files: `Processed-Data/replay_content/models_per_bin_rate/`, the SWR-rate contra
 ## Review
 
 Before the final review, confirm: every task implemented as specified, including the A4 decision
-executed one way or the other; "Deliberately not in this phase" honoured (stop definition
+executed one way or the other; "Deliberately not in this phase" honored (stop definition
 unchanged; `time_since_stop_start_s` in the event table unchanged; C7 is a one-line check only);
 stop-table parity evidence attached; validation-slice tests pass with `slow` marks; tests
 value-level; no plan/phase references; stale comments actually replaced; docs updated; every

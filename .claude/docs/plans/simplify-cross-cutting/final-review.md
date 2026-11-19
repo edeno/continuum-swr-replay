@@ -33,7 +33,7 @@ and `git diff <a> <b> -- <paths>`, in these passes:
 
 ## Strengths
 
-- **The analysed-time rule now matches CLAUDE.md.** `_frame_epoch` (swr_source.py:828-869) is the one place
+- **The analyzed-time rule now matches CLAUDE.md.** `_frame_epoch` (swr_source.py:828-869) is the one place
   that refuses a stale frame: a `time` column, a time index that does not increase, a moving or speed-NaN
   non-local or MUA label, and a non-local bin at or below the threshold. The decode runner passes its own
   threshold, and so do `run_quality_metrics` and `canonical_events`. SWRs keep their `moving` drop. The
@@ -45,14 +45,14 @@ and `git diff <a> <b> -- <paths>`, in these passes:
   check ran before the merge, as the plan asked. Event-level `is_swr` is still strict. The stop-level
   `is_swr_stop` is untouched.
 - **The decode runners' log-likelihood drift is recorded, not hidden.** `DecodeRunner.hpc_log_likelihood` and
-  a parametrised test pin it. The identifier suffix order is unchanged from the old contfrag runner.
+  a parametrized test pin it. The identifier suffix order is unchanged from the old contfrag runner.
   `algorithm_params` replaces the `getattr` dispatch, so the method names can be grepped.
 - **The leaf module `decode_files.py` is placed well.** The lazy-import test pins six readers free of
   `dask.distributed` and `dask_cuda`. The `int(t*100)` truncation is kept and documented.
 - **`EpochKey` refuses unknown suffixes** instead of misreading them. j16 is covered. 3,025 ids were checked
   old against new.
-- **e70ab12's vectorisations are correct.** I checked each against its old code. `_run_slices`/`find_objects`
-  on a 1-D label array is equivalent. The searchsorted nearest bin handles ties, including the left-neighbour
+- **e70ab12's vectorizations are correct.** I checked each against its old code. `_run_slices`/`find_objects`
+  on a 1-D label array is equivalent. The searchsorted nearest bin handles ties, including the left-neighbor
   tie. `binj = arange - repeat(cumsum - nbin)` is equivalent. The sort is skipped only when the
   self-history block already sorted and a left merge on unique keys keeps that order. `merge_intervals` has
   the same algorithm as `_merge_windows`, including merging touching windows.
@@ -211,7 +211,7 @@ Add a RangeIndex case to `TestTheLabelContract`.
   performance claim.
 - Golden-table parity and full-suite results. I relied on the ledger's records (atol 0 after each
   table-affecting task) and did not re-run the 5-session rebuild. The full suite is running elsewhere.
-- GPU and `LocalCUDACluster` behaviour of `_decode_runner`. The controller verified it (scratchpad
+- GPU and `LocalCUDACluster` behavior of `_decode_runner`. The controller verified it (scratchpad
   `task4_gpu/probe.py`); I did not re-run it.
 - `analyze_content_occupancy.find_sessions`' `epoch_id.startswith(animal)` prefix match. It is pre-existing,
   and no current animal name is a prefix of another.
@@ -237,7 +237,7 @@ Add a RangeIndex case to `TestTheLabelContract`.
 
 The nine tasks meet their intent across the branch. The read point, the strict-overlap predicate, the shared
 runner, the parser and the path module work together without conflicts. The invariants still hold:
-analysed time is applied once, overlap is strict at the event level and inclusive at the stop level, and
+analyzed time is applied once, overlap is strict at the event level and inclusive at the stop level, and
 junction bins are untouched (the `spatial_mapping` change keeps nearest-over-real-bins). Two Important
 gaps should close before merging: the builders' `speed_threshold` that no longer gates every cohort (I1),
 and the read's integer-index / `time`-column blind spot (I2). Both can fail silently, and both are cheap to

@@ -74,7 +74,7 @@ the decoder's transition matrix and mPFC response shares change across days and 
 checks. Output: `scripts/exploratory/_learning_trends.py` and `.claude/docs/reviews/2026-10-26-learning-trends.md`
 on its branch. Memory: project-learning-evolution-followup.
 Done 2026-10-26 20:40: branch `worktree-agent-a52c665f3acd09fe4` commit `8dc03829` (not merged). No change
-generalises across animals (smallest q 0.12 on slopes over animals); across-day content trends track each
+generalizes across animals (smallest q 0.12 on slopes over animals); across-day content trends track each
 animal's HPC spike-rate drift and the per-epoch fitted transitions. Next checks: re-decode with a common
 transition matrix; match epochs on spike count; within-day reward vs reward delivered so far.
 Follow-up (commit `e14301d5`): Kay SWRs and SWR-coupled events are elevated early (mostly the first-exposure
@@ -95,7 +95,7 @@ content, strength, context marks; GPU refit); results into `part4.json`.
 
 - mPFC Phase C: context marks (item 8) leave the marked family; answer the context question at the stop level,
   pooled across sessions. Rare class: all sessions main, the >=10-event subset as a check. Ridge slopes stay as
-  fitted (no "unique part"). No power equalising; instead measure how the called share depends on event count and
+  fitted (no "unique part"). No power equalizing; instead measure how the called share depends on event count and
   firing rate. Open: is the shuffle reference needed at all; is a linear slope in the mark flexible enough.
 - Claim 19c burst/refractory text: marked pending on the duration artifact (claims table), not removed.
 - Duration-aware self/cross-history refit on real data: approved (measure the duration spread first).

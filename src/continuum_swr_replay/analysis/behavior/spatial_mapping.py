@@ -22,13 +22,13 @@ def _nearest_bin_index(bin_positions: np.ndarray, x: np.ndarray) -> np.ndarray:
 
     The same index as ``np.abs(bin_positions[None, :] - x[:, None]).argmin(1)``
     without its ``(n_x, n_bins)`` temporary: on strictly increasing bins the
-    nearest one is a ``searchsorted`` neighbour of ``x``. Other bins take the
+    nearest one is a ``searchsorted`` neighbor of ``x``. Other bins take the
     dense path.
 
     Parameters
     ----------
     bin_positions : np.ndarray, shape (n_bins,)
-        Bin centres, at least one.
+        Bin centers, at least one.
     x : np.ndarray, shape (n_x,)
         Positions, none NaN.
 

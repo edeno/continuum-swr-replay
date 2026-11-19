@@ -85,7 +85,7 @@ def fit_models_batched(
         Spike counts on those bins, one column per unit.
     penalties : Mapping[str, NDArray], optional
         Per-model ridge penalty vectors, one value per column of that model's
-        design. Omitted, or missing a model, the fit is unpenalised. See
+        design. Omitted, or missing a model, the fit is unpenalized. See
         :func:`~continuum_swr_replay.analysis.pfc.batched_glm.make_ridge_penalty`.
 
     Returns
@@ -121,7 +121,7 @@ def model_penalties(
         intercept.
     sigma : float or None
         Prior standard deviation of an event-basis coefficient on the log-rate
-        scale. ``None`` leaves every model unpenalised.
+        scale. ``None`` leaves every model unpenalized.
 
     Returns
     -------
@@ -226,7 +226,7 @@ def _fit_immobility_models(
         Spike counts per time bin.
     fitter : {"statsmodels", "jax"}
         Backend. Ignored when ``prefitted`` is given. The default is the
-        unpenalised control; the canonical path fits with ``fitter="jax"`` and
+        unpenalized control; the canonical path fits with ``fitter="jax"`` and
         ``penalties=model_penalties(design_matrices, sigma)``.
     prefitted : Mapping[str, Any], optional
         This unit's already-fitted results keyed by model name, as
@@ -235,7 +235,7 @@ def _fit_immobility_models(
     penalties : Mapping[str, NDArray], optional
         Per-model ridge penalty vectors for the batched fitter, as
         :func:`model_penalties` builds them. The statsmodels backend has no
-        penalised path and refuses them.
+        penalized path and refuses them.
 
     Returns
     -------
@@ -273,8 +273,8 @@ def _fit_immobility_models(
 
     if penalties:
         raise ValueError(
-            "the statsmodels backend fits unpenalised models only; use "
-            "fitter='jax' for a penalised fit"
+            "the statsmodels backend fits unpenalized models only; use "
+            "fitter='jax' for a penalized fit"
         )
     glm_models = {
         model_name: sm.GLM(

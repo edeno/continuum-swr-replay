@@ -8,7 +8,7 @@ immobility in the bin), so ``exp(intercept)`` is the per-bin onset rate.
 
 How this differs from ``per_stop_rate_model.py`` (Family A): that model fits one
 row per stop with a ``log(immobility_duration_s)`` dwell offset, averaging the
-whole stop into a single rate; here the within-stop time course is modelled
+whole stop into a single rate; here the within-stop time course is modeled
 explicitly by a ``bs(tc)`` spline and the equal-exposure offset, and the same-
 event self-history (refractoriness / bursting) is carried as autoregressive
 ``onset_lag{j}`` terms. The two families answer complementary questions: Family
@@ -489,7 +489,7 @@ def cross_validate_per_bin_rate_model(
         return None
     # binj is the integer bin index (never NaN from aggregate_to_timebins); it
     # is kept only to preserve temporal order, so it is excluded from the NaN
-    # check while every modelled column (including stop_id) must be present.
+    # check while every modeled column (including stop_id) must be present.
     require_frozen_per_bin_design(
         design, [c for c in needed if c != "binj"], name=f"CV {spec.name}"
     )

@@ -1,4 +1,4 @@
-"""The held-out sweep's labelling of events."""
+"""The held-out sweep's labeling of events."""
 
 import numpy as np
 import pytest

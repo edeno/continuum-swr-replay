@@ -143,7 +143,7 @@ class TestTrialRail:
         fig, ax = plt.subplots()
         _plot_trial_rail(ax, _ctx_with_trials(trials, (0.0, 30.0)))
         # One step-post line covers the rail; well-guideline axhlines
-        # are grey at the well positions (6 of them).
+        # are gray at the well positions (6 of them).
         lines = ax.get_lines()
         # 1 step line + 6 axhline guidelines = 7 lines
         assert len(lines) >= 1

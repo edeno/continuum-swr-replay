@@ -10,7 +10,7 @@ where these three epochs are `analysed`.
 | from | cohort | status |
 |---|---|---|
 | (until 2026-08-19) | 215 | superseded 2026-08-19: the three epochs rejoined |
-| 2026-08-19 | 218 | superseded 2026-10-11: the full pipeline refresh swapped in the R11 decodes and the register switched to 242 analysed epochs (255 decoded, less 13 `SUSTAINED_NOISE`; [known issue](2026-10-12-full-redecode-r11.md)) |
+| 2026-08-19 | 218 | superseded 2026-10-11: the full pipeline refresh swapped in the R11 decodes and the register switched to 242 analyzed epochs (255 decoded, less 13 `SUSTAINED_NOISE`; [known issue](2026-10-12-full-redecode-r11.md)) |
 | 2026-10-11 | **242** | current |
 
 The text below is the history of the 215-to-218 change. Where a count has been superseded, it
@@ -69,7 +69,7 @@ the Replay and ContFrag tables.
 
 ## What no longer applies
 
-- Every count is over the register's analysed epochs: 218 from 2026-08-19, and **242 since
+- Every count is over the register's analyzed epochs: 218 from 2026-08-19, and **242 since
   2026-10-11** (not 215, and no longer 218).
 - A parity gate that reports a 218→215 drop for these keys is now reporting a real
   regression, not the expected state.

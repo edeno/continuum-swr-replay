@@ -49,7 +49,7 @@ The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
     function-scoped fixtures: a module- or session-scoped fixture in a
     `real_data` module still sees the sentinel and None; one that reads real
     data takes the `live_processed_data_dir` fixture as its root, and one that
-    reads a table through `analysed_time.with_swr_source` must set the run itself.
+    reads a table through `analyzed_time.with_swr_source` must set the run itself.
   - A test that reads only a small fixture committed under `tests/` is not real
     data. In a file that mixes the two, mark the real-data tests, not the file.
   - The hook is pinned by [`repository/test_markers.py`](repository/test_markers.py).

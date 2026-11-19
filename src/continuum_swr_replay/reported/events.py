@@ -36,7 +36,7 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   ``scripts/event_properties/measure_event_gamma.py`` (``Processed-Data/event_gamma``):
   the z-scored gamma per event and epoch, and the band power's change against
   quiet rest in dB (its ``reference.parquet``);
-- the decoder quality of each analysed epoch (``Processed-Data/decoder_quality``,
+- the decoder quality of each analyzed epoch (``Processed-Data/decoder_quality``,
   from ``scripts/decoding/measure_decoder_quality.py``): the Local-state
   decoding error, the state fractions moving and immobile, and the calibration
   curve, summarized by ``analysis.decode_quality.quality_metrics``.
@@ -67,7 +67,7 @@ from continuum_swr_replay.analysis.detector_comparison.feature_run import (
     STATE_SPACE_FEATURES_RUN,
 )
 from continuum_swr_replay.analysis.event_definition import swr_source
-from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
 from continuum_swr_replay.analysis.event_evidence import (
     likelihood_advantage,
     participation,
@@ -87,8 +87,8 @@ from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (
-    analysed_animals,
-    analysed_epoch_ids,
+    analyzed_animals,
+    analyzed_epoch_ids,
 )
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
@@ -345,7 +345,7 @@ def calibration_values(calibration: pd.DataFrame, source: str) -> list[Value]:
             "quantity",
             "sig2",
             f"median over sessions of each session's median decoding error at time "
-            f"bins whose Local probability is in the 0.1-wide bin centred on "
+            f"bins whose Local probability is in the 0.1-wide bin centered on "
             f"{format_number(center, 'dec2')} (bin {index} of "
             f"{len(CALIBRATION_BINS)}), outside excluded time, sessions pooled",
             "cm",
@@ -690,7 +690,7 @@ def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Val
             stats["rest_hours"],
             "quantity",
             "sig2",
-            "hours of analysed immobility the non-local detector observed (exposure), "
+            "hours of analyzed immobility the non-local detector observed (exposure), "
             "summed over epochs",
             "h",
         ),
@@ -759,7 +759,7 @@ def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Val
                 stats[f"nonlocal_events_outside_{word}_per_hour"],
                 "quantity",
                 "sig2",
-                f"non-local events {label}, per hour of analysed immobility",
+                f"non-local events {label}, per hour of analyzed immobility",
                 "per h",
             ),
         ]
@@ -786,7 +786,7 @@ def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Val
             "quantity",
             "sig2",
             "non-local events no SWR definition and no MUA event overlaps, per hour of "
-            "analysed immobility",
+            "analyzed immobility",
             "per h",
         ),
     ]
@@ -989,7 +989,7 @@ def spike_evidence_metrics(per_epoch_dir: Path, n_epochs: int) -> pd.DataFrame:
     per_epoch_dir : Path
         The run's folder, with one folder per epoch.
     n_epochs : int
-        The epochs the run must hold: it scores every analysed epoch.
+        The epochs the run must hold: it scores every analyzed epoch.
 
     Raises
     ------
@@ -1416,7 +1416,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     """
     make = value_factory(class_distribution_values, source, TAGS["class_distribution"])
     stats = event_statistics.peak_ripple_mode_statistics(
-        distribution, n_animals=len(analysed_animals())
+        distribution, n_animals=len(analyzed_animals())
     )
     return [
         make(
@@ -1453,7 +1453,7 @@ def _step_statistics(steps: pd.DataFrame) -> pd.DataFrame:
         steps,
         n_knots=STEP_KNOTS,
         window_z=STEP_WINDOW_Z,
-        n_animals=len(analysed_animals()),
+        n_animals=len(analyzed_animals()),
     )
 
 
@@ -2025,8 +2025,8 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     events = read_swr_table(inputs.event_table)
     event_table_record = file_record(inputs.event_table, ROOT_DIR)
     current_sha256 = event_table_record["sha256"]
-    # every per-epoch input must hold the epoch register's analysed epochs
-    n_epochs = len(analysed_epoch_ids())
+    # every per-epoch input must hold the epoch register's analyzed epochs
+    n_epochs = len(analyzed_epoch_ids())
 
     def stale(folder: Path) -> str | None:
         return event_table_staleness(
@@ -2201,16 +2201,16 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         file_record(inputs.content_along_arms / "manifest.json", ROOT_DIR),
     ]
 
-    # every analysed epoch with an event: an epoch with none has no table
-    analysed = swr_source.event_table_epochs(events, analysed_epoch_ids())
+    # every analyzed epoch with an event: an epoch with none has no table
+    analyzed = swr_source.event_table_epochs(events, analyzed_epoch_ids())
     participation_table = read_complete_run(
-        inputs.event_participation, "participation", analysed
+        inputs.event_participation, "participation", analyzed
     )
     advantage_table = read_complete_run(
-        inputs.likelihood_advantage, "likelihood_advantage", analysed
+        inputs.likelihood_advantage, "likelihood_advantage", analyzed
     )
     holdout_table = read_complete_run(
-        inputs.tetrode_holdout, "tetrode_holdout", analysed
+        inputs.tetrode_holdout, "tetrode_holdout", analyzed
     )
     participation_paths = ok_table_paths(inputs.event_participation, "participation")
     participation_sha256 = files_sha256(participation_paths)
@@ -2282,13 +2282,13 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         ("sessions.parquet", quality_sessions),
         ("calibration.parquet", calibration),
     ):
-        if set(table["epoch_id"]) != set(analysed_epoch_ids()):
+        if set(table["epoch_id"]) != set(analyzed_epoch_ids()):
             raise ValueError(
                 f"{folder / name} holds {table['epoch_id'].nunique()} epochs, not "
-                f"the {n_epochs} analysed ones"
+                f"the {n_epochs} analyzed ones"
             )
     quality_source = (
-        f"{rel(folder)} (scripts/decoding/measure_decoder_quality.py: each analysed "
+        f"{rel(folder)} (scripts/decoding/measure_decoder_quality.py: each analyzed "
         "epoch's decode)"
     )
     summary.add(*decoding_error_values(quality_sessions, quality_source))

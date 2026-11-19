@@ -141,7 +141,7 @@ def _draw_event_patch_heatmap(
     view = _patch_view_with_times(ctx, value_col)
 
     for patch in _PATCHES:
-        ax.axhline(patch, color="lightgrey", linewidth=0.3, zorder=0)
+        ax.axhline(patch, color="lightgray", linewidth=0.3, zorder=0)
     ax.set_ylabel(label)
     ax.set_ylim(0.5, 3.5)
     ax.set_yticks(list(_PATCHES))
@@ -154,7 +154,7 @@ def _draw_event_patch_heatmap(
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
 

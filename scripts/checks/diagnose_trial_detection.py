@@ -91,7 +91,7 @@ def figure_trial_sanity(
     ax = axes[0]
     arms = win["track_segment_id"].values
     valid = ~np.isnan(arms)
-    colors = [ARM_COLORS.get(int(a), "lightgrey") for a in arms[valid]]
+    colors = [ARM_COLORS.get(int(a), "lightgray") for a in arms[valid]]
     ax.scatter(win_t[valid], arms[valid], c=colors, s=8, marker="s")
     ax.set_yticks(range(9))
     ax.set_yticklabels([f"arm {a}" for a in range(9)])
@@ -213,7 +213,7 @@ def figure_predictor_collapse(*, output_dir: Path) -> None:
     ax.set_yticklabels(names, fontsize=9)
     ax.set_xlabel("% of events where this predictor marks the same arm as is_current")
     ax.set_xlim(0, 100)
-    ax.axvline(50, color="grey", lw=0.5, ls="--")
+    ax.axvline(50, color="gray", lw=0.5, ls="--")
     for b, v in zip(bars, vals, strict=True):
         ax.text(
             v + 1, b.get_y() + b.get_height() / 2, f"{v:.1f}%", va="center", fontsize=9

@@ -58,7 +58,7 @@ None.
 3. **`src/continuum_swr_replay/analysis/replay/fitting.py:1452`:
    `sm.add_constant(X)` defaults to `has_constant="skip"`** (T12 Concern 2, Phase D Minor 4).
    - With a column that is a nonzero constant overall, no intercept is added. Each `vif_<pred>`
-     then reports its neighbour's VIF, and the last index raises IndexError.
+     then reports its neighbor's VIF, and the last index raises IndexError.
    - Since T12-2, that IndexError is not in `EXPECTED_FIT_ERRORS`. It escapes the `:967`
      handler and throws away a conditional-Poisson fit that had otherwise succeeded, with the
      term marked unidentified.
@@ -226,7 +226,7 @@ reports they point to (T#).
   - the 199-file detection chain;
   - 83 argparse defaults and 57 root values with the variable set and unset;
   - the byte-identical figure renders.
-- GPU-path behaviour (breeze) of the sweeps and example scripts after Task 16. I checked config and import order only.
+- GPU-path behavior (breeze) of the sweeps and example scripts after Task 16. I checked config and import order only.
 - DB-dependent paths:
   - the DLC position branch (0 DLCPosV1 rows);
   - the several-row linearization tie-break;

@@ -126,7 +126,7 @@ class _EnvStub:
         nx.set_edge_attributes(graph, edge_cm, "distance")
         self.track_graph_with_bin_centers_edges_ = graph
         # Mirrors how ``Environment`` populates this at fit time
-        # (``get_track_grid``): all-pairs Dijkstra over the bin-centre graph.
+        # (``get_track_grid``): all-pairs Dijkstra over the bin-center graph.
         self.distance_between_nodes_ = dict(
             nx.all_pairs_dijkstra_path_length(graph, weight="distance")
         )

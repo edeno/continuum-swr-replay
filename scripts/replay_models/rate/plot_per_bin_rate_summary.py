@@ -39,7 +39,7 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (  # noqa: E402
     excluded_intervals_by_session,
     require_swr_source,
 )
@@ -156,7 +156,7 @@ def _survival(stop, tmax=TMAX, dt=DESCRIPTIVE_BIN_S):
 
 
 def _shade_low_support(ax, stop, thresh=0.2, tmax=TMAX):
-    """Grey the tc region where <thresh of stops survive (curve is a thin subset)."""
+    """Gray the tc region where <thresh of stops survive (curve is a thin subset)."""
     tc, surv = _survival(stop, tmax)
     below = tc[surv < thresh]
     if below.size:
@@ -246,7 +246,7 @@ def _panel_reward1(ax, df):
     # the 1.5 IQR whiskers are taken in log space. On RR they are not: a rate ratio
     # is skewed, the whisker runs to the minimum, and one near-separated session
     # stretched the axis over five decades. The axis is linear in beta, with
-    # ticks at the log of plain RR values and labelled with the RR; RR = 1 is
+    # ticks at the log of plain RR values and labeled with the RR; RR = 1 is
     # beta = 0.
     data = [_gated_coefficient(df, oc, IMMEDIATE_TERM) for oc in POPS3]
     bp = ax.boxplot(data, labels=SHORT, showfliers=False, patch_artist=True)

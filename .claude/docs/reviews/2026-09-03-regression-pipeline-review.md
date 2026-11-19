@@ -6,7 +6,7 @@
 (`covariate_contract_v5_dio_poke_trials`); fitted artifacts dated 2026-09-02.
 **Method:** code reading plus executed checks (synthetic boundary scenarios against the real
 functions; refits and statistics on the live tables and persisted fits). Every finding below is
-labelled CONFIRMED (observed by execution) or HYPOTHESIS (reasoned, needs a check). No
+labeled CONFIRMED (observed by execution) or HYPOTHESIS (reasoned, needs a check). No
 repository file was modified. Scratch scripts live in the session scratchpad.
 
 Prior reviews in this directory (`07_*`, `08_*`) were treated as leads, not as evidence; the
@@ -158,7 +158,7 @@ GLM: intercept forced, rank check, correct offset. Time-rescaling GOF is the rig
 
 ## B. Are the covariates right, valid, and complete?
 
-### B1. MAJOR: event length / dispersion is unmodelled in the content SWR contrasts (CONFIRMED)
+### B1. MAJOR: event length / dispersion is unmodeled in the content SWR contrasts (CONFIRMED)
 
 At-well events: `n_nonlocal_bins` median 45 (SWR) vs 25; `n_unique_arms` 3.31 vs 1.44; posterior
 entropy 0.49 vs 0.29; **trunk share of MAP bins 36.2 % vs 16.8 %**. Current-arm fraction falls
@@ -252,7 +252,7 @@ predictive rungs; qvals missingness (1.9 %, session-end tail) is not a leak.
 
 ## C. Is the processing and timing correct?
 
-### C1. MAJOR (interpretation): the modelled stop is an immobility fragment (CONFIRMED)
+### C1. MAJOR (interpretation): the modeled stop is an immobility fragment (CONFIRMED)
 
 `_helpers.py:118-139` defines stops by `head_speed < 4 cm/s` crossings. Live: 69,224 at-well stops
 for 35,043 visits (mean 1.96/visit, 90th pct 3); **50.6 % of at-well stops are the first fragment
@@ -342,15 +342,15 @@ Findings:
 6. MINOR Real-data tests in `tests/unit` gated on cwd-relative paths and unmarked as slow.
 7. MINOR `tests/baselines/` (35 PDFs) referenced by no test. Fixtures `_EnvStub` x6,
    `_bandit_graph` x7 duplicated across files.
-8. MINOR Two sign-critical behaviours (arrival tie, prev/next arm) each hang on a single test;
+8. MINOR Two sign-critical behaviors (arrival tie, prev/next arm) each hang on a single test;
    `TestMutationSurvivorGuards::test_is_prev_references_prev_arm_not_next_arm` did not fire on M8.
 9. NOTE `docs/design/builder_test_floor.md` cites `history.py:702/748`, a module that no longer
    exists; re-run `scripts/qa/mutation_check.py`.
 
-Top untested behaviours: stop-disjoint CV through the real function; planted-effect recovery in the
+Top untested behaviors: stop-disjoint CV through the real function; planted-effect recovery in the
 per-bin orchestrator; the inclusive `is_swr_stop` vs strict event `is_swr` dual convention at a
 boundary-touching SWR; production omission clock reaching a table builder; `time_since_stop_start_s`
-value; `_fit_alpha` objective; pooled `_z` moments through `prepare_data`; spline behaviour at
+value; `_fit_alpha` objective; pooled `_z` moments through `prepare_data`; spline behavior at
 `tc >= upper_bound`; `n_categories` vs actual arm count in pseudo-R2.
 
 ---

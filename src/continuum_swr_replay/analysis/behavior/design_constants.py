@@ -121,7 +121,7 @@ SPLINE_KNOTS = (1.0, 2.0, 3.0)
 # bout (the moment the animal became immobile); a stop can begin well after the
 # animal reached the well, so a rate that is locked to the ARRIVAL is smeared
 # across ``tc`` by the arrival-to-bout offset. The arrival rungs re-anchor the
-# same spline block on ``time_since_last_well_arrival_s`` (bin centre minus the
+# same spline block on ``time_since_last_well_arrival_s`` (bin center minus the
 # arrival of the well occupied at bout start) to ask which clock the rate
 # follows. Window and knots come from the at-well event distribution: median
 # 3.7 s after arrival, IQR 2.7-5.1 s, 87.6 % of events within 8 s, balanced
@@ -134,7 +134,7 @@ N_HISTORY_BASIS = 4  # raised-cosine bumps over the history window (*_histcos mo
 # The long cross-history window of the ridge cross-validated comparison
 # (MODEL_CROSS_HISTORY_LONG_RATE): 67 lags = 1.005 s after the other stream's
 # event, so the cross block reaches past the 150 ms self window. Six log-spaced
-# bumps keep about the self basis's resolution: neighbouring centres are
+# bumps keep about the self basis's resolution: neighboring centers are
 # exp(log(67) / 5) = 2.3x apart in lag (self: exp(log(10) / 3) = 2.2x), so the
 # bumps sit near 15, 35, 80, 185, 430 and 1005 ms.
 N_CROSS_LONG_LAGS = 67

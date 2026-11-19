@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Compare the replay-detection inventories, one epoch at a time.
 
-Nine inventories of each analysed epoch are read through their adapters
+Nine inventories of each analyzed epoch are read through their adapters
 (``detector_comparison.adapters``) and compared on one substrate, with
 per-detector denominators. Design:
 ``docs/design/replay_detection_comparison/03-inventory-comparison.md``.
@@ -18,12 +18,12 @@ The roster (:data:`ROSTER`):
 Per epoch:
 
 1. **Decode.** The canonical decode's ``data_over_time`` pickle is read once:
-   its drops (``analysed_time.artifact_event_drops``) from the frame as saved,
-   and the frame through the SWR source (``analysed_time.with_swr_source``). Its
+   its drops (``analyzed_time.artifact_event_drops``) from the frame as saved,
+   and the frame through the SWR source (``analyzed_time.with_swr_source``). Its
    sha256 is recorded, and its first 12 characters name the decode in the
    ``mua`` and ``state_space`` tables.
 2. **Inventories.** Each adapter returns its inventory, its observation table
-   and the events the analysed-time rule set aside. A run with no usable
+   and the events the analyzed-time rule set aside. A run with no usable
    record for the epoch reads unavailable, never empty.
 3. **Speed.** One trace, the frame's ``head_speed`` on its grid, with one
    threshold (``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``) and one largest
@@ -63,7 +63,7 @@ the process's peak RSS so far (``process_peak_rss_gib``, cumulative over the
 epochs before it). Only this process writes it, atomically, after
 each epoch. A rerun under the same run id skips the epochs already ``ok``
 unless ``--overwrite`` is given, and refuses settings other than the ones the
-manifest was written with. The epochs are the epoch register's analysed ones,
+manifest was written with. The epochs are the epoch register's analyzed ones,
 narrowed by ``--animal``, ``--date`` and ``--epoch``, or the one
 ``--epoch-id``, run one at a time in this process, on the CPU.
 
@@ -116,7 +116,7 @@ from continuum_swr_replay.analysis.detector_comparison.schema import (
     STATE_SPACE,
 )
 from continuum_swr_replay.analysis.event_definition import (
-    analysed_time,
+    analyzed_time,
     swr_source,
 )
 from continuum_swr_replay.parameters import (
@@ -133,7 +133,7 @@ from continuum_swr_replay.runs.batch import RunManifest, run_lock
 from continuum_swr_replay.runs.cli import (
     add_epoch_filters,
     parse_run_id,
-    select_analysed_epochs,
+    select_analyzed_epochs,
 )
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.io import (
@@ -205,8 +205,8 @@ def run_epoch(
         path = decode_path(identifier)
         decode_sha256 = sha256_file(path)
         saved = pd.read_pickle(path)
-        drops = analysed_time.artifact_event_drops(saved)
-        dot = analysed_time.with_swr_source(saved)
+        drops = analyzed_time.artifact_event_drops(saved)
+        dot = analyzed_time.with_swr_source(saved)
         del saved
         time, _ = speed_trace(dot)
         bounds = (float(time[0]), float(time[-1]))
@@ -384,9 +384,9 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         if not (run_dir / "manifest.json").exists():
             sys.exit(f"{option}: no run manifest at {run_dir}.")
     settings = run_settings(args.carey_run_id, args.memoryless_run_id)
-    epochs = select_analysed_epochs(args)
+    epochs = select_analyzed_epochs(args)
     if not epochs:
-        sys.exit("No analysed epochs match --animal, --date and --epoch.")
+        sys.exit("No analyzed epochs match --animal, --date and --epoch.")
 
     manifest_path = output_dir / "manifest.json"
     manifest = RunManifest.resume(

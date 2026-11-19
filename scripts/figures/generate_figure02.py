@@ -5,7 +5,7 @@ The decoder of Figure 1 applied to the recordings, and how its non-local events
 relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
 
     a — The decode over a run and the rest after it, with the 2D track. Lanes
-        mark the immobile (analysed) time, the Local / non-local / No-Spike
+        mark the immobile (analyzed) time, the Local / non-local / No-Spike
         stretches and the SWRs; the counted non-local events are shaded.
     b — Six examples: a non-local event inside an SWR, one that starts before
         its SWR, one that ends after it, two with no SWR (a trajectory and a
@@ -86,8 +86,8 @@ from continuum_swr_replay.analysis.detector_comparison.feature_run import (
 from continuum_swr_replay.analysis.detector_comparison.inventory_run import (
     SWR_DEFINITIONS,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
-    immobile_analysed_bins,
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    immobile_analyzed_bins,
     read_swr_table,
     swr_intervals,
 )
@@ -124,8 +124,8 @@ from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.epoch_register import (
-    analysed_decode_files,
-    analysed_epoch_ids,
+    analyzed_decode_files,
+    analyzed_epoch_ids,
 )
 from continuum_swr_replay.decoding.files import data_over_time_suffix, decode_paths
 from continuum_swr_replay.decoding.identifiers import (
@@ -169,7 +169,7 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 )
 
 # The render cache's version, part of its file name. The name also carries the
-# SWR source's name, a fingerprint of the epoch register's analysed epochs and
+# SWR source's name, a fingerprint of the epoch register's analyzed epochs and
 # a fingerprint of the decode files read, so a new SWR inventory, artifact run,
 # register change or rewritten decode makes a new cache by itself. Bump this
 # whenever the cached values could change for any other reason.
@@ -236,7 +236,7 @@ TRACK_EDGE_LINEWIDTH = LINE_WIDTH_LIMITS_PT[1]
 # Panel a: a run and the rest after it in the example session (start, seconds).
 OVERVIEW_START_S = 1617036555.9
 OVERVIEW_DURATION_S = 12.6
-# Panel b: half the window around each example's centre, seconds.
+# Panel b: half the window around each example's center, seconds.
 EXAMPLE_HALF_WINDOW_S = 0.2
 # Panel b's examples, chosen by eye from contact sheets of the example session's
 # events with peak non-local probability >= 0.95, no other event and no other
@@ -307,11 +307,11 @@ def frame_event_counts(event_types: dict) -> dict[str, int]:
 def rest_nonlocal_share(data_over_time: pd.DataFrame) -> pd.DataFrame:
     """Panel k: the share of rest bins decoded non-local, by ripple power.
 
-    Rest bins are the immobile analysed ones (:func:`immobile_analysed_bins`);
+    Rest bins are the immobile analyzed ones (:func:`immobile_analyzed_bins`);
     each animal is one group (:func:`nonlocal_share_by_power`).
     """
     rest = data_over_time.loc[
-        immobile_analysed_bins(data_over_time),
+        immobile_analyzed_bins(data_over_time),
         ["SWR_zscore", "Non-Local_prob", "animal"],
     ]
     return nonlocal_share_by_power(
@@ -328,7 +328,7 @@ def _decode_files_fingerprint(
 ) -> str:
     """SHA-256 over the decode files ``_compute_figure_inputs`` reads.
 
-    The files are the analysed epochs' ``data_over_time`` (as
+    The files are the analyzed epochs' ``data_over_time`` (as
     ``load_data_over_time`` finds them) and the example session's HPC
     ``results.nc`` and ``detector.pkl`` (as ``load_results`` names them), all
     in `data_dir`. Each contributes its path, size and ``st_mtime_ns``, or
@@ -338,7 +338,7 @@ def _decode_files_fingerprint(
         format_epoch_identifier(nwb_file_name, epoch_name, "HPC"), data_dir
     )
     files = [
-        *analysed_decode_files(data_dir, data_over_time_suffix()),
+        *analyzed_decode_files(data_dir, data_over_time_suffix()),
         example.results,
         example.detector,
     ]
@@ -360,7 +360,7 @@ def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) ->
     MultiIndex netCDF cannot serialize, the fitted detector and environment
     objects, and small DataFrames; joblib (pickle) preserves them all exactly.
     """
-    cohort = hashlib.sha256("\n".join(analysed_epoch_ids()).encode()).hexdigest()
+    cohort = hashlib.sha256("\n".join(analyzed_epoch_ids()).encode()).hexdigest()
     decodes = _decode_files_fingerprint(nwb_file_name, epoch_name, data_dir)
     return (
         data_dir
@@ -788,14 +788,14 @@ def draw_examples(
 def draw_donut(
     ax: Axes,
     wedges: list[tuple[str, float, str, bool]],
-    centre: tuple[str, str],
+    center: tuple[str, str],
     title: str,
     label_space: float = 2.2,
 ) -> None:
-    """A donut of (label, fraction, colour, highlighted) wedges.
+    """A donut of (label, fraction, color, highlighted) wedges.
 
     The wedges with a label are listed, one line each, to the right of the
-    donut in their colours, the highlighted ones in bold; the others are faded. ``centre`` is
+    donut in their colors, the highlighted ones in bold; the others are faded. ``center`` is
     a number and its caption, written in the hole. ``label_space`` is the room
     kept right of the donut for the labels, in donut radii: the labels' width
     over the donut's sets the donut's size in its axes.
@@ -818,7 +818,7 @@ def draw_donut(
                 color=readable_text_color(color),
             )  # fmt: skip
             k += 1
-    number, caption = centre
+    number, caption = center
     ax.text(
         0,
         0.17,
@@ -1106,9 +1106,9 @@ def draw_share_by_power(ax: Axes, shares: pd.DataFrame) -> None:
     One thin line per animal, their mean in bold.
     """
     by_animal = shares.pivot(index="power_low", columns="group", values="share")
-    centre = by_animal.index + np.diff(POWER_EDGES)[0] / 2
-    ax.plot(centre, by_animal.to_numpy(), color="k", lw=0.5, alpha=0.5)
-    ax.plot(centre, by_animal.mean(axis=1), color="k", lw=1.0)
+    center = by_animal.index + np.diff(POWER_EDGES)[0] / 2
+    ax.plot(center, by_animal.to_numpy(), color="k", lw=0.5, alpha=0.5)
+    ax.plot(center, by_animal.mean(axis=1), color="k", lw=1.0)
     ax.axvline(KAY_ZSCORE_THRESHOLD, color=C_SWR, lw=0.8, ls="--")
     ax.text(
         KAY_ZSCORE_THRESHOLD + 0.3, 0.05, "SWR\nthreshold", fontsize=SMALL_SIZE,
@@ -1229,8 +1229,8 @@ def generate_figure(
         pd.read_parquet(data_dir / BRAIN_STATE_REFERENCE_DIR / "reference.parquet"),
         ["ripple", "mua"],
     )
-    # every analysed epoch with an event: an epoch with none has no table
-    event_epochs = event_table_epochs(events, analysed_epoch_ids())
+    # every analyzed epoch with an event: an epoch with none has no table
+    event_epochs = event_table_epochs(events, analyzed_epoch_ids())
     participation = participation_statistics(
         read_complete_run(
             data_dir / EVENT_PARTICIPATION_DIR, "participation", event_epochs
@@ -1240,7 +1240,7 @@ def generate_figure(
         read_complete_run(
             data_dir / EVENT_TETRODE_HOLDOUT_DIR,
             "tetrode_holdout",
-            analysed_epoch_ids(),
+            analyzed_epoch_ids(),
         )
     )
     heldout_events, heldout_controls = (

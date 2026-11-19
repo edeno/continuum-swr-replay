@@ -6,7 +6,7 @@ split aggregates over. The events and their classes are the paper's: the rows
 of the canonical event table (``replay_content/event_table.parquet``), whose
 ``overlap_class`` and ``overlap_subclass`` the classified pass
 (``event_definition.classified_table.build_classified_nonlocal_event_table``)
-derived against the paper's SWR source, after the one analysed-time rule.
+derived against the paper's SWR source, after the one analyzed-time rule.
 
 Usage:
     uv run python scripts/replay_models/content/quantify_swr_overlap_geometry.py
@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
 from continuum_swr_replay.decoding.identifiers import nwb_stem, parse_nwb_filename
 from continuum_swr_replay.paths import table_path
 

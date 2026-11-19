@@ -87,15 +87,15 @@ def cohort_values(
             len(sidecars),
             "count",
             "count",
-            "epochs with an mPFC unit bundle (the PFC cohort: analysed epochs with "
+            "epochs with an mPFC unit bundle (the PFC cohort: analyzed epochs with "
             "curated cortical spike sorting)",
         ),
         make(
-            "analysed_epochs",
+            "analyzed_epochs",
             cohort["n_analysed"],
             "count",
             "count",
-            "analysed epochs the PFC cohort is drawn from",
+            "analyzed epochs the PFC cohort is drawn from",
         ),
         make(
             "animals",
@@ -338,8 +338,8 @@ def prior_binding_values(
     """How often the prior moves a curve's peak, per curve.
 
     Among the well-posed
-    units of a curve (unpenalised fit converged and no separated column), the
-    share whose penalised peak differs from the unpenalised one by more than
+    units of a curve (unpenalized fit converged and no separated column), the
+    share whose penalized peak differs from the unpenalized one by more than
     that peak's standard error (the bundle's ``prior_binds``). The values are
     the lowest and highest share over the five curves;
     ``compare_pfc_cohorts.shrinkage_table`` shows each curve's share.

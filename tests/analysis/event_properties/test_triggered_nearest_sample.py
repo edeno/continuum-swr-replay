@@ -3,7 +3,7 @@
 ``np.searchsorted`` returns the *insertion* index — the next sample
 to the right of the query time. For an off-grid event time that
 falls between two samples, that's not the closest sample. With
-samples every 2 ms and an event at 0.0025 s, the centre used to be
+samples every 2 ms and an event at 0.0025 s, the center used to be
 0.004 s instead of the nearer 0.002 s.
 
 Fix: compare distances to the bracketing samples and pick the
@@ -45,7 +45,7 @@ def _events_at(time_s: float) -> pd.DataFrame:
 
 
 def _center_window_values(time_s: float) -> np.ndarray:
-    """Run ``get_signal_windows`` and return the 3-sample centred window."""
+    """Run ``get_signal_windows`` and return the 3-sample centered window."""
     arr = get_signal_windows(
         data=_data_frame_2ms_grid(),
         event_times=_events_at(time_s),
@@ -61,13 +61,13 @@ def _center_window_values(time_s: float) -> np.ndarray:
 class TestNearestSampleCenter:
     def test_event_closer_to_left_sample_centers_on_left(self):
         # Event at 0.0025 s; left = 0.002 (Δ=0.0005), right = 0.004 (Δ=0.0015).
-        # Centre on the LEFT (sample value 1) ⇒ window [0, 1, 2].
+        # Center on the LEFT (sample value 1) ⇒ window [0, 1, 2].
         np.testing.assert_array_equal(
             _center_window_values(0.0025), np.array([0.0, 1.0, 2.0])
         )
 
     def test_event_exactly_on_sample(self):
-        # Exact match ⇒ that sample is the centre.
+        # Exact match ⇒ that sample is the center.
         # Sample at 0.004 has value 2 ⇒ window [1, 2, 3].
         np.testing.assert_array_equal(
             _center_window_values(0.004), np.array([1.0, 2.0, 3.0])
@@ -75,7 +75,7 @@ class TestNearestSampleCenter:
 
     def test_event_closer_to_right_sample_centers_on_right(self):
         # Event at 0.0035 s; left = 0.002 (Δ=0.0015), right = 0.004 (Δ=0.0005).
-        # Centre on the RIGHT (sample value 2) ⇒ window [1, 2, 3].
+        # Center on the RIGHT (sample value 2) ⇒ window [1, 2, 3].
         np.testing.assert_array_equal(
             _center_window_values(0.0035), np.array([1.0, 2.0, 3.0])
         )

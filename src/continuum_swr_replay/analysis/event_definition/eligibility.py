@@ -1,4 +1,4 @@
-"""One analysed-time rule for every event cohort, exposure, bin and window.
+"""One analyzed-time rule for every event cohort, exposure, bin and window.
 
 **Excluded time** is the one artifact mask (``artifact_masks``) widened by
 :data:`ARTIFACT_REACH_S` on each side (:func:`excluded_time`). An event of any
@@ -16,7 +16,7 @@ dropped too (``overlaps_dropped_event``): its overlap class is unknown. One pass
 is made; an event dropped by that pass drops no other.
 
 Exposure seconds, time bins with their history windows, and peri-event windows
-follow the same rule: they are analysed only outside excluded time. Inputs (the
+follow the same rule: they are analyzed only outside excluded time. Inputs (the
 decoders' missing bins and encoding exclusion, the SWR detectors'
 normalization, the ripple-power covariate) use the mask itself, not this.
 
@@ -56,7 +56,7 @@ __all__ = [
 ARTIFACT_REACH_S = 0.3
 """Seconds by which the artifact mask is widened into excluded time.
 
-Why 0.3 s: study C3 masked gaps in the decodes, and a gap changed analysed
+Why 0.3 s: study C3 masked gaps in the decodes, and a gap changed analyzed
 NonLocal events within at most 0.21 s and flipped ContFrag SWR labels within at
 most 0.19 s; the reach did not grow with the gap's length. The lead chose
 (2026-10-10) to apply it to every cohort, exposure, bin and window, not only to
@@ -124,7 +124,7 @@ def artifact_drop_reasons(
         closed.
     dropped : pd.DataFrame, optional
         The SWR and MUA events dropped for excluded time
-        (``analysed_time.dropped_for_excluded_time``), for a cohort not read
+        (``analyzed_time.dropped_for_excluded_time``), for a cohort not read
         through the source (events re-detected from a posterior, Widloski
         events): an event every other rule keeps that overlaps one is
         ``overlaps_dropped_event``.
@@ -289,12 +289,12 @@ def label_drop_reasons(
     event_col: str,
     artifacts: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Every labelled event of one epoch's frame, with its excluded-time reason.
+    """Every labeled event of one epoch's frame, with its excluded-time reason.
 
     The labels are already speed-qualified where the frame was made (the
     decode's ``get_data_over_time``), so only excluded time's reasons apply
     here; each event is read at its sampled bounds, its first and last
-    labelled bin.
+    labeled bin.
 
     Parameters
     ----------
@@ -333,7 +333,7 @@ def drop_labels(
     """`frame` with each dropped event's label zeroed whole.
 
     The other events keep their numbers, so an event's ``event_id`` (hashed
-    from its label) does not change when a neighbour is dropped.
+    from its label) does not change when a neighbor is dropped.
 
     Parameters
     ----------
@@ -341,7 +341,7 @@ def drop_labels(
         One epoch, carrying `event_col`.
     event_col : str
     drops : pd.DataFrame
-        One row per labelled event: `event_col` and ``drop_reason`` (None for
+        One row per labeled event: `event_col` and ``drop_reason`` (None for
         a kept event), as :func:`label_drop_reasons` returns it.
 
     Returns

@@ -629,7 +629,7 @@ def _aggregate_with_clocks(stops, onsets):
 
 
 def test_time_since_arrival_and_outcome(arrival_clock_stops):
-    """Both per-bin clocks are the bin centre minus the absolute stop clock."""
+    """Both per-bin clocks are the bin center minus the absolute stop clock."""
     stops, onsets = arrival_clock_stops
     df = _aggregate_with_clocks(stops, onsets)
 

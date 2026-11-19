@@ -1,7 +1,7 @@
-"""Command-line behaviour of the per-stop rate runner.
+"""Command-line behavior of the per-stop rate runner.
 
 The runner writes ``models_per_stop_rate/all_models.pkl`` in place, so an
-unrecognised flag must abort instead of silently refitting the canonical
+unrecognized flag must abort instead of silently refitting the canonical
 artifact. These tests exercise the parser only: the fitting entry point is
 replaced so that a run which reaches it is detectable as a failure.
 """
@@ -15,7 +15,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import SwrSourceError

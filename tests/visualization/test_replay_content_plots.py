@@ -59,7 +59,7 @@ def test_the_axis_names_the_scale_the_fit_was_on(scale_label, expected) -> None:
         plt.close("all")
 
 
-def test_a_step_whose_child_is_better_is_drawn_negative_in_the_non_local_colour():
+def test_a_step_whose_child_is_better_is_drawn_negative_in_the_non_local_color():
     _fig, ax = plt.subplots()
     try:
         plot_model_hierarchy_comparison(COMPARISON, ax=ax)

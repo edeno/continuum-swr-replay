@@ -1,4 +1,4 @@
-"""Diagnostic per-animal fitted-alpha leaky-Q learner. Produces no catalogued covariate; used only for offline model checking."""
+"""Diagnostic per-animal fitted-alpha leaky-Q learner. Produces no cataloged covariate; used only for offline model checking."""
 
 from __future__ import annotations
 

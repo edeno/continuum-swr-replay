@@ -6,7 +6,7 @@ doi:10.1038/s41467-025-65181-5, onto this project's linearized track graph and
 encoding models.
 
 Each window is decoded independently under a uniform spatial prior, and
-sequences are assembled afterwards from continuity criteria.
+sequences are assembled afterward from continuity criteria.
 
 The pipeline, in order: an ``EpochLikelihood`` from one of the
 ``*_epoch_log_likelihood`` functions; ``aggregate_windows`` and

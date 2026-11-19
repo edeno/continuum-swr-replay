@@ -68,7 +68,7 @@ cp -p Processed-Data/replay_content/_staging_stop_regen_full_20260904/stop_table
       Processed-Data/replay_content/stop_table.parquet
 ```
 
-Verified afterwards: the promoted file has the same SHA-256 as the staged one
+Verified afterward: the promoted file has the same SHA-256 as the staged one
 and passes `require_covariate_schema(table="stop")`.
 
 ## Artifact integrity

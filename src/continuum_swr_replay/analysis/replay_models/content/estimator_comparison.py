@@ -122,7 +122,7 @@ def estimator_rows(
     ``aic_equalized`` is ``2 n_params - 2 llf`` with the multinomial log
     constant added to an ``llf`` that omits it, so the three estimators' AICs
     are on one footing. The fraction fit reports its event-clustered standard
-    error; a non-finite sandwich falls back to the model SE, labelled
+    error; a non-finite sandwich falls back to the model SE, labeled
     ``model_fallback``.
 
     Parameters
@@ -836,7 +836,7 @@ def run_comparison(
     n_jobs : int, optional
         Worker processes for the Dirichlet-multinomial session fits.
     min_events_session_phi : int, optional
-        Sessions below this many modelled events have their concentration
+        Sessions below this many modeled events have their concentration
         intercept pinned to the animal-pooled median.
     n_bootstrap, seed : int, optional
         Animal-bootstrap draws and RNG seed.

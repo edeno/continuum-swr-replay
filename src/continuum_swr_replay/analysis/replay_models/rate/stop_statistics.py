@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     excluded_intervals_by_session,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
@@ -72,9 +72,9 @@ def stop_cohort_counts(stops: pd.DataFrame) -> dict[str, int]:
 
 
 def dwell_statistics(stops: pd.DataFrame) -> dict[str, float]:
-    """How long the analysed immobility lasts after a rewarded and an omitted outcome.
+    """How long the analyzed immobility lasts after a rewarded and an omitted outcome.
 
-    The duration is the stop's analysed immobility, ``immobility_duration_s``:
+    The duration is the stop's analyzed immobility, ``immobility_duration_s``:
     its span, ``stop_end - stop_start``, less the excluded time inside it. It
     is shorter than the span for a stop that holds excluded time, and zero for
     a stop of one sample or wholly inside excluded time.
@@ -88,7 +88,7 @@ def dwell_statistics(stops: pd.DataFrame) -> dict[str, float]:
     Returns
     -------
     statistics : dict
-        ``mean_rewarded_s`` and ``mean_omitted_s``, the mean analysed
+        ``mean_rewarded_s`` and ``mean_omitted_s``, the mean analyzed
         immobility, in seconds, over all the stops with each outcome (those of
         zero duration included), and ``mean_ratio``, rewarded over omitted;
         ``median_rewarded_s``, ``median_omitted_s`` and ``median_ratio``, the
@@ -164,12 +164,12 @@ def onset_rate_time_course(
         Each session's excluded time: the session columns, ``start_time`` and
         ``end_time``, in seconds. None (the default) reads it from the SWR
         source
-        (:func:`~continuum_swr_replay.analysis.event_definition.analysed_time.excluded_intervals_by_session`).
+        (:func:`~continuum_swr_replay.analysis.event_definition.analyzed_time.excluded_intervals_by_session`).
 
     Returns
     -------
     time_course : pd.DataFrame, shape (n_bins, 3)
-        One row per bin, indexed by ``time_s``, the bin's centre: ``n_onsets``;
+        One row per bin, indexed by ``time_s``, the bin's center: ``n_onsets``;
         ``exposure_s``, the seconds of immobility in the bin over all the
         stops; and ``rate``, their ratio in events per second (NaN where no
         stop is immobile).

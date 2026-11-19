@@ -33,7 +33,7 @@ one-population null tested against its split.
 > the SWR-coupled non-local stream — so an in-transit cell showing no effect is
 > an absence of evidence, not evidence of absence, and its paired tests have no
 > power. Every number below is from the well-anchored
-> fit unless it is explicitly labelled all-stops. Every number below is read from `paper/reported/behavior.json`. The cohort rule is in
+> fit unless it is explicitly labeled all-stops. Every number below is read from `paper/reported/behavior.json`. The cohort rule is in
 > [design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md).
 
 ## Family A — per-stop rate (the literature-comparable layer)
@@ -75,7 +75,7 @@ one-population null tested against its split.
   which is what makes their ΔAIC a model comparison rather than a cohort
   comparison. On the shipped fit that cohort costs nothing beyond the occupancy
   rule — **<!--v:behavior.per_stop_audit_stops_in-->93,560<!--/v-->** well-anchored stops in, <!--v:behavior.per_stop_audit_stops_own_drop-->5<!--/v--> dropped for a missing own
-  predictor, `n_drop_common_cohort_other` <!--v:behavior.per_stop_audit_stops_common_drop-->0<!--/v-->, **<!--v:behavior.per_stop_audit_stops_modeled-->93,555<!--/v-->** modelled on `R0` and
+  predictor, `n_drop_common_cohort_other` <!--v:behavior.per_stop_audit_stops_common_drop-->0<!--/v-->, **<!--v:behavior.per_stop_audit_stops_modeled-->93,555<!--/v-->** modeled on `R0` and
   <!--v:behavior.per_stop_audit_stops_full-->93,215<!--/v--> on `R1` (<!--v:behavior.per_stop_audit_stops_full_session_excluded-->340<!--/v--> stops in gated-out sessions)
   (`models_per_stop_rate/all_models_cohort_audit.csv`).
 - **Estimator:** one ordinary Poisson GLM per stop on the event *count*, with a
@@ -111,7 +111,7 @@ offset. Its limitation is exactly that offset — see below.
   [`model_specs.py`](../src/continuum_swr_replay/analysis/replay_models/model_specs.py).
 - **Estimator:** one Poisson GLM per session on the **(stop × 15 ms bin)**
   design from `aggregate_to_timebins`, with a `log(exposure)` offset; the
-  within-stop time course is modelled explicitly by a `bs(tc, df=4)` spline
+  within-stop time course is modeled explicitly by a `bs(tc, df=4)` spline
   rather than averaged into a per-stop dwell offset
   ([`per_bin_rate_model.py`](../src/continuum_swr_replay/analysis/replay_models/rate/per_bin_rate_model.py)).
 - **At-risk bins (2026-11-03).** Only bins in which an event can start enter
@@ -279,10 +279,10 @@ offset. Its limitation is exactly that offset — see below.
 
 A "stop" is an immobility bout: the interval between two crossings of the
 `head_speed < 4 cm/s` threshold (`bouts.py`). A single well visit is routinely
-cut into several such bouts by small movements at the port, so **the modelled
+cut into several such bouts by small movements at the port, so **the modeled
 unit is a fragment of a visit, not the visit**.
 
-**Which fragments are modelled.** Both families fit the **well-anchored**
+**Which fragments are modeled.** Both families fit the **well-anchored**
 fragments: `occupancy_state` `at_well` **or** `mixed`, <!--v:behavior.stops_well_anchored-->93,560<!--/v--> of the <!--v:behavior.stops_total-->120,320<!--/v-->
 canonical stops. A `mixed` bout is one whose first settling samples still read as
 in-transit — it begins after the last well arrival and sits at the well — so
@@ -309,7 +309,7 @@ direct test of that alternative.
 > population.
 
 `M0a_const_arrival`, `M5a_time_arrival` and `M7ra_time_arrival_histcos_rew`
-re-anchor the same spline block on `time_since_last_well_arrival_s` (bin centre
+re-anchor the same spline block on `time_since_last_well_arrival_s` (bin center
 minus the arrival of the well occupied at bout start) instead of `tc`. Window
 `[0, TMAX_ARRIVAL = 8]` s with interior knots (1, 2, 4, 6) s, chosen from the
 at-well event distribution.
@@ -350,7 +350,7 @@ agreement turns partly on the cohort.
 
 Read over the **full** [0, 8] s window, a median arrival-clock curve's argmax
 can land on the 0 s grid point, where the window holds almost no exposure; that
-is a boundary artefact, not an arrival-locked rate. **A 0.00 s peak must never be
+is a boundary artifact, not an arrival-locked rate. **A 0.00 s peak must never be
 read as arrival-locked.** The same caution applied to the non-local-no-SWR stop-clock
 peak, which sits at <!--v:behavior.rate_time_peak_s_non_local_no_swr-->2.48<!--/v--> s on the well-anchored fit and <!--v:behavior.rate_allstops_time_peak_s_non_local_no_swr-->3.00<!--/v--> s on the all-stops fit;
 an argmax at 3.00 s is the right edge of the supported interval: it bounds the peak rather than locating it.
@@ -438,14 +438,14 @@ uncertainty beyond the time/reward/history controls. It is the M7r base
   absolute value-update magnitudes
   `reward_belief_mean_update_l1_all_ports_postoutcome` and
   `reward_belief_mean_update_l1_alternative_patches_postoutcome`. Every one comes
-  from the beta-Bernoulli behavioural model; the block carries no HMM covariate
+  from the beta-Bernoulli behavioral model; the block carries no HMM covariate
   (the HMM was retired 2026-07-13). See
   [behavior_model_covariates.md](behavior_model_covariates.md).
 
 Collinearity is controlled, and the exclusions are recorded in the runner
 (`scripts/replay_models/rate/fit_uncertainty_rate.py`): the model's chosen-port value is not
 fit, being strongly correlated with ΔV; the nominal-RPE stand-in is not fit either
-(it tracks `rpe_postoutcome`, the behavioural-model RPE the block fits
+(it tracks `rpe_postoutcome`, the behavioral-model RPE the block fits
 instead); `task_reward_probability_patch_mean_gap_best_vs_second` is kept
 because it is nearly uncorrelated with ΔV and so carries independent nominal
 information. Fit over the three populations
@@ -537,7 +537,7 @@ contrast fit, <!--v:behavior.rate_contrast_expanded_separated_low-->231<!--/v-->
 <!--v:behavior.rate_contrast_expanded_fits_low-->242<!--/v-->–<!--v:behavior.rate_contrast_expanded_fits_high-->242<!--/v--> fits of every rung that carries an `is_swr` expansion (`S2`–`S10`) —
 because one term dominates it: `is_swr:reward_history_rcos_1` alone is flagged in
 <!--v:behavior.rate_contrast_expanded_flagged_low-->223<!--/v-->–<!--v:behavior.rate_contrast_expanded_flagged_high-->239<!--/v--> fits per rung. The middle bump of the three-bump reward basis is nearly
-collinear with its neighbours *inside* the expansion, where it is estimated on
+collinear with its neighbors *inside* the expansion, where it is estimated on
 the SWR-coupled bins alone; the same bump outside an expansion is ordinary
 (`S1_rew`, which has no `is_swr` reward expansion, flags <!--v:behavior.rate_contrast_plain_flagged-->2<!--/v--> of <!--v:behavior.rate_contrast_plain_fits-->242<!--/v--> fits). The key
 `is_swr:<covariate>` terms are barely affected: <!--v:behavior.rate_contrast_terms_losing_sessions-->1<!--/v--> of them lose any session to

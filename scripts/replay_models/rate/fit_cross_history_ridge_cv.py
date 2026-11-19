@@ -18,7 +18,7 @@ Designs are built in ``--workers`` CPU processes; every fit of a rung's
 cross-validation runs as one batch on one GPU (``--gpu``, never card 0).
 
 A session with fewer than ``MIN_SESSION_EVENTS`` response onsets is left out
-(its unpenalised session effect has no estimate in a training set without
+(its unpenalized session effect has no estimate in a training set without
 events); the count is recorded. Writes one pickle per run with the
 per-(animal, stream) records and a ``.provenance.json`` sidecar.
 
@@ -42,7 +42,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     require_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (

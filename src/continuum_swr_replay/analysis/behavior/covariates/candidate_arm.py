@@ -307,7 +307,7 @@ def eq_indicator(values: np.ndarray, reference: np.ndarray) -> np.ndarray:
     ``is_last_rewarded`` before the first reward.  Where an absent
     reference instead means "unobserved", use
     :func:`eq_indicator_or_nan` so the row is excluded by complete-case
-    fitting rather than silently labelled a zero.
+    fitting rather than silently labeled a zero.
     """
     values = np.asarray(values, dtype=float)
     reference = np.asarray(reference, dtype=float)

@@ -317,7 +317,7 @@ def read_complete_run(
     run_dir : Path
     name : str
     expected : iterable of str, optional
-        The epochs the run must hold, no more and no fewer (the analysed
+        The epochs the run must hold, no more and no fewer (the analyzed
         epochs, for a reader that reports on the cohort).
 
     Raises

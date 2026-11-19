@@ -171,7 +171,7 @@ def fit_model_per_session(
     n_jobs : int
         Worker processes for the Dirichlet-multinomial per-session fits.
     min_events_session_phi : int
-        Sessions with fewer modelled events than this have their concentration
+        Sessions with fewer modeled events than this have their concentration
         intercept pinned to the animal-pooled value.
 
     Returns
@@ -699,7 +699,7 @@ def fit_contrast_ladder(
     n_jobs : int, optional
         Worker processes for the Dirichlet-multinomial session fits.
     min_events_session_phi : int, optional
-        Sessions below this many modelled events have their concentration
+        Sessions below this many modeled events have their concentration
         intercept pinned to the animal-pooled median.
     concentration_length : bool, optional
         Dirichlet-multinomial only: add the z-scored log event length to the

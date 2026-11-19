@@ -17,7 +17,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     excluded_intervals_of,
 )
 from continuum_swr_replay.analysis.event_definition.immobility import (
@@ -165,7 +165,7 @@ def _in_contfrag_event_mask(
     labels in ``docs/known_issues/degenerate_mua_events.md`` are the
     motivating case.
 
-    On a frame read through ``analysed_time.with_swr_source`` this is a no-op;
+    On a frame read through ``analyzed_time.with_swr_source`` this is a no-op;
     it excludes nothing further. The read holds every label to the rule (an
     SWR that moves is dropped, a moving MUA label is refused), and the
     historical ~0.5% SWR / ~0.7% MUA exclusion happens upstream at cohort

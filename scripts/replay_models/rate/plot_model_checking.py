@@ -34,7 +34,7 @@ from non_local_detector.model_checking.sorted_spikes import (  # noqa: E402
     point_process_residuals,
 )
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (  # noqa: E402
     require_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (  # noqa: E402
@@ -106,7 +106,7 @@ SC = list(SESSION_COLUMNS)
 # deviance, dispersion and held-out likelihood are on a different row set from
 # every stop-clock rung's. Drawn on one continuous axis they read as further
 # steps of the same ladder, which is exactly the comparison that is invalid, so
-# they are plotted after a marked gap with the two groups labelled.
+# they are plotted after a marked gap with the two groups labeled.
 STOP_LADDER = [n for n, s in MODEL_PER_BIN_RATE.items() if s.time_clock == "stop"]
 ARRIVAL_LADDER = [n for n, s in MODEL_PER_BIN_RATE.items() if s.time_clock == "arrival"]
 # Gap in x units between the last stop rung and the first arrival rung.
@@ -179,7 +179,7 @@ def plot_gof_ladder(df: pd.DataFrame) -> None:
     """GOF metrics up the ladder, one line per population.
 
     The stop-clock and arrival-clock rungs are drawn as two SEPARATE line
-    segments either side of a labelled gap: they are fit to different rows, so a
+    segments either side of a labeled gap: they are fit to different rows, so a
     line joining them would assert a ladder step that does not exist. Each
     point is ``rate_fit_statistics.ladder_fit_statistics``' summary of the
     rung's fits.

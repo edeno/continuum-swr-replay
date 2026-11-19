@@ -7,7 +7,7 @@ replay of the sweep and every trial of the controls (:func:`trials`,
 :func:`run_fold`) and over the controls' no-replay stretches
 (:func:`run_no_replay_fold`); the evaluation cells' fields are fitted
 separately (:func:`fold_models`). Every event either detector reports is
-classed, labelled with what it truly is (:func:`event_truth`,
+classed, labeled with what it truly is (:func:`event_truth`,
 :func:`matches_injection`) and scored by the held-out rule of
 :mod:`~continuum_swr_replay.analysis.detector_comparison.heldout` under both
 content estimates (:func:`score_events`). ``heldout.heldout_summary``

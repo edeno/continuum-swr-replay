@@ -159,7 +159,7 @@ class TestExposure:
         )
 
 
-class TestStillRunsReachTheNeighbouringSamples:
+class TestStillRunsReachTheNeighboringSamples:
     """An event is speed-eligible when every sample inside it is still, so a
     still run's exposure reaches the samples on either side of it."""
 
@@ -173,7 +173,7 @@ class TestStillRunsReachTheNeighbouringSamples:
             [[time[0], time[300]], [time[599], time[999]]],
         )
 
-    def test_a_lone_still_sample_spans_from_one_moving_neighbour_to_the_other(self):
+    def test_a_lone_still_sample_spans_from_one_moving_neighbor_to_the_other(self):
         time = grid()
         speed = np.full(time.size, 9.0)
         speed[500] = 0.0
@@ -405,7 +405,7 @@ class TestExcludedTime:
 
     @pytest.fixture
     def masked(self, tmp_path, monkeypatch):
-        from continuum_swr_replay.analysis.event_definition import analysed_time
+        from continuum_swr_replay.analysis.event_definition import analyzed_time
         from tests.support._swr_inventory_fixtures import (
             use_artifact_run,
             write_artifact_run,
@@ -414,7 +414,7 @@ class TestExcludedTime:
         directory = write_artifact_run(tmp_path, {self.EPOCH_ID: self.CORES})
         use_artifact_run(monkeypatch, directory)
         np.testing.assert_allclose(
-            analysed_time.excluded_intervals(self.EPOCH_ID).to_numpy(), self.EXCLUDED
+            analyzed_time.excluded_intervals(self.EPOCH_ID).to_numpy(), self.EXCLUDED
         )
 
     def _observations(self) -> tuple[pd.DataFrame, dict]:
@@ -447,9 +447,9 @@ class TestExcludedTime:
         return pd.concat(tables, ignore_index=True), stretches
 
     def test_every_detectors_exposure_is_its_stretches_less_excluded_time(self, masked):
-        from continuum_swr_replay.analysis.event_definition import analysed_time
+        from continuum_swr_replay.analysis.event_definition import analyzed_time
 
-        excluded = analysed_time.excluded_intervals(self.EPOCH_ID).to_numpy()
+        excluded = analyzed_time.excluded_intervals(self.EPOCH_ID).to_numpy()
         observations, stretches = self._observations()
 
         coverage = coverage_from_observations(
@@ -458,10 +458,10 @@ class TestExcludedTime:
 
         for detector, runs in stretches.items():
             entry = coverage[("sim", 20200101, "02_r1", detector)]
-            analysed = subtract(runs, excluded)
-            np.testing.assert_array_equal(entry.observed, analysed)
+            analyzed = subtract(runs, excluded)
+            np.testing.assert_array_equal(entry.observed, analyzed)
             np.testing.assert_array_equal(
-                entry.exposure, exposure(analysed, self.STILL)
+                entry.exposure, exposure(analyzed, self.STILL)
             )
             assert total_duration(intersect(entry.exposure, excluded)) == 0.0
         empty = coverage[("sim", 20200101, "02_r1", "missing")]

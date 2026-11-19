@@ -294,7 +294,7 @@ def test_qvals_output_validates_exact_rpe_identities(column, bad, message):
     (
         (True, 10.2, 10.2),
         # Omission: poke_in + the latency by which a pump would have fired,
-        # NOT poke-out. Poke-out is a behavioural boundary and lands a median
+        # NOT poke-out. Poke-out is a behavioral boundary and lands a median
         # 880 ms after the information exists.
         (False, np.nan, 10.0 + OMISSION_KNOWN_LATENCY_SEC),
     ),

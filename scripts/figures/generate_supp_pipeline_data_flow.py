@@ -32,7 +32,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.behavior.spatial_mapping import (
     map_estimate_to_arm,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
     require_swr_source,
 )
@@ -110,9 +110,9 @@ def wrap_name(name: str, width: int = HEADER_WIDTH) -> str:
     return "\n".join(lines)
 
 
-# Colour code for each arm (0..8). Patches share families:
+# Color code for each arm (0..8). Patches share families:
 # arms 0-1 = patch 1 (blues), 2-3 = patch 2 (greens), 4-5 = patch 3 (reds),
-# 6-8 = trunks (greys).
+# 6-8 = trunks (grays).
 ARM_COLORS = {
     0: "#1f77b4",
     1: "#5ba3d8",
@@ -422,7 +422,7 @@ def make_figure(
     ax.scatter(
         win_t[other.values],
         win.loc[other, "map_estimate"].values,
-        c="lightgrey",
+        c="lightgray",
         s=2,
         alpha=0.3,
     )

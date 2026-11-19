@@ -66,9 +66,9 @@ def spike_counts_of(spike_times, time_axis):
 
 
 #: Prior standard deviation of an event-basis coefficient, on the log-rate
-#: scale, for the tests that fit the penalised estimator. The fixtures here are
+#: scale, for the tests that fit the penalized estimator. The fixtures here are
 #: ten seconds of a ~5 Hz Poisson train with three events, so every event class
-#: has spline columns with no spikes under them and the unpenalised fits run
+#: has spline columns with no spikes under them and the unpenalized fits run
 #: away (coefficients past 100, a deviance above the constant model's, half the
 #: ladder at ``maxiter``); the prior is what makes them estimable.
 PENALTY_SIGMA = 2.0
@@ -188,7 +188,7 @@ class TestEventBasisFunctions:
         the window. Dropping only the first -- which is what patsy's
         ``bs(...) - 1`` does -- pins the kernel to zero at the left edge and
         leaves the right edge free to run off, so the same modulation gets a
-        boundary artefact at one end and not the other.
+        boundary artifact at one end and not the other.
         """
         lags = np.arange(-125, 126)
 
@@ -257,7 +257,7 @@ def planted_kernel_session():
     a 300 s epoch with 300 events, the kernel a 30 ms bump 20 ms after onset,
     projected into the basis so it is exactly representable (50 ms knots cannot
     carry a 30 ms bump, and the recoverable truth is the projection, not the
-    bump). A seventh unit fires nowhere near an event, so its unpenalised fit
+    bump). A seventh unit fires nowhere near an event, so its unpenalized fit
     separates.
     """
     rng = np.random.default_rng(20260916)
@@ -310,8 +310,8 @@ def planted_kernel_session():
         "spline_basis": spline_basis,
         "lag_time": lag_time,
         # Fit once: every test below reads the same two fits.
-        "penalised": fit_poisson_glms(design, counts, penalty=penalty),
-        "unpenalised": fit_poisson_glms(design, counts),
+        "penalized": fit_poisson_glms(design, counts, penalty=penalty),
+        "unpenalized": fit_poisson_glms(design, counts),
     }
 
 
@@ -319,7 +319,7 @@ class TestPlantedKernelRecovery:
     """The estimator has to return the kernel that generated the spikes.
 
     Agreement with a reference solver says the arithmetic is right; this says
-    the answer is. The prior shrinks towards no modulation, so a recovered peak
+    the answer is. The prior shrinks toward no modulation, so a recovered peak
     is expected to come back *at most* the planted one plus sampling noise, and
     at least the planted one times the ridge factor ``tau**2 / (tau**2 + s**2)``
     -- ``tau`` the prior standard deviation of the kernel at one lag, ``s`` the
@@ -332,7 +332,7 @@ class TestPlantedKernelRecovery:
 
     @staticmethod
     def fits(session):
-        return session["penalised"], session["unpenalised"]
+        return session["penalized"], session["unpenalized"]
 
     def peaks(self, fit, session):
         peak = peak_log_modulation(
@@ -348,8 +348,8 @@ class TestPlantedKernelRecovery:
     ):
         from continuum_swr_replay.analysis.pfc.batched_glm import implied_prior_sd
 
-        penalised, _ = self.fits(planted_kernel_session)
-        peak, se = self.peaks(penalised, planted_kernel_session)
+        penalized, _ = self.fits(planted_kernel_session)
+        peak, se = self.peaks(penalized, planted_kernel_session)
         window = np.abs(planted_kernel_session["lag_time"]) <= 0.2
         tau = implied_prior_sd(
             self.SIGMA, planted_kernel_session["spline_basis"], window
@@ -359,7 +359,7 @@ class TestPlantedKernelRecovery:
             planted = cell["planted_peak"]
             ridge_factor = tau**2 / (tau**2 + se[unit] ** 2)
             assert ridge_factor > 0.99, cell
-            # Shrunk towards zero by at most the ridge factor, and free to
+            # Shrunk toward zero by at most the ridge factor, and free to
             # scatter by the fit's own standard error either way.
             assert planted * ridge_factor - 3 * se[unit] <= peak.value[unit], cell
             assert peak.value[unit] <= planted + 3 * se[unit], cell
@@ -368,8 +368,8 @@ class TestPlantedKernelRecovery:
     def test_a_higher_rate_recovers_the_same_kernel_more_precisely(
         self, planted_kernel_session
     ):
-        penalised, _ = self.fits(planted_kernel_session)
-        peak, se = self.peaks(penalised, planted_kernel_session)
+        penalized, _ = self.fits(planted_kernel_session)
+        peak, se = self.peaks(penalized, planted_kernel_session)
 
         for low, high in ((0, 1), (2, 3), (4, 5)):  # 2 Hz then 20 Hz, per amplitude
             assert se[high] < se[low]
@@ -379,8 +379,8 @@ class TestPlantedKernelRecovery:
     def test_the_recovered_amplitudes_are_ordered_like_the_planted_ones(
         self, planted_kernel_session
     ):
-        penalised, _ = self.fits(planted_kernel_session)
-        peak, _ = self.peaks(penalised, planted_kernel_session)
+        penalized, _ = self.fits(planted_kernel_session)
+        peak, _ = self.peaks(penalized, planted_kernel_session)
 
         n_cells = len(planted_kernel_session["cells"])
         for rate_offset in (0, 1):
@@ -389,32 +389,32 @@ class TestPlantedKernelRecovery:
 
     def test_the_prior_barely_moves_a_well_sampled_fit(self, planted_kernel_session):
         """Where the data speak, the prior does not: binding is the exception."""
-        penalised, unpenalised = self.fits(planted_kernel_session)
-        penalised_peak, _ = self.peaks(penalised, planted_kernel_session)
-        mle_peak, mle_se = self.peaks(unpenalised, planted_kernel_session)
+        penalized, unpenalized = self.fits(planted_kernel_session)
+        penalized_peak, _ = self.peaks(penalized, planted_kernel_session)
+        mle_peak, mle_se = self.peaks(unpenalized, planted_kernel_session)
 
         n_cells = len(planted_kernel_session["cells"])
         binds = prior_binds(
-            penalised_peak.value[:n_cells], mle_peak.value[:n_cells], mle_se[:n_cells]
+            penalized_peak.value[:n_cells], mle_peak.value[:n_cells], mle_se[:n_cells]
         )
 
         assert not binds.any()
-        assert not is_separated(unpenalised.params[:n_cells, 1:]).any()
+        assert not is_separated(unpenalized.params[:n_cells, 1:]).any()
 
     def test_the_separated_unit_gets_a_finite_curve_instead_of_a_runaway(
         self, planted_kernel_session
     ):
-        penalised, unpenalised = self.fits(planted_kernel_session)
-        penalised_peak, _ = self.peaks(penalised, planted_kernel_session)
-        mle_peak, _ = self.peaks(unpenalised, planted_kernel_session)
+        penalized, unpenalized = self.fits(planted_kernel_session)
+        penalized_peak, _ = self.peaks(penalized, planted_kernel_session)
+        mle_peak, _ = self.peaks(unpenalized, planted_kernel_session)
 
         separated = -1
-        assert is_separated(unpenalised.params[:, 1:])[separated]
+        assert is_separated(unpenalized.params[:, 1:])[separated]
         assert mle_peak.value[separated] < -10.0  # a rate multiplier of 5e-5
-        assert np.isfinite(penalised_peak.value[separated])
+        assert np.isfinite(penalized_peak.value[separated])
         # Suppression, said at a scale a rate can have: at most a few percent
         # of baseline, not zero.
-        assert -8.0 < penalised_peak.value[separated] < -1.0
+        assert -8.0 < penalized_peak.value[separated] < -1.0
 
 
 #: Peak lags (s) and signed amplitudes the replay-split regression test plants,
@@ -769,11 +769,11 @@ class TestPeakModulationSe:
 
 class TestPriorBinds:
     def test_it_is_a_statement_about_the_curve_not_a_coefficient(self):
-        penalised = np.array([1.0, 1.0, 1.0])
+        penalized = np.array([1.0, 1.0, 1.0])
         mle = np.array([1.05, 2.0, 1.0])
         mle_se = np.array([0.5, 0.5, 0.5])
 
-        binds = prior_binds(penalised, mle, mle_se)
+        binds = prior_binds(penalized, mle, mle_se)
 
         # Moved by less than the data can resolve -> not binding; more -> yes.
         assert not binds[0]
@@ -937,8 +937,8 @@ class TestMakeDesignMatrices:
 def _fit_ladder(is_immobile, design_matrices, spike_count, fitter):
     """The ladder as it is shipped under each backend.
 
-    The batched backend fits the penalised estimator; statsmodels has no
-    penalised path and fits the maximum-likelihood one, which is the only
+    The batched backend fits the penalized estimator; statsmodels has no
+    penalized path and fits the maximum-likelihood one, which is the only
     reason both appear here.
     """
     return _fit_immobility_models(
@@ -988,7 +988,7 @@ class TestFitImmobilityModels:
         self, dense_session, fitter
     ):
         # On the well-posed fixture: a nested model can only lower the
-        # deviance at the optimum, and neither an unpenalised fit that never
+        # deviance at the optimum, and neither an unpenalized fit that never
         # settled nor a prior that binds hard has an optimum to say that of.
         results, _ = _fit_ladder(
             dense_session["fit_mask"],
@@ -1013,7 +1013,7 @@ class TestDevianceFractions:
     """Read off the well-posed fixture, under the estimator that is shipped.
 
     The fractions are differences of deviances between nested fits; on a
-    fixture where the maximum-likelihood fit does not exist, an unpenalised
+    fixture where the maximum-likelihood fit does not exist, an unpenalized
     "fit" can leave the larger model with the larger deviance and the fractions
     then describe the solver rather than the data.
     """
@@ -1216,10 +1216,10 @@ class TestProcessNeuron:
             for suffix in (": frac_null_dev", ": frac_explained_dev"):
                 assert f"{full} vs. {reduced}{suffix}" in stats
 
-        # ... and nothing here is a test: the fits are penalised, so a
+        # ... and nothing here is a test: the fits are penalized, so a
         # likelihood ratio has no reference distribution and an AIC no stated
         # number of parameters. The theta comparison is the one exception --
-        # it is an unpenalised fit of its own.
+        # it is an unpenalized fit of its own.
         retired = [
             key
             for key in stats
@@ -1596,7 +1596,7 @@ def dense_session():
 
 
 class TestFitterEquivalence:
-    """Unpenalised, the batched backend must not move a single shipped number.
+    """Unpenalized, the batched backend must not move a single shipped number.
 
     ``process_neuron`` is the unit of comparison because it is what the
     pipeline calls: everything the bundle carries -- the LR tests, the
@@ -1608,7 +1608,7 @@ class TestFitterEquivalence:
     is anything to compare: where a spline column's support holds no spikes the
     maximum-likelihood estimate is at infinity and the two solvers disagree
     about a number neither of them means. That regime is what the prior is for,
-    and statsmodels has no penalised path to check it against.
+    and statsmodels has no penalized path to check it against.
     """
 
     #: Far tighter than the real-data audit's gate; on a synthetic session the
@@ -2036,7 +2036,7 @@ class TestBuildSessionEventSets:
         self, position_info
     ):
         # The canonical events were built on the decode's own axis. One past
-        # the end of the aligned position frame has no bins to be modelled on,
+        # the end of the aligned position frame has no bins to be modeled on,
         # so it is dropped -- and counted, because it means the two axes
         # disagree over more than an empty tail.
         from continuum_swr_replay.analysis.pfc.event_sets import (

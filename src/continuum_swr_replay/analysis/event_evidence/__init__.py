@@ -1,7 +1,7 @@
 """Are the events real: spike evidence that did not choose the decode.
 
 - ``spike_evidence``: per non-local event, whether the prior-excluded spike
-  likelihood favours the decoded location over the animal's.
+  likelihood favors the decoded location over the animal's.
 - ``state_evidence``: held-out spike evidence for each decoder state, its
   windows, terms and summaries.
 

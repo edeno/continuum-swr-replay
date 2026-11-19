@@ -1,6 +1,6 @@
-"""The project's colour palettes.
+"""The project's color palettes.
 
-- :data:`COLORS` — one colour per event type and decoder state (SWR, MUA,
+- :data:`COLORS` — one color per event type and decoder state (SWR, MUA,
   Non-Local, Local, No-Spike, ...), used by every figure.
 - :data:`CONTFRAG_COLORS` — the Continuous/Fragmented classifier's two states.
 
@@ -52,22 +52,22 @@ COLORS: dict[str, str] = {
     # comparison. Same Dark2 family as SWR/MUA/Non-Local.
     "Combined": "#e6ab02",
 }
-"""Colour scheme for plotting the event types and decoder states."""
+"""Color scheme for plotting the event types and decoder states."""
 
 LIGHT_COLOR_LIGHTNESS = 0.6
-"""A colour lighter than this (HLS lightness) is too pale for text on white, and
+"""A color lighter than this (HLS lightness) is too pale for text on white, and
 too pale under white text."""
 
 TEXT_LIGHTNESS = 0.4
-"""The lightness a pale colour is darkened to when text is written in it."""
+"""The lightness a pale color is darkened to when text is written in it."""
 
 
 def readable_text_color(color: str) -> str:
-    """The colour to write text in ``color`` on white.
+    """The color to write text in ``color`` on white.
 
-    A pale colour (``COLORS["Local"]``'s light blue, ``COLORS["No-Spike"]``'s
-    grey) is darkened to :data:`TEXT_LIGHTNESS`, keeping its hue, so the text can
-    be read and still names its state by colour; any other colour is returned as
+    A pale color (``COLORS["Local"]``'s light blue, ``COLORS["No-Spike"]``'s
+    gray) is darkened to :data:`TEXT_LIGHTNESS`, keeping its hue, so the text can
+    be read and still names its state by color; any other color is returned as
     given.
     """
     hue, lightness, saturation = rgb_to_hls(*to_rgb(color))
@@ -77,7 +77,7 @@ def readable_text_color(color: str) -> str:
 
 
 def text_color_on(fill: str) -> str:
-    """Black on a pale fill, white on any other: the colour of text drawn over ``fill``."""
+    """Black on a pale fill, white on any other: the color of text drawn over ``fill``."""
     return "black" if rgb_to_hls(*to_rgb(fill))[1] > LIGHT_COLOR_LIGHTNESS else "white"
 
 
@@ -85,7 +85,7 @@ CONTFRAG_COLORS: dict[str, str] = {
     "Continuous": "#1b9e77",  # Teal green (smooth trajectory)
     "Fragmented": "#d95f02",  # Orange (disjointed representation)
 }
-"""Colours of the ContFrag classifier's Continuous and Fragmented states."""
+"""Colors of the ContFrag classifier's Continuous and Fragmented states."""
 
 
 def build_arm_color_map(
@@ -191,7 +191,7 @@ def patch_grouped_arm_palette(
             palette[arm] = tuple(cmap(trunk_level))
 
     # Final safety net: any arm not covered (degenerate fixture
-    # without full patch coverage) falls back to a grey so it's
+    # without full patch coverage) falls back to a gray so it's
     # visibly different from patch colors.
     for arm in ALL_ARMS:
         palette.setdefault(arm, (0.5, 0.5, 0.5, 1.0))

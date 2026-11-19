@@ -23,7 +23,7 @@ not on spike count measured engagement more than evidence. A run written
 before that decision holds baseline rows (detector ``baseline``); they are
 dropped on reading. The evidence is reported beside the spikes per row.
 
-Every table comes per session (one analysed epoch, nested in its animal) and
+Every table comes per session (one analyzed epoch, nested in its animal) and
 per animal. Counts are summed over each animal's sessions and proportions are
 taken from those sums, never averaged over sessions. Feature distributions are
 quantiles of the events, per session and pooled per animal. The session tables
@@ -91,7 +91,7 @@ from continuum_swr_replay.analysis.detector_comparison.selection import (  # noq
     REJECTION_STAGES,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
-    analysed_epoch_ids,
+    analyzed_epoch_ids,
 )
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,
@@ -188,7 +188,7 @@ DERIVED_FEATURES = ("spikes_per_row",)
 SPIKES_PER_ROW_BINS = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0, np.inf)
 """Bounds of the spikes-per-row bins, each closed on the left."""
 SPIKES_PER_ROW_LABELS = ("0-0.25", "0.25-0.5", "0.5-1", "1-2", "2-4", ">=4")
-LABELLED_FEATURES = (
+LABELED_FEATURES = (
     "track_segment_id",
     "patch_id",
     "stop_id",
@@ -203,7 +203,7 @@ LABELLED_FEATURES = (
 (``ss_disagreement`` also in ``comparator_only_by_*``)."""
 MISSING_FEATURES = (
     *(column for columns in FEATURE_GROUPS.values() for column in columns),
-    *LABELLED_FEATURES,
+    *LABELED_FEATURES,
 )
 
 UNSCORABLE_REASONS = ("no_row", "no_valid_row")
@@ -259,7 +259,7 @@ _POPULATIONS = (
     "beside it."
 )
 _SESSION_ROWS = (
-    "Per session (one analysed epoch, nested in its animal), with the pairwise "
+    "Per session (one analyzed epoch, nested in its animal), with the pairwise "
     "populations against state_space and memoryless only."
 )
 _ANIMAL_EVENTS = (
@@ -325,7 +325,7 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "ss_nearest_event_gap_s and ss_disagreement of state_space's own "
             "events, the stop context of an event in no stop, and "
             "spikes_per_row of an interval with no row. Labels "
-            f"({', '.join(LABELLED_FEATURES)}) are counted here and in "
+            f"({', '.join(LABELED_FEATURES)}) are counted here and in "
             "context_by_*. " + _POPULATIONS,
             _SESSION_ROWS + " Features with no missing value in any session of "
             "the run are left out; report.md names them.",
@@ -338,7 +338,7 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "valid rows (n_valid_rows) and spikes (n_spikes) summed, a missing "
             "count (an interval with no row) summed as 0; and spikes_per_row, "
             "n_spikes over n_rows. " + _EVIDENCE_NOTE,
-            "Per session (one analysed epoch, nested in its animal).",
+            "Per session (one analyzed epoch, nested in its animal).",
             _ANIMAL_SUMS + " spikes_per_row is taken from the sums.",
         ),
         "evidence_by_spikes": (
@@ -373,7 +373,7 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "row, with its reasons (n_no_shared_exposure, "
             "n_outside_shared_exposure) and no rejection reason (left "
             "missing).",
-            "Per session (one analysed epoch, nested in its animal).",
+            "Per session (one analyzed epoch, nested in its animal).",
             _ANIMAL_SUMS + " The unknown rows' reason columns stay missing.",
         ),
         "memoryless_cohort": (
@@ -403,7 +403,7 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             + _EVIDENCE_NOTE
             + " "
             + QUANTILE_COLUMNS,
-            "Per session (one analysed epoch, nested in its animal).",
+            "Per session (one analyzed epoch, nested in its animal).",
             _ANIMAL_SUMS + " The quantiles pool the animal's events.",
         ),
     }
@@ -414,7 +414,7 @@ TABLE_CAPTIONS: Mapping[str, str] = MappingProxyType(
         "epochs": caption_with_pending(
             "Every epoch of the run: ok or failed (with the manifest's reason "
             "or error), and whether the memoryless run observed it. The "
-            "analysed epochs the run does not hold are counted in report.md."
+            "analyzed epochs the run does not hold are counted in report.md."
         ),
         **{
             f"{topic}_{level}": caption_with_pending(what, detail)
@@ -1277,11 +1277,11 @@ def draw_figures(
     save(fig, "feature_distributions.png")
 
     # rejection stages of the ours-only events: one cell per animal and
-    # stage, each labelled by its column and printed, so a thin stage shows
+    # stage, each labeled by its column and printed, so a thin stage shows
     rejection = out["rejection_by_animal"]
     stages = list(REJECTION_STAGES[:-1])
     cohorts = list(REJECTION_COHORTS)
-    greys = plt.get_cmap("Greys")
+    grays = plt.get_cmap("Greys")
     fig, axes = _subplots(
         1,
         len(cohorts),
@@ -1319,7 +1319,7 @@ def draw_figures(
             shares.reshape(len(animals), len(stages)),
             vmin=0,
             vmax=1,
-            cmap=greys,
+            cmap=grays,
             aspect="auto",
         )
         for (i, j), value in np.ndenumerate(shares):
@@ -1355,7 +1355,7 @@ def draw_figures(
 
     # comparator-only classes
     comparator = out["comparator_only_by_animal"]
-    # neutral greys, no family hue; missing white and hatched
+    # neutral grays, no family hue; missing white and hatched
     class_colors = dict(zip(DISAGREEMENTS, ["0.3", "0.6", "0.85", "w"], strict=True))
     class_hatches = {"missing": "////"}
     detectors = [d for d in _detectors_of(comparator) if d != STATE_SPACE]
@@ -1501,7 +1501,7 @@ def write_report(
     *,
     inventory_root: Path | None = None,
     memoryless_root: Path | None = None,
-    analysed: Collection[str] | None = None,
+    analyzed: Collection[str] | None = None,
 ) -> dict[str, list[Path]]:
     """Write the run's report tables, figures and captions.
 
@@ -1517,8 +1517,8 @@ def write_report(
         Where the comparison and memoryless runs are;
         ``paths.inventory_comparison_root()`` and ``paths.memoryless_root()``
         by default.
-    analysed : collection of str, optional
-        The analysed epochs; the epoch register's by default.
+    analyzed : collection of str, optional
+        The analyzed epochs; the epoch register's by default.
 
     Returns
     -------
@@ -1529,7 +1529,7 @@ def write_report(
         inventory_root = inventory_comparison_root()
     if memoryless_root is None:
         memoryless_root = memoryless_runs_root()
-    analysed = analysed_epoch_ids() if analysed is None else analysed
+    analyzed = analyzed_epoch_ids() if analyzed is None else analyzed
     manifest, tables = read_run(run_dir, feature_run.TABLE_DTYPES)
     tables |= read_inputs(manifest, inventory_root, memoryless_root)
     out = report_tables(manifest, tables)
@@ -1557,13 +1557,13 @@ def write_report(
     inventory_run = settings["input_runs"]["inventory"]
     boundary_dir = inventory_root / inventory_run / "report"
     status = out["epochs"].status.value_counts()
-    outside = len(set(analysed) - set(manifest["epochs"]))
+    outside = len(set(analyzed) - set(manifest["epochs"]))
     lines = [
         f"# Event features report: run {run_id}",
         "",
         f"Written by `{PRODUCED_BY}` from the per-epoch tables of `{run_dir}` "
         f"({status.get('ok', 0)} ok epochs, {status.get('failed', 0)} failed, "
-        f"and {outside} analysed epochs of the epoch register outside the run), "
+        f"and {outside} analyzed epochs of the epoch register outside the run), "
         f"the cells and directional tables of inventory comparison run "
         f"{inventory_run} and the candidates of memoryless run "
         f"{settings['input_runs']['memoryless']}, read through SWR source "
@@ -1647,7 +1647,7 @@ def main(argv: list[str] | None = None) -> None:
         FIGURE_ROOT,
         inventory_root=inventory_comparison_root(),
         memoryless_root=memoryless_runs_root(),
-        analysed=analysed_epoch_ids(),
+        analyzed=analyzed_epoch_ids(),
     )
     print(
         f"{len(written['tables'])} tables -> {run_dir / REPORT_DIR}; "

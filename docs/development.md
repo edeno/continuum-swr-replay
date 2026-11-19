@@ -76,7 +76,7 @@ src/continuum_swr_replay/
 │   ├── event_tables/      #   the canonical event, arm, patch, stop and time-bin tables and their contracts
 │   ├── replay_models/     #   the Part 3 models: rate/, content/, coupling/, choice/, and the shared model ladders, fitters and fit statistics
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
-│   ├── event_definition/  #   the rule: analysed time, immobility, the non-local event rule, the SWR source, decode masks, classified event table, cohorts
+│   ├── event_definition/  #   the rule: analyzed time, immobility, the non-local event rule, the SWR source, decode masks, classified event table, cohorts
 │   ├── detection/         #   the detectors: SWR, Carey, artifacts, memoryless sequence, R-T, the non-local detector on a decode, Figure 1's simulated run
 │   ├── detector_comparison/ # the inventories compared on the same recordings
 │   ├── decode_quality/    #   is the decode trustworthy: decoding error, state fractions, calibration, posterior summaries
@@ -242,10 +242,10 @@ bins), so no non-local event is clipped. From that window it derives
 timing, per-event speed summaries, peak non-local probability, the 3-way
 `overlap_class` (and 6-way `overlap_subclass`), and the matched SWR.
 
-**One analysed-time rule.** *Excluded time* is the artifact mask
+**One analyzed-time rule.** *Excluded time* is the artifact mask
 (`analysis/event_definition/artifact_masks.py`) widened by 0.3 s on each side
-(`analysis/event_definition/analysed_time.py:excluded_intervals`; the rule is in
-`analysis/event_definition/eligibility.py`). Nothing inside it is analysed.
+(`analysis/event_definition/analyzed_time.py:excluded_intervals`; the rule is in
+`analysis/event_definition/eligibility.py`). Nothing inside it is analyzed.
 An event of any kind (non-local, SWR, MUA, ContFrag label, Widloski), an
 exposure second, a time bin with its history window, and a peri-event window
 are used only when they lie wholly outside excluded time. An event must also
@@ -254,9 +254,9 @@ be immobile as a whole: every sampled speed finite and below 4 cm/s
 event is dropped too, because its overlap class is unknown.
 
 The rule is applied once, where a decode frame is read
-(`analysis/event_definition/analysed_time.py:with_swr_source`), so every table
+(`analysis/event_definition/analyzed_time.py:with_swr_source`), so every table
 inherits it. Each dropped event keeps a reason
-(`analysis/event_definition/analysed_time.py:artifact_event_drops`), and kept events
+(`analysis/event_definition/analyzed_time.py:artifact_event_drops`), and kept events
 keep their labels and `event_id`. A stop's `immobility_duration_s` is its
 span less the excluded seconds in it, so it is no longer
 `stop_end - stop_start`.
@@ -400,8 +400,8 @@ macOS arm64, where `jax-cuda12-plugin` has no wheel).
 
 ## Animal and Session Information
 
-The dataset includes recordings from 5 animals. Each NWB file can contain multiple epochs (e.g., `02_r1`, `04_r2`, `06_r3`). The cohort is the epoch register's analysed epochs (`data_loaders/epoch_register.csv`, read by `analysed_epochs()`); `docs/epoch_register.md` gives each excluded epoch's reason. The register analyses 242 epochs in 45 NWB files; the table counts those, and its dates are
-the recording days of the analysed epochs (`tests/repository/test_documented_values.py` checks both).
+The dataset includes recordings from 5 animals. Each NWB file can contain multiple epochs (e.g., `02_r1`, `04_r2`, `06_r3`). The cohort is the epoch register's analyzed epochs (`data_loaders/epoch_register.csv`, read by `analyzed_epochs()`); `docs/epoch_register.md` gives each excluded epoch's reason. The register analyzes 242 epochs in 45 NWB files; the table counts those, and its dates are
+the recording days of the analyzed epochs (`tests/repository/test_documented_values.py` checks both).
 
 | Animal | NWB Files | Epochs | Dates |
 |--------|-----------|--------|-------|

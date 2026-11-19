@@ -249,7 +249,7 @@ float32. The two cases differ.
 - **Above 0 and tiny**: a GPU keeps float32 subnormals (below 1.18e-38); XLA on the
   CPU flushes them to zero. A CPU rebuild of the likelihood there differs from the
   stored decode by up to 20 nats per spike, and the stored decode is the closer to
-  exact arithmetic (D1; ``chimi20200221_08_r4`` is the only analysed epoch with
+  exact arithmetic (D1; ``chimi20200221_08_r4`` is the only analyzed epoch with
   such bins: the animal never entered patch 1). These are flagged.
 
 D1 measured the per-spike difference between the CPU rebuild and the decode, by
@@ -257,7 +257,7 @@ the stored occupancy of the bin: 20 nats from 5.6e-40 to 2.5e-34, falling to 16,
 11 and 5.6 nats at 1e-31, 3e-29 and 8e-27, 0.35 at 1.4e-24, and 9e-4 (float
 noise, as at every other bin) from 1.9e-22 up. The floor sits 7,000 times above
 the last bin that disagreed and 4e14 times below the lowest occupancy of any
-other analysed epoch's decode (4e-6), so it takes in no ordinary bin.
+other analyzed epoch's decode (4e-6), so it takes in no ordinary bin.
 """
 
 
@@ -552,7 +552,7 @@ def training_spike_bins(
     NaN, labels the runs of consecutive training bins among the rest, and keeps
     every spike from one bin before a run's first bin time to one bin after its
     last (``start_time -= time_delta``; ``stop_time += time_delta``). So a run
-    pads its neighbours, the bin before entirely and the bin after at its start,
+    pads its neighbors, the bin before entirely and the bin after at its start,
     and a run across a NaN-position bin covers that bin too. A bin counts here
     when the decoder (``np.digitize(spike_times, time[1:-1])``) would put a
     kept spike in it; spikes outside ``time[0]``-``time[-1]`` are not scored.
@@ -626,8 +626,8 @@ def running_only_masks(
     position : ndarray, shape (n_time, n_dims)
         What the encoding is fit with.
     in_event : ndarray of bool, shape (n_time,)
-        Non-local event bins, every event the decoder labelled (the ones the
-        analysed-time rule drops included).
+        Non-local event bins, every event the decoder labeled (the ones the
+        analyzed-time rule drops included).
     folds : ndarray of int, shape (n_time,)
     is_missing : ndarray of bool, shape (n_time,)
         The decode's missing bins (``hpc_decode_masks``).

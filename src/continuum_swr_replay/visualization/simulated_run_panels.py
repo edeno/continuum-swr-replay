@@ -1,9 +1,9 @@
-"""What the figures of the simulated run share: colours, sizes and drawing helpers.
+"""What the figures of the simulated run share: colors, sizes and drawing helpers.
 
 Figure 1 (``scripts/figures/generate_figure01.py``) and the memoryless
 comparison (``scripts/figures/generate_supp_memoryless_comparison.py``) draw the same
 simulated run (``analysis.detection.simulated_run``) and read as one pair, so
-the state colours, the type sizes, the decoded-position panel and the hand
+the state colors, the type sizes, the decoded-position panel and the hand
 layout (rows spaced from what they draw, letters on measured edges) are defined
 once, here.
 """
@@ -49,7 +49,7 @@ __all__ = [
 
 # Keyed by the figures' name for each state: the detector's name without its
 # "Non-Local " prefix. Local and No-Spike are the palette's (``COLORS``), as in
-# every other figure. The palette has no colour for the two non-local states:
+# every other figure. The palette has no color for the two non-local states:
 # CONTFRAG_COLORS' Continuous and Fragmented are the ContFrag classifier's, and
 # equal Non-Local and SWR.
 STATE_COLORS = {
@@ -171,7 +171,7 @@ def plot_posterior(
         The animal's position, in cm, drawn against ``time`` when it has one
         value per row.
     vmax : float
-        Top of the colour scale.
+        Top of the color scale.
     linewidth : float
         Of the animal's position, in points.
     dashes : tuple of float, optional
@@ -224,7 +224,7 @@ def check_journal_limits(fig: Figure) -> None:
 
     Checks the size of the figure as it is saved (cropped to what it draws,
     with the saving margin), the size of every text and the width of every
-    line, axis spine and tick. Panel letters, fonts and colours are not
+    line, axis spine and tick. Panel letters, fonts and colors are not
     checked here.
 
     Parameters
@@ -291,7 +291,7 @@ def check_journal_limits(fig: Figure) -> None:
 
 
 def posterior_color_limit(posterior: np.ndarray, time: np.ndarray, events) -> float:
-    """Top of a decoded-position colour scale: the posterior's 99th percentile
+    """Top of a decoded-position color scale: the posterior's 99th percentile
     inside ``events``.
 
     Outside an event the posterior sits on the animal and is more concentrated;

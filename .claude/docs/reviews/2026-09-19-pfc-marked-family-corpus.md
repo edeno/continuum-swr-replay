@@ -28,7 +28,7 @@ Ineligible pairs by model: `novelty_content` 11, `reward_context` 8,
 class 16, `content_weighted_novelty_fraction` constant 11,
 `current_arm_fraction_x_switch` constant 6, `switch_patch_context` constant 3.
 Every marker carries the model name and the reason, and the skip check
-recognises them, so a rerun re-fits nothing.
+recognizes them, so a rerun re-fits nothing.
 
 ## Fit health per model
 
@@ -69,7 +69,7 @@ Reading this:
   452 NaN units. Its `current_arm_fraction_x_switch` mark is a fraction
   times a rare binary, so after within-class standardization a handful of
   switch events carry very large weights, and a fold that holds them out
-  destabilises the held-out prediction. Any summary of this model must drop
+  destabilizes the held-out prediction. Any summary of this model must drop
   non-finite and exploding deltas with a stated rule, and the fix (a minimum
   count of the rare level for the modifier of an interaction) is a
   follow-up, not applied here.

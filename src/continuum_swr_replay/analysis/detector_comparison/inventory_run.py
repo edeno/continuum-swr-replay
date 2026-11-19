@@ -54,7 +54,7 @@ from continuum_swr_replay.analysis.detector_comparison.swr_matrix import (
     MATRIX_DTYPES,
     PAIRED_LABEL_DTYPES,
 )
-from continuum_swr_replay.analysis.event_definition import analysed_time
+from continuum_swr_replay.analysis.event_definition import analyzed_time
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.intervals import max_step_s, sample_step
 from continuum_swr_replay.parameters import DECODE_SAMPLE_S
@@ -210,10 +210,10 @@ def stamped_tables(
 ) -> Mapping[str, pd.DataFrame]:
     """Stamp each table (in place, and return them) with the SWR source and `stamp`.
 
-    The SWR source's stamp (``analysed_time.stamp_swr_source``) goes first, then
+    The SWR source's stamp (``analyzed_time.stamp_swr_source``) goes first, then
     `stamp`'s keys are merged into each table's ``attrs``.
     """
     for frame in tables.values():
-        analysed_time.stamp_swr_source(frame)
+        analyzed_time.stamp_swr_source(frame)
         frame.attrs |= stamp
     return tables

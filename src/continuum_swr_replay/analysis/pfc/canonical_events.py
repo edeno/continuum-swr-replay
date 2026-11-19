@@ -39,7 +39,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
+from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 from continuum_swr_replay.analysis.event_definition.immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
@@ -128,7 +128,7 @@ def load_session_canonical_events(
         If the table lacks the session or event columns.
     SwrSourceError
         If the table was not built from the configured SWR source
-        (``analysed_time.require_swr_source``). Its ``is_swr`` column is combined
+        (``analyzed_time.require_swr_source``). Its ``is_swr`` column is combined
         with :func:`load_session_swr_intervals`' live source intervals, so the
         two must be one source.
     ValueError
@@ -145,7 +145,7 @@ def load_session_canonical_events(
     animal, session_date = parse_nwb_filename(nwb_file_name)
 
     event_table = read_table(path)
-    analysed_time.require_swr_source(event_table, what=f"the event table at {path}")
+    analyzed_time.require_swr_source(event_table, what=f"the event table at {path}")
     require_columns(
         event_table, [*SESSION_COLUMNS, *_EVENT_COLUMNS], f"the event table at {path}"
     )
@@ -212,7 +212,7 @@ def load_session_swr_intervals(
     """Load one session's SWR intervals: the SWR source's, on the cached frame's grid.
 
     The cached decode frame is read through the SWR source
-    (:func:`~continuum_swr_replay.analysis.event_definition.analysed_time.read_dot_with_swr_source`),
+    (:func:`~continuum_swr_replay.analysis.event_definition.analyzed_time.read_dot_with_swr_source`),
     so its ``SWR_event`` labels are the direct Kay inventory's, not the
     decode's stored ripples. The intervals are then built exactly as
     :func:`~continuum_swr_replay.analysis.event_definition.classified_table.build_classified_nonlocal_event_table`
@@ -276,7 +276,7 @@ def load_session_swr_intervals(
             "the canonical SWR population and cannot be re-detected here"
         )
 
-    dot = analysed_time.read_dot_with_swr_source(
+    dot = analyzed_time.read_dot_with_swr_source(
         path, non_local_threshold=non_local_threshold
     )
     # The read already gates SWRs at the canonical threshold, so at the default
@@ -370,7 +370,7 @@ def load_session_event_ripple_power(
     """Mean ripple power of each event, from the session's cached decode frame.
 
     The frame is read through the SWR source
-    (:func:`~continuum_swr_replay.analysis.event_definition.analysed_time.read_dot_with_swr_source`),
+    (:func:`~continuum_swr_replay.analysis.event_definition.analyzed_time.read_dot_with_swr_source`),
     as :func:`load_session_swr_intervals` reads it.
 
     Parameters
@@ -400,7 +400,7 @@ def load_session_event_ripple_power(
         if dot_path is None
         else Path(dot_path)
     )
-    frame = analysed_time.read_dot_with_swr_source(
+    frame = analyzed_time.read_dot_with_swr_source(
         path, non_local_threshold=non_local_threshold
     )
     return (

@@ -10,7 +10,7 @@ Design:
 ``docs/design/replay_detection_comparison/03-inventory-comparison.md``
 (Reporting).
 
-Every table comes per session (one analysed epoch, nested in its animal) and
+Every table comes per session (one analyzed epoch, nested in its animal) and
 per animal. An animal pools its sessions by summing counts and seconds and
 takes proportions from those sums (``n_matched`` over ``n_eligible``), never
 by averaging the sessions' proportions. A session where the comparison was
@@ -66,7 +66,7 @@ from continuum_swr_replay.analysis.detector_comparison.populations import (  # n
     compared_events,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
-    analysed_epoch_ids,
+    analyzed_epoch_ids,
 )
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.paths import inventory_comparison_root  # noqa: E402
@@ -100,7 +100,7 @@ _ANIMAL_SUMS = (
     "comparison was unavailable is not summed; it is listed in "
     "unavailable_sessions, and n_sessions counts the sessions summed."
 )
-_SESSION_ROWS = "Per session (one analysed epoch, nested in its animal)."
+_SESSION_ROWS = "Per session (one analyzed epoch, nested in its animal)."
 
 
 _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
@@ -126,7 +126,7 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "unavailable there.",
         ),
         "set_aside": (
-            "Events set aside, by detector and reason: the analysed-time rule's "
+            "Events set aside, by detector and reason: the analyzed-time rule's "
             "drop reasons, and bridging (an event spanning its own detector's "
             "unobserved time).",
             _SESSION_ROWS + " Only reasons with events have rows.",
@@ -230,7 +230,7 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             _ANIMAL_SUMS,
         ),
         "swr_matrix": (
-            "The SWR label matrix: each sequence cohort labelled under each of "
+            "The SWR label matrix: each sequence cohort labeled under each of "
             "the five SWR definitions. n_eligible counts the cohort's events "
             "wholly inside its exposure and every definition's (the same events "
             "in every column; n_excluded are the rest); non_swr_fraction = "
@@ -249,11 +249,11 @@ _TOPICS: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             _ANIMAL_SUMS,
         ),
         "definition_disagreement": (
-            "Definition disagreement: per cohort, the sequence events labelled "
+            "Definition disagreement: per cohort, the sequence events labeled "
             "SWR by at least one definition and non-SWR by another "
             "(n_disagree); n_with_unknown counts events with at least one "
             "unknown label, and n_agree_all_known the events every definition "
-            "labelled the same.",
+            "labeled the same.",
             _SESSION_ROWS + " available says whether the cohort's SWR-matrix "
             "population exists in the session, as in swr_matrix.",
             _ANIMAL_SUMS,
@@ -276,7 +276,7 @@ TABLE_CAPTIONS: Mapping[str, str] = MappingProxyType(
         "epochs": caption_with_pending(
             "Every epoch of the run: ok or failed (with the manifest's reason "
             "or error), and the detectors unavailable in each ok epoch. The "
-            "analysed epochs the run does not hold are counted in report.md."
+            "analyzed epochs the run does not hold are counted in report.md."
         ),
         "unavailable_detectors": caption_with_pending(
             "Each session and detector with no observed time, and the reason "
@@ -304,7 +304,7 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
             "Directional agreement per animal: the proportion of the source "
             "detector's eligible events (rows) that overlap any event of the "
             "target detector (columns), n_matched over n_eligible summed over "
-            "the animal's available sessions. Grey: no eligible events. "
+            "the animal's available sessions. Gray: no eligible events. "
             "Counts in directional_by_animal.csv."
         ),
         "overlap_distributions.png": caption_with_pending(
@@ -318,7 +318,7 @@ FIGURE_CAPTIONS: Mapping[str, str] = MappingProxyType(
             "cohort (rows) under each SWR definition (columns), n_non_swr over "
             "n_eligible summed over the animal's available sessions, printed in "
             "each cell to two places; the counts are in "
-            "swr_matrix_by_animal.csv. Grey: no eligible events."
+            "swr_matrix_by_animal.csv. Gray: no eligible events."
         ),
         "components.png": caption_with_pending(
             "Overlap-graph components over the eight inventories without "
@@ -1089,7 +1089,7 @@ def write_report(run_dir: Path, figure_root: Path) -> dict[str, list[Path]]:
     out = report_tables(manifest, tables)
     run_id = run_dir.name
     figure_dir = figure_root / run_id
-    outside = len(set(analysed_epoch_ids()) - set(manifest["epochs"]))
+    outside = len(set(analyzed_epoch_ids()) - set(manifest["epochs"]))
     report_dir = run_dir / REPORT_DIR
     report_dir.mkdir(exist_ok=True)
     table_paths = []
@@ -1108,7 +1108,7 @@ def write_report(run_dir: Path, figure_root: Path) -> dict[str, list[Path]]:
         "",
         f"Written by `{PRODUCED_BY}` from the per-epoch tables of `{run_dir}` "
         f"({status.get('ok', 0)} ok epochs, {status.get('failed', 0)} failed, "
-        f"and {outside} analysed epochs of the epoch register outside the run).",
+        f"and {outside} analyzed epochs of the epoch register outside the run).",
         "",
         PENDING_SENTENCE,
         "",

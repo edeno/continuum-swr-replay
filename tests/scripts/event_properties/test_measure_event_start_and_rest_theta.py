@@ -45,7 +45,7 @@ def stored(processed_data_root, monkeypatch) -> str:
             )
         )
     )
-    monkeypatch.setattr(script.analysed_time, "with_swr_source", lambda dot: dot)
+    monkeypatch.setattr(script.analyzed_time, "with_swr_source", lambda dot: dot)
     monkeypatch.setattr(
         start_and_rest_theta,
         "regime_masks",

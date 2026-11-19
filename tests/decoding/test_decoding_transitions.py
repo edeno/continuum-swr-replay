@@ -83,7 +83,7 @@ _STUB_BOUND_MODULES = (
 def decoders(monkeypatch) -> Iterator[dict[str, types.ModuleType]]:
     """Both decoder scripts, imported offline with ``spyglass`` stubbed.
 
-    The modules imported here that bind the stub are forgotten afterwards, so a
+    The modules imported here that bind the stub are forgotten afterward, so a
     later import gets the real ones.
     """
     common = types.ModuleType("spyglass.common")

@@ -30,7 +30,7 @@ Per epoch:
 5. **Features** of every compared event: rows, engagement, LFP and MUA
    (``interval_features``), evidence (``interval_evidence``), the stop holding
    the onset (``stop_context``), the state-space posterior (``ss_features``),
-   the memoryless windows (``ms_features``) and the neighbour gaps.
+   the memoryless windows (``ms_features``) and the neighbor gaps.
 6. **Rejection stages** of every state-space event against each memoryless
    cohort (``rejection_stages``).
 
@@ -56,7 +56,7 @@ refuses settings other than the ones the manifest was written with. A run
 whose SWR source (its SWR and artifact runs, and the source's name) is not the
 one the comparison read is refused before any epoch.
 
-The epochs are the epoch register's analysed ones, narrowed by ``--animal``,
+The epochs are the epoch register's analyzed ones, narrowed by ``--animal``,
 ``--date`` and ``--epoch``, or the one ``--epoch-id``, run on a dask
 ``LocalCluster`` of ``--n-workers`` processes, one epoch at a time each, each
 logging to ``logs/{epoch_id}_event_features.log`` under the working directory.
@@ -140,7 +140,7 @@ from continuum_swr_replay.analysis.detector_comparison.features import (  # noqa
     grid_row_mask,
     interval_features,
     ms_features,
-    neighbour_gaps,
+    neighbor_gaps,
     ss_features,
     stop_context,
 )
@@ -166,7 +166,7 @@ from continuum_swr_replay.analysis.detector_comparison.selection import (  # noq
     rejection_stages,
 )
 from continuum_swr_replay.analysis.event_definition import (  # noqa: E402
-    analysed_time,
+    analyzed_time,
     swr_source,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (  # noqa: E402
@@ -205,7 +205,7 @@ from continuum_swr_replay.runs.batch import (  # noqa: E402
 from continuum_swr_replay.runs.cli import (  # noqa: E402
     add_epoch_filters,
     parse_run_id,
-    select_analysed_epochs,
+    select_analyzed_epochs,
 )
 from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
 from continuum_swr_replay.runs.io import (  # noqa: E402
@@ -394,7 +394,7 @@ def epoch_tables(
         run is not the comparison's.
     """
     saved = pd.read_pickle(inventory_run.decode_path(identifier))
-    dot = analysed_time.with_swr_source(saved)
+    dot = analyzed_time.with_swr_source(saved)
     del saved
     # raises unless the grid's median step is DECODE_SAMPLE_S, the step
     # interval_features is given
@@ -473,7 +473,7 @@ def epoch_tables(
     engagement = interval_features(traces, intervals, sample_interval_s=DECODE_SAMPLE_S)
     _require_requested(rows, engagement)
 
-    stops = analysed_time.read_swr_table(
+    stops = analyzed_time.read_swr_table(
         stop_table,
         filters=[
             ("animal", "==", session[0]),
@@ -492,7 +492,7 @@ def epoch_tables(
             intervals,
             engagement,
             interval_evidence(traces, evidence, intervals),
-            neighbour_gaps(compared).reindex(intervals.index),
+            neighbor_gaps(compared).reindex(intervals.index),
             stop_context(intervals, stops),
             ss_features(
                 traces,
@@ -810,9 +810,9 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     if not (memoryless_dir / "manifest.json").exists():
         sys.exit(f"No memoryless run manifest at {memoryless_dir}.")
     settings = run_settings(args.inventory_run_id, inventory)
-    epochs = select_analysed_epochs(args)
+    epochs = select_analyzed_epochs(args)
     if not epochs:
-        sys.exit("No analysed epochs match --animal, --date and --epoch.")
+        sys.exit("No analyzed epochs match --animal, --date and --epoch.")
 
     manifest_path = output_dir / "manifest.json"
     manifest = RunManifest.resume(

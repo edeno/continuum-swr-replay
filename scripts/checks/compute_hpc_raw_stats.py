@@ -39,7 +39,7 @@ from continuum_swr_replay.analysis.decode_quality.hpc_raw_stats import (
     compute_hpc_raw_stats_single,
     extract_discrete_transition_matrix,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_epochs
 from continuum_swr_replay.data_types import DataLoadingPreset
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
@@ -118,9 +118,9 @@ def _compute_one_session(
 def _build_session_list(animal: str | None, limit: int | None) -> pd.DataFrame:
     """Return a DataFrame with one row per epoch, columns animal/day/epoch/nwb.
 
-    The epochs are the epoch register's analysed ones.
+    The epochs are the epoch register's analyzed ones.
     """
-    ei = analysed_epochs().reset_index()  # index: (nwb_file_name, interval_list_name)
+    ei = analyzed_epochs().reset_index()  # index: (nwb_file_name, interval_list_name)
     df = pd.DataFrame(
         {
             "nwb_file_name": ei["nwb_file_name"],

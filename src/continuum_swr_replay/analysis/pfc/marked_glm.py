@@ -325,7 +325,7 @@ class MarkedSessionContext:
     cohort_info : dict[str, object]
         Bin, event and decode-alignment counts for the session, including the
         excluded-time counts (``n_excluded_intervals``, ``n_bins_excluded``)
-        and the events the analysed-time rule dropped
+        and the events the analyzed-time rule dropped
         (``n_artifact_dropped_events``, ``n_artifact_dropped_overlapping_fit``).
     input_provenance : dict[str, object]
         Paths and SHA-256 digests of every canonical input read: the event
@@ -540,7 +540,7 @@ def prepare_marked_session_context(
 
     This repeats no model fit. The session is assembled by the same steps
     :func:`~continuum_swr_replay.analysis.pfc.session.run_session` takes --
-    decode/position alignment, the fit mask with the analysed-time rule (no
+    decode/position alignment, the fit mask with the analyzed-time rule (no
     fitted bin's basis window reaches excluded time), the canonical event sets
     with the Kay SWR intervals and the artifact-dropped events -- so the fit
     mask and the event onsets are the canonical ones. Spikes are binned once,
@@ -990,7 +990,7 @@ def weighted_event_onset_counts(
 ) -> NDArray:
     """Bin event-onset weights on the PFC time axis.
 
-    This is the weighted analogue of :func:`pfc.design.event_onset_counts` and
+    This is the weighted analog of :func:`pfc.design.event_onset_counts` and
     follows its half-open-bin convention.  Multiple events in one bin add.
     Events outside the sampled frame contribute nothing, matching the ordinary
     onset builder; the canonical session preparation audits those events before

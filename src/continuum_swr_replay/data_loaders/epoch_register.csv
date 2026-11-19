@@ -1,60 +1,60 @@
 nwb_file_name,epoch,status,reason,evidence,first_exposure
-chimi20200212_.nwb,02_r1,analysed,,"First-exposure session (200 trials, p(R) 100% then 50%): the StateScript log switches from contingency 0 (p(R) 1.0 at all six ports) to contingency 1 (0.5 at all six) after 100 pokes (trialThresh 100); qvals_table task_reward_probability_port_0-5 is 1.0 at all six ports for trials 0-99 and 0.5 for trials 100-199; rig file chimi_20200212_beh1_100all50all.py.",True
-chimi20200213_.nwb,02_r1,analysed,,,False
-chimi20200213_.nwb,04_r2,analysed,,,False
-chimi20200213_.nwb,06_r3,analysed,,,False
-chimi20200214_.nwb,02_r1,analysed,,,False
-chimi20200214_.nwb,04_r2,analysed,,,False
-chimi20200214_.nwb,06_r3,analysed,,,False
+chimi20200212_.nwb,02_r1,analyzed,,"First-exposure session (200 trials, p(R) 100% then 50%): the StateScript log switches from contingency 0 (p(R) 1.0 at all six ports) to contingency 1 (0.5 at all six) after 100 pokes (trialThresh 100); qvals_table task_reward_probability_port_0-5 is 1.0 at all six ports for trials 0-99 and 0.5 for trials 100-199; rig file chimi_20200212_beh1_100all50all.py.",True
+chimi20200213_.nwb,02_r1,analyzed,,,False
+chimi20200213_.nwb,04_r2,analyzed,,,False
+chimi20200213_.nwb,06_r3,analyzed,,,False
+chimi20200214_.nwb,02_r1,analyzed,,,False
+chimi20200214_.nwb,04_r2,analyzed,,,False
+chimi20200214_.nwb,06_r3,analyzed,,,False
 chimi20200215_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 chimi20200215_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 chimi20200215_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 chimi20200215_.nwb,07_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
-chimi20200216_.nwb,02_r1,analysed,,,False
-chimi20200216_.nwb,04_r2,analysed,,,False
-chimi20200216_.nwb,06_r3,analysed,,,False
-chimi20200217_.nwb,02_r1,analysed,,,False
-chimi20200217_.nwb,04_r2,analysed,,,False
-chimi20200217_.nwb,06_r3,analysed,,,False
-chimi20200218_.nwb,02_r1,analysed,,,False
-chimi20200218_.nwb,04_r2,analysed,,,False
-chimi20200218_.nwb,06_r3,analysed,,,False
+chimi20200216_.nwb,02_r1,analyzed,,,False
+chimi20200216_.nwb,04_r2,analyzed,,,False
+chimi20200216_.nwb,06_r3,analyzed,,,False
+chimi20200217_.nwb,02_r1,analyzed,,,False
+chimi20200217_.nwb,04_r2,analyzed,,,False
+chimi20200217_.nwb,06_r3,analyzed,,,False
+chimi20200218_.nwb,02_r1,analyzed,,,False
+chimi20200218_.nwb,04_r2,analyzed,,,False
+chimi20200218_.nwb,06_r3,analyzed,,,False
 chimi20200219_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 chimi20200219_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 chimi20200219_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
-chimi20200220_.nwb,02_r1,analysed,,,False
-chimi20200220_.nwb,04_r2,analysed,,,False
-chimi20200220_.nwb,06_r3,analysed,,,False
-chimi20200221_.nwb,02_r1,analysed,,,False
-chimi20200221_.nwb,04_r2,analysed,,,False
-chimi20200221_.nwb,06_r3,analysed,,,False
-chimi20200221_.nwb,08_r4,analysed,,,False
-chimi20200222_.nwb,02_r1,analysed,,,False
-chimi20200222_.nwb,04_r2,analysed,,,False
-chimi20200222_.nwb,06_r3,analysed,,,False
-chimi20200222_.nwb,08_r4,analysed,,,False
-chimi20200223_.nwb,02_r1,analysed,,,False
-chimi20200223_.nwb,04_r2,analysed,,,False
-chimi20200223_.nwb,06_r3,analysed,,,False
-chimi20200223_.nwb,08_r4,analysed,,,False
-chimi20200224_.nwb,02_r1,analysed,,,False
-chimi20200224_.nwb,04_r2,analysed,,,False
-chimi20200224_.nwb,06_r3,analysed,,,False
-chimi20200224_.nwb,08_r4,analysed,,,False
-chimi20200225_.nwb,02_r1,analysed,,,False
-chimi20200225_.nwb,04_r2,analysed,,,False
-chimi20200225_.nwb,06_r3,analysed,,,False
-chimi20200225_.nwb,08_r4,analysed,,,False
+chimi20200220_.nwb,02_r1,analyzed,,,False
+chimi20200220_.nwb,04_r2,analyzed,,,False
+chimi20200220_.nwb,06_r3,analyzed,,,False
+chimi20200221_.nwb,02_r1,analyzed,,,False
+chimi20200221_.nwb,04_r2,analyzed,,,False
+chimi20200221_.nwb,06_r3,analyzed,,,False
+chimi20200221_.nwb,08_r4,analyzed,,,False
+chimi20200222_.nwb,02_r1,analyzed,,,False
+chimi20200222_.nwb,04_r2,analyzed,,,False
+chimi20200222_.nwb,06_r3,analyzed,,,False
+chimi20200222_.nwb,08_r4,analyzed,,,False
+chimi20200223_.nwb,02_r1,analyzed,,,False
+chimi20200223_.nwb,04_r2,analyzed,,,False
+chimi20200223_.nwb,06_r3,analyzed,,,False
+chimi20200223_.nwb,08_r4,analyzed,,,False
+chimi20200224_.nwb,02_r1,analyzed,,,False
+chimi20200224_.nwb,04_r2,analyzed,,,False
+chimi20200224_.nwb,06_r3,analyzed,,,False
+chimi20200224_.nwb,08_r4,analyzed,,,False
+chimi20200225_.nwb,02_r1,analyzed,,,False
+chimi20200225_.nwb,04_r2,analyzed,,,False
+chimi20200225_.nwb,06_r3,analyzed,,,False
+chimi20200225_.nwb,08_r4,analyzed,,,False
 chimi20200226_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 chimi20200226_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 chimi20200226_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
-chimi20200227_.nwb,02_r1,analysed,,,False
-chimi20200227_.nwb,04_r2,analysed,,,False
-chimi20200227_.nwb,06_r3,analysed,,,False
-chimi20200227_.nwb,08_r4,analysed,,,False
-chimi20200228_.nwb,02_r1,analysed,,,False
-chimi20200228_.nwb,04_r2,analysed,,,False
-chimi20200228_.nwb,06_r3,analysed,,,False
+chimi20200227_.nwb,02_r1,analyzed,,,False
+chimi20200227_.nwb,04_r2,analyzed,,,False
+chimi20200227_.nwb,06_r3,analyzed,,,False
+chimi20200227_.nwb,08_r4,analyzed,,,False
+chimi20200228_.nwb,02_r1,analyzed,,,False
+chimi20200228_.nwb,04_r2,analyzed,,,False
+chimi20200228_.nwb,06_r3,analyzed,,,False
 chimi20200301_.nwb,*,excluded,NO_RUN_EPOCH,"The raw NWB (/stelmo/nwb/raw/chimi20200301.nwb) holds one epoch, 01_s1 (sleep), so no run epoch exists; never ingested (Spyglass Session: 0 rows).",False
 chimi20200302_.nwb,*,excluded,NO_NWB,"No chimi20200302*.nwb in /stelmo/nwb/raw or /nimbus/nwb/raw2, and no Spyglass Nwbfile or Session row. Whether a raw .rec exists elsewhere is unknown.",False
 chimi20200303_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; no alison_behav.TrialsInfoByEpoch row for the epoch. Also no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (trial parsing incomplete; listed as excluded since c39f0e9).,False
@@ -88,64 +88,64 @@ chimi20200313_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Sp
 chimi20200313_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
 chimi20200313_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
 chimi20200313_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
-j1620210706_.nwb,02_r1,analysed,,"First-exposure session (200 trials, p(R) 100% then 50%).",True
-j1620210706_.nwb,04_r2,analysed,,,False
-j1620210706_.nwb,06_r3,analysed,,,False
-j1620210706_.nwb,08_r4,analysed,,,False
-j1620210706_.nwb,10_r5,analysed,,,False
-j1620210706_.nwb,12_r6,analysed,,,False
-j1620210707_.nwb,02_r1,analysed,,,False
-j1620210707_.nwb,04_r2,analysed,,,False
-j1620210707_.nwb,06_r3,analysed,,,False
-j1620210707_.nwb,08_r4,analysed,,,False
-j1620210707_.nwb,10_r5,analysed,,,False
-j1620210707_.nwb,12_r6,analysed,,"Formerly blocked by an NWB checksum failure; resolved 2026-08-19, when its analysis file was rewritten and its DataJoint hash matched again.",False
-j1620210707_.nwb,14_r7,analysed,,,False
-j1620210707_.nwb,16_r8,analysed,,,False
-j1620210708_.nwb,02_r1,analysed,,,False
-j1620210708_.nwb,04_r2,analysed,,,False
-j1620210708_.nwb,06_r3,analysed,,,False
-j1620210708_.nwb,08_r4,analysed,,,False
-j1620210708_.nwb,10_r5,analysed,,,False
-j1620210708_.nwb,12_r6,analysed,,,False
-j1620210708_.nwb,14_r7,analysed,,,False
-j1620210708_.nwb,16_r8,analysed,,,False
-j1620210709_.nwb,02_r1,analysed,,,False
-j1620210709_.nwb,04_r2,analysed,,,False
-j1620210709_.nwb,06_r3,analysed,,,False
-j1620210709_.nwb,08_r4,analysed,,,False
-j1620210709_.nwb,10_r5,analysed,,,False
-j1620210709_.nwb,12_r6,analysed,,,False
-j1620210709_.nwb,14_r7,analysed,,,False
-j1620210710_.nwb,02_r1,analysed,,,False
-j1620210710_.nwb,04_r2,analysed,,,False
-j1620210710_.nwb,06_r3,analysed,,,False
-j1620210710_.nwb,08_r4,analysed,,,False
-j1620210710_.nwb,10_r5,analysed,,,False
-j1620210710_.nwb,12_r6,analysed,,,False
-j1620210710_.nwb,14_r7,analysed,,,False
-j1620210711_.nwb,02_r1,analysed,,,False
-j1620210711_.nwb,04_r2,analysed,,,False
-j1620210711_.nwb,06_r3,analysed,,,False
-j1620210711_.nwb,08_r4,analysed,,,False
-j1620210711_.nwb,10_r5,analysed,,,False
-j1620210711_.nwb,12_r6,analysed,,,False
-j1620210711_.nwb,14_r7,analysed,,,False
-j1620210712_.nwb,02_r1,analysed,,,False
-j1620210712_.nwb,04_r2,analysed,,,False
-j1620210712_.nwb,06_r3,analysed,,,False
-j1620210712_.nwb,08_r4,analysed,,,False
-j1620210712_.nwb,10_r5,analysed,,,False
-j1620210712_.nwb,12_r6,analysed,,,False
-j1620210712_.nwb,14_r7,analysed,,,False
-j1620210713_.nwb,02_r1,analysed,,,False
-j1620210713_.nwb,04_r2,analysed,,,False
-j1620210713_.nwb,06_r3,analysed,,,False
-j1620210713_.nwb,08_r4,analysed,,,False
-j1620210713_.nwb,10_r5,analysed,,,False
-j1620210713_.nwb,12_r6,analysed,,,False
-j1620210713_.nwb,14_r7,analysed,,,False
-j1620210713_.nwb,16_r8,analysed,,,False
+j1620210706_.nwb,02_r1,analyzed,,"First-exposure session (200 trials, p(R) 100% then 50%).",True
+j1620210706_.nwb,04_r2,analyzed,,,False
+j1620210706_.nwb,06_r3,analyzed,,,False
+j1620210706_.nwb,08_r4,analyzed,,,False
+j1620210706_.nwb,10_r5,analyzed,,,False
+j1620210706_.nwb,12_r6,analyzed,,,False
+j1620210707_.nwb,02_r1,analyzed,,,False
+j1620210707_.nwb,04_r2,analyzed,,,False
+j1620210707_.nwb,06_r3,analyzed,,,False
+j1620210707_.nwb,08_r4,analyzed,,,False
+j1620210707_.nwb,10_r5,analyzed,,,False
+j1620210707_.nwb,12_r6,analyzed,,"Formerly blocked by an NWB checksum failure; resolved 2026-08-19, when its analysis file was rewritten and its DataJoint hash matched again.",False
+j1620210707_.nwb,14_r7,analyzed,,,False
+j1620210707_.nwb,16_r8,analyzed,,,False
+j1620210708_.nwb,02_r1,analyzed,,,False
+j1620210708_.nwb,04_r2,analyzed,,,False
+j1620210708_.nwb,06_r3,analyzed,,,False
+j1620210708_.nwb,08_r4,analyzed,,,False
+j1620210708_.nwb,10_r5,analyzed,,,False
+j1620210708_.nwb,12_r6,analyzed,,,False
+j1620210708_.nwb,14_r7,analyzed,,,False
+j1620210708_.nwb,16_r8,analyzed,,,False
+j1620210709_.nwb,02_r1,analyzed,,,False
+j1620210709_.nwb,04_r2,analyzed,,,False
+j1620210709_.nwb,06_r3,analyzed,,,False
+j1620210709_.nwb,08_r4,analyzed,,,False
+j1620210709_.nwb,10_r5,analyzed,,,False
+j1620210709_.nwb,12_r6,analyzed,,,False
+j1620210709_.nwb,14_r7,analyzed,,,False
+j1620210710_.nwb,02_r1,analyzed,,,False
+j1620210710_.nwb,04_r2,analyzed,,,False
+j1620210710_.nwb,06_r3,analyzed,,,False
+j1620210710_.nwb,08_r4,analyzed,,,False
+j1620210710_.nwb,10_r5,analyzed,,,False
+j1620210710_.nwb,12_r6,analyzed,,,False
+j1620210710_.nwb,14_r7,analyzed,,,False
+j1620210711_.nwb,02_r1,analyzed,,,False
+j1620210711_.nwb,04_r2,analyzed,,,False
+j1620210711_.nwb,06_r3,analyzed,,,False
+j1620210711_.nwb,08_r4,analyzed,,,False
+j1620210711_.nwb,10_r5,analyzed,,,False
+j1620210711_.nwb,12_r6,analyzed,,,False
+j1620210711_.nwb,14_r7,analyzed,,,False
+j1620210712_.nwb,02_r1,analyzed,,,False
+j1620210712_.nwb,04_r2,analyzed,,,False
+j1620210712_.nwb,06_r3,analyzed,,,False
+j1620210712_.nwb,08_r4,analyzed,,,False
+j1620210712_.nwb,10_r5,analyzed,,,False
+j1620210712_.nwb,12_r6,analyzed,,,False
+j1620210712_.nwb,14_r7,analyzed,,,False
+j1620210713_.nwb,02_r1,analyzed,,,False
+j1620210713_.nwb,04_r2,analyzed,,,False
+j1620210713_.nwb,06_r3,analyzed,,,False
+j1620210713_.nwb,08_r4,analyzed,,,False
+j1620210713_.nwb,10_r5,analyzed,,,False
+j1620210713_.nwb,12_r6,analyzed,,,False
+j1620210713_.nwb,14_r7,analyzed,,,False
+j1620210713_.nwb,16_r8,analyzed,,,False
 j1620210714_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
 j1620210714_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
 j1620210714_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
@@ -193,37 +193,37 @@ peanut20201124_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete:
 peanut20201124_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 peanut20201124_.nwb,07_r4,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 peanut20201124_.nwb,09_r5,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
-peanut20201125_.nwb,02_r1,analysed,,,False
-peanut20201125_.nwb,04_r2,analysed,,,False
-peanut20201125_.nwb,06_r3,analysed,,,False
-peanut20201125_.nwb,08_r4,analysed,,,False
-peanut20201125_.nwb,10_r5,analysed,,,False
-peanut20201125_.nwb,12_r6,analysed,,,False
-peanut20201125_.nwb,14_r7,analysed,,,False
+peanut20201125_.nwb,02_r1,analyzed,,,False
+peanut20201125_.nwb,04_r2,analyzed,,,False
+peanut20201125_.nwb,06_r3,analyzed,,,False
+peanut20201125_.nwb,08_r4,analyzed,,,False
+peanut20201125_.nwb,10_r5,analyzed,,,False
+peanut20201125_.nwb,12_r6,analyzed,,,False
+peanut20201125_.nwb,14_r7,analyzed,,,False
 peanut20201126_.nwb,*,excluded,NO_NWB,"No peanut20201126*.nwb in /stelmo/nwb/raw or /nimbus/nwb/raw2, and no Spyglass Nwbfile or Session row. Whether a raw .rec exists elsewhere is unknown.",False
-peanut20201127_.nwb,02_r1,analysed,,,False
-peanut20201127_.nwb,04_r2,analysed,,,False
-peanut20201127_.nwb,06_r3,analysed,,,False
-peanut20201127_.nwb,08_r4,analysed,,,False
-peanut20201127_.nwb,10_r5,analysed,,,False
-peanut20201127_.nwb,12_r6,analysed,,,False
-peanut20201127_.nwb,14_r7,analysed,,,False
-peanut20201128_.nwb,02_r1,analysed,,,False
-peanut20201128_.nwb,04_r2,analysed,,,False
-peanut20201128_.nwb,06_r3,analysed,,,False
+peanut20201127_.nwb,02_r1,analyzed,,,False
+peanut20201127_.nwb,04_r2,analyzed,,,False
+peanut20201127_.nwb,06_r3,analyzed,,,False
+peanut20201127_.nwb,08_r4,analyzed,,,False
+peanut20201127_.nwb,10_r5,analyzed,,,False
+peanut20201127_.nwb,12_r6,analyzed,,,False
+peanut20201127_.nwb,14_r7,analyzed,,,False
+peanut20201128_.nwb,02_r1,analyzed,,,False
+peanut20201128_.nwb,04_r2,analyzed,,,False
+peanut20201128_.nwb,06_r3,analyzed,,,False
 peanut20201128_.nwb,08_r4,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 5.0-7.0 s (core 2.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 1 19. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.000 [95 % CI -0.000, +0.000], PASS. Was PENDING_POPULATE: populated and decoded in R11 (--pending-only) before the ruling.",False
-peanut20201128_.nwb,10_r5,analysed,,,False
-peanut20201128_.nwb,12_r6,analysed,,,False
-peanut20201128_.nwb,14_r7,analysed,,,False
-peanut20201128_.nwb,16_r8,analysed,,,False
-peanut20201129_.nwb,02_r1,analysed,,,False
-peanut20201129_.nwb,04_r2,analysed,,,False
-peanut20201129_.nwb,06_r3,analysed,,,False
-peanut20201129_.nwb,08_r4,analysed,,,False
-peanut20201129_.nwb,10_r5,analysed,,,False
-peanut20201129_.nwb,12_r6,analysed,,,False
-peanut20201129_.nwb,14_r7,analysed,,,False
-peanut20201129_.nwb,16_r8,analysed,,,False
+peanut20201128_.nwb,10_r5,analyzed,,,False
+peanut20201128_.nwb,12_r6,analyzed,,,False
+peanut20201128_.nwb,14_r7,analyzed,,,False
+peanut20201128_.nwb,16_r8,analyzed,,,False
+peanut20201129_.nwb,02_r1,analyzed,,,False
+peanut20201129_.nwb,04_r2,analyzed,,,False
+peanut20201129_.nwb,06_r3,analyzed,,,False
+peanut20201129_.nwb,08_r4,analyzed,,,False
+peanut20201129_.nwb,10_r5,analyzed,,,False
+peanut20201129_.nwb,12_r6,analyzed,,,False
+peanut20201129_.nwb,14_r7,analyzed,,,False
+peanut20201129_.nwb,16_r8,analyzed,,,False
 peanut20201130_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 peanut20201130_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 peanut20201130_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
@@ -232,21 +232,21 @@ peanut20201130_.nwb,10_r5,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete:
 peanut20201130_.nwb,12_r6,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 peanut20201130_.nwb,14_r7,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 peanut20201130_.nwb,16_r8,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
-peanut20201201_.nwb,02_r1,analysed,,,False
-peanut20201201_.nwb,04_r2,analysed,,,False
-peanut20201201_.nwb,06_r3,analysed,,,False
-peanut20201201_.nwb,08_r4,analysed,,,False
-peanut20201201_.nwb,10_r5,analysed,,,False
-peanut20201201_.nwb,12_r6,analysed,,,False
-peanut20201201_.nwb,14_r7,analysed,,,False
-peanut20201202_.nwb,02_r1,analysed,,,False
-peanut20201202_.nwb,04_r2,analysed,,,False
-peanut20201202_.nwb,06_r3,analysed,,,False
-peanut20201202_.nwb,08_r4,analysed,,,False
-peanut20201202_.nwb,10_r5,analysed,,,False
-peanut20201202_.nwb,12_r6,analysed,,,False
-peanut20201202_.nwb,14_r7,analysed,,,False
-peanut20201202_.nwb,16_r8,analysed,,,False
+peanut20201201_.nwb,02_r1,analyzed,,,False
+peanut20201201_.nwb,04_r2,analyzed,,,False
+peanut20201201_.nwb,06_r3,analyzed,,,False
+peanut20201201_.nwb,08_r4,analyzed,,,False
+peanut20201201_.nwb,10_r5,analyzed,,,False
+peanut20201201_.nwb,12_r6,analyzed,,,False
+peanut20201201_.nwb,14_r7,analyzed,,,False
+peanut20201202_.nwb,02_r1,analyzed,,,False
+peanut20201202_.nwb,04_r2,analyzed,,,False
+peanut20201202_.nwb,06_r3,analyzed,,,False
+peanut20201202_.nwb,08_r4,analyzed,,,False
+peanut20201202_.nwb,10_r5,analyzed,,,False
+peanut20201202_.nwb,12_r6,analyzed,,,False
+peanut20201202_.nwb,14_r7,analyzed,,,False
+peanut20201202_.nwb,16_r8,analyzed,,,False
 peanut20201203_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
 peanut20201203_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
 peanut20201203_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
@@ -283,23 +283,23 @@ peanut20201209_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'S
 peanut20201209_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
 peanut20201209_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
 peanut20201209_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
-senor20201027_.nwb,02_r1,analysed,,"First-exposure session (200 trials, p(R) 100% then 50%).",True
-senor20201028_.nwb,02_r1,analysed,,,False
-senor20201028_.nwb,04_r2,analysed,,,False
-senor20201028_.nwb,06_r3,analysed,,,False
-senor20201028_.nwb,08_r4,analysed,,,False
+senor20201027_.nwb,02_r1,analyzed,,"First-exposure session (200 trials, p(R) 100% then 50%).",True
+senor20201028_.nwb,02_r1,analyzed,,,False
+senor20201028_.nwb,04_r2,analyzed,,,False
+senor20201028_.nwb,06_r3,analyzed,,,False
+senor20201028_.nwb,08_r4,analyzed,,,False
 senor20201029_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 senor20201029_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 senor20201029_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 senor20201029_.nwb,08_r4,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 senor20201029_.nwb,10_r5,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
-senor20201030_.nwb,02_r1,analysed,,,False
-senor20201030_.nwb,04_r2,analysed,,,False
-senor20201030_.nwb,06_r3,analysed,,,False
-senor20201030_.nwb,08_r4,analysed,,,False
-senor20201030_.nwb,10_r5,analysed,,,False
-senor20201030_.nwb,12_r6,analysed,,,False
-senor20201030_.nwb,14_r7,analysed,,,False
+senor20201030_.nwb,02_r1,analyzed,,,False
+senor20201030_.nwb,04_r2,analyzed,,,False
+senor20201030_.nwb,06_r3,analyzed,,,False
+senor20201030_.nwb,08_r4,analyzed,,,False
+senor20201030_.nwb,10_r5,analyzed,,,False
+senor20201030_.nwb,12_r6,analyzed,,,False
+senor20201030_.nwb,14_r7,analyzed,,,False
 senor20201031_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 senor20201031_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 senor20201031_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
@@ -307,57 +307,57 @@ senor20201031_.nwb,08_r4,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: 
 senor20201031_.nwb,10_r5,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 senor20201031_.nwb,12_r6,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 senor20201031_.nwb,14_r7,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
-senor20201101_.nwb,02_r1,analysed,,,False
-senor20201101_.nwb,04_r2,analysed,,,False
-senor20201101_.nwb,06_r3,analysed,,,False
-senor20201101_.nwb,08_r4,analysed,,,False
-senor20201101_.nwb,10_r5,analysed,,,False
-senor20201101_.nwb,12_r6,analysed,,,False
+senor20201101_.nwb,02_r1,analyzed,,,False
+senor20201101_.nwb,04_r2,analyzed,,,False
+senor20201101_.nwb,06_r3,analyzed,,,False
+senor20201101_.nwb,08_r4,analyzed,,,False
+senor20201101_.nwb,10_r5,analyzed,,,False
+senor20201101_.nwb,12_r6,analyzed,,,False
 senor20201101_.nwb,14_r7,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 84.0-112.0 s (core 28.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.015 [95 % CI -0.131, +0.186], PASS.",False
 senor20201101_.nwb,16_r8,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 632.2-636.2 s (core 4.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.107 [95 % CI -0.052, +0.315], PASS.",False
-senor20201102_.nwb,02_r1,analysed,,"Formerly blocked by an NWB checksum failure; resolved 2026-08-19, when its analysis file was rewritten and its DataJoint hash matched again.",False
-senor20201102_.nwb,04_r2,analysed,,,False
+senor20201102_.nwb,02_r1,analyzed,,"Formerly blocked by an NWB checksum failure; resolved 2026-08-19, when its analysis file was rewritten and its DataJoint hash matched again.",False
+senor20201102_.nwb,04_r2,analyzed,,,False
 senor20201102_.nwb,06_r3,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 836.0-840.0 s (core 4.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.032 [95 % CI -0.018, +0.122], PASS.",False
 senor20201102_.nwb,08_r4,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 805.0-809.0 s (core 4.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.022 [95 % CI -0.020, +0.068], PASS. Was PENDING_POPULATE: populated and decoded in R11 (--pending-only) before the ruling.",False
-senor20201102_.nwb,10_r5,analysed,,,False
-senor20201102_.nwb,12_r6,analysed,,,False
-senor20201102_.nwb,14_r7,analysed,,,False
+senor20201102_.nwb,10_r5,analyzed,,,False
+senor20201102_.nwb,12_r6,analyzed,,,False
+senor20201102_.nwb,14_r7,analyzed,,,False
 senor20201102_.nwb,16_r8,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 232.0-238.0 s (core 6.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.025 [95 % CI -0.020, +0.074], PASS.",False
-senor20201103_.nwb,02_r1,analysed,,,False
-senor20201103_.nwb,04_r2,analysed,,,False
-senor20201103_.nwb,06_r3,analysed,,,False
-senor20201103_.nwb,08_r4,analysed,,,False
+senor20201103_.nwb,02_r1,analyzed,,,False
+senor20201103_.nwb,04_r2,analyzed,,,False
+senor20201103_.nwb,06_r3,analyzed,,,False
+senor20201103_.nwb,08_r4,analyzed,,,False
 senor20201103_.nwb,10_r5,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 306.0-327.0 s (core 21.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.004 [95 % CI -0.061, +0.080], PASS.",False
-senor20201103_.nwb,12_r6,analysed,,,False
+senor20201103_.nwb,12_r6,analyzed,,,False
 senor20201103_.nwb,14_r7,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 203.0-216.0 s (core 13.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.115 [95 % CI +0.010, +0.252], FAIL.",False
 senor20201104_.nwb,02_r1,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 1.0-3.0 s (core 2.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 21. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: -0.035 [95 % CI -0.087, +0.016], PASS.",False
-senor20201104_.nwb,04_r2,analysed,,,False
+senor20201104_.nwb,04_r2,analyzed,,,False
 senor20201104_.nwb,06_r3,excluded,MISSING_INPUT,"LFPV1.make fails in spyglass common_interval.censor ('Interval_list must contain all timestamps') for the existing LFPSelection (populate 2026-10-09), so no LFP, ripple band or CA1 ripple times; likely why LFPV1 was never made",False
 senor20201104_.nwb,08_r4,excluded,MISSING_INPUT,"LFPV1.make fails in spyglass common_interval.censor ('Interval_list must contain all timestamps') for the existing LFPSelection (populate 2026-10-09), so no LFP, ripple band or CA1 ripple times; likely why LFPV1 was never made",False
-senor20201104_.nwb,10_r5,analysed,,,False
-senor20201104_.nwb,12_r6,analysed,,,False
-senor20201104_.nwb,14_r7,analysed,,,False
-senor20201104_.nwb,16_r8,analysed,,,False
-senor20201105_.nwb,02_r1,analysed,,,False
-senor20201105_.nwb,04_r2,analysed,,,False
+senor20201104_.nwb,10_r5,analyzed,,,False
+senor20201104_.nwb,12_r6,analyzed,,,False
+senor20201104_.nwb,14_r7,analyzed,,,False
+senor20201104_.nwb,16_r8,analyzed,,,False
+senor20201105_.nwb,02_r1,analyzed,,,False
+senor20201105_.nwb,04_r2,analyzed,,,False
 senor20201105_.nwb,06_r3,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 562.0-578.0 s (core 16.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.030 [95 % CI -0.021, +0.090], PASS.",False
 senor20201105_.nwb,09_r4,excluded,MISSING_INPUT,"IntervalPositionInfo head_position spatial series empty for 'pos 8 valid times' (IntervalLinearizedPosition.make fails, populate 2026-10-09); also no CA1 RippleTimesV1",False
-senor20201105_.nwb,11_r5,analysed,,,False
-senor20201105_.nwb,13_r6,analysed,,,False
-senor20201105_.nwb,15_r7,analysed,,,False
-senor20201106_.nwb,02_r1,analysed,,,False
+senor20201105_.nwb,11_r5,analyzed,,,False
+senor20201105_.nwb,13_r6,analyzed,,,False
+senor20201105_.nwb,15_r7,analyzed,,,False
+senor20201106_.nwb,02_r1,analyzed,,,False
 senor20201106_.nwb,04_r2,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 0.0-14.0 s (core 14.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.311 [95 % CI +0.084, +0.486], FAIL.",False
-senor20201106_.nwb,06_r3,analysed,,,False
-senor20201106_.nwb,08_r4,analysed,,,False
-senor20201106_.nwb,10_r5,analysed,,,False
-senor20201106_.nwb,12_r6,analysed,,,False
-senor20201106_.nwb,14_r7,analysed,,,False
+senor20201106_.nwb,06_r3,analyzed,,,False
+senor20201106_.nwb,08_r4,analyzed,,,False
+senor20201106_.nwb,10_r5,analyzed,,,False
+senor20201106_.nwb,12_r6,analyzed,,,False
+senor20201106_.nwb,14_r7,analyzed,,,False
 senor20201106_.nwb,16_r8,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 1 S block, at 247.0-249.0 s (core 2.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 1 2. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.013 [95 % CI -0.003, +0.032], PASS.",False
-senor20201107_.nwb,02_r1,analysed,,,False
-senor20201107_.nwb,04_r2,analysed,,,False
-senor20201107_.nwb,06_r3,analysed,,,False
-senor20201107_.nwb,08_r4,analysed,,,False
-senor20201107_.nwb,10_r5,analysed,,,False
+senor20201107_.nwb,02_r1,analyzed,,,False
+senor20201107_.nwb,04_r2,analyzed,,,False
+senor20201107_.nwb,06_r3,analyzed,,,False
+senor20201107_.nwb,08_r4,analyzed,,,False
+senor20201107_.nwb,10_r5,analyzed,,,False
 senor20201107_.nwb,12_r6,excluded,SUSTAINED_NOISE,"Artifact run fbbff144a123 finds 2 S blocks, at 1.0-30.0 s (core 29.0 s) and 398.0-421.0 s (core 23.0 s) after the epoch's first sample. Evidence tetrodes (electrode groups): 0 1 2 3 20 21 22 23. R11a step 5, excess P(non-local) 1-3 s outside the S blocks: +0.063 [95 % CI +0.018, +0.117], FAIL.",False
 senor20201108_.nwb,*,excluded,NO_NWB,"No senor20201108*.nwb in /stelmo/nwb/raw or /nimbus/nwb/raw2, and no Spyglass Nwbfile or Session row. Whether a raw .rec exists elsewhere is unknown.",False
 senor20201109_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
@@ -428,7 +428,7 @@ senor20201121_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Sp
 senor20201121_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
 senor20201121_.nwb,08_r4,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
 senor20201121_.nwb,10_r5,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80.,False
-wilbur20210326_.nwb,03_r1,analysed,,"First-exposure session (200 trials, p(R) 100% then 50%): the StateScript log switches from contingency 0 (p(R) 1.0 at all six ports) to contingency 1 (0.5 at all six) after 100 pokes (trialThresh 100); qvals_table task_reward_probability_port_0-5 is 1.0 at all six ports for trials 0-99 and 0.5 for trials 100-199; rig file wilbur_20210326_beh1_100all_50all.py.",True
+wilbur20210326_.nwb,03_r1,analyzed,,"First-exposure session (200 trials, p(R) 100% then 50%): the StateScript log switches from contingency 0 (p(R) 1.0 at all six ports) to contingency 1 (0.5 at all six) after 100 pokes (trialThresh 100); qvals_table task_reward_probability_port_0-5 is 1.0 at all six ports for trials 0-99 and 0.5 for trials 100-199; rig file wilbur_20210326_beh1_100all_50all.py.",True
 wilbur20210327_.nwb,02_r1,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 wilbur20210327_.nwb,04_r2,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 wilbur20210327_.nwb,06_r3,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
@@ -436,37 +436,37 @@ wilbur20210327_.nwb,08_r4,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete:
 wilbur20210327_.nwb,10_r5,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 wilbur20210327_.nwb,12_r6,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
 wilbur20210327_.nwb,14_r7,excluded,NO_TRIAL_INTERVALS,"Trial parsing incomplete: no noPrePostTrialTimes interval for any of the session's run epochs and no alison_behav.NoPrePostTrialIntervals row for the session (experimenter-confirmed, commit c39f0e9). Session.session_description 'Spatial bandit task (regular)'.",False
-wilbur20210328_.nwb,02_r1,analysed,,,False
-wilbur20210328_.nwb,04_r2,analysed,,,False
-wilbur20210328_.nwb,06_r3,analysed,,,False
-wilbur20210328_.nwb,08_r4,analysed,,,False
-wilbur20210328_.nwb,10_r5,analysed,,,False
-wilbur20210328_.nwb,12_r6,analysed,,,False
-wilbur20210328_.nwb,14_r7,analysed,,,False
-wilbur20210328_.nwb,16_r8,analysed,,,False
-wilbur20210329_.nwb,02_r1,analysed,,,False
-wilbur20210329_.nwb,04_r2,analysed,,,False
-wilbur20210329_.nwb,06_r3,analysed,,,False
-wilbur20210329_.nwb,08_r4,analysed,,,False
-wilbur20210329_.nwb,10_r5,analysed,,,False
-wilbur20210329_.nwb,12_r6,analysed,,,False
-wilbur20210329_.nwb,14_r7,analysed,,,False
-wilbur20210329_.nwb,16_r8,analysed,,,False
-wilbur20210330_.nwb,02_r1,analysed,,,False
-wilbur20210330_.nwb,04_r2,analysed,,,False
-wilbur20210330_.nwb,06_r3,analysed,,,False
-wilbur20210330_.nwb,08_r4,analysed,,,False
-wilbur20210330_.nwb,10_r5,analysed,,,False
-wilbur20210330_.nwb,12_r6,analysed,,,False
-wilbur20210330_.nwb,14_r7,analysed,,,False
-wilbur20210331_.nwb,02_r1,analysed,,,False
-wilbur20210331_.nwb,04_r2,analysed,,,False
-wilbur20210331_.nwb,06_r3,analysed,,,False
-wilbur20210331_.nwb,08_r4,analysed,,,False
-wilbur20210331_.nwb,10_r5,analysed,,,False
-wilbur20210331_.nwb,12_r6,analysed,,"Formerly blocked by an NWB checksum failure; resolved 2026-08-19, when its analysis file was rewritten and its DataJoint hash matched again.",False
-wilbur20210331_.nwb,14_r7,analysed,,,False
-wilbur20210331_.nwb,16_r8,analysed,,,False
+wilbur20210328_.nwb,02_r1,analyzed,,,False
+wilbur20210328_.nwb,04_r2,analyzed,,,False
+wilbur20210328_.nwb,06_r3,analyzed,,,False
+wilbur20210328_.nwb,08_r4,analyzed,,,False
+wilbur20210328_.nwb,10_r5,analyzed,,,False
+wilbur20210328_.nwb,12_r6,analyzed,,,False
+wilbur20210328_.nwb,14_r7,analyzed,,,False
+wilbur20210328_.nwb,16_r8,analyzed,,,False
+wilbur20210329_.nwb,02_r1,analyzed,,,False
+wilbur20210329_.nwb,04_r2,analyzed,,,False
+wilbur20210329_.nwb,06_r3,analyzed,,,False
+wilbur20210329_.nwb,08_r4,analyzed,,,False
+wilbur20210329_.nwb,10_r5,analyzed,,,False
+wilbur20210329_.nwb,12_r6,analyzed,,,False
+wilbur20210329_.nwb,14_r7,analyzed,,,False
+wilbur20210329_.nwb,16_r8,analyzed,,,False
+wilbur20210330_.nwb,02_r1,analyzed,,,False
+wilbur20210330_.nwb,04_r2,analyzed,,,False
+wilbur20210330_.nwb,06_r3,analyzed,,,False
+wilbur20210330_.nwb,08_r4,analyzed,,,False
+wilbur20210330_.nwb,10_r5,analyzed,,,False
+wilbur20210330_.nwb,12_r6,analyzed,,,False
+wilbur20210330_.nwb,14_r7,analyzed,,,False
+wilbur20210331_.nwb,02_r1,analyzed,,,False
+wilbur20210331_.nwb,04_r2,analyzed,,,False
+wilbur20210331_.nwb,06_r3,analyzed,,,False
+wilbur20210331_.nwb,08_r4,analyzed,,,False
+wilbur20210331_.nwb,10_r5,analyzed,,,False
+wilbur20210331_.nwb,12_r6,analyzed,,"Formerly blocked by an NWB checksum failure; resolved 2026-08-19, when its analysis file was rewritten and its DataJoint hash matched again.",False
+wilbur20210331_.nwb,14_r7,analyzed,,,False
+wilbur20210331_.nwb,16_r8,analyzed,,,False
 wilbur20210401_.nwb,02_r1,excluded,NOT_INGESTED,"Partly ingested, and re-ingestion is blocked. The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3).",False
 wilbur20210401_.nwb,04_r2,excluded,NOT_INGESTED,"Partly ingested, and re-ingestion is blocked. The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3).",False
 wilbur20210401_.nwb,06_r3,excluded,NOT_INGESTED,"Partly ingested, and re-ingestion is blocked. The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3).",False
@@ -475,19 +475,19 @@ wilbur20210401_.nwb,10_r5,excluded,NOT_INGESTED,"Partly ingested, and re-ingesti
 wilbur20210401_.nwb,12_r6,excluded,NOT_INGESTED,"Partly ingested, and re-ingestion is blocked. The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3).",False
 wilbur20210401_.nwb,14_r7,excluded,NOT_INGESTED,"Partly ingested, and re-ingestion is blocked. The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3).",False
 wilbur20210401_.nwb,16_r8,excluded,NOT_INGESTED,"Partly ingested, and re-ingestion is blocked. The raw NWB (/nimbus/nwb/raw2/wilbur20210401.nwb) is a regular session with 8 run epochs, but Spyglass holds only its Nwbfile row (no Session, IntervalList or trials) and its tracked copy /stelmo/nwb/raw/wilbur20210401_.nwb is missing. Blocked: re-ingestion needs a destructive reinsert (or a hash-identical regenerated copy), Comrie's alison_behav trial parsing, and a refit of Comrie's RL model, without which wilbur's q-value coverage falls below the 90 % gate (populate_report.md B1-B3).",False
-wilbur20210402_.nwb,02_r1,analysed,,,False
-wilbur20210402_.nwb,04_r2,analysed,,,False
-wilbur20210402_.nwb,06_r3,analysed,,,False
-wilbur20210402_.nwb,08_r4,analysed,,,False
-wilbur20210402_.nwb,10_r5,analysed,,,False
-wilbur20210402_.nwb,12_r6,analysed,,,False
-wilbur20210402_.nwb,14_r7,analysed,,,False
-wilbur20210402_.nwb,16_r8,analysed,,,False
-wilbur20210403_.nwb,02_r1,analysed,,,False
-wilbur20210403_.nwb,04_r2,analysed,,,False
-wilbur20210403_.nwb,06_r3,analysed,,,False
-wilbur20210403_.nwb,08_r4,analysed,,,False
-wilbur20210403_.nwb,10_r5,analysed,,,False
+wilbur20210402_.nwb,02_r1,analyzed,,,False
+wilbur20210402_.nwb,04_r2,analyzed,,,False
+wilbur20210402_.nwb,06_r3,analyzed,,,False
+wilbur20210402_.nwb,08_r4,analyzed,,,False
+wilbur20210402_.nwb,10_r5,analyzed,,,False
+wilbur20210402_.nwb,12_r6,analyzed,,,False
+wilbur20210402_.nwb,14_r7,analyzed,,,False
+wilbur20210402_.nwb,16_r8,analyzed,,,False
+wilbur20210403_.nwb,02_r1,analyzed,,,False
+wilbur20210403_.nwb,04_r2,analyzed,,,False
+wilbur20210403_.nwb,06_r3,analyzed,,,False
+wilbur20210403_.nwb,08_r4,analyzed,,,False
+wilbur20210403_.nwb,10_r5,analyzed,,,False
 wilbur20210404_.nwb,02_r1,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80. Also no CA1 RippleTimesV1 (only group sb_wilbur_ripple); decoding never attempted it.,False
 wilbur20210404_.nwb,04_r2,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80. Also no CA1 RippleTimesV1 (only group sb_wilbur_ripple); decoding never attempted it.,False
 wilbur20210404_.nwb,06_r3,excluded,DEPLETION_TASK,Session.session_description 'Spatial bandit task (depletion)'; alison_behav.TrialsInfoByEpoch decay_percent=80. Also no CA1 RippleTimesV1 (only group sb_wilbur_ripple); decoding never attempted it.,False

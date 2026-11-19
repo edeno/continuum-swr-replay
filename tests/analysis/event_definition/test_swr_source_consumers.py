@@ -36,8 +36,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     swr_event_labels,
 )
 from continuum_swr_replay.analysis.event_definition.classified_table import (
@@ -92,7 +92,7 @@ def source(tmp_path, monkeypatch):
 def register(tmp_path, monkeypatch):
     path = tmp_path / "epoch_register.csv"
     pd.DataFrame(
-        [[NWB, EPOCH, "analysed", "", "", "False"]],
+        [[NWB, EPOCH, "analyzed", "", "", "False"]],
         columns=list(epoch_register.COLUMNS),
     ).to_csv(path, index=False)
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
@@ -135,9 +135,9 @@ def assert_source_labels(frame: pd.DataFrame) -> None:
     np.testing.assert_array_equal(labels, source_labels())
     assert sorted(set(labels) - {0}) == [1, 2]  # the artifact dropped SWR 3
     assert "n_SWR" not in frame.columns
-    # excluded time (the mask widened by 0.3 s) is not analysed: neither SWR
+    # excluded time (the mask widened by 0.3 s) is not analyzed: neither SWR
     # nor non-SWR
-    ((start, end),) = analysed_time.excluded_intervals(EPOCH_ID).to_numpy()
+    ((start, end),) = analyzed_time.excluded_intervals(EPOCH_ID).to_numpy()
     in_excluded = (TIME >= start) & (TIME <= end)
     assert in_excluded.any()
     np.testing.assert_array_equal(frame["swr_observed"].to_numpy(), ~in_excluded)
@@ -153,7 +153,7 @@ def recorder(seen: list):
 
 @pytest.fixture
 def offline(monkeypatch):
-    """Import a script with ``spyglass`` stubbed; forget it afterwards."""
+    """Import a script with ``spyglass`` stubbed; forget it afterward."""
     common = types.ModuleType("spyglass.common")
     common.PositionIntervalMap = type("PositionIntervalMap", (), {})
     monkeypatch.setitem(sys.modules, "spyglass", types.ModuleType("spyglass"))
@@ -236,7 +236,7 @@ def test_the_event_tables_is_swr_follows_the_source(source):
     )
 
     stored = build_classified_nonlocal_event_table(dot)
-    new = build_classified_nonlocal_event_table(analysed_time.with_swr_source(dot))
+    new = build_classified_nonlocal_event_table(analyzed_time.with_swr_source(dot))
 
     assert stored["is_swr"].tolist() == [False, True]
     assert new["is_swr"].tolist() == [True, False]
@@ -424,7 +424,7 @@ def test_the_overlap_geometry_count_reads_the_event_tables_classes(
             "n_swrs_overlapping": [0, 1, 0],
         }
     )
-    write_table(analysed_time.stamp_swr_source(rows), table)
+    write_table(analyzed_time.stamp_swr_source(rows), table)
 
     geom = script.quantify_session(NWB, EPOCH, event_table=table)
 
@@ -732,7 +732,7 @@ STORED_RIPPLE_READERS = {
     "src/continuum_swr_replay/analysis/event_definition/swr_source.py": (
         "prose naming what it replaces"
     ),
-    "src/continuum_swr_replay/analysis/event_definition/analysed_time.py": (
+    "src/continuum_swr_replay/analysis/event_definition/analyzed_time.py": (
         "prose naming what it replaces"
     ),
     "src/continuum_swr_replay/data_types.py": "load_data's return types",
@@ -770,7 +770,7 @@ STORED_RIPPLE_READERS = {
 
 #: Files that unpickle a decode frame without the source, and why none of them reads its SWRs.
 DECODE_FRAME_READERS = {
-    "src/continuum_swr_replay/analysis/event_definition/analysed_time.py": "the reader",
+    "src/continuum_swr_replay/analysis/event_definition/analyzed_time.py": "the reader",
     "scripts/event_evidence/run_state_evidence.py": (
         "reads it through with_swr_source, and keeps the decoder's own non-local "
         "labels so every decoded event stays out of the running-only encodings"
@@ -837,7 +837,7 @@ def test_only_the_listed_modules_unpickle_a_decode_frame():
 
 
 def test_the_spike_evidence_baseline_lies_outside_excluded_time(source):
-    """The null's matched non-event windows are analysed time too: none may
+    """The null's matched non-event windows are analyzed time too: none may
     touch excluded time [101.75, 102.55] (the configured mask widened by
     0.3 s)."""
     from continuum_swr_replay.analysis.event_evidence import spike_evidence
@@ -846,7 +846,7 @@ def test_the_spike_evidence_baseline_lies_outside_excluded_time(source):
     windows = [(100.20, 100.24), (101.72, 101.76), (102.20, 102.24), (103.00, 103.04)]
     for start, end in windows:  # short, clearly local stretches
         probability[(TIME >= start) & (TIME <= end)] = 0.0
-    dot = analysed_time.with_swr_source(
+    dot = analyzed_time.with_swr_source(
         decode_frame(**{"Non-Local_Continuous_prob": probability})
     )
 
@@ -856,6 +856,6 @@ def test_the_spike_evidence_baseline_lies_outside_excluded_time(source):
     # the stretch at 101.72 is cut where excluded time begins; the one at
     # 102.20 lies in it and is gone
     np.testing.assert_allclose(TIME[baseline.s.to_numpy()], [100.20, 101.72, 103.00])
-    excluded = analysed_time.excluded_intervals(EPOCH_ID)
+    excluded = analyzed_time.excluded_intervals(EPOCH_ID)
     for s, e in zip(baseline.s, baseline.e, strict=True):
         assert not interval_mask(TIME[s : e + 1], excluded).any()

@@ -126,7 +126,7 @@ def test_dropped_first_and_last_bout_of_a_session_still_raise():
         assert_qvals_aligned(stop.iloc[[1]], qvals)
 
 
-def test_padding_does_not_reach_a_neighbouring_session():
+def test_padding_does_not_reach_a_neighboring_session():
     """The pad is slack around one session, not a claim on the next one."""
     stop = pd.DataFrame(
         {

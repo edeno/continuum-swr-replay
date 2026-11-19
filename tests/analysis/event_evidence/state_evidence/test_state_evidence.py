@@ -151,7 +151,7 @@ def reference_evidence(
     li = terms.log_intensity.astype(np.float64)
     n_pos = li.shape[1]
     s_all, e_all = windows.s.to_numpy(), windows.e.to_numpy()
-    centre = animal_bins[s_all + (e_all - s_all + 1) // 2]
+    center = animal_bins[s_all + (e_all - s_all + 1) // 2]
 
     def mark_part(half: np.ndarray, bins: np.ndarray) -> np.ndarray:
         out = np.zeros((bins.size, n_pos))
@@ -187,7 +187,7 @@ def reference_evidence(
             bins = np.arange(s_all[w], e_all[w] + 1)
             pooled = mark_part(sel, bins).sum(0) - bins.size * g_sel
             maps.append(int(np.argmax(pooled)))
-            remote = np.where(distance[centre[w]] < min_cm, -np.inf, pooled)
+            remote = np.where(distance[center[w]] < min_cm, -np.inf, pooled)
             maps_remote.append(int(np.argmax(remote)))
         for w in range(len(windows)):
             bins = np.arange(s_all[w], e_all[w] + 1)
@@ -201,8 +201,8 @@ def reference_evidence(
             v["nl_anim_full"][r, w] = np.sum((own - g_sco[m]) - (anim - g_sco[ab]))
             v["nlr_anim_mark"][r, w] = np.sum(rem - anim)
             v["nlr_anim_full"][r, w] = np.sum((rem - g_sco[mr]) - (anim - g_sco[ab]))
-            v["mapS_dist_cm"][r, w] = distance[m, centre[w]]
-            v["mapSr_dist_cm"][r, w] = distance[mr, centre[w]]
+            v["mapS_dist_cm"][r, w] = distance[m, center[w]]
+            v["mapSr_dist_cm"][r, w] = distance[mr, center[w]]
             if nl_partner[w, 0] >= 0:
                 pm = [maps[j] for j in nl_partner[w]]
                 null_m = np.mean([mc[:, j] for j in pm], axis=0)
@@ -210,7 +210,7 @@ def reference_evidence(
                 v["nl_null_mark"][r, w] = np.sum(own - null_m)
                 v["nl_null_full"][r, w] = np.sum((own - g_sco[m]) - (null_m - null_g))
             if loc_partner[w, 0] >= 0:
-                lp = [centre[j] for j in loc_partner[w]]
+                lp = [center[j] for j in loc_partner[w]]
                 null_m = np.mean([mc[:, j] for j in lp], axis=0)
                 null_g = np.mean([g_sco[j] for j in lp])
                 v["loc_mark"][r, w] = np.sum(anim - null_m)
@@ -402,13 +402,13 @@ def test_training_spike_bins_are_the_bins_the_library_trains_on():
     assert np.isin(library, covered).all() and np.isin(extra + 1, library).all()
 
 
-def test_each_window_is_scored_by_the_fold_without_its_centre_bin():
+def test_each_window_is_scored_by_the_fold_without_its_center_bin():
     folds = np.repeat([0, 1, 0, 1], 10).astype(np.int8)  # blocks of 10 bins
     windows = pd.DataFrame({"s": [0, 8, 15, 25], "e": [4, 12, 19, 34]})
 
     cv = window_folds(windows, folds)
 
-    # centre bins 2, 10, 17 and 30
+    # center bins 2, 10, 17 and 30
     assert cv.cv_fold.tolist() == [0, 1, 1, 1]
     # the share of a window's bins in the blocks its scoring model was fit on
     assert cv.cv_insample_share.tolist() == pytest.approx([0.0, 2 / 5, 0.0, 5 / 10])
@@ -547,20 +547,20 @@ def test_a_partner_is_never_the_window_itself_and_is_far_enough():
     n = 300
     pool = rng.choice(["a", "b", "c"], n).astype(object)
     pool[0] = "alone"
-    centre = rng.integers(0, 40, n)
+    center = rng.integers(0, 40, n)
     distance = linear_distance(40)
 
-    nl, loc = null_partners(pool, centre, distance, n_partners=20, min_cm=20.0, seed=4)
+    nl, loc = null_partners(pool, center, distance, n_partners=20, min_cm=20.0, seed=4)
 
     assert (nl[0] == -1).all() and (loc[0] == -1).all()
     for w in range(1, n):
         assert (nl[w] != w).all() and (pool[nl[w]] == pool[w]).all()
         if loc[w, 0] >= 0:
             assert (loc[w] != w).all() and (pool[loc[w]] == pool[w]).all()
-            assert (distance[centre[w], centre[loc[w]]] >= 20.0).all()
+            assert (distance[center[w], center[loc[w]]] >= 20.0).all()
         else:  # no window of its pool is 20 cm away
             others = (pool == pool[w]) & (np.arange(n) != w)
-            assert (distance[centre[w], centre[others]] < 20.0).all()
+            assert (distance[center[w], center[others]] < 20.0).all()
 
 
 def test_the_vectorized_evidence_matches_a_per_window_loop():
@@ -577,8 +577,8 @@ def test_the_vectorized_evidence_matches_a_per_window_loop():
         terms, windows, animal, distance, halves,
         n_partners=6, no_spike_rate=NO_SPIKE_RATE, seed=15,
     )  # fmt: skip
-    centre = animal[windows.s + (windows.e - windows.s + 1) // 2]
-    nl, loc = null_partners(windows["pool"], centre, distance, n_partners=6, seed=15)
+    center = animal[windows.s + (windows.e - windows.s + 1) // 2]
+    nl, loc = null_partners(windows["pool"], center, distance, n_partners=6, seed=15)
     expected = reference_evidence(
         terms, windows, animal, distance, halves, nl, loc,
         min_cm=20.0, rho=NO_SPIKE_RATE * 0.002,
@@ -612,8 +612,8 @@ def test_run_averaged_local_and_no_spike_values_are_half_the_all_tetrode_values(
         terms, windows, animal, distance, tetrode_halves(n_tet, seed=24),
         n_partners=5, no_spike_rate=NO_SPIKE_RATE, seed=25,
     )  # fmt: skip
-    centre = animal[windows.s + (windows.e - windows.s + 1) // 2]
-    _, loc = null_partners(windows["pool"], centre, distance, n_partners=5, seed=25)
+    center = animal[windows.s + (windows.e - windows.s + 1) // 2]
+    _, loc = null_partners(windows["pool"], center, distance, n_partners=5, seed=25)
     rho = NO_SPIKE_RATE * 0.002
     everyone = np.arange(n_tet)
     li = terms.log_intensity.astype(np.float64)
@@ -633,7 +633,7 @@ def test_run_averaged_local_and_no_spike_values_are_half_the_all_tetrode_values(
         assert out.ns_expected[w] == pytest.approx(local.sum() / 2, rel=1e-9)
         if loc[w, 0] < 0:
             continue
-        partners = centre[loc[w]]
+        partners = center[loc[w]]
         rows = np.arange(in_window.sum())
         mark = li[in_window][rows, ab_spike] - li[in_window][:, partners].mean(1)
         assert out.loc_mark[w] == pytest.approx(mark.sum() / 2, rel=1e-9)
@@ -807,11 +807,11 @@ def test_sign_flip_p_and_stratified_bootstrap_ci():
     rng = np.random.default_rng(0)
     shifted = rng.normal(1.0, 1.0, 200)
     half = rng.normal(0.0, 1.0, 100)
-    centred = np.r_[half, -half]  # mean exactly 0: every flip is as extreme
+    centered = np.r_[half, -half]  # mean exactly 0: every flip is as extreme
     strata = np.repeat(["a", "b"], 100)
 
     assert sign_flip_p(shifted, seed=(1,)) == pytest.approx(1 / 10_001)
-    assert sign_flip_p(centred, seed=(1,)) == pytest.approx(1.0)
+    assert sign_flip_p(centered, seed=(1,)) == pytest.approx(1.0)
     assert sign_flip_p(shifted, seed=(1,)) == sign_flip_p(shifted, seed=(1,))
     assert np.isnan(sign_flip_p(np.array([np.nan]), seed=(1,)))
     lo, hi = stratified_bootstrap_ci(shifted, strata, seed=(2,))
@@ -1557,7 +1557,7 @@ def test_a_normal_occupancy_has_no_flagged_bin(tmp_path):
 
 def test_the_floor_sits_between_the_float32_trouble_and_every_real_occupancy():
     # D1: the CPU rebuild and the decode disagreed up to an occupancy of 1.4e-24;
-    # the lowest occupancy of any other analysed epoch's decode is 4e-6
+    # the lowest occupancy of any other analyzed epoch's decode is 4e-6
     assert UNDERFLOW_OCCUPANCY_FLOOR >= 1e3 * 1.4e-24
     assert UNDERFLOW_OCCUPANCY_FLOOR <= 1e-6 * 4e-6
     assert UNDERFLOW_OCCUPANCY_FLOOR > 1e6 * np.finfo(np.float32).tiny
@@ -1588,7 +1588,7 @@ def underflow_case(n_pos: int = 30, n_time: int = 600, seed: int = 4):
     terms = random_terms(n_time, n_pos, 4, rate=0.3, seed=seed)
     left_out = np.zeros(n_pos, dtype=bool)
     left_out[[0, 1, 2, 3, 4, 5, 22]] = True
-    # strongly favour the left-out bins, as the CPU does for a zone it flushed
+    # strongly favor the left-out bins, as the CPU does for a zone it flushed
     li = terms.log_intensity.copy()
     li[:, left_out] += 6.0
     terms = TetrodeTerms(
@@ -1629,7 +1629,7 @@ def test_left_out_bins_are_no_choice_and_the_evidence_is_that_of_the_remaining_b
     for column in ("run0_mapS", "run0_mapSr"):
         np.testing.assert_array_equal(out[column], kept_bins[absent[column]])
         assert not left_out[out[column].to_numpy()].any()
-    # without the rule the planted favour picks a left-out bin, which is marked
+    # without the rule the planted favor picks a left-out bin, which is marked
     free = window_evidence(terms, windows, animal, distance, halves, **options)
     assert left_out[free.run0_mapS.to_numpy()].any()
     assert (out.mapS_left_out_runs > 0).any() and (out.mapSr_left_out_runs > 0).any()

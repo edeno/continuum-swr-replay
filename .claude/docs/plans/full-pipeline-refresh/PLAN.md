@@ -1224,7 +1224,7 @@ for 40 restorable epochs is in `.claude/research/refresh_populate/`
 (`populate_report.md`, `populate_matrix.csv`).
 
 **The lead's decisions this task implements:**
-- 40 epochs become analysable after Spyglass populates, which the controller runs after this
+- 40 epochs become analyzable after Spyglass populates, which the controller runs after this
   task lands:
   - 36 with no `PositionIntervalMap` and no CA1 ripple times;
   - senor20201104 06_r3 and 08_r4;
@@ -1243,7 +1243,7 @@ for 40 restorable epochs is in `.claude/research/refresh_populate/`
   variant. Document this; today it is undocumented.
 
 **The rule** (state it verbatim in the module docstring and in the doc):
-> An epoch is analysed if and only if it is a run epoch (`^[0-9]+_r[0-9]+$`) of a regular
+> An epoch is analyzed if and only if it is a run epoch (`^[0-9]+_r[0-9]+$`) of a regular
 > spatial-bandit session in Spyglass (or of a listed first-exposure session), with parsed
 > trials (`noPrePostTrialTimes`), and every decode input resolves to exactly one row:
 > position map, position info and linearization, ripple band, CA1 ripple times, HPC marks.
@@ -1273,7 +1273,7 @@ for 40 restorable epochs is in `.claude/research/refresh_populate/`
     error, never silently included.
   - `register_reason(nwb_file_name, epoch) -> Reason | None`.
 - Modify `get_epoch_info()` (`data_loaders/utils.py`): admit the listed first-exposure
-  sessions' descriptions. Keep its other behaviour, because other callers use it. Document
+  sessions' descriptions. Keep its other behavior, because other callers use it. Document
   the change.
 - Every stage that enumerates epochs uses `analysed_epochs()`:
   - both decoders' `run_batch` epoch list (add an `--pending-only` flag for the
@@ -1309,7 +1309,7 @@ for 40 restorable epochs is in `.claude/research/refresh_populate/`
 
 **Tests (write them first):**
 - the register covers every row of `exclusions_table.csv`, and no epoch has two statuses;
-- every non-analysed entry has exactly one reason and non-empty evidence;
+- every non-analyzed entry has exactly one reason and non-empty evidence;
 - `analysed_epochs()` raises on an unregistered epoch;
 - `analysed_epochs()` gives exactly the 218 decoded epoch ids today (pinned list), and 258
   with `include_pending=True`. Verify the 40 count against the populate matrix;
@@ -1753,14 +1753,14 @@ analyses: the masked 2.0 Kay inventory.
     normalization leaves it out.
   - **Consequences (the lead: "We also need to make sure we are not analyzing the artifact times
     or the consequences of artifact times in the analysis").**
-    - **One analysed-time rule (the lead, 2026-10-10).** Excluded time is the mask widened by
+    - **One analyzed-time rule (the lead, 2026-10-10).** Excluded time is the mask widened by
       0.3 s on each side. An event of any kind (non-local, SWR, MUA, ContFrag label, Widloski), an
       exposure second, a time bin with its history window, and a peri-event window (PFC responses,
-      reward kernels, triggered averages) is analysed only when it lies wholly outside excluded
+      reward kernels, triggered averages) is analyzed only when it lies wholly outside excluded
       time. A kept event that overlaps a dropped event is dropped too, because its overlap class is
       unknown. Inputs (the decoders' `is_missing` and encoding exclusion, the detectors'
       normalization and the ripple-power covariate's normalization) use the mask itself.
-    - Why 0.3 s: C3 measured that a masked gap changes analysed NonLocal events within at most
+    - Why 0.3 s: C3 measured that a masked gap changes analyzed NonLocal events within at most
       0.21 s and flips ContFrag SWR labels within at most 0.19 s; the reach does not grow with gap
       length. ContFrag's posterior settles more slowly, by about 1.3 s, but the change is small: SWR
       mean P(Continuous) moves by 0.01 or more within 0.2 s in 99 % of gaps, and by 1.36 s at most.
@@ -1839,7 +1839,7 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
 - **Prototype:** `.claude/research/refresh_artifact_detector/scripts/`:
   - `artdet_detector.py` (the rules);
   - feature code in `artdet_lfp.py`, `artdet_lfp2.py` and `artdet_lfp3.py` (S window spectra, J5 and
-    L20 steps) and in `artdet_spikes.py` (spike lines and nearest-neighbour mark distances);
+    L20 steps) and in `artdet_spikes.py` (spike lines and nearest-neighbor mark distances);
   - `artdet_common.py`.
 
   Read the report's §1, §5.1 and §6 first.
@@ -1874,7 +1874,7 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
   | `t_spk_frac` | 0.40 |
   | `t_spk_ood` | 0.20 |
   | `t_spk_bin` | 200 µs, on two grids offset by half a bin |
-  | OOD cut | nearest neighbour > 4 × the decoder's `waveform_std` (read from the decoder settings, not a literal) |
+  | OOD cut | nearest neighbor > 4 × the decoder's `waveform_std` (read from the decoder settings, not a literal) |
   | `t_merge` | 0.05 s |
 
 - The stored file holds **unpadded cores and their evidence**. Consumers pad them from one table:
@@ -1898,7 +1898,7 @@ Work in the worktree `/cumulus/edeno/continuum-swr-replay-refresh-dev`, branch
 **Files:**
 - Create the package `src/continuum_swr_replay/analysis/hippocampus/artifacts/`:
   - `features.py`: robust per-channel scaling; S window power and the specificity ratio; J5 and L20
-    on CA1 and on the reference; spike lines with their OOD fractions. Vectorised, with array shapes
+    on CA1 and on the reference; spike lines with their OOD fractions. Vectorized, with array shapes
     documented.
   - `detect.py`: the constants and the four rules. `detect_artifacts(...) -> pd.DataFrame` returns
     cores with columns `kind`, `signatures`, `core_start`, `core_end` and the evidence columns.
@@ -2177,7 +2177,7 @@ Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `follow
 1. Fast-forward the main branch to Task 16 once its review passes, and push. R9 needs only Task 16.
    Tasks 17–18 continue in the worktree and merge after R9 finishes, because the run imports from
    the main tree.
-2. Run on all 255 epochs (218 analysed and 37 pending) in tmux `artifacts_full`, on CPU, from a
+2. Run on all 255 epochs (218 analyzed and 37 pending) in tmux `artifacts_full`, on CPU, from a
    clean tree. Use 8 workers and about 30 GiB of memory: one epoch peaked at 3.8 GiB.
 3. **Gate.**
    - **Provenance:** every manifest record has `dirty: false`; otherwise the run is not used.
@@ -2239,7 +2239,7 @@ Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `follow
     without them. If they do, bring the comparison to the lead before the full run.
 - **Rulings (project lead, 2026-10-10).**
   - **S epochs excluded.** The 13 epochs in which artifact run `fbbff144a123` finds an S block
-    (11 analysed, 2 pending) are left out whole. No tetrode is dropped. The register gives them
+    (11 analyzed, 2 pending) are left out whole. No tetrode is dropped. The register gives them
     reason `SUSTAINED_NOISE`, and the audit's `sustained_noise` check holds the register to the run.
     The reasons: the S-epoch test failed (3 of 13 epochs fail; pooled over 14 blocks the excess is
     +0.054, 95 % CI [0.019, 0.102]; `.claude/research/refresh_r11/r11a_report.md` §5), and R1's
@@ -2253,7 +2253,7 @@ Output: `.claude/research/refresh_artifact_detector/followup/`. Reports: `follow
 - **Gates:** as R1 (P30-B pinned, no CPU fallback, provenance), plus both run ids recorded in every
   decode.
 - **Swap:** move the 218 old decodes out of the canonical folder, and move 242 R11 decodes in: the
-  207 analysed epochs and the 35 pending ones, whose entries flip to `analysed` in the same change
+  207 analyzed epochs and the 35 pending ones, whose entries flip to `analysed` in the same change
   (with `docs/epoch_register.md` regenerated). The 13 S epochs' R11 decodes stay out of the
   canonical folder. Use the R2 swap procedure with a sample re-hash.
 

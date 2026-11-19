@@ -147,7 +147,7 @@ Three optional interaction sensitivities are available with
 
 Each interaction includes both constituent main-effect kernels plus duration,
 leaf mass, value, and posterior entropy. The interaction mark is the product of
-the two raw marks, standardized afterwards; with a 0/1 modifier the content
+the two raw marks, standardized afterward; with a 0/1 modifier the content
 main-effect kernel in an interaction model is therefore the response at
 modifier = 0 (non-switch, unrewarded), not at the class mean. The
 context/coupling modifier is required to vary; this prevents an interaction
@@ -239,7 +239,7 @@ seed), so different models' references are independent.
 The draws of a block are fit together in device batches
 (`batched_glm.fit_poisson_column_variants`: the design stays on the device and
 only the replaced columns cross per batch), each warm-started from the
-observed fit's coefficients. The penalised objective is strictly concave, so
+observed fit's coefficients. The penalized objective is strictly concave, so
 the warm start moves the iterations, not the answer: against one draw at a
 time, cold, the curves agree to 1.5e-8.
 
@@ -351,7 +351,7 @@ partial, or mismatched bundle is removed before refitting. **The 71-session
 corpus was fit 2026-09-19** at git `4d69b83` (on `feature/pfc-marked-event-kernels`;
 its code reached this branch in `cc04527d`) (816 bundles, 36 ineligible
 markers): [2026-09-19-pfc-marked-family-corpus.md](../../.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md).
-That corpus predates the analysed-time rule: its sessions were assembled
+That corpus predates the analyzed-time rule: its sessions were assembled
 without excluded time and without the artifact-dropped events, on the
 218-session tables of that date. The runner now assembles each session with
 the canonical PFC assembly (`analysis/pfc/session.py`), so a refit's fit mask

@@ -316,7 +316,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         type=int,
         default=DEFAULT_MIN_EVENTS_SESSION_PHI,
         help=(
-            "Modelled events a session needs to estimate its own "
+            "Modeled events a session needs to estimate its own "
             "Dirichlet-multinomial concentration intercept (default: "
             f"{DEFAULT_MIN_EVENTS_SESSION_PHI}); shorter sessions are pinned to "
             "the median intercept of that animal's longer sessions. This "

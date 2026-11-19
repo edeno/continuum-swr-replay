@@ -88,7 +88,7 @@ class _EnvStub:
     @property
     def distance_between_nodes_(self):
         # Mirrors how ``Environment`` populates this at fit time
-        # (``get_track_grid``): all-pairs Dijkstra over the bin-centre graph.
+        # (``get_track_grid``): all-pairs Dijkstra over the bin-center graph.
         return dict(
             nx.all_pairs_dijkstra_path_length(
                 self.track_graph_with_bin_centers_edges_, weight="distance"

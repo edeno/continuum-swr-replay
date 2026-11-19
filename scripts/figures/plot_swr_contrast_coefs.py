@@ -1,7 +1,7 @@
 """Coefficient figures for the is_swr rate + content contrast ladders.
 
 For each effect: the coefficient of every session the per-term gate keeps is a faint
-jittered dot (colored by animal; a term the gate refuses is drawn empty and labelled
+jittered dot (colored by animal; a term the gate refuses is drawn empty and labeled
 "(not reported)"); the 5 larger dots are per-animal medians; the black bar is the
 across-animal median; the horizontal whisker is its 95% interval (nested bootstrap:
 the animals, then each drawn animal's sessions, each draw's statistic the median over
@@ -48,7 +48,7 @@ from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
 from continuum_swr_replay.analysis.replay_models.rate.swr_contrast_rate import (
     home_cohort,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
 from continuum_swr_replay.paths import (
     figure_dir,
     model_dir,
@@ -136,7 +136,7 @@ def _per_sd_units(artifacts: dict[str, Path]):
     }
 
 
-ANIM = list(analysed_animals())
+ANIM = list(analyzed_animals())
 CMAP = dict(zip(ANIM, plt.cm.tab10(np.linspace(0, 0.5, 5)), strict=True))
 # The dots' vertical jitter only. Each row's bootstrap has its own generator,
 # seeded BOOTSTRAP_SEED, so a row's CI does not depend on the rows drawn before it.

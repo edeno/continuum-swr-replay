@@ -3,12 +3,12 @@
 One adapter per inventory reads what its detector recorded for an epoch and
 returns three tables (:class:`InventoryTables`): the inventory, with its
 moving events kept and flagged; what the detector observed; and the events the
-analysed-time rule sets aside, with their reasons. The accounting modules do
+analyzed-time rule sets aside, with their reasons. The accounting modules do
 no IO; the readers of recorded outputs are here.
 
 Every adapter reads one epoch's canonical decode frame, read once through the
-SWR source (``analysed_time.read_dot_with_swr_source``), and its drops, read once
-from the same pickle (``analysed_time.read_artifact_event_drops``): the frame as
+SWR source (``analyzed_time.read_dot_with_swr_source``), and its drops, read once
+from the same pickle (``analyzed_time.read_artifact_event_drops``): the frame as
 saved, never ``artifact_event_drops`` of the read frame, whose dropped labels
 are already gone. The frame's ``head_speed`` on its grid is the one speed
 trace, and the grid's first and last time are the epoch's bounds.
@@ -17,8 +17,8 @@ An event is set aside, and leaves the inventory, when the one rule drops it
 for excluded time (``artifact``, ``near_artifact``) or for overlapping an SWR
 or MUA event dropped for excluded time (``overlaps_dropped_event``). That
 second pass reads every event at its bounds sampled on the decode grid, as
-``analysed_time`` reads the paper's SWRs, so Kay's kept events are exactly the
-ones ``analysed_time.with_swr_source`` keeps. A moving event stays in the inventory with ``whole_event_speed_eligible`` False. So a
+``analyzed_time`` reads the paper's SWRs, so Kay's kept events are exactly the
+ones ``analyzed_time.with_swr_source`` keeps. A moving event stays in the inventory with ``whole_event_speed_eligible`` False. So a
 detector's native count is its inventory's rows plus its set-aside rows.
 
 A run whose record for the epoch cannot be used (no manifest, the epoch not in
@@ -63,7 +63,7 @@ from continuum_swr_replay.analysis.detector_comparison.schema import (
     inventory_from_intervals,
     validate_inventory,
 )
-from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
+from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 from continuum_swr_replay.analysis.event_definition.classified_table import (
     build_classified_nonlocal_event_table,
 )
@@ -145,7 +145,7 @@ class _Epoch(NamedTuple):
 
 def _epoch(dot: pd.DataFrame) -> _Epoch:
     """The one epoch a frame read through the SWR source holds."""
-    analysed_time.require_swr_source(dot, what="the decode frame")
+    analyzed_time.require_swr_source(dot, what="the decode frame")
     animal, day, epoch = one_session(dot, "An adapter")
     time = dot.index.to_numpy(dtype=np.float64)
     return _Epoch(
@@ -316,14 +316,14 @@ def _numbered_events(path: Path) -> pd.DataFrame:
 
 def _sampled_bounds(intervals: pd.DataFrame, epoch: _Epoch) -> NDArray:
     """Each interval's first and last sample on the decode grid
-    (``analysed_time.sampled_bounds``), as the rule's second pass reads them.
+    (``analyzed_time.sampled_bounds``), as the rule's second pass reads them.
 
     Returns
     -------
     bounds : ndarray, shape (n_intervals, 2)
         NaN for an interval the speed rule rejects, which the pass never reads.
     """
-    _, bounds = analysed_time.sampled_bounds(
+    _, bounds = analyzed_time.sampled_bounds(
         intervals[["start_time", "end_time"]], epoch.time, epoch.speed
     )
     return bounds
@@ -340,9 +340,9 @@ def _lfp_inventory(
     """An LFP detector's events under the one rule: excluded time with the
     artifact mask and the speed rule (``event_drop_reasons``), then its second
     pass on the grid-sampled bounds of each kept event and of the SWR and MUA
-    events dropped for excluded time, as ``analysed_time`` makes it.
+    events dropped for excluded time, as ``analyzed_time`` makes it.
 
-    Two events sharing a sample of the grid cannot both be labelled on it, so
+    Two events sharing a sample of the grid cannot both be labeled on it, so
     the second pass cannot read them: the detector is then unavailable for the
     epoch, with the error as its reason."""
     starts = events["start_time"].to_numpy(dtype=np.float64)
@@ -365,7 +365,7 @@ def _lfp_inventory(
         )
     kept = np.flatnonzero(pd.isna(reasons) & np.isfinite(sampled[:, 0]))
     overlapping = overlaps_dropped_events(
-        sampled[kept, 0], sampled[kept, 1], analysed_time.dropped_on_grid(drops)
+        sampled[kept, 0], sampled[kept, 1], analyzed_time.dropped_on_grid(drops)
     )
     reasons[kept[overlapping]] = DropReason.OVERLAPS_DROPPED_EVENT.value
     aside = np.isin(reasons.astype(str), list(SET_ASIDE_REASONS))
@@ -408,7 +408,7 @@ def swr_detector_inventory(
     dot : DataFrame
         The epoch's decode frame, read through the SWR source.
     drops : DataFrame
-        ``analysed_time.read_artifact_event_drops`` of the decode pickle, the
+        ``analyzed_time.read_artifact_event_drops`` of the decode pickle, the
         frame as saved; never ``artifact_event_drops`` of the read frame,
         whose dropped labels are already gone.
 
@@ -416,7 +416,7 @@ def swr_detector_inventory(
     -------
     InventoryTables
         Kay's eligible events are exactly the paper's SWRs, the ones
-        ``analysed_time.with_swr_source`` keeps in the same frame.
+        ``analyzed_time.with_swr_source`` keeps in the same frame.
 
     """
     if detector not in SWR_DETECTORS:
@@ -506,7 +506,7 @@ def mua_inventory(
     dot : DataFrame
         The epoch's decode frame, read through the SWR source.
     drops : DataFrame
-        ``analysed_time.read_artifact_event_drops`` of the decode pickle, the
+        ``analyzed_time.read_artifact_event_drops`` of the decode pickle, the
         frame as saved; never ``artifact_event_drops`` of the read frame,
         whose dropped labels are already gone.
     run_id : str
@@ -634,7 +634,7 @@ def _memoryless_second_pass(
     ``overlaps_dropped_event`` is not read: the cohort's candidates outside
     excluded time are checked at their bounds sampled on the decode grid
     against the SWR and MUA events dropped for excluded time at theirs
-    (``analysed_time.dropped_on_grid``).
+    (``analyzed_time.dropped_on_grid``).
 
     Raises
     ------
@@ -656,7 +656,7 @@ def _memoryless_second_pass(
     )
     on_grid = np.isfinite(sampled[:, 0])
     overlapping = overlaps_dropped_events(
-        sampled[on_grid, 0], sampled[on_grid, 1], analysed_time.dropped_on_grid(drops)
+        sampled[on_grid, 0], sampled[on_grid, 1], analyzed_time.dropped_on_grid(drops)
     )
     reasons[checked[on_grid][overlapping]] = DropReason.OVERLAPS_DROPPED_EVENT.value
     return reasons
@@ -687,7 +687,7 @@ def memoryless_inventory(
         The epoch's decode frame, read through the SWR source (for its
         session, bounds and speed).
     drops : DataFrame
-        ``analysed_time.read_artifact_event_drops`` of the decode pickle, as for
+        ``analyzed_time.read_artifact_event_drops`` of the decode pickle, as for
         :func:`swr_detector_inventory`.
 
     Returns

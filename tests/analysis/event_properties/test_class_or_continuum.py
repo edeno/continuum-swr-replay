@@ -94,7 +94,7 @@ def test_fit_step_null_and_planted():
         assert fit.has_step is expect_step
         assert fit.n_folds == 5
         assert fit.n_events == len(s)
-        assert fit.n_labelled == int(s.is_swr.sum())
+        assert fit.n_labeled == int(s.is_swr.sum())
 
 
 def test_fit_step_with_a_covariate():
@@ -112,7 +112,7 @@ def _fit(step: float, ci_low: float, ci_high: float) -> cc.StepFit:
     return cc.StepFit(
         n_events=0,
         n_groups=0,
-        n_labelled=0,
+        n_labeled=0,
         step=step,
         step_ci_low=ci_low,
         step_ci_high=ci_high,

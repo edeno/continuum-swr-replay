@@ -87,14 +87,14 @@ canonical one (Kay's SWRs, trained on ``no_ripple``, stationary). A decode
 made another way carries suffixes in the order the decode appends them:
 ``_contfrag``, a ripple detector (``_Karlsson``), ``_non_stationary``, and a
 training type (``_all``). ``--animal`` and ``--all`` run the epoch register's
-analysed epochs of that animal, or of every animal, or with ``--pending-only``
+analyzed epochs of that animal, or of every animal, or with ``--pending-only``
 its pending ones alone (``epochs_to_run``): each one's canonical decode, and
 with ``--include-variants`` also the variants of it found under ``--root``. An
 epoch so selected whose decode is missing is run, and recorded as failed, so a
 run never covers fewer epochs than the register without saying so; a decode
 under ``--root`` of any other epoch is left out, and recorded as skipped. The
 pending epochs' decodes are staged outside the canonical folder until they are
-analysed (``docs/epoch_register.md``), so a ``--pending-only`` run takes
+analyzed (``docs/epoch_register.md``), so a ``--pending-only`` run takes
 ``--root`` at that staging folder. ``--epoch-id`` runs whatever it
 names. ``--date`` and ``--epoch`` narrow any of the three. The date is the
 last 8 characters of the NWB file's stem, so ``j1620210707`` was recorded on
@@ -173,7 +173,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.shuffle import 
     MINIMUM_N_SHUFFLES,
     SIGNIFICANCE_LEVEL,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
     read_dot_with_swr_source,
@@ -224,8 +224,8 @@ from continuum_swr_replay.runs.threads import BLAS_THREAD_VARIABLES
 from continuum_swr_replay.tables.io import write_atomically, write_table
 
 DESIGN_SPEC = "docs/design/replay_detection_comparison/02-memoryless-sequence.md"
-NOT_ANALYSED = "not an analysed epoch in the epoch register"
-"""Why a decode under ``--root`` is left out when the register does not analyse
+NOT_ANALYZED = "not an analyzed epoch in the epoch register"
+"""Why a decode under ``--root`` is left out when the register does not analyze
 its epoch."""
 NOT_PENDING = "not a pending epoch in the epoch register"
 """Why a ``--pending-only`` run leaves out a decode under ``--root``."""
@@ -237,7 +237,7 @@ def find_epochs(
     selected: Iterable[tuple[str, str]],
     *,
     include_variants: bool = False,
-    left_out: str = NOT_ANALYSED,
+    left_out: str = NOT_ANALYZED,
 ) -> tuple[list[str], dict[str, str]]:
     """The selected epochs' HPC decodes, and why every other decode was left out.
 
@@ -255,12 +255,12 @@ def find_epochs(
         Where the decodes are.
     selected : Iterable of (str, str)
         ``(nwb_file_name, epoch_name)`` of the epochs this run covers:
-        ``epochs_to_run().index``, the register's analysed epochs or its
+        ``epochs_to_run().index``, the register's analyzed epochs or its
         pending ones.
     include_variants : bool, optional
         Also list the selected epochs' decode variants found under `root`.
     left_out : str, optional
-        Why a decode of another epoch is left out: ``NOT_ANALYSED``, or
+        Why a decode of another epoch is left out: ``NOT_ANALYZED``, or
         ``NOT_PENDING`` for a ``--pending-only`` run.
 
     Returns
@@ -340,7 +340,7 @@ def run_one(
     ------
     FileNotFoundError
         An input is missing. A run over the register asks for one when an
-        analysed epoch's decode is missing, and records the epoch as failed;
+        analyzed epoch's decode is missing, and records the epoch as failed;
         :func:`find_epochs` leaves out a variant with a missing input.
     ValueError
         The marks are not the ones the decoder's encoding model was fitted on,
@@ -855,7 +855,7 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="With --all or --animal: run only the epochs the epoch register holds "
         "pending, from their staged decodes under --root, instead of its "
-        "analysed epochs.",
+        "analyzed epochs.",
     )
     parser.add_argument(
         "--include-variants",
@@ -952,7 +952,7 @@ def main(argv: list[str] | None = None) -> None:
             args.root,
             epochs_to_run(args.pending_only).index,
             include_variants=args.include_variants,
-            left_out=NOT_PENDING if args.pending_only else NOT_ANALYSED,
+            left_out=NOT_PENDING if args.pending_only else NOT_ANALYZED,
         )
     epoch_ids = epoch_ids_matching(epoch_ids, date=args.date, epoch=args.epoch)
     for epoch_id, why in sorted(skipped.items()):

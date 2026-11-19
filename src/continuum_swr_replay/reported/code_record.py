@@ -4,7 +4,7 @@ A summary records, when it is built, the files of the checkout the build
 depended on: every package module loaded during the build (the summary's builder
 and the building script's own imports), the script itself, every non-Python file
 under the package directory that git does not ignore (today only
-``data_loaders/epoch_register.csv``, the analysed cohort), and the input files
+``data_loaders/epoch_register.csv``, the analyzed cohort), and the input files
 the repository tracks (the literature survey table, the committed sweep
 summaries), each with two digests. It also records the commit checked out, the
 digest of ``uv.lock``, and which of those files or ``uv.lock`` differ from that

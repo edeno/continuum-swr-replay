@@ -48,7 +48,7 @@ settings and one record per epoch; only this process writes it, atomically,
 after each epoch. A rerun under the same run id skips the epochs already
 ``ok`` unless ``--overwrite`` is given, and refuses settings other than the
 ones the manifest was written with. The epochs are the epoch register's
-analysed ones, narrowed by ``--animal``, ``--date`` and ``--epoch``, run on a
+analyzed ones, narrowed by ``--animal``, ``--date`` and ``--epoch``, run on a
 dask ``LocalCluster`` of ``--n-workers`` processes, each epoch logging to
 ``logs/{epoch_id}_carey.log`` under the working directory.
 

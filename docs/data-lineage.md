@@ -17,7 +17,7 @@ hand-joined string. Nothing under the root is committed.
   lists every file the loaders search. `load_data` reads position, spikes, LFP
   and task events from the Spyglass tables listed in
   [development.md](development.md#data-integration-with-spyglass).
-- **Cohort.** Which run epochs are analysed is decided by the epoch register,
+- **Cohort.** Which run epochs are analyzed is decided by the epoch register,
   `src/continuum_swr_replay/data_loaders/epoch_register.csv`, one row per epoch
   with its status and the reason for every exclusion
   ([epoch_register.md](epoch_register.md)). Every stage reads it; no stage globs
@@ -40,7 +40,7 @@ Two settings tie the decodes to the detector runs:
 `ARTIFACT_INTERVALS_RUN_ID` and `SWR_INVENTORY_RUN_ID` in
 `src/continuum_swr_replay/analysis/event_definition/swr_source.py` name the artifact and
 SWR runs every decode and every analysis reads. A decode refuses to start
-without them. The rule for which time and which events are analysed is
+without them. The rule for which time and which events are analyzed is
 described in [development.md](development.md#canonical-per-event-classification-table).
 
 The event, event × arm, event × patch, event sequence and stop tables share

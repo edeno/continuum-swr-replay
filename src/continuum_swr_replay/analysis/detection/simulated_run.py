@@ -108,9 +108,9 @@ def splice_remote_stationary(
     place_field_means: np.ndarray,
     start_s: float,
 ) -> tuple[list[np.ndarray], tuple[float, float]]:
-    """Add a non-local representation that is held still rather than travelled.
+    """Add a non-local representation that is held still rather than traveled.
 
-    The package simulates travelling replay, a stationary local event and
+    The package simulates traveling replay, a stationary local event and
     silence, but not a remote place held still. That case separates two things
     a sequence detector does for different reasons: it absorbs a stationary
     representation when the representation is the animal's own place, and it

@@ -114,10 +114,10 @@ than the ones the manifest was written with. A run holds an exclusive lock on it
 folder's ``.lock`` throughout, so a second run under the same run id exits at
 once instead of overwriting the first one's records.
 
-The epochs are the epoch register's analysed ones, or with ``--pending-only``
+The epochs are the epoch register's analyzed ones, or with ``--pending-only``
 its pending ones alone, for the incremental update after their populates
 (``epochs_to_run``, read against ``get_epoch_info``), narrowed by ``--animal``,
-``--date`` and ``--epoch``. An epoch the register does not analyse (no inputs, another task,
+``--date`` and ``--epoch``. An epoch the register does not analyze (no inputs, another task,
 and so on: ``docs/epoch_register.md``) never reaches the runner, so the manifest
 records none. The epochs run in parallel on a
 dask ``LocalCluster`` of ``--n-workers`` processes, one epoch per worker at a
@@ -1048,7 +1048,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--pending-only",
         action="store_true",
         help="Run only the epochs the epoch register holds pending a Spyglass "
-        "populate, after their populates, instead of its analysed epochs.",
+        "populate, after their populates, instead of its analyzed epochs.",
     )
     parser.add_argument(
         "--overwrite", action="store_true", help="Redo epochs already written."

@@ -123,7 +123,7 @@ def test_content_contrast_values_refuse_a_missing_row_and_a_missing_animal():
         content_contrast_values(audited, SOURCES)
     audited = _audited()
     audited["_dm"].loc[audited["_dm"]["term"] == BREADTH, "n_animals"] = 4
-    with pytest.raises(ValueError, match="dm_breadth: 4 animals, not the 5 analysed"):
+    with pytest.raises(ValueError, match="dm_breadth: 4 animals, not the 5 analyzed"):
         content_contrast_values(audited, SOURCES)
 
 
@@ -224,7 +224,7 @@ def test_estimator_values_refuse_a_percentile_bootstrap():
 
 
 def test_estimator_values_refuse_a_missing_animal():
-    with pytest.raises(ValueError, match="4 animals, not the 5 analysed"):
+    with pytest.raises(ValueError, match="4 animals, not the 5 analyzed"):
         estimator_values(*_estimator_tables(n_animals=4), "x")
 
 

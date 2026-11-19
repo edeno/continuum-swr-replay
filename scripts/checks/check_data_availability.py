@@ -247,7 +247,7 @@ def main(argv: Sequence[str] | None = None):
     args = parser.parse_args(argv)
 
     print("Loading epoch info...")
-    # Every epoch Spyglass lists, not only the epoch register's analysed ones:
+    # Every epoch Spyglass lists, not only the epoch register's analyzed ones:
     # this script diagnoses which inputs load, pending epochs included.
     epoch_info = get_epoch_info()
 

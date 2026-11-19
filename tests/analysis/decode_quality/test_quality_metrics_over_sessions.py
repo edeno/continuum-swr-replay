@@ -45,7 +45,7 @@ def test_calibration_curve_is_median_and_quartiles_over_sessions_per_bin():
 
 
 def _session(animal: str, speed: list[float], local: list[float]) -> pd.DataFrame:
-    """One session's bins: Local or Non-Local Continuous, all analysed."""
+    """One session's bins: Local or Non-Local Continuous, all analyzed."""
     local = np.asarray(local)
     return pd.DataFrame(
         {

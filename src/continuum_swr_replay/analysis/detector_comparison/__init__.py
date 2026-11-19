@@ -11,7 +11,7 @@ with per-detector denominators.
 - ``components``: connected components of the overlap graph.
 - ``recount``: one detector's events recounted with nearby fragments merged.
 - ``cells``: events no detector of a set found, and time no detector found.
-- ``swr_matrix``: each sequence cohort labelled under each SWR definition.
+- ``swr_matrix``: each sequence cohort labeled under each SWR definition.
 - ``adapters``: each detector's recorded outputs for an epoch, read onto the
   schema with what it observed and the events it set aside.
 - ``features``: per-event features read on the decode grid by one rule for

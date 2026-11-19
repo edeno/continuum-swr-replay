@@ -14,7 +14,7 @@ run_session
     One session end to end: load and align the data, build the fit mask and
     the canonical event sets, draw the matched control, build the design
     matrices, bin every unit's spikes, fit every unit against every design at
-    once (``fitter="jax"``, penalised by ``penalty_sigma``), and return the
+    once (``fitter="jax"``, penalized by ``penalty_sigma``), and return the
     per-unit statistics and peri-event curves. With ``scoring_out`` it also
     hands back the fit material the held-out scoring needs. The batch runner
     is ``scripts/pfc/run_pfc_analysis_bandit.py``.
@@ -44,7 +44,7 @@ p-value; ``ENGAGEMENT_PAIR`` and ``BEST_MODEL_CANDIDATES`` name the engagement
 comparison and the best-model candidate sets. ``scoring.score_session``
 assembles them into a session's held-out statistics, and
 ``scoring.maximum_likelihood_comparison`` reads the prior's effect on each
-curve's peak against the same curve fit unpenalised.
+curve's peak against the same curve fit unpenalized.
 
 Population (``load_population``)
 --------------------------------
@@ -65,7 +65,7 @@ See Also
 continuum_swr_replay.analysis.pfc.session : Per-neuron and per-session GLM fits
 continuum_swr_replay.analysis.pfc.design : Event bases and design matrices
 continuum_swr_replay.analysis.pfc.fit : Fitters, penalties and fit diagnostics
-continuum_swr_replay.analysis.pfc.batched_glm : The batched penalised IRLS
+continuum_swr_replay.analysis.pfc.batched_glm : The batched penalized IRLS
 continuum_swr_replay.analysis.pfc.heldout : Held-out deviance and its null
 continuum_swr_replay.analysis.pfc.scoring : A session's held-out statistics
 continuum_swr_replay.analysis.pfc.modulation : Deviance and modulation statistics

@@ -18,7 +18,7 @@ step, so a disagreement can be placed: the posterior, each window's center,
 spread and gates, the candidate sequences, their duration, dispersion and
 replay verdict, and the p-values. Every cell of
 ``scripts/detection/sweep_memoryless_detection.py`` is then run through both, and
-the candidates and verdicts are totalled, for the acceptance decisions on
+the candidates and verdicts are totaled, for the acceptance decisions on
 thousands of candidates rather than a handful. Neither is scored against the
 injected replay: the question is whether the port decides as the reference
 would, not whether either is right.
@@ -480,7 +480,7 @@ def decode_sweep_cell(recording: dict, injected: list, window: tuple, key: str) 
 
 
 def sweep_totals(n_seeds: int) -> pd.DataFrame:
-    """Both procedures on every sweep cell, the counts totalled per variant.
+    """Both procedures on every sweep cell, the counts totaled per variant.
 
     The cells, placements and injections are the sweep's own
     (``sweep_replays.planned_cells``), so each cell is the one the sweep scored.

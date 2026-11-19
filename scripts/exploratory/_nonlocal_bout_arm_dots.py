@@ -238,7 +238,7 @@ def build_figure(
         ("binary", rew_col, "reward", None, "stop"),
         ("kernel", kernel, "reward (stops back)", ("Greys", False), "stop"),
         ("heatbout", rrt_col, "reward rate trial", ("viridis", False), "stop"),
-        # per-stop context: switch / behavioural state
+        # per-stop context: switch / behavioral state
         ("binary", switch_col, "after switch", None, "stop"),
         ("binary", omit_col, "after omission", None, "stop"),
         ("binary", postsw_col, "post switch", None, "stop"),
@@ -411,7 +411,7 @@ def build_figure(
             for s in ("top", "right"):
                 ax.spines[s].set_visible(False)
         elif kind == "binary" and gran == "event":
-            # Per-event binary (SWR): one square per event; missing -> grey x.
+            # Per-event binary (SWR): one square per event; missing -> gray x.
             v = np.asarray(data, dtype=float)
             no, yes, miss = v == 0, v == 1, ~np.isfinite(v)
             ax.scatter(

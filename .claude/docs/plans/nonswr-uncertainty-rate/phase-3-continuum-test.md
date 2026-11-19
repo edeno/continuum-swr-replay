@@ -39,7 +39,7 @@ themselves ride the burst. This phase tests that directly. Rate-only.
   `paper/figures/swr_nonswr_crosscorr.png`.
 
 - **Cross-type ensemble-history GLM (controlled)**: extend the (stop × bin)
-  design so the *non-SWR* rate is modelled with **two** history kernels —
+  design so the *non-SWR* rate is modeled with **two** history kernels —
   lagged counts of (a) prior **non-SWR** onsets and (b) prior **SWR-coupled**
   onsets — plus the usual `bs(tc)` + `reward_lag1`. Build the cross kernel by
   computing per-bin SWR-coupled onset counts on the same bins as the non-SWR

@@ -58,7 +58,7 @@ Findings addressed: A1, A5 (reporting), A6 (restore base ladder), A7 (`_TSC` con
   `log_n_nonlocal_bins_z = attach_standardized(ev, ["log_n_nonlocal_bins"], support_label="fit_cohort_all_rows")`
   from `np.log(ev["n_nonlocal_bins"])` and the products
   `log_n_nonlocal_bins_z_x_is_current_arm`, `log_n_nonlocal_bins_z_x_is_prev_arm`; patch
-  analogues in `_assemble_patch`. In `model_specs.py` add both arm products and `_TSC` to `BASEc`
+  analogs in `_assemble_patch`. In `model_specs.py` add both arm products and `_TSC` to `BASEc`
   (1106-1112) so every C/CS rung carries them (resolves the CS2/CS4/CS5 inconsistency), and the
   patch product plus the patch time term to `BASEc_PATCH`. Register the products in
   `DERIVED_COVARIATE_SOURCES` with source atoms `["n_nonlocal_bins", "is_current_arm"]`, and add
@@ -95,7 +95,7 @@ Findings addressed: A1, A5 (reporting), A6 (restore base ladder), A7 (`_TSC` con
 
 - The Dirichlet-multinomial fitter and the three-way comparison (phase 2b); this phase produces the
   fraction fits that comparison consumes.
-- Adding `is_rewarded_outcome × role` as a predictor: rejected in favour of strata because the
+- Adding `is_rewarded_outcome × role` as a predictor: rejected in favor of strata because the
   timing registry would need a new availability class; revisit only if strata are underpowered.
 - Ripple-power / session-time covariates (open in the review, not scheduled).
 - Claims-table rewrite (phase 4).

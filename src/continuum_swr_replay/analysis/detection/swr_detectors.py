@@ -61,7 +61,7 @@ normalization sample leaves its time out (``normalization_sample``): Kay,
 Karlsson and Zugaro z-score over the unmasked samples, and Yu estimates its
 threshold on the unmasked immobile ones, though its per-channel z-score
 before the median still pools every valid sample, masked or not (the
-package's behaviour). The caller drops the events that overlap the mask
+package's behavior). The caller drops the events that overlap the mask
 (``drop_overlapping_events``); the LFP is never NaN-filled, so no filter or
 envelope meets a gap. ``yu_diagnostics`` recomputes Yu's
 threshold and the histogram behind it, so both are known for an epoch with no
@@ -653,7 +653,7 @@ def drop_overlapping_events(
     """Drop the events that share any time with an interval; renumber the rest.
 
     Both are closed (``intervals.overlaps_intervals``), so an event that only
-    touches an interval at an instant is dropped too, as ``analysed_time`` drops an
+    touches an interval at an instant is dropped too, as ``analyzed_time`` drops an
     event touching an artifact. The kept events are renumbered 1..n in
     ``event_number``, which an inventory's reader (``swr_source``) takes as the
     event's label.
@@ -721,7 +721,7 @@ def run_swr_detectors(
         Samples left out of every detector's normalization sample, such as the
         artifact mask: each detector gets ``normalization_sample``'s
         mask (Yu's per-channel z-score before the median still pools every
-        valid sample, a package behaviour; its threshold uses the masked
+        valid sample, a package behavior; its threshold uses the masked
         immobile sample). The LFP itself is not changed, so the filters and envelopes
         never meet a gap, and events are still found there; the caller drops
         those (``drop_overlapping_events``). None passes no mask, so each

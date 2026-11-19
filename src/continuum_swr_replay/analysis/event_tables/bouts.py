@@ -144,9 +144,9 @@ def immobility_bout_intervals(
 def bout_exposure_s(
     bout_starts: np.ndarray, bout_ends: np.ndarray, excluded: pd.DataFrame
 ) -> np.ndarray:
-    """Each bout's analysed immobility: its span less the excluded time in it.
+    """Each bout's analyzed immobility: its span less the excluded time in it.
 
-    Excluded time (the artifact mask widened by 0.3 s) is not analysed, so it
+    Excluded time (the artifact mask widened by 0.3 s) is not analyzed, so it
     is no rate's exposure. The bout itself (its start, end and ``stop_id``) is
     not changed; only its exposure falls.
 
@@ -155,7 +155,7 @@ def bout_exposure_s(
     bout_starts, bout_ends : np.ndarray, shape (n_bouts,)
         Seconds, from :func:`immobility_bout_intervals`.
     excluded : pd.DataFrame
-        The epoch's excluded time (``analysed_time.excluded_intervals``):
+        The epoch's excluded time (``analyzed_time.excluded_intervals``):
         ``start_time`` and ``end_time``, closed.
 
     Returns
@@ -178,7 +178,7 @@ def summarize_bout_location(
 ) -> pd.DataFrame:
     """Where each bout was: location, segment and distance to a well.
 
-    Excluded time (the artifact mask widened by 0.3 s) is not analysed, so each
+    Excluded time (the artifact mask widened by 0.3 s) is not analyzed, so each
     summary reads only the bout's rows outside it (closed intervals). A bout
     wholly inside it is ``unknown``, with no well, segment or distance. The
     bout itself is not changed. With no excluded time every row is read.
@@ -196,7 +196,7 @@ def summarize_bout_location(
     track_graph : nx.Graph
         Session track graph, for the well's arm.
     excluded : pd.DataFrame
-        The epoch's excluded time (``analysed_time.excluded_intervals``):
+        The epoch's excluded time (``analyzed_time.excluded_intervals``):
         ``start_time`` and ``end_time``, closed.
 
     Returns
@@ -211,9 +211,9 @@ def summarize_bout_location(
         strict at-well bout, NaN otherwise.
     """
     times = bout_rows.index.to_numpy(dtype=float)
-    analysed = bout_rows.loc[~interval_mask(times, excluded)]
-    by_bout = dict(tuple(analysed.groupby("_bout_idx", sort=True)))
-    no_rows = analysed.iloc[0:0]
+    analyzed = bout_rows.loc[~interval_mask(times, excluded)]
+    by_bout = dict(tuple(analyzed.groupby("_bout_idx", sort=True)))
+    no_rows = analyzed.iloc[0:0]
 
     states: list[str] = []
     at_well: list[object] = []
@@ -303,7 +303,7 @@ def bout_start_context(
     track_graph : nx.Graph
         Session track graph.
     excluded : pd.DataFrame
-        The epoch's excluded time (``analysed_time.excluded_intervals``):
+        The epoch's excluded time (``analyzed_time.excluded_intervals``):
         ``start_time`` and ``end_time``, closed.
 
     Returns

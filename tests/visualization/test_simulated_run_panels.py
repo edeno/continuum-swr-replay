@@ -47,7 +47,7 @@ def test_a_figure_outside_a_limit_is_refused(change, message):
     plt.close(fig)
 
 
-def test_the_state_colours_are_the_palette_colours():
+def test_the_state_colors_are_the_palette_colors():
     from continuum_swr_replay.visualization.palettes import COLORS
     from continuum_swr_replay.visualization.simulated_run_panels import STATE_COLORS
 
@@ -70,7 +70,7 @@ def test_text_on_a_light_fill_is_black_and_on_a_dark_fill_white(color, expected)
     assert text_color_on(color) == expected
 
 
-def test_a_light_colour_is_darkened_for_text_and_a_dark_one_kept():
+def test_a_light_color_is_darkened_for_text_and_a_dark_one_kept():
     from colorsys import rgb_to_hls
 
     from matplotlib.colors import to_rgb

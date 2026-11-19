@@ -141,7 +141,7 @@ class TestLocalCodingIsAbsorbed:
         assert 2.0 < rs.duration_ratio(decoded, SWEEP_EVENT) < 3.0
 
     def test_most_of_the_reported_event_lies_outside_the_sweep(self, decoded, sequence):
-        """The measure that needs no "same place" judgement."""
+        """The measure that needs no "same place" judgment."""
         start, stop = decoded["candidates"].runs[sequence]
         inside = windows_inside(decoded, SWEEP_EVENT)[start : stop + 1]
 

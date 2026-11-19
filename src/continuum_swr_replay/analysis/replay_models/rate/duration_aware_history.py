@@ -324,7 +324,7 @@ def stack_sessions(
         As in :func:`build_design`.
     min_events : int
         A session with fewer response onsets (``count`` summed over its bins)
-        is left out: its unpenalised session effect has no estimate in a
+        is left out: its unpenalized session effect has no estimate in a
         training set without events.
 
     Returns

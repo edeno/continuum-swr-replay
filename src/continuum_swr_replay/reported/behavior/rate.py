@@ -1212,7 +1212,7 @@ def cohort_audit_values(inputs: BehaviorInputs) -> list[Value]:
                     row["n_modeled"],
                     "count",
                     "count",
-                    f"{path.name}: stops modelled on {model}",
+                    f"{path.name}: stops modeled on {model}",
                 ),
                 make(
                     f"{prefix}_stops_{word}_session_excluded",

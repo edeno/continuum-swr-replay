@@ -72,7 +72,7 @@ No dependency changes. The mutation harness is stdlib `ast` + `subprocess` only.
 
 ## Rollout Strategy
 
-Replace-in-place, no feature flags. Backwards compatibility is preserved where external callers exist: `tables.py` keeps re-exporting every builder name (phase 4), and no published file path changes. Each phase is an independent PR that leaves the suite green and the canonical tables byte-identical, so partial rollout is safe. The mutation harness ships as a repo tool (phase 0) and a CI-runnable check.
+Replace-in-place, no feature flags. Backward compatibility is preserved where external callers exist: `tables.py` keeps re-exporting every builder name (phase 4), and no published file path changes. Each phase is an independent PR that leaves the suite green and the canonical tables byte-identical, so partial rollout is safe. The mutation harness ships as a repo tool (phase 0) and a CI-runnable check.
 
 ## Open Questions
 

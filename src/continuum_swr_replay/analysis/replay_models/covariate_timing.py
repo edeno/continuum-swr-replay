@@ -95,7 +95,7 @@ DERIVED_COVARIATE_SOURCES = {
     ],
     # Reads completed_trial_reward since 1290257, not reward_outcome.
     "wsls_deviation": ["completed_trial_reward", "is_stay"],
-    # Per-bin clocks built by ``aggregate_to_timebins`` as bin centre minus an
+    # Per-bin clocks built by ``aggregate_to_timebins`` as bin center minus an
     # absolute stop clock; each inherits its source clock's availability, so the
     # outcome-relative one stays behind the post-outcome gate even though its
     # negative values sit before the boundary.
@@ -133,7 +133,7 @@ DERIVED_COVARIATE_SOURCES = {
 KNOWN_ATOMS = frozenset(COVARIATE_DEFINITIONS)
 
 # Load-bearing consistency check (keeps PRE_OUTCOME_SAFE from silently rotting):
-# every catalogued covariate carries exactly one Availability, so the three
+# every cataloged covariate carries exactly one Availability, so the three
 # availability-derived classes must cover the whole catalog. POST_OUTCOME also
 # folds in POST_CHOICE_COVARIATES (which are PRE_OUTCOME by availability but
 # gated conservatively), so it can only add names already inside KNOWN_ATOMS.

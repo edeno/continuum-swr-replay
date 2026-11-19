@@ -173,7 +173,7 @@ T_SPK_OOD_OWN_EVENT_S = 1e-3
 included), left out of its nearest-mark search. A neuron cannot fire twice
 within its absolute refractory period (about 1 ms), so two detections that close
 on one tetrode are two units, whose marks differ and are not each other's
-nearest neighbour, or one waveform detected twice. Leaving them out stops an
+nearest neighbor, or one waveform detected twice. Leaving them out stops an
 artifact's twin detections from holding each other in distribution; on the 23
 acceptance epochs it made 20 other spikes OOD and changed no other core. The
 first full run, made before this rule (run ``a1083731940b``), missed the

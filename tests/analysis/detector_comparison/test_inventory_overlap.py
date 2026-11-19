@@ -535,7 +535,7 @@ class TestContracts:
         assert coverage != Coverage(np.array([[0.0, 100.0]]), np.array([[0.0, 100.0]]))
 
     def test_a_pair_table_built_before_bridging_events_were_removed_is_refused(self):
-        """Its neighbours would otherwise read as matched."""
+        """Its neighbors would otherwise read as matched."""
         inventory = pd.concat(
             [events("A", [(39.9, 41.1)]), events("B", [(41.05, 41.2)])],
             ignore_index=True,

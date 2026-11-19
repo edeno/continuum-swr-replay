@@ -30,7 +30,7 @@ from matplotlib.patches import Patch
 from continuum_swr_replay.analysis.replay_models.content.uncertainty_content import (
     HORSERACE_SUMMARY,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
 from continuum_swr_replay.paths import (
     UNCERTAINTY_CONTENT_DIR,
     figure_dir,
@@ -43,7 +43,7 @@ from continuum_swr_replay.visualization.figure_utilities import (
     set_figure_defaults,
 )
 
-ANIMAL_ORDER = list(analysed_animals())
+ANIMAL_ORDER = list(analyzed_animals())
 ANIMAL_COLORS = dict(zip(ANIMAL_ORDER, [WONG[i] for i in [1, 2, 3, 5, 7]], strict=True))
 ANIMAL_MARKERS = dict(zip(ANIMAL_ORDER, ["o", "s", "^", "D", "P"], strict=True))
 SCOPE_COLORS = {"all": "#666666", "unchosen": WONG[5]}

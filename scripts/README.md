@@ -30,19 +30,19 @@ them importable.
 - `run_decoding_bandit.py` — continuum decoding for the bandit task (HPC/mPFC/OFC).
 - `run_decoding_contfrag.py` — decoding for the ContFrag (SWR/MUA) event sources.
 - `_decode_runner.py` — not a script: the flow both decode runners share, imported as `scripts.decoding._decode_runner`.
-- `measure_decoder_quality.py` — each analysed epoch's Local-state decoding error, state fractions and calibration curve, which the events summary reads.
+- `measure_decoder_quality.py` — each analyzed epoch's Local-state decoding error, state fractions and calibration curve, which the events summary reads.
 
 ## `detection/` — the event detectors (Part 1)
 - `run_artifact_detection.py` — the artifact mask of every epoch's CA1 data (`docs/design/2026-10-09-artifact-detection.md`).
 - `run_swr_detection.py` — the four SWR inventories (Kay, Karlsson, Yu, Zugaro) for every epoch, on shared CA1 inputs.
-- `run_carey_detection.py` — Carey's candidate detector, the fifth SWR definition, for every analysed epoch.
+- `run_carey_detection.py` — Carey's candidate detector, the fifth SWR definition, for every analyzed epoch.
 - `run_memoryless_detection.py` — the Widloski & Foster sliding-window detector on each HPC epoch's saved decode.
 - `sweep_memoryless_detection.py` — injected replays scored by both detectors; writes `paper/reported/inputs/detection/detection_sweep_summary.csv`.
 - `sweep_memoryless_controls.py` — the detectors on activity that is not one clean replay; writes `detection_controls_summary.csv` beside it.
 
 ## `detector_comparison/` — the inventories compared (Part 1)
 - `_report.py` — not a script: what the two detection-comparison reports share, imported as `scripts.detector_comparison._report`.
-- `run_inventory_comparison.py` — compares the nine event inventories of each analysed epoch on one substrate.
+- `run_inventory_comparison.py` — compares the nine event inventories of each analyzed epoch on one substrate.
 - `report_inventory_comparison.py` — the counts of one comparison run, per session and per animal, with figures.
 - `run_event_features.py` — the features of every compared event of the nine inventories.
 - `add_state_shares.py` — adds each compared event's decoder-state shares to an event features run.
@@ -52,7 +52,7 @@ them importable.
 ## `event_evidence/` — are the events real (Part 2)
 - `run_state_evidence.py` — held-out spike evidence for each decoder state on every canonical HPC decode.
 - `split_state_evidence_by_swr.py` — held-out spike evidence of Non-Local bouts, split by SWR coupling.
-- `analyze_event_spike_evidence.py` — the spike-evidence test that non-SWR non-local events favour their decoded location.
+- `analyze_event_spike_evidence.py` — the spike-evidence test that non-SWR non-local events favor their decoded location.
 - `run_event_spike_evidence.sh [NJOBS]` — the run of it the events summary reads, one process per epoch (run it in tmux).
 
 ## `event_properties/` — what the events are like (Part 2)
@@ -143,7 +143,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `calibrate_pfc_kernel_timing.py` — how far the kernel estimator moves a response's onset and peak, in simulation.
 - `part4_rate_threshold_sensitivity.py` — Part 4's per-unit values at several firing-rate gates, without a refit.
 - `diagnose_pfc_event_definition.py` — the retired run-time event construction against the canonical event table.
-- `check_pfc_ridge_lambda0.py` — the audit that the penalised solver at zero penalty is the maximum-likelihood one.
+- `check_pfc_ridge_lambda0.py` — the audit that the penalized solver at zero penalty is the maximum-likelihood one.
 - `compare_pfc_fitters.py` — **history**: the audit of the batched JAX fitter against per-neuron statsmodels.
 
 ## `reported/` — the reported values

@@ -705,7 +705,7 @@ class TestShuffleCandidate:
         so the spread half separates by a wide margin. The center of a broad
         posterior sits near the middle of the track and barely moves, so the
         shuffled jump means are small, and "observed jump below the shuffled"
-        favours a decode that stands still: a trajectory that really moves
+        favors a decode that stands still: a trajectory that really moves
         sits inside the null (p about 0.25 at 80 Hz) and does not pass. A
         literal zero-jump rule on binned centers had turned this into a pass
         by setting most of the trajectory's own pairs aside; read from the

@@ -2,9 +2,9 @@
 
 The peri-event models are compared by how well they predict spikes they were
 not fit on, not by a likelihood ratio. Two things make the usual asymptotics
-unusable here: the fits are penalised (the ratio's reference distribution is
+unusable here: the fits are penalized (the ratio's reference distribution is
 not a chi-square at any stated degrees of freedom), and spike counts in
-neighbouring 2 ms bins are not independent, so an in-sample deviance drop is
+neighboring 2 ms bins are not independent, so an in-sample deviance drop is
 worth much less than its nominal degrees of freedom suggest.
 
 **Folds are blocks, not bins.** A random split of bins would put a bin 2 ms
@@ -18,7 +18,7 @@ seeded and recorded.
 
 **The score is the Poisson deviance on the held-out fold**, from a fit on the
 other ``K - 1``. The penalty is part of the estimator, so it is applied to the
-training fit exactly as in the full-data fit; the score itself is unpenalised,
+training fit exactly as in the full-data fit; the score itself is unpenalized,
 because it is a prediction error and not an objective.
 
 **The null comes from re-drawing the matched control, once per event class.**
@@ -40,7 +40,7 @@ bouts and avoiding the same real events, and class ``k``'s improvement is read
 against class ``k``'s draws.
 
 Some real events have no legal non-event window in their own fitted bout. They
-cannot enter a matched randomisation test: comparing an all-event observed
+cannot enter a matched randomization test: comparing an all-event observed
 regressor with a thinner null changes the estimand. A dedicated, deterministic
 placement therefore selects one fixed jointly matchable subset per class,
 before spikes are inspected. Both the observed test statistic and every null
@@ -228,7 +228,7 @@ def assign_blocked_folds(
 ) -> NDArray:
     """Assign support-separated immobility blocks to folds, balanced by size.
 
-    A run is the unit of assignment because neighbouring bins of one run are
+    A run is the unit of assignment because neighboring bins of one run are
     not independent: splitting a run across folds would let a model score on
     held-out bins it has effectively seen. When ``support_radius_bins`` is
     positive, runs separated by no more than twice that radius are first
@@ -365,7 +365,7 @@ def heldout_deviance(
         Spike counts on those bins.
     penalty : NDArray, shape (n_features,), or None
         The estimator's penalty, applied to each training fit exactly as to the
-        full-data fit. The held-out score itself is unpenalised: it is a
+        full-data fit. The held-out score itself is unpenalized: it is a
         prediction error, not the objective.
     folds : NDArray of int, shape (n_fit_bins,)
         Fold index per bin, from :func:`assign_blocked_folds`.
@@ -689,7 +689,7 @@ def control_draw_null(
         The fit window's lags in samples.
     penalty_sigma : float or None
         Prior standard deviation of a basis coefficient, on the log-rate scale.
-        ``None`` scores unpenalised fits.
+        ``None`` scores unpenalized fits.
     classes : Sequence[str]
         Event classes to build a null for.
     baseline_control : pandas.DataFrame, optional
@@ -724,7 +724,7 @@ def control_draw_null(
         bounded as ``len(rng_seeds)`` grows.
     avoid : pandas.DataFrame, optional
         Further windows no control may overlap (``start_time`` / ``end_time``,
-        seconds): the events the analysed-time rule dropped
+        seconds): the events the analyzed-time rule dropped
         (:func:`~continuum_swr_replay.analysis.pfc.matched_control.artifact_dropped_events`),
         as ``run_session`` passes them to the shipped control. The subset
         selection and every draw avoid them, so the null's controls avoid what

@@ -162,7 +162,7 @@ def test_context_baseline_column_is_constant_within_stop():
         "std": pytest.approx(np.std([2.0, 1.0, 0.0])),
     }
 
-    # ... and unpenalised in the design that carries it.
+    # ... and unpenalized in the design that carries it.
     lags = np.arange(-4, 5)
     basis, _, _ = event_basis_functions(lags, SAMPLING_FREQUENCY)
     events = {"a": pd.DataFrame({"start_time": fit_mask.index[[10, 400, 610]]})}
@@ -305,7 +305,7 @@ def test_empty_baseline_reproduces_the_contract_one_fit():
     )
 
 
-def test_baseline_prior_penalises_only_the_baseline_columns():
+def test_baseline_prior_penalizes_only_the_baseline_columns():
     fit_mask, basis, lags, events, baseline, _ = _design_inputs()
     spec = MarkedFamilySpec(
         "baseline_probe", (CURRENT_ARM_FRACTION,), (EVENT_DURATION_MARK,), "probe"

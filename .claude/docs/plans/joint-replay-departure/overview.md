@@ -47,7 +47,7 @@ rate×content models remain separate downstream scientific questions.
   burst **precede departure** (replay → leaving)? Does "destined duration"
   predict early replay (replay ↔ duration)? (Phase 3)
 - **Is replay↔dwell a shared latent (consummatory/engagement) drive**, and does
-  modelling it **de-confound** the time course and change the SWR-vs-non-SWR
+  modeling it **de-confound** the time course and change the SWR-vs-non-SWR
   conclusions? (Phase 4)
 - **Do SWR-coupled vs non-SWR non-local events relate to departure
   differently** — e.g. does SWR-coupled replay wrap up a stop before leaving
@@ -102,7 +102,7 @@ next, more complex phase is justified. Stop early if a gate fails.
   versioned run linked to the source release.
 - **No continuous-time Cox / external survival packages** — discrete-time
   per-bin hazard reusing the existing binned design (no new heavy deps).
-- **No cross-/ensemble spike modelling** — event-onset and departure processes
+- **No cross-/ensemble spike modeling** — event-onset and departure processes
   only.
 - **No replay content/direction model.** This plan does not use represented
   arm/patch or posterior content as a mark; it owns rate/timing only.
@@ -137,7 +137,7 @@ next, more complex phase is justified. Stop early if a gate fails.
 
 ## Open Questions
 1. **Hazard link** — cloglog (grouped continuous-time hazard) vs logistic;
-   default cloglog (the discrete analogue of a proportional continuous hazard).
+   default cloglog (the discrete analog of a proportional continuous hazard).
    Settle in Phase 2.
 2. **Frailty distribution** — gamma (conjugate, standard for joint frailty) vs
    log-normal (couples naturally to the log-linear intensity). Default gamma;

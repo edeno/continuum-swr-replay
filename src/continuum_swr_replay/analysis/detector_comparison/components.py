@@ -2,7 +2,7 @@
 
 Overlap is not transitive: A can overlap B and B overlap C while A
 and C share no time, so membership in "found by all" is not defined by the
-pairs alone. Each component is labelled by which detectors contribute to it,
+pairs alone. Each component is labeled by which detectors contribute to it,
 with its size and span, so a long chain fusing events that do not individually
 overlap is visible. A component is never an event: it carries no bounds that
 could be mistaken for a replacement interval, only a span.

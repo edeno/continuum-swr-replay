@@ -38,7 +38,7 @@ import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
 from continuum_swr_replay.analysis.event_definition import (  # noqa: E402
-    analysed_time,
+    analyzed_time,
     swr_source,
 )
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
@@ -240,7 +240,7 @@ def test_the_data_flow_figure_reads_its_frame_through_the_source(tmp_path, monke
 
     dot, _ = flow.load_session("chimi", 20200213, "02_r1")
 
-    ((start, end),) = analysed_time.excluded_intervals(EPOCH_ID).to_numpy()
+    ((start, end),) = analyzed_time.excluded_intervals(EPOCH_ID).to_numpy()
     np.testing.assert_array_equal(
         dot["in_excluded_time"].to_numpy(), (TIME >= start) & (TIME <= end)
     )
@@ -254,7 +254,7 @@ def test_the_data_flow_figure_reads_its_frame_through_the_source(tmp_path, monke
 
 @pytest.fixture
 def offline(monkeypatch):
-    """Import a script with ``spyglass`` stubbed; forget it afterwards."""
+    """Import a script with ``spyglass`` stubbed; forget it afterward."""
     common = types.ModuleType("spyglass.common")
     common.PositionIntervalMap = type("PositionIntervalMap", (), {})
     monkeypatch.setitem(sys.modules, "spyglass", types.ModuleType("spyglass"))
@@ -302,7 +302,7 @@ def test_the_figure02_cache_is_keyed_on_a_version_token(offline, tmp_path):
 def _register(path: Path, epochs: list[str]) -> Path:
     pd.DataFrame(
         [
-            ["wilbur20210329_.nwb", epoch, "analysed", "", "", "False"]
+            ["wilbur20210329_.nwb", epoch, "analyzed", "", "", "False"]
             for epoch in epochs
         ],
         columns=[
@@ -409,7 +409,7 @@ def test_figure02_checks_the_event_table_against_the_cached_frame_counts(
         "event_table", tmp_path / replay_content_dir().relative_to(processed_data_dir())
     )
     table.parent.mkdir(parents=True)
-    write_table(analysed_time.stamp_swr_source(_figure02_events()), table)
+    write_table(analyzed_time.stamp_swr_source(_figure02_events()), table)
     cache = figure02._figure02_cache_path("wilbur20210329_.nwb", "02_r1", tmp_path)
     cache.parent.mkdir(parents=True)
     data = {"ripple_times": pd.DataFrame(columns=["start_time", "end_time"])}
@@ -524,10 +524,10 @@ def test_figure02_counts_the_frames_events_by_swr_overlap(offline):
     assert counts == {"swr": 1, "non_swr": 2, "total": 3}
 
 
-def test_the_figure02_cache_is_keyed_on_the_analysed_epochs(
+def test_the_figure02_cache_is_keyed_on_the_analyzed_epochs(
     offline, tmp_path, monkeypatch
 ):
-    """Panel e summarises every analysed epoch, so a register change must make
+    """Panel e summarizes every analyzed epoch, so a register change must make
     a new cache without a code change."""
     from continuum_swr_replay.data_loaders import epoch_register
 
@@ -621,7 +621,7 @@ def test_the_figure02_panel_e_label_lies_inside_the_figure():
         gs_cde = outer[2].subgridspec(
             2, 4, width_ratios=[1.35, 0.8, 0.8, 1.05], hspace=0.05, wspace=0.38
         )
-        # the neighbours that set the room panel e gets
+        # the neighbors that set the room panel e gets
         ax_c_top = fig.add_subplot(gs_cde[0, 0])
         ax_c_bot = fig.add_subplot(gs_cde[1, 0], sharex=ax_c_top)
         ax_c_top.set_ylabel("Non-Local\nProb.")
@@ -693,7 +693,7 @@ def test_the_rate_summary_panel_b_takes_its_box_statistics_in_log_space():
     five decades. The panel boxes the coefficient beta = log(RR) instead.
 
     The axis is therefore linear in beta by design, not a log axis; its ticks
-    sit at beta = log(RR) for plain RR values and are labelled with the RR."""
+    sit at beta = log(RR) for plain RR values and are labeled with the RR."""
     import matplotlib.pyplot as plt
 
     summary = importlib.import_module(
@@ -775,7 +775,7 @@ def test_the_rate_summary_panel_b_takes_its_box_statistics_in_log_space():
     # RR = 1 is beta = 0: inside the limits, and drawn there
     assert low < 0.0 < high
     assert any(np.allclose(y, 0.0) for y in one_lines)
-    # ticks at log of plain 1-2-5 rate ratios, labelled with the RR
+    # ticks at log of plain 1-2-5 rate ratios, labeled with the RR
     assert len(ticks) >= 3
     assert all("^" not in text and "$" not in text for text in tick_labels)
     rate_ratio_labels = [float(text) for text in tick_labels]
@@ -829,7 +829,7 @@ def _contrast_plotting_namespace() -> dict:
     from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
         animal_median_bootstrap,
     )
-    from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+    from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
 
     tree = ast.parse(CONTRAST_SCRIPT.read_text())
     kept = []
@@ -863,7 +863,7 @@ def _contrast_plotting_namespace() -> dict:
         "np": np,
         "pd": pd,
         "plt": plt,
-        "analysed_animals": analysed_animals,
+        "analyzed_animals": analyzed_animals,
         "animal_median_bootstrap": animal_median_bootstrap,
         "std_factor": std_factor,
         "sessions": sessions,
@@ -1027,7 +1027,7 @@ def test_the_gof_ladder_title_carries_the_computed_retention_note(
 
 
 def _symmetric_autocorrelation(n_spikes: int) -> np.ndarray:
-    """A normalised autocorrelation of length ``2 * n_spikes - 1``."""
+    """A normalized autocorrelation of length ``2 * n_spikes - 1``."""
     from scipy.signal import correlate
 
     values = np.random.default_rng(2).normal(size=n_spikes)
@@ -1038,7 +1038,7 @@ def _symmetric_autocorrelation(n_spikes: int) -> np.ndarray:
 @pytest.mark.parametrize(
     ("n_spikes", "lag_max"), [(100, 50), (100, 3), (60, 60), (30, 50)]
 )
-def test_the_isi_autocorrelation_window_is_centred_on_the_zero_lag(n_spikes, lag_max):
+def test_the_isi_autocorrelation_window_is_centered_on_the_zero_lag(n_spikes, lag_max):
     """non_local_detector#64: ``slice(-lag_max + 1, lag_max)`` is empty for every
     ``lag_max <= n_spikes`` because its start counts from the end of the array and
     its stop from the start."""

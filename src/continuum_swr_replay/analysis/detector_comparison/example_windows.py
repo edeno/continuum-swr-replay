@@ -44,7 +44,7 @@ from continuum_swr_replay.analysis.detection.memoryless_sequence.window_statisti
 )
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
 from continuum_swr_replay.analysis.event_definition import (
-    analysed_time,
+    analyzed_time,
     swr_source,
 )
 from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
@@ -210,7 +210,7 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
         missing_windows=missing_windows,
         band_time=band["time"][in_span],
         ripple_band=band["ripple_band"][in_span][:, kept],
-        excluded=analysed_time.excluded_intervals(identifier),
+        excluded=analyzed_time.excluded_intervals(identifier),
         inventory=table("inventory"),
         set_aside=table("set_aside"),
     )

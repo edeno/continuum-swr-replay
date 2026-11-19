@@ -670,7 +670,7 @@ Find the ripple-branch value (likely `1000`).
 **Step 3: Smoke-test against a session**
 
 Run: `uv run python -c "from continuum_swr_replay.data_loaders.lfp import get_lfp_data; d = get_lfp_data('chimi20200212_.nwb', '02_r1'); print(d.keys())"`
-Expected: works (or the same behaviour you got before — no runtime regression).
+Expected: works (or the same behavior you got before — no runtime regression).
 
 **Step 4: Commit**
 

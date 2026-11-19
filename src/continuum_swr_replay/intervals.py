@@ -27,7 +27,7 @@ convention of the artifact mask and of excluded time
 (``analysis/event_definition/artifact_masks.py``, ``event_definition.eligibility``). They
 refuse an interval with a NaN bound or with ``start > end`` (``ValueError``,
 naming the rows): such an interval has no closed reading, and merging one
-would silently hide its neighbours.
+would silently hide its neighbors.
 
 **Overlap conventions.** "Overlap" means four different things in the
 project. Each has its own name, so the choice is visible at each caller:

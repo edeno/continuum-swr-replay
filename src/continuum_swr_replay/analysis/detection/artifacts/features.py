@@ -397,7 +397,7 @@ def nearest_mark_distance(
     `own_event_s` from it in time, the spike itself included (Δt = 0); those
     marks are left out of its search. Within a neuron's absolute refractory
     period (about 1 ms) two detections on one tetrode are either two units,
-    whose marks differ and are not each other's nearest neighbour among the
+    whose marks differ and are not each other's nearest neighbor among the
     tetrode's marks, or one waveform detected twice. Leaving them out stops an
     artifact detected twice from holding its own twin in distribution; on the
     23 acceptance epochs it made 20 other spikes OOD and changed no other
@@ -443,10 +443,10 @@ def nearest_mark_distance(
     n_own -= np.searchsorted(sorted_time, times - reach, side="left")
     k = int(min(n_own.max() + 1, reference_index.size))
     tree = cKDTree(marks[reference_index])
-    found, neighbour = tree.query(marks, k=k)
+    found, neighbor = tree.query(marks, k=k)
     found = found.reshape(n_spikes, k)
-    neighbour = neighbour.reshape(n_spikes, k)
-    outside = np.abs(reference_time[neighbour] - times[:, None]) > own_event_s
+    neighbor = neighbor.reshape(n_spikes, k)
+    outside = np.abs(reference_time[neighbor] - times[:, None]) > own_event_s
     first = outside.argmax(axis=1)  # the nearest outside the own event
     nearest: NDArray[np.float64] = np.where(
         outside.any(axis=1), found[np.arange(n_spikes), first], np.inf

@@ -336,8 +336,8 @@ def test_logit_run_headline_is_also_event_scale() -> None:
 
 
 def test_scale_label_refuses_to_claim_a_scale_it_does_not_know() -> None:
-    assert fit_outputs.scale_label(None) == "unlabelled scale"
-    assert fit_outputs.scale_label("some_new_estimator") == "unlabelled scale"
+    assert fit_outputs.scale_label(None) == "unlabeled scale"
+    assert fit_outputs.scale_label("some_new_estimator") == "unlabeled scale"
 
 
 # ── Provenance ──
@@ -671,7 +671,7 @@ def test_dm_parser_defaults() -> None:
     )
 
 
-def test_dm_numbers_are_labelled_a_full_event_likelihood() -> None:
+def test_dm_numbers_are_labeled_a_full_event_likelihood() -> None:
     assert (
         fit_outputs.scale_label("dirichlet_multinomial")
         == "event-scale (full likelihood)"

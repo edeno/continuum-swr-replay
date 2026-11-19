@@ -38,7 +38,7 @@ def _results() -> xr.Dataset:
     return xr.Dataset({"acausal_posterior": posterior})
 
 
-def test_the_panel_draws_the_package_posterior_forward_filled_and_off_track_grey():
+def test_the_panel_draws_the_package_posterior_forward_filled_and_off_track_gray():
     env = SimpleNamespace(
         place_bin_centers_=POSITION,
         is_track_interior_=np.array([True, True, True, False]),

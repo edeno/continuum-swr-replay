@@ -24,7 +24,7 @@ reported as a plain edge rather than as an ``ImportError`` from a cycle:
   (:data:`FOUNDATION`) imports, from within the package, only other
   foundation modules, and nothing from ``scripts``.
 - ``event_definition_imports_only_foundation``: the rule
-  (``analysis.event_definition``: analysed time, immobility, the non-local
+  (``analysis.event_definition``: analyzed time, immobility, the non-local
   event rule, the canonical SWR source) imports, from within the package, only
   foundation modules, ``analysis.constants``, ``analysis.shared_statistics``
   and itself, and nothing from ``scripts``.
@@ -433,7 +433,7 @@ def test_event_definition_rule_allows_only_foundation_constants_and_itself(
 
 
 def test_data_flow_and_reporting_rules_see_a_planted_import(tmp_path: Path) -> None:
-    """Each new rule reports the import it forbids and none of its neighbours.
+    """Each new rule reports the import it forbids and none of its neighbors.
 
     Forbidden: ``behavior`` importing ``event_tables``, ``event_tables``
     importing ``replay_models``, a top-level ``behavior`` module importing

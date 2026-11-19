@@ -27,7 +27,7 @@ def _windows() -> pd.DataFrame:
     ).assign(regime="immobile")
 
 
-def test_a_bout_touching_an_swr_bin_and_its_matched_window_are_labelled_swr():
+def test_a_bout_touching_an_swr_bin_and_its_matched_window_are_labeled_swr():
     swr = np.zeros(30, dtype=bool)
     swr[4] = True  # the last bin of the first bout
     out = split_non_local_by_swr(_windows(), swr)

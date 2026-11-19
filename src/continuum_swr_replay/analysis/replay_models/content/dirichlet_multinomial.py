@@ -81,7 +81,7 @@ ESTIMATOR = "dirichlet_multinomial"
 #: Name of the concentration intercept coefficient (``gamma_0``).
 LOG_PHI_INTERCEPT = "log_phi_intercept"
 
-# The concentration intercept is the DM analogue of ``Intercept``: it sets the
+# The concentration intercept is the DM analog of ``Intercept``: it sets the
 # baseline within-event redundancy and is never an aggregated scientific effect.
 # It is also structurally unjudgeable on the effect scale (its design column is a
 # constant, so its SD is 0) and it is NaN by construction when pinned via
@@ -353,7 +353,7 @@ def _pack_events(
 def _swr_event_counts(
     Z: np.ndarray, concentration_cols: tuple[str, ...]
 ) -> dict[str, float]:
-    """Modelled events on each side of the ``is_swr`` concentration modifier.
+    """Modeled events on each side of the ``is_swr`` concentration modifier.
 
     The ``log_phi_is_swr`` contrast is only as trustworthy as the smaller of the
     two event groups behind it, and neither ``n_events`` nor the effect-scale
@@ -675,7 +675,7 @@ def fit_dirichlet_multinomial(
     # McFadden's ratio of two FULL log-likelihoods: both ``llf`` and ``llf_null``
     # carry the multinomial coefficient, which a statsmodels conditional fit's
     # likelihood omits. The constant is a large negative number that enters both
-    # numerator and denominator, so this ratio is compressed towards zero
+    # numerator and denominator, so this ratio is compressed toward zero
     # relative to a conditional fit's -- the two are not on one scale and must
     # not be tabulated against each other. Its null also differs: the DM null
     # refits the concentration, so the baseline is uniform-allocation-at-the-
@@ -844,7 +844,7 @@ def cross_validate_dirichlet_multinomial(
 # ── per-session driving, with a pooled concentration for small sessions ─────
 
 
-#: Default minimum modelled events for a session to estimate its own ``log phi``.
+#: Default minimum modeled events for a session to estimate its own ``log phi``.
 DEFAULT_MIN_EVENTS_SESSION_PHI = 40
 
 #: Key under which :func:`animal_pooled_log_phi` stores the all-animal median.
@@ -902,7 +902,7 @@ def animal_pooled_log_phi(
     pin down: with a handful of events the likelihood is nearly flat in it, and
     the optimizer walks it to whatever value makes the few observed allocations
     look certain -- which then propagates into that session's coefficient
-    standard errors. Sessions with at least ``min_events`` modelled events do
+    standard errors. Sessions with at least ``min_events`` modeled events do
     estimate it, and their median within an animal is what a short session of
     the same animal is pinned to.
 
@@ -912,7 +912,7 @@ def animal_pooled_log_phi(
         First-pass fits, one row per session, carrying ``animal``,
         ``n_events`` and ``coef_log_phi_intercept``.
     min_events : int, optional
-        Minimum modelled events for a session to contribute.
+        Minimum modeled events for a session to contribute.
 
     Returns
     -------
@@ -1046,7 +1046,7 @@ def fit_sessions_dirichlet_multinomial(
     predictors : list of str
         Category-varying predictors for this rung.
     min_events : int, optional
-        Sessions with fewer modelled events than this are pinned.
+        Sessions with fewer modeled events than this are pinned.
     n_jobs : int, optional
         Worker processes for the per-session fits.
     response_col, event_col, concentration_cols, n_categories

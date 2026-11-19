@@ -49,7 +49,7 @@ from continuum_swr_replay.analysis.detector_comparison.overlap import (
 from continuum_swr_replay.analysis.detector_comparison.populations import (
     rebuild_matches,
 )
-from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
+from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 from continuum_swr_replay.intervals import (
     intersect,
     total_duration,
@@ -82,7 +82,7 @@ SPEED = np.where((TIME >= 20.0) & (TIME < 25.0), 10.0, 1.0)
 
 NON_LOCAL = [(5.0, 5.3), (10.0, 10.2), (41.1, 41.15), (51.0, 51.2)]
 """The state-space events, all still: the decoder labels only events that are
-immobile as a whole, and the read (``analysed_time.with_swr_source``) refuses a
+immobile as a whole, and the read (``analyzed_time.with_swr_source``) refuses a
 moving ``non_local_event`` label as a stale frame. The moving event is Kay's."""
 KAY = [(5.05, 5.1), (21.0, 21.05), (30.0, 30.1)]
 """Kay's SWRs; the one at 21.0 s is during the movement bout, so it stays in
@@ -257,7 +257,7 @@ def inputs(tmp_path_factory, module_monkeypatch):
     write_carey_run(carey_root())
     write_memoryless_run(memoryless_root())
     monkeypatch.setattr(
-        cli, "analysed_epoch_ids", lambda: [*EPOCHS.values(), SHIFTED, NO_DECODE]
+        cli, "analyzed_epoch_ids", lambda: [*EPOCHS.values(), SHIFTED, NO_DECODE]
     )
     return tmp_path
 
@@ -569,12 +569,12 @@ class TestTheStoredTablesRebuildTheComparison:
             return seen["matches"]
 
         saved = pd.read_pickle(inventory_run.decode_path(identifier))
-        dot = analysed_time.with_swr_source(saved)
+        dot = analyzed_time.with_swr_source(saved)
         with pytest.MonkeyPatch.context() as patch:
             patch.setattr(epoch_comparison, "event_matches", spy)
             epoch_comparison.compare_epoch(
                 dot,
-                analysed_time.artifact_event_drops(saved),
+                analyzed_time.artifact_event_drops(saved),
                 decode_run_id="decode",
                 carey_dir=carey_root() / CAREY_RUN,
                 memoryless_dir=memoryless_root() / MEMORYLESS_RUN,

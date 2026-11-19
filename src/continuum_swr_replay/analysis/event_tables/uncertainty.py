@@ -1,6 +1,6 @@
 """Per-event decoder-confidence summaries from the arm-marginal posterior.
 
-Three event-level variables summarising the within-event decoder
+Three event-level variables summarizing the within-event decoder
 posterior over arms, each computed as a ``w_t``-weighted mean across
 the event's timebins:
 

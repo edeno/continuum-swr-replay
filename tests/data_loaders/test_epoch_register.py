@@ -8,7 +8,7 @@ The committed register is checked for its contract, and for covering every key
 of the 2026-10-05 exclusion audit (``tests/support/data/epoch_register/
 exclusions_table_keys.csv``: the 557 keys of ``exclusions_table.csv``, a blank
 epoch for a session with no run epoch). No test pins an epoch's status there
-that a register edit could change: which epochs are analysed is the audit's to
+that a register edit could change: which epochs are analyzed is the audit's to
 check, live. The selections and lookups are tested on registers written under
 ``tmp_path``, which ``REGISTER_PATH`` is pointed at.
 """
@@ -32,10 +32,10 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     EpochRegisterError,
     Reason,
     Status,
-    analysed_animals,
-    analysed_decode_files,
-    analysed_epoch_ids,
-    analysed_epochs,
+    analyzed_animals,
+    analyzed_decode_files,
+    analyzed_epoch_ids,
+    analyzed_epochs,
     epochs_to_run,
     first_exposure_epochs,
     pending_epochs,
@@ -61,16 +61,16 @@ AUDIT_KEYS = (
 COLUMNS = ["nwb_file_name", "epoch", "status", "reason", "evidence", "first_exposure"]
 
 ROWS = [
-    ["a20200101_.nwb", "02_r1", "analysed", "", "", "False"],
-    ["a20200101_.nwb", "04_r2", "analysed", "", "", "False"],
+    ["a20200101_.nwb", "02_r1", "analyzed", "", "", "False"],
+    ["a20200101_.nwb", "04_r2", "analyzed", "", "", "False"],
     ["a20200101_.nwb", "06_r3", "pending", "PENDING_POPULATE", "no PIM row", "False"],
     ["b20200102_.nwb", "02_r1", "pending", "PENDING_POPULATE", "no LFPV1", "False"],
     ["b20200102_.nwb", "04_r2", "excluded", "DEPLETION_TASK", "decay 80", "False"],
     ["c20200103_.nwb", "*", "excluded", "NO_NWB", "no NWB file anywhere", "False"],
 ]
-"""A small register: two analysed, two pending, an excluded epoch, a
+"""A small register: two analyzed, two pending, an excluded epoch, a
 session-wide entry; no first-exposure epoch."""
-ANALYSED = [("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")]
+ANALYZED = [("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")]
 PENDING = [("a20200101_.nwb", "06_r3"), ("b20200102_.nwb", "02_r1")]
 
 
@@ -131,12 +131,12 @@ def test_no_epoch_has_two_statuses():
     assert session_wide.isdisjoint(with_epochs)
 
 
-def test_every_unanalysed_entry_has_one_reason_and_its_evidence():
+def test_every_unanalyzed_entry_has_one_reason_and_its_evidence():
     register = read_register()
-    analysed = register["status"] == Status.ANALYSED
+    analyzed = register["status"] == Status.ANALYZED
 
-    assert (register.loc[analysed, "reason"] == "").all()
-    others = register[~analysed]
+    assert (register.loc[analyzed, "reason"] == "").all()
+    others = register[~analyzed]
     assert others["reason"].map(lambda reason: reason in set(Reason)).all()
     assert (others["evidence"].str.strip() != "").all()
     pending = others["status"] == Status.PENDING
@@ -169,17 +169,17 @@ def test_the_rule_is_stated_in_the_module_docstring():
     assert " ".join(epoch_register.RULE.split()) in docstring
 
 
-def test_the_committed_cohort_is_whatever_the_register_analyses(monkeypatch):
-    """With Spyglass listing every analysed and pending epoch, as after the
-    populates, the cohort is exactly the register's analysed entries."""
+def test_the_committed_cohort_is_whatever_the_register_analyzes(monkeypatch):
+    """With Spyglass listing every analyzed and pending epoch, as after the
+    populates, the cohort is exactly the register's analyzed entries."""
     register = read_register()
     keys = [key for key in register.index if key[1] != "*"]
     status = dict(zip(register.index, register["status"], strict=True))
     listed = [key for key in keys if status[key] != Status.EXCLUDED]
     _listing(monkeypatch, listed)
 
-    assert set(analysed_epochs().index) == {
-        key for key in listed if status[key] == Status.ANALYSED
+    assert set(analyzed_epochs().index) == {
+        key for key in listed if status[key] == Status.ANALYZED
     }
     pending = {key for key in listed if status[key] == Status.PENDING}
     if pending:
@@ -195,7 +195,7 @@ def test_the_committed_cohort_is_whatever_the_register_analyses(monkeypatch):
 
 
 GOOD_ROWS = [
-    ["a20200101_.nwb", "02_r1", "analysed", "", "", "True"],
+    ["a20200101_.nwb", "02_r1", "analyzed", "", "", "True"],
     ["a20200101_.nwb", "04_r2", "pending", "PENDING_POPULATE", "no PIM row", "False"],
     ["b20200101_.nwb", "*", "excluded", "NO_NWB", "no NWB file anywhere", "False"],
 ]
@@ -216,14 +216,14 @@ def test_a_well_formed_register_is_read_by_epoch(tmp_path):
             ["a20200101_.nwb", "02_r1", "excluded", "NO_NWB", "x", "False"],
             "more than once",
         ),
-        (["b20200101_.nwb", "02_r1", "analysed", "", "", "False"], "session-wide"),
+        (["b20200101_.nwb", "02_r1", "analyzed", "", "", "False"], "session-wide"),
         (["c20200101_.nwb", "02_r1", "kept", "", "", "False"], "status"),
         (
             ["c20200101_.nwb", "02_r1", "excluded", "NO_REASON", "x", "False"],
             "reason",
         ),
         (["c20200101_.nwb", "02_r1", "excluded", "NO_NWB", " ", "False"], "evidence"),
-        (["c20200101_.nwb", "02_r1", "analysed", "NO_NWB", "x", "False"], "reason"),
+        (["c20200101_.nwb", "02_r1", "analyzed", "NO_NWB", "x", "False"], "reason"),
         (
             ["c20200101_.nwb", "02_r1", "pending", "NO_NWB", "x", "False"],
             "PENDING_POPULATE",
@@ -241,14 +241,14 @@ def test_a_well_formed_register_is_read_by_epoch(tmp_path):
             ["c20200101_.nwb", "*", "pending", "PENDING_POPULATE", "x", "False"],
             "session-wide",
         ),
-        (["c20200101_.nwb", "02_r1", "analysed", "", "", "true"], "first_exposure"),
-        (["c20200101_.nwb", "02_r1", "analysed", "", "", ""], "first_exposure"),
+        (["c20200101_.nwb", "02_r1", "analyzed", "", "", "true"], "first_exposure"),
+        (["c20200101_.nwb", "02_r1", "analyzed", "", "", ""], "first_exposure"),
         (
             ["c20200101_.nwb", "*", "excluded", "NO_NWB", "x", "True"],
             "not first exposure",
         ),
         (
-            ["a20200105_.nwb", "02_r1", "analysed", "", "", "True"],
+            ["a20200105_.nwb", "02_r1", "analyzed", "", "", "True"],
             "a has more than one first-exposure epoch",
         ),
     ],
@@ -258,7 +258,7 @@ def test_a_well_formed_register_is_read_by_epoch(tmp_path):
         "unknown-status",
         "unknown-reason",
         "blank-evidence",
-        "analysed-with-reason",
+        "analyzed-with-reason",
         "pending-other-reason",
         "pending-sustained-noise",
         "excluded-pending-reason",
@@ -306,53 +306,53 @@ def test_register_entry_carries_status_reason_and_evidence(small_register):
 
 
 # --------------------------------------------------------------------------
-# analysed_epochs, pending_epochs, epochs_to_run
+# analyzed_epochs, pending_epochs, epochs_to_run
 # --------------------------------------------------------------------------
 
 
-def test_analysed_epochs_keep_get_epoch_infos_rows_the_register_analyses(
+def test_analyzed_epochs_keep_get_epoch_infos_rows_the_register_analyzes(
     small_register, monkeypatch
 ):
-    """Spyglass also lists pending epochs; the cohort is still the analysed."""
-    listed = [PENDING[0], ANALYSED[1], ANALYSED[0], PENDING[1]]
+    """Spyglass also lists pending epochs; the cohort is still the analyzed."""
+    listed = [PENDING[0], ANALYZED[1], ANALYZED[0], PENDING[1]]
     _listing(monkeypatch, listed)
 
-    selected = analysed_epochs()
+    selected = analyzed_epochs()
 
-    assert list(selected.index) == [ANALYSED[1], ANALYSED[0]]  # its order
+    assert list(selected.index) == [ANALYZED[1], ANALYZED[0]]  # its order
     assert list(selected.columns) == ["animal", "date", "epoch"]
-    assert sorted(analysed_epochs(include_pending=True).index) == sorted(
-        ANALYSED + PENDING
+    assert sorted(analyzed_epochs(include_pending=True).index) == sorted(
+        ANALYZED + PENDING
     )
 
 
-def test_analysed_epochs_raise_on_an_unregistered_epoch(small_register, monkeypatch):
-    _listing(monkeypatch, [*ANALYSED, ("testrat20990101_.nwb", "02_r1")])
+def test_analyzed_epochs_raise_on_an_unregistered_epoch(small_register, monkeypatch):
+    _listing(monkeypatch, [*ANALYZED, ("testrat20990101_.nwb", "02_r1")])
 
     with pytest.raises(EpochRegisterError, match="testrat20990101_.nwb 02_r1"):
-        analysed_epochs()
+        analyzed_epochs()
 
 
-def test_analysed_epochs_raise_when_an_analysed_epoch_is_not_listed(
+def test_analyzed_epochs_raise_when_an_analyzed_epoch_is_not_listed(
     small_register, monkeypatch
 ):
-    _listing(monkeypatch, ANALYSED[1:])
+    _listing(monkeypatch, ANALYZED[1:])
 
-    with pytest.raises(EpochRegisterError, match="1 analysed epoch"):
-        analysed_epochs()
+    with pytest.raises(EpochRegisterError, match="1 analyzed epoch"):
+        analyzed_epochs()
 
 
 def test_pending_epochs_are_exactly_the_pending_ones(small_register, monkeypatch):
-    _listing(monkeypatch, [*ANALYSED, *PENDING])
+    _listing(monkeypatch, [*ANALYZED, *PENDING])
 
     assert list(pending_epochs().index) == PENDING
     assert list(epochs_to_run(pending_only=True).index) == PENDING
-    assert list(epochs_to_run().index) == ANALYSED
+    assert list(epochs_to_run().index) == ANALYZED
 
 
 def test_pending_epochs_must_be_listed_by_spyglass(small_register, monkeypatch):
     """A pending epoch whose populate has not happened is not listed."""
-    _listing(monkeypatch, [*ANALYSED, PENDING[0]])
+    _listing(monkeypatch, [*ANALYZED, PENDING[0]])
 
     with pytest.raises(EpochRegisterError, match="1 pending epoch"):
         pending_epochs()
@@ -362,7 +362,7 @@ def test_pending_epochs_refuse_a_register_with_none(tmp_path, monkeypatch):
     rows = [row for row in ROWS if row[2] != "pending"]
     path = _write_register(tmp_path / "epoch_register.csv", rows)
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
-    _listing(monkeypatch, ANALYSED)
+    _listing(monkeypatch, ANALYZED)
 
     with pytest.raises(EpochRegisterError, match="no pending epoch"):
         pending_epochs()
@@ -396,34 +396,34 @@ def test_select_epochs_drops_a_listed_sustained_noise_epoch_without_raising(
     """Spyglass lists the epoch (it was populated and decoded), and the register
     leaves it out of every selection without an error."""
     register = read_register(_write_register(tmp_path / "r.csv", [*ROWS, NOISY_ROW]))
-    listed = [ANALYSED[0], NOISY, *PENDING, ANALYSED[1]]
+    listed = [ANALYZED[0], NOISY, *PENDING, ANALYZED[1]]
     epoch_info = _epoch_info(listed)
 
-    analysed = select_epochs(epoch_info, {Status.ANALYSED}, register)
-    both = select_epochs(epoch_info, {Status.ANALYSED, Status.PENDING}, register)
+    analyzed = select_epochs(epoch_info, {Status.ANALYZED}, register)
+    both = select_epochs(epoch_info, {Status.ANALYZED, Status.PENDING}, register)
 
-    assert list(analysed.index) == ANALYSED
-    assert list(both.index) == [ANALYSED[0], *PENDING, ANALYSED[1]]
+    assert list(analyzed.index) == ANALYZED
+    assert list(both.index) == [ANALYZED[0], *PENDING, ANALYZED[1]]
 
 
-def test_analysed_epochs_add_the_sustained_noise_epochs_on_request(
+def test_analyzed_epochs_add_the_sustained_noise_epochs_on_request(
     tmp_path, monkeypatch
 ):
     """The artifact runner re-tests the S epochs, read through get_epoch_info
     like the others."""
     path = _write_register(tmp_path / "epoch_register.csv", [*ROWS, NOISY_ROW])
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
-    _listing(monkeypatch, [ANALYSED[0], NOISY, *PENDING, ANALYSED[1]])
+    _listing(monkeypatch, [ANALYZED[0], NOISY, *PENDING, ANALYZED[1]])
 
-    assert list(analysed_epochs().index) == ANALYSED
-    assert list(analysed_epochs(include_sustained_noise=True).index) == [
-        ANALYSED[0],
+    assert list(analyzed_epochs().index) == ANALYZED
+    assert list(analyzed_epochs(include_sustained_noise=True).index) == [
+        ANALYZED[0],
         NOISY,
-        ANALYSED[1],
+        ANALYZED[1],
     ]
     assert list(
-        analysed_epochs(include_pending=True, include_sustained_noise=True).index
-    ) == [ANALYSED[0], NOISY, *PENDING, ANALYSED[1]]
+        analyzed_epochs(include_pending=True, include_sustained_noise=True).index
+    ) == [ANALYZED[0], NOISY, *PENDING, ANALYZED[1]]
 
 
 def test_a_requested_sustained_noise_epoch_spyglass_does_not_list_raises(
@@ -431,40 +431,40 @@ def test_a_requested_sustained_noise_epoch_spyglass_does_not_list_raises(
 ):
     path = _write_register(tmp_path / "epoch_register.csv", [*ROWS, NOISY_ROW])
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
-    _listing(monkeypatch, ANALYSED)
+    _listing(monkeypatch, ANALYZED)
 
     with pytest.raises(EpochRegisterError, match="1 excluded epoch"):
-        analysed_epochs(include_sustained_noise=True)
+        analyzed_epochs(include_sustained_noise=True)
     # unrequested, its absence is no concern
-    assert list(analysed_epochs().index) == ANALYSED
+    assert list(analyzed_epochs().index) == ANALYZED
 
 
 # --------------------------------------------------------------------------
-# analysed_decode_files, the register's replacement for globbing a folder
+# analyzed_decode_files, the register's replacement for globbing a folder
 # --------------------------------------------------------------------------
 
 
-def test_analysed_epoch_ids_name_the_decodes(small_register):
-    assert analysed_epoch_ids() == ["a20200101_02_r1_HPC", "a20200101_04_r2_HPC"]
+def test_analyzed_epoch_ids_name_the_decodes(small_register):
+    assert analyzed_epoch_ids() == ["a20200101_02_r1_HPC", "a20200101_04_r2_HPC"]
 
 
-def test_a_decode_folder_yields_only_analysed_epochs_files(small_register, tmp_path):
+def test_a_decode_folder_yields_only_analyzed_epochs_files(small_register, tmp_path):
     folder = tmp_path / "decodes"
     folder.mkdir()
     for name in [
-        "a20200101_02_r1_HPC_80_data_over_time.pkl",  # analysed
+        "a20200101_02_r1_HPC_80_data_over_time.pkl",  # analyzed
         "a20200101_06_r3_HPC_80_data_over_time.pkl",  # pending
         "b20200102_04_r2_HPC_80_data_over_time.pkl",  # excluded
         "z20990101_02_r1_HPC_80_data_over_time.pkl",  # unregistered
     ]:
         (folder / name).touch()
 
-    found = analysed_decode_files(folder, "_80_data_over_time.pkl")
+    found = analyzed_decode_files(folder, "_80_data_over_time.pkl")
 
-    # a20200101 04_r2 is analysed but has no file: left out, not raised
+    # a20200101 04_r2 is analyzed but has no file: left out, not raised
     assert found == [folder / "a20200101_02_r1_HPC_80_data_over_time.pkl"]
     with pytest.raises(FileNotFoundError, match="a20200101_04_r2_HPC_80"):
-        analysed_decode_files(folder, "_80_data_over_time.pkl", require_all=True)
+        analyzed_decode_files(folder, "_80_data_over_time.pkl", require_all=True)
 
 
 # --------------------------------------------------------------------------
@@ -520,18 +520,18 @@ def test_get_epoch_info_restricts_session_to_the_admitted_descriptions(monkeypat
 
 
 # --------------------------------------------------------------------------
-# analysed_animals, format_epoch_identifier over the committed cohort
+# analyzed_animals, format_epoch_identifier over the committed cohort
 # --------------------------------------------------------------------------
 
 
-def test_the_analysed_animals_are_the_cohorts_in_register_order():
+def test_the_analyzed_animals_are_the_cohorts_in_register_order():
     """The five animals, alphabetical because the register sorts by file name."""
-    assert analysed_animals() == ("chimi", "j16", "peanut", "senor", "wilbur")
+    assert analyzed_animals() == ("chimi", "j16", "peanut", "senor", "wilbur")
 
 
-def test_an_animal_with_no_analysed_epoch_is_not_listed(small_register):
+def test_an_animal_with_no_analyzed_epoch_is_not_listed(small_register):
     """``b`` has only pending and excluded epochs, ``c`` a session-wide exclusion."""
-    assert analysed_animals() == ("a",)
+    assert analyzed_animals() == ("a",)
 
 
 # --------------------------------------------------------------------------
@@ -542,14 +542,14 @@ def test_an_animal_with_no_analysed_epoch_is_not_listed(small_register):
 def test_first_exposure_epochs_are_the_flagged_ones_whatever_their_status(
     tmp_path, monkeypatch
 ):
-    """An excluded epoch is flagged like an analysed one (peanut's is excluded),
+    """An excluded epoch is flagged like an analyzed one (peanut's is excluded),
     and an animal may have none."""
     rows = [
         ["b20200102_.nwb", "02_r1", "excluded", "NO_TRIAL_INTERVALS", "x", "True"],
-        ["b20200103_.nwb", "02_r1", "analysed", "", "", "False"],
-        ["a20200101_.nwb", "04_r2", "analysed", "", "", "True"],
-        ["a20200101_.nwb", "02_r1", "analysed", "", "", "False"],
-        ["c20200101_.nwb", "02_r1", "analysed", "", "", "False"],
+        ["b20200103_.nwb", "02_r1", "analyzed", "", "", "False"],
+        ["a20200101_.nwb", "04_r2", "analyzed", "", "", "True"],
+        ["a20200101_.nwb", "02_r1", "analyzed", "", "", "False"],
+        ["c20200101_.nwb", "02_r1", "analyzed", "", "", "False"],
     ]
     path = _write_register(tmp_path / "epoch_register.csv", rows)
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
@@ -565,7 +565,7 @@ def test_the_committed_register_flags_one_first_exposure_epoch_per_animal():
     epochs = first_exposure_epochs()
     animals = [parse_nwb_filename(name)[0] for name, _ in epochs]
 
-    assert sorted(animals) == sorted(analysed_animals())
+    assert sorted(animals) == sorted(analyzed_animals())
 
 
 @pytest.mark.parametrize("brain_area", ["HPC", "mPFC", "OFC"])
@@ -573,16 +573,16 @@ def test_the_committed_register_flags_one_first_exposure_epoch_per_animal():
     "suffix",
     ["", "_contfrag", "_non_stationary", "_contfrag_non_stationary"],
 )
-def test_every_analysed_epoch_id_round_trips_through_the_parser(
+def test_every_analyzed_epoch_id_round_trips_through_the_parser(
     monkeypatch, brain_area, suffix
 ):
-    """format_epoch_identifier is the parser's inverse on every analysed epoch,
+    """format_epoch_identifier is the parser's inverse on every analyzed epoch,
     and gives the string the inline ``.replace('_.nwb', '')`` formatters did."""
     register = read_register()
     keys = [key for key in register.index if key[1] != "*"]
     _listing(monkeypatch, keys)
-    epochs = list(analysed_epochs().index)
-    assert len(epochs) == (register["status"] == Status.ANALYSED).sum()
+    epochs = list(analyzed_epochs().index)
+    assert len(epochs) == (register["status"] == Status.ANALYZED).sum()
 
     for nwb_file_name, epoch in epochs:
         epoch_id = format_epoch_identifier(nwb_file_name, epoch, brain_area, suffix)

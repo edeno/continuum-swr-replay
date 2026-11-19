@@ -140,7 +140,7 @@ def merge_runs(
     time_s: NDArray,
     thresholds: ReferenceThresholds,
 ) -> NDArray:
-    """Merge neighbours closer than both gaps, as ``compute_allSequences_NaNseparated_merge.m``.
+    """Merge neighbors closer than both gaps, as ``compute_allSequences_NaNseparated_merge.m``.
 
     The gap is measured from the last window of one run to the first of the
     next, in bins and in seconds.

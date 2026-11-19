@@ -50,7 +50,7 @@ for _cat in (UserWarning, FutureWarning, DeprecationWarning):
 from continuum_swr_replay.analysis.detection.nonlocal_events import (  # noqa: E402
     validate_dot_event_contract,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (  # noqa: E402
     read_dot_with_swr_source,
     require_swr_source,
 )
@@ -71,7 +71,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (  #
 )
 from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS  # noqa: E402
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
-    analysed_decode_files,
+    analyzed_decode_files,
 )
 from continuum_swr_replay.decoding.files import (  # noqa: E402
     ENVIRONMENT_SUFFIX,
@@ -110,13 +110,13 @@ QUADRANT_LABELS = (
 
 # --- Session helpers ----------------------------------------------------------
 def find_sessions(animal: str | None) -> list[str]:
-    """Analysed HPC epoch identifiers with data_over_time + environment present.
+    """Analyzed HPC epoch identifiers with data_over_time + environment present.
 
-    The epoch register's analysed epochs (``analysed_decode_files``), never a
+    The epoch register's analyzed epochs (``analyzed_decode_files``), never a
     glob, so a pending epoch's decode in the folder is not read.
     """
     out = []
-    for env in analysed_decode_files(processed_data_dir(), ENVIRONMENT_SUFFIX):
+    for env in analyzed_decode_files(processed_data_dir(), ENVIRONMENT_SUFFIX):
         epoch_id = epoch_identifier_of(env, ENVIRONMENT_SUFFIX)
         if animal is not None and parse_epoch_identifier(epoch_id).animal != animal:
             continue

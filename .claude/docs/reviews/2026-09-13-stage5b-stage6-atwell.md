@@ -192,7 +192,7 @@ this change — for example the old `swr_only` `chosen_arm_fraction` Δ was −0
 (14/218 sessions positive) against +0.0007 (86/166) now, which is the null
 changing, not the cohort.
 
-| variant | at-well events | modelled (arm family) | `ok` / `partial` / `none` |
+| variant | at-well events | modeled (arm family) | `ok` / `partial` / `none` |
 | --- | --- | --- | --- |
 | all | 59,699 | 25,275 | 35 / 160 / 23 |
 | swr_only | 25,470 | 8,614 | 20 / 148 / 50 |

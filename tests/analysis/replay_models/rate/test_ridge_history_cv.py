@@ -77,7 +77,7 @@ def test_zero_penalty_reproduces_statsmodels(cross_design):
     np.testing.assert_allclose(fit.params, ref.params, atol=1e-6)
 
 
-def test_the_penalised_fit_is_a_stationary_point(cross_design):
+def test_the_penalized_fit_is_a_stationary_point(cross_design):
     spec = LADDER["Mselfcross_long_dur"]
     X, _, penalized = ridge_design(cross_design, spec)
     y = cross_design["count"].to_numpy(dtype=float)
@@ -87,7 +87,7 @@ def test_the_penalised_fit_is_a_stationary_point(cross_design):
     grad = X.T @ (y - np.exp(X @ fit.params + offset)) - lam * fit.params
     assert fit.converged
     assert np.max(np.abs(grad)) < 1e-5
-    # Only the history columns are penalised.
+    # Only the history columns are penalized.
     assert penalized.sum() == 4 + 4 + 6 + 6
 
 

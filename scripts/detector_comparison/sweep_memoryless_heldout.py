@@ -16,7 +16,7 @@ support on pure local coding is measured too.
 
 Every event either detector reports (our non-local events, the sliding window
 under the published definition) is classed as shared, ours only or the
-comparator's only, labelled with what it truly is, and scored by the one
+comparator's only, labeled with what it truly is, and scored by the one
 held-out rule of ``detector_comparison.heldout``, under both content
 estimates: our decoder's non-local posterior and the sliding window's own
 posterior, each from the discovery cells. What comes out is how often held-out

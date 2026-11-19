@@ -8,7 +8,7 @@ statistics the mpfc summary reports (``continuum_swr_replay.reported.mpfc``
 names and describes them). Three functions select or classify units instead:
 :func:`called_units` returns a mask, :func:`units_at_or_above_rate` the rows
 of the units at or above a firing rate, and :func:`fit_status` whether each
-unit's unpenalised fit of a curve is well posed. The timing statistics of the
+unit's unpenalized fit of a curve is well posed. The timing statistics of the
 peri-event curves are in :mod:`~continuum_swr_replay.analysis.pfc.timing`;
 :func:`swr_without_replay_timing_statistics` applies one of them to the units
 called for SWRs without replay.
@@ -159,7 +159,7 @@ def fit_count_statistics(fits: pd.DataFrame) -> dict[str, float]:
 
 
 def fit_status(population: pd.DataFrame, curve: str) -> pd.Series:
-    """Whether each unit's unpenalised fit of a curve has a peak to compare with.
+    """Whether each unit's unpenalized fit of a curve has a peak to compare with.
 
     Parameters
     ----------
@@ -172,7 +172,7 @@ def fit_status(population: pd.DataFrame, curve: str) -> pd.Series:
     Returns
     -------
     status : pd.Series of str, shape (n_units,)
-        On ``population``'s index: ``"nonconverged"`` when the unpenalised fit
+        On ``population``'s index: ``"nonconverged"`` when the unpenalized fit
         did not converge, else ``"separated"`` when it has a separated column,
         else ``"well posed"``. A missing flag counts as False: a unit with no
         convergence flag has not converged.
@@ -199,9 +199,9 @@ def fit_status(population: pd.DataFrame, curve: str) -> pd.Series:
 def prior_binding_percent(population: pd.DataFrame, curves: Sequence[str]) -> pd.Series:
     """How often the prior moves a curve's peak, per curve.
 
-    A unit is well posed for a curve when its unpenalised fit converged and
+    A unit is well posed for a curve when its unpenalized fit converged and
     has no separated column (:func:`fit_status`). The prior binds on it when
-    its penalised peak differs from the unpenalised one by more than that
+    its penalized peak differs from the unpenalized one by more than that
     peak's standard error (``<curve>: prior_binds``; a missing flag counts as
     False).
 
@@ -964,7 +964,7 @@ def swr_without_replay_event_statistics(
         in the stop cohort that overlap no non-local event
         (``n_swr_no_non_local``), those that overlap one
         (``n_swr_with_non_local``), and those left out of both because they
-        overlap a window the analysed-time rule dropped
+        overlap a window the analyzed-time rule dropped
         (``n_swr_no_non_local_unknown``).
     min_events : int
         The floor a session's SWRs without replay are compared with.

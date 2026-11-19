@@ -16,7 +16,7 @@ re-checked only for the whole-branch invariants and the open items.
    - Task 14: glm.py at 3782844e against the six modules at 26844eea. 49 = 49 definitions, none missing, none extra, none differing.
    - Task 15: session_tables.py at 779c08c7 against the package at 6de3c467. 92 = 92, none missing, extra or differing.
    - Task 16: `git diff types.py schemas.py` changes only the 3 `>>>` doctest lines.
-   - swr_source.py at BASE against analysed_time + swr_inventory: 15 definitions differ. Every difference is one of these:
+   - swr_source.py at BASE against analyzed_time + swr_inventory: 15 definitions differ. Every difference is one of these:
      - a docstring;
      - a module-qualified call (`swr_inventory.<fn>`, from Phase-B M6);
      - `swr_epoch_id` → `format_epoch_identifier`, whose body is the same expression;
@@ -55,10 +55,10 @@ re-checked only for the whole-branch invariants and the open items.
   - the historical diff statement at `compare_pfc_cohorts.py:2041`;
   - the "(now …)" annotations in one design doc;
   - the four committed CSV provenance rows.
-- **The analysed-time rule is untouched.** The set of read-point call sites is identical at BASE and HEAD (only the paths differ).
+- **The analyzed-time rule is untouched.** The set of read-point call sites is identical at BASE and HEAD (only the paths differ).
   `classified_table` changes are imports and the `match_swr` rename only, `spatial_mapping` is untouched, and strict overlap is
   still `events.detection.strict_overlap_matrix`.
-- **The decomposition preserves behaviour.**
+- **The decomposition preserves behavior.**
   - Stage bodies are contiguous blocks of the original.
   - `neuron_stats` key order is preserved (the `dict.update` order matches the original assignment order).
   - The fallback path's `_firing_rates` is the same three expressions.
@@ -84,7 +84,7 @@ None.
 - What is wrong: at 8f690706, `docs/regression_pipeline_map.md` had entries for `scripts/qa/{check_pfc_ridge_lambda0,
   compare_pfc_cohorts, compare_pfc_fitters, diagnose_pfc_event_definition, measure_pfc_null_geometry}.py` (lines 733–793).
   After 46389e03 they are gone, because `scripts/pfc` is not a root.
-- Why it matters: `--check` passes, because it only checks that the map is current. A pure reorganisation silently removed
+- Why it matters: `--check` passes, because it only checks that the map is current. A pure reorganization silently removed
   documentation coverage.
 - Fix: add `"scripts/pfc"` to `ROOTS`, and add `scripts/pfc/run_pfc_analysis_bandit.py` to `EXCLUDED_PREFIXES`, so coverage
   matches BASE exactly. Regenerate the map, and check that those five entries come back with the same stage and body.
@@ -186,7 +186,7 @@ None.
    - `session_tables/responses.py:161` does `reset_index(drop=True)`, which renumbers from 0, before
      `trial_context_at_times` compares the index with `movement_trial_number` (`covariates/context.py:161-167`).
    - So on real data the `trial_rail` panel always raises.
-   - Ruling: fix it on its own branch after the merge. It is a behaviour change, so it does not belong in a refactor branch.
+   - Ruling: fix it on its own branch after the merge. It is a behavior change, so it does not belong in a refactor branch.
      Write a failing test first, with a fixture whose trial ids start at 1, as the cache does. Then keep the trial ids instead
      of resetting the index, and check that the later `iterrows` loop reads position, not label.
 2. **The `lfp`-style local copies: none of the kind M7 removed remain in `src`. Leave the rest.** What is left:
@@ -260,7 +260,7 @@ Out of this wave, as follow-ups:
 ## Assessment
 
 **Ready to merge: with fixes.** There are no correctness defects. Every split is verbatim, the decomposition preserves
-behaviour, the layering allowlists are empty, and the analysed-time, strict-overlap, `event_id` and junction-bin paths are
+behavior, the layering allowlists are empty, and the analyzed-time, strict-overlap, `event_id` and junction-bin paths are
 unchanged. The fixes that should land first are I1 (restore the lost pipeline-map coverage), I2 (write down the layering and
 the old→new module map) and M1 (3 ruff regressions). All three are small docs and tooling edits; M4–M7 and the `trial_rail`
 bug are follow-ups.

@@ -1,7 +1,7 @@
-"""Measure each analysed epoch's decoder quality: Local-state error, state fractions, calibration.
+"""Measure each analyzed epoch's decoder quality: Local-state error, state fractions, calibration.
 
 The inputs of the events summary's decoder-validation values, so the summary
-reads them without the decode frames. From each analysed epoch's decode
+reads them without the decode frames. From each analyzed epoch's decode
 (read through the SWR source):
 
 - ``sessions.parquet``, one row per epoch:
@@ -33,8 +33,8 @@ from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     compute_calibration_curve,
     session_decoder_quality,
 )
-from continuum_swr_replay.analysis.event_definition import analysed_time
-from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
+from continuum_swr_replay.analysis.event_definition import analyzed_time
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_decode_files
 from continuum_swr_replay.decoding.files import (
     data_over_time_suffix,
     epoch_identifier_of,
@@ -47,7 +47,7 @@ from continuum_swr_replay.runs.provenance import described_commit, produced_by
 def measure_epoch(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     """One epoch's session row and calibration rows, with its id and decode hash."""
     sha256 = sha256_file(path)
-    dot = analysed_time.read_verified_dot_with_swr_source(path, sha256)
+    dot = analyzed_time.read_verified_dot_with_swr_source(path, sha256)
     epoch = {
         "epoch_id": epoch_identifier_of(path, data_over_time_suffix()),
         "decode_sha256": sha256,
@@ -71,19 +71,19 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--epochs",
         nargs="+",
         help="measure only these epoch ids (a trial; the events summary refuses "
-        "an output that lacks an analysed epoch)",
+        "an output that lacks an analyzed epoch)",
     )
     parser.add_argument("--out-dir", type=Path)
     args = parser.parse_args(argv)
 
-    paths = analysed_decode_files(
+    paths = analyzed_decode_files(
         processed_data_dir(), data_over_time_suffix(), require_all=True
     )
     if args.epochs:
         wanted = {f"{epoch}{data_over_time_suffix()}" for epoch in args.epochs}
         paths = [path for path in paths if path.name in wanted]
         if len(paths) != len(wanted):
-            raise ValueError(f"not all of {args.epochs} are analysed epochs")
+            raise ValueError(f"not all of {args.epochs} are analyzed epochs")
     with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
         measured = list(pool.map(measure_epoch, paths))
     sessions = pd.concat([s for s, _ in measured], ignore_index=True)

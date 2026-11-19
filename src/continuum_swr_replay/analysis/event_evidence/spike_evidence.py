@@ -1,4 +1,4 @@
-"""Spike evidence of non-local events: does the prior-excluded spike likelihood favour the decoded location over the animal's?
+"""Spike evidence of non-local events: does the prior-excluded spike likelihood favor the decoded location over the animal's?
 
 The decoder's posterior is likelihood times prior, so a confident posterior can
 come from the prior while the spikes say little. Each event (and each matched
@@ -28,8 +28,8 @@ from continuum_swr_replay.analysis.constants import REMOTE_CM
 from continuum_swr_replay.analysis.detection.nonlocal_events import (
     validate_dot_event_contract,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
-    immobile_analysed_bins,
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    immobile_analyzed_bins,
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     event_strict_overlap_mask,
@@ -69,7 +69,7 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
     out. The ``baseline`` windows are the runs of bins with non-local
     probability below :data:`NON_EVENT_THRESHOLD`, immobile and outside
     excluded time
-    (:func:`~continuum_swr_replay.analysis.event_definition.analysed_time.immobile_analysed_bins`),
+    (:func:`~continuum_swr_replay.analysis.event_definition.analyzed_time.immobile_analyzed_bins`),
     of :data:`MIN_EVENT_BINS` to :data:`MAX_BASELINE_BINS` bins.
 
     Parameters
@@ -131,9 +131,9 @@ def build_session_events(dot: pd.DataFrame) -> pd.DataFrame:
             }
         )
 
-    # the null is analysed time too: no baseline window touches excluded time
+    # the null is analyzed time too: no baseline window touches excluded time
     # (the artifact mask widened by 0.3 s; the low-non-local label is decoded)
-    quiet = (nlp < NON_EVENT_THRESHOLD) & immobile_analysed_bins(dot)
+    quiet = (nlp < NON_EVENT_THRESHOLD) & immobile_analyzed_bins(dot)
     for s, stop in contiguous_true_runs(quiet):
         e = stop - 1
         n_bins = e - s + 1

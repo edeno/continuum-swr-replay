@@ -38,7 +38,7 @@ def test_peak_and_onset_on_planted_curves():
     assert 0.020 <= result.peak_lag[0] <= 0.100
     assert result.peak[1] < 0
     assert result.peak_lag[1] == pytest.approx(0.050)
-    # Half of a Gaussian's height is reached 1.1774 SD before its centre.
+    # Half of a Gaussian's height is reached 1.1774 SD before its center.
     assert result.onset_lag[1] == pytest.approx(0.050 - 1.1774 * 0.020, abs=0.002)
     assert result.onset_at_edge[2]
     assert result.onset_lag[2] == pytest.approx(-0.2)
@@ -192,7 +192,7 @@ def test_population_timing_resamples_the_units_within_a_session():
 
 
 def test_reference_window_baseline_and_size():
-    # A dip of depth 0.6 centred at +50 ms on an offset of -0.4: from a
+    # A dip of depth 0.6 centered at +50 ms on an offset of -0.4: from a
     # reference window before the dip the onset is at the dip's half depth and
     # the size is the dip's depth, not the offset plus the dip.
     curve = -0.4 + _bump(0.050, 0.020, -0.6)

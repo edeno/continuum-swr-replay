@@ -3,7 +3,7 @@
 ``_table_runner.find_sessions`` serves ``prepare_replay_content_data.py``,
 ``build_timebin_tables.py`` and ``regenerate_stop_table.py``; the ContFrag
 build has its own, ``_table_runner.find_contfrag_sessions``, which the
-behavioral-covariate refresh also uses. Each lists the register's analysed
+behavioral-covariate refresh also uses. Each lists the register's analyzed
 epochs, and refuses to start when one of them has no decode, rather than
 building tables that silently cover fewer epochs than the register.
 
@@ -22,10 +22,10 @@ from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
 from scripts.tables import _table_runner as runner
 
 
-def _analysed(*keys: tuple[str, str]):
-    """``analysed_epochs`` returning these (nwb_file_name, epoch) keys."""
+def _analyzed(*keys: tuple[str, str]):
+    """``analyzed_epochs`` returning these (nwb_file_name, epoch) keys."""
 
-    def analysed_epochs() -> pd.DataFrame:
+    def analyzed_epochs() -> pd.DataFrame:
         return pd.DataFrame(
             {"epoch": [int(epoch.split("_")[0]) for _, epoch in keys]},
             index=pd.MultiIndex.from_tuples(
@@ -33,7 +33,7 @@ def _analysed(*keys: tuple[str, str]):
             ),
         )
 
-    return analysed_epochs
+    return analyzed_epochs
 
 
 def _decode(root: Path, identifier: str, dot_suffix: str, *, results: bool) -> None:
@@ -49,16 +49,16 @@ def _decode(root: Path, identifier: str, dot_suffix: str, *, results: bool) -> N
 # --------------------------------------------------------------------------
 
 
-def test_replay_sessions_are_the_registers_analysed_epochs(tmp_path, monkeypatch):
+def test_replay_sessions_are_the_registers_analyzed_epochs(tmp_path, monkeypatch):
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
         runner,
-        "analysed_epochs",
-        _analysed(("b20200102_.nwb", "04_r2"), ("a20200101_.nwb", "02_r1")),
+        "analyzed_epochs",
+        _analyzed(("b20200102_.nwb", "04_r2"), ("a20200101_.nwb", "02_r1")),
     )
     _decode(tmp_path, "a20200101_02_r1_HPC", "80_data_over_time.pkl", results=True)
     _decode(tmp_path, "b20200102_04_r2_HPC", "80_data_over_time.pkl", results=False)
-    # a decode on disk whose epoch the register does not analyse
+    # a decode on disk whose epoch the register does not analyze
     _decode(tmp_path, "a20200101_06_r3_HPC", "80_data_over_time.pkl", results=True)
 
     sessions = runner.find_sessions()
@@ -87,7 +87,7 @@ def test_replay_sessions_keep_the_first_of_each_animal(tmp_path, monkeypatch):
     keys = [("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")]
     keys.append(("b20200102_.nwb", "02_r1"))
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
-    monkeypatch.setattr(runner, "analysed_epochs", _analysed(*keys))
+    monkeypatch.setattr(runner, "analyzed_epochs", _analyzed(*keys))
     for nwb_file_name, epoch in keys:
         identifier = f"{nwb_file_name.removesuffix('_.nwb')}_{epoch}_HPC"
         _decode(tmp_path, identifier, "80_data_over_time.pkl", results=True)
@@ -101,12 +101,12 @@ def test_replay_sessions_keep_the_first_of_each_animal(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("missing", ["80_data_over_time.pkl", "environment.pkl"])
-def test_an_analysed_epoch_without_its_decode_stops_the_replay_build(
+def test_an_analyzed_epoch_without_its_decode_stops_the_replay_build(
     tmp_path, monkeypatch, missing
 ):
     keys = [("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")]
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
-    monkeypatch.setattr(runner, "analysed_epochs", _analysed(*keys))
+    monkeypatch.setattr(runner, "analyzed_epochs", _analyzed(*keys))
     for identifier in ("a20200101_02_r1_HPC", "a20200101_04_r2_HPC"):
         _decode(tmp_path, identifier, "80_data_over_time.pkl", results=True)
     (tmp_path / f"a20200101_04_r2_HPC_{missing}").unlink()
@@ -120,10 +120,10 @@ def test_an_analysed_epoch_without_its_decode_stops_the_replay_build(
 # --------------------------------------------------------------------------
 
 
-def test_contfrag_sessions_are_the_registers_analysed_epochs(tmp_path, monkeypatch):
+def test_contfrag_sessions_are_the_registers_analyzed_epochs(tmp_path, monkeypatch):
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
-        runner, "analysed_epochs", _analysed(("a20200101_.nwb", "02_r1"))
+        runner, "analyzed_epochs", _analyzed(("a20200101_.nwb", "02_r1"))
     )
     _decode(
         tmp_path, "a20200101_02_r1_HPC_contfrag", "data_over_time.pkl", results=True
@@ -146,14 +146,14 @@ def test_contfrag_sessions_are_the_registers_analysed_epochs(tmp_path, monkeypat
     ]
 
 
-def test_an_analysed_epoch_without_its_hpc_contfrag_decode_stops_the_build(
+def test_an_analyzed_epoch_without_its_hpc_contfrag_decode_stops_the_build(
     tmp_path, monkeypatch
 ):
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
         runner,
-        "analysed_epochs",
-        _analysed(("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")),
+        "analyzed_epochs",
+        _analyzed(("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")),
     )
     _decode(
         tmp_path, "a20200101_02_r1_HPC_contfrag", "data_over_time.pkl", results=True
@@ -163,16 +163,16 @@ def test_an_analysed_epoch_without_its_hpc_contfrag_decode_stops_the_build(
         runner.find_contfrag_sessions(brain_area="HPC")
 
 
-def test_a_cortical_contfrag_build_keeps_the_analysed_epochs_it_decoded(
+def test_a_cortical_contfrag_build_keeps_the_analyzed_epochs_it_decoded(
     tmp_path, monkeypatch
 ):
-    """mPFC and OFC are recorded in some sessions only: an analysed epoch with no
+    """mPFC and OFC are recorded in some sessions only: an analyzed epoch with no
     decode for the area is outside that area's cohort, not missing."""
     monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
         runner,
-        "analysed_epochs",
-        _analysed(("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")),
+        "analyzed_epochs",
+        _analyzed(("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")),
     )
     _decode(
         tmp_path, "a20200101_04_r2_mPFC_contfrag", "data_over_time.pkl", results=True
@@ -188,13 +188,13 @@ def test_a_cortical_contfrag_build_keeps_the_analysed_epochs_it_decoded(
 # --------------------------------------------------------------------------
 
 
-def test_hpc_raw_stats_run_over_the_registers_analysed_epochs(monkeypatch):
+def test_hpc_raw_stats_run_over_the_registers_analyzed_epochs(monkeypatch):
     import scripts.checks.compute_hpc_raw_stats as raw_stats
 
     monkeypatch.setattr(
         raw_stats,
-        "analysed_epochs",
-        lambda: _analysed(
+        "analyzed_epochs",
+        lambda: _analyzed(
             ("b20200102_.nwb", "04_r2"), ("a20200101_.nwb", "02_r1")
         )().assign(animal=["b", "a"], date=[20200102, 20200101]),
     )

@@ -1,6 +1,6 @@
 """Every rate denominator loses excluded time: the mask widened by 0.3 s.
 
-Excluded time is not analysed, so it is no one's exposure:
+Excluded time is not analyzed, so it is no one's exposure:
 
 - a stop's immobility exposure (Family A's offset, the ContFrag stop table's
   too) falls by exactly the excluded seconds inside the stop, and nothing else
@@ -27,7 +27,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
-from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
+from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 from continuum_swr_replay.analysis.event_tables.stop_table import build_stop_table
 from continuum_swr_replay.analysis.event_tables.timebin_tables import (
     build_stop_timebin_table,
@@ -59,7 +59,7 @@ MASK = [(2.0, 5.0), (15.85, 16.05)]
 EXCLUDED = [(1.7, 5.3), (15.55, 16.35)]
 """MASK widened by 0.3 s on each side."""
 
-#: Stop columns summarised over the stop's rows outside excluded time.
+#: Stop columns summarized over the stop's rows outside excluded time.
 LOCATION_COLUMNS = [
     "occupancy_state",
     "at_well",
@@ -129,7 +129,7 @@ def masked(tmp_path, monkeypatch):
     use_artifact_run(monkeypatch, directory)
     np.testing.assert_allclose(swr_source.artifact_intervals(EPOCH_ID).to_numpy(), MASK)
     np.testing.assert_allclose(
-        analysed_time.excluded_intervals(EPOCH_ID).to_numpy(), EXCLUDED
+        analyzed_time.excluded_intervals(EPOCH_ID).to_numpy(), EXCLUDED
     )
 
 
@@ -595,7 +595,7 @@ class TestNoArtifactsChangeNothing:
             [(TIME >= 4.0) & (TIME <= 4.05), (TIME >= 6.0) & (TIME <= 6.05)], [1, 2], 0
         )
         dot["Non-Local_Continuous_prob"] = np.where(labels > 0, 0.9, 0.0)
-        read = analysed_time.with_swr_source(dot)
+        read = analyzed_time.with_swr_source(dot)
         trials = _trials()
         experiences = port_experiences_from_trials(trials, prepend_initial=True)
         stops = build_stop_table(read, trials, experiences, _graph())
@@ -611,7 +611,7 @@ class TestNoArtifactsChangeNothing:
                 onsets[onsets.event_type == "non_local"].dropna(subset=["stop_id"]),
                 bin_s=0.5,
                 tmax=20.0,
-                excluded_intervals=analysed_time.excluded_intervals_by_session(stops),
+                excluded_intervals=analyzed_time.excluded_intervals_by_session(stops),
                 history_window_s=1.0,
             ),
         }

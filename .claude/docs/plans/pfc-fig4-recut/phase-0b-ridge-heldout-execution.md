@@ -26,16 +26,16 @@ matchable event subset, the combined population loader and estimator audit passe
 session completed in 27:25 at 8.89 GiB peak RSS. The optimized j16 gate completed in 5:23 at
 4.66 GiB peak RSS with an equivalent 74 x 131 result table and byte-identical modulation arrays.
 
-**The problem.** 23 % of mPFC units have at least one model whose unpenalised Poisson fit
+**The problem.** 23 % of mPFC units have at least one model whose unpenalized Poisson fit
 separates (a spline column with no spikes under its support drives a coefficient to −∞); statsmodels
 runs those to its iteration cap and ships meaningless LR statistics (≈16 % of FDR-significant calls
 across the 13 tests on the gate sessions, 25 % on the replay-split test). The batched JAX fitter
-reproduced that behaviour by handing those units back to statsmodels, which is 77 % of a session's
+reproduced that behavior by handing those units back to statsmodels, which is 77 % of a session's
 wall clock.
 
 ## Decisions (binding)
 
-1. **Estimator: penalised Poisson GLM with a loose Gaussian prior on the event-basis
+1. **Estimator: penalized Poisson GLM with a loose Gaussian prior on the event-basis
    coefficients.** The coefficients live on the log-rate scale (the cubic B-spline basis with 50 ms
    knots is a partition of unity, so each coefficient is the log-rate modulation near its knot). The
    prior's only job is to exclude implausible rates, not to shape plausible ones. **Ruling 2 set
@@ -43,21 +43,21 @@ wall clock.
    2.066 puts 95 % of the prior mass on rate multipliers between about ×0.02 and ×57; the draft's
    `σ = 2` below is superseded and survives only as one of the two sensitivity values; rat mPFC units are reported to move by at most ~10× above baseline and to near silence below,
    and 99 % of this corpus's well-posed SWR modulations are under ×20, so the prior binds only where
-   the unpenalised fit diverges (a basis column with no spikes under it, whose coefficient the prior
+   the unpenalized fit diverges (a basis column with no spikes under it, whose coefficient the prior
    settles near −2 to −3, i.e. "rate at most a small fraction of baseline"). The same prior for every
-   unit, model and event class; the intercept is unpenalised. Sensitivity bundles at `σ = 2` and
+   unit, model and event class; the intercept is unpenalized. Sensitivity bundles at `σ = 2` and
    `σ = 4.5` (written for `j1620210710_02_r1`), plus an empirical-Bayes estimate of σ from the
    converged units' coefficient spread with estimation noise deconvolved, reported next to the
    chosen value (the batch gives 0.66–1.28 against the shipped 3). The audit reports for how many
-   units the prior binds (penalised vs unpenalised peak modulation differing by more than the
+   units the prior binds (penalized vs unpenalized peak modulation differing by more than the
    estimation error). The choice is documented as a stated scientific assumption.
 2. **One fitter.** The batched JAX Newton solver gains the penalty (`H + Λ`, `Λ = λ` on the
    basis columns in the ORIGINAL coordinates — with the orthonormal-basis trick the penalty must be
-   transformed accordingly, and the intercept direction must stay unpenalised: orthogonalise the
-   basis columns against the constant first). The penalised objective is strictly concave, so every
+   transformed accordingly, and the intercept direction must stay unpenalized: orthogonalize the
+   basis columns against the constant first). The penalized objective is strictly concave, so every
    unit converges; the statsmodels hand-back, `needs_reference_fit`, `--reference-fit-workers` and
    `--fitter statsmodels` are deleted from the runner (the gate script and audit stay as history).
-   Convergence rule unchanged (|Δ penalised deviance| < 1e-8, maxiter 100); a unit that still fails
+   Convergence rule unchanged (|Δ penalized deviance| < 1e-8, maxiter 100); a unit that still fails
    is non-estimable (NaN everywhere, counted).
 3. **Inference by blocked held-out deviance.** `K` folds (5 or 10 — decided on the three smoke
    sessions by the fold-to-fold spread of each pair's held-out difference relative to its mean, and
@@ -80,20 +80,20 @@ wall clock.
    own null from re-drawn controls. `R` is set from a smoke (target 50; floor 20); each draw is one
    batched fit per fold across all units, so cost scales as `R × K` batched fits per session — measure.
    **Amended after the 2026-09-16 exact-null gate:** if a real event has no legal non-event window
-   in its own fitted bout, it cannot enter a matched randomisation test. Select one deterministic,
+   in its own fitted bout, it cannot enter a matched randomization test. Select one deterministic,
    jointly matchable event subset per class using timing/duration only, and use that identical subset
    for the observed statistic and all null draws. Keep the original all-event `heldout_delta_dev` as a
    separate descriptive result; store the matched-test observed statistic separately and record total,
    tested and excluded event counts plus tested source indices in the sidecar. Never compare an
    all-event observed statistic with a thinner null.
-5. **Modulation curves** come from the full-data penalised fit at the shipped prior (`σ = 3`).
+5. **Modulation curves** come from the full-data penalized fit at the shipped prior (`σ = 3`).
 6. **Basis fixes folded in (user instruction 2026-09-15).** (a) Boundary symmetry: the patsy
    `bs(...) - 1` basis drops one boundary function, pinning the kernel to zero at −250 ms but
    leaving +250 ms free. Drop BOTH boundary functions so the kernel returns to baseline at both
    ends of the fit window (state the parameter count per class before/after; the report window
    ±200 ms is unchanged); verify the basis sums to one on the interior and to zero at both ends.
    (b) Build the convolution columns by direct convolution of the onset indicator with the basis
-   kernels (one `convolve` per basis function per class) instead of materialising 251 lagged
+   kernels (one `convolve` per basis function per class) instead of materializing 251 lagged
    copies (≈1.4 GB per class on the longest sessions); assert equality with the lagged-matrix
    construction on a synthetic indicator to 1e-12 before deleting the old path. (c) NOT in this
    phase: an event-duration regressor ("event in progress" box, or an offset-locked kernel) — the
@@ -101,9 +101,9 @@ wall clock.
    SWR-coupled events > 200 ms); scheduled as its own reviewed change with an explicit comparison
    against the onset-only kernel.
 7. **Population inference stays Phase 4** (neuron → session → animal; the audit here reports the
-   fraction of units with `p_heldout < 0.05` per class and animal as a preview, clearly labelled).
-8. **Validation before the batch.** (a) `σ → ∞` (λ = 0): the penalised solver equals the
-   unpenalised JAX fit and statsmodels on the gate sessions' well-posed units to the existing
+   fraction of units with `p_heldout < 0.05` per class and animal as a preview, clearly labeled).
+8. **Validation before the batch.** (a) `σ → ∞` (λ = 0): the penalized solver equals the
+   unpenalized JAX fit and statsmodels on the gate sessions' well-posed units to the existing
    tolerances (reuse the gate script); (b) synthetic recovery: planted modulation curves at several
    amplitudes and spike rates — ridge recovers them within the expected shrinkage, and a separated
    synthetic unit gets a finite, small curve; (c) held-out deviance prefers the generating model on
@@ -127,7 +127,7 @@ As in `phase-0-fitter-execution.md`; plus: every estimator/inference choice abov
 sidecar (`penalty_sigma_log_rate`, `n_folds`, `fold_seed`, `n_control_draws`, `control_draw_seed`);
 no plan/phase/task references in shipped code/tests/docs; commit before launching, not during.
 
-### Task A: penalised batched solver + blocked folds + control-draw null (library + tests + validation)
+### Task A: penalized batched solver + blocked folds + control-draw null (library + tests + validation)
 ### Task B: runner/Figure 4/loader integration, smoke on three sessions, audit script extension
 ### Task C: batch, audit, docs, claims
 

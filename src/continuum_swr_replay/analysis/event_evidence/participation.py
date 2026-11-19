@@ -7,7 +7,7 @@ one control window of the same length drawn from Local rest in the same epoch:
 - **spike rate**: spikes per second, summed over tetrodes.
 
 Local rest is a bin the decoder calls Local (above :data:`LOCAL_THRESHOLD`), with
-the animal immobile and outside excluded time (``analysed_time``), and no SWR or
+the animal immobile and outside excluded time (``analyzed_time``), and no SWR or
 non-local event within :data:`MARGIN_S`. A control window is every bin of Local
 rest, drawn as :func:`~.state_evidence.windows.matched_windows` draws a bout's
 (a seeded order of every valid start per length); an event longer than any
@@ -45,7 +45,7 @@ MEASURES = ("participation", "spike_rate_hz")
 
 def local_rest_mask(
     local_probability: NDArray,
-    immobile_analysed: NDArray,
+    immobile_analyzed: NDArray,
     in_event: NDArray,
     *,
     margin_bins: int,
@@ -56,8 +56,8 @@ def local_rest_mask(
     ----------
     local_probability : ndarray, shape (n_time,)
         The decoder's Local probability.
-    immobile_analysed : ndarray of bool, shape (n_time,)
-        Immobile and outside excluded time (``immobile_analysed_bins``).
+    immobile_analyzed : ndarray of bool, shape (n_time,)
+        Immobile and outside excluded time (``immobile_analyzed_bins``).
     in_event : ndarray of bool, shape (n_time,)
         In an SWR or a non-local event.
     margin_bins : int
@@ -78,7 +78,7 @@ def local_rest_mask(
     )
     return (
         (np.asarray(local_probability) > LOCAL_THRESHOLD)
-        & np.asarray(immobile_analysed, dtype=bool)
+        & np.asarray(immobile_analyzed, dtype=bool)
         & ~near
     )
 

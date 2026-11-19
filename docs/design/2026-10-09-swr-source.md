@@ -25,7 +25,7 @@ tables, the Widloski-detector table's SWR columns, and the PFC path's SWR interv
   threshold of 4 cm/s at the event's endpoints. They are on the stored CA1 ripple band,
   with the head speed and time span that `load_data` uses.
 - **The inventory.** Run `056eee0dcb5a` (R10, 2026-10-10, commit `056eee0dcb5a`): all
-  255 epochs `ok` (the register's 242 analysed and its 13 `SUSTAINED_NOISE`), with the
+  255 epochs `ok` (the register's 242 analyzed and its 13 `SUSTAINED_NOISE`), with the
   artifact mask of run `fbbff144a123` and rule R-T for all four detectors. It replaced R3's
   run `50a98592acee` (no mask, no R-T; j1620210710 `02_r1` and `04_r2` had failed there on a lab-database
   inconsistency, and both are `ok` now).
@@ -218,7 +218,7 @@ source.
   NaN inside it (`swr_source.ripple_power_inputs`, `data_loaders/lfp.with_ripple_power`).
   An older decode's, and any `load_data` call made without those inputs, is still
   Spyglass's consensus over every CA1 tetrode.
-- **Every cohort of an analysis frame** follows one analysed-time rule since Task 18
+- **Every cohort of an analysis frame** follows one analyzed-time rule since Task 18
   (`events.eligibility`). `with_swr_source` drops whole every SWR, MUA or non-local event
   in excluded time, which is the mask widened by 0.3 s (`excluded_intervals`). It also
   drops any kept event that overlaps an SWR or MUA event dropped there.

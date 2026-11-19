@@ -1,4 +1,4 @@
-"""Command-line and artifact-naming behaviour of the PFC GLM runner.
+"""Command-line and artifact-naming behavior of the PFC GLM runner.
 
 The runner writes into the shared ``Processed-Data`` tree under names every
 downstream reader hard-codes, so the population a run was fit on must be visible
@@ -923,9 +923,9 @@ def test_the_retired_statistics_are_dropped_before_the_bundle_is_written():
     ]
 
 
-def test_a_batch_cannot_be_launched_on_the_unpenalised_backend():
-    # The per-unit statsmodels IRLS has no penalised path, so a batch fit with
-    # it would be an unpenalised ladder written under a sidecar claiming a
+def test_a_batch_cannot_be_launched_on_the_unpenalized_backend():
+    # The per-unit statsmodels IRLS has no penalized path, so a batch fit with
+    # it would be an unpenalized ladder written under a sidecar claiming a
     # prior. It is not offered at all.
     with pytest.raises(SystemExit) as excinfo:
         runner.get_command_line_arguments(["--fitter", "statsmodels"])
@@ -1045,7 +1045,7 @@ def test_main_raises_the_limit_first_and_closes_each_sessions_files(
         return True
 
     monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
-    monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
+    monkeypatch.setattr(runner, "analyzed_epochs", lambda: _epoch_info(keys))
     monkeypatch.setattr(
         runner, "pfc_sorted_nwb_file_names", lambda: [name for name, _ in keys]
     )
@@ -1095,7 +1095,7 @@ def test_main_hands_every_session_the_commit_it_loaded(
 
     monkeypatch.setattr(runner, "loaded_commit", lambda: "parent-commit-dirty")
     monkeypatch.setattr(runner, "raise_open_file_limit", lambda: (1024, 65536))
-    monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
+    monkeypatch.setattr(runner, "analyzed_epochs", lambda: _epoch_info(keys))
     monkeypatch.setattr(
         runner, "pfc_sorted_nwb_file_names", lambda: [name for name, _ in keys]
     )
@@ -1131,11 +1131,11 @@ def test_main_hands_every_session_the_commit_it_loaded(
     assert cohort["git_hash"] == "parent-commit-dirty"
 
 
-def test_main_takes_the_registers_analysed_epochs_less_those_without_sorting(
+def test_main_takes_the_registers_analyzed_epochs_less_those_without_sorting(
     tmp_path, monkeypatch, capsys
 ):
-    """The PFC cohort is the register's analysed epochs whose session has curated
-    spike sorting. An analysed epoch without it is left out at the PFC level,
+    """The PFC cohort is the register's analyzed epochs whose session has curated
+    spike sorting. An analyzed epoch without it is left out at the PFC level,
     with that reason, and is not an epoch exclusion."""
     keys = [
         ("chimi20200223_.nwb", "02_r1"),
@@ -1148,7 +1148,7 @@ def test_main_takes_the_registers_analysed_epochs_less_those_without_sorting(
         ran.append((nwb_file_name, epoch_name))
 
     monkeypatch.setattr(runner, "raise_open_file_limit", lambda: (1024, 65536))
-    monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
+    monkeypatch.setattr(runner, "analyzed_epochs", lambda: _epoch_info(keys))
     monkeypatch.setattr(
         runner, "pfc_sorted_nwb_file_names", lambda: ["chimi20200223_.nwb"]
     )
@@ -1171,7 +1171,7 @@ def test_main_takes_the_registers_analysed_epochs_less_those_without_sorting(
     assert ran == keys[:2]
     out = capsys.readouterr().out
     assert (
-        "1 analysed epoch(s) left out at the PFC level, "
+        "1 analyzed epoch(s) left out at the PFC level, "
         f"{runner.NO_SORTED_UNITS_REASON}: chimi20200224_.nwb 02_r1"
     ) in out
     assert not hasattr(runner, "get_epoch_info")

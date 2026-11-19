@@ -1,6 +1,6 @@
 """When an mPFC peri-event response peaks, and when it starts.
 
-The shipped curves are ridge-penalised B-spline kernels on the report window
+The shipped curves are ridge-penalized B-spline kernels on the report window
 (``+/-200 ms``, one value per 2 ms lag). Two times are read off each:
 
 - **peak**: the lag of the largest ``|curve|``, the convention of

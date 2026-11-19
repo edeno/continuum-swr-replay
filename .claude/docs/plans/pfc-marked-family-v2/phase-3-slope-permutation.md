@@ -19,7 +19,7 @@ Why: the quantity the summary quotes is the population mean one-SD slope kernel,
 
 ## Tasks
 
-- **Generalise the block rebuild.** Move the geometry/permutation helpers' dependence on `MarkedModelLadder` to explicit arguments: `permuted_mark_blocks(events, fit_mask, spline_basis, lags, mark_z_column, permutations, *, geometry=None)`. Keep the single-mark call sites working (they pass `ladder.events[c]`, etc.). Existing tests for these helpers keep passing unchanged in behaviour.
+- **Generalize the block rebuild.** Move the geometry/permutation helpers' dependence on `MarkedModelLadder` to explicit arguments: `permuted_mark_blocks(events, fit_mask, spline_basis, lags, mark_z_column, permutations, *, geometry=None)`. Keep the single-mark call sites working (they pass `ladder.events[c]`, etc.). Existing tests for these helpers keep passing unchanged in behavior.
 
 - **Draws in `fit_marked_family_ladder`.** New keywords `slope_permutations: int = 0`, `slope_permutation_seed: int = 0`, `slope_permutation_targets: tuple[str, ...] | None = None` (default: every target). After the observed full-data fit, for each class and target in scope:
 
@@ -42,7 +42,7 @@ Why: the quantity the summary quotes is the population mean one-SD slope kernel,
 
 - **Runner.** `--slope-permutations R` (default 0), `--slope-permutation-seed` (default: `session_seed("marked_family_slope_null", ...)`), `--slope-permutation-models` (default `spatial_role belief_content trajectory_geometry`). Each null array is written as `<artifact>.<class>.<target>.slope_null.npy` (float32) and listed in `family_companion_paths` when R > 0, so the skip check requires it. Contract keys as in shared-contracts.
 
-- **Summary.** `load_bundles` reads the null arrays when present. For each (model, class, target): per draw index r, the population null curve is the mean over sessions of the session mean over units of `null[r]`, giving `(R, n_lags)`; report the 2.5th and 97.5th per-lag percentiles as a band, whether the observed population curve's peak lies outside the band at its peak lag, and the same per animal. Per unit, the fraction whose observed |peak| exceeds the 95th percentile of its own null |peak| (descriptive). `plot_model` draws the band in grey behind the observed curve.
+- **Summary.** `load_bundles` reads the null arrays when present. For each (model, class, target): per draw index r, the population null curve is the mean over sessions of the session mean over units of `null[r]`, giving `(R, n_lags)`; report the 2.5th and 97.5th per-lag percentiles as a band, whether the observed population curve's peak lies outside the band at its peak lag, and the same per animal. Per unit, the fraction whose observed |peak| exceeds the 95th percentile of its own null |peak| (descriptive). `plot_model` draws the band in gray behind the observed curve.
 
 - **Run** with R = 30 on the three default models over the corpus (about 15 GPU-hours on three cards), then regenerate the summary and add a "Reference" column to the corpus-v2 audit's reading section: for each event-locked effect named there, inside or outside the band.
 
@@ -57,7 +57,7 @@ Why: the quantity the summary quotes is the population mean one-SD slope kernel,
 
 | Test | Asserts |
 | --- | --- |
-| `test_permuted_block_rebuild_is_ladder_agnostic` | the generalised `permuted_mark_blocks` reproduces the single-mark test's batched-vs-scalar equality on the boundary fixture. |
+| `test_permuted_block_rebuild_is_ladder_agnostic` | the generalized `permuted_mark_blocks` reproduces the single-mark test's batched-vs-scalar equality on the boundary fixture. |
 | `test_slope_null_is_seeded_and_only_permutes_the_named_target` | two runs with the same seed give identical null arrays; the other class's block and every adjustment column in the permuted design equal the observed design. |
 | `test_slope_null_recovers_zero_for_a_planted_kernel` (`slow`) | on the two-target recovery fixture with R = 8: the planted target's null curves have mean within ±0.15 of zero at the planted peak lag while the observed curve is 0.9 ± 0.35; the unplanted target's observed curve lies inside its null band. |
 | `test_runner_writes_null_companions_and_requires_them` | with R = 2, the `.slope_null.npy` files exist for the named models only, are float32 with shape `(2, 201, n_units)`, and deleting one makes the bundle stale. |

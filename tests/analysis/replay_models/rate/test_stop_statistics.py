@@ -41,7 +41,7 @@ def test_stop_cohort_counts_divide_the_stops_by_occupancy_and_stay():
     }
 
 
-def test_dwell_statistics_compare_the_analysed_immobility_by_outcome():
+def test_dwell_statistics_compare_the_analyzed_immobility_by_outcome():
     # The first rewarded stop spans 20 s with 18 s of excluded time inside it,
     # and the first omitted stop is one sample long: both count as they are.
     stops = pd.DataFrame(

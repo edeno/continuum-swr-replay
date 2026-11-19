@@ -108,8 +108,8 @@ CLASS_LABEL = {
 }
 #: Order of the target classes in tables and figure columns.
 CLASS_ORDER = (*EXTENDED_MARKED_EVENT_CLASSES, "pooled")
-#: Okabe-Ito, one colour per animal, in the corpus's animal order.
-ANIMAL_COLOURS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00"]
+#: Okabe-Ito, one color per animal, in the corpus's animal order.
+ANIMAL_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00"]
 
 
 def _model_set(model: str) -> str:
@@ -279,7 +279,7 @@ def plot_model(
 ) -> Path:
     """One figure per model: rows are targets, columns are its classes.
 
-    The shuffled-mark band (grey, :func:`shuffled_band`, the band
+    The shuffled-mark band (gray, :func:`shuffled_band`, the band
     :func:`null_band_summary` reads) sits behind the observed population curve
     when the bundles carry nulls; the population curve's band is its standard
     error over animals (:func:`animal_curve_sem`, none with one animal); a
@@ -290,7 +290,7 @@ def plot_model(
     targets = list(dict.fromkeys(k[2] for k in keys))
     classes = [c for c in CLASS_ORDER if any(k[1] == c for k in keys)]
     animals = sorted(set(animal_of.values()))
-    colour = dict(zip(animals, ANIMAL_COLOURS, strict=False))
+    colors = dict(zip(animals, ANIMAL_COLORS, strict=False))
     fig, axes = plt.subplots(
         len(targets),
         len(classes),
@@ -311,7 +311,7 @@ def plot_model(
                 ax.plot(
                     lag_time * 1000,
                     curve,
-                    color=colour[animal],
+                    color=colors[animal],
                     lw=0.8,
                     alpha=0.8,
                     label=f"{animal} (n={n_sessions[animal]})",
@@ -357,7 +357,7 @@ def plot_model(
     axes[0, 0].legend(fontsize=6, frameon=False, loc="upper left")
     fig.suptitle(
         f"{model}: one-SD slope kernels (animal means; black = mean over animals "
-        "± SEM over animals; grey = shuffled-mark 95 %)",
+        "± SEM over animals; gray = shuffled-mark 95 %)",
         fontsize=9,
     )
     fig.tight_layout()

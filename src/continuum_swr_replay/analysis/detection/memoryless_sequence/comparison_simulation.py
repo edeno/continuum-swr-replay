@@ -142,7 +142,7 @@ def simulate_and_decode(n_neurons: int, config: MemorylessSequenceConfig) -> dic
         is_event |= (time >= bounds[0]) & (time <= bounds[1])
         spike_times = with_replay
 
-    # encode on non-event data only, the analogue of this project's no-ripple
+    # encode on non-event data only, the analog of this project's no-ripple
     # training mask; spikes inside an event must not shape the place fields
     detector, results = estimate_state_space_model(
         time, position, spike_times, ~is_event

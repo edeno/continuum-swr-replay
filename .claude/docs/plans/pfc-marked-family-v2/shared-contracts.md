@@ -9,7 +9,7 @@
 
 ## Baseline columns
 
-Per-stop baseline terms enter every marked design as unpenalised columns immediately after the intercept, before any event-kernel block. They are constant within a stop and zero outside every cohort stop (fitted bins are always inside a cohort stop, so "outside" never occurs on fitted rows).
+Per-stop baseline terms enter every marked design as unpenalized columns immediately after the intercept, before any event-kernel block. They are constant within a stop and zero outside every cohort stop (fitted bins are always inside a cohort stop, so "outside" never occurs on fitted rows).
 
 ```python
 BASELINE_REFERENCE_WELL = 0  # its indicator is omitted; the intercept carries it
@@ -33,7 +33,7 @@ Semantics, do not weaken:
 - `kept_wells` are the wells (`occupancy_well_id` of the cohort stops, integers 0–5) with at least one fitted bin in the session; a well with no fitted bins contributes no column, and the sidecar records `baseline_column_names`.
 - If the reference well itself is absent, the lowest kept well becomes the reference for that session and the sidecar says so (`baseline_reference_well`).
 - `mixed` stops carry the `occupancy_well_id` the stop table assigns them; a stop with NaN `occupancy_well_id` (0.2 % of well-anchored events) contributes to no well column and is flagged in `n_bins_without_well` in the sidecar.
-- The columns are not standardized and not penalised: `make_ridge_penalty(width, sigma, n_unpenalized=1 + n_baseline)`.
+- The columns are not standardized and not penalized: `make_ridge_penalty(width, sigma, n_unpenalized=1 + n_baseline)`.
 - `KernelDesign.n_baseline` is the count; `KernelDesign.__post_init__` requires the first block to start at `1 + n_baseline`.
 - The typical-event kernel is then the response at the reference well after an unrewarded, known outcome; document this on the summary.
 

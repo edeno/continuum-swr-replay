@@ -524,7 +524,7 @@ class TestHardVsSoftBothAttenuateUnderSmearing:
     Implication: contrary to the naive intuition that "using the full
     posterior would obviously be better", swapping MAP-collapse for soft
     counts in the production pipeline would *worsen* the attenuation of
-    indicator coefficients under realistic σ. Whether this generalises to
+    indicator coefficients under realistic σ. Whether this generalizes to
     other generative models (e.g., bimodal posteriors that MAP picks
     asymmetrically) is open and worth checking.
     """

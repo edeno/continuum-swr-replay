@@ -26,7 +26,7 @@ def stop_table_values(
     stops: pd.DataFrame, onsets: pd.DataFrame, source: str
 ) -> list[Value]:
     """Stop- and onset-table facts the rate docs quote: dwell by outcome on the
-    well-anchored cohort (the analysed immobility: the stop's span less the
+    well-anchored cohort (the analyzed immobility: the stop's span less the
     excluded time inside it), survival past 2 s and 4 s (from the stop's
     start, excluded time not taken out), the outcome-boundary shift
     (:func:`~continuum_swr_replay.analysis.replay_models.rate.stop_statistics.outcome_boundary_statistics`), and the share of onsets
@@ -39,14 +39,14 @@ def stop_table_values(
     incomplete = stop_statistics.reward_history_incomplete_statistics(
         stops, onsets, "non_local"
     )
-    analysed = "analysed immobility (the stop's span less the excluded time inside it)"
+    analyzed = "analyzed immobility (the stop's span less the excluded time inside it)"
     values = [
         make(
             "stop_duration_mean_rewarded",
             dwell["mean_rewarded_s"],
             "quantity",
             "sig2",
-            f"well-anchored stops with a rewarded outcome: mean {analysed}",
+            f"well-anchored stops with a rewarded outcome: mean {analyzed}",
             "s",
         ),
         make(
@@ -54,7 +54,7 @@ def stop_table_values(
             dwell["mean_omitted_s"],
             "quantity",
             "sig2",
-            f"well-anchored stops with an omitted outcome: mean {analysed}",
+            f"well-anchored stops with an omitted outcome: mean {analyzed}",
             "s",
         ),
         make(
@@ -70,7 +70,7 @@ def stop_table_values(
             dwell["median_rewarded_s"],
             "quantity",
             "sig2",
-            f"well-anchored stops with a rewarded outcome: median {analysed}",
+            f"well-anchored stops with a rewarded outcome: median {analyzed}",
             "s",
         ),
         make(
@@ -78,7 +78,7 @@ def stop_table_values(
             dwell["median_omitted_s"],
             "quantity",
             "sig2",
-            f"well-anchored stops with an omitted outcome: median {analysed}",
+            f"well-anchored stops with an omitted outcome: median {analyzed}",
             "s",
         ),
         make(

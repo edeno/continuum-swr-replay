@@ -14,7 +14,7 @@ def test_the_well_positions_leave_excluded_time_out():
     100 excluded immobile bins at 50 cm would move it from 10 cm."""
     arms = np.repeat(np.arange(6), 60)
     linear = 10.0 + 20.0 * arms
-    analysed = pd.DataFrame(
+    analyzed = pd.DataFrame(
         {
             "head_speed": 1.0,
             "track_segment_id": arms,
@@ -30,12 +30,12 @@ def test_the_well_positions_leave_excluded_time_out():
             "in_excluded_time": True,
         }
     )
-    frame = pd.concat([analysed, excluded], ignore_index=True)
+    frame = pd.concat([analyzed, excluded], ignore_index=True)
 
     wells = content_occupancy.well_positions(frame)
 
     assert wells == [10.0, 30.0, 50.0, 70.0, 90.0, 110.0]
-    assert wells == content_occupancy.well_positions(analysed)
+    assert wells == content_occupancy.well_positions(analyzed)
     assert content_occupancy.well_positions(unfiltered(frame))[0] == 50.0
 
 

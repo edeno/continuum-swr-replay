@@ -61,7 +61,7 @@ def matrix_of(labels, coverage, cohorts=COHORTS, definitions=DEFINITIONS):
 
 
 @pytest.fixture
-def labelled():
+def labeled():
     """S1: one SWR event under both definitions, one under K only, and one
     that K calls SWR during a gap in Y's LFP. S2's first event overlaps S1's
     first but not its SWR; its second overlaps S1's third, inside Y's gap."""
@@ -90,8 +90,8 @@ def label_of(labels, key, definition):
     return row.iloc[0]
 
 
-def test_labels_follow_strict_overlap_and_coverage(labelled):
-    _, labels, _ = labelled
+def test_labels_follow_strict_overlap_and_coverage(labeled):
+    _, labels, _ = labeled
 
     assert label_of(labels, key("S1", 0), "K").label == "SWR"
     assert label_of(labels, key("S1", 1), "K").label == "SWR"
@@ -101,9 +101,9 @@ def test_labels_follow_strict_overlap_and_coverage(labelled):
     assert label_of(labels, key("S1", 2), "Y").label == "unknown"
 
 
-def test_the_matrix_uses_the_same_events_in_every_column(labelled):
+def test_the_matrix_uses_the_same_events_in_every_column(labeled):
     """S1:2 is observed by K but not by Y, so it leaves both columns."""
-    _, labels, coverage = labelled
+    _, labels, coverage = labeled
 
     matrix = matrix_of(labels, coverage).set_index(["cohort", "swr_definition"])
 
@@ -117,8 +117,8 @@ def test_the_matrix_uses_the_same_events_in_every_column(labelled):
     assert matrix.loc[("S2", "K")].non_swr_fraction == pytest.approx(1.0)
 
 
-def test_the_matrix_carries_its_declared_columns(labelled):
-    _, labels, coverage = labelled
+def test_the_matrix_carries_its_declared_columns(labeled):
+    _, labels, coverage = labeled
 
     matrix = matrix_of(labels, coverage)
 
@@ -180,8 +180,8 @@ def test_a_cohort_and_a_definition_must_be_different_detectors():
         swr_labels(inventory, matches, coverage, cohorts=["S1"], swr_definitions=["k"])
 
 
-def test_a_matched_pair_may_carry_different_labels_and_the_table_keeps_it(labelled):
-    pairs, labels, _ = labelled
+def test_a_matched_pair_may_carry_different_labels_and_the_table_keeps_it(labeled):
+    pairs, labels, _ = labeled
 
     paired = paired_labels(pairs, labels, cohorts=COHORTS).set_index(
         ["event_key_a", "event_key_b", "swr_definition"]
@@ -200,8 +200,8 @@ def test_a_matched_pair_may_carry_different_labels_and_the_table_keeps_it(labell
     assert len(paired) == 4
 
 
-def test_where_definitions_disagree_about_an_event_it_is_reported(labelled):
-    _, labels, _ = labelled
+def test_where_definitions_disagree_about_an_event_it_is_reported(labeled):
+    _, labels, _ = labeled
 
     disagreement = definition_disagreement(labels).set_index("event_key")
 
@@ -273,9 +273,9 @@ def test_a_definition_missing_in_an_epoch_leaves_every_column_unavailable():
     assert matrix.n_excluded.tolist() == [2, 2]
 
 
-def test_pairs_with_no_labels_at_all_are_refused(labelled):
+def test_pairs_with_no_labels_at_all_are_refused(labeled):
     """An empty labels table must not quietly pair nothing."""
-    pairs, labels, _ = labelled
+    pairs, labels, _ = labeled
 
     with pytest.raises(ValueError, match="no labels"):
         paired_labels(pairs, labels.iloc[:0], cohorts=COHORTS)

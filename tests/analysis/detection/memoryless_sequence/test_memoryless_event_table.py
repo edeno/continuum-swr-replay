@@ -727,7 +727,7 @@ def test_a_dropped_single_window_inside_a_merged_gap_is_reported():
 
 
 class TestTheArtifactMask:
-    """A Widloski event is held to the one analysed-time rule: a candidate in
+    """A Widloski event is held to the one analyzed-time rule: a candidate in
     excluded time (the mask widened by ``ARTIFACT_REACH_S``), or overlapping an
     SWR or MUA event dropped for it, leaves every cohort with its reason. Every
     candidate keeps its row, as every rejection does."""

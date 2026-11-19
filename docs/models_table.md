@@ -163,7 +163,7 @@ likelihood including the multinomial coefficient
 (`False`): **a DM AIC is not comparable to a conditional fit's until
 `multinomial_log_constant` — computed from the same count matrix — is added to
 the conditional side.** Every DM row carries `phi_source` ∈ {`session`,
-`animal_pooled`, `pooled_all_animals`}: a session with fewer modelled events
+`animal_pooled`, `pooled_all_animals`}: a session with fewer modeled events
 than `--min-events-session-phi` (default 40) is refit with its animal's median
 concentration intercept pinned, and the column records which. `--n-jobs` sizes
 the process pool that fits the per-session DM models (ignored by the conditional
@@ -215,7 +215,7 @@ membership lists those rules refer to are enumerated at the end of this file.
 
 A point-process conditional-intensity ladder (Truccolo–Eden–Brown 2005), one row
 per (stop, 15 ms bin) with an equal-exposure offset, so the within-stop time
-course is modelled explicitly rather than averaged into a per-stop dwell
+course is modeled explicitly rather than averaged into a per-stop dwell
 correction. `tmax = 4 s` on the bout clock.
 
 ```rungs
@@ -413,7 +413,7 @@ on one candidate set — a leaf-only `Mv` cannot be compared to a nine-arm `M4` 
 ΔAIC, because changing the candidate set changes the conditional likelihood. A
 leaf-only fit is a **six**-category conditional likelihood (null baseline
 `log(6)`, not `log(9)`), the arm dummies for arms 5–7 are dropped (arm 5 becomes
-the reference), and the fraction response is renormalised to unit mass over the
+the reference), and the fraction response is renormalized to unit mass over the
 six leaves — without that, an event would be weighted by its leaf share, and SWR
 events put more of their bins on the trunks. The bundle is
 `models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu/` (leaf-only ∧ partial ladder; see
@@ -495,9 +495,9 @@ P2  patch_fraction ~ is_current_patch + reward_fraction_candidate_arm_last10_vis
 `scripts/replay_models/content/compare_event_source_models.py`
 (`clogit(chosen ~ …, strata(stop))`)
 
-Asks whether replay content predicts behaviour beyond a behavioural baseline.
+Asks whether replay content predicts behavior beyond a behavioral baseline.
 These are not a single linear nested chain: `C_full` nests both `C_behavior`
-(+ `replay_fraction`) and `C_replay_only` (+ the behavioural block). The
+(+ `replay_fraction`) and `C_replay_only` (+ the behavioral block). The
 declared parent encodes the primary test, `C_full` vs `C_behavior`;
 `C_replay_only` is a standalone replay-only reference.
 
@@ -512,7 +512,7 @@ C_full_swr_split  chosen ~ [C_behavior terms] + replay_fraction_swr + replay_fra
 ```
 
 `is_same_patch` and the raw `distance_to_candidate_arm_cm` are deliberately
-excluded from the behavioural block: the two were near-collinear, and the raw
+excluded from the behavioral block: the two were near-collinear, and the raw
 distance quasi-separated (the animal almost always chose the closest arm) and
 crashed the fit in a substantial minority of sessions.
 `candidate_arm_distance_rank` is the identifiable geometric baseline that
@@ -544,7 +544,7 @@ SWR-vs-non-SWR dissociation. Specs: `SWR_CONTRAST_RATE_G_SPECS` /
 only data-assembly and fitting.
 
 Covariate blocks for the rate ladders. The task dimensions are the paper's
-variables (Comrie et al.), all from the **beta-Bernoulli** behavioural model:
+variables (Comrie et al.), all from the **beta-Bernoulli** behavioral model:
 
 ```
 BASE      := BS_TC + reward_history_rcos_0 + reward_history_rcos_1
@@ -568,7 +568,7 @@ Response `count` = non-local onset count per 15 ms bin; `family = poisson(log)`,
 aggregate coefficients across sessions (signed-rank).
 
 Notes on the covariate choices. (1) **Single-model provenance:** every task
-dimension comes from the beta-Bernoulli model; there is one behavioural model.
+dimension comes from the beta-Bernoulli model; there is one behavioral model.
 (2) **Context is split into three near-orthogonal rungs** (`PERISWITCH`,
 `BLOCK`, `SWITCHRATE`), each tested individually rather than as one lumped
 block. Peri-switch's three terms stay together — the interaction is meaningless
@@ -794,7 +794,7 @@ estimands are told apart from the record rather than the filename.
 ### Content `is_swr` contrast — patch (CP / CPS)
 
 The same ladder one level up: conditional Poisson on `patch_fraction` over the
-three patches, with the patch analogues of the arm within-stop-time and
+three patches, with the patch analogs of the arm within-stop-time and
 event-length controls.
 
 ```
@@ -844,7 +844,7 @@ is a tuple.
 `LEAF_ONLY_CONTRAST_RUNGS` — standalone contrast rungs conditioned on the six
 leaf arms rather than all nine. Their belief covariates are structural zeros on
 the trunks, `is_candidate_arm_6` / `is_candidate_arm_7` become identically zero,
-and the fraction response is renormalised to unit mass over the leaves so an SWR
+and the fraction response is renormalized to unit mass over the leaves so an SWR
 event is not downweighted for putting more of its bins on a trunk. The per-SD
 units the audited table reports these coefficients in are likewise taken over
 the leaf arms only. Restricted to standalone rungs because they are fitted one

@@ -43,7 +43,7 @@ from continuum_swr_replay.runs.fit_provenance import fit_provenance_path
 
 logger = logging.getLogger(__name__)
 
-#: Column suffixes only the maximum-likelihood ladder produced. A penalised
+#: Column suffixes only the maximum-likelihood ladder produced. A penalized
 #: fit has no likelihood-ratio reference distribution and no AIC at a stated
 #: number of parameters, so their presence identifies a bundle from the
 #: earlier estimator.

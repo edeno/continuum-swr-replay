@@ -266,7 +266,7 @@ _SCALE_LABELS = {
     # constant is why they must not be differenced against a conditional fit's.
     "dirichlet_multinomial": "event-scale (full likelihood)",
 }
-_DEFAULT_SCALE_LABEL = "unlabelled scale"
+_DEFAULT_SCALE_LABEL = "unlabeled scale"
 
 
 def scale_label(estimator: object) -> str:
@@ -282,7 +282,7 @@ def scale_label(estimator: object) -> str:
     -------
     str
         ``"event-scale (quasi)"``, ``"timebin-scale"``, or
-        ``"unlabelled scale"`` when the estimator is unknown.
+        ``"unlabeled scale"`` when the estimator is unknown.
     """
     return _SCALE_LABELS.get(estimator, _DEFAULT_SCALE_LABEL)
 

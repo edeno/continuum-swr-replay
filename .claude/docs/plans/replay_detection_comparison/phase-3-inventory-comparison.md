@@ -9,7 +9,7 @@ where this file and the spec disagree. Status lives in [PLAN.md](PLAN.md), not h
 
 ## What this phase delivers
 
-The spec's five deliverables (03 §Deliverables) for the 242 analysed epochs, at the retained default
+The spec's five deliverables (03 §Deliverables) for the 242 analyzed epochs, at the retained default
 settings, over eight inventories:
 
 | # | detector name in the tables | source |
@@ -58,7 +58,7 @@ The report and the examples carry that note wherever the `memoryless` column app
   `ripple_power_inputs` :448 (kept electrodes, span, artifact mask), `artifact_intervals` :524,
   `excluded_intervals` :562, `artifact_event_drops` :915, `read_artifact_event_drops` :959,
   `dropped_for_excluded_time` :967, `excluded_intervals_of` :1127, `read_dot_with_swr_source` :1192.
-- `src/continuum_swr_replay/analysis/hippocampus/event_eligibility.py` — the one analysed-time rule:
+- `src/continuum_swr_replay/analysis/hippocampus/event_eligibility.py` — the one analyzed-time rule:
   `DropReason`, `EXCLUDED_TIME_REASONS`, `excluded_time` :97, `overlaps_dropped_events` :157,
   `event_drop_reasons` :198.
 - `src/continuum_swr_replay/analysis/hippocampus/event_table.py:186` — `build_classified_nonlocal_event_table`.
@@ -82,7 +82,7 @@ The report and the examples carry that note wherever the `memoryless` column app
   decode frame's `head_speed` on its 500 Hz grid, as `swr_source.swr_events` and the classified table read it.
 - **Epoch bounds** for every observation table are the decode grid's first and last time (equal to the
   position span the SWR runner cut to; check it).
-- **Dropped events.** Every event the analysed-time rule drops (reasons `artifact`, `near_artifact`,
+- **Dropped events.** Every event the analyzed-time rule drops (reasons `artifact`, `near_artifact`,
   `overlaps_dropped_event`) leaves its cohort, keeps its reason in a `set_aside` table, and its span is
   removed from its own detector's observed time, as `remove_bridging_events` does for bridging events, so a
   dropped event never makes another detector's event read `unmatched` (open question Q10).
@@ -176,8 +176,8 @@ The same holds at a run's start.
 
 - **Files.** Modify `availability.still_intervals` (:172). Update `tests/unit/test_inventory_availability.py`
   and the hand-worked exposure in `tests/unit/test_inventory_comparison_end_to_end.py` (its still intervals
-  become `[0, 20.x]` and `[24.y, 60]` to the neighbouring samples).
-- **Change** (pending Q9): each still run reaches out to the neighbouring samples on either side, when they
+  become `[0, 20.x]` and `[24.y, 60]` to the neighboring samples).
+- **Change** (pending Q9): each still run reaches out to the neighboring samples on either side, when they
   continue the run's stretch (no timestamp gap, finite time). The event rule reads only the samples inside an
   event, so an event is speed-eligible exactly when it lies inside such an interval and no sample inside it is
   moving or unknown. Exposure grows by at most one sample interval (2 ms) at each end of a still run.
@@ -427,7 +427,7 @@ Outputs, all under `PROCESSED_DATA_DIR/replay_detection_comparison/`: `carey/<ru
 | --- | --- |
 | `test_carey_inventory.py` | settings equal the package defaults; MUA binning rule; events need 5 active tetrodes; gaps and NaN stretches unobserved; mask overlap dropped and renumbered |
 | `test_run_carey_detection.py` | outputs and manifest written; a band hash mismatch or marks mismatch fails the epoch and writes nothing; rerun skip and settings gate |
-| `test_inventory_availability.py` (updated) | still runs reach the neighbouring samples, never across a gap or NaN; `exclusion_by_reason` partitions the epoch |
+| `test_inventory_availability.py` (updated) | still runs reach the neighboring samples, never across a gap or NaN; `exclusion_by_reason` partitions the epoch |
 | `test_inventory_overlap.py` (updated) | the review's boundary event is `unmatched`, not `unknown`; `set_aside_events` makes a dropped event's span unobserved |
 | `test_inventory_comparison_end_to_end.py` (updated) | the hand-worked exposures under the new still rule |
 | `test_inventory_adapters.py` | schema and dtypes for every adapter; native counts; drop reasons including `overlaps_dropped_event`; missing or changed runs read unavailable; Kay equals the paper's cohort |
@@ -451,7 +451,7 @@ them as asked.
 - **Q6.** Carey is a fifth SWR definition in the SWR label matrix, and also in the "triggered" set.
 - **Q7.** Both cohorts, `published` and `replay_criteria`.
 - **Q8.** Native counts equal eligible counts for MUA and state-space, with a note saying why.
-- **Q9.** Agreed: still runs reach the neighbouring samples.
+- **Q9.** Agreed: still runs reach the neighboring samples.
 - **Q10.** Agreed: a dropped event's span leaves its own detector's coverage.
 - **Q11.** Accepted: the Carey runner imports the SWR runner's helpers.
 
@@ -487,7 +487,7 @@ Other choices:
   counts equal their eligible counts and their moving events are not stored. Report that with a note, or
   recompute the native MUA events from the cached marks (`get_multiunit_hse`) and check its eligible events
   equal the labels?
-- **Q9. Review item 2's fix.** Still runs reach the neighbouring samples (Task 3): exposure grows by at most
+- **Q9. Review item 2's fix.** Still runs reach the neighboring samples (Task 3): exposure grows by at most
   2 ms at each end of a still run. Agree?
 - **Q10. Dropped events' spans.** Remove each dropped event's span from its own detector's observed time, as
   the spec does for bridging events, so a Kay SWR dropped near an artifact does not make a Karlsson event read

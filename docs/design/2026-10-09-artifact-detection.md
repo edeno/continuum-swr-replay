@@ -7,10 +7,10 @@ stage, thresholds placed by one rule, and no post-step second. Implemented in
 [2026-10-03-full-pipeline-refresh-design.md](2026-10-03-full-pipeline-refresh-design.md)).
 The SWR runner, MUA detection and both HPC decoders use the mask (Task 17a), and so does the
 Widloski runner (Task 17b: the mask's bins are missing in its likelihood). Task 18
-applies one analysed-time rule (the lead, 2026-10-10;
+applies one analyzed-time rule (the lead, 2026-10-10;
 `analysis/events/eligibility.py`). *Excluded time* is the mask widened by
 0.3 s on each side (`analysed_time.excluded_intervals`). An event of any kind, an exposure
-second, a time bin with its history window, and a peri-event window are analysed only
+second, a time bin with its history window, and a peri-event window are analyzed only
 wholly outside it. A kept event that overlaps an SWR or MUA event dropped there is
 dropped too. Inputs read the mask itself: the decoders' missing bins, the detectors'
 normalization, and the ripple-power covariate. The covariate is the Kay detector's own
@@ -19,7 +19,7 @@ consensus over rule R-T's tetrodes, with the mask out of its normalization
 None until runbook R9 runs the detector on all epochs and sets it.
 
 **Where the numbers come from.** Unless a number names a later run, it is a dated
-measurement of 2026-10-05 to 2026-10-09 on the 218 epochs then analysed, made by the
+measurement of 2026-10-05 to 2026-10-09 on the 218 epochs then analyzed, made by the
 studies below; no summary in `paper/reported/` computes it, and nothing in the repository
 recomputes it. The studies' working files
 were scratch analyses and are not in the repository: this note is their record, and it
@@ -47,7 +47,7 @@ Neither validation set is ground truth.
     |deflection| ≥ 1 robust SD, ≥ 80 % sign agreement);
   - MUA ≥ 2× the epoch mean in ± 25 ms.
 
-  No rule uses an artifact signature. 6 events that met the rules were labelled steps by the
+  No rule uses an artifact signature. 6 events that met the rules were labeled steps by the
   model reviewer and removed from the 9,214. The "hard" stratum (505 events) is the top 5 % by
   power, or ≥ 50 % of tetrodes in 1 ms.
 - **Model-reviewed labels** come from one AI reviewer, with no human and no second rater:
@@ -92,14 +92,14 @@ the giant-day events.
   results with 1 s masked after each step, as a robustness check.
 - **The decoders' reach: 0.3 s (Task 18).** A decoded event (non-local event, ContFrag label,
   Widloski event) within 0.3 s of the mask is dropped. C3 injected 1,200 gaps into clean epochs:
-  - no analysable (immobile) non-local event changed farther than 0.21 s from a gap;
+  - no analyzable (immobile) non-local event changed farther than 0.21 s from a gap;
   - the reach does not grow with gap length.
 - **No reference veto (R-rip).** C1b's event veto (reference ripple envelope > 11.36 × the CA1
   median at the event's peak) removed 116 Kay events, most of them j16's. The tetrode rule
   (R-T, Task 17b) now handles those. One rule fewer is kept. Both are described in
   [2026-10-09-swr-tetrode-selection.md](2026-10-09-swr-tetrode-selection.md).
 - **Leave out every epoch with an S block (project lead, 2026-10-10).** The 13 epochs in which
-  the artifact run finds an S block (11 analysed, 2 pending) are excluded whole, in the epoch
+  the artifact run finds an S block (11 analyzed, 2 pending) are excluded whole, in the epoch
   register (`SUSTAINED_NOISE`). Two reasons:
   1. The masked R11 decode still shows extra non-local probability 1–3 s outside the S blocks:
      +0.054 pooled over 14 blocks, 95 % CI [0.019, 0.102], and 3 of 13 epochs fail on their
@@ -175,7 +175,7 @@ is searched only among the same tetrode's reference marks more than 1 ms from it
 (`T_SPK_OOD_OWN_EVENT_S`); the spike itself, at Δt = 0, falls under the same rule. A neuron
 cannot fire twice within its absolute refractory period (about 1 ms), so two detections that
 close on one tetrode are either two units, whose marks differ and are not each other's nearest
-neighbour among the tetrode's ~10^5 marks, or one waveform detected twice. Leaving them out
+neighbor among the tetrode's ~10^5 marks, or one waveform detected twice. Leaving them out
 takes away the support an artifact's twin detection gives it; on the 23 acceptance epochs it
 also made 20 other spikes OOD, and no other core changed. R9 (run `a1083731940b`, gate report
 §7) found the case: at 8.614 s in chimi20200227_02_r1 a spike line on 55 % of tetrodes was detected twice, about 0.15 ms apart, on five tetrodes; the
@@ -203,7 +203,7 @@ The value is measured where the rule could mask the event: the event widened by 
   reaches 1.27–1.59 (C2; T-ca1 1.59 and T-ref 1.27, both chimi). A cut placed
   on four animals with less margin failed on the fifth: placed without chimi, T-ref 13.8 and K
   15.7 masked 2 model-reviewed SWRs and 2 giant-day events on chimi (C2 §3.1).
-- **Zero maximum.** If SWRs never reach the statistic, it is placed below the smallest labelled
+- **Zero maximum.** If SWRs never reach the statistic, it is placed below the smallest labeled
   artifact.
 - **Definitions are exempt.** Window lengths, bins, run lengths, persistence, merging and
   padding are placed by a mechanism or a measured tail.
@@ -346,7 +346,7 @@ From C2 §1a (versions as fetched 2026-10-09) and the literature review:
 
 ## Validation
 
-**The prototype**, on the 218 analysed epochs (report §0, §4; prototype constants, its SWR mask
+**The prototype**, on the 218 analyzed epochs (report §0, §4; prototype constants, its SWR mask
 with S padded 0 s):
 
 | Set | Result |
@@ -387,7 +387,7 @@ C2's rebuilt detector at the same constants and the one mask:
     `T_CA1_K` no longer flags its CA1 part. Its spike line (0.68 of tetrodes, 40 % OOD) is
     still flagged under the repo reference, but not under the prototype's.
 - **Verdicts identical to C2's** on these epochs:
-  - reference SWR set: 0 of 902 masked (3 of the 905 as labelled: the known label errors, all
+  - reference SWR set: 0 of 902 masked (3 of the 905 as labeled: the known label errors, all
     model-reviewed steps);
   - model-reviewed SWRs: 1 of 7, the S-padding case;
   - steps: 63 of 69;
@@ -465,7 +465,7 @@ The literature check read the methods of 23 papers and 3 code sources. It found:
 - **The labels are not ground truth.** The reference SWR set is rule-defined; its purity
   outside flagged events was checked on 30 random events. The model-reviewed labels come from
   one AI reviewer with no human and no second rater.
-- **T-spk rests on 3 labelled lines** with a 1.10× margin. R9 reviews every spike-only core.
+- **T-spk rests on 3 labeled lines** with a 1.10× margin. R9 reviews every spike-only core.
 - **The decode-free OOD reference** makes S-noise marks OOD inside S blocks, so a line near an
   S block could become a spike-only core. R9 lists spike-only cores within 1.1 s of an S core.
 - **The cause of S is unknown:** fixed electrodes {0, 4, 8, 12, 80, 84, 88, 92} on senor,

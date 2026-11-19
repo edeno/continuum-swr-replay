@@ -2,7 +2,7 @@
 
 Every number the project reports is a value in one of these files
 (``continuum_swr_replay.reported``). This reads the analyses' outputs and refits
-nothing. Afterwards run
+nothing. Afterward run
 ``scripts/reported/emit_reported_values.py`` to write the values into the
 LaTeX macros and the docs.
 

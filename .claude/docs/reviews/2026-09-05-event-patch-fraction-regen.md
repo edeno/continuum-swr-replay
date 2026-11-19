@@ -75,7 +75,7 @@ cp -p Processed-Data/replay_content/_staging_patch_fraction_full_20260905/event_
       Processed-Data/replay_content/event_patch_table.parquet
 ```
 
-Verified afterwards: the promoted file has the same SHA-256 as the staged one
+Verified afterward: the promoted file has the same SHA-256 as the staged one
 and passes `require_covariate_schema(table="event_patch")`.
 
 ## Artifact integrity

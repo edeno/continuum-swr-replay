@@ -24,7 +24,7 @@ The first three come from ``build_classified_nonlocal_event_table``'s
 overlapping no non-local event).
 
 Why a sample? Each epoch holds ~1.7k immobile non-local events (hundreds of
-thousands across the analysed epochs) — too many to render or eyeball. We
+thousands across the analyzed epochs) — too many to render or eyeball. We
 instead take ~50 events per category per animal, *stratified by ambiguity*
 (boundary cases: low-overlap partials, near-miss non-SWR events, sub-threshold
 SWR-only windows, very short events), which is what actually stresses the
@@ -33,8 +33,8 @@ category definitions.
 Two phases (the per-epoch Spyglass load dominates cost, so it is the
 parallel unit):
 
-    1. catalog  — stream every analysed epoch's ``*_HPC_80_data_over_time.pkl``
-                  (the epoch register's, ``analysed_decode_files``; cheap, no
+    1. catalog  — stream every analyzed epoch's ``*_HPC_80_data_over_time.pkl``
+                  (the epoch register's, ``analyzed_decode_files``; cheap, no
                   Spyglass load), classify + sample, write a small catalog
                   parquet of selected events.
     2. render   — for one epoch in the catalog: load_data + load_results
@@ -45,7 +45,7 @@ parallel unit):
 The sample is the same in every run: each (animal, category) group's seed is
 built from its strings (``gallery_sample.group_seed``), not from ``hash()``. Each rendered
 window shades the epoch's excluded time (``excluded_intervals_of``) in a
-light grey hatched band behind the data, and its column title says so.
+light gray hatched band behind the data, and its column title says so.
 
 Usage
 -----
@@ -85,7 +85,7 @@ from continuum_swr_replay.analysis.behavior.covariates import (
 from continuum_swr_replay.analysis.decode_quality.posterior_analysis import (
     load_conditional_posterior,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     excluded_intervals_of,
     read_dot_with_swr_source,
     swr_intervals,
@@ -107,8 +107,8 @@ from continuum_swr_replay.analysis.event_tables.bouts import (
 )
 from continuum_swr_replay.analysis.event_tables.event_table import build_event_table
 from continuum_swr_replay.data_loaders.epoch_register import (
-    analysed_decode_files,
-    analysed_epoch_ids,
+    analyzed_decode_files,
+    analyzed_epoch_ids,
 )
 from continuum_swr_replay.decoding.files import (
     data_over_time_suffix,
@@ -172,27 +172,27 @@ def epoch_id_from_pkl(pkl_path: Path) -> str:
 
 
 def list_epoch_pkls(data_dir: Path) -> list[Path]:
-    """The analysed epochs' canonical decode frames in `data_dir`.
+    """The analyzed epochs' canonical decode frames in `data_dir`.
 
-    The epoch register's analysed epochs (``analysed_decode_files``), never a
+    The epoch register's analyzed epochs (``analyzed_decode_files``), never a
     glob, so a pending or excluded epoch's decode in the folder is not shown.
-    An analysed epoch whose frame is not in `data_dir` is left out with a
+    An analyzed epoch whose frame is not in `data_dir` is left out with a
     warning that names it (the sample then differs from a full folder's).
 
     Raises
     ------
     FileNotFoundError
-        If no analysed epoch's frame is in `data_dir`.
+        If no analyzed epoch's frame is in `data_dir`.
     """
     suffix = data_over_time_suffix()
-    pkls = analysed_decode_files(data_dir, suffix)
+    pkls = analyzed_decode_files(data_dir, suffix)
     if not pkls:
-        raise FileNotFoundError(f"No analysed epoch's *{suffix} found in {data_dir}")
+        raise FileNotFoundError(f"No analyzed epoch's *{suffix} found in {data_dir}")
     found = {epoch_identifier_of(pkl, suffix) for pkl in pkls}
-    missing = [epoch_id for epoch_id in analysed_epoch_ids() if epoch_id not in found]
+    missing = [epoch_id for epoch_id in analyzed_epoch_ids() if epoch_id not in found]
     if missing:
         logging.warning(
-            "%d of the %d analysed epochs have no *%s in %s, left out: %s",
+            "%d of the %d analyzed epochs have no *%s in %s, left out: %s",
             len(missing),
             len(missing) + len(pkls),
             suffix,
@@ -936,8 +936,8 @@ def _plot_behavioral_context(
     Three lanes vs time-from-event-center:
       - TRIAL: run segment [start→goal_arrival] (solid) + post-arrival dwell
         [goal_arrival→end] (hatched), shown post hoc as physical context.
-      - STOP: the immobility bout containing the event (dark grey) + the
-        previous bout (light grey) — the bounded stop unit (time_since_stop).
+      - STOP: the immobility bout containing the event (dark gray) + the
+        previous bout (light gray) — the bounded stop unit (time_since_stop).
       - EVENT: the event's true extent, in the non-local (or SWR) color.
 
     Showing the trial dwell and the immobility bout together makes the
@@ -993,7 +993,7 @@ def _plot_behavioral_context(
             va="bottom",
         )
         # goal arrival (well reached / reward site) — distinct from the
-        # speed-defined immobility onset (start of the grey stop bar).
+        # speed-defined immobility onset (start of the gray stop bar).
         ax.axvline(gr, color="darkorange", ls=":", lw=0.9, zorder=2)
         ax.annotate(
             "arrival",
@@ -1213,10 +1213,10 @@ def _excluded_spans_in_window(
 
 
 def _shade_excluded(axes: list, spans: list[tuple[float, float]]) -> None:
-    """A light grey hatched band behind the data over each excluded span.
+    """A light gray hatched band behind the data over each excluded span.
 
     Drawn on every row of the window, below the traces (``zorder`` -3, under the
-    SWR shading's -2). The hatch tells it apart from the speed row's grey fill.
+    SWR shading's -2). The hatch tells it apart from the speed row's gray fill.
     The posterior row's image covers it, so the column title names it too.
     """
     for ax in axes:
@@ -1403,7 +1403,7 @@ def _render_event(row: pd.Series, ctx: dict, out_dir: Path, overwrite: bool) -> 
         ctx["excluded"], time_slice.start, time_slice.stop
     )
     if excluded_spans:
-        title += "\nhatched grey: excluded time (not analysed)"
+        title += "\nhatched gray: excluded time (not analyzed)"
     _plot_decoding_stack(
         axes,
         ctx["data"],

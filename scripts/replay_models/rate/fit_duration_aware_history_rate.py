@@ -55,7 +55,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     require_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (

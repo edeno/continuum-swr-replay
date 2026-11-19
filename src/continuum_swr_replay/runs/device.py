@@ -11,12 +11,12 @@ A runner that fits on a GPU host (the PFC batched fitter, the cross-history
 ridge fit, Figure 4's refit) claims one card first, with
 :func:`configure_jax_gpu`. The host carries other people's jobs. Grabbing a busy card would
 evict them, and JAX grabs most of a card's memory by default, so a run has to
-say which card it wants and how much of it **before JAX initialises a
+say which card it wants and how much of it **before JAX initializes a
 backend**. That is later than "before ``import jax``": the module import is
 cheap and lazy, and the environment is read when the first device is asked
 for. Callers should still configure as early as they can -- the margin is
 narrow and invisible -- and :func:`verify_jax_device` closes it by checking
-afterwards that the process really did end up on one card.
+afterward that the process really did end up on one card.
 
 Selection reads ``nvidia-smi`` and sets environment variables; only the
 verification touches JAX, and nothing here imports Spyglass. The chosen card
@@ -30,7 +30,7 @@ Three rules keep it from colliding with other work:
 
 - a card counts as free only if its used memory is under a threshold (an idle
   card still shows a few hundred MiB of other users' contexts) *and* its
-  utilisation is zero;
+  utilization is zero;
 - a chosen card is claimed with a lock file naming the claiming process, so two
   workers of the same batch starting at the same moment cannot both read the
   same card as idle and land on it. A claim whose process is gone is ignored,
@@ -133,7 +133,7 @@ def default_jax_platforms(platforms: str = "cpu") -> str:
     one starts inherit the choice, and JAX's ``jax_platforms`` config is set to
     the result: JAX read the variable when it was imported, so setting the
     variable alone would change nothing in this process. Call it before JAX's
-    first computation, which starts its backend; afterwards the backend stays
+    first computation, which starts its backend; afterward the backend stays
     where it started.
 
     Parameters
@@ -215,7 +215,7 @@ class GPUStatus:
 
 
 def query_gpus() -> list[GPUStatus]:
-    """Every visible card's memory and utilisation.
+    """Every visible card's memory and utilization.
 
     Returns
     -------
@@ -243,7 +243,7 @@ def parse_gpu_query(output: str) -> list[GPUStatus]:
     Parameters
     ----------
     output : str
-        One row per card: index, used MiB, total MiB, utilisation %, uuid, name.
+        One row per card: index, used MiB, total MiB, utilization %, uuid, name.
 
     Returns
     -------
@@ -275,7 +275,7 @@ def occupancy_table(cards: list[GPUStatus]) -> str:
         return "no NVIDIA GPUs are visible"
     return "\n".join(
         f"  GPU {card.index} ({card.name}): {card.used_mib}/{card.total_mib} MiB "
-        f"used, {card.utilization_pct}% utilisation"
+        f"used, {card.utilization_pct}% utilization"
         for card in cards
     )
 
@@ -367,7 +367,7 @@ def select_free_gpu(
             return card
     raise NoFreeGPUError(
         "No GPU is free (needs <= "
-        f"{max_used_mib} MiB used and <= {max_util_pct}% utilisation, and no "
+        f"{max_used_mib} MiB used and <= {max_util_pct}% utilization, and no "
         "claim by another worker):\n" + occupancy_table(cards)
     )
 
@@ -381,7 +381,7 @@ def verify_jax_device(
 ) -> None:
     """Check that JAX really is on the one device ``record`` names.
 
-    ``CUDA_VISIBLE_DEVICES`` is read when JAX initialises its backend, not when
+    ``CUDA_VISIBLE_DEVICES`` is read when JAX initializes its backend, not when
     it is imported, so configuring after ``import jax`` still works -- but only
     until something has already asked for a device. When that happens the
     environment variable is ignored silently and the process is on **every**
@@ -395,7 +395,7 @@ def verify_jax_device(
         A :func:`configure_jax_gpu` record.
     devices : sequence, optional
         The devices to check, for testing. Defaults to ``jax.devices()``, which
-        initialises the backend -- that is the point: the check must be made on
+        initializes the backend -- that is the point: the check must be made on
         the backend the run will use.
 
     Raises
@@ -412,7 +412,7 @@ def verify_jax_device(
     if len(devices) != 1:
         raise WrongJAXDeviceError(
             f"JAX sees {len(devices)} devices, not the one that was "
-            f"configured ({devices}). The backend was initialised before "
+            f"configured ({devices}). The backend was initialized before "
             "CUDA_VISIBLE_DEVICES was set, so this process is on every card "
             "on the host -- including other people's."
         )
@@ -500,7 +500,7 @@ def configure_jax_gpu(
     mem_fraction: float = DEFAULT_MEM_FRACTION,
     max_used_mib: int = DEFAULT_MAX_USED_MIB,
 ) -> dict[str, object]:
-    """Point JAX at one card, before JAX initialises a backend.
+    """Point JAX at one card, before JAX initializes a backend.
 
     Sets ``CUDA_VISIBLE_DEVICES`` to the chosen card's uuid,
     ``XLA_PYTHON_CLIENT_PREALLOCATE=false`` and

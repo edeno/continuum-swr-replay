@@ -7,7 +7,7 @@ a per-stop **frailty** `u` coupling them. **Only build this if Phase 3 found
 residual coupling** — otherwise the independent models are the result.
 
 **Questions:** Is replay↔dwell a **shared latent (consummatory/engagement)
-drive** rather than two independent reward effects? Does modelling it
+drive** rather than two independent reward effects? Does modeling it
 **de-confound the within-stop time course** (does `λ(tc)` change once the
 duration process and frailty are in)? Do **SWR-coupled vs non-SWR** events couple
 to departure differently (separate `ξ`/frailty loading per type)?

@@ -1359,7 +1359,7 @@ class TestRetrospectiveAlignmentWithShuffle:
             )
             arm_fracs = [0.05] * 9
             arm_fracs[next_arm] = 0.6
-            # Renormalise so it sums to 1.
+            # Renormalize so it sums to 1.
             s = sum(arm_fracs)
             arm_fracs = [f / s for f in arm_fracs]
             per_arm_fracs[i] = arm_fracs
@@ -1379,7 +1379,7 @@ class TestRetrospectiveAlignmentWithShuffle:
             metrics=("chosen_arm_fraction",),
         )
         # Real chosen_arm_fraction should be ~0.6/(0.6+8*0.05) ≈ 0.6
-        # (after renormalisation), much greater than the ~1/9 chance.
+        # (after renormalization), much greater than the ~1/9 chance.
         assert result["real_mean_chosen_arm_fraction"] > 0.5
         assert result["shuffled_mean_chosen_arm_fraction"] < 0.2
         assert result["real_minus_shuffled_chosen_arm_fraction"] > 0.3

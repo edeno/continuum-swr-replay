@@ -101,7 +101,7 @@ def test_a_raw_term_without_an_sd_is_refused_by_the_aggregation() -> None:
 
 
 def test_the_last_rewarded_arm_indicator_is_per_category() -> None:
-    """A 0/1 indicator, like its SWR product and its patch analogue."""
+    """A 0/1 indicator, like its SWR product and its patch analog."""
     assert std_factor("is_last_rewarded_noncurrent_arm", SD) == (1.0, "per_category")
 
 

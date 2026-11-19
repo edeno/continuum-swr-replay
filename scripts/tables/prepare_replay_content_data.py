@@ -32,7 +32,7 @@ this file runs the session loop, assembles, standardizes and publishes.
 **Skipping Spyglass for covariate-only changes** (``--from-cache``): the
 only per-session Spyglass fetch is ``trials`` + ``track_graph`` (the ~3 h
 cost of a full run). Every run, ``--from-cache`` included, still reads the
-database once: the sessions are the epoch register's analysed epochs, which
+database once: the sessions are the epoch register's analyzed epochs, which
 ``find_sessions`` checks against ``get_epoch_info``. Every normal run pickles those to
 ``replay_content/_session_cache/<cache-version>/<session_id>.pkl``. With ``--from-cache``
 the driver reads them back instead of querying Spyglass and re-runs the
@@ -73,7 +73,7 @@ from continuum_swr_replay.analysis.behavior.covariates import load_contingency
 from continuum_swr_replay.analysis.detection.nonlocal_events import (
     validate_dot_event_contract,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     publish_swr_table,
     read_dot_with_swr_source,
     stamp_swr_source,
@@ -86,7 +86,7 @@ from continuum_swr_replay.analysis.event_tables.prepare_data import (
     standardize_event_arm,
 )
 from continuum_swr_replay.analysis.event_tables.stop_table import build_stop_table
-from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
 from continuum_swr_replay.paths import (
     STANDARDIZATION_REFERENCE,
     replay_content_dir,
@@ -493,7 +493,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-per-animal", type=int, default=None)
     parser.add_argument(
         "--animal",
-        choices=analysed_animals(),
+        choices=analyzed_animals(),
         default=None,
         help="Restrict this invocation to one animal's sessions.",
     )

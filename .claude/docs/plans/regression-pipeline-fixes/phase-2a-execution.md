@@ -14,7 +14,7 @@ sensitivity), and the review `.claude/docs/reviews/2026-09-03-regression-pipelin
   code in files that are not already format-clean; check added lines with `ruff format --diff`).
 - Docstrings, test names, module names, and commit messages must not mention this plan, phase
   numbers, task numbers, or `.claude/docs/plans/`.
-- Tests are value-level (numbers and behaviour, not presence). No test-only methods in production
+- Tests are value-level (numbers and behavior, not presence). No test-only methods in production
   code. Shared setup in fixtures.
 - Fail loud: contracts are enforced with `raise`, never warn-and-continue.
 - Canonical tables are parquet under `Processed-Data/replay_content/`; read through
@@ -172,7 +172,7 @@ at ~595-600, `_z_reference`/`_fit_z_reference` 511-540), `src/continuum_swr_repl
 - Event-length control: build `log_n_nonlocal_bins` = `np.log(n_nonlocal_bins)` (n ≥ 1 on every
   event; assert), standardize it with `attach_standardized`, and create
   `log_n_nonlocal_bins_z_x_is_current_arm` and `log_n_nonlocal_bins_z_x_is_prev_arm`; patch
-  analogues `log_n_nonlocal_bins_z_x_is_current_patch`, `..._x_is_prev_patch`. In `model_specs.py`
+  analogs `log_n_nonlocal_bins_z_x_is_current_patch`, `..._x_is_prev_patch`. In `model_specs.py`
   add both arm products and `_TSC` to `BASEc` so every C/CS rung carries them (this makes CS2/CS4/
   CS5/CS5b/CS6 consistent with CS1 and C6–C12; `CS1nt_current`/`CPS1nt_current`, the deliberately
   uncontrolled twins, keep BASEc without `_TSC` — define `BASEc_NT` for them); add the patch
@@ -229,7 +229,7 @@ Files: `Processed-Data/replay_content/models*/` (content dirs: `models`, `models
 - Extend `scripts/qa/compare_fits.py` with a content mode: join backup (count response) and new
   (fraction response) `all_models.pkl` on (session, model); per (model, term) report median
   coefficient old/new, median `bse` old vs `bse_cluster` new, `n_animals_pos` old/new, median
-  per-session ΔAIC vs parent old/new (labelled as different scales), sessions fitted old/new; for
+  per-session ΔAIC vs parent old/new (labeled as different scales), sessions fitted old/new; for
   the SWR-content contrast report the key-term rows old/new and the outcome-stratum rows side by
   side. Save `docs/audits/2026-09-05-content-refit-comparison.md` (generated; commit).
 - Docs: `docs/models_table.md` conventions rows for content (response = per-event fraction; SEs =

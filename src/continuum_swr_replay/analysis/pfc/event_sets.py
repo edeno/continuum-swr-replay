@@ -7,7 +7,7 @@ keyed on, restricted to the shared stop cohort.
 An extended event set adds a fifth class, ``SWR_no_non_local``: the kept,
 cohort-restricted SWRs that overlap no canonical non-local event of the
 session (whether or not that event is in the cohort) and no window the
-analysed-time rule dropped (:func:`swr_without_non_local`). It is a subset of
+analyzed-time rule dropped (:func:`swr_without_non_local`). It is a subset of
 ``SWR``, so every window a matched control must avoid is unchanged by it.
 """
 
@@ -49,7 +49,7 @@ def build_session_fit_mask(
     cohort keeps only the time the animal spends stopped at a well, which is
     the population the hippocampal rate and content ladders are read on, so a
     PFC claim and a replay claim describe the same stops. Excluded time (the
-    artifact mask widened by 0.3 s) is not analysed: a bin whose peri-event
+    artifact mask widened by 0.3 s) is not analyzed: a bin whose peri-event
     basis window (``+/- basis_half_window_s``) touches it is not fit, so no
     fitted bin's design reads excluded time.
 
@@ -69,7 +69,7 @@ def build_session_fit_mask(
     immobility_threshold : float
         Speed threshold for immobility (cm/s).
     excluded_intervals : pandas.DataFrame, optional
-        The session's excluded time (``analysed_time.excluded_intervals``):
+        The session's excluded time (``analyzed_time.excluded_intervals``):
         ``start_time`` and ``end_time``, absolute seconds, closed. None
         excludes nothing.
     basis_half_window_s : float, optional
@@ -236,7 +236,7 @@ def _restrict_to_frame(
     The canonical events were built on the decode's own time axis. A session
     whose decode and position axes were trimmed to their shared run could in
     principle carry an event in a dropped tail; such an event has no bins to be
-    modelled on, so keeping it would put an onset outside the design matrix.
+    modeled on, so keeping it would put an onset outside the design matrix.
     The 27 trimmed sessions were checked and none has one, so a non-zero count
     here is a data change worth seeing rather than routine attrition.
     """
@@ -447,7 +447,7 @@ def swr_without_non_local(
     Overlap is the open test (:func:`~continuum_swr_replay.intervals.overlaps_open`),
     which agrees with the strict positive-duration overlap that defines the
     canonical ``is_swr`` for intervals of positive duration. An SWR that
-    overlaps no non-local event but does overlap a window the analysed-time
+    overlaps no non-local event but does overlap a window the analyzed-time
     rule dropped has an unknown class -- the dropped window may have held a
     non-local event -- and is left out, and counted.
 
@@ -460,7 +460,7 @@ def swr_without_non_local(
         Every canonical non-local event of the session, in the cohort or not:
         ``start_time``, ``end_time``.
     unknown_windows : pandas.DataFrame
-        The windows the analysed-time rule dropped (``start_time``,
+        The windows the analyzed-time rule dropped (``start_time``,
         ``end_time``), from
         :func:`~continuum_swr_replay.analysis.pfc.matched_control.artifact_dropped_events`.
 

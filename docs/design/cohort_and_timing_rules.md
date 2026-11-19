@@ -29,7 +29,7 @@ its sibling `select_event_cohort` (event grain), on the canonical
 
 **The two grains need different predicates to mean the same thing.**
 `occupancy_state` is not the same statement about a stop as about an event. A
-stop is labelled `mixed` whenever its sampled states differ; an event is
+stop is labeled `mixed` whenever its sampled states differ; an event is
 `at_well` only when its whole window is at one well. Measured on 2026-09-12 on
 the 218-session canonical tables of that date (no script re-derives the counts
 in this section), 14,845 of the 107,400 canonical stops were `mixed`, and they
@@ -58,7 +58,7 @@ arriving at a well and sits at it.
   14,845 `mixed`), 22,850 `in_transit`, 481 `unknown`.
 - arm event table: **65,913** events → **59,699 at-well** (90.6%).
 
-What reached the rate fits of that date from those 84,069: Family A modelled
+What reached the rate fits of that date from those 84,069: Family A modeled
 **84,064** stops on `R0` (today <!--v:behavior.per_stop_audit_stops_modeled-->93,555<!--/v-->) (5 dropped for a missing own predictor), Family B
 **83,549** over **6,777,953** bins (the same 5, plus 515 with no arrival clock,
 which the arrival rungs put into the frozen union). Counts from
@@ -106,7 +106,7 @@ table (`Processed-Data/replay_content/event_table.parquet` — `event_id`,
 `event_start_s`/`event_end_s`, `is_swr`, `occupancy_state`), and the SWR
 intervals are the `SWR_event` labels of the cached
 `{epoch_identifier_HPC}_80_data_over_time.pkl` frame, speed-gated by the read
-(`analysed_time.with_swr_source`) and reduced to their sampled bounds by
+(`analyzed_time.with_swr_source`) and reduced to their sampled bounds by
 `intervals_from_labels`, as the hippocampal event table reads them. The SWR split is that table's own `is_swr` column — strict
 positive-duration overlap with those same labels — so a Figure 4 event and a
 content- or rate-family event with the same `event_id` are one event, classified
@@ -130,7 +130,7 @@ non-local events (15,143 of 16,477) and 93.6% of the SWRs (11,997 of 12,821);
 the per-session table is in
 [`2026-09-14-pfc-atwell-cohort.md`](../../.claude/docs/reviews/2026-09-14-pfc-atwell-cohort.md);
 those counts were measured on bundles cut with the earlier run-time event
-construction, which on that population labelled the same events the same way —
+construction, which on that population labeled the same events the same way —
 identical event count and identical SWR-coupled count in **71 of 71** sessions,
 median per-session SWR fraction **0.447** either way, and an identical SWR
 population wherever the two constructions were run side by side (measured
@@ -138,7 +138,7 @@ population wherever the two constructions were run side by side (measured
 artifact rule existed).
 Reading the canonical table therefore buys traceability, not a different split.
 The script recomputes the comparison for any session; its old construction
-applies no analysed-time rule, so in a session where that rule drops an event
+applies no analyzed-time rule, so in a session where that rule drops an event
 the two now differ for that reason alone. Re-run on 2026-11-12 on
 `wilbur20210329_02_r1`, it found the same 212 events under both, 84 of them
 SWR-coupled, none reclassified.
@@ -228,12 +228,12 @@ The restriction is not balanced across the SWR contrast (in the same 2026-09-12
 measurement, 3.3% of SWR events were off-well against 13.0% of non-SWR events) — expected, since SWR events
 concentrate at wells — so the cohort belongs in Methods.
 
-**The estimator: a penalised Poisson GLM.** The mPFC unit GLMs are fit by a
+**The estimator: a penalized Poisson GLM.** The mPFC unit GLMs are fit by a
 batched Poisson IRLS in JAX, one call per model for every unit of a session,
 with a Gaussian prior on the event-basis coefficients and the intercept left
-free. The prior is a stated scientific assumption, not a regularisation
+free. The prior is a stated scientific assumption, not a regularization
 convenience. It exists because 23% of units had at least one model whose
-unpenalised fit *separates* (measured on 2026-09-15 on the maximum-likelihood
+unpenalized fit *separates* (measured on 2026-09-15 on the maximum-likelihood
 bundles of that date; no script re-derives it): the peri-event basis is a cubic B-spline with
 50 ms knots, and a basis column whose support holds no spikes drives its
 coefficient without bound. Such a fit has no maximum-likelihood estimate at
@@ -259,7 +259,7 @@ computed by `implied_prior_sd` and recorded in every bundle's sidecar
 summary's, read from those sidecars, not restated by hand.
 
 Measured against that choice on 2026-09-15 by `scripts/pfc/compare_pfc_cohorts.py`
-on the 71-session batch of that date (10,907 units past the 1 Hz gate): the corpus's own spread — the unpenalised peaks' standard
+on the 71-session batch of that date (10,907 units past the 1 Hz gate): the corpus's own spread — the unpenalized peaks' standard
 deviation with their estimation error deconvolved, divided by what one unit of σ
 buys at one lag — implied **σ = 1.05** (SWR), **1.15** (non-SWR), **1.28**
 (SWR-coupled replay) and **1.12** (the replay-split non-SWR curve) per
@@ -275,19 +275,19 @@ everywhere, counted. Sensitivity bundles at other priors are written under
 `_sigma<value>` names.
 
 Each bundle also states **where the prior did the work**. Every curve-bearing
-model is fit unpenalised as well, and each of the five curves carries the peak
-of the penalised kernel, the peak the same coefficient block reaches
-unpenalised, that peak's own standard error (the standard error of the kernel
+model is fit unpenalized as well, and each of the five curves carries the peak
+of the penalized kernel, the peak the same coefficient block reaches
+unpenalized, that peak's own standard error (the standard error of the kernel
 at its peak lag, off-diagonal terms included — a diagonal `bse` cannot answer
-it), whether the unpenalised fit ran away, and whether the two peaks differ by
-more than the data can resolve. A unit whose unpenalised fit ran away has no
+it), whether the unpenalized fit ran away, and whether the two peaks differ by
+more than the data can resolve. A unit whose unpenalized fit ran away has no
 peak to difference against and is reported separately rather than counted as
 bound.
 
 **The inference: blocked held-out deviance against a matched-control null.**
-Two things make the usual asymptotics unusable here. The fits are penalised, so
+Two things make the usual asymptotics unusable here. The fits are penalized, so
 a likelihood ratio has no chi-square reference distribution at any stated
-degrees of freedom; and spike counts in neighbouring 2 ms bins are not
+degrees of freedom; and spike counts in neighboring 2 ms bins are not
 independent, so an in-sample deviance drop is worth much less than its nominal
 degrees of freedom suggest. The models are therefore compared by how well they
 predict spikes they were not fit on.
@@ -390,7 +390,7 @@ its second block in that order) until the fix, every bundle's
 `non_local_no_SWR_modulation` the SWR-coupled one, and with them
 `non_local_SWR_max_mod` / `non_local_no_SWR_split_max_mod` and their `_time`
 twins. **Any per-class modulation magnitude quoted from the split model before
-that date is mislabelled** and must be re-read from a bundle written after it;
+that date is mislabeled** and must be re-read from a bundle written after it;
 this is the pair Q4 and Q5 are asked on. Whole-model comparisons never read a
 block and are unaffected — the likelihood-ratio tests then, the held-out
 deviances now — and so are the SWR-controlled model's two curves and the

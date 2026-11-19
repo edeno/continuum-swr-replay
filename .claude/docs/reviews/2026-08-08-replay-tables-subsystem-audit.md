@@ -297,7 +297,7 @@ stop maps to, and that row is the **pre-outcome** belief: at trial 0 of every se
 outcome lands on row *t+1*. The vendored pipeline itself reads post-outcome from *t+1*
 (`_spatial_bandit_rl.py:346`).
 
-**The auditor had the direction backwards.** Every modeled non-local event occurs *after*
+**The auditor had the direction backward.** Every modeled non-local event occurs *after*
 reward delivery — on `event_onset_table.pkl`, the fraction with `t_since_pump < 0` is
 **0.0000**, min +0.035 s, median +4.07 s. So the reward-history block (which includes the
 just-completed trip) correctly encodes what the animal has experienced at event time; it is the
@@ -329,7 +329,7 @@ CS5/C13/Mu against both — *not* to change the history block, which is right.
 | C9c | `is_reward_stop` in the canonical onset/timebin tables is effectively constant `False` (235/138,142 = 0.17%): it tests whether a pump falls *inside* an immobility bout, but pumps fire ~0.79 s *before* bout start. |
 | C9d | All interval durations are `(k−1)·dt` — one 2 ms bin short. Affects `immobility_time`, the `log()` exposure offset; duration-dependent so not absorbed by the intercept, but measured small (median stop −0.6%; refit moves `reward_lag1` RR +0.3%). 20 stops get exactly 0 s exposure and are silently dropped. |
 | C9e | `nonlocal_fraction` ≡ 1.0 and `nospike_fraction` ≡ 0.0 for every event — structurally constant, because the rollups are computed over already-filtered rows. Consumed by no model. |
-| C9f | `ab_slope` is fit by `np.polyfit` on raw Unix-epoch timestamps (~1.58e9) over a ~0.05 s window; for the 1.26% of events with exactly flat `ahead_behind`, 1e-12 float noise decides the binary `is_outbound` (0.84% flip vs a mean-centred fit). Consumed by no model. |
+| C9f | `ab_slope` is fit by `np.polyfit` on raw Unix-epoch timestamps (~1.58e9) over a ~0.05 s window; for the 1.26% of events with exactly flat `ahead_behind`, 1e-12 float noise decides the binary `is_outbound` (0.84% flip vs a mean-centered fit). Consumed by no model. |
 | C9g | Doc drift: `models_table.md:143-148` names `is_after_omission` for R1/R2 where the code fits `reward_lag1` (**opposite sign**); `models_table.md` omits four whole ladders (Mu/Mvu, PS0–PS3, C0–C13/CS, CP0–CP4) including the rungs carrying the cited uncertainty results; `build_event_table`'s docstring says `current_arm` is the modal **`decoded_arm`** when the code uses `track_segment_id` (the docstring describes a circular computation — if "fixed" to match, `is_current` would become tautological); `model_specs.py:39-40` still documents the retired NaN behavior. |
 | C9h | Shipped `event_arm_table.pkl` carries three orphan columns (`q_arm_hmm`, `swr_x_q_arm_hmm`, `q_arm_hmm_z`) that no code emits or reads — the table cannot be reproduced by the current builder. `corr(q_arm, q_arm_hmm) = −0.196`, so confusing them gives a sign-inverted covariate. |
 
@@ -389,7 +389,7 @@ senor 20201027_02_r1, 20201030_{10_r5,14_r7}, 20201101_{02_r1,04_r2,06_r3,10_r5,
 
 | finding | verdict |
 |---|---|
-| **Per-bin design predicted by undelivered rewards** (A4-3) | **REFUTED.** Mechanism stated backwards: immobility onset *follows* the pump by a median 0.48 s. Only **313 of 733,666 bins (0.043%)** precede reward delivery. `reward_lag1`'s identity with `reward_outcome` on post-arrival stops is the definition working, not failing. |
+| **Per-bin design predicted by undelivered rewards** (A4-3) | **REFUTED.** Mechanism stated backward: immobility onset *follows* the pump by a median 0.48 s. Only **313 of 733,666 bins (0.043%)** precede reward delivery. `reward_lag1`'s identity with `reward_outcome` on post-arrival stops is the definition working, not failing. |
 | **0.0 fill inflates apparent low-value avoidance** (A2-2) | **Direction inverted.** Refitting the production rung: the fill *attenuates* a negative effect toward null (shipped p=0.31 vs p=0.0013 neutral). Shipped estimate is the **conservative** one. Also a documented, reviewed decision — an indicator was built, measured, and deliberately dropped. |
 | **Trajectory boundary step biases SWR contrasts** (A1-1) | **Downgraded to minor.** Already documented in the design spec's "Known caveats" *and* the code comment. 58.2% of boundary steps are exactly 0 cm (not a "teleport"). A drop-last control shows ~90% of the apparent effect is the fix's own order-statistic shrinkage. Consumed by no model or scripted figure. |
 | **"M7r lowest AIC is a cohort artifact"** (A3-1 headline) | **REFUTED** by common-cohort refit — ranking holds 48/60. Only the magnitude (~10×) and the comparability claim are wrong. |

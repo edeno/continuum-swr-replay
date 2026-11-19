@@ -96,7 +96,7 @@ def test_directions_are_the_signs_of_the_peak():
     assert DIRECTIONS == {"enhanced": 1.0, "suppressed": -1.0}
 
 
-def test_called_response_timing_summarises_units_by_direction(statistics):
+def test_called_response_timing_summarizes_units_by_direction(statistics):
     assert list(statistics.index) == ["enhanced", "suppressed"]
     enhanced = statistics.loc["enhanced"]
     assert enhanced["n_units"] == 4

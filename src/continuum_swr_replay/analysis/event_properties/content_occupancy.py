@@ -21,8 +21,8 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
-    immobile_analysed_bins,
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    immobile_analyzed_bins,
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     event_strict_overlap_mask,
@@ -33,7 +33,7 @@ MIN_WELLS = 4
 """A session needs this many wells placed (:func:`well_positions`)."""
 
 MIN_IMMOBILE_BINS = 50
-"""A leaf arm needs more immobile, analysed bins than this to place its well."""
+"""A leaf arm needs more immobile, analyzed bins than this to place its well."""
 
 
 def well_positions(dot: pd.DataFrame) -> list[float]:
@@ -54,7 +54,7 @@ def well_positions(dot: pd.DataFrame) -> list[float]:
     list of float
         One linear position (cm) per leaf arm that places a well, in arm order.
     """
-    immobile = immobile_analysed_bins(dot)
+    immobile = immobile_analyzed_bins(dot)
     segment = dot["track_segment_id"].to_numpy()
     linear = dot["linear_position"].to_numpy()
     wells = []

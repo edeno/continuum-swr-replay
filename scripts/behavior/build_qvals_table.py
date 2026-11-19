@@ -60,10 +60,10 @@ from continuum_swr_replay.analysis.behavior.covariates.qvals_table import (
     stop_mapping_agreement,
     write_qvals_outputs,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     require_swr_source,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
 from continuum_swr_replay.data_loaders.utils import quiet_spyglass
 from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import require_covariate_schema
@@ -114,7 +114,7 @@ def _fetch_trial_times(beh: Any, nwb_file_names: list[str]) -> pd.DataFrame:
 def run_build_qvals_table(args: argparse.Namespace) -> None:
     """Build every requested animal's qvals rows, validate, and optionally publish."""
     replay_content_dir = args.replay_content_dir.resolve()
-    animals = [args.animal] if args.animal else list(analysed_animals())
+    animals = [args.animal] if args.animal else list(analyzed_animals())
 
     beh = dj.create_virtual_module("alison_behav", "alison_behav")
     rl = dj.create_virtual_module("alison_rlmodel", "alison_rlmodel")
@@ -171,7 +171,7 @@ def run_build_qvals_table(args: argparse.Namespace) -> None:
 
 def main(argv: Sequence[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--animal", choices=analysed_animals(), default=None)
+    p.add_argument("--animal", choices=analyzed_animals(), default=None)
     p.add_argument("--write", action="store_true")
     p.add_argument(
         "--replay-content-dir",

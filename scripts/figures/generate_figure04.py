@@ -30,7 +30,7 @@ Every fitted quantity in the figure comes from the same estimator the
 bundles were fit with: a Poisson GLM with a Gaussian prior on the
 event-basis coefficients, and a peri-event kernel that returns to
 baseline at both ends of the ±250 ms fit window. The example neuron's
-band is the pointwise penalised posterior-mode standard error of each
+band is the pointwise penalized posterior-mode standard error of each
 curve, from the joint fit's coefficient covariance, and the population
 significance is an empirical p-value from repeated matched-control
 draws (R = 1,000, with the finite-sample plus-one correction, so its minimum is
@@ -185,11 +185,11 @@ def plot_single_neuron_overlay(
     glm_results : dict[str, fitted GLM result]
         Full dict of fitted GLMs; only the models the configs' curves are read
         off are plotted. Each needs ``params`` and ``covariance``, the
-        penalised posterior covariance of the parameters. The band is
+        penalized posterior covariance of the parameters. The band is
         ``curve +/- sqrt(b(lag)' cov b(lag))`` over the curve's own block, off
         diagonal terms included, so it is the pointwise standard error the
         shipped estimator gives -- not a maximum-likelihood interval drawn
-        around a penalised point estimate.
+        around a penalized point estimate.
     event_times : dict[str, pd.DataFrame]
         Event interval tables keyed by name (columns: start_time, end_time).
     model_configs : list of dict
@@ -257,7 +257,7 @@ def plot_single_neuron_overlay(
     legend.set_in_layout(False)
     ax_mod.tick_params(labelbottom=False)
     ax_mod.set_title(
-        "Example mPFC neuron (penalised fit, ±1 posterior SE)", fontsize=8, pad=4
+        "Example mPFC neuron (penalized fit, ±1 posterior SE)", fontsize=8, pad=4
     )
 
     # ── Sub-row 2: overlaid PSTHs ──
@@ -393,7 +393,7 @@ def plot_population_average(modulations, pop_df, lag_time, ax):
 # Panel d — Held-out significance + best model (accepts axes)
 # ---------------------------------------------------------------------------
 
-#: Panel d's bars: which held-out test each one reads, and how it is labelled.
+#: Panel d's bars: which held-out test each one reads, and how it is labeled.
 #: The "beyond control" bar is the engagement comparison -- does non-SWR replay
 #: predict held-out spikes beyond a duration-matched non-event baseline drawn
 #: from the same bouts?
@@ -445,7 +445,7 @@ def plot_significance(
     ax.tick_params(axis="x", labelsize=5)
     # Say both the raw-p threshold and R on the panel: this is a descriptive
     # preview, and its Monte Carlo resolution is part of what the bars mean.
-    # Left-aligned: the title is wider than the axes, and centred it ran under
+    # Left-aligned: the title is wider than the axes, and centered it ran under
     # the panel letter.
     min_pvalue = empirical_pvalue_floor(n_control_draws)["min_pvalue"]
     ax.set_title(
@@ -517,7 +517,7 @@ def generate_figure(
         suffixed ``_allstops`` bundle is read for ``all_stops``.
     fitter : {"jax"}
         Backend the example neuron's GLMs are fit with -- the batched one the
-        population bundle was fit with, and the only one with a penalised path.
+        population bundle was fit with, and the only one with a penalized path.
     penalty_sigma : float
         Prior standard deviation of an event-basis coefficient, on the log-rate
         scale. Only the canonical prior is accepted: the runner writes a
@@ -608,7 +608,7 @@ def generate_figure(
     )
 
     # The models are fit over +/-250 ms and reported over +/-200 ms, as the
-    # bundle's curves are: the spline's boundary behaviour stays outside the
+    # bundle's curves are: the spline's boundary behavior stays outside the
     # window the panel draws.
     report_mask = in_report_window(lag_time)
     spline_basis = spline_basis[report_mask]
@@ -810,7 +810,7 @@ def main(argv: Sequence[str] | None = None):
         help=(
             "Backend the example neuron's GLMs are fit with (default and only "
             "choice: jax, the one the population bundle was fit with and the "
-            "only one with a penalised path)."
+            "only one with a penalized path)."
         ),
     )
     parser.add_argument(
@@ -841,8 +841,8 @@ def main(argv: Sequence[str] | None = None):
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Before JAX initialises a backend (which is later than the import, and
-    # checked afterwards): the panel's fit runs on the same backend the
+    # Before JAX initializes a backend (which is later than the import, and
+    # checked afterward): the panel's fit runs on the same backend the
     # population bundle was fit with, on a card nobody else is using.
     if args.fitter == "jax":
         record = configure_jax_gpu(gpu=args.gpu, allow_cpu=args.allow_cpu)

@@ -89,7 +89,7 @@ class TestPosteriorToArmMarginal:
         np.testing.assert_allclose(arm_post, [[0.75, 0.25]])
 
     def test_rejects_improper_probability_row_mass(self):
-        """Do not silently turn an unnormalised score row into probabilities."""
+        """Do not silently turn an unnormalized score row into probabilities."""
         posterior = np.array([[0.2, 0.2]])
         with pytest.raises(ValueError, match="rows must sum to 1"):
             posterior_to_arm_marginal(posterior, np.array([0, 1]), n_arms=2)

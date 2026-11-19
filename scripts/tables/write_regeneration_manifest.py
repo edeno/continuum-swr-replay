@@ -26,7 +26,7 @@ from continuum_swr_replay.analysis.event_tables.table_contracts import (
 from continuum_swr_replay.analysis.replay_models._fit_diagnostics import (
     flagged_nonconverged,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.paths import (
     QVALS_STANDARDIZATION_REFERENCE,
     STANDARDIZATION_REFERENCE,
@@ -589,9 +589,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--expected-sessions",
         type=int,
-        default=len(analysed_epoch_ids()),
+        default=len(analyzed_epoch_ids()),
         help="Epochs (sessions) the tables must hold; default: the epoch register's "
-        "analysed epochs (HPC cohort).",
+        "analyzed epochs (HPC cohort).",
     )
     parser.add_argument(
         "--expected-drift-columns",

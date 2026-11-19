@@ -101,12 +101,12 @@ ARTIFACT_DROP_COLUMNS = ("non_local_event", "SWR_event")
 
 
 def artifact_dropped_events(drops: pd.DataFrame) -> pd.DataFrame:
-    """The non-local events and SWRs the analysed-time rule dropped.
+    """The non-local events and SWRs the analyzed-time rule dropped.
 
     Parameters
     ----------
     drops : pandas.DataFrame
-        ``analysed_time.artifact_event_drops`` of the session's decode frame.
+        ``analyzed_time.artifact_event_drops`` of the session's decode frame.
 
     Returns
     -------
@@ -192,7 +192,7 @@ def make_matched_control_times(
     - the control window lies entirely inside that bout (so every bin it covers
       is a bin the models are fit on),
     - it overlaps no window of any real event class, ``SWR`` included, nor any
-      event in `avoid` (the events the analysed-time rule dropped), and
+      event in `avoid` (the events the analyzed-time rule dropped), and
     - no other control in the draw uses that exact onset bin.
 
     The duration-matching windows may overlap one another. Duration constrains

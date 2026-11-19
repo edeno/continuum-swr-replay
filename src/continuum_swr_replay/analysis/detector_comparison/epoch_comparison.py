@@ -234,7 +234,7 @@ def compare_epoch(
     dot : DataFrame
         The epoch's decode frame, read through the SWR source.
     drops : DataFrame
-        ``analysed_time.artifact_event_drops`` of the frame as saved.
+        ``analyzed_time.artifact_event_drops`` of the frame as saved.
     decode_run_id : str
         Names the decode in the ``mua`` and ``state_space`` tables.
     carey_dir, memoryless_dir : Path
@@ -283,7 +283,7 @@ def compare_epoch(
     twin_pair = (pairs.detector_a == MEMORYLESS_CRITERIA) | (
         pairs.detector_b == MEMORYLESS_CRITERIA
     )
-    labelled, components = overlap_components(kept[~twin], pairs[~twin_pair])
+    labeled, components = overlap_components(kept[~twin], pairs[~twin_pair])
     recount = []
     for gap_s in FRAGMENT_GAPS_S:
         merged = merge_fragments(
@@ -314,7 +314,7 @@ def compare_epoch(
     )
     tables = {
         "inventory": [
-            labelled,
+            labeled,
             kept[twin].assign(component_id=pd.NA),
             moving.assign(component_id=pd.NA),
         ],

@@ -35,7 +35,7 @@ and which estimator and device fit each session::
         --after Processed-Data \\
         --out .claude/docs/reviews/2026-09-14-pfc-canonical-rerun.md
 
-When the after tree's sidecars name the penalised estimator, a different
+When the after tree's sidecars name the penalized estimator, a different
 report is written instead: what the prior did to each unit's peak
 modulation, how many units carried a basis column with no spikes under it,
 what the two inferences call, how steady the held-out difference is between
@@ -387,7 +387,7 @@ def session_cohort_table(sidecars: pd.DataFrame) -> pd.DataFrame:
 
 
 def coverage_summary(sidecars: pd.DataFrame) -> tuple[dict[str, int], pd.DataFrame]:
-    """The leading-edge coverage diagnostic, totalled and per affected session.
+    """The leading-edge coverage diagnostic, totaled and per affected session.
 
     Returns
     -------
@@ -1164,7 +1164,7 @@ def worker_time_table(paths: list[Path]) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# The estimator change: penalised fits, scored out of fold
+# The estimator change: penalized fits, scored out of fold
 # ---------------------------------------------------------------------------
 
 #: Sidecar keys that state the estimator and the inference a bundle was
@@ -1196,7 +1196,7 @@ ESTIMATOR_SIDECAR_KEYS = [
 REPLAY_SPLIT_SWAP_FIXED = "2026-09-15"
 
 #: The five peri-event curves a bundle ships. The bundle carries, beside each,
-#: the peak of the penalised curve, the peak the same block reaches unpenalised
+#: the peak of the penalized curve, the peak the same block reaches unpenalized
 #: and that peak's own standard error, so the audit reads the prior's effect
 #: off the artifact rather than differencing two trees fit on different bases.
 CURVE_NAMES = (
@@ -1211,7 +1211,7 @@ CURVE_NAMES = (
 def _shrinkage_columns(curve: str) -> dict[str, str]:
     """The peak columns :func:`peak_shrinkage` reads for one curve, by role."""
     return {
-        "peak_penalised": f"{curve}: peak_log_modulation",
+        "peak_penalized": f"{curve}: peak_log_modulation",
         "peak_mle": f"{curve}: peak_log_modulation_mle",
         "peak_mle_se": f"{curve}: peak_log_modulation_mle_se",
         "prior_binds": f"{curve}: prior_binds",
@@ -1246,13 +1246,13 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
     Parameters
     ----------
     after : pandas.DataFrame
-        The penalised population, from ``load_population_data``.
+        The penalized population, from ``load_population_data``.
 
     Returns
     -------
     pandas.DataFrame
-        One row per (unit, curve): ``peak_penalised``, ``peak_mle``,
-        ``peak_mle_se``, ``prior_binds``, ``units`` (the unpenalised fit's
+        One row per (unit, curve): ``peak_penalized``, ``peak_mle``,
+        ``peak_mle_se``, ``prior_binds``, ``units`` (the unpenalized fit's
         status,
         :func:`~continuum_swr_replay.analysis.pfc.population_statistics.fit_status`:
         a unit with no convergence flag has not converged) and the unit's
@@ -1276,7 +1276,7 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(
             columns=[
                 "curve",
-                "peak_penalised",
+                "peak_penalized",
                 "peak_mle",
                 "peak_mle_se",
                 "prior_binds",
@@ -1286,7 +1286,7 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
             ]
         )
     frame = pd.concat(rows, ignore_index=True)
-    frame["delta"] = frame["peak_penalised"] - frame["peak_mle"]
+    frame["delta"] = frame["peak_penalized"] - frame["peak_mle"]
     return frame
 
 
@@ -1295,7 +1295,7 @@ def shrinkage_table(shrinkage: pd.DataFrame, after: pd.DataFrame) -> pd.DataFram
 
     The rows of ``shrinkage``, grouped by curve and
     :func:`~continuum_swr_replay.analysis.pfc.population_statistics.fit_status`.
-    A unit whose unpenalised fit ran away has no peak to difference against,
+    A unit whose unpenalized fit ran away has no peak to difference against,
     so its row is reported -- it is where a prior is supposed to do the work --
     but "the prior binds" is counted only where a maximum-likelihood peak
     exists to be moved. ``prior_binds_pct`` is, on the well-posed row,
@@ -1308,7 +1308,7 @@ def shrinkage_table(shrinkage: pd.DataFrame, after: pd.DataFrame) -> pd.DataFram
     shrinkage : pandas.DataFrame
         :func:`peak_shrinkage` of ``after``.
     after : pandas.DataFrame
-        The penalised population, from ``load_population_data``.
+        The penalized population, from ``load_population_data``.
     """
     if shrinkage.empty:
         return shrinkage
@@ -1332,8 +1332,8 @@ def shrinkage_table(shrinkage: pd.DataFrame, after: pd.DataFrame) -> pd.DataFram
             "peak_mle",
             lambda s: finite_statistic(s, np.median, absolute=True),
         ),
-        median_abs_peak_penalised=(
-            "peak_penalised",
+        median_abs_peak_penalized=(
+            "peak_penalized",
             lambda s: finite_statistic(s, np.median, absolute=True),
         ),
         median_abs_delta=(
@@ -1376,7 +1376,7 @@ def empirical_bayes_sigma(
 ) -> pd.DataFrame:
     """The prior width the corpus's own spread implies, beside the chosen one.
 
-    The unpenalised peaks scatter for two reasons: units really do modulate by
+    The unpenalized peaks scatter for two reasons: units really do modulate by
     different amounts, and each peak is estimated with error. Deconvolving the
     second leaves the first --
     ``sqrt(var(peak_mle) - mean(se_mle**2))`` -- which is a prior standard
@@ -2209,7 +2209,7 @@ def build_estimator_report(
     """Assemble the audit of the estimator and inference change.
 
     The before tree holds maximum-likelihood fits tested by a likelihood ratio
-    and selected by AIC; the after tree holds penalised fits scored out of
+    and selected by AIC; the after tree holds penalized fits scored out of
     fold against a matched-control null. The two are not two runs of one
     estimator, so nothing here is a paired difference of a statistic: what is
     compared is the peak modulation each estimator reports for the same unit,
@@ -2233,7 +2233,7 @@ def build_estimator_report(
         "fit by maximum likelihood and tested by a likelihood ratio against an "
         "asymptotic chi-square, with AIC selecting between models. Neither "
         "survives the fits themselves: a basis column with no spikes under its "
-        "support drives its coefficient to minus infinity, and neighbouring "
+        "support drives its coefficient to minus infinity, and neighboring "
         "2 ms bins are not independent, so an in-sample deviance drop is worth "
         "much less than its nominal degrees of freedom. The models now carry a "
         "Gaussian prior on the event-basis coefficients -- loose enough that "
@@ -2254,7 +2254,7 @@ def build_estimator_report(
         "selection.\n"
         f"- after: `{after_dir}` -- {len(sidecars)} bundles, "
         f"{after_gate['n_neurons_with_fit']} units with a usable fit, "
-        "penalised fits scored out of fold.\n"
+        "penalized fits scored out of fold.\n"
     )
     before_sessions = bundle_sessions(before_dir)
     after_sessions = bundle_sessions(after_dir, artifact_suffix)
@@ -2279,7 +2279,7 @@ def build_estimator_report(
         "one, as did `non_local_SWR_max_mod` and "
         "`non_local_no_SWR_split_max_mod`. Any per-class modulation magnitude "
         "quoted from the split model in an earlier audit or claim is "
-        "mislabelled and must be re-read from a bundle written after the fix. "
+        "mislabeled and must be re-read from a bundle written after the fix. "
         "Whole-model comparisons -- the likelihood ratios then, the held-out "
         "deviances now -- never read a block and are unaffected, and so are "
         "the SWR-controlled and engagement curves.\n"
@@ -2301,16 +2301,16 @@ def build_estimator_report(
     add("## What the prior did to the fits\n")
     add(
         "Each bundle carries, beside every peri-event curve, the peak of the "
-        "penalised curve, the peak the same coefficient block reaches "
-        "**unpenalised**, and that peak's own standard error -- the standard "
+        "penalized curve, the peak the same coefficient block reaches "
+        "**unpenalized**, and that peak's own standard error -- the standard "
         "error of the kernel at its peak lag, off-diagonal terms included. So "
         "the prior's effect is read inside one fit of one design, not by "
         "differencing two trees that were fit on different bases.\n"
     )
     add(
-        "`prior_binds` counts units whose penalised peak differs from the "
+        "`prior_binds` counts units whose penalized peak differs from the "
         "maximum-likelihood one by more than that error. A unit whose "
-        "unpenalised fit ran away has no peak to difference against: it is "
+        "unpenalized fit ran away has no peak to difference against: it is "
         "reported on its own row (`separated`), which is where a prior is "
         "supposed to do the work, and is left out of the binding count.\n"
     )
@@ -2330,7 +2330,7 @@ def build_estimator_report(
 
     add("### The prior the corpus's own spread would have chosen\n")
     add(
-        "The unpenalised peaks scatter for two reasons: units really do "
+        "The unpenalized peaks scatter for two reasons: units really do "
         "modulate by different amounts, and each peak is estimated with "
         "error. Deconvolving the second -- "
         "`sqrt(var(peak_mle) - mean(se_mle**2))` over the well-posed units -- "
@@ -2382,7 +2382,7 @@ def build_estimator_report(
     add("## Which events entered each matched-control test\n")
     add(
         "A real event with no legal non-event window in its own fitted bout "
-        "cannot enter a matched randomisation test. `n_events_tested` is the "
+        "cannot enter a matched randomization test. `n_events_tested` is the "
         "fixed, timing-only subset used on both the observed and null sides; "
         "the original all-event held-out difference remains separately in the "
         "bundle. `n_exact_draws` must meet `n_required_draws` for the empirical "
@@ -2531,7 +2531,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         choices=["auto", "cohort", "estimator"],
         help=(
             "Which audit to write. 'estimator' compares the maximum-likelihood "
-            "bundles against the penalised ones scored out of fold; 'cohort' "
+            "bundles against the penalized ones scored out of fold; 'cohort' "
             "is the earlier before/after of the stop restriction, for "
             "reproducing the audits that were written with it. 'auto' (the "
             "default) reads the after tree's sidecars and picks the one they "
@@ -2591,7 +2591,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     comparison = args.comparison
     if comparison == "auto":
         # The bundles state which estimator produced them, so the audit does
-        # not have to be told: an after tree that names the penalised
+        # not have to be told: an after tree that names the penalized
         # estimator is an estimator change, not another cut of the cohort.
         stated = set(sidecars.get("estimator", pd.Series(dtype=object)).dropna())
         comparison = "estimator" if stated == {"ridge_poisson_glm"} else "cohort"

@@ -138,7 +138,7 @@ def _session_frame() -> pd.DataFrame:
     )
 
 
-def test_the_events_are_grouped_by_swr_overlap_and_distance_and_the_quiet_windows_are_analysed_time():
+def test_the_events_are_grouped_by_swr_overlap_and_distance_and_the_quiet_windows_are_analyzed_time():
     frame = _session_frame()
     # bins 30 and 31 are excluded time
     frame.iloc[30:32, frame.columns.get_loc("in_excluded_time")] = True

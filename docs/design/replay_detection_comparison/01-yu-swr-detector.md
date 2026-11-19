@@ -201,7 +201,7 @@ minimum above-threshold sample duration is 20 ms.
 |---|---|---|---|
 | **V-Y2** | Reflection of the left flank | `2m − b` for every left bin `b` (Y3) | The original's `abs(b) + 2m` equals this only for `b ≤ 0`. Inactive difference when the mode is ≤ 0; the implementation warns when it is not and records the mode per epoch |
 | **V-Y3** | None: histogram grid, mode smoothing, and percentile rule are all fixed by the original | `-10:0.01:50` (left-closed bins, in median-of-z units), 11-point moving-average mode, `1 − 1e-4` CDF crossing plus one bin | Not a choice. Sensitivity of the threshold to grid width (0.005, 0.02) is a characterization for 04, not a design freedom |
-| **V-Y4** | MATLAB `smooth(x, 11)` edge handling and `histc` binning | Centred 11-point mean with shrinking symmetric windows at the ends; left-closed bins with the final bin counting values exactly equal to 50 | Edge handling cannot affect an interior mode; documented so the transliteration is exact rather than approximate |
+| **V-Y4** | MATLAB `smooth(x, 11)` edge handling and `histc` binning | Centered 11-point mean with shrinking symmetric windows at the ends; left-closed bins with the final bin counting values exactly equal to 50 | Edge handling cannot affect an interior mode; documented so the transliteration is exact rather than approximate |
 
 ### Assumptions the method makes, which we inherit
 

@@ -13,7 +13,7 @@ an asymptotic chi-square, and compared by AIC. Neither part holds for these fits
 
 - a basis column with no spikes under its support drives its coefficient to minus
   infinity, so for those units the maximum-likelihood estimate does not exist;
-- neighbouring 2 ms bins are not independent, so an in-sample deviance drop is worth
+- neighboring 2 ms bins are not independent, so an in-sample deviance drop is worth
   much less than its nominal degrees of freedom.
 
 Since 2026-09-16 the models carry a Gaussian prior on the event-basis coefficients
@@ -29,14 +29,14 @@ the observed statistic and every null draw are read on that subset.
 
 - **The solver is the maximum-likelihood one at zero penalty** (2026-09-15,
   `scripts/pfc/check_pfc_ridge_lambda0.py`, three sessions). With the penalty set to
-  zero, the penalised solver matched the stored statsmodels fits on every cell whose
+  zero, the penalized solver matched the stored statsmodels fits on every cell whose
   maximum-likelihood estimate exists, within 1e-5 in the parameters and 1e-6 in the
   deviance. The cells where it does not exist were reported, not compared; they are
   the ones the prior was introduced for.
 - **The prior is loose for this corpus** (2026-09-18, `scripts/pfc/compare_pfc_cohorts.py`
-  on the first 71-session batch). The spread of the unpenalised peaks, less their
+  on the first 71-session batch). The spread of the unpenalized peaks, less their
   estimation error, implied a σ of about 0.7 to 1.3 by curve, against the chosen 3, and
-  the penalised peak differed from the unpenalised one by more than its standard error
+  the penalized peak differed from the unpenalized one by more than its standard error
   for under 3 % of the well-posed units per curve. These are dated numbers of that batch; the
   current share is <!--v:mpfc.prior_binds_percent_min-->2.6<!--/v-->–<!--v:mpfc.prior_binds_percent_max-->4.9<!--/v-->%
   (`paper/reported/mpfc.json`).
@@ -59,7 +59,7 @@ and [2026-09-18-pfc-ridge-heldout.md](../../.claude/docs/reviews/2026-09-18-pfc-
 - **Bundles written before 2026-09-15 have the replay-split curves swapped**:
   `non_local_SWR_modulation` held the non-SWR kernel and the reverse, so a per-class
   modulation magnitude quoted from the split model before that date, the
-  maximum-likelihood backup tree included, is mislabelled. Whole-model comparisons never
+  maximum-likelihood backup tree included, is mislabeled. Whole-model comparisons never
   read a block and are unaffected.
 
 ## What it means today
@@ -77,7 +77,7 @@ time courses.
 - **The statistics.** Per unit: the held-out deviance and the count of separated
   columns per model, each nested pair's held-out difference (total and per fold), an
   empirical p-value per event class and for the engagement comparison, the best model by
-  held-out deviance, and per curve the penalised and unpenalised peak with that peak's
+  held-out deviance, and per curve the penalized and unpenalized peak with that peak's
   own standard error.
 - **The time courses.** `SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR` and
   `matched_control`, the duration-matched non-event baseline. All five are read into the
@@ -123,7 +123,7 @@ states:
 
 A bundle that does not state all of these is refit rather than skipped, and the
 population loader also refuses it before figure generation: the canonical bundle name is
-unsuffixed, so nothing else tells a penalised bundle from the maximum-likelihood one that
+unsuffixed, so nothing else tells a penalized bundle from the maximum-likelihood one that
 held the same name.
 
 **The canonical settings**, read from the sidecars into `paper/reported/mpfc.json`:

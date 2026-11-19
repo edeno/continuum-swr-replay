@@ -14,7 +14,7 @@ Task dimensions, all from the beta-bernoulli model, per event/stop scalars:
   **Switch − Stay**
   (r = −0.952 with the stay value, so a positive
   `relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm` means the current
-  arm's value is *low*; an earlier "Stay-vs-Switch" label here was backwards).
+  arm's value is *low*; an earlier "Stay-vs-Switch" label here was backward).
 - `rpe_postoutcome` — beta reward prediction error (reward − pre-outcome
   chosen-arm belief mean).
 - `reward_belief_differential_entropy_leaf_mean_preoutcome` — mean per-leaf
@@ -73,7 +73,7 @@ The consequences were measured directly, on 2026-09-05, by refitting real sessio
 same fitter with one draw per event instead of hard counts: standard errors on
 `reward_fraction_candidate_arm_last10_visits` moved from 0.07–0.12 to 0.40–0.73
 (**~6×**), and `ΔAIC = AIC(M3) − AIC(M2)` collapsed from −317…−10 to
-−6.7…+2.0 (child minus parent; negative favours `M3`) — that is,
+−6.7…+2.0 (child minus parent; negative favors `M3`) — that is,
 the count response was manufacturing decisive model-selection evidence out of
 autocorrelated bins. Point estimates moved too (e.g. −0.43 → −0.03, −2.03 →
 −0.81), because a count response weights an event by its duration and by how
@@ -93,7 +93,7 @@ the model SE the fitters write an event-clustered sandwich SE
 (`bse_cluster_<term>`), which is what the audited aggregation reads: on a
 fraction response the model SE describes a design in which nothing varied within
 an event, while the clustered SE reflects the events' own variability. AIC-scale
-numbers on a fraction response are quasi-likelihood quantities and are labelled
+numbers on a fraction response are quasi-likelihood quantities and are labeled
 as such; they are **not** comparable with a count bundle's. The count response is
 retained behind `--response hard_count` (own `_hard_count/` bundle) for the
 discriminative-model comparison and for the before/after audit.
@@ -164,7 +164,7 @@ C3   + reward_fraction_candidate_arm_last10_visits
 C4   + reward_belief_mean_candidate_arm_preoutcome
 C5   + is_last_rewarded_noncurrent_arm
 ```
-State modulation of current-arm bias (event scalar × `is_current_arm`; rate-ladder analogues):
+State modulation of current-arm bias (event scalar × `is_current_arm`; rate-ladder analogs):
 ```
 C6   + rpe_postoutcome_z_x_is_current_arm
 C7   + relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm

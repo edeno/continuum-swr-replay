@@ -107,7 +107,7 @@ STATE_DIAGRAM_HEIGHT = 1.14
 def _colored_yticks(
     ax: Axes, ticks: Sequence[float], labels: Sequence[str], colors: Sequence[str]
 ) -> None:
-    """Label the y axis with names in their own colours, without tick marks."""
+    """Label the y axis with names in their own colors, without tick marks."""
     ax.set_yticks(ticks)
     ax.set_yticklabels(labels, fontsize=SMALL_SIZE)
     ax.tick_params(axis="y", length=0, pad=2)

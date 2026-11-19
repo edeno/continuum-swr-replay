@@ -11,7 +11,7 @@ from continuum_swr_replay.analysis.replay_models.contrast_aggregation import (
     MAX_UNIDENTIFIED_SHARE,
     MIN_SESSIONS_PER_TERM,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.reported.values import (
     Tags,
@@ -60,9 +60,9 @@ def _require(condition: bool, message: str) -> None:
 
 
 def _require_every_animal(n_animals: float, what: str) -> None:
-    """Refuse a statistic that does not span every analysed animal."""
-    expected = len(analysed_animals())
+    """Refuse a statistic that does not span every analyzed animal."""
+    expected = len(analyzed_animals())
     _require(
         n_animals == expected,
-        f"{what}: {n_animals} animals, not the {expected} analysed",
+        f"{what}: {n_animals} animals, not the {expected} analyzed",
     )

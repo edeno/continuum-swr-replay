@@ -15,7 +15,7 @@ reports every missing, extra or differing table before failing.
 ``--sessions`` restricts ``regen`` to a few epochs. Every builder takes its
 sessions from the epoch register, so each builder runs with
 ``epoch_register.REGISTER_PATH`` at a copy of the register in which every other
-analysed epoch is marked excluded. Nothing else changes, so the slice runs the
+analyzed epoch is marked excluded. Nothing else changes, so the slice runs the
 full cohort's code path. Pooled quantities (the event-arm and qvals ``_z``
 columns and their standardization references) are pooled over the slice, so a
 slice is compared with a slice, not with the live tables.
@@ -87,27 +87,27 @@ _CONTFRAG = "scripts/tables/prepare_contfrag_replay_content_data.py"
 
 
 def _slice_register(sessions: list[str]) -> pd.DataFrame:
-    """The register with every analysed epoch outside `sessions` excluded.
+    """The register with every analyzed epoch outside `sessions` excluded.
 
-    Raises ``ValueError`` naming any of `sessions` the register does not analyse,
+    Raises ``ValueError`` naming any of `sessions` the register does not analyze,
     before anything is written.
     """
     from continuum_swr_replay.data_loaders.epoch_register import (
         Reason,
         Status,
-        analysed_epoch_ids,
+        analyzed_epoch_ids,
         read_register,
     )
     from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 
     register = read_register()
-    unknown = sorted(set(sessions) - set(analysed_epoch_ids(register)))
+    unknown = sorted(set(sessions) - set(analyzed_epoch_ids(register)))
     if unknown:
-        raise ValueError(f"not analysed epochs of the register: {unknown}")
+        raise ValueError(f"not analyzed epochs of the register: {unknown}")
     ids = [
         format_epoch_identifier(name, epoch, "HPC") for name, epoch in register.index
     ]
-    drop = (register["status"] == Status.ANALYSED) & ~pd.Series(
+    drop = (register["status"] == Status.ANALYZED) & ~pd.Series(
         ids, index=register.index
     ).isin(sessions)
     register.loc[drop, "status"] = Status.EXCLUDED.value
@@ -121,15 +121,15 @@ def _write_register(
 ) -> list[str]:
     """Write the sliced register and check it; return its animals, in order."""
     from continuum_swr_replay.data_loaders.epoch_register import (
-        analysed_animals,
-        analysed_epoch_ids,
+        analyzed_animals,
+        analyzed_epoch_ids,
         read_register,
     )
 
     register.reset_index().to_csv(path, index=False)
     sliced = read_register(path)  # the copy obeys the register's contract
-    assert sorted(analysed_epoch_ids(sliced)) == sorted(sessions)
-    return list(analysed_animals(sliced))
+    assert sorted(analyzed_epoch_ids(sliced)) == sorted(sessions)
+    return list(analyzed_animals(sliced))
 
 
 def _copy_cache(sessions: list[str] | None, root: Path) -> None:
@@ -198,9 +198,9 @@ def regen(root: Path, sessions: list[str] | None) -> None:
         register = root / "epoch_register.csv"
         animals = _write_register(sliced, sessions, register)
     else:
-        from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+        from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
 
-        animals = list(analysed_animals())
+        animals = list(analyzed_animals())
     _copy_cache(sessions, root)
     rc, cf, cache = root / RC, root / CF, str(root / CACHE)
     rc.mkdir()
@@ -313,9 +313,9 @@ def _session_restriction(candidate: Path, reference: Path):
     if not path.exists():
         raise FileNotFoundError(f"--restrict needs a slice root with {path}")
     register = read_register(path)
-    analysed = register.index[register["status"] == Status.ANALYSED]
+    analyzed = register.index[register["status"] == Status.ANALYZED]
     sessions = pd.MultiIndex.from_tuples(
-        [(*parse_nwb_filename(name), epoch) for name, epoch in analysed],
+        [(*parse_nwb_filename(name), epoch) for name, epoch in analyzed],
         names=list(SESSION_COLUMNS),
     )
     columns = list(SESSION_COLUMNS)
@@ -475,7 +475,7 @@ def main(argv: list[str] | None = None) -> None:
         "--restrict",
         action="store_true",
         help="restrict the reference to the sessions the candidate slice's "
-        "epoch_register.csv analyses",
+        "epoch_register.csv analyzes",
     )
     p_step = sub.add_parser("_step", help="internal: run one builder")
     p_step.add_argument("--register", default=None)

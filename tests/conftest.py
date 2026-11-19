@@ -184,7 +184,7 @@ def real_data_sees_the_configured_artifact_run(
 
     This fixture is function-scoped, so it reaches the test function only. A
     module- or session-scoped fixture in a ``real_data`` module still sees
-    None; one that reads a table through ``analysed_time.with_swr_source`` must
+    None; one that reads a table through ``analyzed_time.with_swr_source`` must
     set the run itself.
     """
     if request.node.get_closest_marker("real_data") is None:

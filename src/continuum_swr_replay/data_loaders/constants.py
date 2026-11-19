@@ -9,7 +9,7 @@ Attributes
 ----------
 NWB_FILES : list of str
     The 91 NWB files ``get_epoch_info`` searches, from 5 animals: chimi, j16,
-    peanut, senor, and wilbur. Which of their epochs are analysed is the epoch
+    peanut, senor, and wilbur. Which of their epochs are analyzed is the epoch
     register's to say (``data_loaders/epoch_register.py``).
 REGULAR_SESSION_DESCRIPTION : str
     The ``Session.session_description`` of a regular spatial-bandit session.
@@ -148,11 +148,11 @@ Animals and session counts:
 - senor: 22 sessions (Oct-Nov 2020)
 - wilbur: 19 sessions (Mar-Apr 2021)
 
-Not every file is analysed. The depletion sessions ("Spatial bandit task
+Not every file is analyzed. The depletion sessions ("Spatial bandit task
 (depletion)", a decaying reward schedule) are a different task variant that
 ``get_epoch_info`` leaves out by their description; one first-exposure
 session, wilbur20210326, is admitted through ``FIRST_EXPOSURE_DESCRIPTIONS``.
-Which run epochs are analysed, and why every other run epoch of these files
+Which run epochs are analyzed, and why every other run epoch of these files
 and of the sessions left out of this list is not, is recorded in one place,
 the epoch register (``data_loaders/epoch_register.py``,
 ``epoch_register.csv``), which every stage reads. Its counts and its excluded
@@ -248,7 +248,7 @@ Arm ``i`` ends at well ``i``, so these are also the well (port) ids.
 """
 
 TRUNK_ARMS: tuple[int, ...] = (6, 7, 8)
-"""The trunk arms, ascending: each joins a patch junction to the centre."""
+"""The trunk arms, ascending: each joins a patch junction to the center."""
 
 N_LEAF_ARMS: int = len(LEAF_ARMS)
 """The number of leaf arms, six."""
@@ -285,7 +285,7 @@ The rewarded boundary is a stimulus: in the refreshed 218-session behavioral
 cache, 18,753 rewarded task visits had p99 pump latency 91 ms and maximum
 latency 236 ms after destination arrival. Omissions have no negative-feedback
 cue to timestamp, and the previous rule used destination poke-out -- a median
-880 ms later, and a *behavioural* boundary rather than a stimulus one. Gating
+880 ms later, and a *behavioral* boundary rather than a stimulus one. Gating
 on when the animal chose to leave is circular (dwell length plausibly covaries
 with replay) and it excluded 99% of omission events from every outcome-gated
 fit, collapsing the reward contrast those models exist to estimate.

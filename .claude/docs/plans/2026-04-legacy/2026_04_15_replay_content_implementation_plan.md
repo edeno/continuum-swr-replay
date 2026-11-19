@@ -188,7 +188,7 @@ cluster-robust secondary.
   Poisson with M2 predictors. Output table: per-context-variable
   summary of "affects occurrence, content, or both."
 
-**Gate:** fits converge; per-session outputs saved. Findings catalogued
+**Gate:** fits converge; per-session outputs saved. Findings cataloged
 but paper not updated now.
 
 ---

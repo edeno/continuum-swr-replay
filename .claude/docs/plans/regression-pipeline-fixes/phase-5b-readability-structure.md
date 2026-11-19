@@ -60,7 +60,7 @@ Findings addressed: D2, D3, D5 (session keys, `is_stay`, event timing), D8 (CLIs
   (`scripts/rate/fit_swr_contrast_rate.py:267-268`).
 - **Relocate validators.** Move `_validate_requested_standardization`,
   `_validate_canonical_table_contract`, and `_validate_and_match_fit_results` from the content
-  runner into `analysis/replay/table_contracts.py` as public functions with the same behaviour;
+  runner into `analysis/replay/table_contracts.py` as public functions with the same behavior;
   the runner's science path (`_load_and_filter_cohort → _fit_content_ladder → fit_model_per_session`)
   should then read in under 200 lines.
 - **Parity gate.** Same as phase 5a: freeze one session before, `compare_to_golden_baseline.py`

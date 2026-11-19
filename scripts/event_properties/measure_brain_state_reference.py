@@ -24,7 +24,7 @@ from typing import Any
 import pandas as pd
 
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
-from continuum_swr_replay.analysis.event_definition import analysed_time
+from continuum_swr_replay.analysis.event_definition import analyzed_time
 from continuum_swr_replay.analysis.event_properties.brain_state_reference import (
     brain_state_reference,
 )
@@ -39,7 +39,7 @@ from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 def _epoch(job: tuple[str, str]) -> dict[str, Any]:
     identifier, expected_sha256 = job
-    dot = analysed_time.read_verified_dot_with_swr_source(
+    dot = analyzed_time.read_verified_dot_with_swr_source(
         inventory_run.decode_path(identifier), expected_sha256
     )
     animal, day, epoch = (dot[c].iloc[0] for c in ("animal", "day", "epoch"))

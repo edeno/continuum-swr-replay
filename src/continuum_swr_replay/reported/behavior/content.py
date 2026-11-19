@@ -691,7 +691,7 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
                 step["n_animals_child_better"],
                 "count",
                 "count",
-                f"{what}: animals whose median step is negative (favours the child)",
+                f"{what}: animals whose median step is negative (favors the child)",
             ),
         ]
     return values

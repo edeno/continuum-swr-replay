@@ -12,7 +12,7 @@ distinct concerns:
    per-animal β's vary, the pooled fit estimates a population average β.
    Is that average unbiased w.r.t. the between-animal mean? And does
    the nominal ``bse`` capture the true between-fit variability, or does
-   it under-cover (the cluster-by-animal analogue of the cluster-by-event
+   it under-cover (the cluster-by-animal analog of the cluster-by-event
    autocorrelation finding)?
 """
 

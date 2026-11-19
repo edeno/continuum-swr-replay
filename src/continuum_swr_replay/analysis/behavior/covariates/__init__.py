@@ -17,7 +17,7 @@ Reading order for a newcomer tracing how a covariate is derived:
    rates), ``visit_recency`` (how recently / whether an arm was visited),
    ``value_uncertainty`` (leaky-Q value history, model-free uncertainty),
    ``value_block`` (the precomputed qvals-artifact joins) and ``diagnostics``
-   (offline learner, no catalogued covariate);
+   (offline learner, no cataloged covariate);
    ``candidate_arm.py`` is the shared nine-arm predictor block.
 5. Pre/post-outcome timing lives in ``../covariate_timing.py``.
 6. ``interactions.py`` declares the factors of every interaction product a

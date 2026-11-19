@@ -865,7 +865,7 @@ def test_stop_replay_per_patch_fallback_merge_still_validates_stop_id():
 # the trip that brought the animal to it stayed in its patch
 # (``did_last_completed_trip_switch_patch == 0``), and no earlier stop after
 # that same trip (same ``completed_trial_id``) was already a switch. The
-# decision reads the stop's own trip record, not its neighbour's ``is_stay``,
+# decision reads the stop's own trip record, not its neighbor's ``is_stay``,
 # which is NaN for location reasons (in transit, mixed, excluded time, before
 # the first trial) that say nothing about switching.
 

@@ -55,7 +55,7 @@ well-anchored mPFC population the retired ripple-overlap split and the canonical
 **exactly in 71 of 71 sessions** (median SWR fraction 0.447 both ways); the earlier 44.7 % vs
 43.0 % comparison set the PFC split against the canonical fraction over *all* events, off-well
 ones included, and was wrong. Phase 1 therefore buys traceability — the canonical `event_id`s
-and input hashes on Figure 4 — not a relabelling; the matched control is the substantive change.
+and input hashes on Figure 4 — not a relabeling; the matched control is the substantive change.
 
 Phase 0's fitter half, Phase 3's rerun and Phase 0b are done; Phase 0's GLM mechanics, 2b and 4
 are open.

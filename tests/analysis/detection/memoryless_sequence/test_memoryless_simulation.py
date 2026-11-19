@@ -445,7 +445,7 @@ class TestDrawnReplay:
     means = np.linspace(0.0, 170.0, 30)
     quiet = [np.array([0.5, 1.05, 2.0]) for _ in range(30)]
 
-    def test_a_travelling_replay_fires_its_cells_in_order(self):
+    def test_a_traveling_replay_fires_its_cells_in_order(self):
         drawn, bounds = draw_replay(
             self.quiet, self.means, DrawnReplay(20.0, 90.0, 0.3, at_s=1.0)
         )

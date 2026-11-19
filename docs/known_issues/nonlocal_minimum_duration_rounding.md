@@ -13,7 +13,7 @@ rounds halves up, so 15 ms at 500 Hz (7.5 samples) is meant to give 8 samples.
 On the decode grid the median time step reads 2.0000935 ms, not 2 ms, because
 the timestamps are quantized at a ~1.6e9 s clock. So 0.015 s is 7.49965
 samples, which rounds to 7. The function's 1e-6 tolerance is about 300× too
-small to absorb this. This holds in all 242 analysed epochs.
+small to absorb this. This holds in all 242 analyzed epochs.
 
 So the shortest non-local event is 7 samples: a 12 ms span between first and
 last sample, or a 14 ms `native_duration_s`.

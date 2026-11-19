@@ -16,7 +16,7 @@ def _stops() -> pd.DataFrame:
     """Eight stops of one session; the first six are well-anchored.
 
     Spans 3, 5, 8, 1, 4.5 and 0.5 s; stops 2, 5 and 6 hold excluded time, so
-    their analysed immobility is shorter. Stops 1 and 4 learn their outcome
+    their analyzed immobility is shorter. Stops 1 and 4 learn their outcome
     inside them, within the 4 s the design keeps. Stop 3 learns it 5 s in.
     Stop 5 learns it 1 s in, but contains stop 6's arrival (52 s). Stop 2
     contains stop 3's arrival (24 s) and learned its outcome before it began.
@@ -55,7 +55,7 @@ def _onsets() -> pd.DataFrame:
 def test_stop_table_values_name_each_statistic():
     values = {v.key: v for v in stop_table_values(_stops(), _onsets(), "x")}
     read = {key: value.value for key, value in values.items()}
-    # analysed immobility of the well-anchored stops, rewarded: 3, 1 and 8;
+    # analyzed immobility of the well-anchored stops, rewarded: 3, 1 and 8;
     # omitted: 1, 4 and 0.25 (the rewarded in-transit stop is not one of them)
     assert read["stop_duration_mean_rewarded"] == 4.0
     assert read["stop_duration_mean_unrewarded"] == 1.75

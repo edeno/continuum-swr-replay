@@ -31,7 +31,7 @@ The slice is three epochs:
 
 | Epoch | Animal | Why | Events | Stops |
 |---|---|---|---|---|
-| `chimi20200217_06_r3_HPC` | chimi | 21 excluded intervals (24.1 s), so the analysed-time drops run | 385 | 297 |
+| `chimi20200217_06_r3_HPC` | chimi | 21 excluded intervals (24.1 s), so the analyzed-time drops run | 385 | 297 |
 | `j1620210712_10_r5_HPC` | j16 | one excluded interval; one SWR dropped as moving | 217 | 525 |
 | `wilbur20210330_04_r2_HPC` | wilbur | has mPFC/OFC decodes; 4 excluded intervals | 114 | 418 |
 
@@ -65,7 +65,7 @@ all of them, so use it.
 
 How the slice works. Every builder takes its sessions from the epoch register.
 So `regen --sessions` writes `<root>/epoch_register.csv`, a copy of the register
-in which every other analysed epoch is marked `excluded` (reason
+in which every other analyzed epoch is marked `excluded` (reason
 `MISSING_INPUT`, evidence "outside the table-parity slice"). It then runs each
 builder in a child process with `epoch_register.REGISTER_PATH` pointed at that
 copy. The builders and their code paths are the full cohort's.

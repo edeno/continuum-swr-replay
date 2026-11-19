@@ -35,7 +35,7 @@ from continuum_swr_replay.analysis.detector_comparison.features import (
     interval_features,
     interval_rows,
     ms_features,
-    neighbour_gaps,
+    neighbor_gaps,
     ss_features,
     state_row_shares,
     stop_context,
@@ -305,12 +305,12 @@ def test_a_nan_ripple_row_makes_only_the_intervals_holding_it_nan():
     assert table.mua_z_mean.notna().all()
 
 
-# --- gaps to the neighbouring events -------------------------------------
+# --- gaps to the neighboring events -------------------------------------
 
 
 def test_three_events_give_nan_two_gaps_nan():
     events = inventory([[100.10, 100.20], [100.50, 100.60], [101.00, 101.40]], "kay")
-    gaps = neighbour_gaps(events)
+    gaps = neighbor_gaps(events)
     np.testing.assert_allclose(gaps.previous_gap_s, [np.nan, 0.30, 0.40])
     np.testing.assert_allclose(gaps.next_gap_s, [0.30, 0.40, np.nan])
 
@@ -320,14 +320,14 @@ def test_another_inventorys_or_epochs_event_does_not_enter():
     between = inventory([[100.50, 100.60]], "state_space")
     other_epoch = inventory([[100.50, 100.60]], "kay", session=OTHER_EPOCH)
     events = pd.concat([between, kay, other_epoch], ignore_index=True)
-    gaps = neighbour_gaps(events)
+    gaps = neighbor_gaps(events)
     np.testing.assert_allclose(gaps.previous_gap_s, [np.nan, np.nan, 0.80, np.nan])
     np.testing.assert_allclose(gaps.next_gap_s, [np.nan, 0.80, np.nan, np.nan])
 
 
 def test_gaps_follow_onset_order_not_row_order():
     events = inventory([[100.10, 100.20], [100.50, 100.60], [101.00, 101.40]], "kay")
-    gaps = neighbour_gaps(events.iloc[[2, 0, 1]])
+    gaps = neighbor_gaps(events.iloc[[2, 0, 1]])
     assert gaps.index.tolist() == [2, 0, 1]
     np.testing.assert_allclose(
         gaps.loc[[0, 1, 2], "previous_gap_s"], [np.nan, 0.3, 0.4]
@@ -338,7 +338,7 @@ def test_gaps_refuse_an_event_that_is_not_compared():
     events = inventory([[100.10, 100.20], [100.50, 100.60]], "kay")
     events.loc[1, "whole_event_speed_eligible"] = False
     with pytest.raises(ValueError, match="compared"):
-        neighbour_gaps(events)
+        neighbor_gaps(events)
 
 
 # --- the stop holding the onset -------------------------------------------

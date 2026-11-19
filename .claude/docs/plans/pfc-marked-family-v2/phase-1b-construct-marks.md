@@ -2,7 +2,7 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
-Why: correlated marks split and shrink each other under the joint fit (current-arm and current-patch content at r = 0.66; extent, reversals and pauses at 0.5–0.7; raw interaction products at 0.81–0.95 with their own main effect), and a fraction times a rare binary produces a few enormous event weights that destabilise held-out prediction. This phase changes what the marks are; it does not change how they are fit.
+Why: correlated marks split and shrink each other under the joint fit (current-arm and current-patch content at r = 0.66; extent, reversals and pauses at 0.5–0.7; raw interaction products at 0.81–0.95 with their own main effect), and a fraction times a rare binary produces a few enormous event weights that destabilize held-out prediction. This phase changes what the marks are; it does not change how they are fit.
 
 **Inputs to read first:**
 

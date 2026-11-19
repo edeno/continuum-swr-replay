@@ -1,7 +1,7 @@
-"""One analysed-time rule for every event cohort, exposure, bin and window.
+"""One analyzed-time rule for every event cohort, exposure, bin and window.
 
 Excluded time is the artifact mask widened by ``ARTIFACT_REACH_S`` on each
-side. An event of any kind is analysed only when the whole event is immobile
+side. An event of any kind is analyzed only when the whole event is immobile
 (``event_definition.immobility``) and lies wholly outside excluded time; a kept event that
 overlaps an SWR or MUA event dropped for excluded time is dropped too. A
 dropped event keeps its reason. Offline.

@@ -944,7 +944,7 @@ def retrospective_alignment_by_session(
     Parameters
     ----------
     event_table, event_arm_table, event_sequence_table : pd.DataFrame
-        The three event tables of the analysed cohort, all sessions.
+        The three event tables of the analyzed cohort, all sessions.
     n_shuffles : int
         Circular-shift draws per session.
     seed : int
@@ -952,7 +952,7 @@ def retrospective_alignment_by_session(
     subset, stop_cohort : str
         Labels written on every row.
     max_sessions : int, optional
-        Analyse only the first sessions.
+        Analyze only the first sessions.
 
     Returns
     -------

@@ -1,7 +1,7 @@
 """The detector on a branched track, where linear position is not distance.
 
 Two bins that are adjacent in linearized coordinate can sit on different arms,
-and two bins far apart in that coordinate can be neighbours through a junction.
+and two bins far apart in that coordinate can be neighbors through a junction.
 The detector measures jumps and dispersion on the track graph for that
 reason. These tests build a posterior that walks a chosen path over a
 real Y-shaped ``Environment`` and check what the detector makes of it, with no
@@ -31,7 +31,7 @@ WINDOWS_PER_SECOND = 1.0 / CONFIG.stride_s
 
 
 def y_track() -> nx.Graph:
-    """Three arms of equal length meeting at one centre node."""
+    """Three arms of equal length meeting at one center node."""
     graph = nx.Graph()
     graph.add_edges_from([(0, 3), (1, 3), (2, 3)])
     nx.set_edge_attributes(
@@ -75,12 +75,12 @@ def track():
 
 
 def arm_bins(track, arm: int) -> np.ndarray:
-    """Interior bin indices on one arm, ordered from the centre outwards."""
+    """Interior bin indices on one arm, ordered from the center outward."""
     linear_cm = track["linear_cm"]
     span = ARM_CM + GAP_CM
     on_arm = (linear_cm >= arm * span - 1e-9) & (linear_cm <= arm * span + ARM_CM)
     bins = np.flatnonzero(on_arm)
-    # arm 0 is laid out tip-to-centre, the others centre-to-tip
+    # arm 0 is laid out tip-to-center, the others center-to-tip
     return bins[::-1] if arm == 0 else bins
 
 
@@ -121,13 +121,13 @@ class TestGeometry:
     def test_bins_near_the_junction_are_close_on_the_graph_and_far_in_linear(
         self, track
     ):
-        near_centre = [arm_bins(track, arm)[0] for arm in (0, 1, 2)]
+        near_center = [arm_bins(track, arm)[0] for arm in (0, 1, 2)]
         linear_cm, distance_cm = track["linear_cm"], track["distance_cm"]
 
         for first, second in ((0, 1), (1, 2), (0, 2)):
-            graph_gap = distance_cm[near_centre[first], near_centre[second]]
+            graph_gap = distance_cm[near_center[first], near_center[second]]
             linear_gap = abs(
-                linear_cm[near_centre[first]] - linear_cm[near_centre[second]]
+                linear_cm[near_center[first]] - linear_cm[near_center[second]]
             )
             assert graph_gap < CONFIG.jump_threshold_cm
             assert linear_gap > CONFIG.jump_threshold_cm
@@ -162,7 +162,7 @@ class TestWithinOneArm:
         assert found.dispersion_cm.max() < CONFIG.dispersion_threshold_cm
 
     def test_retracing_a_path_does_not_change_dispersion(self, track):
-        """Dispersion measures spread about a centre, not distance travelled.
+        """Dispersion measures spread about a center, not distance traveled.
         An out-and-back replay covers twice the ground and scores the same, so
         dispersion and path length are not interchangeable summaries."""
         out = arm_bins(track, 0)
@@ -179,7 +179,7 @@ class TestWithinOneArm:
 
 
 class TestAcrossAJunction:
-    def test_a_replay_through_the_centre_stays_one_sequence(self, track):
+    def test_a_replay_through_the_center_stays_one_sequence(self, track):
         """The step between arms is small on the graph, so nothing is cut."""
         path = np.concatenate([arm_bins(track, 0)[:14][::-1], arm_bins(track, 1)[:14]])
         posterior, midpoint_s, _ = walk(track, path, 0.25)
@@ -204,7 +204,7 @@ class TestAcrossAJunction:
 
 class TestSwitchingArms:
     def test_a_teleport_between_arms_cuts_the_sequence(self, track):
-        """No journey through the centre, so the graph step is large."""
+        """No journey through the center, so the graph step is large."""
         before = arm_bins(track, 0)[20:34]
         after = arm_bins(track, 2)[20:34]
         posterior, midpoint_s, _ = walk(track, np.concatenate([before, after]), 0.40)

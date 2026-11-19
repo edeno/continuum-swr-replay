@@ -1307,7 +1307,7 @@ from continuum_swr_replay.analysis.event_tables.trajectory import (  # noqa: E40
 
 
 def _traj_env():
-    """Env stub with node_id + a bin-centre chain graph for graph distances."""
+    """Env stub with node_id + a bin-center chain graph for graph distances."""
     env = _EnvStub()
     lp = np.concatenate([np.arange(18, dtype=float), [100.0, 101.0, 102.0]])
     eid = np.concatenate([np.repeat(np.arange(9), 2), [-1, -1, -1]]).astype(int)
@@ -1322,7 +1322,7 @@ def _traj_env():
         )
     env.track_graph_with_bin_centers_edges_ = g
     # Mirrors how ``Environment`` populates this at fit time
-    # (``get_track_grid``): all-pairs Dijkstra over the bin-centre graph.
+    # (``get_track_grid``): all-pairs Dijkstra over the bin-center graph.
     env.distance_between_nodes_ = dict(
         nx.all_pairs_dijkstra_path_length(g, weight="distance")
     )

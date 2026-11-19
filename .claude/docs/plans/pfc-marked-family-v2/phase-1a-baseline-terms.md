@@ -2,14 +2,14 @@
 
 [← back to PLAN.md](PLAN.md) · [overview](overview.md)
 
-Why: the contract-1 corpus showed reward, switch, novelty and previous-arm "effects" that are as large 200 ms before a replay as after it. A design with one intercept per session cannot tell a context's baseline rate from a replay response. This phase adds unpenalised, session-wide well and reward-outcome columns so the event kernels are estimated against the right baseline. Code only; no refit here (that is phase 1c).
+Why: the contract-1 corpus showed reward, switch, novelty and previous-arm "effects" that are as large 200 ms before a replay as after it. A design with one intercept per session cannot tell a context's baseline rate from a replay response. This phase adds unpenalized, session-wide well and reward-outcome columns so the event kernels are estimated against the right baseline. Code only; no refit here (that is phase 1c).
 
 **Inputs to read first:**
 
 - [src/continuum_swr_replay/analysis/pfc/marked_glm.py:145-190](../../../../src/continuum_swr_replay/analysis/pfc/marked_glm.py#L145) — `KernelDesign` and its `__post_init__`; the contiguity check assumes the first block starts at column 1.
 - [src/continuum_swr_replay/analysis/pfc/marked_glm.py:273-437](../../../../src/continuum_swr_replay/analysis/pfc/marked_glm.py#L273) — `MarkedSessionContext` and `prepare_marked_session_context`; the fit mask is built at `:381` from `cohort_stops`, spikes are binned at `:413`.
 - [src/continuum_swr_replay/analysis/pfc/marked_glm.py:917-1003](../../../../src/continuum_swr_replay/analysis/pfc/marked_glm.py#L917) — `build_kernel_design` (intercept column at `:954`) and `_without_block` (`:983`, slices restart at 1).
-- [src/continuum_swr_replay/analysis/pfc/marked_glm.py:1006-1130](../../../../src/continuum_swr_replay/analysis/pfc/marked_glm.py#L1006) — `build_marked_model_ladder` and the single-mark `fit_marked_kernel_ladder`, which call `make_ridge_penalty(width, sigma)` with the default one unpenalised column.
+- [src/continuum_swr_replay/analysis/pfc/marked_glm.py:1006-1130](../../../../src/continuum_swr_replay/analysis/pfc/marked_glm.py#L1006) — `build_marked_model_ladder` and the single-mark `fit_marked_kernel_ladder`, which call `make_ridge_penalty(width, sigma)` with the default one unpenalized column.
 - [src/continuum_swr_replay/analysis/pfc/marked_model_family.py:1063](../../../../src/continuum_swr_replay/analysis/pfc/marked_model_family.py#L1063) — the family's `build_kernel_design` call; [`:1135-1160`](../../../../src/continuum_swr_replay/analysis/pfc/marked_model_family.py#L1135) `family_ridge_penalty`.
 - [src/continuum_swr_replay/analysis/pfc/batched_glm.py:605](../../../../src/continuum_swr_replay/analysis/pfc/batched_glm.py#L605) — `make_ridge_penalty(n_features, sigma, *, n_unpenalized=1)`; the `n_unpenalized` keyword already exists.
 - [src/continuum_swr_replay/analysis/pfc/cohort.py:32](../../../../src/continuum_swr_replay/analysis/pfc/cohort.py#L32) — `load_session_stop_cohort`: the stops carry `stop_start`, `stop_end` (seconds on the position clock), `occupancy_well_id` (0–5 or NaN), `is_rewarded_outcome` (0/1/NaN).
@@ -66,7 +66,7 @@ Why: the contract-1 corpus showed reward, switch, novelty and previous-arm "effe
 
   Every fitted bin must fall inside a cohort stop (the fit mask is built from those stops at `marked_glm.py:381`); a violation raises rather than silently zero-fills. NumPy docstring with shapes.
 
-- **`KernelDesign` gains `n_baseline: int = 0`.** `__post_init__` (`marked_glm.py:166-189`) requires the first block to start at `1 + n_baseline` and the docstring says columns `1..n_baseline` are the unpenalised baseline. `build_kernel_design(..., baseline: NDArray | None = None)` concatenates `[ones, baseline, blocks...]` and sets `n_baseline`; it raises if `baseline.shape[0] != rows.sum()`. `_without_block` starts its recomputed slices at `1 + design.n_baseline` and carries `n_baseline` through.
+- **`KernelDesign` gains `n_baseline: int = 0`.** `__post_init__` (`marked_glm.py:166-189`) requires the first block to start at `1 + n_baseline` and the docstring says columns `1..n_baseline` are the unpenalized baseline. `build_kernel_design(..., baseline: NDArray | None = None)` concatenates `[ones, baseline, blocks...]` and sets `n_baseline`; it raises if `baseline.shape[0] != rows.sum()`. `_without_block` starts its recomputed slices at `1 + design.n_baseline` and carries `n_baseline` through.
 
 - **`MarkedSessionContext` gains `baseline` and `baseline_names` and `baseline_report`.** `prepare_marked_session_context` calls the builder after the fit mask at `:381` and stores all three; a new keyword `baseline_terms: str = "well_and_reward_outcome"` accepts `"none"` and then stores an empty `(n_fit_bins, 0)` array. `build_marked_model_ladder` (`:1006`) and `build_marked_family_ladder` (`marked_model_family.py:980`) take `baseline: NDArray | None` and pass it to `build_kernel_design`.
 

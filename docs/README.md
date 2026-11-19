@@ -13,7 +13,7 @@ it stops drifting; add new docs to the matching home.
 | methods and results | `docs/rate_models.md` | how the two event-rate model families work and are checked, with the fits and comparisons that shaped them; the values it quotes are generated markers filled from `paper/reported/` |
 | results | `paper/reported/questions.md` (generated) | every reported value, under the question it answers, in the paper's outline |
 | reference | `docs/task_description.md`, `docs/cached_trials_for_testing.md`, `docs/known_issues/` | task/data background |
-| cohort | `docs/epoch_register.md` | which run epochs are analysed, and the reason for every other one (mirrors `data_loaders/epoch_register.py`) |
+| cohort | `docs/epoch_register.md` | which run epochs are analyzed, and the reason for every other one (mirrors `data_loaders/epoch_register.py`) |
 | **design spec** (scientific/methodological) | **`docs/design/`** | analysis designs — human-discoverable for collaborators/reviewers |
 | history | `docs/history/` | where moved code and data went, and the dated audits the docs once cited; not current instruction |
 | implementation plan (agent process) | `.claude/docs/plans/` | phased execution plans |
@@ -122,7 +122,7 @@ violation fails.
 
 | Stage | Package (`analysis/`) | Owns | Does not own |
 |---|---|---|---|
-| Rule | `event_definition/` | analysed time and excluded time, immobility, the non-local event rule (`nonlocal_event_rule.py`), the canonical SWR source, the decode masks, the classified event table and the cohorts | any detector or statistic |
+| Rule | `event_definition/` | analyzed time and excluded time, immobility, the non-local event rule (`nonlocal_event_rule.py`), the canonical SWR source, the decode masks, the classified event table and the cohorts | any detector or statistic |
 | Find | `detection/` | the algorithms that produce inventories: the SWR and Carey detectors, rule R-T, the artifact detector, the memoryless sequence detector, the paper's non-local detector applied to a decode (`nonlocal_events.py`), and the simulated run Figure 1 shows it on (`simulated_run.py`) | which inventory is canonical; comparing inventories |
 | Compare | `detector_comparison/` | the inventories brought onto one schema and compared on the same recordings: overlap, exposure, counts, event features, held-out evidence | running a detector |
 | Check | `decode_quality/` | whether the decode is trustworthy: decoding error, state fractions, calibration, raw-data flags, posterior summaries | reading a saved decode (`decoding/results.py`) |
@@ -214,7 +214,7 @@ Three tiers:
    | `contfrag_replay_content/` | `contfrag_replay_content_dir()` | `scripts/tables/prepare_contfrag_replay_content_data.py` | the replay-content tables built from the Continuous-Fragmented decodes |
    | `{epoch_identifier}_mPFC_modulation.pkl` + five `*_modulation.npy` (root) | | `scripts/pfc/run_pfc_analysis_bandit.py` | the mPFC unit GLMs ([design/pfc_unit_glm_estimator.md](design/pfc_unit_glm_estimator.md), "The bundles") |
    | `pfc_marked_kernels/` | | `scripts/pfc/run_pfc_marked_kernels.py` | the content-marked kernels ([design/pfc_marked_event_kernels.md](design/pfc_marked_event_kernels.md)); no bundle exists yet |
-   | `pfc_marked_model_family/` | | `scripts/pfc/run_pfc_marked_model_family.py` | the 2026-09-19 marked-family corpus, fit before the analysed-time rule ([design/pfc_marked_model_family.md](design/pfc_marked_model_family.md), "Artifacts") |
+   | `pfc_marked_model_family/` | | `scripts/pfc/run_pfc_marked_model_family.py` | the 2026-09-19 marked-family corpus, fit before the analyzed-time rule ([design/pfc_marked_model_family.md](design/pfc_marked_model_family.md), "Artifacts") |
 
 2. **Results**: the reported values (`paper/reported/<summary>.json`, listed in
    `paper/reported/questions.md`).

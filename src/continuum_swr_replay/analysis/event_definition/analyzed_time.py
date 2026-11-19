@@ -1,8 +1,8 @@
-"""The analysed-time read point: a decode frame held to the one analysed-time rule.
+"""The analyzed-time read point: a decode frame held to the one analyzed-time rule.
 
 The SWR source itself (which inventory, which artifact run, which epochs it
 serves, the source's name) is ``swr_source``. This module reads it and
-applies the project's one analysed-time rule (``eligibility``) to every cohort
+applies the project's one analyzed-time rule (``eligibility``) to every cohort
 of an analysis frame.
 
 What this module fixes
@@ -25,22 +25,22 @@ What this module fixes
 - **The per-bin labels** (:func:`swr_event_labels`): exactly the convention
   ``SWR_event`` has had since the unified immobility change. That is
   ``build_speed_eligible_event_cohort(..., preserve_source_ids=True)``, the call
-  ``get_data_over_time`` makes: a bin is labelled with an event's number when
+  ``get_data_over_time`` makes: a bin is labeled with an event's number when
   its time lies in the event's closed interval ``[start_time, end_time]``; the
   number is the inventory's own ``event_number``, so a dropped event leaves a
   gap; and a dropped event's bins are 0.
 - **Where detection was observed** (:func:`swr_observed_stretches`,
   :func:`swr_observed_mask`): the gap-free stretches of the stored ripple band
   that Kay read (``scope == "stored_band"`` in ``swr_observed.parquet``), less
-  excluded time. Excluded time is not analysed: an event there is neither an
+  excluded time. Excluded time is not analyzed: an event there is neither an
   SWR nor a non-SWR event.
 
 Analyses read a decode's ``data_over_time`` through :func:`with_swr_source`
 or :func:`read_dot_with_swr_source`. Its ``SWR_event`` column then holds this
 source's labels, ``swr_observed`` the coverage mask and ``in_excluded_time``
 the rows in excluded time (a per-bin summary keeps the rows
-:func:`analysed_bins` returns); every event cohort of the frame follows the one
-analysed-time rule, and the frame's two epoch normalizers
+:func:`analyzed_bins` returns); every event cohort of the frame follows the one
+analyzed-time rule, and the frame's two epoch normalizers
 (``theta_power_zscore``, ``run_speed_baseline``) leave the artifact mask out,
 as the other inputs do. An HPC decode made by the
 decoders since 2026-10-09 (commit ``b66f9d28``, the code of the October 2026
@@ -123,7 +123,7 @@ __all__ = [
     "DECODE_SWR_COUNT_COLUMNS",
     "IN_EXCLUDED_TIME_COLUMN",
     "SWR_OBSERVED_COLUMN",
-    "analysed_bins",
+    "analyzed_bins",
     "artifact_event_drops",
     "dropped_for_excluded_time",
     "dropped_on_grid",
@@ -131,7 +131,7 @@ __all__ = [
     "publish_swr_table",
     "excluded_intervals_by_session",
     "excluded_intervals_of",
-    "immobile_analysed_bins",
+    "immobile_analyzed_bins",
     "read_artifact_event_drops",
     "read_dot_with_swr_source",
     "read_verified_dot_with_swr_source",
@@ -154,7 +154,7 @@ detection was observed."""
 IN_EXCLUDED_TIME_COLUMN = "in_excluded_time"
 """The per-bin column :func:`with_swr_source` adds: True where the row's time
 lies in the epoch's excluded time (:func:`excluded_intervals`, closed), all
-False with no artifact run. A reader that summarises bins leaves these rows out.
+False with no artifact run. A reader that summarizes bins leaves these rows out.
 It is not ``swr_observed``, which is also False at gaps in the stored band."""
 
 
@@ -176,7 +176,7 @@ DECODE_EVENT_COUNT_COLUMNS = (
     "n_non_local_no_MUA",
 )
 """The decode's other event counts in ``data_over_time`` (one number per epoch).
-They count every event the decode labelled, the ones the analysed-time rule
+They count every event the decode labeled, the ones the analyzed-time rule
 drops too, so they are dropped from every analysis frame as well. No reader in
 ``src/`` or ``scripts/`` used them (checked 2026-10-11)."""
 
@@ -318,7 +318,7 @@ def excluded_intervals(epoch_id: str) -> pd.DataFrame:
 
     The one function every analysis consumer reads: an event, an exposure
     second, a time bin with its history window and a peri-event window are
-    analysed only wholly outside these intervals. Inputs (the decoders' missing
+    analyzed only wholly outside these intervals. Inputs (the decoders' missing
     bins, the SWR detectors, the ripple-power covariate) read the mask itself.
 
     Parameters
@@ -340,10 +340,10 @@ def excluded_intervals(epoch_id: str) -> pd.DataFrame:
 
 
 def swr_observed_stretches(epoch_id: str) -> NDArray[np.float64]:
-    """Where SWR detection was observed and is analysed: the stored band's
+    """Where SWR detection was observed and is analyzed: the stored band's
     gap-free stretches, less the epoch's :func:`excluded_intervals`.
 
-    Excluded time is not analysed. Next to an excluded interval a stretch ends
+    Excluded time is not analyzed. Next to an excluded interval a stretch ends
     (or starts) at the float just outside it, so a time lies in a stretch
     exactly when it was observed and lies in no excluded interval.
 
@@ -395,9 +395,9 @@ def sampled_bounds(
 ) -> tuple[NDArray[np.int64], NDArray[np.float64]]:
     """Each event's labels on a decode grid and its sampled bounds there.
 
-    The events are labelled by their row ordinals (1..n) on the grid, as
+    The events are labeled by their row ordinals (1..n) on the grid, as
     ``build_speed_eligible_event_cohort`` labels them (the ones in excluded
-    time too); an event's sampled bounds are its first and last labelled
+    time too); an event's sampled bounds are its first and last labeled
     sample. The rule's second pass (``overlaps_dropped_event``) reads every
     event at these bounds.
 
@@ -418,7 +418,7 @@ def sampled_bounds(
         The row ordinal of the event each sample lies in, 0 outside the events
         the speed rule keeps.
     bounds : ndarray, shape (n_events, 2)
-        First and last labelled sample (seconds) of each event; NaN for an
+        First and last labeled sample (seconds) of each event; NaN for an
         event the speed rule rejects.
 
     Raises
@@ -459,7 +459,7 @@ def swr_event_labels(
     immobility change, and the table builders read:
     ``build_speed_eligible_event_cohort(events, speed=speed, time=time,
     event_col="SWR_event")``, here on the inventory's events, with the bins of
-    an event dropped for excluded time also set to 0. A bin is labelled with
+    an event dropped for excluded time also set to 0. A bin is labeled with
     the event's inventory number when its time lies in ``[start_time,
     end_time]``. A frame read through :func:`with_swr_source` also drops the
     SWRs that overlap an MUA event dropped for excluded time.
@@ -576,12 +576,12 @@ def _drops(
     ]
     for column in LABEL_COLUMNS:
         if column in dot.columns:
-            labelled = label_drop_reasons(dot, column, source.artifacts)
+            labeled = label_drop_reasons(dot, column, source.artifacts)
             parts.append(
-                labelled.rename(columns={column: "label"}).assign(
+                labeled.rename(columns={column: "label"}).assign(
                     event_col=column,
-                    sampled_start_time=labelled["start_time"],
-                    sampled_end_time=labelled["end_time"],
+                    sampled_start_time=labeled["start_time"],
+                    sampled_end_time=labeled["end_time"],
                     speed_eligible=True,
                 )[DROP_COLUMNS]
             )
@@ -639,8 +639,8 @@ def artifact_event_drops(
         Columns :data:`DROP_COLUMNS`: the label column, the event's label, its
         bounds (seconds; an SWR's are the inventory's), its sampled bounds on
         the frame's grid (``sampled_start_time``, ``sampled_end_time``: an
-        SWR's first and last labelled bin, :func:`sampled_bounds`, NaN for one
-        the speed rule rejects; a labelled event's are its bounds), whether the
+        SWR's first and last labeled bin, :func:`sampled_bounds`, NaN for one
+        the speed rule rejects; a labeled event's are its bounds), whether the
         speed rule alone keeps it, and its reason (None for a kept event); SWR
         events first, then each label column, in label order.
 
@@ -759,7 +759,7 @@ def with_swr_source(
     non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
     """One epoch's ``data_over_time`` with its SWR labels from this source,
-    and every event cohort held to the one analysed-time rule.
+    and every event cohort held to the one analyzed-time rule.
 
     Parameters
     ----------
@@ -987,7 +987,7 @@ def read_verified_dot_with_swr_source(
     return with_swr_source(frame)
 
 
-def analysed_bins(frame: pd.DataFrame) -> NDArray[np.bool_]:
+def analyzed_bins(frame: pd.DataFrame) -> NDArray[np.bool_]:
     """The rows of a read frame that lie outside excluded time.
 
     The one check of :data:`IN_EXCLUDED_TIME_COLUMN` that every per-bin summary
@@ -1004,7 +1004,7 @@ def analysed_bins(frame: pd.DataFrame) -> NDArray[np.bool_]:
     Returns
     -------
     np.ndarray of bool, shape (n_rows,)
-        True where the row is analysed: ``~in_excluded_time``.
+        True where the row is analyzed: ``~in_excluded_time``.
 
     Raises
     ------
@@ -1013,24 +1013,24 @@ def analysed_bins(frame: pd.DataFrame) -> NDArray[np.bool_]:
     TypeError
         If the column is not boolean. There is no coercion: cast to bool, a NaN
         (left by a concat with a frame read another way) would read as excluded
-        and a None as analysed.
+        and a None as analyzed.
     """
     require_columns(
         frame,
         [IN_EXCLUDED_TIME_COLUMN],
-        "the frame (read it through analysed_time.read_dot_with_swr_source or "
+        "the frame (read it through analyzed_time.read_dot_with_swr_source or "
         "load_data_over_time, which mark excluded time)",
     )
     column = frame[IN_EXCLUDED_TIME_COLUMN]
     if column.dtype != bool:
         raise TypeError(
             f"{IN_EXCLUDED_TIME_COLUMN!r} must be boolean, not {column.dtype}: "
-            "read every frame through analysed_time.read_dot_with_swr_source"
+            "read every frame through analyzed_time.read_dot_with_swr_source"
         )
     return ~column.to_numpy()
 
 
-def immobile_analysed_bins(
+def immobile_analyzed_bins(
     frame: pd.DataFrame,
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> NDArray[np.bool_]:
@@ -1051,14 +1051,14 @@ def immobile_analysed_bins(
     Returns
     -------
     np.ndarray of bool, shape (n_rows,)
-        True where the row is immobile and analysed.
+        True where the row is immobile and analyzed.
 
     Raises
     ------
     ValueError, TypeError
-        As :func:`analysed_bins`.
+        As :func:`analyzed_bins`.
     """
-    return (frame["head_speed"].to_numpy() < speed_threshold) & analysed_bins(frame)
+    return (frame["head_speed"].to_numpy() < speed_threshold) & analyzed_bins(frame)
 
 
 def swr_intervals(

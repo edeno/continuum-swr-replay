@@ -11,7 +11,7 @@ trustworthy -> ``analysis/decode_quality``; whether the events are real ->
 Packages
 --------
 event_definition
-    The rule: the analysed-time rule, immobility, the non-local event rule, the
+    The rule: the analyzed-time rule, immobility, the non-local event rule, the
     SWR source, the decode masks, the classified non-local event table and the
     event cohorts every table reads.
 detection

@@ -15,7 +15,7 @@ from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
 
 def _frame() -> pd.DataFrame:
     # A frame as the read hands it over: the speed rule and the probability
-    # contract are the read's (analysed_time.with_swr_source), so every label
+    # contract are the read's (analyzed_time.with_swr_source), so every label
     # here is an eligible event. Event 1 overlaps SWR 3 in its last two bins.
     return pd.DataFrame(
         {

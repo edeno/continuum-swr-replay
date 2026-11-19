@@ -531,7 +531,7 @@ MODEL_PER_STOP_RATE: dict[str, ModelSpec] = {
 # :func:`per_bin_design.aggregate_to_timebins`. Unlike ``MODEL_PER_STOP_RATE`` (one
 # row per stop, ``log(immobility_duration_s)`` dwell offset), every model here is one
 # row per (stop, ``RATE_BIN_S``-wide bin) with an equal-exposure ``log(exposure)``
-# offset, so the within-stop time course is modelled explicitly by a spline
+# offset, so the within-stop time course is modeled explicitly by a spline
 # rather than averaged into a per-stop dwell correction.
 #
 # The three blocks (time-since-stop spline, self-history/autoregressive,
@@ -1195,7 +1195,7 @@ MODEL_CROSS_HISTORY_DURATION_RATE: dict[str, PerBinRateModelSpec] = {
 
 # The long-window pair of the ridge cross-validated comparison
 # (``analysis/replay_models/rate/ridge_history_cv.py``). A single session holds about one
-# expected cross-stream onset in the 150 ms cross window, so the unpenalised
+# expected cross-stream onset in the 150 ms cross window, so the unpenalized
 # per-session cross rungs above mostly fail to converge. These two rungs are
 # ``Mself_dur`` and ``Mselfcross_dur`` with the cross block (onset- and
 # end-locked) reaching 1 s (``N_CROSS_LONG_LAGS``, ``N_CROSS_LONG_BASIS``
@@ -1219,22 +1219,22 @@ MODEL_CROSS_HISTORY_LONG_RATE: dict[str, PerBinRateModelSpec] = {
 #
 # A DIFFERENT estimator again: a conditional logit on the animal's
 # next-arm choice (``choice_prediction.fit_choice_model``), used to
-# ask whether replay content predicts behaviour beyond a behavioural
+# ask whether replay content predicts behavior beyond a behavioral
 # baseline.
 #
 # These three are not a single linear nested chain: ``C_full`` nests
 # both ``C_behavior`` (+ ``replay_fraction``) and ``C_replay_only``
-# (+ the behavioural block). ``parent`` encodes the primary test —
+# (+ the behavioral block). ``parent`` encodes the primary test —
 # ``C_full`` vs ``C_behavior``, i.e. does replay add predictive power
-# beyond behaviour — while ``C_replay_only`` is a standalone
+# beyond behavior — while ``C_replay_only`` is a standalone
 # replay-only reference (``parent=None``).
 #
-# Two predictors are deliberately excluded from the behavioural block:
+# Two predictors are deliberately excluded from the behavioral block:
 # ``is_same_patch`` (near-collinear with candidate-arm distance) and
 # ``distance_to_candidate_arm_cm`` itself (quasi-separation). The trade-off —
 # the replay coefficient is then not cleanly distance-controlled — and the
 # principled alternative are in ``docs/design/model_history.md``
-# § "Choice models: the two excluded behavioural predictors".
+# § "Choice models: the two excluded behavioral predictors".
 # Callers should still drop any column absent from the choice dataset
 # before fitting.
 
@@ -1258,13 +1258,13 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
     "C_behavior": ModelSpec(
         name="C_behavior",
         predictors=_CHOICE_BEHAVIOR,
-        description="Behavioural baseline (recency, recent reward rate, learned Q)",
+        description="Behavioral baseline (recency, recent reward rate, learned Q)",
         parent=None,
     ),
     "C_full": ModelSpec(
         name="C_full",
         predictors=(*_CHOICE_BEHAVIOR, "replay_fraction"),
-        description="Behavioural baseline + replay content",
+        description="Behavioral baseline + replay content",
         parent="C_behavior",
     ),
     "C_full_swr_split": ModelSpec(
@@ -1274,9 +1274,7 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
             "replay_fraction_swr",
             "replay_fraction_non_swr",
         ),
-        description=(
-            "Behavioural baseline + SWR-overlap and non-SWR replay separately"
-        ),
+        description=("Behavioral baseline + SWR-overlap and non-SWR replay separately"),
         parent="C_behavior",
     ),
 }
@@ -1314,7 +1312,7 @@ _BLOCKS: dict[str, tuple[PerBinTerm, ...]] = {
         _column_terms(("patch_switch_fraction_last5_completed_trips",))
     ),
     # beta relative value DeltaV. Sign convention: Switch - Stay; ~= -(current stay value), r = -0.952 with stay_sibling_mu_preoutcome_sess and -0.890 with q_chosen, so a POSITIVE coefficient means the current option's value is LOW.
-    # An earlier "Stay-vs-Switch" label here had it backwards.
+    # An earlier "Stay-vs-Switch" label here had it backward.
     "VALUE": tuple(_column_terms(("relative_value_switch_minus_stay_preoutcome",))),
     # beta reward prediction error (reward - q_chosen)
     "RPE": tuple(_column_terms(("rpe_postoutcome",))),
@@ -1698,7 +1696,7 @@ BASEc_PATCH_NT = [
     "visit_recency_trials_patch",
     "is_patch_never_visited",
 ]
-# Patch analogues of the arm within-stop-time and event-length controls (see BASEc).
+# Patch analogs of the arm within-stop-time and event-length controls (see BASEc).
 _TSC_PATCH = "log1p_time_since_stop_start_s_z_x_is_current_patch"
 _LENC_PATCH = "log_n_nonlocal_bins_z_x_is_current_patch"
 _LENP_PATCH = "log_n_nonlocal_bins_z_x_is_prev_patch"
@@ -1992,7 +1990,7 @@ def _hierarchy_comparison_rung(name: str, parent: str | None) -> ComparisonRung:
 def _contrast_comparison_rung(
     name: str, parent: str | None, *, spec_name: str | None = None
 ) -> ComparisonRung:
-    """An is_swr-contrast rung as a comparison rung, honouring leaf-only scope."""
+    """An is_swr-contrast rung as a comparison rung, honoring leaf-only scope."""
     source = spec_name or name
     predictors, _scope = SWR_CONTRAST_CONTENT_ARM_LADDER[source]
     leaf_only = source in LEAF_ONLY_CONTRAST_RUNGS or name.endswith("_leaf")

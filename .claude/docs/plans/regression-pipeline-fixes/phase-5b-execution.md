@@ -9,7 +9,7 @@ re-exports, the clock wrappers) before editing.
 
 ## Global Constraints
 
-- **Behaviour-preserving, structure-only phase.** No fitter, spec, formula, persisted column, or
+- **Behavior-preserving, structure-only phase.** No fitter, spec, formula, persisted column, or
   value changes. Proof: the same parity gate as phase 5a — freeze one cached session before the
   first edit (`scripts/qa/freeze_regression_baseline.py --label pre5b`), and after the last edit
   `scripts/qa/compare_to_golden_baseline.py` byte-identical across all tables; plus one content
@@ -117,10 +117,10 @@ fixture; the deny-list rejects a legacy column). Production callers to keep work
 - Relocate validators: `_validate_requested_standardization` (~245),
   `_validate_canonical_table_contract` (~289), `_validate_and_match_fit_results` (~1169) from
   `scripts/content/fit_replay_content_models.py` (2599 lines) into
-  `analysis/replay/table_contracts.py` as public functions with identical behaviour; the runner's
+  `analysis/replay/table_contracts.py` as public functions with identical behavior; the runner's
   science path (`_load_and_filter_cohort` ~2018 → `_fit_content_ladder` ~2224 →
   `fit_model_per_session`) should read in under 200 lines — report the line count; if it cannot
-  reach 200 without a behaviour change, report and stop.
+  reach 200 without a behavior change, report and stop.
 
 ### Task 4: Parity, suite, and line counts
 
@@ -132,7 +132,7 @@ passes. Write `docs/audits/<date>-readability-structure-parity.md`.
 ## Review
 
 Before the final review, confirm: every task implemented as specified; "Deliberately not in this
-phase" honoured; the layering test fails on the pre-move tree (recorded) and passes after; the six
+phase" honored; the layering test fails on the pre-move tree (recorded) and passes after; the six
 former session-key sites are gone; `_merge_classified_and_verify_timing`, the ledger, `_SESSION_COLS`,
 and the in-`src` CLIs are gone; parity and the 1e-12 coefficient diff are committed as an audit;
 no plan/phase references.

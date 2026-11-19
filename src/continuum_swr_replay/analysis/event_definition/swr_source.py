@@ -8,7 +8,7 @@ comes from the Kay inventory that the SWR runner
 continuously above z = 2. Design note: ``docs/design/2026-10-09-swr-source.md``.
 
 This module reads the inventory. The read point that holds a decode frame to
-the one analysed-time rule is ``analysed_time``, which imports this module,
+the one analyzed-time rule is ``analyzed_time``, which imports this module,
 never the reverse.
 
 What this module fixes
@@ -27,19 +27,19 @@ What this module fixes
   detection, the decoders and the ripple-power covariate
   (:func:`ripple_power_inputs`) use the mask itself; every analysis consumer
   uses *excluded time*, the mask widened by ``eligibility.ARTIFACT_REACH_S``
-  (``analysed_time.excluded_intervals``).
+  (``analyzed_time.excluded_intervals``).
 - **The source's name** (:func:`swr_source_name`): the detector, the inventory
   run and the artifact run, such as ``kay@056eee0dcb5a+artifacts@fbbff144a123``. Every
   table built from these labels is stamped with it
-  (``analysed_time.stamp_swr_source``), and a reader that combines a table's
+  (``analyzed_time.stamp_swr_source``), and a reader that combines a table's
   SWR columns with this source's live labels refuses a table stamped with
-  another name (``analysed_time.require_swr_source``).
+  another name (``analyzed_time.require_swr_source``).
 - **Which epochs it serves**: one whose manifest status is ``ok``, or
   ``partial`` with the Kay inventory written. Anything else raises
   :class:`SwrSourceError`. The event and observed files are checked against
   the sha256 the manifest recorded for them.
 - **Which events count** (:func:`swr_events`): the project's one
-  analysed-time rule (``eligibility``): the whole-event immobility rule
+  analyzed-time rule (``eligibility``): the whole-event immobility rule
   (every speed sample in the closed interval finite and strictly below 4 cm/s,
   ``immobility``), the rule of the non-local and MUA cohorts, on the
   head speed of the decode grid, and no time shared with excluded time. Every
@@ -106,7 +106,7 @@ SWR_INVENTORY_RUN_ID = "056eee0dcb5a"
 
 The run of ``scripts/detection/run_swr_detection.py`` made on 2026-10-10 at
 commit ``056eee0dcb5a`` (the runner names a run by its commit's first 12
-characters): all 255 epochs ``ok`` (the register's 242 analysed and its 13
+characters): all 255 epochs ``ok`` (the register's 242 analyzed and its 13
 ``SUSTAINED_NOISE``), masked by the artifact run
 :data:`ARTIFACT_INTERVALS_RUN_ID`, with each detector's pinned
 ``swr_detectors.DETECTOR_SETTINGS`` and, for all four detectors, the CA1
@@ -295,19 +295,19 @@ def event_epoch_ids(events: pd.DataFrame) -> pd.Series:
     return pd.Series([ids[key] for key in keys], index=events.index, dtype=object)
 
 
-def event_table_epochs(events: pd.DataFrame, analysed: Iterable[str]) -> list[str]:
+def event_table_epochs(events: pd.DataFrame, analyzed: Iterable[str]) -> list[str]:
     """The epochs with an event in ``events``, sorted: the epochs a per-event run
-    holds (an analysed epoch with no event has no table).
+    holds (an analyzed epoch with no event has no table).
 
     Raises
     ------
     ValueError
-        If an epoch of ``events`` is not in ``analysed``.
+        If an epoch of ``events`` is not in ``analyzed``.
     """
     epochs = sorted(set(event_epoch_ids(events)))
-    if other := sorted(set(epochs) - set(analysed)):
+    if other := sorted(set(epochs) - set(analyzed)):
         raise ValueError(
-            f"{len(other)} epochs of the events are not analysed: {other[:3]}"
+            f"{len(other)} epochs of the events are not analyzed: {other[:3]}"
         )
     return epochs
 
@@ -568,7 +568,7 @@ def swr_events(
 
     The SWR cohort's own rule: excluded time and the whole-event immobility
     rule. The pass that drops an SWR overlapping an MUA event dropped for
-    excluded time needs a decode frame's MUA labels: ``analysed_time.artifact_event_drops``
+    excluded time needs a decode frame's MUA labels: ``analyzed_time.artifact_event_drops``
     makes it.
 
     Parameters

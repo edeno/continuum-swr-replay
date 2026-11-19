@@ -19,7 +19,7 @@ neurons). The before/after audit is
 [docs/audits/2026-09-18-pfc-ridge-heldout.md](2026-09-18-pfc-ridge-heldout.md),
 Figure 4 is regenerated from these bundles and claim 20 is requoted from that audit.
 
-Three properties of the null were measured afterwards rather than assumed
+Three properties of the null were measured afterward rather than assumed
 (`scripts/qa/measure_pfc_null_geometry.py`, folded into that audit): the engagement null's draws
 land on the shipped control they are entered beside on a median 11.0 % of their windows (5.4–52.9 %
 across sessions), not the ~3 % assumed here; 7.0–10.0 % of the units called at raw p < .05 have a
@@ -52,7 +52,7 @@ The prepared-response fast path also accepted redundant same-shaped raw counts a
 could silently score another dataset or split. The API now accepts either raw inputs or one prepared
 response, never both, so the ambiguous identity path is structurally unavailable.
 
-The unpenalised comparison used to audit prior binding is also gated on convergence and on
+The unpenalized comparison used to audit prior binding is also gated on convergence and on
 model-level separation. A failed maximum-likelihood fit no longer supplies a peak, covariance or
 `prior_binds` call.
 
@@ -108,7 +108,7 @@ The first post-review real-session gate was deliberately retained as a conservat
 the placement failure was found. It used GPUs 3/4/6 and peaked at about 1.5/2.5/4.6 GiB of device
 memory. Wall/RSS were 3:41/4.16 GiB for j16, 8:15/4.98 GiB for chimi and 37:46/9.06 GiB for wilbur.
 The short j16 time is not a valid full-cost estimate: all of its incomplete null draws were correctly
-skipped. Wilbur exercised the full 40-draw path for all four classes; its low, bursty GPU utilisation
+skipped. Wilbur exercised the full 40-draw path for all four classes; its low, bursty GPU utilization
 motivated moving held-out prediction and deviance onto JAX. A replacement three-session gate under
 the versioned placement policy and device-side scoring remains required before production launch.
 
@@ -133,7 +133,7 @@ exact draws on the same fixed event subset used by its observed statistic, and a
 Wilbur is the comparable full-workload performance case: device-side held-out scoring reduced it
 from 37:46 to 27:25 (27% less wall time). At that gate GPU use remained bursty and host CPU stayed
 near 83%, identifying the host-orchestrated IRLS loop and its per-iteration convergence
-synchronisation as the next ceiling. The follow-up below moves that loop onto the device. The three
+synchronization as the next ceiling. The follow-up below moves that loop onto the device. The three
 smoke artifacts loaded
 together as 581 usable units with five aligned 201-sample modulation matrices; all five empirical
 p-value columns were finite for every retained unit. The estimator audit completed successfully.

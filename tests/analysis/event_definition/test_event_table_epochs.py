@@ -25,15 +25,15 @@ def test_event_epoch_ids_name_each_rows_epoch():
     ]
 
 
-def test_an_analysed_epoch_without_events_is_not_expected_and_an_unanalysed_one_refused():
-    analysed = [
+def test_an_analyzed_epoch_without_events_is_not_expected_and_an_unanalyzed_one_refused():
+    analyzed = [
         "chimi20200212_02_r1_HPC",
         "wilbur20210329_04_r2_HPC",
         "wilbur20210329_06_r3_HPC",  # no event
     ]
-    assert event_table_epochs(EVENTS, analysed) == [
+    assert event_table_epochs(EVENTS, analyzed) == [
         "chimi20200212_02_r1_HPC",
         "wilbur20210329_04_r2_HPC",
     ]
-    with pytest.raises(ValueError, match="not analysed"):
-        event_table_epochs(EVENTS, analysed[:1])
+    with pytest.raises(ValueError, match="not analyzed"):
+        event_table_epochs(EVENTS, analyzed[:1])

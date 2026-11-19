@@ -1,12 +1,12 @@
 """A stop's location, segment and distance summaries leave excluded time out.
 
-Excluded time (the artifact mask widened by 0.3 s) is not analysed, so the
+Excluded time (the artifact mask widened by 0.3 s) is not analyzed, so the
 per-stop summaries over the stop's rows (``occupancy_state``, ``at_well``,
 ``occupancy_well_id``, ``modal_observed_track_segment_id`` and
 ``nearest_well_distance_cm_min/mean/max``, and the columns derived from them)
 read only the rows outside it, in both stop builders:
 
-- a stop partly in excluded time is summarised from its outside rows;
+- a stop partly in excluded time is summarized from its outside rows;
 - a stop wholly in excluded time is ``unknown``, with no well, segment or
   distance;
 - a stop outside excluded time is what it was;
@@ -23,7 +23,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
-from continuum_swr_replay.analysis.event_definition import analysed_time
+from continuum_swr_replay.analysis.event_definition import analyzed_time
 from continuum_swr_replay.analysis.event_tables.stop_table import build_stop_table
 from tests.analysis.event_definition.test_artifact_exposure import (
     CORES,
@@ -102,7 +102,7 @@ def _tables() -> dict[str, pd.DataFrame]:
 def _outside_rows_of_stop_c() -> np.ndarray:
     """By hand: stop C's rows outside the closed excluded intervals."""
     excluded = np.zeros(TIME.size, dtype=bool)
-    for start, end in analysed_time.excluded_intervals(EPOCH_ID).to_numpy():
+    for start, end in analyzed_time.excluded_intervals(EPOCH_ID).to_numpy():
         excluded |= (TIME >= start) & (TIME <= end)
     return (TIME >= 3.0) & (TIME <= 7.0) & ~excluded
 
@@ -110,7 +110,7 @@ def _outside_rows_of_stop_c() -> np.ndarray:
 @pytest.fixture
 def tables(tmp_path, monkeypatch) -> dict[str, dict[str, pd.DataFrame]]:
     """Both tables built with no artifact run (``"all_rows"``: every stop
-    summarised over all its rows), then with the exposure test's cores
+    summarized over all its rows), then with the exposure test's cores
     (``"masked"``). The source stays configured for the test."""
     all_rows = _tables()
     directory = write_artifact_run(tmp_path, {EPOCH_ID: CORES})

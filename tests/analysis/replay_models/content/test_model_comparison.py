@@ -216,7 +216,7 @@ class TestSummarizeComparison:
     def test_the_animal_view_is_the_median_of_each_animal_s_median(self):
         """Animal b has only a NaN session, so it is not an animal of the
         summary: a's median is -2, c's is -1, d's is 5, their median -1. A
-        negative median favours the child, so a and c (two animals) favour
+        negative median favors the child, so a and c (two animals) favor
         it; counting the positive ones would give one."""
         comparisons = _make_comparison_df([-3.0, -1.0, np.nan, 4.0, -6.0, 5.0]).assign(
             animal=["a", "a", "b", "c", "c", "d"]
@@ -262,7 +262,7 @@ class TestSummarizeComparison:
         """The mirror case: the child's AIC is 100 + 10, 100 + 5 and 100 - 1
         against the parent's 100, so the differences are +10, +5, -1: median
         +5, the parent better by more than 2 in two sessions, the child in
-        none, and the one animal's median favours the parent."""
+        none, and the one animal's median favors the parent."""
         parent = _make_fit_results(ll=-48, aic=100, bic=104, n_params=2, n_sessions=3)
         child = parent.assign(aic=[110.0, 105.0, 99.0], bic=[116.0, 111.0, 105.0])
         result = summarize_comparison(compare_nested_models(parent, child), "M0", "M1")

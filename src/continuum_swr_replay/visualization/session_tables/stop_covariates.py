@@ -70,7 +70,7 @@ def _plot_reward_lag_kernel(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
 
@@ -122,7 +122,7 @@ def _plot_reward_rate_trial_k10(ax: Axes, ctx: _PanelContext) -> None:
     view = _stop_view(ctx, ["reward_fraction_last10_known_trials"])
     ax.set_ylabel("reward fraction\nprior ≤10 trials")
     ax.set_ylim(-0.05, 1.05)
-    ax.axhline(0.0, color="grey", linewidth=0.3, zorder=0)
+    ax.axhline(0.0, color="gray", linewidth=0.3, zorder=0)
 
     if len(view) == 0:
         ax.text(
@@ -132,7 +132,7 @@ def _plot_reward_rate_trial_k10(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
 
@@ -201,7 +201,7 @@ def _plot_last_completed_trip_switch(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
 

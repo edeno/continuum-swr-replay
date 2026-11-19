@@ -534,7 +534,7 @@ def summarize_direction(result: dict) -> dict:
 
     Each is the AIC of the more complex rung minus that of the simpler one,
     or (``*_offset_vs_onset``) of the offset anchor minus the onset anchor:
-    negative values favour the more complex rung, or the offset anchor.
+    negative values favor the more complex rung, or the offset anchor.
 
     Returns
     -------

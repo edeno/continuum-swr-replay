@@ -47,7 +47,7 @@ summaries is planned (see `TODO.md`).
 All scripts are in `scripts/`. Steps 1–8 are the full rebuild. After a change to the table code, start at step 4;
 after a change to fitting code only, start at step 6.
 
-1. **Cohort.** The analysed epochs are the register's (`data_loaders/epoch_register.csv`;
+1. **Cohort.** The analyzed epochs are the register's (`data_loaders/epoch_register.csv`;
    [epoch_register.md](epoch_register.md)).
 2. **Artifacts and SWRs.**
    - Run `detection/run_artifact_detection.py` (the artifact mask), then `detection/run_swr_detection.py` (the

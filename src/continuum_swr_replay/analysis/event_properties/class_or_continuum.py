@@ -10,7 +10,7 @@ from "one continuum cut by a threshold":
 
 1. **One mode or two.** Over all non-local events, is the distribution of event
    ripple power unimodal? :func:`dip_test` (Hartigan's dip, with its p-value
-   against the uniform, the least favourable unimodal law), :func:`sarle_bimodality`
+   against the uniform, the least favorable unimodal law), :func:`sarle_bimodality`
    (descriptive only: a skewed unimodal law can exceed its 0.555 cutoff) and
    :func:`kde_modes`.
 2. **A step at the threshold.** For an event property ``y``, does the label add
@@ -37,7 +37,7 @@ The simulations check both tests on data whose answer is known:
 :func:`matched_unimodal_sample`, :func:`matched_lognormal_sample` and
 :func:`two_class_mixture_sample` for test 1; :func:`simulate_step_data` (a
 planted step or none) and :func:`simulate_ripple_events` (one continuum, or one
-with a planted step, labelled by the Kay rule on a simulated ripple-power
+with a planted step, labeled by the Kay rule on a simulated ripple-power
 trace) for test 2.
 
 On the canonical events, :func:`distribution_table` runs test 1 per animal and
@@ -325,13 +325,13 @@ class StepFit:
     ----------
     n_events, n_groups : int
         Events and epochs in the fit.
-    n_labelled : int
+    n_labeled : int
         Events whose 0/1 term is 1.
     step, step_ci_low, step_ci_high : float
         The 0/1 term's coefficient (in ``y``'s units) and its 95 % interval,
         clustered by epoch.
     raw_difference : float
-        Mean ``y`` of the events labelled 1 less that of the others, same rows.
+        Mean ``y`` of the events labeled 1 less that of the others, same rows.
     step_share : float
         ``step / raw_difference``: the part of the label difference that a
         step at the label carries once power (and any covariate) is smooth.
@@ -350,7 +350,7 @@ class StepFit:
 
     n_events: int
     n_groups: int
-    n_labelled: int
+    n_labeled: int
     step: float
     step_ci_low: float
     step_ci_high: float
@@ -450,7 +450,7 @@ def fit_step(
     return StepFit(
         n_events=int(y.size),
         n_groups=n_groups,
-        n_labelled=int(label.sum()),
+        n_labeled=int(label.sum()),
         step=step,
         step_ci_low=ci_low,
         step_ci_high=ci_high,
@@ -669,12 +669,12 @@ def simulate_ripple_events(
     property_noise_sd: float = 0.5,
     step: float = 0.0,
 ) -> pd.DataFrame:
-    """One continuum of events, labelled by the Kay rule on a simulated ripple trace.
+    """One continuum of events, labeled by the Kay rule on a simulated ripple trace.
 
     The trace is a smoothed noise background plus Gaussian ripple bursts at
     Poisson times, with lognormal (unimodal, continuous) amplitudes ``A`` and
     widths; it is z-scored and :func:`kay_like_intervals` gives the SWRs.
-    Every burst carries one non-local event, centred near the burst (jitter
+    Every burst carries one non-local event, centered near the burst (jitter
     ``jitter_fraction`` of its width), lasting longer for larger bursts. Each
     event's ``power_peak`` and ``power_mean`` are the trace's maximum and mean
     over its samples, as the real events' are, and ``power_criterion`` is
@@ -787,7 +787,7 @@ def event_ripple_power(
     z : NDArray, shape (n_time,)
         The z-scored ripple power on the grid (``SWR_zscore``).
     swr : NDArray of bool, shape (n_time,)
-        Rows labelled as an SWR.
+        Rows labeled as an SWR.
     first, n_rows : NDArray of int, shape (n_events,)
         Each event's first grid row and its number of rows.
 

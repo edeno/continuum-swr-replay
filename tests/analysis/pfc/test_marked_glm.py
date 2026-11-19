@@ -471,7 +471,7 @@ def test_kernel_design_refuses_block_spans_that_do_not_tile_the_columns():
     with pytest.raises(ValueError, match="name the blocks in column order"):
         KernelDesign(matrix, {"b": slice(1, 3), "a": slice(3, 5)}, blocks)
     with pytest.raises(ValueError, match="expected a non-empty span starting at"):
-        # Column 0 is the unpenalised intercept and belongs to no block.
+        # Column 0 is the unpenalized intercept and belongs to no block.
         KernelDesign(matrix, {"a": slice(0, 2), "b": slice(2, 5)}, blocks)
     with pytest.raises(ValueError, match="expected a non-empty span starting at"):
         KernelDesign(matrix, {"a": slice(1, 3), "b": slice(4, 5)}, blocks)

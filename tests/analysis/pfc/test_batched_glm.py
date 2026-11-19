@@ -258,7 +258,7 @@ class TestRankDeficientDesign:
 
 class TestUnitsWithoutSpikes:
     def test_statsmodels_refuses_an_all_zero_response(self):
-        """The behaviour the batched fitter has to reproduce per unit."""
+        """The behavior the batched fitter has to reproduce per unit."""
         design = np.column_stack([np.ones(500), np.linspace(-1, 1, 500)])
         with pytest.raises(ValueError, match="deviance function returned a nan"):
             statsmodels_fit(design, np.zeros(500))
@@ -279,7 +279,7 @@ class TestUnitsWithoutSpikes:
         assert np.isnan(silent.aic)
         assert silent.converged is False
 
-        # The spiking unit in the same batch is untouched by its neighbour.
+        # The spiking unit in the same batch is untouched by its neighbor.
         alive = batched.for_unit(1)
         np.testing.assert_allclose(
             alive.params, statsmodels_fit(design, spiking).params, atol=ATOL, rtol=0
@@ -308,8 +308,8 @@ class TestNonConvergence:
 class TestSeparation:
     """A design column whose support holds no spikes, with and without a prior.
 
-    Unpenalised, that coefficient's maximum-likelihood estimate is at ``-inf``
-    and whatever a solver reports is an artefact of where it stopped. The
+    Unpenalized, that coefficient's maximum-likelihood estimate is at ``-inf``
+    and whatever a solver reports is an artifact of where it stopped. The
     prior's whole job is to make the fit finite there, and to leave it alone
     everywhere else.
     """
@@ -326,7 +326,7 @@ class TestSeparation:
         counts[100:200] = 0.0
         return design, counts
 
-    def test_the_unpenalised_fit_runs_away(self, separating):
+    def test_the_unpenalized_fit_runs_away(self, separating):
         design, counts = separating
         batched = fit_poisson_glms(design, counts)
 
@@ -363,16 +363,16 @@ class TestSeparation:
 
 
 class TestPenalty:
-    """The Gaussian prior, against a dense penalised Newton solve."""
+    """The Gaussian prior, against a dense penalized Newton solve."""
 
     @staticmethod
     def dense_penalized_fit(design, counts, penalty, maxiter=200, tol=1e-10):
-        """Penalised IRLS in the design's own columns, in dense NumPy.
+        """Penalized IRLS in the design's own columns, in dense NumPy.
 
         The estimator the batched solver must reproduce, written the obvious
         way: no orthonormal basis, no chunking, no batching -- solve
         ``(X' W X + Lambda) beta = X' W z`` on the working response until the
-        penalised deviance settles.
+        penalized deviance settles.
         """
         penalty_matrix = np.diag(penalty)
         mean = (counts + counts.mean()) / 2.0
@@ -396,19 +396,19 @@ class TestPenalty:
             previous = penalized
         return beta
 
-    def test_a_zero_penalty_is_the_unpenalised_fit_bit_for_bit(self, planted):
+    def test_a_zero_penalty_is_the_unpenalized_fit_bit_for_bit(self, planted):
         design, counts, _ = planted
-        unpenalised = fit_poisson_glms(design, counts)
+        unpenalized = fit_poisson_glms(design, counts)
 
         zeros = fit_poisson_glms(design, counts, penalty=np.zeros(design.shape[1]))
 
-        assert np.array_equal(zeros.params, unpenalised.params)
-        assert np.array_equal(zeros.deviance, unpenalised.deviance)
-        assert np.array_equal(zeros.llf, unpenalised.llf)
-        assert np.array_equal(zeros.bse, unpenalised.bse)
-        assert np.array_equal(zeros.n_iter, unpenalised.n_iter)
+        assert np.array_equal(zeros.params, unpenalized.params)
+        assert np.array_equal(zeros.deviance, unpenalized.deviance)
+        assert np.array_equal(zeros.llf, unpenalized.llf)
+        assert np.array_equal(zeros.bse, unpenalized.bse)
+        assert np.array_equal(zeros.n_iter, unpenalized.n_iter)
 
-    def test_the_penalised_fit_matches_a_dense_newton_reference(self, planted):
+    def test_the_penalized_fit_matches_a_dense_newton_reference(self, planted):
         design, counts, _ = planted
         penalty = make_ridge_penalty(design.shape[1], sigma=2.0)
 
@@ -420,8 +420,8 @@ class TestPenalty:
                 batched.params[unit], expected, atol=ATOL, rtol=0
             )
 
-    def test_the_penalty_shrinks_only_the_penalised_columns(self, planted):
-        """A column with lambda 0 is fit exactly as it was; its neighbours are not.
+    def test_the_penalty_shrinks_only_the_penalized_columns(self, planted):
+        """A column with lambda 0 is fit exactly as it was; its neighbors are not.
 
         Not a tautology: the penalty is stated in the design's own columns but
         applied in the orthonormal basis, where a wrong transform would leak
@@ -432,9 +432,9 @@ class TestPenalty:
         penalty[-1] = 10.0
 
         batched = fit_poisson_glms(design, counts, penalty=penalty)
-        unpenalised = fit_poisson_glms(design, counts)
+        unpenalized = fit_poisson_glms(design, counts)
 
-        assert np.all(np.abs(batched.params[:, -1]) < np.abs(unpenalised.params[:, -1]))
+        assert np.all(np.abs(batched.params[:, -1]) < np.abs(unpenalized.params[:, -1]))
         for unit in range(counts.shape[1]):
             expected = self.dense_penalized_fit(design, counts[:, unit], penalty)
             np.testing.assert_allclose(
@@ -445,15 +445,15 @@ class TestPenalty:
         _, counts, _ = planted
         constant = np.ones((counts.shape[0], 1))
 
-        penalised = fit_poisson_glms(constant, counts, penalty=np.zeros(1))
+        penalized = fit_poisson_glms(constant, counts, penalty=np.zeros(1))
         plain = fit_poisson_glms(constant, counts)
 
-        assert np.array_equal(penalised.params, plain.params)
+        assert np.array_equal(penalized.params, plain.params)
         np.testing.assert_allclose(
-            penalised.params[:, 0], np.log(counts.mean(axis=0)), atol=1e-10
+            penalized.params[:, 0], np.log(counts.mean(axis=0)), atol=1e-10
         )
 
-    def test_standard_errors_are_the_penalised_posterior_mode(self, planted):
+    def test_standard_errors_are_the_penalized_posterior_mode(self, planted):
         design, counts, _ = planted
         penalty = make_ridge_penalty(design.shape[1], sigma=2.0)
 
@@ -486,7 +486,7 @@ class TestPenalty:
         assert batched.params[0, 2] == pytest.approx(0.0, abs=1e-12)
         assert batched.bse[0, 2] == pytest.approx(0.0, abs=1e-12)
 
-    def test_the_covariance_is_the_penalised_inverse_information(self, planted):
+    def test_the_covariance_is_the_penalized_inverse_information(self, planted):
         """The curve helpers need the off-diagonal terms, not just ``bse``."""
         design, counts, _ = planted
         penalty = make_ridge_penalty(design.shape[1], sigma=2.0)

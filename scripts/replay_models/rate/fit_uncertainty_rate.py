@@ -65,7 +65,7 @@ from continuum_swr_replay.analysis.behavior.covariates import (  # noqa: E402
     add_uncertainty_covariates,
     assert_qvals_aligned,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (  # noqa: E402
     require_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (  # noqa: E402

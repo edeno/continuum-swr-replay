@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     stamp_swr_source,
 )
 from continuum_swr_replay.runs.fit_provenance import fit_provenance_path

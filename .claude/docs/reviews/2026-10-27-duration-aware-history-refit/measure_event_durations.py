@@ -4,7 +4,7 @@ For the duration-aware history refit: the simulation's identifiability depends
 on the log-SD of event durations (``2026-10-26-duration-aware-history-
 simulation.md``, "Identifiability limits"). Classes:
 
-- ``swr``: the Kay SWRs in the onset table (analysed stops), durations from the
+- ``swr``: the Kay SWRs in the onset table (analyzed stops), durations from the
   SWR inventory matched on start time;
 - ``non_local_swr`` / ``non_local_no_swr``: ``event_table`` events split by
   ``is_swr`` (``event_duration_s``).

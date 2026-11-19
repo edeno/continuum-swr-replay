@@ -2,7 +2,7 @@
 
 **Status:** fixed in `event-location-context`; regeneration pending
 **Found:** 2026-08-10, following the replay-tables review
-**Severity of the defect:** negligible pooled (0.93 % of events *mislabelled*);
+**Severity of the defect:** negligible pooled (0.93 % of events *mislabeled*);
 material per-animal for wilbur (3.9 %) and disqualifying for one session
 (`wilbur20210329_16_r8`, 40.8 %)
 **Footprint of the fix:** ~11 % of events lose a defined `current_arm` — an
@@ -42,7 +42,7 @@ per-animal spread in particular was much wider in those samples — 3.8–25.2 %
 than in the full corpus.)*
 
 **Most of it is not the trunk defect.** 77.5 % of the newly-NaN events had a
-modal *leaf* arm under the old rule, so they were never mislabelled by the
+modal *leaf* arm under the old rule, so they were never mislabeled by the
 trunk fallback this document describes. They are nulled because the animal sat
 immobile on a leaf arm before `goal_arrival_time` — a correct application of
 the new definition, but not a correction of a prior error.
@@ -128,7 +128,7 @@ A 165× spread across animals. Per-session share: median 0 %, max **40.75 %**.
   number.)
 
 So the animal made one very slow, heavily paused final approach; non-local events
-fired during the pauses; and each was labelled with the destination it would reach
+fired during the pauses; and each was labeled with the destination it would reach
 up to 2.4 minutes later.
 
 This is the same session the audit's C8 flags as losing 33 % of its events to the

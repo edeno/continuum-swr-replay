@@ -290,7 +290,7 @@ def behavioral_location_from_port_experiences(
     off-well must say which one it means rather than defaulting.
 
     ``"in_transit"`` names the **trip interval, not the animal's motion**, and
-    this reliably misleads. Every event in the modelled cohort is speed-gated
+    this reliably misleads. Every event in the modeled cohort is speed-gated
     immobility; off-well events have a median speed of 1.35 cm/s. An
     ``in_transit`` event is an animal *standing still partway through a trip*,
     not a running animal. The reason the content models exclude those events is

@@ -63,7 +63,7 @@ def _draw_event_arm_indicator(
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
 

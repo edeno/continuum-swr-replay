@@ -64,7 +64,7 @@ def test_fitted_cohort_record_books_each_unit_once():
     """Hand count: 10 stops, 4 more in the qvals gap, two sessions fit.
 
     ``common_missing`` marks 3 stops, one of which ``own_missing`` also marks,
-    so 2 are common; the rest not modelled is the session remainder.
+    so 2 are common; the rest not modeled is the session remainder.
     """
     own = pd.Series([True, True] + [False] * 8)
     common = pd.Series([False, True, True, True] + [False] * 6)
@@ -519,7 +519,7 @@ def test_qvals_gap_excludes_columns_missing_for_other_reasons(column):
 def test_every_qvals_produced_covariate_declares_its_gap_status():
     """A new qvals covariate must be classified, not silently left out of the gap.
 
-    Every catalogued covariate whose producer is the qvals pipeline is
+    Every cataloged covariate whose producer is the qvals pipeline is
     ``qvals_sourced`` (and row-gated or not) or named here with the reason it
     is not.
     """

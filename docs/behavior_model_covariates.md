@@ -99,7 +99,7 @@ Checked against `references/Spatial_bandit_manuscript_v3.2_biorxiv_figs.pdf`
   `μ = α/(α+β)` and `σ² = αβ/((α+β)²(α+β+1))`. Inverting the shipped
   `reward_belief_mean_port_*` / `reward_belief_variance_port_*` values recovers an
   implied `α+β` spanning **2.00 to 73.26**, with the
-  minimum exactly at the `α = β = 1` initialisation the manuscript specifies.
+  minimum exactly at the `α = β = 1` initialization the manuscript specifies.
 - **ΔV reproduces the manuscript's definition.** Stay = the *upcoming* port
   within the patch; Switch = the **greater** of the two alternative patches' mean
   port values; ΔV = **Switch − Stay**. The shipped
@@ -127,7 +127,7 @@ Checked against `references/Spatial_bandit_manuscript_v3.2_biorxiv_figs.pdf`
 per-trial scalar for one port. Our
 `reward_belief_variance_candidate_arm_preoutcome` is the per-arm Beta variance
 across all six leaves, which is what makes a within-event arm contrast possible.
-That is a deliberate generalisation, not the manuscript's quantity; any sentence
+That is a deliberate generalization, not the manuscript's quantity; any sentence
 citing the paper for "uncertainty" should say which of the two it means.
 
 ### Value-update magnitudes (Fig 5E / S5; absolute, summed across ports)
@@ -147,7 +147,7 @@ citing the paper for "uncertainty" should say which of the two it means.
 | `reward_belief_variance_chosen_arm_preoutcome` | variance of the chosen port |
 | `prev_local_variance` | upstream diagnostic retained under its native, insufficiently documented name; outside the v1 fitted vocabulary |
 | `reward_belief_variance_leaf_sum_preoutcome` | sum of the six port variances; canonicalized from the numerically duplicate global-variance paths |
-| `upcoming_leaf_variance`, `next_choice_variance` | uncertainty about the upcoming choice — **look-ahead**: both use trial `t+1` (sourced from the upstream DataJoint `BehaviorModelResults`, not recomputed here). They **are** exported (listed in `COVARIATES`, present in `qvals_table.parquet`) but are **never fitted** (not in `model_specs.MU_UNCERTAINTY_RL_COVARIATES`); do not use them as contemporaneous stop-time covariates for a replay event at trial `t`. The repo's own session-safe analogues are the `_sess` variants. |
+| `upcoming_leaf_variance`, `next_choice_variance` | uncertainty about the upcoming choice — **look-ahead**: both use trial `t+1` (sourced from the upstream DataJoint `BehaviorModelResults`, not recomputed here). They **are** exported (listed in `COVARIATES`, present in `qvals_table.parquet`) but are **never fitted** (not in `model_specs.MU_UNCERTAINTY_RL_COVARIATES`); do not use them as contemporaneous stop-time covariates for a replay event at trial `t`. The repo's own session-safe analogs are the `_sess` variants. |
 
 ### Belief entropy (beta — the outcome-uncertainty covariate)
 | Column | Meaning |

@@ -65,7 +65,7 @@
 
 ## Rollout Strategy
 
-All at once on the unpushed `memoryless-sequence-detection` branch; no backwards
+All at once on the unpushed `memoryless-sequence-detection` branch; no backward
 compatibility (confirmed at planning time). Each phase regenerates the outputs it
 changes and commits them with the code.
 

@@ -310,19 +310,19 @@ class TestHeldoutDeviance:
             np.testing.assert_allclose(heldout.per_fold[fold], expected, rtol=1e-12)
 
     def test_the_penalty_is_part_of_the_estimator_being_scored(self, event_session):
-        """Scoring a penalised and an unpenalised estimator gives different
+        """Scoring a penalized and an unpenalized estimator gives different
         numbers, so the penalty cannot be quietly dropped from the training
         fit."""
         folds = assign_blocked_folds(event_session["fit_mask"], n_folds=5, seed=5)
         design = event_session["designs"]["events"]
         counts = event_session["fit_counts"]
 
-        penalised = heldout_deviance(
+        penalized = heldout_deviance(
             design, counts, make_ridge_penalty(design.shape[1], sigma=0.1), folds
         )
-        unpenalised = heldout_deviance(design, counts, None, folds)
+        unpenalized = heldout_deviance(design, counts, None, folds)
 
-        assert not np.allclose(penalised.total, unpenalised.total)
+        assert not np.allclose(penalized.total, unpenalized.total)
 
     def test_a_unit_with_no_spikes_scores_nan_and_leaves_the_others_alone(
         self, event_session
@@ -620,7 +620,7 @@ class TestControlDrawNull:
         events = event_times["non_local"]
         # 3.1 s falls in the first moving gap, so this source event cannot be
         # matched within a fitted bout. It remains a real event in the
-        # all-event descriptive model but cannot enter the randomisation test.
+        # all-event descriptive model but cannot enter the randomization test.
         outside = pd.DataFrame({"start_time": [3.1], "end_time": [3.18]})
         event_times["non_local"] = pd.concat(
             [events, outside], ignore_index=True
@@ -741,7 +741,7 @@ class TestControlDrawNull:
     def test_the_null_controls_avoid_the_dropped_events(
         self, null_session, monkeypatch
     ):
-        """The events the analysed-time rule dropped are avoided by the subset
+        """The events the analyzed-time rule dropped are avoided by the subset
         selection and by every null draw, as they are by the shipped control."""
         from continuum_swr_replay.analysis.pfc import heldout
 

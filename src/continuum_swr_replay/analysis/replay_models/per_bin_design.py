@@ -21,7 +21,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     excluded_intervals_by_session,
 )
 from continuum_swr_replay.intervals import overlaps_intervals
@@ -223,7 +223,7 @@ def attach_is_swr_to_onsets(
     # Join on the onset time itself, not on within-stop ordinal rank. A
     # non-local onset IS its event's start, so the two are exactly equal by
     # construction. Ranking instead makes one missing onset shift every later
-    # rank in that stop, relabelling events that were present and correct --
+    # rank in that stop, relabeling events that were present and correct --
     # and because the shifted ranks still all find *a* row, the match-rate
     # guard below stays silent through it. Matching on time contains the
     # failure to the row that is actually missing.
@@ -262,7 +262,7 @@ def attach_is_swr_to_onsets(
     )
     # Any mismatch means the onset table and event_table were built from
     # divergent non-local/speed thresholds or decodes -- fail loud rather than
-    # silently leave is_swr unlabelled downstream. On the shipped artifacts the
+    # silently leave is_swr unlabeled downstream. On the shipped artifacts the
     # time join matches exactly; unmatched rows would make SWR and non-SWR fail
     # to partition the pooled non-local population.
     merged = merged.sort_values("_onset_order", kind="stable")
@@ -421,7 +421,7 @@ def aggregate_to_timebins(
     exact. The last bin's ``exposure`` is the partial remainder. A stop with no
     exposure (``immobility_duration_s <= 0``) has no bins.
 
-    Excluded time (the artifact mask widened by 0.3 s) is not analysed: a bin is
+    Excluded time (the artifact mask widened by 0.3 s) is not analyzed: a bin is
     dropped when ``[left - history_window_s, left + bin]`` (its history clipped
     at the stop's start) touches it. The drop comes last, so every kept bin's
     history columns are those of the design without the mask.
@@ -460,7 +460,7 @@ def aggregate_to_timebins(
         Each session's excluded time: ``animal``, ``session_date``,
         ``epoch``, ``start_time`` and ``end_time`` (absolute seconds, closed).
         None (the default) reads it for ``stop_table``'s sessions from the SWR
-        source, ``analysed_time.excluded_intervals_by_session(stop_table)``; with
+        source, ``analyzed_time.excluded_intervals_by_session(stop_table)``; with
         no artifact run configured that has no rows. A frame with no rows (such
         as :data:`NO_EXCLUDED_TIME`, for synthetic sessions the source does not
         serve) masks nothing and leaves ``attrs`` without the excluded counts.
@@ -486,7 +486,7 @@ def aggregate_to_timebins(
     at_risk_events : pd.DataFrame, optional
         Duration-aware option (default None: every bin of the stop is at risk,
         the shipped design). Every event of the decoder whose onsets are
-        modelled -- all streams, since one decoder's events never overlap --
+        modeled -- all streams, since one decoder's events never overlap --
         with ``stop_id``, ``t_since_stop_onset`` (start) and
         ``t_end_since_stop_onset`` (end), seconds since stop onset. While an
         event is ongoing no new onset can occur, so a bin's ``exposure`` becomes
@@ -517,7 +517,7 @@ def aggregate_to_timebins(
         ``hist_rcos_0..self_history_basis-1``. With ``arrival_clocks``, two
         further per-bin clocks:
         ``time_since_last_well_arrival_s`` and ``time_since_outcome_known_s``
-        (bin centre minus the absolute clock; ``NaN`` where the clock is
+        (bin center minus the absolute clock; ``NaN`` where the clock is
         ``NaN``, and negative for bins that precede the outcome boundary).
         When excluded time has rows, ``attrs`` counts the bins dropped for
         touching it (``n_bins_excluded``), those dropped for their
@@ -642,7 +642,7 @@ def aggregate_to_timebins(
     out["binj"] = binj
     out["tc"] = (binj + 0.5) * bin_s
     if arrival_clocks:
-        # Bin CENTRE on two absolute session clocks, as elapsed seconds. The
+        # Bin CENTER on two absolute session clocks, as elapsed seconds. The
         # arrival clock is >= 0 for an at-well stop (the animal arrived before
         # the bout began); the outcome clock is NEGATIVE for bins that precede
         # the reward/omission becoming observable.
@@ -662,7 +662,7 @@ def aggregate_to_timebins(
     # floor with a tolerance, not int(): int() truncates the quotient, and an
     # onset exactly on a bin edge whose binary-float quotient lands just below
     # the integer (0.3 / 0.1 -> 2.9999999999999996) would fall one bin early,
-    # shifting the estimated time course backwards. The clip keeps an onset in
+    # shifting the estimated time course backward. The clip keeps an onset in
     # the final partial window [(nmax-1)*bin_s, tmax) in the last bin rather
     # than a phantom bin that the merge below would silently drop.
     src_binj = np.clip(
@@ -796,7 +796,7 @@ def aggregate_to_timebins(
     if shift_at_outcome:
         # The reward history a stop carries is evaluated at BOUT START, so bins
         # after the current trip's reward/omission became observable would
-        # otherwise be modelled with a history that omits the outcome the animal
+        # otherwise be modeled with a history that omits the outcome the animal
         # already has. Shift the lag vector by one at the boundary and re-derive
         # the basis features with the same functions the stop level uses, so the
         # two levels stay one kernel rather than two.

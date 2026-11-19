@@ -939,7 +939,7 @@ def restrict_to_analysis_cohort(
 
 
 def analysis_cohort_counts(trial_leaf: pd.DataFrame) -> dict[str, int]:
-    """Sessions, trials, replay-bearing trials and rows of the analysed table.
+    """Sessions, trials, replay-bearing trials and rows of the analyzed table.
 
     Parameters
     ----------
@@ -978,7 +978,7 @@ def select_example_session(trial_leaf: pd.DataFrame) -> dict[str, str]:
 
     :data:`DEFAULT_EXAMPLE_SESSION` when the table holds it; otherwise the
     robust medoid of the sessions on trial count, event count and the median
-    within-well uncertainty range (each feature centred on its median and
+    within-well uncertainty range (each feature centered on its median and
     scaled by 1.4826 x MAD, or by its SD when the MAD is zero; a feature with
     no spread is left out).
 

@@ -275,7 +275,7 @@ def _qvals_rows_expected_in(
     table's stops -- those are joined, so their clock is always checked -- or
     its epoch appears in the table and its ``qvals_context_time`` falls inside
     that epoch's span of ``stop_start``, which is how a row whose ``stop_id``
-    went stale is still recognised as belonging here. A corpus-wide stop table
+    went stale is still recognized as belonging here. A corpus-wide stop table
     therefore claims every qvals row of every epoch it covers, and a
     one-session stop table claims only that session's rows.
 
@@ -283,7 +283,7 @@ def _qvals_rows_expected_in(
     bouts that went missing can be the session's own first and last, which
     would otherwise shrink the span past them and let them escape unnoticed;
     the smallest gap between sessions in this corpus is 61,589 s, so ten
-    minutes of slack cannot reach a neighbouring session.
+    minutes of slack cannot reach a neighboring session.
     """
     spans = stop_table.groupby("epoch", sort=False)["stop_start"].agg(["min", "max"])
     epoch = contingency["epoch"].to_numpy()

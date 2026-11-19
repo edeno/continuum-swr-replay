@@ -7,7 +7,7 @@ never in the cohort. Its 5 run epochs (02_r1, 04_r2, 06_r3, 08_r4, 10_r5) are
 exclusion audit. The earlier version of this note, written 2026-07-10, named the wrong
 mechanism.
 
-## Why it is not analysed
+## Why it is not analyzed
 
 - `Session.session_description` is "Spatial bandit task (depletion)". Comrie's
   `alison_behav.TrialsInfoByEpoch` gives `decay_percent` = 80, a decaying reward
@@ -24,7 +24,7 @@ mechanism.
 wilbur20210404 is the only project session whose ripple times exist only under
 `group_name = "sb_wilbur_ripple"`, with no `CA1` extraction (`RippleTimesV1`: 11
 rows). That is a different channel and reference set from the `CA1` extraction
-every analysed epoch uses. `get_ripple` (`data_loaders/lfp.py`) restricts on
+every analyzed epoch uses. `get_ripple` (`data_loaders/lfp.py`) restricts on
 `group_name = "CA1"`, and it raises a `ValueError` naming the group names present
 when no single CA1 row matches.
 

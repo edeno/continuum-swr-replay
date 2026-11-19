@@ -311,7 +311,7 @@ def test_spike_binning_uses_left_edges_and_keeps_the_last_bin():
 
 class TestClosedIntervalsRefuseMalformedBounds:
     """NaN bounds and start > end raise, naming the rows, in every
-    closed-interval function. Before, one NaN row merged into its neighbour:
+    closed-interval function. Before, one NaN row merged into its neighbor:
     ``merge_intervals([nan, 4], [nan, 5])`` gave ``[[4, nan]]``, hiding
     ``[4, 5]`` from overlap, coverage and subtraction."""
 

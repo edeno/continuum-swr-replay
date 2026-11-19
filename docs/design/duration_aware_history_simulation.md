@@ -16,7 +16,7 @@ per-bin design treated each event as an instant onset: every 15 ms bin of a stop
 risk, including the bins inside an ongoing event, and self- and cross-history counted
 past onsets. On that design the real fits showed a deep negative coefficient at the
 shortest cross-history lag and a self-history "burst" about 105–120 ms after an onset.
-Are these artefacts of event duration, or real refractoriness, rhythm and coupling?
+Are these artifacts of event duration, or real refractoriness, rhythm and coupling?
 
 ## How it was checked
 

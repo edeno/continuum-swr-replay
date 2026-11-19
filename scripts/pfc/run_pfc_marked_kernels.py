@@ -84,7 +84,7 @@ from continuum_swr_replay.analysis.pfc.runner_support import (
     fails_convergence_gate,
     session_seed,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_epochs
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import processed_data_dir, table_path
@@ -806,7 +806,7 @@ def main() -> None:
     args.log_directory.mkdir(parents=True, exist_ok=True)
 
     epoch_info = filter_epoch_info(
-        analysed_epochs(),
+        analyzed_epochs(),
         sessions=args.sessions,
         animal=args.animal,
         date=args.date,

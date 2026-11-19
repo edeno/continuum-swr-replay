@@ -24,7 +24,7 @@ from .summaries import _group_by_event
 
 RollupResult = tuple[np.ndarray, dict[str, np.ndarray]]
 
-#: trunk arms join the three patch junctions to the centre of the track
+#: trunk arms join the three patch junctions to the center of the track
 _TRUNK_ARMS = frozenset(TRUNK_ARMS)
 
 #: per-event columns produced identically for both scenarios (parity target).
@@ -444,13 +444,13 @@ def trajectory_dynamics(
     nodes_df = env.place_bin_centers_nodes_df_
     node_ids, has_valid = map_estimate_to_map_nodes(map_estimate, nodes_df)
     graph = env.track_graph_with_bin_centers_edges_
-    # All-pairs shortest-path distances over the bin-centre graph,
+    # All-pairs shortest-path distances over the bin-center graph,
     # precomputed by the environment at fit time. Recomputing them here
     # would be the same Dijkstra over the same graph, per session, with a
     # chance of drifting from the distances every other consumer of
     # ``env`` sees.
     dist = env.distance_between_nodes_
-    # Well nodes are the degree-1 terminals of the bin-centre track graph (the
+    # Well nodes are the degree-1 terminals of the bin-center track graph (the
     # six well ends). ``well_radius`` defaults to four place bins.
     well_nodes = [n for n, deg in graph.degree() if deg == 1]
     well_radius = well_radius_cm if well_radius_cm is not None else 4.0 * place_bin_size

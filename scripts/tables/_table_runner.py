@@ -21,13 +21,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     publish_swr_table,
     require_swr_source,
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import swr_epoch_id
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_epochs
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import (
     CONTFRAG_SUFFIX,
@@ -47,11 +47,11 @@ logging.basicConfig(
 
 
 def find_sessions(max_per_animal: int | None = None) -> list[dict]:
-    """The epoch register's analysed epochs, each with its decode files.
+    """The epoch register's analyzed epochs, each with its decode files.
 
-    The sessions are ``analysed_epochs()``, in ``session_id`` order within each
+    The sessions are ``analyzed_epochs()``, in ``session_id`` order within each
     animal, the animals in order; a decode on disk whose epoch the register does
-    not analyse is not one. ``results.nc`` absence is recorded here as
+    not analyze is not one. ``results.nc`` absence is recorded here as
     ``results_file=None`` and acted on in ``prepare_data.build_session_tables``,
     which refuses the session: without a posterior there is no
     ``event_sequence_table`` and no retrospective metrics.
@@ -72,11 +72,11 @@ def find_sessions(max_per_animal: int | None = None) -> list[dict]:
     FileNotFoundError
         If a selected epoch has no ``data_over_time.pkl`` or ``environment.pkl``
         under ``paths.processed_data_dir()``: the tables would otherwise cover fewer
-        epochs than the register analyses.
+        epochs than the register analyzes.
     """
     by_animal: dict[str, list] = {}
     decode_dir = processed_data_dir()
-    for nwb_file_name, epoch in analysed_epochs().index:
+    for nwb_file_name, epoch in analyzed_epochs().index:
         animal = parse_nwb_filename(nwb_file_name)[0]
         session_id = swr_epoch_id(nwb_file_name, epoch)
         paths = decode_paths(session_id, decode_dir)
@@ -106,7 +106,7 @@ def find_sessions(max_per_animal: int | None = None) -> list[dict]:
     ]
     if missing:
         raise FileNotFoundError(
-            f"{len(missing)} decode file(s) of the epoch register's analysed epochs "
+            f"{len(missing)} decode file(s) of the epoch register's analyzed epochs "
             f"are not under {decode_dir}: {', '.join(missing[:10])}"
             + (", ..." if len(missing) > 10 else "")
         )
@@ -117,17 +117,17 @@ def find_contfrag_sessions(
     max_per_animal: int | None = None,
     brain_area: str = "HPC",
 ) -> list[dict]:
-    """The epoch register's analysed epochs, each with its ContFrag decode files.
+    """The epoch register's analyzed epochs, each with its ContFrag decode files.
 
     One brain area at a time: ``run_decoding_contfrag.py`` writes per-area files,
     and the saved tables would collide on event_id / stop_id across areas,
     because the canonical hashes do not include brain_area (see
     ``tables.event_ids.hash_event_id`` / ``hash_stop_id``).
 
-    The sessions are ``analysed_epochs()``, in ``session_id`` order within each
-    animal, the animals in order. For HPC, recorded in every analysed epoch, an
-    analysed epoch without its decode stops the build. mPFC and OFC are recorded
-    in some sessions only, so an analysed epoch with no decode for the area is
+    The sessions are ``analyzed_epochs()``, in ``session_id`` order within each
+    animal, the animals in order. For HPC, recorded in every analyzed epoch, an
+    analyzed epoch without its decode stops the build. mPFC and OFC are recorded
+    in some sessions only, so an analyzed epoch with no decode for the area is
     outside that area's cohort and is left out.
 
     Parameters
@@ -151,7 +151,7 @@ def find_contfrag_sessions(
     """
     by_animal: dict[str, list] = {}
     decode_dir = processed_data_dir()
-    for nwb_file_name, epoch in analysed_epochs().index:
+    for nwb_file_name, epoch in analyzed_epochs().index:
         animal = parse_nwb_filename(nwb_file_name)[0]
         session_id = format_epoch_identifier(
             nwb_file_name, epoch, brain_area, CONTFRAG_SUFFIX
@@ -189,7 +189,7 @@ def find_contfrag_sessions(
     if missing:
         raise FileNotFoundError(
             f"{len(missing)} ContFrag decode file(s) of the epoch register's "
-            f"analysed epochs are not under {decode_dir}: "
+            f"analyzed epochs are not under {decode_dir}: "
             f"{', '.join(missing[:10])}" + (", ..." if len(missing) > 10 else "")
         )
     return selected

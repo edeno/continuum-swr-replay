@@ -39,7 +39,7 @@ The prerequisites, not run here (GPUs or hours each), are listed in order in
 
 Before a table run starts, a preflight checks they are on disk: both pinned run
 folders, the inventory masked with the pinned artifact run
-(``decode_masks.require_hpc_decode_sources``), and each analysed epoch's decode
+(``decode_masks.require_hpc_decode_sources``), and each analyzed epoch's decode
 files. It reads files only, never the database. ``--dry-run`` lists the
 prerequisites and, when table runs are selected, what the preflight found.
 
@@ -337,7 +337,7 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
 
     Checks both pinned run folders, that the SWR inventory was masked with the
     pinned artifact run (``decode_masks.require_hpc_decode_sources``), and that
-    every analysed epoch (from the epoch register) has its HPC decode files,
+    every analyzed epoch (from the epoch register) has its HPC decode files,
     and its ContFrag ones when a ContFrag table run is selected. Reads files
     only, never the database; imported here so the scheduler loads no package
     code.
@@ -349,7 +349,7 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
     from continuum_swr_replay.analysis.event_definition.decode_masks import (
         require_hpc_decode_sources,
     )
-    from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
+    from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
     from continuum_swr_replay.decoding.files import decode_paths
     from continuum_swr_replay.decoding.identifiers import CONTFRAG_SUFFIX
     from continuum_swr_replay.paths import processed_data_dir
@@ -374,7 +374,7 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
             {"threshold_percent": None},
             ("data_over_time", "environment"),
         )
-    epoch_ids = analysed_epoch_ids()
+    epoch_ids = analyzed_epoch_ids()
     decode_dir = processed_data_dir()
     for kind, (suffix, naming, needed) in decodes.items():
         missing = []
@@ -388,7 +388,7 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
         if missing:
             problems.append(
                 f"{len(missing)} {kind} decode files of the {len(epoch_ids)} "
-                f"analysed epochs are not in {decode_dir}: "
+                f"analyzed epochs are not in {decode_dir}: "
                 + ", ".join(missing[:5])
                 + (", ..." if len(missing) > 5 else "")
             )

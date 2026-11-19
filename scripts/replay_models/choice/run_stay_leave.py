@@ -47,7 +47,7 @@ from typing import Any
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     require_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
@@ -222,7 +222,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             len(ev),
             len(ea),
         )
-        # Restrict the population BEFORE summarising: a stop that is not in the
+        # Restrict the population BEFORE summarizing: a stop that is not in the
         # cohort must not reach a fit, and an event inside it must not reach a
         # stop that is.
         st, cohort_report = select_stop_cohort(st, cohort=args.stop_cohort)

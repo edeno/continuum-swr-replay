@@ -1,4 +1,4 @@
-"""Each sequence cohort labelled under each SWR definition.
+"""Each sequence cohort labeled under each SWR definition.
 
 A sequence event is ``SWR`` under a definition when an event of that SWR
 inventory overlaps it with positive duration and ``non-SWR`` when nothing
@@ -281,7 +281,7 @@ def swr_label_matrix(
     matrix = pd.DataFrame(rows)
     if (matrix.n_swr + matrix.n_non_swr != matrix.n_eligible).any():
         raise RuntimeError(
-            "Every eligible event must be labelled SWR or non-SWR; the labels were "
+            "Every eligible event must be labeled SWR or non-SWR; the labels were "
             "not made under this coverage."
         )
     matrix["n_excluded"] = matrix.n_events - matrix.n_eligible
@@ -305,12 +305,12 @@ def paired_labels(
     cohorts = list(cohorts)
     both = pairs[pairs.detector_a.isin(cohorts) & pairs.detector_b.isin(cohorts)]
     # a cohort with no events has no labels and no pairs; one in a pair must
-    # have been labelled, or the merge below would drop its pairs unseen
+    # have been labeled, or the merge below would drop its pairs unseen
     paired_cohorts = set(both.detector_a) | set(both.detector_b)
-    unlabelled = sorted(paired_cohorts - set(labels.cohort.unique()))
-    if unlabelled:
+    unlabeled = sorted(paired_cohorts - set(labels.cohort.unique()))
+    if unlabeled:
         raise ValueError(
-            f"{unlabelled} have pairs but no labels; label every cohort before pairing."
+            f"{unlabeled} have pairs but no labels; label every cohort before pairing."
         )
     label = labels[["event_key", "swr_definition", "label"]]
     paired = both.merge(

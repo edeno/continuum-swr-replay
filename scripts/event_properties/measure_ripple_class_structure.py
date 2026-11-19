@@ -17,7 +17,7 @@ Two tests over the immobile non-local events of the canonical event table
    mean power (label ``is_swr``, rows in the common support), and as a sharp
    discontinuity design on the detector's criterion (label ``criterion >= 2``,
    rows within ``--window`` z of the threshold). Calibrated on simulated data:
-   a planted step or none, and one continuum labelled by the Kay rule on a
+   a planted step or none, and one continuum labeled by the Kay rule on a
    simulated ripple trace.
 
 Stage ``measure`` reads each epoch's decode frame through the SWR source (its
@@ -63,8 +63,8 @@ from continuum_swr_replay.analysis.detector_comparison.features import (  # noqa
 from continuum_swr_replay.analysis.detector_comparison.schema import (  # noqa: E402
     native_event_keys,
 )
-from continuum_swr_replay.analysis.event_definition import analysed_time  # noqa: E402
-from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition import analyzed_time  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
 from continuum_swr_replay.analysis.event_definition.swr_source import (  # noqa: E402
     swr_epoch_id_of_session,
 )
@@ -110,7 +110,7 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
     """One epoch's events: peak, mean and criterion of the ripple power, and
     whether their rows hold an SWR label of the frame."""
     identifier, expected_sha256, events = job
-    dot = analysed_time.read_verified_dot_with_swr_source(
+    dot = analyzed_time.read_verified_dot_with_swr_source(
         inventory_run.decode_path(identifier), expected_sha256
     )
     first, n_rows = _grid_rows(dot.index.to_numpy(dtype=np.float64), events)
@@ -486,7 +486,7 @@ def plot_property(events: pd.DataFrame, word: str, window: float, path: Path) ->
                 ax.set_ylabel(cc.STEP_PROPERTIES[word][0], fontsize=8)
     axes[0, 0].legend(fontsize=7, frameon=False)
     fig.suptitle(
-        f"{cc.STEP_PROPERTIES[word][0]} by ripple power and label; grey: rows compared; "
+        f"{cc.STEP_PROPERTIES[word][0]} by ripple power and label; gray: rows compared; "
         "dashed: Kay threshold",
         fontsize=9,
     )
@@ -570,7 +570,7 @@ def plot_spot_checks(spots: pd.DataFrame, path: Path) -> None:
                 ax.axis("off")
                 continue
             event = rows.iloc[0]
-            dot = analysed_time.read_dot_with_swr_source(
+            dot = analyzed_time.read_dot_with_swr_source(
                 inventory_run.decode_path(event.epoch_id)
             )
             window = dot.loc[event.event_start_s - 0.15 : event.event_end_s + 0.15]

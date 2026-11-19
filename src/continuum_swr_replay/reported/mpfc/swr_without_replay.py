@@ -92,7 +92,7 @@ def swr_without_replay_values(
         "count",
         "count",
         "kept SWRs left out of the class because they overlap a window the "
-        "analysed-time rule dropped",
+        "analyzed-time rule dropped",
     )
     add(
         "swr_no_replay_events_session_median",

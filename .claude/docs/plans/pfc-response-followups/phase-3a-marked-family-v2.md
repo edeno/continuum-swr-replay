@@ -18,7 +18,7 @@ Why: questions 3, 5 and 8 are graded properties of events (what is replayed, how
 
 ## Tasks
 
-- **Baseline terms** — v2 phase 1a in full. Extension: `build_baseline_columns(..., context_columns: Sequence[str] = ())` adds one unpenalised per-stop column for each stop-level context mark a model targets (`trips_to_patch_switch` as its stop value, z-scored over fitted bins, with an `_unknown` indicator where undefined). Contract key `baseline_context_columns`.
+- **Baseline terms** — v2 phase 1a in full. Extension: `build_baseline_columns(..., context_columns: Sequence[str] = ())` adds one unpenalized per-stop column for each stop-level context mark a model targets (`trips_to_patch_switch` as its stop value, z-scored over fitted bins, with an `_unknown` indicator where undefined). Contract key `baseline_context_columns`.
 - **New mark `trips_to_patch_switch`** in `build_recommended_event_mark_table`: per session, order stops by `stop_idx`; for stop `s`, the number of completed trips from `s` until the first later trip whose destination patch differs from its origin (0 when the next trip leaves the patch), capped at 3; NaN after the session's last switch. Derive from the stop table's `current_patch`/`next_patch` (verify on one session against the trials table that `next_patch` is the destination of the trip that starts at this stop). Plus `next_trip_switches_patch = (trips_to_patch_switch == 0)`. Add both to `MARK_DESCRIPTIONS`. Question 8's definition is the lead's (overview Open Questions 7); this is the default.
 - **Three models** in a new mapping `FOLLOWUP_MODEL_SPECS` (the v1 `RECOMMENDED_MODEL_SPECS` stays; nothing is deleted):
 
@@ -48,7 +48,7 @@ Why: questions 3, 5 and 8 are graded properties of events (what is replayed, how
 | --- | --- |
 | v2 phase 1a's ten tests | as listed there |
 | `test_trips_to_patch_switch_counts_forward` | a synthetic stop sequence with patches 1,1,1,2,2,3: values 2,1,0,1,0,NaN; cap at 3 |
-| `test_context_baseline_column_is_constant_within_stop` | the `trips_to_patch_switch` baseline column is constant on each stop's fitted bins and unpenalised |
+| `test_context_baseline_column_is_constant_within_stop` | the `trips_to_patch_switch` baseline column is constant on each stop's fitted bins and unpenalized |
 | `test_followup_specs_use_known_marks` | every target/adjustment is in `MARK_DESCRIPTIONS`; widths per class recorded |
 | v2 phase 2's marginal tests | on the follow-up specs |
 | `test_stop_level_permutation_moves_whole_stops` | after permutation every stop's events share one value and the multiset of stop values is unchanged |

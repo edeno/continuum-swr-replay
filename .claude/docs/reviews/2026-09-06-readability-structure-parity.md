@@ -195,7 +195,7 @@ New modules and their sizes: `design_constants.py` 127, `bouts.py` 152, `event_i
 `scripts/behavior/build_qvals_table.py` 73.
 
 Two of these did not reach their nominal targets and the trimming was stopped rather than
-pushed into a behaviour change:
+pushed into a behavior change:
 
 - **`_helpers.py` at 405 (target < 400).** The split alone left it at 364; the shared
   `stay_indicator` / `stay_indicator_from_patches` pair (39 lines with docstrings) and their

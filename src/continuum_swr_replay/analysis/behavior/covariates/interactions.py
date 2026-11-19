@@ -23,7 +23,7 @@ one is reviewed and taken out of that set.
 
 A factor is a design column. Its source covariate (:func:`factor_source`) is
 the column with the fit-time ``_z`` standardization removed, then mapped through
-:data:`TRANSFORM_SOURCES` when it is a fit-time transform of a catalogued
+:data:`TRANSFORM_SOURCES` when it is a fit-time transform of a cataloged
 covariate.
 """
 
@@ -40,7 +40,7 @@ LOG_EVENT_LENGTH = "log_n_nonlocal_bins"
 #: Within-stop time on a log1p scale, z-scored at fit time as the duration control.
 LOG1P_STOP_TIME = "log1p_time_since_stop_start_s"
 
-#: Fit-time transform column -> the catalogued covariate it is computed from.
+#: Fit-time transform column -> the cataloged covariate it is computed from.
 TRANSFORM_SOURCES: dict[str, str] = {
     LOG_EVENT_LENGTH: "n_nonlocal_bins",
     LOG1P_STOP_TIME: "time_since_stop_start_s",
@@ -255,7 +255,7 @@ UNFITTED_PRODUCTS = frozenset(
 
 
 def factor_source(factor: str) -> str:
-    """The catalogued covariate a product factor is measured from.
+    """The cataloged covariate a product factor is measured from.
 
     Parameters
     ----------

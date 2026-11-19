@@ -69,7 +69,7 @@ class DecodeRunner:
     figurl: Callable[..., None] | None
     """Draws the interactive view when ``create_figurl`` is set (NonLocal only)."""
     start_banner: str
-    """The text centred in the log's ``START`` line."""
+    """The text centered in the log's ``START`` line."""
     decoding_label: str
     """Begins the ``<label> <brain_area>...`` log line before the fit."""
     model_line: str | None = None

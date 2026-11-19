@@ -13,19 +13,19 @@ No spec; review findings in the plan are the requirements — rulings provisiona
 | T2 × T3 | fit_uncertainty_rate.py, fit_cross_history_rate.py | T2 edits excluded-interval plumbing, T3 moves specs; independent |
 | T5 × T6 | event_immobility.intervals_from_labels | T5 makes the strict-overlap rule consume intervals_from_labels; T6 changes it to index-only. T5's new callers (data_aggregation on all-session frames may carry `time` as a column) must be audited by T6 |
 | T5 × T7 | figure_panels.py ~415-424, analyze_event_spike_evidence, analyze_content_occupancy, quality_metrics, data_aggregation, contfrag/tables, tables_event | adjacent code (overlap mask follows the speed filter); sequential, T7 rebases on T5 |
-| T6 × T7 | swr_source.with_swr_source | both add read-point normalisation/validation; T7 builds on T6 |
+| T6 × T7 | swr_source.with_swr_source | both add read-point normalization/validation; T7 builds on T6 |
 | T6 × T8 | run_memoryless_detection.py, analyze_event_spike_evidence.py | different regions |
 | T7 × T9 | generate_event_gallery.py, data_aggregation.py | different regions (speed filter vs decode path/glob) |
 | T8 × T9 | prepare_data.py, run_memoryless_detection.py, generate_event_gallery.py, run_inventory_comparison.py | T8 parses ids, T9 builds paths from them; T9 consumes T8's parser if useful |
-| T1 self | — | rollback behaviour change vs "success-path bytes identical": consistent |
+| T1 self | — | rollback behavior change vs "success-path bytes identical": consistent |
 | T2 self | — | default-derive vs explicit no-mask sentinel: consistent |
 | T3 self | — | consistent |
-| T4 self | — | "preserve behaviour incl. log-likelihood drift": consistent |
+| T4 self | — | "preserve behavior incl. log-likelihood drift": consistent |
 | T5 self | — | stop-and-report if A ≠ B: consistent |
 | T6 self | — | consistent |
 | T7 self | — | keep deliberate non-default thresholds: consistent |
 | T8 self | — | consistent |
-| T9 self | — | identical paths + gallery behaviour change: consistent |
+| T9 self | — | identical paths + gallery behavior change: consistent |
 
 Ruling: execute tasks 1→9 sequentially in place on the branch, no worktree — lead's standing SDD preference — cost if wrong: none (all local commits).
 Ruling: T5 runs before T6, and T6 must audit every intervals_from_labels caller including those T5 adds — order follows the plan; T6 is the time-axis owner — cost if wrong: a caller passing a `time` column breaks loudly in T6's tests.
@@ -80,7 +80,7 @@ Task 5: complete (commits 051b056..0cfe2c4, review clean)
 Task 6: dispatched (BASE 0cfe2c4, implementer abe9bffb0af298dbf), carrying Task 5's two ⚠️ items
 Task 6: implementer DONE (d8778a6); 484 decode pickles audited (time index, no column); golden {} 7 tables atol=0
 Task 6: ⚠️ test output not saved — resolved: covered by end-of-branch full suite. ⚠️ classifier callers outside the source read (generate_figure02.py:246, generate_event_gallery.py:246, exploratory) rely on upstream ordering — accepted per brief's "one place".
-Task 6: minor (deferred): _frame_epoch accepts a RangeIndex (reset_index'd frame) — could assert index.name == "time" / float dtype (brief said "normalise to, or assert, a time index")
+Task 6: minor (deferred): _frame_epoch accepts a RangeIndex (reset_index'd frame) — could assert index.name == "time" / float dtype (brief said "normalize to, or assert, a time index")
 Task 6: minor (deferred): ruff reflow left trailing comments after closing parens in test_classified_event_table.py (~diff l.862-877)
 Task 6: complete (commits 0cfe2c4..d8778a6, review clean)
 Task 7: dispatched (BASE d8778a6, implementer a20950504fddde2d6); facts-first, stop if any re-filter is not a no-op on production data
@@ -105,11 +105,11 @@ Task 8: complete (commits e9cd5af..736e18b, review clean)
 Task 9: dispatched (BASE 736e18b, implementer a39e0727b78c7b147)
 Task 9: implementer DONE_WITH_CONCERNS (755fcc0, 58ea08f): paths byte-identical 242 epochs × variants × thresholds; golden {} ×7; gallery glob 242 = register 242 in Processed-Data (backup/staging glob had +11/13 SUSTAINED_NOISE); decode_paths placed in decoding_common → dask.distributed now imported by pfc events/result_loading/data_aggregation (~3.9 s); review dispatched
 Task 9: review ✅ spec / needs fixes: Important — decode_paths in decoding_common drags dask.distributed+dask_cuda into 5 library readers and adds a fragile hippocampus→decoding_common→swr_source edge; fix = leaf module decode_files.py (task-9-review.md)
-Task 9: fix round 1 dispatched (resume a39e0727b78c7b147): move to decode_files.py + lazy-import test; gallery logs missing analysed decodes; drop duplicate _decode_paths wrappers if trivial
+Task 9: fix round 1 dispatched (resume a39e0727b78c7b147): move to decode_files.py + lazy-import test; gallery logs missing analyzed decodes; drop duplicate _decode_paths wrappers if trivial
 Task 9: minor (deferred): contfrag/data_aggregation builds `_contfrag` name part by hand
 Task 9: minor (deferred, pre-existing, flag for lead): run_quality_metrics --threshold 29/57/58 looks for _29_/_57_/_58_ but 0.29/0.57/0.58 decodes write _28_/_56_/_57_ (int truncation); memoryless names _contfrag_80_ for a ContFrag variant
 Task 9: minor (deferred, pre-existing): generate_event_gallery render_epoch reads dot from data_dir but results from PROCESSED_DATA_DIR
-Task 9: fix round 1 DONE (44996e7): decode_files.py leaf module, lazy-import test (6 modules), gallery warns on missing analysed decodes, wrappers deleted; paths 242 byte-identical; scoped re-review dispatched (ac5dc56fa8e9370b0, sonnet — scoped re-review of a small fix diff)
+Task 9: fix round 1 DONE (44996e7): decode_files.py leaf module, lazy-import test (6 modules), gallery warns on missing analyzed decodes, wrappers deleted; paths 242 byte-identical; scoped re-review dispatched (ac5dc56fa8e9370b0, sonnet — scoped re-review of a small fix diff)
 Ruling: scoped re-review of Task 9's fix round on sonnet, not opus — skill tiers scoped re-reviews of small fix diffs cheap-to-mid; findings are mechanical (module move, warning) — cost if wrong: a missed regression in the move, still caught by the opus final whole-branch review.
 Task 9: re-review — all 3 findings fixed (task-9-rereview.md)
 Task 9: ⚠️ gallery counts / golden / path dump not re-run by first reviewer — resolved: fix round re-ran path parity (paths_fix1_cmp.txt, 242 byte-identical); golden {} ×7 from implementer's run at 755fcc0; fix round changed only prepare_data's import line.
@@ -117,14 +117,14 @@ Task 9: minor (deferred): analyze_content_occupancy / analyze_event_spike_eviden
 Task 9: complete (commits 736e18b..44996e7, review clean after 1 fix round)
 Final review: dispatched (merge base 345c134..44996e7, opus, a6311dfa4b45e57c4); full suite running at 44996e7 (scratchpad/fullsuite)
 Final review: With fixes — 0 Critical, 2 Important (I1 builders' speed_threshold no longer gates SWR/MUA; I2 read accepts RangeIndex / intervals_from_labels ignores a time column), 15 minors for the wave, 16 leave (final-review.md)
-Ruling: I1 fix = table builders raise ValueError on a non-default speed_threshold; the two kept knob filters (canonical_events, memoryless) raise only on a threshold looser than 4 cm/s (stricter stays honoured — diagnose --immobility-threshold is a real sensitivity knob) — no production caller passes a non-default value — cost if wrong: a future stricter-threshold sensitivity run on the builders must re-add the label filter.
+Ruling: I1 fix = table builders raise ValueError on a non-default speed_threshold; the two kept knob filters (canonical_events, memoryless) raise only on a threshold looser than 4 cm/s (stricter stays honored — diagnose --immobility-threshold is a real sensitivity knob) — no production caller passes a non-default value — cost if wrong: a future stricter-threshold sensitivity run on the builders must re-add the label filter.
 Ruling: I2 fix = one shared time-axis check (float, strictly increasing index, no `time` column, not a RangeIndex) used by _frame_epoch and intervals_from_labels — T6 audit found 0/484 frames with a time column — cost if wrong: hand-built frames with integer indices must be given a float time index.
 Ruling: wave item 14 (gallery one root) = both frame and results read from data_dir (default PROCESSED_DATA_DIR) — a frame and posterior from two decodes is never intended — cost if wrong: none for the default path.
 Ruling: hold the fix wave until the in-flight full suite at 44996e7 finishes, so its results aren't contaminated by edits and any failure can join the wave — cost: ~15 min wall clock.
 Full suite at 44996e7: 7 failed (exactly the 7 untracked-WIP failures: test_replay_story_figures ×5, test_session_keys ×2), 5073 passed, 2 skipped, 78 warnings, 30:41 (scratchpad/fullsuite/pytest_44996e7_full.txt)
 Final fix wave: dispatched (BASE 44996e7, fresh opus implementer a226d8986b5e8f10b)
 Final fix wave: DONE (049506a..7e54217, 6 commits); golden {} ×7; scoped re-review + full suite next
-Final fix wave: scoped re-review dispatched (opus abdd4962e72ce6835 — 120 KB behavioural diff, so not the cheap tier); full suite running at 7e54217; code-organization review dispatched (opus ab1d7319d5f057e0b → .claude/docs/reviews/2026-10-19-code-organization-review.md)
+Final fix wave: scoped re-review dispatched (opus abdd4962e72ce6835 — 120 KB behavioral diff, so not the cheap tier); full suite running at 7e54217; code-organization review dispatched (opus ab1d7319d5f057e0b → .claude/docs/reviews/2026-10-19-code-organization-review.md)
 Final fix wave: re-review — all 17 fixed (final-rereview.md); guards misfire on no production path; parse_run_id accepts all 22 existing run-id folders
 Ruling: the residual minor (build_event_arm_table, tables_arm_patch.py:67, unguarded speed_threshold) is applied by the controller as a one-line guard + test after the in-flight full suite finishes — mechanical, mirrors the ContFrag event-arm guard — cost if wrong: none (a non-default value already raises upstream in build_event_table).
 Code-organization review: DONE — .claude/docs/reviews/2026-10-19-code-organization-review.md, 12 findings (top: eager replay/__init__ ~4.5 s imports, 6 package-level cycles via hippocampus, run infra split 3 ways, scripts-as-libraries 35 imports, inline output paths ×50), 9 questions for the lead; not acted on (lead decides a follow-up plan)

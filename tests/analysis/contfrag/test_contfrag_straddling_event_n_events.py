@@ -153,7 +153,7 @@ def _two_event_dot() -> pd.DataFrame:
     # Event 2: fully immobile block.
     dot.iloc[e0:e1, swr] = 2
     dot.iloc[e0:e1, spd] = 1.0
-    # Real-arm decoding on every SWR-labelled bin (arm 0's first place bin).
+    # Real-arm decoding on every SWR-labeled bin (arm 0's first place bin).
     for lo, hi in ((a0, a1), (b0, b1), (e0, e1)):
         dot.iloc[lo:hi, mp] = 0.0
         dot.iloc[lo:hi, ts] = 0.0

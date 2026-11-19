@@ -530,7 +530,7 @@ def aic_difference_statistics(
         both AICs are infinite. Negative means the child is better, so
         ``negative_fraction`` is the share of sessions in which the child has
         the lower AIC and ``n_animals_negative`` the animals whose median step
-        favours it.
+        favors it.
 
     Raises
     ------

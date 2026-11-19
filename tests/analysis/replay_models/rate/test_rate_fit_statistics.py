@@ -201,7 +201,7 @@ def test_the_reward_gate_leaves_out_a_fit_with_any_separated_reward_term():
 
 
 def test_the_kernel_statistics_report_the_kernel_not_the_first_coefficient():
-    # A large first coefficient cancelled by the second: exp(c0) is 20x, but
+    # A large first coefficient canceled by the second: exp(c0) is 20x, but
     # the kernel at lag 1 is below 1.
     c0 = np.log(20.0)
     c1 = -c0 * 0.5 / 0.066  # about -22.7: makes 0.32*c0 + 0.066*c1 < 0

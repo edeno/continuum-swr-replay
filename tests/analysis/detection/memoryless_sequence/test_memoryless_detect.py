@@ -640,7 +640,7 @@ class TestDetectCandidateSequences:
         posterior[np.arange(bins.size), bins] = 1.0
         return posterior
 
-    def test_a_long_travelling_sequence_is_replay(self):
+    def test_a_long_traveling_sequence_is_replay(self):
         bins = np.arange(40)
         midpoints = window_times(40)
 

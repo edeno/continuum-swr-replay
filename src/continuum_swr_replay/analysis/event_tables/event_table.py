@@ -216,7 +216,7 @@ def _aggregate_event_features(
         # ``n_junction_bins`` is a misnomer kept for schema stability: it
         # counts bins whose ``decoded_arm`` is not a real arm, and
         # ``map_estimate_to_arm`` excludes junction bins from its
-        # nearest-neighbour lookup, returning NaN only where
+        # nearest-neighbor lookup, returning NaN only where
         # ``map_estimate`` itself is NaN. So this is an *undecoded*-bin
         # count, not a count of MAPs that landed on a junction.
         n_junction = int((~real_arm_mask).sum())
@@ -481,7 +481,7 @@ def _merge_classified_event_facts(
     complete window the aggregate pass does -- ``_in_event_mask`` validates the
     speed/probability contract without clipping. Timing is therefore *derived
     once*, here, rather than recomputed by the aggregate pass and checked for
-    agreement afterwards. Merged on ``event_id``; every model-cohort event must
+    agreement afterward. Merged on ``event_id``; every model-cohort event must
     have exactly one classified row.
     """
     classified = build_classified_nonlocal_event_table(
@@ -557,7 +557,7 @@ def build_event_table(
 
     Consumes the pre-saved ``{epoch}_HPC_{thr}_data_over_time.pkl`` frame
     (``dot``), read through the SWR source
-    (``analysed_time.read_dot_with_swr_source``) so its ``SWR_event`` is the
+    (``analyzed_time.read_dot_with_swr_source``) so its ``SWR_event`` is the
     paper's SWRs, plus the session's ``env`` / ``trials`` /
     ``port_experiences`` / ``track_graph``
     and emits the event-level slice of the canonical schema.
@@ -687,7 +687,7 @@ def build_event_table(
     at-well events, where the animal is inside its well-visit interval but a
     mean 48.4 cm from the well. Neither substitutes for the other.
 
-    ``in_transit`` labels the trip interval, **not** motion: the modelled cohort
+    ``in_transit`` labels the trip interval, **not** motion: the modeled cohort
     is speed-gated immobility throughout, and off-well events have a median
     speed of 1.35 cm/s. Those events are animals standing still partway through
     a trip. They are excluded from the content models because the well-visit

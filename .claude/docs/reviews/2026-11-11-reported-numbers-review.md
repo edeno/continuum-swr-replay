@@ -16,14 +16,14 @@ read the lab data.
 **What was already known:** on the lab data, every reported value is bit for bit
 what it was before the statistics moved. No reviewer found a value in today's
 summaries that is computed wrongly. The findings are of four kinds: a number
-that would be wrong or mislabelled on other data with no error; text that does
+that would be wrong or mislabeled on other data with no error; text that does
 not say what the code does; code that is not clean; tests that cannot fail.
 
 **Status of each finding** is at its end: `todo`, `FIXED <commit>`, `record` (an
 undecided choice for `docs/known_issues/reported_statistics_choices.md`), or
 `ask` (the data owner's decision). `HIGH` marks the ones to do first. A finding
-is as its reviewer reported it unless it says it was confirmed afterwards.
-Confirmed afterwards in the code or the summaries: L1 (fixed), M-1, E-1, T-2,
+is as its reviewer reported it unless it says it was confirmed afterward.
+Confirmed afterward in the code or the summaries: L1 (fixed), M-1, E-1, T-2,
 K-1, K-2, K-3.
 
 ## Outcome (same day)
@@ -229,7 +229,7 @@ was a transliteration: duplication and inconsistent edge rules came along. No st
   prior_binding_percent (tests silence); onset_before_onset_fraction naming; three loop idioms in
   called_response_timing (timing.py:632-659); timing_values calls called_response_timing_by_animal twice;
   generate_figure04.py:453 writes 1/(n_control_draws+1) instead of empirical_pvalue_floor; mpfc.py:2018
-  row.get("post_onset_mean", np.nan) where neighbours use row[...]. todo
+  row.get("post_onset_mean", np.nan) where neighbors use row[...]. todo
 - M-11 weak tests: BH test input gives 0.25 under BH/BY/Bonferroni (test_population_statistics.py:148; use
   p=[0.01,0.02,0.03,0.9]); odds ratio (a*b)/(c*d) survives (b==d in both tables); CI low/high swap survives
   (low==high); resampling by epoch vs day survives; n_boot not passed survives (bootstrap untested); `<0` vs `<=0`
@@ -256,7 +256,7 @@ builder functions. Not yet trustworthy on other data.
   Fix: raise when an animal lacks a class. todo
 - T-4 still_immobile_fraction and dwell (stop_statistics.py:98-113, 68-95; descriptions behavior.py:1261, 1309) use
   immobility_duration_s = span less excluded time (tables_stop.py:70-73), described as "still immobile t after
-  they began"; denominator includes zero-duration bouts. Fix: say "analysed immobility (excluded time removed)" or
+  they began"; denominator includes zero-duration bouts. Fix: say "analyzed immobility (excluded time removed)" or
   compute from stop_end - stop_start. record/ask (size not measured)
 - T-5 outcome_boundary_statistics (stop_statistics.py:116-177): "shifted" count built without at_risk_events while
   shipped fits pass them (scripts/rate/fit_per_bin_rate_models.py:223-235) -> an upper bound; rule re-derived
@@ -264,7 +264,7 @@ builder functions. Not yet trustworthy on other data.
   description; better: aggregate_to_timebins reports shifted stops. record/todo
 - T-6 lag_index (history_kernel_statistics.py:53-66): lag_index(5) or (0) -> -1 (reads last lag silently);
   lag_index(40) -> 2. Fix: raise unless positive whole multiple of the bin. pooled_gee_role_summary
-  (learning.py:740-761): a stratum with no converged role raises ZeroDivisionError from statsmodels (neighbours
+  (learning.py:740-761): a stratum with no converged role raises ZeroDivisionError from statsmodels (neighbors
   guard). smallest_adjusted_p with nothing finite: "min() arg is an empty sequence". todo
 - T-7 "measurable" means two things: module docstring (history_kernel_statistics.py:10-14) = support>=3 and SE<=0.5;
   cross_history_statistics (:326-333) applies support only; builder docstring (behavior.py:2454-2459) says cross
@@ -364,7 +364,7 @@ Verdict: main path followable; cannot yet be trusted to enforce its two headline
   recorded input under the repository like a build file (tracked, equal to HEAD); --code-only skips only inputs
   outside the repo. (summarize.py:59-71, code_record.py:120-147) todo HIGH
 - K-2 assume-unchanged / skip-worktree files pass as committed (code_record.py:197-202: git ls-files + git diff
-  honour index flags). Fix: compare content: git ls-tree -r HEAD blob ids vs git hash-object of working files
+  honor index flags). Fix: compare content: git ls-tree -r HEAD blob ids vs git hash-object of working files
   (with -z; also fixes non-ASCII names). todo HIGH
 - K-3 a script or module OUTSIDE the checkout is dropped from the record silently (code_record.py:146-147), and an
   EMPTY record is written (summarize.py:78-84): test_summarize_writes_no_canonical_summary_from_uncommitted_code

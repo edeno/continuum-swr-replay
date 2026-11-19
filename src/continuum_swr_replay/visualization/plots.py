@@ -191,7 +191,7 @@ def plot_theta_power_zscore(
     ax.set_ylabel("Theta\nStd")
 
     if plot_thresholds:
-        ax.axhline(2, color="grey", linestyle="--", linewidth=1, zorder=10)
+        ax.axhline(2, color="gray", linestyle="--", linewidth=1, zorder=10)
 
 
 def plot_theta_phase(data: dict[str, Any], time_slice: slice, ax: Axes) -> None:
@@ -346,7 +346,7 @@ def plot_multiunit_firing(
     if plot_multiunit_zscore:
         ax.set_ylabel("MUA\n[Std].")
         if plot_thresholds:
-            ax.axhline(2, color="grey", linestyle="--", linewidth=1, zorder=10)
+            ax.axhline(2, color="gray", linestyle="--", linewidth=1, zorder=10)
     else:
         ax.set_ylabel("MUA\n[spikes/s]")
 
@@ -384,7 +384,7 @@ def plot_multiunit_firing(
     ax.set_yticks((min_multiunit, max_multiunit))
 
     if plot_thresholds:
-        ax.axhline(2, color="grey", linestyle="--", linewidth=1, zorder=10)
+        ax.axhline(2, color="gray", linestyle="--", linewidth=1, zorder=10)
 
 
 def plot_ripple_consensus_trace_zscore(
@@ -435,7 +435,7 @@ def plot_ripple_consensus_trace_zscore(
     ax.set_ylabel("SWR\n[Std]")
 
     if plot_thresholds:
-        ax.axhline(2, color="grey", linestyle="--", linewidth=1, zorder=10)
+        ax.axhline(2, color="gray", linestyle="--", linewidth=1, zorder=10)
 
 
 def plot_spike_times(
@@ -594,7 +594,7 @@ def plot_acausal_probabilities(
     if plot_thresholds:
         ax.axhline(
             DEFAULT_NON_LOCAL_THRESHOLD,
-            color="grey",
+            color="gray",
             linestyle="--",
             linewidth=1,
             zorder=10,
@@ -614,7 +614,7 @@ def plot_conditional_non_local_posterior(
     The posterior is the package's
     (:func:`~continuum_swr_replay.analysis.decode_quality.posterior_analysis.get_conditional_non_local_posterior`)
     over the window: a time bin with no non-local mass takes the nearest
-    earlier bin's. Bins off the track interior are drawn grey.
+    earlier bin's. Bins off the track interior are drawn gray.
 
     Parameters
     ----------
@@ -633,7 +633,7 @@ def plot_conditional_non_local_posterior(
 
     """
     cmap = copy.copy(plt.get_cmap("bone_r"))
-    cmap.set_bad(color="lightgrey", alpha=1.0)
+    cmap.set_bad(color="lightgray", alpha=1.0)
 
     window = results.sel(time=time_slice)
     t, x = np.meshgrid(window.time.values, env.place_bin_centers_)
@@ -744,7 +744,7 @@ def plot_track_graph_2d(
     ax: Axes,
     *,
     edge_order: list | None = None,
-    occupancy_color: str = "lightgrey",
+    occupancy_color: str = "lightgray",
     mark_wells: bool = True,
     reward_well_size: int = 22,
     occupancy_linewidth: float = 0.3,
@@ -771,7 +771,7 @@ def plot_track_graph_2d(
         Linearization edge order (``data["linear_edge_order"]``). Edge
         colors are assigned by position in this list to match the 1D
         strip. Defaults to ``list(track_graph.edges)``.
-    occupancy_color : str, default "lightgrey"
+    occupancy_color : str, default "lightgray"
         Color of the faint 2D occupancy trajectory.
     mark_wells : bool, default True
         If True, mark degree-1 (well) nodes with filled circles in their
@@ -847,7 +847,7 @@ def plot_speed(data: dict[str, Any], time_slice: slice, ax: Axes) -> None:
         )
     max_speed = np.ceil(speed.max()).astype(int)
     max_speed = max(5, max_speed)
-    ax.fill_between(position_info.index, speed, color="lightgrey")
+    ax.fill_between(position_info.index, speed, color="lightgray")
     ax.set_ylabel("Speed\n[cm/s]")
     ax.set_yticks((0.0, max_speed))
     ax.set_ylim((0.0, max_speed))

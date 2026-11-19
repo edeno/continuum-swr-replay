@@ -52,7 +52,7 @@ def event_catalog(dot: pd.DataFrame, epoch_id: str, epoch_name: str) -> pd.DataF
     ----------
     dot : pd.DataFrame
         The epoch's decode frame read through the SWR source
-        (``analysed_time.read_dot_with_swr_source``). A ``Non-Local_prob``
+        (``analyzed_time.read_dot_with_swr_source``). A ``Non-Local_prob``
         column (Continuous plus Fragmented) is added to it.
     epoch_id : str
         ``{animal}{day}_{epoch}``, written on each row.

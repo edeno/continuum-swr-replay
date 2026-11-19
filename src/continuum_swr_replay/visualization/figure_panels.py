@@ -27,8 +27,8 @@ from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     session_state_fractions,
     state_fraction_statistics,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
-    immobile_analysed_bins,
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    immobile_analyzed_bins,
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_event_bins_by_swr,
@@ -225,21 +225,21 @@ def plot_triggered_averages(
                 name = "Theta"
             ax.set_ylabel(f"{name}\nZ-score")
             ax.axhline(
-                2.0, color="lightgrey", linestyle="--", alpha=0.5, linewidth=0.75
+                2.0, color="lightgray", linestyle="--", alpha=0.5, linewidth=0.75
             )
         elif signal_type == "Non-Local_prob":
             ax.set_ylabel("Non-Local\nProb.")
             ax.axhline(
                 DEFAULT_NON_LOCAL_THRESHOLD,
-                color="lightgrey",
+                color="lightgray",
                 linestyle="--",
                 alpha=0.5,
                 linewidth=0.75,
             )
             ax.set_ylim(0.0, 1.0)
 
-        ax.axvline(0.0, color="lightgrey", linestyle="--", alpha=0.5, linewidth=0.75)
-        ax.axhline(0.0, color="lightgrey", linestyle="--", alpha=0.5, linewidth=0.75)
+        ax.axvline(0.0, color="lightgray", linestyle="--", alpha=0.5, linewidth=0.75)
+        ax.axhline(0.0, color="lightgray", linestyle="--", alpha=0.5, linewidth=0.75)
 
         if i == 0:
             ax.legend(loc="upper right")
@@ -281,8 +281,8 @@ def plot_swr_zscore_by_state(
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
     # Immobile bins outside excluded time. The mask bins have no SWR z-score,
-    # but the bins in its 0.3-s reach do, and they are not analysed either.
-    is_immobile = immobile_analysed_bins(data_over_time)
+    # but the bins in its 0.3-s reach do, and they are not analyzed either.
+    is_immobile = immobile_analyzed_bins(data_over_time)
 
     local_mask = is_immobile & (
         data_over_time["Local_prob"] > DEFAULT_NON_LOCAL_THRESHOLD
@@ -322,7 +322,7 @@ def plot_swr_zscore_by_state(
 
 
 #: The two classes of immobile non-local events, as the event table's ``is_swr``,
-#: with the colour and legend label each per-event panel gives them.
+#: with the color and legend label each per-event panel gives them.
 _EVENT_CLASSES = (
     (False, "non_swr", COLORS["Non-Local"], "non-SWR"),
     (True, "swr", COLORS["SWR"], "SWR"),
@@ -391,7 +391,7 @@ def plot_event_ripple_by_swr(
     )
     ax.axvline(
         references["rest"],
-        color="grey",
+        color="gray",
         linestyle=":",
         linewidth=1.0,
         label="quiet rest",
@@ -539,7 +539,7 @@ def plot_event_speed_by_swr(
             linewidth=1.0,
             gid=word,
         )
-    ax_difference.axhline(0.0, color="grey", linewidth=0.75)
+    ax_difference.axhline(0.0, color="gray", linewidth=0.75)
     ax_difference.set_xticks([0, 1])
     ax_difference.set_xticklabels(
         ["all", "duration-\nmatched"], rotation=45, ha="right", rotation_mode="anchor"

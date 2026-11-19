@@ -14,7 +14,7 @@ spike versions and MAP_S's distance from the animal.
 
 Reads every epoch the run's ``manifest.json`` marks ``ok``. Writes, beside the run:
 
-- ``nl_bouts_by_swr.parquet``: the labelled windows;
+- ``nl_bouts_by_swr.parquet``: the labeled windows;
 - ``nl_bouts_by_swr_stats.csv``: the statistics (the events summary reads it, question 2c.3);
 - ``nl_bouts_by_swr.provenance.json``: the commit, the SWR source and the epochs.
 
@@ -32,7 +32,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import swr_source_name
@@ -59,7 +59,7 @@ METRICS = (
 
 
 def label_epoch(run_dir: Path, epoch_id: str, decode_dir: Path) -> pd.DataFrame:
-    """One epoch's Non-Local windows labelled by SWR."""
+    """One epoch's Non-Local windows labeled by SWR."""
     windows = read_table(run_dir / "per_epoch" / f"{epoch_id}_windows.parquet")
     frame = read_dot_with_swr_source(decode_paths(epoch_id, decode_dir).data_over_time)
     try:

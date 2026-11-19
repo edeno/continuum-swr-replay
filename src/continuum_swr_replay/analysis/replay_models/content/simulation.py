@@ -459,7 +459,7 @@ def simulate_dirichlet_multinomial_counts(
 
     The overdispersed counterpart of :func:`simulate_with_event_covariates`: the
     mean allocation over arms is the same softmax, but each event draws its *own*
-    allocation from a Dirichlet centred on it, so the within-event timebins are
+    allocation from a Dirichlet centered on it, so the within-event timebins are
     correlated. ``phi_e = exp(log_phi_intercept + log_phi_is_swr · is_swr_e)``
     controls how tightly: large ``phi`` reproduces the multinomial simulator,
     small ``phi`` makes each event's bins near-copies of one another.
@@ -749,8 +749,8 @@ def simulate_posterior_bumps(
     designed to expose), and (3) snap the MAP to the nearest real bin via
     ``map_estimate_to_arm``. At sigma=0 every MAP lands cleanly inside its
     chosen arm. As sigma grows, samples can land in junction-bin regions
-    (where they snap to whichever neighbouring arm has the closer real
-    bin) or directly inside a neighbouring arm.
+    (where they snap to whichever neighboring arm has the closer real
+    bin) or directly inside a neighboring arm.
 
     Parameters
     ----------

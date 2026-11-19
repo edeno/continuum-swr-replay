@@ -11,7 +11,7 @@ scientific output**.
 
 ## Global Constraints
 
-1. **Behaviour-preserving.** Every canonical table (`event_table`,
+1. **Behavior-preserving.** Every canonical table (`event_table`,
    `event_arm_table`, `event_sequence_table`, `event_onset_table`,
    `event_patch_table`, `stop_table`, timebin tables, contfrag tables,
    `qvals_table`), every fitted-model output and every figure's data must be
@@ -205,7 +205,7 @@ ingestion function with a plain rename and the one real check. Verify
 
 ## Phase C — compute once
 
-### Task 9: Analysed-time drops computed once
+### Task 9: Analyzed-time drops computed once
 - `analysis/events/eligibility.py:203-275` `event_drop_reasons` applies the
   speed rule with a per-event loop (`filter_event_intervals_by_speed`,
   `immobility.py:376`) and again with cumsum counts, raising if they disagree.
@@ -233,7 +233,7 @@ check on ≥2 epochs:
   `intervals.get_spikecount_per_time_bin` (`intervals.py:573`); call it.
 - `data_loaders/utils.py:408-450,494`: `get_training_timepoints` turns
   `get_labels` output back into a boolean with `> 0`; use
-  `intervals.interval_mask`. Check NaN-bound behaviour (interval_mask refuses
+  `intervals.interval_mask`. Check NaN-bound behavior (interval_mask refuses
   NaN bounds): confirm on real ripple tables that none have NaN bounds, else
   report.
 - `analysis/hippocampus/swr_detectors.py:836` `_mask_intervals` turns a bool
@@ -246,7 +246,7 @@ check on ≥2 epochs:
 
 ### Task 11: Per-stop GLM without the intercept relabel
 `analysis/replay/per_stop_rate_model.py:138-207`: array design named
-"intercept", relabelled "Intercept" mid-fit, so outputs carry `coef_intercept`
+"intercept", relabeled "Intercept" mid-fit, so outputs carry `coef_intercept`
 next to `sd_Intercept`; BIC hand-computed at :195 though statsmodels'
 `result.bic_llf` exists. Use one intercept name throughout and statsmodels' BIC.
 If any reader of saved Family-A bundles (grep `coef_intercept`, `sd_Intercept`)
@@ -393,7 +393,7 @@ Restore a lazy-export `__init__` for `analysis.hippocampus` only, so
 JAX/non_local_detector/statsmodels/dask for leaves that do not need them.
 Start from the layer Task 13 removed (`git show 7b5fec82`), but keep what
 Task 13 got right: no fallback that hides an ImportError, and the guard
-tests (`test_lazy_imports`, `test_import_layering`) pin the new behaviour.
+tests (`test_lazy_imports`, `test_import_layering`) pin the new behavior.
 Measure a leaf import's time before and after.
 
 ### Task 23: Provenance records the arguments main received

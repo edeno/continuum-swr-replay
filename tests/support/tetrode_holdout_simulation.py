@@ -225,7 +225,7 @@ def detected_events(
     detector: NonLocalClusterlessDetector, recording: Recording, threshold: float = 0.8
 ) -> pd.DataFrame:
     """The detector's non-local events at rest: runs of at least 7 bins whose
-    non-local probability is above ``threshold``, each labelled by the inserted
+    non-local probability is above ``threshold``, each labeled by the inserted
     event it overlaps (``"none"`` for a detection over plain rest)."""
     results = detector.predict(
         spike_times=recording.spike_times,

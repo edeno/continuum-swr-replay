@@ -374,7 +374,7 @@ class TestUnreachableBins:
         assert center[0] == 1
         assert spread[0] == pytest.approx(2.0)
 
-    def test_a_missing_center_leaves_its_neighbour_without_a_jump(self):
+    def test_a_missing_center_leaves_its_neighbor_without_a_jump(self):
         """Otherwise the preceding window measures a jump to bin 0."""
         posterior = np.zeros((2, 6))
         posterior[0, 1] = 1.0

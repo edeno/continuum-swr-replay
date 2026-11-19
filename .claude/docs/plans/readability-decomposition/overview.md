@@ -64,7 +64,7 @@ Do not start the next phase until both reviewers are addressed. This catches dec
 
 ## Rollout Strategy
 
-Replace-in-place, no flags. Backwards compatibility preserved by re-export shims (`history/__init__.py`, and `tables.py` / `covariates/__init__.py` already do this) and by leaving every persisted column name and published path unchanged. Each phase is an independent PR that leaves the suite green; the phase-5 byte-diff is the consolidating gate.
+Replace-in-place, no flags. Backward compatibility preserved by re-export shims (`history/__init__.py`, and `tables.py` / `covariates/__init__.py` already do this) and by leaving every persisted column name and published path unchanged. Each phase is an independent PR that leaves the suite green; the phase-5 byte-diff is the consolidating gate.
 
 ## Open Questions
 

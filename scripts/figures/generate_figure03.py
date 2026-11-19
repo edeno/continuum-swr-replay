@@ -57,7 +57,7 @@ from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
 from matplotlib.gridspec import GridSpec
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_swr_table,
 )
 from continuum_swr_replay.analysis.event_properties.content_along_arms import (
@@ -74,7 +74,7 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     class_medians,
 )
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
     processed_data_dir,
@@ -160,7 +160,7 @@ def read_inputs() -> dict:
     """The events with their gamma, their content's time bins, and the other inputs."""
     inputs = default_inputs()
     events = read_swr_table(inputs.event_table)
-    n_epochs = len(analysed_epoch_ids())
+    n_epochs = len(analyzed_epoch_ids())
     events, reference, _ = with_brain_state(events, inputs, n_epochs)
     along, _ = content_along_arms_bins(
         events,
@@ -198,7 +198,7 @@ def animal_signal_values(
     ``event_statistics.animal_signal_levels``: the event values the summary's
     animal counts compare, and the levels they are compared with. Each class's
     levels come from the animal's epochs with an event of that class; every
-    analysed epoch holds both kinds, so the two classes' levels must be equal.
+    analyzed epoch holds both kinds, so the two classes' levels must be equal.
     """
     levels = animal_signal_levels(events, reference, signal, column)
     non_swr, swr = levels.loc[False], levels.loc[True]

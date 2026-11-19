@@ -4,7 +4,7 @@
 Two steps (the model and its estimators are described in
 ``analysis/pfc/stop_context.py``):
 
-``assemble`` builds, per epoch of the PFC cohort (the analysed epochs less the
+``assemble`` builds, per epoch of the PFC cohort (the analyzed epochs less the
 ones ``pfc_cohort_mPFC.json`` leaves out; each must have a canonical mPFC
 bundle), the event-level table (unit x replay event: post-onset count, the
 stop's event-free baseline, the stop's reward outcome and next-trip patch
@@ -102,7 +102,7 @@ def bundle_path(nwb_file_name: str, epoch_name: str) -> Path:
 
 
 def pfc_left_out() -> set[tuple[str, str]]:
-    """The analysed epochs the PFC cohort record leaves out, as (file, epoch)."""
+    """The analyzed epochs the PFC cohort record leaves out, as (file, epoch)."""
     record = json.loads(
         (processed_data_dir() / pfc_cohort_name(BRAIN_AREA)).read_text()
     )
@@ -117,11 +117,11 @@ def selected_sessions(args: Namespace) -> list[tuple[str, str]]:
     FileNotFoundError
         If a cohort epoch has no canonical mPFC bundle.
     """
-    from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+    from continuum_swr_replay.data_loaders.epoch_register import analyzed_epochs
     from continuum_swr_replay.runs.cli import filter_epoch_info
 
     epochs = filter_epoch_info(
-        analysed_epochs(), animal=args.animal, date=args.date, epoch=args.epoch
+        analyzed_epochs(), animal=args.animal, date=args.date, epoch=args.epoch
     )
     left_out = pfc_left_out()
     keys = [(index[0], index[1]) for index in epochs.index]
@@ -318,7 +318,7 @@ def fit(args: Namespace) -> None:
     stops = table.drop_duplicates(["nwb_file_name", "epoch", "stop_idx"])
     known = stops[["rewarded", "next_trip_switches_patch"]].dropna()
     print(
-        "stops with an analysed event: "
+        "stops with an analyzed event: "
         f"{len(stops)}; context correlation (rewarded, next switch) over "
         f"{len(known)} known: {known.corr().iloc[0, 1]:.3f}",
         flush=True,

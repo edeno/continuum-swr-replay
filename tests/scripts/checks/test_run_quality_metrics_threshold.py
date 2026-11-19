@@ -56,7 +56,7 @@ def test_load_all_sessions_reads_at_the_filename_threshold(monkeypatch, tmp_path
         return pd.DataFrame({"animal": ["a"], "day": [1], "epoch": ["02_r1"]})
 
     monkeypatch.setattr(
-        quality_script, "analysed_decode_files", lambda _dir, _suffix: [path]
+        quality_script, "analyzed_decode_files", lambda _dir, _suffix: [path]
     )
     monkeypatch.setattr(quality_script, "read_dot_with_swr_source", _read)
 

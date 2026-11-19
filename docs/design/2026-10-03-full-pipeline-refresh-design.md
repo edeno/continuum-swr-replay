@@ -10,7 +10,7 @@ changed, and where the backups are, is in
 The spec was approved on 2026-10-03 and revised after an independent review (dask-cuda, ContFrag
 staging, R9, backups, Kay version check, filter edges). It was not rewritten after the build. Its
 planning numbers stand as written, among them "218 epochs". The cohort is now the epoch
-register's 242 analysed epochs, with 13 more left out as `SUSTAINED_NOISE`.
+register's 242 analyzed epochs, with 13 more left out as `SUSTAINED_NOISE`.
 
 Out of scope, as the spec says: Phase 3 of the comparison, Phase 2's deferred pilot checks,
 Spyglass integration, and requoting the hand-maintained result docs (they wait for the project
@@ -60,7 +60,7 @@ Dates written `YYYYMMDD` in paths below are the day that stage runs.
 - **Phase 3 of the comparison.** Its adapters and report are the next step; this work
   produces their inputs.
 - **Phase 2's deferred pilot checks** (null validation and the two sensitivity runs). They
-  rerun on the new decodes afterwards.
+  rerun on the new decodes afterward.
 - **Spyglass integration** of the new detectors (Phase 7).
 - **Requoting hand-maintained result docs.** The before/after report lists every claim that
   needs a new number; requoting follows the project lead's review of that report.
@@ -153,7 +153,7 @@ is re-measured on a smoke run before its stage is launched.
   `ripple_detection @ git+https://github.com/Eden-Kramer-Lab/ripple_detection.git@68e1784b183f161a568d3154325cf770730bfb83`
   with `uv add --no-sync`, then run `uv sync --inexact`. The CUDA plugin
   (`jax-cuda12-plugin[with-cuda]==0.8.0`) was installed by hand and is not in `uv.lock`
-  (`docs/README.md`, "Where results live"), so an exact sync would remove it. Afterwards,
+  (`docs/README.md`, "Where results live"), so an exact sync would remove it. Afterward,
   confirm that `jax.devices()` lists the GPUs, and that `uv.lock` still holds
   `non_local_detector` `2d730c3` and Spyglass `18b2bff`.
 - **dask-cuda.** `dask_cuda` is not installed (the review found `find_spec` returns None),
@@ -271,7 +271,7 @@ speed trace and time span.
     electrode table, as Spyglass does.
   - Each channel then has its reference subtracted, in the stored dtype, as Spyglass does
     (`lfp_band.py:420-436`). Any integer overflow is counted, and the data become float64
-    afterwards.
+    afterward.
   - These referenced channels are Zugaro's candidates, from which it picks one.
 - **Input check.** Spyglass's own FIR filter (`FirFilterParameters`, `ripple_150_250` at
   1000 Hz: 535 taps, band edges 140/150/250/260 Hz) is applied through

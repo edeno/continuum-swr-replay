@@ -196,7 +196,7 @@ def test_content_runner_cohort_step_refuses_a_table_without_the_column():
 
     The content cohort calls its cohort step unconditionally, so a frame missing
     ``occupancy_state`` raises there. The canonical-schema gate upstream refuses
-    such a table first; this is the second line of defence, and the reason the
+    such a table first; this is the second line of defense, and the reason the
     selection carries no ``column in frame`` guard.
     """
     frame = pd.DataFrame({"event_id": ["e0"], "candidate_arm": [0]})

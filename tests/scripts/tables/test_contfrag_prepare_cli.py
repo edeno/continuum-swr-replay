@@ -29,7 +29,7 @@ SCRIPT = "scripts.tables.prepare_contfrag_replay_content_data"
 def contfrag_prepare(monkeypatch):
     """The script, imported offline with ``spyglass`` stubbed.
 
-    If the import is the first, the module is forgotten afterwards, so a later
+    If the import is the first, the module is forgotten afterward, so a later
     import does not get one bound to the stub.
     """
     common = types.ModuleType("spyglass.common")

@@ -100,7 +100,7 @@ tested and described.
      (wilbur z 2.9, j16 1.7).
 
 8. **Limitations to state more prominently (R):**
-   - The held-out tetrode windows are labelled by the all-tetrode decode.
+   - The held-out tetrode windows are labeled by the all-tetrode decode.
    - `rate_baseline_ratio` 0.98, p 0.30, is read as "similar" with no equivalence test.
    - "SWR-coupled" is defined by overlap with an SWR, so reward gating may be SWR gating
      (the `swr` lag-1 kernel is 1.38).

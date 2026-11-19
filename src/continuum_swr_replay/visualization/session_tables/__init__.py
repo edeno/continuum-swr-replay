@@ -684,7 +684,7 @@ def plot_session_tables(
     swr_intervals : pd.DataFrame, optional
         The session's SWR intervals (``start_time``, ``end_time``) that the
         ``swr_lfp`` panel shades: the SWR source's, such as
-        ``analysed_time.swr_intervals`` on the session's source-read
+        ``analyzed_time.swr_intervals`` on the session's source-read
         ``data_over_time``, so the shading shows the SWRs the tables were
         built from. Required when ``swr_lfp`` is among `panels`; a
         ``data['ripple_times']`` (Spyglass's stored ripples) is never drawn.
@@ -703,7 +703,7 @@ def plot_session_tables(
         if swr_intervals is None:
             raise ValueError(
                 "the swr_lfp panel shades the SWR source's intervals: pass "
-                "swr_intervals= (analysed_time.swr_intervals on the session's "
+                "swr_intervals= (analyzed_time.swr_intervals on the session's "
                 "source-read data_over_time)"
             )
         data = {**data, "ripple_times": swr_intervals}

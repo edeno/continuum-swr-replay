@@ -42,7 +42,7 @@ in `paper/figures/content_estimators/content_estimators_caption.md` (written by
 the runner too, and not kept in the repository).
 `coef_agreement.png` plots each rung's key coefficient, session by session, with
 the retired count model on the x axis and the fraction / DM estimate on the y
-axis (identity dashed, colour = animal). `log_phi_by_session.png` plots the DM
+axis (identity dashed, color = animal). `log_phi_by_session.png` plots the DM
 concentration intercept and its `is_swr` shift per session for `C2_base`, with
 the animal-balanced median and its 95 % nested-bootstrap interval as a band.
 
@@ -123,7 +123,7 @@ cannot be differenced against a nine-arm one).
 |---|---|---|---|
 | `CS5_armvalue` vs `C2_base_swr_leaf` (both leaf-only) | <!--v:behavior.est_armvalue_rung_delta_aic_count-->−64<!--/v--> | <!--v:behavior.est_armvalue_rung_delta_aic_fraction-->+2.4<!--/v--> | <!--v:behavior.est_armvalue_rung_delta_aic_dm-->+2.1<!--/v--> |
 
-A large negative count-scale ΔAIC is the timebin-pseudoreplication artefact: on
+A large negative count-scale ΔAIC is the timebin-pseudoreplication artifact: on
 a per-bin likelihood a session contributes thousands of "observations", so a
 parameter's likelihood cost is swamped. Only the two event-scale columns can be
 read. Fits whose parent and child dropped different events have a NaN ΔAIC
@@ -194,7 +194,7 @@ Read it on the log scale, and read φ as the Dirichlet **concentration**: it
 concentrates the event's own probability vector around the model's mean
 allocation, so **large φ is *less* overdispersion** (φ → ∞ is exactly the count
 multinomial, with the bins independent) and **small φ means the event's mass
-clumps onto whichever few arms that event happened to favour, with its bins
+clumps onto whichever few arms that event happened to favor, with its bins
 near-copies of one another**. An SWR event's φ is therefore
 <!--v:behavior.dm_breadth_ratio-->5.6<!--/v-->× that of a non-SWR event: its bins
 sit far closer to independent draws from its arm distribution, and its mass is

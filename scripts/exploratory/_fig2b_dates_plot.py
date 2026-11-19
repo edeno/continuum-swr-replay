@@ -36,7 +36,7 @@ for j, animal in enumerate(animals):
         if i == 2:
             ax.set_xlabel("day index")
 fig.suptitle(
-    "Non-local activity & SWR rate over dates, per animal (grey=session, red=day-mean)",
+    "Non-local activity & SWR rate over dates, per animal (gray=session, red=day-mean)",
     y=1.0,
 )
 fig.tight_layout()

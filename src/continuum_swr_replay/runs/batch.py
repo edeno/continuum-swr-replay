@@ -167,7 +167,7 @@ def raise_open_file_limit(target: int = 65536) -> tuple[int, int]:
     """Raise this process's soft limit on open files to `target`, at most the hard limit.
 
     A tmux session hands its processes a soft limit of 1024 open files, which a
-    batch's long-lived workers can exhaust. Processes started afterwards,
+    batch's long-lived workers can exhaust. Processes started afterward,
     including dask's worker processes, inherit the raised limit, so call this
     before any cluster starts. A soft limit already at or above the new value is
     left as it is: this never lowers it.
@@ -231,10 +231,10 @@ def run_batch(
 
     Notes
     -----
-    The epochs are the epoch register's analysed ones, or with ``--pending-only``
+    The epochs are the epoch register's analyzed ones, or with ``--pending-only``
     its pending ones alone (``epochs_to_run``), narrowed by ``--animal``,
     ``--date`` and ``--epoch``. Pending epochs are decoded into a staging folder
-    and promoted with the register edit that makes them analysed
+    and promoted with the register edit that makes them analyzed
     (``docs/epoch_register.md``), so ``--pending-only`` refuses the canonical
     ``paths.processed_data_dir()``: a reader of that folder must never meet a pending
     epoch's decode.
@@ -271,7 +271,7 @@ def run_batch(
     if args.pending_only and save_dir == processed_data_dir().resolve():
         raise ValueError(
             "--pending-only decodes the register's pending epochs, which must "
-            "not reach the canonical folder before they are analysed: give a "
+            "not reach the canonical folder before they are analyzed: give a "
             f"staging --save_dir, not {save_dir}."
         )
 

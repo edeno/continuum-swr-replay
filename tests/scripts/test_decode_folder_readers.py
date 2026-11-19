@@ -1,12 +1,12 @@
-"""Readers of a decode folder take the register's analysed epochs, never a glob.
+"""Readers of a decode folder take the register's analyzed epochs, never a glob.
 
 A pending epoch's decode in the folder, or any other epoch the register does
-not analyse, must not reach a figure, a QA summary or an exploratory scan. Each
-reader names the analysed epochs' files through
-``epoch_register.analysed_decode_files``.
+not analyze, must not reach a figure, a QA summary or an exploratory scan. Each
+reader names the analyzed epochs' files through
+``epoch_register.analyzed_decode_files``.
 
 Offline: ``REGISTER_PATH`` points at a register written under ``tmp_path``,
-analysing ``a20200101 02_r1`` and ``b20200102 04_r2`` and holding
+analyzing ``a20200101 02_r1`` and ``b20200102 04_r2`` and holding
 ``a20200101 06_r3`` pending; the decode files are small stand-ins, and the SWR
 source is a synthetic inventory with no SWRs (the frames are read through it).
 The data root is ``tmp_path / "decodes"``: the inventory is written under it, and
@@ -35,7 +35,7 @@ from continuum_swr_replay.data_loaders import epoch_register
 from continuum_swr_replay.decoding.files import non_local_threshold_percent
 from tests.support._swr_inventory_fixtures import use_swr_source, write_swr_inventory
 
-ANALYSED = ("a20200101_02_r1_HPC", "b20200102_04_r2_HPC")
+ANALYZED = ("a20200101_02_r1_HPC", "b20200102_04_r2_HPC")
 PENDING = "a20200101_06_r3_HPC"
 
 
@@ -44,8 +44,8 @@ def register(tmp_path, monkeypatch):
     path = tmp_path / "epoch_register.csv"
     pd.DataFrame(
         [
-            ["a20200101_.nwb", "02_r1", "analysed", "", "", "False"],
-            ["b20200102_.nwb", "04_r2", "analysed", "", "", "False"],
+            ["a20200101_.nwb", "02_r1", "analyzed", "", "", "False"],
+            ["b20200102_.nwb", "04_r2", "analyzed", "", "", "False"],
             [
                 "a20200101_.nwb",
                 "06_r3",
@@ -65,7 +65,7 @@ def source(tmp_path, monkeypatch):
     """The decode frames are read through the SWR source: an empty inventory,
     under the data root ``tmp_path / "decodes"``."""
     inventory = write_swr_inventory(
-        tmp_path / "decodes", {epoch_id: [] for epoch_id in (*ANALYSED, PENDING)}
+        tmp_path / "decodes", {epoch_id: [] for epoch_id in (*ANALYZED, PENDING)}
     )
     use_swr_source(monkeypatch, inventory)
 
@@ -88,7 +88,7 @@ def _frame(epoch_id: str) -> pd.DataFrame:
     )
 
 
-def _folder(tmp_path: Path, suffix: str, epoch_ids=(*ANALYSED, PENDING)) -> Path:
+def _folder(tmp_path: Path, suffix: str, epoch_ids=(*ANALYZED, PENDING)) -> Path:
     folder = tmp_path / "decodes"
     folder.mkdir(parents=True, exist_ok=True)
     for epoch_id in epoch_ids:
@@ -96,68 +96,68 @@ def _folder(tmp_path: Path, suffix: str, epoch_ids=(*ANALYSED, PENDING)) -> Path
     return folder
 
 
-def test_the_nonlocal_loader_reads_only_the_analysed_epochs(tmp_path):
+def test_the_nonlocal_loader_reads_only_the_analyzed_epochs(tmp_path):
     folder = _folder(tmp_path, "_80_data_over_time.pkl")
 
     data = load_data_over_time(folder)
 
-    assert sorted(set(data["epoch_id"])) == list(ANALYSED)
+    assert sorted(set(data["epoch_id"])) == list(ANALYZED)
     np.testing.assert_allclose(data["Non-Local_prob"], [0.4, 0.6, 0.4, 0.6])
 
 
-def test_the_nonlocal_loader_refuses_a_missing_analysed_epoch(tmp_path):
-    folder = _folder(tmp_path, "_80_data_over_time.pkl", (ANALYSED[0], PENDING))
+def test_the_nonlocal_loader_refuses_a_missing_analyzed_epoch(tmp_path):
+    folder = _folder(tmp_path, "_80_data_over_time.pkl", (ANALYZED[0], PENDING))
 
-    with pytest.raises(FileNotFoundError, match=ANALYSED[1]):
+    with pytest.raises(FileNotFoundError, match=ANALYZED[1]):
         load_data_over_time(folder)
 
 
-def test_the_contfrag_loader_reads_only_the_analysed_epochs(tmp_path):
+def test_the_contfrag_loader_reads_only_the_analyzed_epochs(tmp_path):
     folder = _folder(tmp_path, "_contfrag_data_over_time.pkl")
 
     data = load_contfrag_data_over_time(folder)
 
-    assert sorted(set(data["epoch_id"])) == list(ANALYSED)
-    with pytest.raises(FileNotFoundError, match=ANALYSED[0]):
+    assert sorted(set(data["epoch_id"])) == list(ANALYZED)
+    with pytest.raises(FileNotFoundError, match=ANALYZED[0]):
         load_contfrag_data_over_time(
             _folder(tmp_path / "other", "_contfrag_data_over_time.pkl", (PENDING,))
         )
 
 
-def test_quality_metrics_load_only_the_analysed_epochs(tmp_path):
+def test_quality_metrics_load_only_the_analyzed_epochs(tmp_path):
     _folder(tmp_path, "_80_data_over_time.pkl")  # the data root
 
     data = quality_metrics.load_all_sessions(threshold=80)
     one_animal = quality_metrics.load_all_sessions(animal="b", threshold=80)
 
-    assert sorted(set(data["epoch_id"])) == list(ANALYSED)
-    assert sorted(set(one_animal["epoch_id"])) == [ANALYSED[1]]
+    assert sorted(set(data["epoch_id"])) == list(ANALYZED)
+    assert sorted(set(one_animal["epoch_id"])) == [ANALYZED[1]]
     with pytest.raises(ValueError, match="'c'"):
         quality_metrics.load_all_sessions(animal="c", threshold=80)
 
 
-def test_the_content_scan_finds_only_analysed_epochs(tmp_path, monkeypatch):
+def test_the_content_scan_finds_only_analyzed_epochs(tmp_path, monkeypatch):
     folder = tmp_path / "decodes"
-    for epoch_id in (*ANALYSED, PENDING):
+    for epoch_id in (*ANALYZED, PENDING):
         (folder / f"{epoch_id}_environment.pkl").touch()
         (folder / f"{epoch_id}_80_data_over_time.pkl").touch()
-    (folder / f"{ANALYSED[1]}_80_data_over_time.pkl").unlink()
+    (folder / f"{ANALYZED[1]}_80_data_over_time.pkl").unlink()
 
-    assert content_occupancy.find_sessions(None) == [ANALYSED[0]]
+    assert content_occupancy.find_sessions(None) == [ANALYZED[0]]
     assert content_occupancy.find_sessions("b") == []
 
 
-def test_the_spike_evidence_scan_finds_only_analysed_epochs(tmp_path, monkeypatch):
+def test_the_spike_evidence_scan_finds_only_analyzed_epochs(tmp_path, monkeypatch):
     folder = tmp_path / "decodes"
-    for epoch_id in (*ANALYSED, PENDING):
+    for epoch_id in (*ANALYZED, PENDING):
         for suffix in ("_detector.pkl", "_results.nc", "_80_data_over_time.pkl"):
             (folder / f"{epoch_id}{suffix}").touch()
 
-    assert spike_evidence.find_sessions(None) == list(ANALYSED)
-    assert spike_evidence.find_sessions("a") == [ANALYSED[0]]
+    assert spike_evidence.find_sessions(None) == list(ANALYZED)
+    assert spike_evidence.find_sessions("a") == [ANALYZED[0]]
 
 
-def test_the_event_gallery_catalogs_only_analysed_epochs(tmp_path):
+def test_the_event_gallery_catalogs_only_analyzed_epochs(tmp_path):
     """The gallery read every ``*_HPC_80_data_over_time.pkl`` in the folder."""
     folder = _folder(tmp_path, "_80_data_over_time.pkl")
     _frame("z20990101_02_r1_HPC").to_pickle(
@@ -167,31 +167,31 @@ def test_the_event_gallery_catalogs_only_analysed_epochs(tmp_path):
     pkls = event_gallery.list_epoch_pkls(folder)
 
     assert pkls == [
-        folder / f"{epoch_id}_80_data_over_time.pkl" for epoch_id in ANALYSED
+        folder / f"{epoch_id}_80_data_over_time.pkl" for epoch_id in ANALYZED
     ]
     assert [event_gallery.epoch_id_from_pkl(pkl) for pkl in pkls] == [
         "a20200101_02_r1",
         "b20200102_04_r2",
     ]
-    with pytest.raises(FileNotFoundError, match="No analysed epoch"):
+    with pytest.raises(FileNotFoundError, match="No analyzed epoch"):
         event_gallery.list_epoch_pkls(
             _folder(tmp_path / "other", "_80_data_over_time.pkl", (PENDING,))
         )
 
 
-def test_the_event_gallery_names_an_analysed_epoch_it_leaves_out(tmp_path, caplog):
-    folder = _folder(tmp_path, "_80_data_over_time.pkl", (ANALYSED[0], PENDING))
+def test_the_event_gallery_names_an_analyzed_epoch_it_leaves_out(tmp_path, caplog):
+    folder = _folder(tmp_path, "_80_data_over_time.pkl", (ANALYZED[0], PENDING))
 
     with caplog.at_level("WARNING"):
         pkls = event_gallery.list_epoch_pkls(folder)
 
-    assert pkls == [folder / f"{ANALYSED[0]}_80_data_over_time.pkl"]
-    assert "1 of the 2 analysed epochs" in caplog.text
-    assert ANALYSED[1] in caplog.text
+    assert pkls == [folder / f"{ANALYZED[0]}_80_data_over_time.pkl"]
+    assert "1 of the 2 analyzed epochs" in caplog.text
+    assert ANALYZED[1] in caplog.text
     assert PENDING not in caplog.text
 
 
-def test_the_event_gallery_is_quiet_when_every_analysed_epoch_is_there(
+def test_the_event_gallery_is_quiet_when_every_analyzed_epoch_is_there(
     tmp_path, caplog
 ):
     with caplog.at_level("WARNING"):
@@ -212,12 +212,12 @@ def test_a_scan_names_the_file_its_threshold_validates(script, tmp_path):
         "_results.nc",
         "_50_data_over_time.pkl",
     ):
-        (folder / f"{ANALYSED[0]}{suffix}").touch()
+        (folder / f"{ANALYZED[0]}{suffix}").touch()
 
     assert script.find_sessions(None) == []
     percent = non_local_threshold_percent(script.DEFAULT_NON_LOCAL_THRESHOLD)
-    (folder / f"{ANALYSED[0]}_{percent}_data_over_time.pkl").touch()
-    assert script.find_sessions(None) == [ANALYSED[0]]
+    (folder / f"{ANALYZED[0]}_{percent}_data_over_time.pkl").touch()
+    assert script.find_sessions(None) == [ANALYZED[0]]
 
 
 def test_the_event_gallery_renders_from_one_decode_folder(tmp_path, monkeypatch):

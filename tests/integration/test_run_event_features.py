@@ -78,7 +78,7 @@ from continuum_swr_replay.analysis.detector_comparison.selection import (
     REJECTION_COHORTS,
     REJECTION_DTYPES,
 )
-from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
+from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.parameters import (
@@ -266,7 +266,7 @@ def write_stop_table(path: Path) -> None:
             )
         )
     write_table(
-        analysed_time.stamp_swr_source(pd.concat(rows, ignore_index=True)), path
+        analyzed_time.stamp_swr_source(pd.concat(rows, ignore_index=True)), path
     )
 
 
@@ -335,7 +335,7 @@ def inputs(tmp_path_factory, module_monkeypatch):
     stop_table.parent.mkdir(parents=True)
     write_stop_table(stop_table)
 
-    monkeypatch.setattr(cli, "analysed_epoch_ids", lambda: [*EPOCHS.values()])
+    monkeypatch.setattr(cli, "analyzed_epoch_ids", lambda: [*EPOCHS.values()])
     comparison.main(
         [
             "--carey-run-id",
@@ -483,7 +483,7 @@ class TestTheWorkedEpoch:
         compared = compared_events(inputs, WORKED)
         names = ("observations", "set_aside", "inventory", "pairs", "directional")
         tables = {name: stored(inputs, WORKED, name) for name in (*names, "cells")}
-        dot = analysed_time.with_swr_source(
+        dot = analyzed_time.with_swr_source(
             pd.read_pickle(inventory_run.decode_path(WORKED))
         )
         time, speed = inventory_run.speed_trace(dot)
@@ -533,7 +533,7 @@ class TestTheWorkedEpoch:
 
     def test_each_published_event_reads_as_its_criteria_twin(self, run):
         """The same interval gets the same features; only its identity and its
-        neighbours in its own inventory differ."""
+        neighbors in its own inventory differ."""
         features = table(run, WORKED, "features")
         own = {
             *INVENTORY_DTYPES,

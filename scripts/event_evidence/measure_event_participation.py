@@ -35,8 +35,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
-    immobile_analysed_bins,
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    immobile_analyzed_bins,
     read_dot_with_swr_source,
     read_swr_table,
 )
@@ -107,7 +107,7 @@ def epoch_table(epoch_id: str, events: pd.DataFrame, data_dir: Path) -> pd.DataF
     )
     local_rest = pt.local_rest_mask(
         frame["Local_prob"].to_numpy(),
-        immobile_analysed_bins(frame),
+        immobile_analyzed_bins(frame),
         in_event,
         margin_bins=int(round(pt.MARGIN_S / bin_s)),
     )

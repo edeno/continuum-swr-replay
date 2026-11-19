@@ -12,7 +12,7 @@ Reading order — each concern is its own module:
   * value-block join — :mod:`value_block` (joins the precomputed ``qvals_table``
     artifact: candidate-arm reward probability, belief mean, belief variance);
   * diagnostics — :mod:`diagnostics` (a per-animal fitted-alpha leaky-Q learner
-    used only for offline model checking; it produces no catalogued covariate);
+    used only for offline model checking; it produces no cataloged covariate);
   * shared plumbing — :mod:`_common` (port-experience validation).
 
 Only vectorized, all-events public names are re-exported here. Private helpers

@@ -322,10 +322,10 @@ def stratified_bootstrap_ci(
 
 
 def _slope(p: NDArray, x: NDArray) -> NDArray:
-    centred = p - p.mean(-1, keepdims=True)
+    centered = p - p.mean(-1, keepdims=True)
     with np.errstate(invalid="ignore", divide="ignore"):
-        result: NDArray = (centred * (x - x.mean(-1, keepdims=True))).sum(-1) / (
-            centred**2
+        result: NDArray = (centered * (x - x.mean(-1, keepdims=True))).sum(-1) / (
+            centered**2
         ).sum(-1)
     return result
 
@@ -1364,7 +1364,7 @@ NON_LOCAL_STATES = ("Non-Local Continuous", "Non-Local Fragmented")
 
 
 def split_non_local_by_swr(windows: pd.DataFrame, swr: np.ndarray) -> pd.DataFrame:
-    """One epoch's Non-Local bouts and their matched windows, labelled by SWR.
+    """One epoch's Non-Local bouts and their matched windows, labeled by SWR.
 
     A bout is "SWR" when some bin of its full span ``[bout_s, bout_e]`` is in
     an SWR, else "no SWR"; its matched window takes the bout's label. The

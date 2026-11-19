@@ -79,11 +79,11 @@ that is where the tests belong, not padded in here.
   start is past a rewarded experience (e.g. `[1,1,0,1,1]`, `k=2`). Real value
   gap, closeable with one more fixture.
 
-### Diagnostic-only objective (not a catalogued covariate)
+### Diagnostic-only objective (not a cataloged covariate)
 
 - `diagnostics.py:77-78` — the clip bound and the Bernoulli NLL
   (`reward*log(p) + (1-reward)*log(1-p)`) of `nll`, the per-animal fitted-alpha
-  leaky-Q learner. That module produces no catalogued covariate and is used only
+  leaky-Q learner. That module produces no cataloged covariate and is used only
   for offline model checking, so a wrong value here cannot reach a fitted model.
   Worth a test, lowest priority.
 

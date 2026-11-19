@@ -36,7 +36,7 @@ from continuum_swr_replay.analysis.contfrag.tables import (
 from continuum_swr_replay.analysis.detection.nonlocal_events import (
     validate_dot_event_contract,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
 )
 from continuum_swr_replay.analysis.event_tables import (

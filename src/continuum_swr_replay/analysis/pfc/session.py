@@ -170,7 +170,7 @@ def process_neuron(
     Each nested pair carries an effect size -- ``frac_null_dev`` and
     ``frac_explained_dev``, ratios of the deviances the added regressors buy.
     No likelihood-ratio statistic, p-value or AIC is produced here: the fits
-    are penalised, so a likelihood ratio has no chi-square reference
+    are penalized, so a likelihood ratio has no chi-square reference
     distribution at any stated degrees of freedom and an AIC has no stated
     number of parameters. What the models are compared and selected by is the
     held-out deviance the runner scores them on, read against a null drawn by
@@ -206,7 +206,7 @@ def process_neuron(
         must not be counted as such.
     fitter : {"statsmodels", "jax"}, optional
         Backend for the IRLS fits. Ignored for any model whose results are
-        supplied prefitted. The default is the unpenalised control; the
+        supplied prefitted. The default is the unpenalized control; the
         canonical bundles are fit through :func:`run_session` with
         ``fitter="jax"`` under the prior ``model_penalties(designs, sigma)``.
     prefitted_immobility : Mapping[str, Any] | None, optional
@@ -227,7 +227,7 @@ def process_neuron(
     penalty_sigma : float | None, optional
         Prior standard deviation of an event-basis coefficient, on the log-rate
         scale, when this neuron's immobility models are fit here. ``None`` fits
-        them unpenalised. Ignored when ``prefitted_immobility`` is given -- the
+        them unpenalized. Ignored when ``prefitted_immobility`` is given -- the
         prior is then whatever the session was prefit with.
     prebinned_spike_count : NDArray, shape (n_time,), optional
         Counts already binned on ``time``. The session runner bins every unit
@@ -235,7 +235,7 @@ def process_neuron(
         column here; direct callers may continue to pass spike times only.
     in_excluded_time : NDArray, shape (n_time,), optional
         True at the bins in the session's excluded time (the artifact mask
-        widened by 0.3 s, ``analysed_time.excluded_intervals``). They are left out
+        widened by 0.3 s, ``analyzed_time.excluded_intervals``). They are left out
         of ``run_avg_firing_rate`` and
         ``immobility_avg_firing_rate_all_immobile``; ``fit_mask`` already
         leaves them out of the fit. None leaves no bin out.
@@ -317,9 +317,9 @@ def process_neuron(
     immobile_bins = np.asarray(is_immobile, dtype=bool)
     running_bins = ~immobile_bins
     if in_excluded_time is not None:
-        analysed = ~np.asarray(in_excluded_time, dtype=bool)
-        immobile_bins = immobile_bins & analysed
-        running_bins = running_bins & analysed
+        analyzed = ~np.asarray(in_excluded_time, dtype=bool)
+        immobile_bins = immobile_bins & analyzed
+        running_bins = running_bins & analyzed
 
     try:
         neuron_stats: dict[str, Any] = {}
@@ -746,7 +746,7 @@ def _prefit_session(
     logger : logging.Logger
     penalty_sigma : float or None
         Prior standard deviation of an event-basis coefficient, on the log-rate
-        scale, for the immobility models. ``None`` fits them unpenalised.
+        scale, for the immobility models. ``None`` fits them unpenalized.
     counts : NDArray, shape (n_time, n_units), optional
         Spike counts already binned on ``time``. Supplying the session-wide
         matrix avoids binning the same spikes again for scoring and for each
@@ -885,8 +885,8 @@ def run_session(
         for the fitter equivalence audit. Never part of the shipped bundle.
     penalty_sigma : float or None
         Prior standard deviation of an event-basis coefficient, on the log-rate
-        scale, for the batched fitter. ``None`` fits the models unpenalised.
-        The statsmodels backend has no penalised path and refuses a value.
+        scale, for the batched fitter. ``None`` fits the models unpenalized.
+        The statsmodels backend has no penalized path and refuses a value.
     scoring_out : dict, optional
         When given, filled with everything an out-of-fold score and its null
         need from this session: ``fit_mask`` (bool Series on the session's time
@@ -894,7 +894,7 @@ def run_session(
         ``designs`` (the full-length design matrices by model name),
         ``spline_basis``, ``lag_time``, ``lags``, ``event_times`` (the
         matched control included, as drawn here) and ``artifact_dropped`` (the
-        events the analysed-time rule dropped, which the null's controls avoid
+        events the analyzed-time rule dropped, which the null's controls avoid
         as the shipped one does). It is the same material the
         fits were built from, handed over rather than rebuilt: a caller that
         reassembled it from the same functions would pay a second load of the
@@ -1162,7 +1162,7 @@ class PreparedSession(NamedTuple):
     event_provenance : dict
         Paths and hashes of the canonical event inputs.
     artifact_dropped : pd.DataFrame
-        The events the analysed-time rule dropped.
+        The events the analyzed-time rule dropped.
     control_seed : int
         The matched control's seed.
     control_draw : MatchedControlDraw
@@ -1300,12 +1300,12 @@ def _check_session_arguments(
     penalty_sigma: float | None,
     non_local_threshold: float,
 ) -> None:
-    """Refuse the :func:`run_session` arguments the canonical events cannot honour.
+    """Refuse the :func:`run_session` arguments the canonical events cannot honor.
 
     Raises
     ------
     ValueError
-        If ``penalty_sigma`` is given for a backend with no penalised path, or
+        If ``penalty_sigma`` is given for a backend with no penalized path, or
         ``non_local_threshold`` differs from the one the canonical events were
         cut at.
     """
@@ -1313,7 +1313,7 @@ def _check_session_arguments(
     if penalty_sigma is not None and fitter != "jax":
         raise ValueError(
             f"penalty_sigma={penalty_sigma!r} needs fitter='jax'; the "
-            f"{fitter!r} backend fits unpenalised models only"
+            f"{fitter!r} backend fits unpenalized models only"
         )
     if non_local_threshold != DEFAULT_NON_LOCAL_THRESHOLD:
         raise ValueError(
@@ -1321,7 +1321,7 @@ def _check_session_arguments(
             f"the canonical event table is cut at "
             f"({DEFAULT_NON_LOCAL_THRESHOLD}). Non-local events are read from "
             "that table, not re-detected, so a different threshold cannot be "
-            "honoured here."
+            "honored here."
         )
 
 
@@ -1406,12 +1406,12 @@ def _session_fit_population(
     """
     # Deferred: opens Spyglass / DataJoint at import time (see the note at
     # the top of this module).
-    from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
+    from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 
-    # Excluded time (the artifact mask widened by 0.3 s) is not analysed. No
+    # Excluded time (the artifact mask widened by 0.3 s) is not analyzed. No
     # fitted bin's peri-event basis window reaches it, and no running bin's
     # theta phase is read from it.
-    excluded = analysed_time.excluded_intervals(
+    excluded = analyzed_time.excluded_intervals(
         swr_source.swr_epoch_id(nwb_file_name, epoch_name)
     )
     is_immobile, fit_mask, bin_counts = build_session_fit_mask(
@@ -1471,7 +1471,7 @@ def _session_events(
     """The session's event sets, artifact-dropped events and matched control.
 
     The matched non-event control is drawn against the event sets and the
-    events the analysed-time rule dropped. With ``event_set`` set to
+    events the analyzed-time rule dropped. With ``event_set`` set to
     ``"with_swr_without_replay"`` the SWRs that overlap no non-local event
     (:func:`swr_without_non_local`) are added as ``"SWR_no_non_local"``; they
     are a subset of ``"SWR"``, so the control is drawn exactly as without them.
@@ -1494,7 +1494,7 @@ def _session_events(
     """
     # Deferred: opens Spyglass / DataJoint at import time (see the note at
     # the top of this module).
-    from continuum_swr_replay.analysis.event_definition import analysed_time
+    from continuum_swr_replay.analysis.event_definition import analyzed_time
     from continuum_swr_replay.analysis.pfc.canonical_events import (
         canonical_event_provenance,
         load_session_canonical_events,
@@ -1535,11 +1535,11 @@ def _session_events(
         fit_mask=fit_mask,
         basis_half_window_s=float(np.abs(fit_lags).max()) / sampling_frequency,
     )
-    # The events the one analysed-time rule dropped (``analysed_time``): fitted
+    # The events the one analyzed-time rule dropped (``analyzed_time``): fitted
     # bins near one are fit with its regressor missing, which is counted, and
     # no matched control may land on one.
     artifact_dropped = artifact_dropped_events(
-        analysed_time.read_artifact_event_drops(
+        analyzed_time.read_artifact_event_drops(
             session_data_over_time_path(
                 nwb_file_name, epoch_name, non_local_threshold=non_local_threshold
             ),
@@ -1571,7 +1571,7 @@ def _session_events(
     # The matched non-event control is drawn after the cohort restriction and
     # from the fit mask, so its windows sample exactly the bins the models are
     # fit on and avoid every event, the ones the restriction or the
-    # analysed-time rule dropped included.
+    # analyzed-time rule dropped included.
     control_seed = matched_control_seed(nwb_file_name, epoch_name)
     control_draw = make_matched_control_times(
         event_times,

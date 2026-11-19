@@ -519,14 +519,14 @@ def from_memoryless_table(table: pd.DataFrame, *, cohort: str) -> pd.DataFrame:
         )
     selected = table[flag].to_numpy(dtype=bool)
     if "artifact_drop_reason" in table.columns:
-        # a candidate in excluded time is not analysed: in no cohort
+        # a candidate in excluded time is not analyzed: in no cohort
         # not in place: the flag's array can be the caller's column itself
         selected = selected & table["artifact_drop_reason"].isna().to_numpy()
     elif swr_source.ARTIFACT_INTERVALS_RUN_ID is not None:
         raise ValueError(
             "The memoryless table has no artifact_drop_reason column, but the "
             f"artifact run {swr_source.ARTIFACT_INTERVALS_RUN_ID!r} is "
-            "configured: a table made before the analysed-time rule would read "
+            "configured: a table made before the analyzed-time rule would read "
             "its candidates in excluded time as kept. Rerun the detector."
         )
     configured = swr_source.swr_source_name()

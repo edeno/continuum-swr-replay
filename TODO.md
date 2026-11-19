@@ -155,13 +155,3 @@ Work that is deferred on purpose. Each item says when it should be done.
   (`@v4`), which the action's owner can move.
   *When:* before the repository is made public, or before a workflow gets a
   secret or deploys anything.
-- [ ] **American spellings in names.** About 296 Python files use British
-  spellings in identifiers: `analysed` (the module `analysed_time.py`,
-  `analysed_epochs`, `analysed_epoch_ids` and more), `labelled`, `centre`,
-  `colour`, `grey`, `neighbour`, `behaviour`, `favour`, `initialise`. Rename them
-  on their own branch. Keep external names (matplotlib's `lightgrey`). Check the
-  names that live in written files (summary keys, parquet columns, manifest
-  fields): rebuild or migrate those, and confirm every summary and output reads
-  the same afterwards. New code already uses American spellings.
-  *When:* after the Figure 2 and Figure 3 branches merge, so the other branches
-  do not conflict.

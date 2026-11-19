@@ -2,7 +2,7 @@
 
 The guides state settings a reader needs without opening the code: the decoding
 settings in ``docs/reproduce.md``, and in ``docs/development.md`` the
-analysed-time rule's margin and speed limit, the coincident-spike filter, and
+analyzed-time rule's margin and speed limit, the coincident-spike filter, and
 the cohort's size per animal. Each test reads the number out of the guide's text
 and compares it with the constant or file it describes, so a changed setting
 fails here until the guide is updated in the same change.
@@ -74,7 +74,7 @@ def test_settings_table_matches_the_code(setting, value, dotted):
         assert documented == pytest.approx(actual), setting
 
 
-def test_analysed_time_margin_and_speed_limit():
+def test_analyzed_time_margin_and_speed_limit():
     from continuum_swr_replay.analysis.event_definition.eligibility import (
         ARTIFACT_REACH_S,
     )
@@ -102,12 +102,12 @@ def test_coincident_spike_filter():
     )
 
 
-def _analysed_by_animal() -> dict[str, tuple[set[str], int, set[str]]]:
-    """Per animal: the analysed epochs' NWB files, epoch count and recording days."""
+def _analyzed_by_animal() -> dict[str, tuple[set[str], int, set[str]]]:
+    """Per animal: the analyzed epochs' NWB files, epoch count and recording days."""
     by: dict[str, list] = defaultdict(lambda: [set(), 0, set()])
     with REGISTER.open(newline="") as f:
         for row in csv.DictReader(f):
-            if row["status"] != "analysed":
+            if row["status"] != "analyzed":
                 continue
             animal, day = re.match(
                 r"([a-z]+\d*?)(\d{8})_", row["nwb_file_name"]
@@ -130,8 +130,8 @@ def _months(days: set[str]) -> str:
 
 
 def test_cohort_totals():
-    stated = re.search(r"analyses (\d+) epochs in (\d+) NWB files", DEVELOPMENT)
-    by = _analysed_by_animal()
+    stated = re.search(r"analyzes (\d+) epochs in (\d+) NWB files", DEVELOPMENT)
+    by = _analyzed_by_animal()
     assert stated
     assert int(stated.group(1)) == sum(n for _, n, _ in by.values())
     assert int(stated.group(2)) == sum(len(files) for files, _, _ in by.values())
@@ -146,6 +146,6 @@ def test_cohort_table_per_animal():
         animal, files, epochs, dates = (c.strip() for c in line.strip("|").split("|"))
         stated[animal] = (int(files), int(epochs), dates)
     actual = {
-        a: (len(f), n, _months(d)) for a, (f, n, d) in _analysed_by_animal().items()
+        a: (len(f), n, _months(d)) for a, (f, n, d) in _analyzed_by_animal().items()
     }
     assert stated == actual

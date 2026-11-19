@@ -5,7 +5,7 @@ runner compares one: detector ``a`` observes all of it, ``b`` all but
 40-41 s, and ``c`` did not run. The animal moves over 60-65 s. ``a`` finds
 events at 10.0, 20.0, 40.5 and 62.0 s (the last one moving); ``b`` at 10.1
 and 30.0 s, and at 39.95-41.05 s, which bridges its own gap and is set aside;
-``a``'s event at 70.0 s was dropped by the analysed-time rule.
+``a``'s event at 70.0 s was dropped by the analyzed-time rule.
 """
 
 import numpy as np

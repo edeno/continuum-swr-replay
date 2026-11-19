@@ -12,7 +12,7 @@ and contracts win.
 - Lint/format: `uv run ruff check <paths>` and `uv run ruff format <paths>` on every file touched.
 - Docstrings, test names, module names, and commit messages must not mention this plan, phase
   numbers, task numbers, or `.claude/docs/plans/`.
-- Tests are value-level: assert numbers and behaviour, not column presence or "does not raise".
+- Tests are value-level: assert numbers and behavior, not column presence or "does not raise".
   No test-only methods in production code. Shared setup in fixtures.
 - Fail loud: contracts are enforced with `raise`, not silent fallbacks or warnings.
 - Canonical tables are parquet under `Processed-Data/replay_content/`; read through
@@ -312,7 +312,7 @@ Files: `docs/rate_models.md`, `docs/models_table.md`, `docs/covariate_dictionary
   feature weights; the structural indicator for the epoch prefix; the common-cohort rule; the
   per-bin cohort is every stop with positive immobility); replace every number in the "What the
   ladder actually shows" and Family-A paragraphs with values from the Task 8 comparison; remove
-  the ten-lag "boost-then-suppression" narrative in favour of the fitted kernel figure.
+  the ten-lag "boost-then-suppression" narrative in favor of the fitted kernel figure.
 - `docs/models_table.md`: confirm the Task 3 R notation; state in "Cohort-audit tables" that rate
   audits now populate `n_drop_common_cohort_other` and that the shipped ladders report zero there.
 - `docs/covariate_dictionary.md`: entries for the three features and the indicator; mark the ten
@@ -333,7 +333,7 @@ Files: `src/continuum_swr_replay/analysis/replay/_fit_diagnostics.py:31-44, 84-1
 `SEPARATION_COEF_ABS = 10`, `_SEPARATION_BSE_ABS = 1e3`, `SEPARATION_EFFECT_SE = 1.0`),
 `contrast_aggregation.py` (the `flagged` mask in `aggregate_contrast`), `per_bin_rate_model.py`
 (`fit_per_bin_rate_model`, `cross_validate_per_bin_rate_model` fold invalidation),
-`per_stop_rate_model.py`, `fitting.py` (conditional fitters; keep their behaviour but adopt the
+`per_stop_rate_model.py`, `fitting.py` (conditional fitters; keep their behavior but adopt the
 same return shape), the four rate runners, `scripts/qa/compare_fits.py`, `docs/models_table.md`
 (the "Every per-session fit carries converged / separated" paragraph), `docs/rate_models.md`.
 

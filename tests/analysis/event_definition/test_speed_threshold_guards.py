@@ -1,10 +1,10 @@
 """The speed threshold cannot split the speed cohorts.
 
-The read (``analysed_time.with_swr_source``) gates the SWR and MUA labels at the
+The read (``analyzed_time.with_swr_source``) gates the SWR and MUA labels at the
 canonical 4 cm/s, once for every consumer. A table builder that gated its own
 events at another value would classify them against SWRs and MUA events gated
 at 4 cm/s, so no builder takes a speed threshold: each uses the canonical
-constant. The two filters that re-gate the read's SWRs themselves honour a
+constant. The two filters that re-gate the read's SWRs themselves honor a
 stricter value and refuse only a looser one, which could not re-admit the SWRs
 the read dropped.
 """
@@ -95,7 +95,7 @@ class TestCanonicalSwrIntervals:
         ):
             canonical_swr_intervals(_swr_frame(), speed_threshold=5.0)
 
-    def test_a_stricter_threshold_is_honoured(self):
+    def test_a_stricter_threshold_is_honored(self):
         frame = _swr_frame()
 
         stricter = canonical_swr_intervals(frame, speed_threshold=2.0)

@@ -39,7 +39,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     require_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
@@ -126,7 +126,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         default="at_well",
         choices=list(STOP_COHORTS),
         help=(
-            "Population analysed (default, and only value: at_well). The "
+            "Population analyzed (default, and only value: at_well). The "
             "event-grain half of the cohort the hippocampal rate and content "
             "ladders are read on; an in-transit event has no current arm to "
             "measure alignment from."
@@ -136,7 +136,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--max-sessions",
         type=int,
         default=None,
-        help="Analyse only the first N sessions (smoke runs; writes a partial table).",
+        help="Analyze only the first N sessions (smoke runs; writes a partial table).",
     )
     argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
@@ -224,12 +224,12 @@ def main(argv: Sequence[str] | None = None) -> None:
             "n_events_after_cohort": n_after_location,
             # Events left after the cohort AND the subset filter, over every
             # session in the table -- not restricted to the sessions a partial
-            # run analysed, which `n_sessions_analysed` names.
+            # run analyzed, which `n_sessions_analyzed` names.
             "n_events_in_subset": int(len(event_table)),
             "subset": label,
             "n_shuffles": args.n_shuffles,
             "seed": args.seed,
-            "n_sessions_analysed": n_sessions,
+            "n_sessions_analyzed": n_sessions,
             "is_partial_run": args.max_sessions is not None,
         },
     )

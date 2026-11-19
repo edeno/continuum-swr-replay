@@ -174,14 +174,14 @@ def window_evidence(
             "cannot be scored"
         )
     animal_concat = animal_bins[concat_bins]
-    centre = animal_bins[s + lens // 2]
-    near_animal = distance[centre] < partner_min_cm
+    center = animal_bins[s + lens // 2]
+    near_animal = distance[center] < partner_min_cm
     window_sum = sp.csr_matrix(
         (np.ones(rows.size), (win_of_row, rows)), shape=(n_win, n_rows)
     )
     remote_partner, local_partner = null_partners(
         windows["pool"].to_numpy(),
-        centre,
+        center,
         distance,
         n_partners=n_partners,
         min_cm=partner_min_cm,
@@ -264,7 +264,7 @@ def window_evidence(
                 partner_map = choice[np.maximum(remote_partner[:, j], 0)][win_of_row]
                 null_m += flat[base + partner_map]
                 null_g += sco_ground[partner_map]
-                partner_animal = centre[np.maximum(local_partner[:, j], 0)][win_of_row]
+                partner_animal = center[np.maximum(local_partner[:, j], 0)][win_of_row]
                 loc_m += flat[base + partner_animal]
                 loc_g += sco_ground[partner_animal]
             null_m, null_g = null_m / n_partners, null_g / n_partners
@@ -280,7 +280,7 @@ def window_evidence(
                 "nlr_anim_full": window_total(
                     (at_remote - remote_g) - (at_animal - animal_g)
                 ),
-                "mapSr_dist_cm": distance[remote_choice, centre],
+                "mapSr_dist_cm": distance[remote_choice, center],
                 "nl_null_mark": np.where(
                     has_remote, window_total(at_map - null_m), np.nan
                 ),
@@ -305,7 +305,7 @@ def window_evidence(
                 "ns_silent_frac": (n_sco == 0).astype(float),
                 "ns_pred_silent": np.exp(-expected),
                 "sel_count": n_sel,
-                "mapS_dist_cm": distance[choice, centre],
+                "mapS_dist_cm": distance[choice, center],
                 "cond_S_silent": s_silent,
                 "cond_both_silent": s_silent * (n_sco == 0),
                 "cond_pred_C_silent": s_silent * np.exp(-expected),
@@ -332,6 +332,6 @@ def window_evidence(
     per_tetrode = np.add.reduceat(counts[:, rows], starts, axis=1)  # (n_tet, n_win)
     out["n_spikes"] = per_tetrode.sum(0).astype(np.int64)
     out["n_tetrodes"] = (per_tetrode > 0).sum(0)
-    out["animal_center_bin"] = centre
+    out["animal_center_bin"] = center
     out["has_loc_partner"] = has_local
     return pd.DataFrame(out, index=windows.index)

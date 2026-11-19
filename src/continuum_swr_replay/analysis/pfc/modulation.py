@@ -302,7 +302,7 @@ def is_separated(params: NDArray, threshold: float = SEPARATED_LOG_RATE) -> NDAr
     Parameters
     ----------
     params : NDArray, shape (n_units, n_basis) or (n_basis,)
-        Basis coefficients of an **unpenalised** fit.
+        Basis coefficients of an **unpenalized** fit.
     threshold : float
         Absolute log-rate a coefficient has to pass to count as separated.
 
@@ -316,19 +316,19 @@ def is_separated(params: NDArray, threshold: float = SEPARATED_LOG_RATE) -> NDAr
 
 
 def prior_binds(
-    penalised_peak: NDArray, mle_peak: NDArray, mle_peak_se: NDArray
+    penalized_peak: NDArray, mle_peak: NDArray, mle_peak_se: NDArray
 ) -> NDArray:
     """Where the prior moved the curve by more than the data could resolve.
 
     "The prior binds" is a statement about the modulation, not about a
-    coefficient: the peak of the penalised kernel differs from the peak of the
+    coefficient: the peak of the penalized kernel differs from the peak of the
     maximum-likelihood one by more than the latter's own estimation error. A
     unit with no maximum-likelihood fit (see :func:`is_separated`) has nothing
     to difference and is not counted here -- report it separately.
 
     Parameters
     ----------
-    penalised_peak, mle_peak : NDArray, shape (n_units,)
+    penalized_peak, mle_peak : NDArray, shape (n_units,)
         Peak log-rate modulations, from :func:`peak_log_modulation`.
     mle_peak_se : NDArray, shape (n_units,)
         Standard error of ``mle_peak``, from :func:`peak_modulation_se`.
@@ -338,7 +338,7 @@ def prior_binds(
     NDArray of bool, shape (n_units,)
         False wherever any of the three is not finite.
     """
-    difference = np.abs(np.asarray(penalised_peak) - np.asarray(mle_peak))
+    difference = np.abs(np.asarray(penalized_peak) - np.asarray(mle_peak))
     finite = np.isfinite(difference) & np.isfinite(mle_peak_se)
     return finite & (difference > np.asarray(mle_peak_se))
 
@@ -351,7 +351,7 @@ def prior_binds(
 #:
 #: For the replay-split model that order is ``[constant, non_local_no_SWR,
 #: non_local_SWR]`` -- the reverse of the order the model's name lists the
-#: classes in. Reading it by the name is the swap that mislabelled both of that
+#: classes in. Reading it by the name is the swap that mislabeled both of that
 #: model's curves in every bundle written before 2026-09-15.
 #:
 #: Read through :func:`curve_coefficients`.

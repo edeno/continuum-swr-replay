@@ -1,7 +1,7 @@
 """The PFC analyses' cohorts: the epochs with sorted units, and the shared stops.
 
 :func:`split_sorted_epochs` is the PFC epoch cohort: the epoch register's
-analysed epochs whose session has curated cortical spike sorting.
+analyzed epochs whose session has curated cortical spike sorting.
 
 The hippocampal rate and content families are read on one population -- the
 stops the animal spends at a well (``analysis/event_definition/cohort_selection.py``,
@@ -35,14 +35,14 @@ __all__ = ["load_session_stop_cohort", "split_sorted_epochs"]
 
 
 def split_sorted_epochs(
-    analysed: pd.DataFrame, sorted_nwb_file_names: Iterable[str]
+    analyzed: pd.DataFrame, sorted_nwb_file_names: Iterable[str]
 ) -> tuple[pd.DataFrame, pd.Index]:
-    """The PFC epoch cohort: the analysed epochs whose session has sorted units.
+    """The PFC epoch cohort: the analyzed epochs whose session has sorted units.
 
     Parameters
     ----------
-    analysed : pandas.DataFrame
-        The epoch register's analysed epochs, indexed by
+    analyzed : pandas.DataFrame
+        The epoch register's analyzed epochs, indexed by
         ``(nwb_file_name, interval_list_name)``.
     sorted_nwb_file_names : iterable of str
         The NWB files with curated cortical spike sorting
@@ -51,15 +51,15 @@ def split_sorted_epochs(
     Returns
     -------
     cohort : pandas.DataFrame
-        The rows of ``analysed`` whose ``nwb_file_name`` has sorting, in order.
+        The rows of ``analyzed`` whose ``nwb_file_name`` has sorting, in order.
     left_out : pandas.Index
-        The index entries of the other rows, in ``analysed``'s order.
+        The index entries of the other rows, in ``analyzed``'s order.
     """
-    has_sorting = analysed.index.get_level_values("nwb_file_name").isin(
+    has_sorting = analyzed.index.get_level_values("nwb_file_name").isin(
         list(sorted_nwb_file_names)
     )
-    cohort = analysed[has_sorting]
-    return cohort, analysed.index.difference(cohort.index, sort=False)
+    cohort = analyzed[has_sorting]
+    return cohort, analyzed.index.difference(cohort.index, sort=False)
 
 
 def load_session_stop_cohort(

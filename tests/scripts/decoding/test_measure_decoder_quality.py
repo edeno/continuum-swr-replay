@@ -42,7 +42,7 @@ def test_an_epoch_s_rows_carry_its_id_and_its_decode_s_hash(tmp_path, monkeypatc
     raw = pickle.dumps(_frame())
     path.write_bytes(raw)
     # the SWR source is tested elsewhere; the frame already has its column
-    monkeypatch.setattr(script.analysed_time, "with_swr_source", lambda dot: dot)
+    monkeypatch.setattr(script.analyzed_time, "with_swr_source", lambda dot: dot)
 
     sessions, calibration = script.measure_epoch(path)
 

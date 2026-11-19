@@ -42,7 +42,7 @@ history is measured from the previous event's end as well as its onset:
 
   It shows up only when sessions are pooled.
 
-**Main caveat.** Unmodelled rate variation between stops (and within sessions) inflates any history
+**Main caveat.** Unmodeled rate variation between stops (and within sessions) inflates any history
 term, especially when sessions are pooled. Two things argue against heterogeneity as the whole story:
 
 - the kernels are timed: they peak and then return to about 1 by 100–150 ms;
@@ -91,16 +91,16 @@ So:
   sparse the session).
 - **Kernels:** fit pooled within animal, with session fixed effects (`fit_pooled_kernels.py`).
 - **Measurable lag:** pooled support ≥ 3 expected onsets and Wald SE ≤ 0.5 (log scale). Unmeasurable
-  lags are not summarised or drawn.
+  lags are not summarized or drawn.
 
 ## Session-level AIC contrasts (`session_contrasts.json`, at-well)
 
 How to read the table:
 
-- ΔAIC = AIC(simpler) − AIC(richer), so positive favours the richer rung.
+- ΔAIC = AIC(simpler) − AIC(richer), so positive favors the richer rung.
 - Each cell shows: session median / % of sessions positive / animals whose median is positive (of 5)
   / animals significant by summed likelihood ratio (of 5).
-- "offset vs onset" is AIC(onset only) − AIC(offset only), so positive favours the end anchor; it is
+- "offset vs onset" is AIC(onset only) − AIC(offset only), so positive favors the end anchor; it is
   non-nested and has no likelihood-ratio test.
 
 | population | self, both anchors | self, offset vs onset | offset adds to onset | onset adds to offset | cross, both | cross, offset vs onset |

@@ -188,11 +188,11 @@ reviewer):
   j16 tetrode-epochs. With each other animal held out it drops one weakly rippling tetrode-epoch
   in senor (group 0) and one in wilbur (group 2); C1c measured the wilbur drop's cost at
   1 reference-set SWR.
-- Rule P's analogue (1/1.5 of the rippling floor, 0.61) keeps 9 of 174 culprit tetrode-epochs,
+- Rule P's analog (1/1.5 of the rippling floor, 0.61) keeps 9 of 174 culprit tetrode-epochs,
   whose epochs return to 9–50 % featureless events. A relative form (0.25 × the epoch's median
   coupling) drops 172 of 174 and no rippling one; it is not better enough to replace the stated
   rule.
-- The asymmetry favours dropping: one weak tetrode of 13–22 costs about one reference-set SWR,
+- The asymmetry favors dropping: one weak tetrode of 13–22 costs about one reference-set SWR,
   while one kept culprit restores up to half of an epoch's events as featureless.
 - **Precedent** (read from source in C2): PREP and EEGLAB `clean_channels` drop a channel whose
   correlation with the others is low; IBL / SpikeInterface `detect_bad_channels` drops a channel

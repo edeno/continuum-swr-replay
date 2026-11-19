@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
+from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 from continuum_swr_replay.analysis.event_definition.immobility import (
     filter_event_labels_by_speed,
     intervals_from_labels,
@@ -54,7 +54,7 @@ def event_table_path(tmp_path):
         }
     )
     path = tmp_path / "event_table.parquet"
-    write_table(analysed_time.stamp_swr_source(frame), path)
+    write_table(analyzed_time.stamp_swr_source(frame), path)
     return path
 
 
@@ -167,7 +167,7 @@ class TestLoadSessionCanonicalEvents:
             }
         )
         path = tmp_path / "event_table.parquet"
-        write_table(analysed_time.stamp_swr_source(frame), path)
+        write_table(analyzed_time.stamp_swr_source(frame), path)
 
         with pytest.raises(ValueError, match="event_start_s"):
             load_session_canonical_events(
@@ -211,7 +211,7 @@ class TestLoadSessionSwrIntervals:
 
         expected = intervals_from_labels(
             filter_event_labels_by_speed(
-                analysed_time.with_swr_source(dot), ["SWR_event"], speed_threshold=4.0
+                analyzed_time.with_swr_source(dot), ["SWR_event"], speed_threshold=4.0
             ),
             "SWR_event",
         )

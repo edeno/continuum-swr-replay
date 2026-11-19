@@ -65,7 +65,7 @@ class CovariateDefinition:
     on stops that do have a row: the switch-minus-stay value and the
     belief-update magnitudes, which ``qvals_table`` masks next to a gap in the
     behavioral model's trials. The peri-switch fields would also be NaN in an
-    epoch with no patch switch; no analysed epoch lacks one (checked 2026-10-24).
+    epoch with no patch switch; no analyzed epoch lacks one (checked 2026-10-24).
     The current-outcome flags are not qvals-sourced: the event and stop tables
     carry them on stops with no qvals row too.
     """
@@ -982,7 +982,7 @@ _DEFINITIONS.append(
         "bout: the well occupied at the start of an at-well stop, and for an "
         "in-transit bout the well the animal has already left. Two "
         "incarnations share the name and the clock: on the per-bin rate design "
-        "it is the bin centre minus that arrival, zero at the moment of "
+        "it is the bin center minus that arrival, zero at the moment of "
         "arrival and non-negative for every bin of an at-well stop (the bout "
         "can only begin once the animal has arrived); on the event table it is "
         "the event's first timebin minus the same arrival.",

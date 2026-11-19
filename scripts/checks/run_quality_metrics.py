@@ -34,10 +34,10 @@ from continuum_swr_replay.analysis.decode_quality.quality_metrics import (
     compute_non_local_event_context,
     compute_session_quality_summary,
 )
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
+from continuum_swr_replay.data_loaders.epoch_register import analyzed_decode_files
 from continuum_swr_replay.decoding.files import (
     DEFAULT_NON_LOCAL_THRESHOLD_PERCENT,
     data_over_time_suffix,
@@ -104,17 +104,17 @@ def load_all_sessions(
     animal: str | None = None,
     threshold: int = DEFAULT_NON_LOCAL_THRESHOLD_PERCENT,
 ) -> pd.DataFrame:
-    """Load and concatenate the analysed epochs' data_over_time pickle files.
+    """Load and concatenate the analyzed epochs' data_over_time pickle files.
 
-    The epoch register's analysed epochs (``analysed_decode_files``), never a
+    The epoch register's analyzed epochs (``analyzed_decode_files``), never a
     glob, so a pending epoch's decode in the folder is not read.
     """
     suffix = data_over_time_suffix(threshold)
-    paths = analysed_decode_files(processed_data_dir(), suffix)
+    paths = analyzed_decode_files(processed_data_dir(), suffix)
 
     if not paths:
         raise FileNotFoundError(
-            f"No analysed epoch's *{suffix} found in {processed_data_dir()}"
+            f"No analyzed epoch's *{suffix} found in {processed_data_dir()}"
         )
 
     if animal is not None:

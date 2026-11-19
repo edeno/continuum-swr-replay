@@ -6,7 +6,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     excluded_intervals_of,
 )
 from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
@@ -76,7 +76,7 @@ def build_stop_table(
 
     ``immobility_duration_s`` is the stop's exposure: ``stop_end -
     stop_start`` less the epoch's excluded time inside the stop
-    (``analysed_time.excluded_intervals``, the artifact mask widened by 0.3 s;
+    (``analyzed_time.excluded_intervals``, the artifact mask widened by 0.3 s;
     nothing with no artifact run). A stop wholly inside it has zero exposure.
     The stop's location, segment and distance summaries (``occupancy_state``,
     ``at_well``, ``occupancy_well_id``, ``modal_observed_track_segment_id``,
@@ -195,7 +195,7 @@ def build_stop_table(
         .to_numpy()
     )
     # n_swr_events: number of distinct whole-event-speed-eligible ripple labels in
-    # the bout — the SWR analogue of n_selected_events, for SWR-rate models.
+    # the bout — the SWR analog of n_selected_events, for SWR-rate models.
     # (is_swr_stop == n_swr_events > 0.)
     per_bout["n_swr_events"] = (
         grouped["SWR_event"]

@@ -209,7 +209,7 @@ def test_cohort_values_pool_the_counts(population, sidecars):
         cohort_values, sidecars, population, {"n_pfc_cohort": 2, "n_analysed": 7}
     )
     assert values["sessions"].value == 2
-    assert values["analysed_epochs"].value == 7
+    assert values["analyzed_epochs"].value == 7
     assert values["animals"].value == 2
     assert values["units"].value == 12
     assert (values["bins_fit"].value, values["bins_immobile"].value) == (400, 800)

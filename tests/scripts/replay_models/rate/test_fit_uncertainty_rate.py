@@ -15,7 +15,7 @@ import json
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.replay_models.rate import uncertainty_rate as unc
@@ -84,8 +84,8 @@ def stubbed_run(monkeypatch, replay_content_root, tmp_path):
     _register(
         register,
         [
-            ("a20200101_.nwb", "02_r1", "analysed", "", True),
-            ("a20200102_.nwb", "02_r1", "analysed", "", False),
+            ("a20200101_.nwb", "02_r1", "analyzed", "", True),
+            ("a20200102_.nwb", "02_r1", "analyzed", "", False),
         ],
     )
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", register)

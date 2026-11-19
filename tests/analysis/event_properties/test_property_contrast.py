@@ -93,7 +93,7 @@ def test_each_interval_is_the_corrected_t_interval_about_the_estimate():
     assert row.difference_low == pytest.approx(10.0 - half)
     assert row.difference_high == pytest.approx(10.0 + half)
     assert row.difference_nan_replicates == 1
-    # identical replicates: no width, centred on the data's value
+    # identical replicates: no width, centered on the data's value
     assert (row.median_non_swr_low, row.median_non_swr_high) == (1.0, 1.0)
     assert row.matched_difference_low == row.matched_difference_high == 3.0
     assert row.n_replicates == 4

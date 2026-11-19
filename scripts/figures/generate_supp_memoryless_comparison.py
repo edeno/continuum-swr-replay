@@ -137,7 +137,7 @@ STATE_SPACE = "State space"
 """One name each. Neither says "our": a figure names a method, not a side."""
 
 # The state-space model's events are Figure 1's non-local events, so they keep
-# that colour. The sliding window's is no state's colour, nor the animal's.
+# that color. The sliding window's is no state's color, nor the animal's.
 SIMULATED_COLOR = "#222222"
 SLIDING_COLOR = "#6a3d9a"
 STATE_SPACE_COLOR = NON_LOCAL_COLOR
@@ -740,7 +740,7 @@ def plot_sweep(fig: Figure, slot: SubplotSpec, summary: pd.DataFrame) -> None:
     )
     ax_offset.tick_params(labelleft=False)
     # Each curve is named once, where the space beside it is empty, in the
-    # colours of the two detection grids.
+    # colors of the two detection grids.
     for ax, label, color, x, y in (
         (ax_offset, SLIDING, SLIDING_COLOR, 130, 50),
         (ax_onset, STATE_SPACE, STATE_SPACE_COLOR, 1.25, 16),

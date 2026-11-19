@@ -142,7 +142,7 @@ def plot_hist_relative_to_event(
     event_times: NDArray[np.floating],
     window: tuple[float, float],
     ax: Axes | None = None,
-    color: str = "grey",
+    color: str = "gray",
     bin_size: float = 0.050,
 ) -> Axes:
     """Plot peri-stimulus time histogram (PSTH) aligned to event times.
@@ -161,7 +161,7 @@ def plot_hist_relative_to_event(
         Example: (-1.0, 1.0) shows activity from 1s before to 1s after event.
     ax : Axes | None, optional
         Matplotlib axes to plot on. If None, uses current axes (plt.gca()).
-    color : str, default="grey"
+    color : str, default="gray"
         Color for histogram bars.
     bin_size : float, default=0.050
         Bin width in seconds. Default is 50ms bins.

@@ -122,7 +122,7 @@ class TestMatchedControlInvariants:
 
     def test_no_control_overlaps_a_real_event_of_any_class(self, event_times, fit_mask):
         # The SWR at 3.0-3.5 s belongs to no non-local class, so a control that
-        # honoured only the non-local windows could land on it.
+        # honored only the non-local windows could land on it.
         controls = make_matched_control_times(
             event_times, fit_mask, np.random.default_rng(2)
         ).times
@@ -343,7 +343,7 @@ def test_replay_beats_the_matched_control_for_a_replay_tracking_neuron(
     )
 
     # The engagement comparison, as a deviance fraction: the in-sample test
-    # statistic is gone with the penalised estimator, and the held-out
+    # statistic is gone with the penalized estimator, and the held-out
     # difference is the runner's. What has to be true here is that non-SWR
     # replay explains deviance the matched baseline does not.
     engagement = stats[
@@ -471,8 +471,8 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
     )
 
 
-class TestEventsTheAnalysedTimeRuleDropped:
-    """A control never lands on an event the analysed-time rule dropped (a
+class TestEventsTheAnalyzedTimeRuleDropped:
+    """A control never lands on an event the analyzed-time rule dropped (a
     non-local event or SWR in excluded time, or overlapping one dropped there),
     and the dropped events near fitted bins are counted, not hidden."""
 

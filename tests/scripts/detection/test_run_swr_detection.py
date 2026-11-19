@@ -1494,9 +1494,9 @@ def test_a_failed_epoch_is_recorded_and_the_rest_run(
 def test_the_run_takes_its_epochs_from_the_epoch_register(
     tmp_path, monkeypatch, in_tmp_path, in_process_cluster
 ):
-    """The epochs run are the register's analysed ones, narrowed by the flags:
+    """The epochs run are the register's analyzed ones, narrowed by the flags:
     the runner keeps no list of epochs to skip, and no epoch the register does
-    not analyse reaches it, so its manifest records none."""
+    not analyze reaches it, so its manifest records none."""
     monkeypatch.setattr(
         runner,
         "epochs_to_run",

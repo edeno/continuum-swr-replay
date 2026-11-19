@@ -18,7 +18,7 @@ detector's unavailable data cannot be trusted as a match, and removing it
 must not read as the other detector missing something. The counting
 functions refuse an inventory in which that has not been done, and a pair
 table that was not built from the inventory they are given. An event the
-analysed-time rule drops leaves its own detector's coverage the same way,
+analyzed-time rule drops leaves its own detector's coverage the same way,
 through :func:`set_aside_events`.
 
 The detectors of a comparison are the roster: by default every detector with
@@ -269,7 +269,7 @@ def validate_pairs(pairs: pd.DataFrame, inventory: pd.DataFrame) -> pd.DataFrame
     Every key must be an event of the inventory, each pair's detector columns
     must be the keys' own detectors in name order, both events must share the
     pair's epoch, and the overlap must be positive. A stale pair table, built
-    before bridging events were removed, would otherwise mark their neighbours
+    before bridging events were removed, would otherwise mark their neighbors
     matched.
     """
     if pairs.empty:
@@ -374,7 +374,7 @@ def set_aside_events(
 ) -> dict[tuple, Coverage]:
     """Remove the spans of events left out of their cohorts from their own coverage.
 
-    An event the analysed-time rule drops is not compared, so, as for a
+    An event the analyzed-time rule drops is not compared, so, as for a
     bridging event, the time it occupied reads as time its own detector did
     not observe: another detector's event there is ``unknown`` against it,
     never ``unmatched``. Every other detector's coverage is unchanged.

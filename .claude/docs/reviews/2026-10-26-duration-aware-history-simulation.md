@@ -89,8 +89,8 @@ The fits come in three sizes:
 
 - **Pooled:** one 6,000-stop session per scenario, about 7,200–7,800 SWR-coupled and
   10,900–11,800 non-SWR events. Measures bias.
-- **Sessions:** 10 sessions of 350 stops per scenario, summarised as the real runner
-  summarises sessions.
+- **Sessions:** 10 sessions of 350 stops per scenario, summarized as the real runner
+  summarizes sessions.
 - **Identifiability:** 4,000 stops.
 
 ## What the current (shipped) design infers
@@ -240,7 +240,7 @@ comment:
    expected onsets: support ≈ 37–98 per lag at 6,000 stops, so roughly 2–6 at 350. The
    anchor contrasts per session are single digits ((b) 7.6–16.8, (c) −4.8 to −5.9). Inference
    must aggregate across sessions (median, sign consistency, per animal), or pool.
-5. **Not modelled.**
+5. **Not modeled.**
    - Stop-to-stop rate heterogeneity, which creates positive history (clustering) in any
      design.
    - A within-stop time course: the spline is fit but the true rate is flat.

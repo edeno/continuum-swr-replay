@@ -30,7 +30,7 @@ from non_local_detector.likelihoods.clusterless_kde import (
 )
 from track_linearization import get_linearized_position
 
-from continuum_swr_replay.analysis.event_definition import analysed_time
+from continuum_swr_replay.analysis.event_definition import analyzed_time
 from continuum_swr_replay.analysis.event_definition.artifact_masks import (
     artifact_intervals,
 )
@@ -284,7 +284,7 @@ def test_an_epoch_is_validated_and_written(simulated, tmp_path):
     assert not [c for c in table if "left_out" in c]
     assert "left_out_selection" not in record["windows"]
     # excluded time is no window's, and no masked bin is in a running-only fit
-    excluded = interval_mask(TIME, analysed_time.excluded_intervals(EPOCH))
+    excluded = interval_mask(TIME, analyzed_time.excluded_intervals(EPOCH))
     assert excluded[2801:3199].all() and excluded[4801:5199].all()
     reach = np.r_[0, np.cumsum(excluded)]
     assert (reach[table.e.to_numpy() + 1] == reach[table.s.to_numpy()]).all()
@@ -466,7 +466,7 @@ def test_a_running_nonlocal_label_is_refused_before_anything_is_fit(
     """The review's probe, a running non-local event at 10.2-10.3 s, breaks the
     decoder's own definition (every sampled speed below 4 cm/s; every bin above
     the probability threshold). No decode makes one, so the read refuses the
-    frame as stale (analysed_time.with_swr_source) and nothing is fit on it."""
+    frame as stale (analyzed_time.with_swr_source) and nothing is fit on it."""
     decode_dir = decode_copy(simulated, tmp_path)
     path = decode_dir / f"{EPOCH}_80_data_over_time.pkl"
     dot = pd.read_pickle(path)
@@ -476,7 +476,7 @@ def test_a_running_nonlocal_label_is_refused_before_anything_is_fit(
     dot.iloc[np.flatnonzero(event), dot.columns.get_loc("non_local_event")] = 1
     dot.to_pickle(path)
     with pytest.raises(EventDefinitionError):
-        analysed_time.read_dot_with_swr_source(path)
+        analyzed_time.read_dot_with_swr_source(path)
 
     record = run(decode_dir, tmp_path / "out", simulated[1])
 
@@ -607,18 +607,18 @@ def test_the_loader_builds_the_decodes_masks_from_the_swr_source(
     assert loaded["is_missing"].any() and loaded["is_training"][4000:4051].all()
 
 
-def test_every_analysed_hpc_decode_is_listed_even_an_incomplete_one(
+def test_every_analyzed_hpc_decode_is_listed_even_an_incomplete_one(
     tmp_path, monkeypatch
 ):
-    """Only epochs the register analyses: a pending epoch's decode in the folder
+    """Only epochs the register analyzes: a pending epoch's decode in the folder
     is not one."""
     from continuum_swr_replay.data_loaders import epoch_register
 
     register = tmp_path / "epoch_register.csv"
     pd.DataFrame(
         [
-            ["aa20200101_.nwb", "02_r1", "analysed", "", "", "False"],
-            ["bb20200101_.nwb", "04_r2", "analysed", "", "", "False"],
+            ["aa20200101_.nwb", "02_r1", "analyzed", "", "", "False"],
+            ["bb20200101_.nwb", "04_r2", "analyzed", "", "", "False"],
             [
                 "bb20200101_.nwb",
                 "06_r3",
@@ -722,13 +722,13 @@ def test_reuse_reason_names_what_changed():
         )
 
 
-def _register_analysing(tmp_path: Path, monkeypatch, *keys: tuple[str, str]) -> None:
-    """``REGISTER_PATH`` at a register that analyses these (nwb, epoch) keys."""
+def _register_analyzing(tmp_path: Path, monkeypatch, *keys: tuple[str, str]) -> None:
+    """``REGISTER_PATH`` at a register that analyzes these (nwb, epoch) keys."""
     from continuum_swr_replay.data_loaders import epoch_register
 
     path = tmp_path / "epoch_register.csv"
     pd.DataFrame(
-        [[name, epoch, "analysed", "", "", "False"] for name, epoch in keys],
+        [[name, epoch, "analyzed", "", "", "False"] for name, epoch in keys],
         columns=list(epoch_register.COLUMNS),
     ).to_csv(path, index=False)
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
@@ -737,7 +737,7 @@ def _register_analysing(tmp_path: Path, monkeypatch, *keys: tuple[str, str]) -> 
 def test_main_reuses_an_epoch_only_while_nothing_changed(
     simulated, tmp_path, monkeypatch
 ):
-    _register_analysing(tmp_path, monkeypatch, ("aa20200101_.nwb", "02_r1"))
+    _register_analyzing(tmp_path, monkeypatch, ("aa20200101_.nwb", "02_r1"))
     decode_dir = decode_copy(simulated, tmp_path)
     output_dir = tmp_path / "out"
     monkeypatch.setattr(runner, "run_epochs", serial_epochs(simulated[1]))
@@ -764,7 +764,7 @@ def test_main_reuses_an_epoch_only_while_nothing_changed(
     assert "the audit's job" in discovery["coverage"]
     readme = (output_dir / "README.md").read_text()
     assert (
-        "every epoch the epoch register analyses with a canonical HPC decode file"
+        "every epoch the epoch register analyzes with a canonical HPC decode file"
     ) in readme
     assert "1 listed, 1 with all three decode files" in readme
     assert "Computed in this run: 1; reused" in readme

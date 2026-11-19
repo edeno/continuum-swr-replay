@@ -676,7 +676,7 @@ def test_visit_context_is_validated_per_session_not_pooled():
 
     Two epochs of the same animal/session_date each number their completed trials
     from zero. Validating the pooled frame would see the second epoch's
-    IDs step backwards and reject an ordinary stop table, so the session
+    IDs step backward and reject an ordinary stop table, so the session
     grouping is load-bearing rather than incidental.
     """
     rows = [

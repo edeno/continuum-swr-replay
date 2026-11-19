@@ -11,7 +11,7 @@ SWR runner's `KNOWN_NO_INPUT_EPOCHS`) and the exclusion notes in the `NWB_FILES`
 docstring.
 
 The register has one row per `(nwb_file_name, epoch)`: its `status`, its `reason`
-(empty for an analysed epoch), its `evidence` and its `first_exposure` flag. An `epoch` of `*` covers every
+(empty for an analyzed epoch), its `evidence` and its `first_exposure` flag. An `epoch` of `*` covers every
 epoch of a session none of whose run epochs is known (no NWB file, or no run epoch
 in it). It was generated once, on 2026-10-05, from the exclusion audit (557 rows:
 553 run epochs and 4 sessions with none) and the populate plan. Their working files
@@ -33,7 +33,7 @@ doc drifts from the register.
 ## The rule
 
 <!-- BEGIN GENERATED: rule -->
-> An epoch is analysed if and only if it is a run epoch (`^[0-9]+_r[0-9]+$`) of a
+> An epoch is analyzed if and only if it is a run epoch (`^[0-9]+_r[0-9]+$`) of a
 > regular spatial-bandit session in Spyglass (or of a listed first-exposure
 > session), with parsed trials (`noPrePostTrialTimes`), and every decode input
 > resolves to exactly one row: position map, position info and linearization, ripple
@@ -73,9 +73,9 @@ the allowlist.
 
 | status | meaning |
 |---|---|
-| analysed | In the cohort: every stage processes the epoch. |
-| pending | Not yet analysed; its reason is `PENDING_POPULATE`. Only a `--pending-only` run of the decoders, the SWR runner or the Widloski runner processes it. |
-| excluded | Never analysed, for its reason. |
+| analyzed | In the cohort: every stage processes the epoch. |
+| pending | Not yet analyzed; its reason is `PENDING_POPULATE`. Only a `--pending-only` run of the decoders, the SWR runner or the Widloski runner processes it. |
+| excluded | Never analyzed, for its reason. |
 
 ## Reason codes
 
@@ -87,7 +87,7 @@ the allowlist.
 | `DEPLETION_TASK` | excluded | A depletion session: a decaying reward schedule, a task variant, not the regular spatial bandit. |
 | `NOT_INGESTED` | excluded | The session is not (fully) ingested in Spyglass. |
 | `NO_TRIAL_INTERVALS` | excluded | Trial parsing failed: the epoch has no `noPrePostTrialTimes` interval. |
-| `PENDING_POPULATE` | pending | A decode input is missing from Spyglass and a planned populate adds it; analysed once its decodes exist and its entry is updated. |
+| `PENDING_POPULATE` | pending | A decode input is missing from Spyglass and a planned populate adds it; analyzed once its decodes exist and its entry is updated. |
 | `MISSING_INPUT` | excluded | A decode input is missing from Spyglass and no fix is planned. |
 | `SUSTAINED_NOISE` | excluded | The artifact run finds an S block (sustained ripple-band noise) in the epoch. That noise's effect on the decode outside the mask could not be bounded, so the whole epoch is left out (project lead, 2026-10-10). |
 <!-- END GENERATED: reason-codes -->
@@ -97,7 +97,7 @@ the allowlist.
 <!-- BEGIN GENERATED: counts -->
 | status | reason | entries |
 |---|---|---|
-| analysed | — | 242 |
+| analyzed | — | 242 |
 | excluded | `NO_NWB` | 3 |
 | excluded | `NO_RUN_EPOCH` | 1 |
 | excluded | `DEPLETION_TASK` | 238 |
@@ -109,7 +109,7 @@ the allowlist.
 
 An entry is one run epoch, except the 4 session-wide `*` entries of sessions with no known run epoch: 553 run epochs and 4 session-wide entries in all.
 
-| animal | analysed | pending |
+| animal | analyzed | pending |
 |---|---|---|
 | chimi | 46 | 0 |
 | j16 | 58 | 0 |
@@ -119,14 +119,14 @@ An entry is one run epoch, except the 4 session-wide `*` entries of sessions wit
 | **all** | **242** | **0** |
 <!-- END GENERATED: counts -->
 
-Of the 91 `NWB_FILES`, 46 are depletion sessions. The other 45 hold every analysed
+Of the 91 `NWB_FILES`, 46 are depletion sessions. The other 45 hold every analyzed
 and pending epoch: 44 regular sessions and wilbur20210326. The other 18 sessions in
 the register are not in `NWB_FILES`.
 
 ## How each stage reads it
 
-`analysed_epochs()` returns `get_epoch_info()`'s rows whose register status is
-`analysed`. `pending_epochs()` returns the `pending` ones alone. `epochs_to_run`
+`analyzed_epochs()` returns `get_epoch_info()`'s rows whose register status is
+`analyzed`. `pending_epochs()` returns the `pending` ones alone. `epochs_to_run`
 picks one of the two, by a stage's `--pending-only` flag.
 
 Each raises `EpochRegisterError` when `get_epoch_info()` and the register disagree:
@@ -138,20 +138,20 @@ Each raises `EpochRegisterError` when `get_epoch_info()` and the register disagr
 `pending_epochs()` also raises when the register holds no pending epoch.
 
 The cohort is pinned in the register, not in Spyglass. A populate makes a pending
-epoch decodable, and so lists it in `get_epoch_info()`. The epoch is analysed only
-once its decodes exist and its entry is changed to `analysed`.
+epoch decodable, and so lists it in `get_epoch_info()`. The epoch is analyzed only
+once its decodes exist and its entry is changed to `analyzed`.
 
 | stage | reads |
 |---|---|
 | NonLocal and ContFrag decoders (`runs.batch.run_batch`) | `epochs_to_run(args.pending_only)`. `--pending-only` refuses the canonical `Processed-Data` folder as `--save_dir`. |
-| artifact runner (`run_artifact_detection.py`) | `analysed_epochs(include_pending=..., include_sustained_noise=True)`: the analysed epochs, the pending ones with `--include-pending`, and always the `SUSTAINED_NOISE` ones, so that a new run re-tests them. `--pending-only` runs the pending ones alone. |
+| artifact runner (`run_artifact_detection.py`) | `analyzed_epochs(include_pending=..., include_sustained_noise=True)`: the analyzed epochs, the pending ones with `--include-pending`, and always the `SUSTAINED_NOISE` ones, so that a new run re-tests them. `--pending-only` runs the pending ones alone. |
 | SWR runner (`run_swr_detection.py`) | `epochs_to_run(args.pending_only)`; no skip list of its own |
 | Widloski runner (`run_memoryless_detection.py`, `--all` / `--animal`) | `epochs_to_run(args.pending_only)`. An epoch it selects with no decode under `--root` is run and recorded as failed. A decode of any other epoch is left out and recorded as skipped. `--epoch-id` runs what it names. |
-| replay table builders (`scripts/tables/_table_runner.find_sessions`, used by `prepare_replay_content_data.py`, `build_timebin_tables.py`, `regenerate_stop_table.py`) | `analysed_epochs()`; an analysed epoch with no decode stops the build |
-| ContFrag table builders (`_table_runner.find_contfrag_sessions`, used by `prepare_contfrag_replay_content_data.py`, `refresh_contfrag_behavioral_covariates.py`) | `analysed_epochs()`; for HPC an analysed epoch with no decode stops the build |
-| PFC runner (`run_pfc_analysis_bandit.py`) | `analysed_epochs()`, then the PFC-level condition below |
-| HPC raw stats (`scripts/checks/compute_hpc_raw_stats.py`) | `analysed_epochs()` |
-| decode-folder readers (see below) | `analysed_decode_files()`, from the register alone |
+| replay table builders (`scripts/tables/_table_runner.find_sessions`, used by `prepare_replay_content_data.py`, `build_timebin_tables.py`, `regenerate_stop_table.py`) | `analyzed_epochs()`; an analyzed epoch with no decode stops the build |
+| ContFrag table builders (`_table_runner.find_contfrag_sessions`, used by `prepare_contfrag_replay_content_data.py`, `refresh_contfrag_behavioral_covariates.py`) | `analyzed_epochs()`; for HPC an analyzed epoch with no decode stops the build |
+| PFC runner (`run_pfc_analysis_bandit.py`) | `analyzed_epochs()`, then the PFC-level condition below |
+| HPC raw stats (`scripts/checks/compute_hpc_raw_stats.py`) | `analyzed_epochs()` |
+| decode-folder readers (see below) | `analyzed_decode_files()`, from the register alone |
 
 The decode-folder readers read decode files rather than Spyglass:
 
@@ -163,18 +163,18 @@ The decode-folder readers read decode files rather than Spyglass:
 - `analyze_content_occupancy.py`;
 - `analyze_event_spike_evidence.py`.
 
-They take `analysed_decode_files(directory, suffix)`, which names the analysed
+They take `analyzed_decode_files(directory, suffix)`, which names the analyzed
 epochs' files instead of globbing, so a decode of any other epoch in the folder is
-never read. The two loaders also require every analysed epoch's
+never read. The two loaders also require every analyzed epoch's
 file. The helper reads only the register, not the database.
 
 `scripts/figures/generate_event_gallery.py` still globs the decode folder. It relies on
-the canonical folder holding only analysed epochs' decodes, which the audit's
+the canonical folder holding only analyzed epochs' decodes, which the audit's
 `decode_folder` check enforces.
 
 `scripts/pfc/measure_pfc_null_geometry.py` globs the PFC runner's `*_mPFC_modulation.pkl`
 bundles, not the decode folder, so the `decode_folder` check does not cover it. It relies
-on the PFC runner, which writes bundles only for the analysed PFC cohort (see "PFC
+on the PFC runner, which writes bundles only for the analyzed PFC cohort (see "PFC
 subset"). No check removes a bundle left in that folder from an earlier cohort.
 
 `scripts/checks/check_data_availability.py` still reads `get_epoch_info()` itself. It
@@ -182,20 +182,20 @@ diagnoses which inputs load for every epoch Spyglass lists, pending ones include
 
 The audit runs these checks on the register:
 
-- `epoch_sets`: every artifact holds exactly the analysed epochs. An absence passes
+- `epoch_sets`: every artifact holds exactly the analyzed epochs. An absence passes
   only with a reason under `--exceptions`. An epoch an artifact holds but the
-  register does not analyse fails, named with its status and reason. So does any
+  register does not analyze fails, named with its status and reason. So does any
   unregistered epoch. One exception: the SWR and Widloski run manifests may hold
   epochs excluded for `SUSTAINED_NOISE`, which those runs processed before the
   ruling; they are listed under `held_sustained_noise`, not failed.
 - `decode_folder`: the decode folder (`--root`) holds HPC NonLocal and ContFrag
-  decode files only of analysed epochs. A file of a pending, excluded or unregistered
+  decode files only of analyzed epochs. A file of a pending, excluded or unregistered
   epoch fails, even one of a partly saved decode.
 - `epochs_registered`: every epoch `get_epoch_info()` lists is registered, and every
-  analysed epoch is listed.
+  analyzed epoch is listed.
 - `pending_epochs`: lists the pending epochs and their evidence, which
   `not_checked` names.
-- `sustained_noise`: among the analysed, pending and `SUSTAINED_NOISE` epochs, those
+- `sustained_noise`: among the analyzed, pending and `SUSTAINED_NOISE` epochs, those
   with at least one S core in the configured artifact run
   (`swr_source.artifact_intervals_dir()`) are exactly the `SUSTAINED_NOISE` ones. An
   S epoch the register does not exclude for it fails, and so does a `SUSTAINED_NOISE`
@@ -213,25 +213,25 @@ The audit runs these checks on the register:
    main run's, each adds only the pending epochs to that run's manifest.
 
    From here until step 4, the audit's `epoch_sets` check reports the pending epochs
-   in the SWR and Widloski manifests as epochs the register does not analyse. That is
-   expected. It clears when step 4 sets their entries to `analysed`.
+   in the SWR and Widloski manifests as epochs the register does not analyze. That is
+   expected. It clears when step 4 sets their entries to `analyzed`.
 4. Check the staged decodes. Then move them into the canonical folder in the same
-   change that sets their entries to `analysed`, with an empty reason. In that
+   change that sets their entries to `analyzed`, with an empty reason. In that
    change, regenerate this doc with `scripts/checks/write_epoch_register_doc.py`.
 5. Rebuild the tables and rerun the PFC runner and the audit. These read only
-   analysed epochs, so they now include the new ones.
+   analyzed epochs, so they now include the new ones.
 
 ## PFC subset
 
-The PFC cohort is the analysed epochs whose session has curated cortical spike
-sorting (`CuratedSpikeSorting`, mountainsort4). An analysed epoch without that
+The PFC cohort is the analyzed epochs whose session has curated cortical spike
+sorting (`CuratedSpikeSorting`, mountainsort4). An analyzed epoch without that
 sorting is left out of the PFC analysis at the PFC level. It is not an epoch
 exclusion and has no register entry.
 
 The PFC runner writes this out to `pfc_cohort_<brain_area>.json` in its output
 folder, holding:
 
-- the analysed and PFC cohort counts;
+- the analyzed and PFC cohort counts;
 - the epochs it ran;
 - each left-out epoch with that reason.
 
@@ -240,7 +240,7 @@ sessions. A batch split across parallel partitions (`--sessions`) leaves the las
 partition's share only. The union is the bundles on disk. The counts and `left_out`
 are the same whichever partition writes last.
 
-The mPFC and OFC ContFrag builds have their own cohort rule: an analysed epoch
+The mPFC and OFC ContFrag builds have their own cohort rule: an analyzed epoch
 with no decode for the area is outside that area's cohort. That rule is not
 recorded.
 
@@ -249,11 +249,11 @@ recorded.
 - **A populate succeeds.** Follow "Adding the pending epochs".
 - **A planned populate fails.** Change the entry to `excluded` / `MISSING_INPUT`,
   with the failure as evidence, and regenerate this doc.
-- **A new session or epoch appears in Spyglass.** `analysed_epochs()` raises until
+- **A new session or epoch appears in Spyglass.** `analyzed_epochs()` raises until
   it is registered.
 - **The configured artifact run changes.** Make the new run with
   `--include-pending`. The artifact runner always adds the `SUSTAINED_NOISE` epochs, so
-  the run covers every epoch the check reads. An analysed or pending epoch in which it
+  the run covers every epoch the check reads. An analyzed or pending epoch in which it
   finds an S block becomes `excluded` / `SUSTAINED_NOISE`, with the run's evidence.
   A `SUSTAINED_NOISE` epoch in which it finds none goes back to the lead. The audit's
   `sustained_noise` check fails until the register and the run agree.
@@ -264,7 +264,7 @@ recorded.
 - a session-wide `*` entry beside epoch entries;
 - an unknown status or reason;
 - a reason that does not match its status;
-- an unanalysed entry without evidence.
+- an unanalyzed entry without evidence.
 
 ## Excluded and pending epochs
 

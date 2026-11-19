@@ -66,7 +66,7 @@ def bypass_event_cohort(
 ) -> tuple[pd.DataFrame, dict]:
     """Stand-in for ``select_event_cohort`` that keeps every event.
 
-    Returns the same report shape the runner logs, labelled ``bypassed`` so the
+    Returns the same report shape the runner logs, labeled ``bypassed`` so the
     log cannot be mistaken for a canonical run.
     """
     counts = frame.groupby(frame["occupancy_state"].fillna("missing"), observed=True)[

@@ -116,7 +116,7 @@ class TestStopPatchReplayNaNPropagation:
         # must be NaN, not 0.0, for a stop whose only event was
         # dropped under the event-wise residual filter.
         assert out["replay_fraction_residual_noncurrent"].isna().all(), (
-            "stop_patch_replay materialised a fabricated 0.0 for a "
+            "stop_patch_replay materialized a fabricated 0.0 for a "
             f"stop whose only event had all-NaN residuals: "
             f"{out['replay_fraction_residual_noncurrent'].tolist()}"
         )

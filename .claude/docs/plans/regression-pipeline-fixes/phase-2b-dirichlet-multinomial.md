@@ -31,7 +31,7 @@ Findings addressed: A1 (alternative estimator), B1 (concentration as the "SWR br
   per-event log-likelihood; report `cv_ll_per_event_mean` and bits vs the DM null with β = 0).
   Effect-scale separation flag and Wald p-values as in the design. Export from
   `analysis/replay/__init__.py`.
-- **Small-session fallback.** In the runner, if a session has fewer than 40 modelled events, fit
+- **Small-session fallback.** In the runner, if a session has fewer than 40 modeled events, fit
   with `fixed_log_phi` set to the animal-pooled intercept obtained from a first pass over that
   animal's sessions with ≥ 40 events; record `phi_source ∈ {"session","animal_pooled"}` in the row.
 - **Simulator.** Add `simulate_dirichlet_multinomial_counts` to `simulation.py` (design). Reuse the
@@ -63,7 +63,7 @@ Findings addressed: A1 (alternative estimator), B1 (concentration as the "SWR br
 - Making DM the shipped primary (decided: fractions primary; revisit after the comparison if the
   DM concentration term changes a headline claim).
 - A Dirichlet-multinomial rate model or any Family-B change.
-- Hierarchical modelling across animals (open question 3); the bootstrap here is descriptive.
+- Hierarchical modeling across animals (open question 3); the bootstrap here is descriptive.
 
 ## Validation slice
 

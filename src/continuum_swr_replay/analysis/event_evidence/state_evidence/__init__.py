@@ -36,7 +36,7 @@ track interior and never enter (:func:`interior_bin_mask`).
 
 - ``loc_*``: logL_C(animal_t) - mean over 20 partners of
   logL_C(partner's animal position). Partners are other windows of the same
-  pool whose centre-bin animal position is at least 20 cm away by track
+  pool whose center-bin animal position is at least 20 cm away by track
   distance; never the window itself (:func:`null_partners`).
 - ``nl_anim_*``: logL_C(MAP_S) - logL_C(animal_t), with MAP_S the argmax of S's
   window-summed log-likelihood.
@@ -56,7 +56,7 @@ track interior and never enter (:func:`interior_bin_mask`).
   local coding's exp(-E_C) (:func:`coordinated_silence`).
 - ``*_ps``: per held-out spike, runs with C silent excluded.
 - ``mapS_dist_cm`` / ``mapSr_dist_cm``: track distance from the animal's
-  window-centre position to MAP_S / S's best remote bin.
+  window-center position to MAP_S / S's best remote bin.
 
 Encodings: what scores a window, and whose spikes it was fit on
 ---------------------------------------------------------------
@@ -66,7 +66,7 @@ Every window is scored under three encodings, the column prefixes:
   decode axis is cut into alternating 30 s blocks (:func:`time_folds`); fold
   f's model is the decode's detector refit on the running bins (head speed
   >= 4 cm/s) of fold f's blocks, and a window is scored by the model of the
-  fold that does not hold its centre bin (:func:`window_folds`,
+  fold that does not hold its center bin (:func:`window_folds`,
   :func:`held_out_evidence`). A window's own spikes are not in the model that
   scores it, but for a window straddling a block edge (``cv_insample_share``
   of its bins; under 0.1 % of windows in the prototype). The library pads
@@ -193,7 +193,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import 
     REGIMES,
     STATES,
     SWR_LABELS,
-    analysed_regimes,
+    analyzed_regimes,
     build_windows,
     calibration_windows,
     keyed_rng,
@@ -225,7 +225,7 @@ __all__ = [
     "SWR_LABELS",
     "UNDERFLOW_OCCUPANCY_FLOOR",
     "TetrodeTerms",
-    "analysed_regimes",
+    "analyzed_regimes",
     "animal_t_test",
     "bout_animal_summaries",
     "bout_statistics",

@@ -199,7 +199,7 @@ def test_fit_conditional_logit_ties_break_by_lowest_arm_id(monkeypatch):
             # **kwargs so the stub tracks the real fit() signature. The fitters
             # pass maxiter (statsmodels' default of 100 leaves the larger rungs
             # short of the optimum); a stub that accepts only what it was written
-            # against fails on the call rather than on the behaviour under test.
+            # against fails on the call rather than on the behavior under test.
             captured["fit_kwargs"] = kwargs
 
             class Result:
@@ -635,7 +635,7 @@ def test_a_tiny_within_event_column_reaches_the_optimum():
     assert old.llf < ref_llf - 1.0
 
 
-def test_rescaling_a_column_is_a_pure_reparametrisation():
+def test_rescaling_a_column_is_a_pure_reparametrization():
     """x1000 on one column divides its coefficient and both SEs by 1000 exactly.
 
     The fitter divides each column by its within-event SD, so the optimizer sees

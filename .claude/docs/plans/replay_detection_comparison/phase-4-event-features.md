@@ -10,7 +10,7 @@ where this file and the spec disagree. Status lives in [PLAN.md](PLAN.md), not h
 
 ## What this phase delivers
 
-Spec 04 §"Initial report: default settings", for the 242 analysed epochs, at the retained default settings,
+Spec 04 §"Initial report: default settings", for the 242 analyzed epochs, at the retained default settings,
 over the nine inventories of Phase 3 run `afeb897d850f` (`kay`, `karlsson`, `yu`, `zugaro`, `carey`, `mua`,
 `state_space`, `memoryless`, `memoryless_criteria`). It answers Q1 of `docs/analysis_map.md` ("Are the
 decoded non-local events real, including those outside SWRs?"), for every inventory alike.
@@ -540,7 +540,7 @@ per figure.
 
 | Test | Asserts |
 | --- | --- |
-| `test_inventory_features.py` | closed-interval rows; the spike rule per row; identical intervals give identical features; NaN rows propagate; neighbour gaps; stop by onset; `ss_*`/`ms_*` on hand-worked paths; comparator-only classes |
+| `test_inventory_features.py` | closed-interval rows; the spike rule per row; identical intervals give identical features; NaN rows propagate; neighbor gaps; stop by onset; `ss_*`/`ms_*` on hand-worked paths; comparator-only classes |
 | `test_inventory_evidence.py` | block rows equal one whole call; scores independent of blocking; remote above zero, local below; invalid rows and flagged bins; unscorable reasons |
 | `test_inventory_availability.py` (updated) | `stored_coverage` equals the runner's coverage |
 | `test_inventory_selection.py` | baseline pool and matching levels, deterministic draws, rank; rejection stages agree with synthetic gate failures built by the detector's own functions; unknown is not a rejection |
@@ -584,7 +584,7 @@ Each with the recommended answer.
   distance of the animal's bin at the middle row), `MIN_MATCHED = 20` for a level, and the fallback to
   `duration_only` reported per event. The per-row evidence makes extra windows nearly free.
 - **Q3. Example subsets.** Recommend "evidence above baseline" = above the event's own `baseline_q95_dll`,
-  and "at or below baseline" = at or below its `baseline_median_dll`, labelled as descriptions, not
+  and "at or below baseline" = at or below its `baseline_median_dll`, labeled as descriptions, not
   verdicts.
 - **Q4. Ours-only for the rejection reasons.** Recommend state-space events `unmatched_by` each memoryless
   cohort, pairwise (not only the exactly-one cell), both cohorts reported.

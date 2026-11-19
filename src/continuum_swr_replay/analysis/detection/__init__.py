@@ -14,7 +14,7 @@ inventory the paper uses is ``event_definition.swr_source``'s.
   detector, its shuffles, simulations and sweeps.
 - ``nonlocal_events``: the paper's non-local event detector applied to a
   decode: the two non-local states' probability thresholded by
-  ``event_definition.nonlocal_event_rule``, speed-gated and labelled on one
+  ``event_definition.nonlocal_event_rule``, speed-gated and labeled on one
   time-indexed frame with behavior (``get_data_over_time``), and that frame
   read back (``load_data_over_time``).
 - ``detection_inputs``: what the detection runners read from a saved HPC

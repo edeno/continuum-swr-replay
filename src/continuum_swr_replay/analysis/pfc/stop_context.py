@@ -13,7 +13,7 @@ For unit ``u`` and replay event ``e`` (one class at a time) in stop ``s``:
 - ``y_ue``: spikes in the post-onset window ``[0, +200) ms`` (fitted bins only).
 - ``B_us``, ``T_s``: spikes and seconds in the stop's *event-free* fitted time,
   the fitted bins of the stop outside every event's ``[-250, +250] ms`` window
-  (any class: non-local events, SWRs and the events the analysed-time rule
+  (any class: non-local events, SWRs and the events the analyzed-time rule
   dropped, in the cohort or not).
 
 The model
@@ -96,7 +96,7 @@ POST_WINDOW_S = 0.2
 #: Half-width of the window around every event onset that event-free baseline
 #: time avoids; the canonical kernels' fit window.
 AVOID_HALF_WINDOW_S = DEFAULT_BASIS_HALF_WINDOW_S
-#: The replay classes analysed.
+#: The replay classes analyzed.
 STOP_CONTEXT_CLASSES = ("non_local_SWR", "non_local_no_SWR")
 #: Stop-level context terms, in design order.
 CONTEXT_TERMS = ("rewarded", "next_trip_switches_patch")
@@ -213,7 +213,7 @@ def count_other_onsets(
     every non-local event but the event itself, every SWR that overlaps no
     non-local event (an SWR that overlaps a replay event is part of that
     event; the open overlap test, which equals the canonical ``is_swr`` rule
-    for intervals of positive duration), and every event the analysed-time
+    for intervals of positive duration), and every event the analyzed-time
     rule dropped.
 
     Parameters
@@ -226,7 +226,7 @@ def count_other_onsets(
     swr_bins, swr_start, swr_end : NDArray, shape (n_swr,)
         Onset bin, start and end (s) of every SWR of the session.
     dropped_bins : NDArray of int, shape (n_dropped,)
-        Onset bins of the events the analysed-time rule dropped.
+        Onset bins of the events the analyzed-time rule dropped.
     n_post_bins : int
         Post-window length in bins.
 
@@ -314,7 +314,7 @@ def assemble_stop_context_table(
     swr_intervals : pd.DataFrame
         Every speed-gated SWR of the session: ``start_time``, ``end_time``.
     dropped_events : pd.DataFrame
-        The events the analysed-time rule dropped: ``start_time``, ``end_time``.
+        The events the analyzed-time rule dropped: ``start_time``, ``end_time``.
     stops : pd.DataFrame, shape (n_stops, ...)
         The cohort stops: ``stop_idx``, ``stop_start``, ``stop_end`` (s,
         closed), ``is_rewarded_outcome`` (0/1/NaN) and
@@ -350,7 +350,7 @@ def assemble_stop_context_table(
     Raises
     ------
     ValueError
-        If an analysed event, or a fitted bin, lies outside every cohort stop.
+        If an analyzed event, or a fitted bin, lies outside every cohort stop.
     """
     time = np.asarray(time, dtype=float)
     fit = np.asarray(fit_mask, dtype=bool)
@@ -388,7 +388,7 @@ def assemble_stop_context_table(
     stop_fit_bins = np.bincount(stop_of_bin[fit], minlength=n_stops)
     stop_free_bins = np.bincount(stop_of_bin[free], minlength=n_stops)
 
-    # Events of the analysed classes, with their stop and post window.
+    # Events of the analyzed classes, with their stop and post window.
     frames = []
     for event_class in STOP_CONTEXT_CLASSES:
         frame = events[event_class].loc[:, ["event_id", "start_time", "end_time"]]
@@ -399,7 +399,7 @@ def assemble_stop_context_table(
     stop_row = _stop_of_times(start, stops)
     if (stop_row < 0).any():
         raise ValueError(
-            f"{int((stop_row < 0).sum())} analysed event(s) lie outside every "
+            f"{int((stop_row < 0).sum())} analyzed event(s) lie outside every "
             "cohort stop"
         )
     post_index = event_bins[:, None] + np.arange(n_post)[None, :]
@@ -505,7 +505,7 @@ def prepare_session_stop_context(
     The session is assembled by the steps
     :func:`~continuum_swr_replay.analysis.pfc.marked_glm.prepare_marked_session_context`
     takes (decode/position alignment, the canonical fit mask with the
-    analysed-time rule, the canonical event sets on the at-well cohort), so
+    analyzed-time rule, the canonical event sets on the at-well cohort), so
     events, fitted bins and spike binning equal Figure 4's. The stop context is
     the cohort stop's ``is_rewarded_outcome`` and the forward
     ``next_trip_switches_patch`` derived over every stop of the session.

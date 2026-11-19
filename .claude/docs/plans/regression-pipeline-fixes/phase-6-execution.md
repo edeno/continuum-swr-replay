@@ -49,7 +49,7 @@ both grains; `all_stops` keeps everything; returns the
 frame and a report (`n_stops_before/after`, counts by `occupancy_state`, the rule string). Raise
 if `occupancy_state` is absent. `scripts/content/fit_replay_content_models.py` ~1692 and
 `scripts/content/fit_swr_contrast_content.py` (find its at-well filter in `_assemble_arm`) call it
-with `cohort="at_well"` (no behaviour change — assert the same event set as today, and the content
+with `cohort="at_well"` (no behavior change — assert the same event set as today, and the content
 smoke `--models M0,M0a` byte-identical; the SWR-contrast runner's cohort audit must show the same
 `n_in`). `scripts/rate/fit_per_bin_rate_models.py` (design built ~163, `aggregate_to_timebins(`),
 `scripts/rate/fit_swr_contrast_rate.py` (`_load` ~515, ~377), `scripts/rate/fit_per_stop_rate_models.py`

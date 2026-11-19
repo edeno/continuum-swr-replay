@@ -37,7 +37,7 @@ Both backups are kept. The refresh's cleanup list leaves them out
 - **`Processed-Data/_pre_r11_backup_20261010/`** holds the first re-decode's files that were
   canonical from 2026-10-05 to 2026-10-10: 1,744 files for the same 218 epochs. `SHA256SUMS` covers
   them. `STAGED_SHA256SUMS` covers the 1,936 R11 files that replaced them (242 epochs, 8
-  each). `EPOCHS.txt` is the swap plan (207 analysed epochs and 35 pending ones going in, 218 old
+  each). `EPOCHS.txt` is the swap plan (207 analyzed epochs and 35 pending ones going in, 218 old
   ones going out, 13 `s_block` epochs staying out). `swap_actions.jsonl` is the swap log.
 - **The 13 `SUSTAINED_NOISE` epochs.** Their R11 decodes (104 files) stay in
   `Processed-Data/_staging_redecode_20261010/`. They are not canonical.
@@ -56,7 +56,7 @@ for the April values).
 | Non-local events need 7 bins at the 500 Hz grid, not 9 (R9; `minimum_sample_count(time, 0.015)` is 7 on every epoch) | first re-decode |
 | Artifact bins are missing data: `is_missing` is set, so the bin's log-likelihood is 0 | R11 |
 | Encoding training leaves out the Kay inventory's events and the artifact mask. Before, it left out Spyglass's stored ripples | R11 |
-| The SWR source, for the decode and for every analysis, is the Kay 2.0 inventory, run `056eee0dcb5a`, with tetrode rule R-T and a mask-excluded normalisation. It replaces Spyglass's `SWR_event` | R11 |
+| The SWR source, for the decode and for every analysis, is the Kay 2.0 inventory, run `056eee0dcb5a`, with tetrode rule R-T and a mask-excluded normalization. It replaces Spyglass's `SWR_event` | R11 |
 | The artifact mask is artifact run `fbbff144a123` | R11 |
 
 Other changes since April, from the same design table: tetrode-only HPC marks (`f172084`),
@@ -70,7 +70,7 @@ Each R11 decode records both run ids in `attrs["decode_masks"]` and the commit i
 
 The cohort is the epoch register's ([../epoch_register.md](../epoch_register.md)):
 
-- **242 analysed epochs** in 45 NWB files. That is 207 of the earlier 218, plus 35 epochs that
+- **242 analyzed epochs** in 45 NWB files. That is 207 of the earlier 218, plus 35 epochs that
   were not in the earlier cohort and were decoded in the refresh.
 - **13 epochs are excluded as `SUSTAINED_NOISE`.** The artifact detector finds an S block
   (sustained ripple-band noise) in each. 11 of them were in the earlier 218.
@@ -85,7 +85,7 @@ short:
 - The code changed no fitted result. With the same decodes and SWR labels, current code rebuilds
   the golden tables and rate fits exactly. It changed two descriptives: the content-quadrant
   definition and the gallery's count of SWRs that do not overlap a non-local event.
-- The SWR source (rule R-T with the mask normalisation) and the 35 added epochs move the SWR and
+- The SWR source (rule R-T with the mask normalization) and the 35 added epochs move the SWR and
   non-SWR reward rate ratios.
 - The R11 decode loses short, mostly non-SWR events with own-arm content. It moves the
   SWR × current-arm content term (CS1), the current-arm main effect (C1) and the

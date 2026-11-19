@@ -58,7 +58,7 @@ def require_time_index(frame: pd.DataFrame, what: str) -> None:
     """Refuse a frame whose index is not one epoch's time axis.
 
     A decode frame's time is its index, in seconds, and nothing else: every
-    reader takes an event's bounds from its first and last labelled row. A
+    reader takes an event's bounds from its first and last labeled row. A
     frame that lost that index (``reset_index(drop=True)``, a concat with
     ``ignore_index=True``) would have its row numbers read as seconds, and a
     ``time`` column would be a second time axis, so both are refused.
@@ -101,7 +101,7 @@ def require_canonical_speed_threshold(
 ) -> None:
     """Refuse a speed threshold the read's SWR and MUA cohorts do not follow.
 
-    The read (``analysed_time.with_swr_source``) gates the SWR and MUA labels at
+    The read (``analyzed_time.with_swr_source``) gates the SWR and MUA labels at
     the canonical :data:`DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC`, once for
     every consumer. A builder that gated its own events at another value would
     classify them against SWRs and MUA events gated at the canonical one, a
@@ -137,7 +137,7 @@ def require_canonical_speed_threshold(
     )
     raise ValueError(
         f"{where}: speed_threshold={speed_threshold!r} cm/s is not supported; "
-        f"pass {accepted}. The read (analysed_time.with_swr_source) gates the "
+        f"pass {accepted}. The read (analyzed_time.with_swr_source) gates the "
         f"SWR and MUA labels at {canonical:g} cm/s, so another value would "
         "mix speed cohorts."
     )
@@ -206,7 +206,7 @@ def filter_event_labels_by_speed(
 ) -> pd.DataFrame:
     """Return a copy with every ineligible event label set atomically to zero.
 
-    A frame read through ``analysed_time.with_swr_source`` already holds only
+    A frame read through ``analyzed_time.with_swr_source`` already holds only
     eligible events at the canonical threshold, so this is for a stricter
     threshold than the read's, or for a frame that was not read that way.
     """
@@ -291,7 +291,7 @@ def validate_nonlocal_event_probability_contract(
     strictly above the configured threshold. A stale or malformed artifact
     must not be clipped per bin or admitted by only some downstream consumers;
     every active label is therefore validated atomically, once, where the
-    frame is read (``analysed_time.with_swr_source``). Unlabeled bins are
+    frame is read (``analyzed_time.with_swr_source``). Unlabeled bins are
     intentionally ignored.
     """
     threshold = float(probability_threshold)

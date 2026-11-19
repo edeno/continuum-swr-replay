@@ -521,12 +521,12 @@ identified. A 3%-support indicator crossed with a time term is not estimable
 per session in a 3-alternative model.
 ```
 
-## Choice models: the two excluded behavioural predictors (moved 2026-09-06)
+## Choice models: the two excluded behavioral predictors (moved 2026-09-06)
 
 Moved verbatim from `model_specs.py`:
 
 ```
-Two predictors are deliberately excluded from the behavioural block:
+Two predictors are deliberately excluded from the behavioral block:
 - ``is_same_patch``: a coarse binary of ``distance_to_candidate_arm_cm`` (same-patch
   arms are close); the two were near-collinear (VIF > 700).
 - ``distance_to_candidate_arm_cm`` itself: the animal chose the closest arm in ~95-99%

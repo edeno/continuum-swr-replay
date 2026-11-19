@@ -17,7 +17,7 @@ file and those differ, they win.
   `ruff format --diff`; do not reformat unrelated code).
 - Docstrings, test names, module names, and commit messages must not mention this plan, phase
   numbers, task numbers, or `.claude/docs/plans/`.
-- Tests are value-level (numbers and behaviour, not presence). No test-only methods in production
+- Tests are value-level (numbers and behavior, not presence). No test-only methods in production
   code. Shared setup in fixtures. Simulation tests pin seeds. Tests over 20 s wall are marked `slow`.
 - Fail loud: contracts are enforced with `raise`, never warn-and-continue.
 - Canonical tables are parquet under `Processed-Data/replay_content/`; read through
@@ -162,7 +162,7 @@ introduced (none expected). Tests: `tests/unit/test_fit_replay_content_models.py
   cohort audit, same bucket the fraction path uses). Output dir = `canonical_output_subdir(...)`
   + `_dm` (add an `estimator` parameter, default `"conditional_poisson"`, and include it in the
   `canonical_output_subdirs` product). Provenance `estimator = "dirichlet_multinomial"`.
-- Small-session fallback (both runners): a session with fewer than 40 modelled events is fit with
+- Small-session fallback (both runners): a session with fewer than 40 modeled events is fit with
   `fixed_log_phi` = the animal-pooled intercept, defined as the median `coef_log_phi_intercept`
   over that animal's sessions with ≥ 40 events from a first pass (same rung, same cohort); the row
   records `phi_source ∈ {"session", "animal_pooled"}`. If an animal has no session with ≥ 40
@@ -223,7 +223,7 @@ Files: new `scripts/content/compare_content_estimators.py`; new
   "three_estimator_comparison"`.
 - Figures under `paper/figures/content_estimators/`: `coef_agreement.png` — per key term, scatter of
   per-session coefficients count vs fraction and count vs DM with the identity line and animal
-  colour; `log_phi_by_session.png` — `coef_log_phi_intercept` per session (x = session order within
+  color; `log_phi_by_session.png` — `coef_log_phi_intercept` per session (x = session order within
   animal) with `coef_log_phi_is_swr` as a second panel, both with the bootstrap interval as a band.
   A `content_estimators_caption.md` next to them (tracked) states what each panel shows and the
   seed.
@@ -254,7 +254,7 @@ Files: none edited beyond logs and the report. Runs write only into new `_dm` /
   animal-level `coef_log_phi_is_swr` medians and sign count, and whether the CS5_armvalue β sign
   agrees across the three estimators, in the report.
 
-### Task 5: Result doc and catalogue entries
+### Task 5: Result doc and catalog entries
 
 Files: new `docs/design/content_estimator_comparison.md`; `docs/models_table.md` (Conventions
 section ~9-46: an estimator row for DM; the content block: `_dm` bundles); `docs/covariate_dictionary.md`

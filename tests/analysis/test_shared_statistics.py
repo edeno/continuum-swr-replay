@@ -417,7 +417,7 @@ def test_many_draws_at_once_keep_the_nesting_and_one_is_the_single_draw():
 
 def test_bootstrap_interval_is_the_estimate_plus_minus_the_corrected_t_half_width():
     # Draws 1, 2, 3, 4: SD (ddof=1) sqrt(5/3). Five animals: t(0.975, 4) is
-    # 2.7764451, the correction sqrt(5/4). The interval is centred on the
+    # 2.7764451, the correction sqrt(5/4). The interval is centered on the
     # estimate, not on the draws (mean 2.5).
     interval = stats.bootstrap_interval(10.0, [1.0, 2.0, 3.0, 4.0], 5)
     half = 2.7764451052 * np.sqrt(5 / 4) * np.sqrt(5 / 3)

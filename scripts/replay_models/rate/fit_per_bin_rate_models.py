@@ -5,7 +5,7 @@ Family B is the point-process counterpart to the per-stop rate hierarchy
 (``fit_per_stop_rate_models.py``). Where Family A fits one Poisson GLM per stop
 with a ``log(immobility_duration_s)`` dwell offset, here every model is fit on the
 canonical (stop x bin) design from ``aggregate_to_timebins`` with a
-``log(exposure)`` offset, modelling the within-stop time course explicitly.
+``log(exposure)`` offset, modeling the within-stop time course explicitly.
 
 The design is the at-risk one (``PER_BIN_DESIGN``): a bin inside an ongoing
 event of the outcome's detector cannot hold an onset, so it is dropped
@@ -88,7 +88,7 @@ import time  # noqa: E402
 import warnings  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (  # noqa: E402
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (  # noqa: E402
     require_swr_source,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (  # noqa: E402

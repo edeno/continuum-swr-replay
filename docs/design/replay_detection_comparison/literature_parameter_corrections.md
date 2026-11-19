@@ -12,7 +12,7 @@ Supplementary Table S1,
 2026-09-21.*
 
 Both the CSV in this directory and the Google Sheet it came from carry the 67
-corrections below, the three papers and seven columns added afterwards, and the
+corrections below, the three papers and seven columns added afterward, and the
 blank-cell and trajectory passes at the end. They were compared cell by cell and agree exactly across
 all 57 rows and 35 columns.
 

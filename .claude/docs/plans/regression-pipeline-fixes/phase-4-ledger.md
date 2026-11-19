@@ -23,7 +23,7 @@ Task 2: fix round 1 implemented (b8177be); re-review dispatched (sonnet)
 Task 2: re-review — 6/7 addressed; residual (scope note says three rows, should be four) fixed by the controller in 86447a0
 Task 2: complete
 Task 3: dispatching implementer (opus); BASE = 86447a0
-Task 3: implementer DONE (9547160 a63683c de8dc1d); retired-name grep zero; q printed as < 0.0001 where the audit prints 0.0000 (Ruling 4: correct — sharper values are not in a listed source); Mu +0.3509 labelled session median; MU/rate-contrast coefficient blocks marked pending (audits print no coefficients). Review dispatched (opus).
+Task 3: implementer DONE (9547160 a63683c de8dc1d); retired-name grep zero; q printed as < 0.0001 where the audit prints 0.0000 (Ruling 4: correct — sharper values are not in a listed source); Mu +0.3509 labeled session median; MU/rate-contrast coefficient blocks marked pending (audits print no coefficients). Review dispatched (opus).
 Note for Task 4: retired-name hits outside the allowlist now 2 (were ~15 before Task 3) — listed above in the shell; the new test must fail on these two before Task 4's cleanup and pass after. CLAUDE.md:162 path is analysis/replay/spatial_mapping.py (verified); label_event_* still exists in tables_event.py:487 (alias present → keep the sentence, correct the wording).
 Task 3: review — 32 numbers traced OK; 1 Critical (19f title contradicts its cell) + 4 Important (19d scope note; 19f REVISED note; ΔAIC sign convention; split-vs-interaction reconciliation) + 4 minors; fix round 1 dispatched (resume implementer)
 Task 3: fix round 1 implemented (2c1119b); two extra stale rate_models.md pointers about 19c corrected (accepted: they became false with the rewrite); re-review dispatched (opus)

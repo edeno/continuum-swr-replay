@@ -20,8 +20,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     read_dot_with_swr_source,
     read_verified_dot_with_swr_source,
     require_swr_source,
@@ -505,7 +505,7 @@ class TestCoverage:
         np.testing.assert_array_equal(observed, expected)
 
     def test_excluded_time_is_not_observed(self, tmp_path, monkeypatch):
-        """Excluded time (the mask widened by 0.3 s) is not analysed: an event
+        """Excluded time (the mask widened by 0.3 s) is not analyzed: an event
         there is neither SWR nor non-SWR. Its intervals leave the coverage,
         endpoints included, and the stretches say the same as the mask."""
         directory = write_swr_inventory(
@@ -523,7 +523,7 @@ class TestCoverage:
             (TIME >= 102.0) & (TIME <= 109.0)
         )
         in_excluded = np.zeros(TIME.size, dtype=bool)
-        for start, end in analysed_time.excluded_intervals(EPOCH).to_numpy():
+        for start, end in analyzed_time.excluded_intervals(EPOCH).to_numpy():
             in_excluded |= (TIME >= start) & (TIME <= end)
         # 0.8 s each; the padded bounds fall a hair off the grid
         assert in_excluded.sum() == 2 * 399
@@ -680,8 +680,8 @@ class TestTheStamp:
             require_swr_source(frame, what="the event table")
 
 
-def test_a_patch_on_swr_inventory_reaches_analysed_time(monkeypatch):
-    """``analysed_time`` calls the source's functions through ``swr_source``,
+def test_a_patch_on_swr_inventory_reaches_analyzed_time(monkeypatch):
+    """``analyzed_time`` calls the source's functions through ``swr_source``,
     so one patch there reaches the stamp, its check and excluded time."""
     monkeypatch.setattr(swr_source, "swr_source_name", lambda: "patched@source")
     frame = stamp_swr_source(pd.DataFrame())
@@ -691,11 +691,11 @@ def test_a_patch_on_swr_inventory_reaches_analysed_time(monkeypatch):
     cores = pd.DataFrame({"start_time": [10.0], "end_time": [12.0]})
     monkeypatch.setattr(swr_source, "artifact_intervals", lambda epoch_id: cores)
     pd.testing.assert_frame_equal(
-        analysed_time.excluded_intervals(EPOCH), excluded_time(cores)
+        analyzed_time.excluded_intervals(EPOCH), excluded_time(cores)
     )
 
 
-@pytest.mark.parametrize("module", ["swr_source", "analysed_time"])
+@pytest.mark.parametrize("module", ["swr_source", "analyzed_time"])
 def test_the_module_names_no_stored_ripple_source(module):
     path = REPO / f"src/continuum_swr_replay/analysis/event_definition/{module}.py"
     code = re.sub(r'""".*?"""', "", path.read_text(), flags=re.S)
@@ -729,9 +729,9 @@ MUA = [
 ]
 
 
-class TestEveryCohortHonoursTheMask:
+class TestEveryCohortHonorsTheMask:
     """The source serves each analysis frame with every event cohort held to the
-    one analysed-time rule: an event in excluded time (the mask widened by
+    one analyzed-time rule: an event in excluded time (the mask widened by
     ``ARTIFACT_REACH_S``) is dropped whatever its kind, and a kept event that
     overlaps an SWR or MUA event dropped for excluded time is dropped too. A
     dropped event keeps its reason, and the others keep their numbers (so
@@ -753,15 +753,15 @@ class TestEveryCohortHonoursTheMask:
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
 
         np.testing.assert_allclose(
-            analysed_time.excluded_intervals(EPOCH).to_numpy(), EXCLUDED_INTERVALS
+            analyzed_time.excluded_intervals(EPOCH).to_numpy(), EXCLUDED_INTERVALS
         )
         np.testing.assert_allclose(
-            analysed_time.excluded_intervals_of(_dot()).to_numpy(), EXCLUDED_INTERVALS
+            analyzed_time.excluded_intervals_of(_dot()).to_numpy(), EXCLUDED_INTERVALS
         )
         sessions = pd.DataFrame(
             {"animal": ["j16"], "session_date": [20210706], "epoch": ["02_r1"]}
         )
-        by_session = analysed_time.excluded_intervals_by_session(sessions)
+        by_session = analyzed_time.excluded_intervals_by_session(sessions)
         assert list(by_session.columns) == [
             "animal",
             "session_date",
@@ -795,7 +795,7 @@ class TestEveryCohortHonoursTheMask:
     ):
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
 
-        drops = analysed_time.artifact_event_drops(self._nonlocal_dot())
+        drops = analyzed_time.artifact_event_drops(self._nonlocal_dot())
 
         def _reasons(column):
             rows = drops.loc[drops["event_col"] == column]
@@ -818,8 +818,8 @@ class TestEveryCohortHonoursTheMask:
         swrs = _reasons("SWR_event")
         assert swrs[5] == swrs[6] == DropReason.ARTIFACT
         assert swrs[3] == DropReason.MOVING
-        assert list(drops.columns) == analysed_time.DROP_COLUMNS
-        dropped = analysed_time.dropped_for_excluded_time(drops)
+        assert list(drops.columns) == analyzed_time.DROP_COLUMNS
+        dropped = analyzed_time.dropped_for_excluded_time(drops)
         assert sorted(zip(dropped["event_col"], dropped["label"], strict=True)) == [
             ("MUA_event", 1),
             ("MUA_event", 2),
@@ -832,13 +832,13 @@ class TestEveryCohortHonoursTheMask:
         self, inventory, tmp_path, monkeypatch
     ):
         """An SWR's sampled bounds are its first and last grid sample (NaN for
-        one the speed rule rejects); a labelled event's are its bounds. The
+        one the speed rule rejects); a labeled event's are its bounds. The
         second pass reads the dropped events at them (``dropped_on_grid``)."""
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
         dot = self._nonlocal_dot()
         time = dot.index.to_numpy()
 
-        drops = analysed_time.artifact_event_drops(dot)
+        drops = analyzed_time.artifact_event_drops(dot)
 
         swr = drops["event_col"] == "SWR_event"
         rows = drops.loc[swr]
@@ -855,8 +855,8 @@ class TestEveryCohortHonoursTheMask:
             drops.loc[~swr, ["sampled_start_time", "sampled_end_time"]].to_numpy(),
             drops.loc[~swr, ["start_time", "end_time"]].to_numpy(),
         )
-        on_grid = analysed_time.dropped_on_grid(drops)
-        dropped = analysed_time.dropped_for_excluded_time(drops)
+        on_grid = analyzed_time.dropped_on_grid(drops)
+        dropped = analyzed_time.dropped_for_excluded_time(drops)
         assert on_grid.index.equals(dropped.index)
         np.testing.assert_array_equal(
             on_grid[["start_time", "end_time"]].to_numpy(),
@@ -908,7 +908,7 @@ class TestEveryCohortHonoursTheMask:
 
         for column in ("non_local_event", "MUA_event"):
             pd.testing.assert_series_equal(out[column], dot[column])
-        reasons = analysed_time.artifact_event_drops(dot)["drop_reason"].dropna()
+        reasons = analyzed_time.artifact_event_drops(dot)["drop_reason"].dropna()
         assert set(reasons) <= {
             DropReason.MOVING,
             DropReason.SPEED_UNKNOWN,
@@ -956,7 +956,7 @@ class TestTheLabelContract:
             with_swr_source(dot)
         assert "time" in str(refused.value)
         with pytest.raises(ValueError, match=message):
-            analysed_time.artifact_event_drops(dot)
+            analyzed_time.artifact_event_drops(dot)
 
     def test_a_frame_that_keeps_the_contract_is_read(self, inventory):
         out = with_swr_source(self._frame())
@@ -973,7 +973,7 @@ class TestTheLabelContract:
         with pytest.raises(EventDefinitionError, match="immobility contract"):
             with_swr_source(dot, drop_masked_events=drop_masked_events)
         with pytest.raises(EventDefinitionError, match="immobility contract"):
-            analysed_time.artifact_event_drops(dot)
+            analyzed_time.artifact_event_drops(dot)
 
     def test_a_label_with_untracked_speed_is_refused(self, inventory):
         dot = self._frame(MUA_event=_labels([(103.05, 103.08)]))  # speed NaN
@@ -1015,10 +1015,10 @@ class TestTheLabelContract:
         dot.to_pickle(path)
 
         with pytest.raises(EventDefinitionError, match="probability-threshold"):
-            analysed_time.artifact_event_drops(dot)
-        drops = analysed_time.artifact_event_drops(dot, non_local_threshold=0.5)
+            analyzed_time.artifact_event_drops(dot)
+        drops = analyzed_time.artifact_event_drops(dot, non_local_threshold=0.5)
         pd.testing.assert_frame_equal(
-            analysed_time.read_artifact_event_drops(path, non_local_threshold=0.5),
+            analyzed_time.read_artifact_event_drops(path, non_local_threshold=0.5),
             drops,
         )
         assert (drops["event_col"] == "non_local_event").sum() == 1
@@ -1063,7 +1063,7 @@ class TestTheExcludedTimeColumn:
         self, inventory, tmp_path, monkeypatch
     ):
         _artifacts(tmp_path, monkeypatch, ARTIFACTS)
-        excluded = analysed_time.excluded_intervals(EPOCH)
+        excluded = analyzed_time.excluded_intervals(EPOCH)
         # the grid holds every interval's exact endpoints, so closedness shows
         time = np.unique(np.r_[TIME, excluded.to_numpy().ravel()])
         dot = pd.DataFrame(
@@ -1103,7 +1103,7 @@ class TestTheExcludedTimeColumn:
 
         np.testing.assert_array_equal(
             out["in_excluded_time"].to_numpy(),
-            _closed_mask(analysed_time.excluded_intervals(EPOCH), TIME),
+            _closed_mask(analyzed_time.excluded_intervals(EPOCH), TIME),
         )
 
     def test_a_contfrag_frame_read_from_its_pickle_carries_it(
@@ -1118,34 +1118,34 @@ class TestTheExcludedTimeColumn:
 
         np.testing.assert_array_equal(
             out["in_excluded_time"].to_numpy(),
-            _closed_mask(analysed_time.excluded_intervals(EPOCH), TIME),
+            _closed_mask(analyzed_time.excluded_intervals(EPOCH), TIME),
         )
 
 
-class TestTheAnalysedBins:
-    """``analysed_bins`` is the one check of the column every per-bin summary
+class TestTheAnalyzedBins:
+    """``analyzed_bins`` is the one check of the column every per-bin summary
     uses: the column must be there and boolean, with no coercion."""
 
     def test_it_is_the_rows_outside_excluded_time(self):
         frame = pd.DataFrame({"in_excluded_time": [False, True, True, False]})
 
         np.testing.assert_array_equal(
-            analysed_time.analysed_bins(frame), [True, False, False, True]
+            analyzed_time.analyzed_bins(frame), [True, False, False, True]
         )
-        assert "analysed_bins" in analysed_time.__all__
+        assert "analyzed_bins" in analyzed_time.__all__
 
     def test_a_frame_without_the_column_is_refused(self):
         with pytest.raises(
             ValueError, match="read_dot_with_swr_source.*in_excluded_time"
         ):
-            analysed_time.analysed_bins(pd.DataFrame({"head_speed": [0.0]}))
+            analyzed_time.analyzed_bins(pd.DataFrame({"head_speed": [0.0]}))
 
     @pytest.mark.parametrize(
         "values",
         [
             [False, True],  # boolean values, object dtype: no coercion
             [False, np.nan],  # a concat with a frame read another way
-            [False, None],  # cast to bool, None would read as analysed
+            [False, None],  # cast to bool, None would read as analyzed
         ],
         ids=["object", "nan", "none"],
     )
@@ -1153,12 +1153,12 @@ class TestTheAnalysedBins:
         frame = pd.DataFrame({"in_excluded_time": pd.Series(values, dtype=object)})
 
         with pytest.raises(TypeError, match="in_excluded_time"):
-            analysed_time.analysed_bins(frame)
+            analyzed_time.analyzed_bins(frame)
 
 
-def test_immobile_analysed_bins_are_strictly_below_the_threshold_outside_excluded_time():
+def test_immobile_analyzed_bins_are_strictly_below_the_threshold_outside_excluded_time():
     """A bin at 4 cm/s, a bin with no speed and an excluded bin are not
-    immobile analysed bins; the bins below 4 cm/s outside excluded time are."""
+    immobile analyzed bins; the bins below 4 cm/s outside excluded time are."""
     frame = pd.DataFrame(
         {
             "head_speed": [0.0, 3.9, 4.0, np.nan, 1.0, 10.0],
@@ -1167,11 +1167,11 @@ def test_immobile_analysed_bins_are_strictly_below_the_threshold_outside_exclude
     )
 
     np.testing.assert_array_equal(
-        analysed_time.immobile_analysed_bins(frame),
+        analyzed_time.immobile_analyzed_bins(frame),
         [True, True, False, False, False, False],
     )
     np.testing.assert_array_equal(
-        analysed_time.immobile_analysed_bins(frame, speed_threshold=10.5),
+        analyzed_time.immobile_analyzed_bins(frame, speed_threshold=10.5),
         [True, True, True, False, False, True],
     )
 
@@ -1228,7 +1228,7 @@ class TestTheNormalizers:
 
         assert np.isnan(theta[in_mask]).all()
         # the reach of the mask is outside it: finite there
-        reach = _closed_mask(analysed_time.excluded_intervals(EPOCH), TIME) & ~in_mask
+        reach = _closed_mask(analyzed_time.excluded_intervals(EPOCH), TIME) & ~in_mask
         assert np.isfinite(theta[reach]).all()
 
     def test_theta_is_the_raw_power_z_scored_outside_the_mask(
@@ -1336,12 +1336,12 @@ def test_the_decodes_event_counts_are_dropped(inventory, drop_masked_events):
         "n_non_local_MUA": 7,
         "n_non_local_no_MUA": 6,
     }
-    assert set(counts) == set(analysed_time.DECODE_EVENT_COUNT_COLUMNS)
+    assert set(counts) == set(analyzed_time.DECODE_EVENT_COUNT_COLUMNS)
 
     out = with_swr_source(_dot(**counts), drop_masked_events=drop_masked_events)
 
     assert not set(counts) & set(out.columns)
-    assert not set(analysed_time.DECODE_SWR_COUNT_COLUMNS) & set(out.columns)
+    assert not set(analyzed_time.DECODE_SWR_COUNT_COLUMNS) & set(out.columns)
 
 
 def test_session_epoch_id_is_the_one_built_from_a_file_name():

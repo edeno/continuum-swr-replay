@@ -1,7 +1,7 @@
-"""Ridge-penalised, cross-validated self vs self+cross history comparison.
+"""Ridge-penalized, cross-validated self vs self+cross history comparison.
 
 Within one session a non-local stream holds about one expected onset in the
-other stream's 150 ms cross window, so the unpenalised cross rungs
+other stream's 150 ms cross window, so the unpenalized cross rungs
 (``Mselfcross_dur``) fail to converge in most sessions and in one animal's
 pooled fit: a lag with no events has its maximum-likelihood coefficient at
 ``-inf``. This module replaces the AIC comparison with a held-out one:
@@ -10,7 +10,7 @@ pooled fit: a lag with no events has its maximum-likelihood coefficient at
   :func:`duration_aware_history.fit_pooled_history` does;
 - the history coefficients (self and cross, onset and end) carry a Gaussian
   prior ``lambda = 1 / sigma**2``; the intercept, the session effects, the time
-  spline and the reward basis are unpenalised. The fit is the posterior mode,
+  spline and the reward basis are unpenalized. The fit is the posterior mode,
   which is finite for every lag;
 - folds are whole stops, assigned within each session, so every session is in
   every training set (its baseline is estimated) and no history window crosses
@@ -19,7 +19,7 @@ pooled fit: a lag with no events has its maximum-likelihood coefficient at
   folds of each outer fold, and the outer held-out Poisson log-likelihood of
   the self-only and the self+cross rung is compared fold by fold.
 
-The fitter is Newton's method on the penalised log-likelihood with step
+The fitter is Newton's method on the penalized log-likelihood with step
 halving (the objective is strictly concave), in ``float64``. The
 cross-validation runs every (training set, sigma) fit of a rung as one batch in
 JAX (:func:`fit_ridge_poisson_batch`), on whichever device the caller chose;
@@ -70,7 +70,7 @@ SIGMA_GRID: tuple[float, ...] = (0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.
 N_FOLDS = 5
 #: Seed of the stop-to-fold assignment.
 FOLD_SEED = 20261030
-#: A session with fewer response onsets than this is left out: an unpenalised
+#: A session with fewer response onsets than this is left out: an unpenalized
 #: session effect with no events in a training set has its estimate at -inf.
 MIN_SESSION_EVENTS = 10
 #: The file the per-animal cross-validation results are written to, in
@@ -79,7 +79,7 @@ RIDGE_CV_FILE = "cross_history_ridge_cv.pkl"
 #: Elements of the largest ``(rows, n_fits, n_features)`` block a batched pass
 #: holds (1 GB in float64).
 _CHUNK_ELEMENTS = 125_000_000
-#: Design columns of the history blocks (the penalised ones).
+#: Design columns of the history blocks (the penalized ones).
 _HISTORY_COLUMN = re.compile(r"^(cross_)?(off)?hist_rcos_\d+$")
 
 
@@ -91,10 +91,10 @@ class RidgeFit:
     ----------
     params : np.ndarray, shape (n_features,)
     converged : bool
-        The penalised log-likelihood changed by less than ``tol`` (relative).
+        The penalized log-likelihood changed by less than ``tol`` (relative).
     n_iter : int
     objective : float
-        Penalised log-likelihood at ``params`` (without ``log y!``).
+        Penalized log-likelihood at ``params`` (without ``log y!``).
     """
 
     params: np.ndarray
@@ -106,7 +106,7 @@ class RidgeFit:
 def ridge_design(
     design: pd.DataFrame, spec: PerBinRateModelSpec, *, group: str = "session"
 ) -> tuple[np.ndarray, list[str], np.ndarray]:
-    """The rung's design matrix with a session effect, and its penalised columns.
+    """The rung's design matrix with a session effect, and its penalized columns.
 
     Returns
     -------
@@ -154,7 +154,7 @@ def fit_ridge_poisson(
 ) -> RidgeFit:
     """Posterior mode of a log-link Poisson GLM under a Gaussian prior.
 
-    Maximises ``sum_i w_i (y_i eta_i - exp(eta_i)) - (1/2) sum_j lambda_j
+    Maximizes ``sum_i w_i (y_i eta_i - exp(eta_i)) - (1/2) sum_j lambda_j
     beta_j**2`` with ``eta = X beta + offset``, by Newton steps with halving.
 
     Parameters
@@ -170,7 +170,7 @@ def fit_ridge_poisson(
         Warm start; by default the intercept-only rate.
     maxiter : int
     tol : float
-        Relative change of the penalised log-likelihood that stops the fit.
+        Relative change of the penalized log-likelihood that stops the fit.
 
     Returns
     -------
@@ -271,7 +271,7 @@ def _weights(fold: jnp.ndarray, keep: jnp.ndarray) -> jnp.ndarray:
 
 
 def _batch_objective(data, keep, lam, beta):
-    """Penalised training log-likelihood of each fit, shape ``(n_fits,)``."""
+    """Penalized training log-likelihood of each fit, shape ``(n_fits,)``."""
 
     def body(acc, chunk):
         X, y, o, f = chunk
@@ -284,7 +284,7 @@ def _batch_objective(data, keep, lam, beta):
 
 
 def _score_and_information(data, keep, lam, beta):
-    """Penalised score ``(n_fits, p)`` and information ``(n_fits, p, p)``."""
+    """Penalized score ``(n_fits, p)`` and information ``(n_fits, p, p)``."""
     n_fits, p = beta.shape
 
     def body(acc, chunk):
@@ -412,7 +412,7 @@ def fit_ridge_poisson_batch(
     score_fold : np.ndarray of int, shape (n_fits,), optional
         Fold each fit is scored on (held-out log-likelihood, with ``log y!``).
     covariance : bool
-        Also return the inverse penalised information at each mode.
+        Also return the inverse penalized information at each mode.
 
     Returns
     -------
@@ -523,7 +523,7 @@ def ridge_kernels(
 ) -> dict[str, dict[str, list[float]]]:
     """Per-lag log rate ratio and its posterior SD for each history block.
 
-    ``covariance`` is the inverse penalised information at the mode (the
+    ``covariance`` is the inverse penalized information at the mode (the
     Laplace posterior covariance), so the SD includes the prior's shrinkage.
     """
     out = {}

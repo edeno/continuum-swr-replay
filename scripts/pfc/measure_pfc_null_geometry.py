@@ -22,7 +22,7 @@ and reported for the reader of the p-values, not acted on:
    null's draws are worse still. Those units are "significant" against the
    control without predicting held-out spikes better than a constant rate.
 4. **Events the matched test could not use.** An event with no legal non-event
-   window inside its own fitted bout cannot enter a matched randomisation test.
+   window inside its own fitted bout cannot enter a matched randomization test.
    Those events are excluded from both sides, so the p-value describes the
    tested subset, not the whole class.
 
@@ -131,7 +131,7 @@ def spacing_summary(
 
 
 def draw_spacing_summary(label: str, draws: list[pd.DataFrame]) -> dict[str, Any]:
-    """Spacing of a set of null draws, summarised across draws.
+    """Spacing of a set of null draws, summarized across draws.
 
     Each draw is measured on its own time axis and the per-draw statistics are
     then combined: pooling the draws' onsets first would make every gap look
@@ -408,7 +408,7 @@ def excluded_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
     text = (
         "## Events the matched test could not use\n\n"
         "An event with no legal non-event window inside its own fitted bout "
-        "cannot enter a matched randomisation test, so one fixed subset -- "
+        "cannot enter a matched randomization test, so one fixed subset -- "
         "selected from timing and duration alone, never from spikes -- is used "
         "on both the observed and the null side. The empirical p-value is "
         "therefore a statement about that subset, not about every event of the "

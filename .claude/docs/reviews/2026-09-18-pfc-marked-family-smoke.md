@@ -16,7 +16,7 @@ from the canonical Figure 4 bundles: the smallest, a median one, the largest.
 | senor20201101 08_r4 | 276 | 9 core | 9 | 0 | 28.5 min | 0 |
 | wilbur20210331 10_r5 | 511 | 9 core | 8 | 1 (`switch_context`) | 39 min | 0 |
 
-Device memory at full utilisation: 34.1 GB on both larger sessions, 20.3 GB on
+Device memory at full utilization: 34.1 GB on both larger sessions, 20.3 GB on
 the smallest, on 80 GB cards. Per-model wall time on the median session:
 spatial role 209 s, belief content 288 s, reward memory 277 s, novelty 176 s,
 trajectory geometry 303 s, within-stop timing 86 s, switch context 91 s,
@@ -44,7 +44,7 @@ What the run exercised, and how it behaved:
   exited in 9 s after finding all twelve bundles current, without reloading
   the session. A rerun does, however, truncate that session's log file to the
   single "skipping" line: the shared `setup_logger` opens the file in write
-  mode. Every PFC runner shares that behaviour; see follow-ups.
+  mode. Every PFC runner shares that behavior; see follow-ups.
 - **Held-out deltas.** For the spatial-role model on the small session the
   per-unit held-out deviance change is negative for most units (median about
   −10, 73 units) with a right tail to about +11. A 22-parameter block fit to
@@ -70,7 +70,7 @@ The base-only refit reproduces the canonical bundle exactly, so the fit mask,
 event sets, spike counts, and estimator agree end to end. The inflation is
 unchanged when every mark is permuted within class, so it is not content: it
 is what adding 132 near-collinear columns under the σ = 3 prior does to the
-base block. About a third of same-class events have a neighbour within
+base block. About a third of same-class events have a neighbor within
 0.5 s, so mark columns overlap base columns, and blocks fit to noise let the
 base block escape part of its shrinkage. With σ = 1 the full design's base
 peaks are within a few percent of the base-only σ = 1 fit (ratios 0.89 vs

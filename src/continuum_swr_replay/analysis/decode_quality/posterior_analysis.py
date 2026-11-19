@@ -322,7 +322,7 @@ def map_estimate_to_map_nodes(
     """MAP track-graph node id per timebin from a stored ``map_estimate`` (cm).
 
     Recovers the decoder's argmax bin node from the *already stored* MAP linear
-    position by nearest-neighbour match against the place-bin centers (the bin
+    position by nearest-neighbor match against the place-bin centers (the bin
     centers equal the decoder's ``map_estimate`` values exactly). This lets
     callers compute :func:`step_distance_from_nodes` from a saved
     ``map_estimate`` column without reloading the full posterior, and matches
@@ -346,7 +346,7 @@ def map_estimate_to_map_nodes(
         ``False`` where ``map_estimate`` was ``NaN``.
     """
     # Exclude junction placeholder bins (node_id == -1, edge_id == -1
-    # interpolation artifacts) from the candidate set so the nearest-neighbour
+    # interpolation artifacts) from the candidate set so the nearest-neighbor
     # match never returns a node that is absent from the track graph
     # (junction-bin rule). The MAP itself never lands on these bins.
     real = np.asarray(place_bin_centers_nodes_df["node_id"]) != -1
@@ -528,7 +528,7 @@ def get_map_speed(
     # all-NaN frame would carry the placeholder's contribution: e.g.
     # valid_node=1, NaN, valid_node=1 returned [10., NaN, 10.] even
     # though the two valid MAP positions are identical and the
-    # motion was an artefact of node 0 being used as the placeholder.
+    # motion was an artifact of node 0 being used as the placeholder.
     invalid_step = ~(has_valid_data[:-1] & has_valid_data[1:])
     speed[:-1][invalid_step] = np.nan
     # The last bin reuses the previous step (backward difference),

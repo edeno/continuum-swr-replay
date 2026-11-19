@@ -41,8 +41,8 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.detector_comparison import inventory_run
-from continuum_swr_replay.analysis.event_definition import analysed_time, swr_source
-from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
+from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
+from continuum_swr_replay.analysis.event_definition.analyzed_time import read_swr_table
 from continuum_swr_replay.analysis.event_properties.gamma_power import (
     FILTER_ORDER,
     GAMMA_BANDS,
@@ -81,7 +81,7 @@ def epoch_gamma(
     lfp = inputs["raw_referenced"][:, keep]
     sampling_frequency = float(record["sampling"]["measured"])
 
-    dot = analysed_time.with_swr_source(
+    dot = analyzed_time.with_swr_source(
         pd.read_pickle(inventory_run.decode_path(identifier))
     )
     grid_time, _ = inventory_run.speed_trace(dot)
@@ -91,7 +91,7 @@ def epoch_gamma(
         sampling_frequency,
         dot,
         grid_time,
-        analysed_time.excluded_intervals(identifier),
+        analyzed_time.excluded_intervals(identifier),
         events,
     )
     table = events[

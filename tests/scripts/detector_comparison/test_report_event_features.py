@@ -897,7 +897,7 @@ def written(tmp_path_factory):
         tmp_path / "figures",
         inventory_root=inventory_root,
         memoryless_root=memoryless_root,
-        analysed=[
+        analyzed=[
             "sim20200101_02_r1_HPC",
             "sim20200101_04_r2_HPC",
             "toy20200101_02_r1_HPC",
@@ -943,8 +943,8 @@ class TestTheReportOnARunOnDisk:
         assert SETTINGS["tracking_confidence"] in text
         assert "Widloski" in text
         assert f"SWR source {SETTINGS['swr_source']}" in text.split("## ")[0]
-        # 3 ok, 1 failed, and 1 analysed epoch outside the run
-        assert "3 ok epochs, 1 failed, and 1 analysed epochs" in text
+        # 3 ok, 1 failed, and 1 analyzed epoch outside the run
+        assert "3 ok epochs, 1 failed, and 1 analyzed epochs" in text
 
     def test_the_tables_read_back_from_disk(self, written):
         report_dir, _, _ = written
@@ -961,7 +961,7 @@ class TestTheReportOnARunOnDisk:
 def test_main_reads_the_run_named(tmp_path, processed_data_root, monkeypatch):
     run_dir, _, _ = _write_run(processed_data_root)
     monkeypatch.setattr(report, "FIGURE_ROOT", tmp_path / "figures")
-    monkeypatch.setattr(report, "analysed_epoch_ids", lambda: [])
+    monkeypatch.setattr(report, "analyzed_epoch_ids", lambda: [])
 
     report.main(["--run-id", "run01"])
 

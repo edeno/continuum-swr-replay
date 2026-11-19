@@ -121,7 +121,7 @@ def _plot_speed(ax: Axes, ctx: _PanelContext) -> None:
 
     ax.axhline(
         DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-        color="grey",
+        color="gray",
         linestyle="--",
         linewidth=0.8,
         zorder=5,
@@ -152,7 +152,7 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         ax.set_ylabel("behavioral\nlocation")
         ax.set_ylim(-0.5, 5.5)
@@ -212,7 +212,7 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         ax.set_ylabel("behavioral\nlocation")
         ax.set_ylim(-0.5, 5.5)
@@ -251,7 +251,7 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
 
     # Per-well horizontal guidelines so step levels are easy to read.
     for well in sorted(WELL_PATCH_MAPPING):
-        ax.axhline(well, color="lightgrey", linewidth=0.3, zorder=0)
+        ax.axhline(well, color="lightgray", linewidth=0.3, zorder=0)
 
     ax.set_ylabel("behavioral\nlocation")
     ax.set_ylim(-0.5, 5.5)
@@ -340,7 +340,7 @@ def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
     et = et.loc[in_window]
 
     for arm in _ALL_ARMS:
-        ax.axhline(arm, color="lightgrey", linewidth=0.3, zorder=0)
+        ax.axhline(arm, color="lightgray", linewidth=0.3, zorder=0)
 
     if len(et) == 0:
         ax.text(
@@ -350,7 +350,7 @@ def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
     else:
         times = et["event_midpoint_s"].to_numpy()
@@ -388,7 +388,7 @@ def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
                 [],
                 [],
                 marker="o",
-                color="grey",
+                color="gray",
                 markersize=6,
                 markeredgecolor="black",
                 markeredgewidth=0.3,
@@ -399,7 +399,7 @@ def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
                 [],
                 [],
                 marker="^",
-                color="grey",
+                color="gray",
                 markersize=6,
                 markeredgecolor="black",
                 markeredgewidth=0.3,
@@ -410,7 +410,7 @@ def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
                 [],
                 [],
                 marker="v",
-                color="grey",
+                color="gray",
                 markersize=6,
                 markeredgecolor="black",
                 markeredgewidth=0.3,
@@ -421,7 +421,7 @@ def _plot_arm_markers(ax: Axes, ctx: _PanelContext) -> None:
                 [],
                 [],
                 marker="*",
-                color="grey",
+                color="gray",
                 markersize=8,
                 markeredgecolor="black",
                 markeredgewidth=0.3,
@@ -448,7 +448,7 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
     ``event_midpoint_s`` for alignment with the other event panels; that
     midpoint is not used to select the next trial.
     A vertical connector between them — **red when the two disagree**,
-    thin grey when they match.
+    thin gray when they match.
 
     ``(NaN, NaN)`` — the legitimate session-end case where the last
     event has no next trip — is treated as a match.
@@ -467,7 +467,7 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
     view = mismatch.loc[in_window]
 
     for arm in _ALL_ARMS:
-        ax.axhline(arm, color="lightgrey", linewidth=0.3, zorder=0)
+        ax.axhline(arm, color="lightgray", linewidth=0.3, zorder=0)
 
     if len(view) == 0:
         ax.text(
@@ -477,7 +477,7 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
     else:
         times = view["event_midpoint_s"].to_numpy()
@@ -560,7 +560,7 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
             [],
             [],
             marker="v",
-            color="grey",
+            color="gray",
             markersize=6,
             markeredgecolor="black",
             markeredgewidth=0.3,
@@ -571,13 +571,13 @@ def _plot_mismatch_pointers(ax: Axes, ctx: _PanelContext) -> None:
             [],
             [],
             marker="x",
-            color="grey",
+            color="gray",
             markersize=6,
             markeredgewidth=1.0,
             linestyle="none",
             label="actual (from trials)",
         ),
-        Line2D([], [], color="lightgrey", linewidth=1.5, label="match"),
+        Line2D([], [], color="lightgray", linewidth=1.5, label="match"),
         Line2D([], [], color="red", linewidth=1.5, label="MISMATCH"),
     ]
     ax.legend(
@@ -618,7 +618,7 @@ def _plot_arm_posterior_heatmap(ax: Axes, ctx: _PanelContext) -> None:
     view = est[(est["time"] >= lo) & (est["time"] <= hi)]
 
     for arm in _ALL_ARMS:
-        ax.axhline(arm, color="lightgrey", linewidth=0.3, zorder=0)
+        ax.axhline(arm, color="lightgray", linewidth=0.3, zorder=0)
 
     if len(view) == 0:
         ax.text(
@@ -628,7 +628,7 @@ def _plot_arm_posterior_heatmap(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         ax.set_ylabel("arm\nposterior")
         ax.set_ylim(-0.5, 8.5)
@@ -767,7 +767,7 @@ def _plot_arm_mass_stackplot(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
 
@@ -829,7 +829,7 @@ def _plot_replay_frac_by_role(ax: Axes, ctx: _PanelContext) -> None:
     ax.set_yticks([0, 0.5, 1])
     ax.axhline(
         1.0 / len(_ALL_ARMS),
-        color="grey",
+        color="gray",
         linewidth=0.5,
         linestyle="--",
         zorder=0,
@@ -844,7 +844,7 @@ def _plot_replay_frac_by_role(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
 
@@ -901,7 +901,7 @@ _EVENT_TYPE_COLORS = {
     (True, True): "#5e4fa2",  # both SWR and MUA — deep purple
     (True, False): COLORS["SWR"],  # SWR only
     (False, True): COLORS["MUA"],  # MUA only
-    (False, False): "#808080",  # neither — grey
+    (False, False): "#808080",  # neither — gray
 }
 
 
@@ -914,7 +914,7 @@ def _plot_event_bars(ax: Axes, ctx: _PanelContext) -> None:
     - SWR only → orange (``COLORS["SWR"]``)
     - MUA only → purple (``COLORS["MUA"]``)
     - Both → deep purple
-    - Neither → grey
+    - Neither → gray
 
     Reads directly from ``event_table``. Lets the user see event
     density, duration, and type at a glance without having to
@@ -934,7 +934,7 @@ def _plot_event_bars(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         ax.set_ylim(0, 1)
         return
@@ -980,7 +980,7 @@ def _plot_stop_activity(ax: Axes, ctx: _PanelContext) -> None:
     view = st[(st["stop_start"] <= hi) & (st["stop_end"] >= lo)]
 
     ax.set_ylabel("selected events\nper stop")
-    ax.axhline(0, color="grey", linewidth=0.3, zorder=0)
+    ax.axhline(0, color="gray", linewidth=0.3, zorder=0)
 
     if len(view) == 0:
         ax.text(
@@ -990,7 +990,7 @@ def _plot_stop_activity(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         ax.set_ylim(0, 1)
         return
@@ -1067,7 +1067,7 @@ def _plot_context_flags(ax: Axes, ctx: _PanelContext) -> None:
     ticks at this density because flag co-occurrence within a single
     event reads as a filled column rather than overlapping marks.
 
-    Undefined is drawn as a distinct hatched grey cell, never as white.
+    Undefined is drawn as a distinct hatched gray cell, never as white.
     ``build_event_table`` assigns ``NaN`` to the outcome/transition flags at
     session boundaries, so the first stop of every session has genuinely
     undefined trial context; rendering that as white would read as "all four
@@ -1111,7 +1111,7 @@ def _plot_context_flags(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
 
@@ -1176,7 +1176,7 @@ def _draw_event_scalar_stem(
 
     if ylim is not None:
         ax.set_ylim(*ylim)
-    ax.axhline(baseline, color="grey", linewidth=0.3, zorder=0)
+    ax.axhline(baseline, color="gray", linewidth=0.3, zorder=0)
     ax.set_ylabel(ylabel)
 
     if len(view) == 0:
@@ -1187,7 +1187,7 @@ def _draw_event_scalar_stem(
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
 
@@ -1202,7 +1202,7 @@ def _draw_event_scalar_stem(
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
     ax.vlines(
@@ -1269,7 +1269,7 @@ def _plot_hpd_widths(ax: Axes, ctx: _PanelContext) -> None:
             transform=ax.transAxes,
             ha="center",
             va="center",
-            color="grey",
+            color="gray",
         )
         return
 

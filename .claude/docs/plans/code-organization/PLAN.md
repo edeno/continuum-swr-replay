@@ -9,7 +9,7 @@ Status: complete, not merged (branch `code-organization-2026-10-19`, from master
 **Architecture:**
 - **Shared code moves first.** Shared code moves out of the leaf analyses into a set of foundation homes:
   - `intervals.py`, `paths.py`, `tables/`, `runs/`, `decoding/`;
-  - an `analysis/events/` package for the analysed-time and event substrate.
+  - an `analysis/events/` package for the analyzed-time and event substrate.
 - **Each move is followed by a byte-identical check.** Every task moves code, rewrites every import in the repo, and proves the golden tables did not change.
 - **Then the remaining work.** Guards land first so each move can only shrink their allowlists. Then come the moves, then scripts-as-libraries, the scripts regroup and the god-module splits.
 
@@ -36,7 +36,7 @@ Status: complete, not merged (branch `code-organization-2026-10-19`, from master
 - **Byte-identical tables.** Every task that touches a table builder, the read point, an interval primitive or an import used on the table path must reproduce the 5-session golden tables exactly.
   - The rebuild commands are in the SDD workspace `global-constraints.md`.
   - Compare against `/tmp/claude-39494/-cumulus-edeno-continuum-swr-replay/abb6ddbf-eeb3-43b5-9505-88838c9b5af2/scratchpad/golden_e70ab12/rc` with `compare_table_roots`, at atol=0, for all 7 rebuilt tables.
-- **Moves use `git mv`,** so rename detection keeps history. A move and a behaviour change never share a commit.
+- **Moves use `git mv`,** so rename detection keeps history. A move and a behavior change never share a commit.
 - **Rewrite imports with a script, not by hand.** Each move task keeps its codemod in scratchpad and reports its output. After the codemod, check with grep that the old dotted path appears nowhere in tracked files. Docs and docstrings count as tracked files.
 - **Grep bare references too.** Grep tracked `*.md` and docstrings for bare `<old_module_basename>.` references, such as `swr_source.with_swr_source`. Rewrite those that name the moved module, and list them in the report. Phase-A review I2 found that `test_doc_paths_resolve` cannot see these references.
 - **These paths do not move:**
@@ -262,7 +262,7 @@ Status: complete, not merged (branch `code-organization-2026-10-19`, from master
   - `artifact_event_drops` output identical on the 5 golden sessions, as in the Task 7 site check of the previous plan: `scratchpad/task7/compare_sites.py`.
   - Targeted tests for events, hippocampus, replay builders, contfrag, inventory comparison and PFC canonical events.
   - The pipeline map, and `test_doc_paths_resolve`.
-- [ ] **Step 5: Commit** with the message "The analysed-time and event substrate is its own analysis.events package".
+- [ ] **Step 5: Commit** with the message "The analyzed-time and event substrate is its own analysis.events package".
 
 ### Task 7: Split `events/swr_source.py` by responsibility (F6 swr_source)
 
@@ -270,8 +270,8 @@ Status: complete, not merged (branch `code-organization-2026-10-19`, from master
 - Split `analysis/events/swr_source.py` (1,364 lines) in two:
   - `events/swr_inventory.py`: the SWR inventory read and run ids, `swr_source.py:385-747` before the move.
   - `events/analysed_time.py`: excluded intervals, artifact drops, `with_swr_source`, `read_dot_with_swr_source`, `analysed_bins`, `_frame_epoch` and the time-axis and label checks.
-  - Delete `swr_source.py` afterwards. `stamp_swr_source` goes with whichever half writes the stamp.
-- Modify CLAUDE.md "One analysed-time rule". The rule's intervals live in `events.analysed_time.excluded_intervals`, the padding in `events.artifact_masks`, and the eligibility rule in `events.eligibility`.
+  - Delete `swr_source.py` afterward. `stamp_swr_source` goes with whichever half writes the stamp.
+- Modify CLAUDE.md "One analyzed-time rule". The rule's intervals live in `events.analysed_time.excluded_intervals`, the padding in `events.artifact_masks`, and the eligibility rule in `events.eligibility`.
 
 **Interfaces:**
 - Produces: `analysis.events.analysed_time.with_swr_source` (and the rest of the read-point API), and `analysis.events.swr_inventory.*`. The module-level constants (`ARTIFACT_INTERVALS_RUN_ID`, the detection roots) go to whichever half uses them. If both halves use one, it goes in `swr_inventory`, and `analysed_time` imports it from there.
@@ -280,7 +280,7 @@ Status: complete, not merged (branch `code-organization-2026-10-19`, from master
 - [ ] **Step 2:** Make the split. Code moves with no edits beyond imports.
 - [ ] **Step 3:** Run the codemod and grep.
 - [ ] **Step 4: Verify** golden tables, the site check, targeted tests, the pipeline map and the doc paths.
-- [ ] **Step 5: Commit** with the message "The SWR inventory read and the analysed-time read point are separate modules".
+- [ ] **Step 5: Commit** with the message "The SWR inventory read and the analyzed-time read point are separate modules".
 
 ### Task 8: `runs/` run infrastructure (F3)
 
@@ -296,8 +296,8 @@ Status: complete, not merged (branch `code-organization-2026-10-19`, from master
 - Produces: `continuum_swr_replay.runs.{io, provenance, cli, batch}`. `replace_outputs(paths, outputs)` moves to `runs.io` with its rollback semantics and the subset assertion from the last fix wave unchanged.
 
 - [ ] **Step 1: Check the variants agree before merging them**
-  - For `json_ready`, re-serialise every existing JSON sidecar and manifest under `Processed-Data/replay_detection_comparison/` (read-only: load, pass through the old and new `json_ready`, compare the dumps). Also run constructed cases: Mapping, ndarray, numpy scalars, NaN, Path, datetime.
-  - For each `run_epochs` and `_run_epoch_logged` variant, write down its differences (lock, logging, error handling) before merging. If two variants differ in behaviour a runner relies on, keep it as a named option, not a silent default.
+  - For `json_ready`, re-serialize every existing JSON sidecar and manifest under `Processed-Data/replay_detection_comparison/` (read-only: load, pass through the old and new `json_ready`, compare the dumps). Also run constructed cases: Mapping, ndarray, numpy scalars, NaN, Path, datetime.
+  - For each `run_epochs` and `_run_epoch_logged` variant, write down its differences (lock, logging, error handling) before merging. If two variants differ in behavior a runner relies on, keep it as a named option, not a silent default.
   - If anything is not identical, stop and report.
 - [ ] **Step 2:** Create the `runs/` modules, using `git mv` where a whole module moves. Run the codemod and grep.
 - [ ] **Step 3:** Migrate the runners, and delete the duplicates.

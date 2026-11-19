@@ -1,4 +1,4 @@
-"""The running-only encodings' training bins, the analysed regimes and the scored spikes."""
+"""The running-only encodings' training bins, the analyzed regimes and the scored spikes."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 
 from continuum_swr_replay.analysis.event_evidence.state_evidence import (
     EVENT_MARGIN_BINS,
-    analysed_regimes,
+    analyzed_regimes,
     running_only_masks,
     spikes_in_bins,
     training_spike_bins,
@@ -88,14 +88,14 @@ def test_the_margin_is_two_bins():
     assert EVENT_MARGIN_BINS == 2
 
 
-def test_analysed_regimes_leave_out_excluded_time_and_unknown_positions():
+def test_analyzed_regimes_leave_out_excluded_time_and_unknown_positions():
     time = np.arange(8) * 0.002
     speed = np.array([1.0, 1.0, 20.0, 20.0, 5.0, 1.0, 20.0, np.nan])
     linear = np.array([0.0, np.nan, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0])
     # bins 5 and 6 (0.010 and 0.012 s): the bounds are in
     excluded = pd.DataFrame({"start_time": [0.010], "end_time": [0.012]})
 
-    regime, in_excluded = analysed_regimes(time, speed, linear, excluded)
+    regime, in_excluded = analyzed_regimes(time, speed, linear, excluded)
 
     assert regime.tolist() == ["immobile", "", "running", "running", "", "", "", ""]
     assert in_excluded.tolist() == [False] * 5 + [True, True, False]

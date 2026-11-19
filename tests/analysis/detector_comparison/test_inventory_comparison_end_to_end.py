@@ -233,7 +233,7 @@ def test_time_coverage_is_clipped_to_the_shared_exposure(comparison):
 def test_the_components_join_the_three_detectors_at_five_seconds(comparison):
     kept, _, pairs, _ = comparison
 
-    labelled, components = overlap_components(kept, pairs)
+    labeled, components = overlap_components(kept, pairs)
 
     three = components[components.n_detectors == 3]
     assert len(three) == 1

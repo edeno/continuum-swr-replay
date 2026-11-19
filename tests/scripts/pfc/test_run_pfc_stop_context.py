@@ -18,7 +18,7 @@ _SPEC.loader.exec_module(runner)
 
 
 def _cohort(root: Path, monkeypatch, *, bundles: list[str]) -> Namespace:
-    """Three analysed epochs, one left out of the PFC cohort; bundles as named."""
+    """Three analyzed epochs, one left out of the PFC cohort; bundles as named."""
     from continuum_swr_replay.data_loaders import epoch_register
 
     epochs = pd.DataFrame(
@@ -32,7 +32,7 @@ def _cohort(root: Path, monkeypatch, *, bundles: list[str]) -> Namespace:
             names=["nwb_file_name", "interval_list_name"],
         ),
     )
-    monkeypatch.setattr(epoch_register, "analysed_epochs", lambda: epochs)
+    monkeypatch.setattr(epoch_register, "analyzed_epochs", lambda: epochs)
     (root / "pfc_cohort_mPFC.json").write_text(
         json.dumps({"left_out": {"j1620210706_.nwb 06_r3": "no sorting"}})
     )

@@ -32,7 +32,7 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     excluded_intervals_of,
 )
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
@@ -50,11 +50,11 @@ time, so the sparse table keeps them."""
 
 
 def _event_onset_times(dot: pd.DataFrame, times: np.ndarray, col: str) -> np.ndarray:
-    """Sorted onset time (first labelled bin) of each event in ``col``.
+    """Sorted onset time (first labeled bin) of each event in ``col``.
 
     All three sources arrive held to the same atomic whole-event speed rule,
     and Non-Local labels to the saved probability threshold, by the read
-    (``analysed_time.with_swr_source``). An absent event column (e.g.
+    (``analyzed_time.with_swr_source``). An absent event column (e.g.
     ``MUA_event`` on older decodes) yields no onsets; the dense builder then
     zero-fills that count.
     """
@@ -99,7 +99,7 @@ def build_event_onset_table(
 ) -> pd.DataFrame:
     """Sparse per-onset table (one row per SWR / non-local / MUA onset in a stop).
 
-    ``dot`` is a frame read through ``analysed_time.with_swr_source``, which holds
+    ``dot`` is a frame read through ``analyzed_time.with_swr_source``, which holds
     its event labels to the speed rule and the Non-Local probability contract.
     """
     animal, day, epoch = _session_keys(dot)
@@ -165,7 +165,7 @@ def build_stop_timebin_table(
 
     ``dot`` is a read frame, as :func:`build_event_onset_table`. A bin
     ``[left, min(left + bin_s, stop end)]`` that touches the epoch's excluded
-    time (``analysed_time.excluded_intervals``; closed) is not analysed and has
+    time (``analyzed_time.excluded_intervals``; closed) is not analyzed and has
     no row; the other bins keep their ``bin_in_stop``. An event kept by the
     event rule (wholly outside excluded time) can still start in such a bin;
     its onset stays in the sparse table and is counted, per event type, in

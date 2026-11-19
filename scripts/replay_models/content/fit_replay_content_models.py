@@ -76,7 +76,7 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.event_definition.analysed_time import (
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     require_swr_source,
 )
 from continuum_swr_replay.analysis.event_tables.content_response import (
@@ -560,7 +560,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_MIN_EVENTS_SESSION_PHI,
         help=(
-            "Modelled events a session needs to estimate its own "
+            "Modeled events a session needs to estimate its own "
             "Dirichlet-multinomial concentration intercept (default: "
             f"{DEFAULT_MIN_EVENTS_SESSION_PHI}). Shorter sessions are pinned to "
             "the median intercept of that animal's longer sessions, and record "

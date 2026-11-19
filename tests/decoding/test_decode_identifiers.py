@@ -339,14 +339,14 @@ class TestSessionNames:
         assert bool(RUN_EPOCH_PATTERN.match(epoch_name)) is is_run
 
 
-def test_every_analysed_epoch_round_trips_through_its_names():
-    """For each of the register's analysed epochs, the NWB name rebuilt from its
+def test_every_analyzed_epoch_round_trips_through_its_names():
+    """For each of the register's analyzed epochs, the NWB name rebuilt from its
     animal and date is the register's, the session name and the HPC identifier
     agree, and the identifier parses back to the epoch."""
     register = read_register()
-    analysed = register.index[register["status"] == Status.ANALYSED]
-    assert len(analysed) == 242
-    for name, epoch in analysed:
+    analyzed = register.index[register["status"] == Status.ANALYZED]
+    assert len(analyzed) == 242
+    for name, epoch in analyzed:
         animal, date = parse_nwb_filename(name)
         assert nwb_file_name(animal, date) == name
         assert nwb_stem(name) == f"{animal}{date}"

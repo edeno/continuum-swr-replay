@@ -752,7 +752,7 @@ def _outcome_known_time(
     reward latency in the corpus, so this cannot label an omission while a pump
     could still arrive.
 
-    The previous rule used poke-out directly. That is a *behavioural* boundary
+    The previous rule used poke-out directly. That is a *behavioral* boundary
     against the rewarded case's *stimulus* one, which is both circular (dwell
     length plausibly covaries with the replay being measured) and empirically
     ruinous: it placed the boundary a median 880 ms after the information was
@@ -875,7 +875,7 @@ def build_animal(
     times: pd.DataFrame,
     stop_table: pd.DataFrame,
 ) -> pd.DataFrame:
-    """One animal's qvals rows, one per stop inside a modelled trial.
+    """One animal's qvals rows, one per stop inside a modeled trial.
 
     Parameters
     ----------

@@ -137,7 +137,7 @@ def _epoch():
     return lfp, time, dot, grid, excluded, events
 
 
-def test_epoch_gamma_measures_events_and_references_on_analysed_time():
+def test_epoch_gamma_measures_events_and_references_on_analyzed_time():
     lfp, time, dot, grid, excluded, events = _epoch()
     before = dot.copy()
 

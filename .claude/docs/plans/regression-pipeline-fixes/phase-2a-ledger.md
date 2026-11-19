@@ -31,7 +31,7 @@ Task 1: code committed (173334a); full regen running in tmux patch_table_regen (
 Task 2: BASE=173334a dispatched (opus) — disjoint files from Task 1's remaining work (promotion/audit)
 Task 2: implementer DONE (c146652). Ruling 4: bse_cluster_<term> is emitted for every conditional Poisson fit (counts and fractions) — the contract's "fractions only" line is relaxed; shared-contracts.md wording to follow in Task 6's docs. Cost if wrong: an extra column on count fits.
 Task 2: review dispatched (opus). Working tree carries Task 1's uncommitted audit script (expected).
-Task 2: review clean (approved; 0 Important). minors (deferred): se_source majority label; finiteness not positivity gate on clustered SE; pct_sig_session still model-based; unsorted groups untested; soft/posterior responses labelled count.
+Task 2: review clean (approved; 0 Important). minors (deferred): se_source majority label; finiteness not positivity gate on clustered SE; pct_sig_session still model-based; unsorted groups untested; soft/posterior responses labeled count.
 Task 2: complete (commits 173334a..c146652, review clean)
 Task 3: BASE=c146652 dispatched (opus) — unit-level only until Task 1 promotes the patch table
 Task 3: implementer DONE (593d82d); found swr-content _run dropped sd_/separated_terms (backstop inert on content until now); review dispatched (opus)

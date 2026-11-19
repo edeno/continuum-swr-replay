@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Generate a supplemental schematic figure of the replay-content pipeline.
 
-Visualises every transformation from raw decoder output through the
+Visualizes every transformation from raw decoder output through the
 fitted conditional Poisson, with data shapes and the load-bearing
 assumption attached to each step.
 
@@ -163,7 +163,7 @@ def draw_schematic(output_dir: Path) -> None:
         y=0.995,
     )
 
-    # Bottom legend explaining the colour code for italic notes
+    # Bottom legend explaining the color code for italic notes
     legend_handles = [
         mpatches.Patch(color=box_color, label="Transformation step"),
         mpatches.Patch(color="white", label=" "),

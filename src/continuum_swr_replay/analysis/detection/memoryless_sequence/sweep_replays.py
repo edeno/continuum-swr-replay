@@ -351,7 +351,7 @@ def run_cell(
 ):
     """One cell: draw the replay, decode with both detectors, summarize.
 
-    ``direction`` is 1 for a replay that travels up the track, towards larger
+    ``direction`` is 1 for a replay that travels up the track, toward larger
     positions, and -1 for one that travels down it over the same path.
     ``seed`` is the replicate's index and ``at_s`` the cell's own placement
     (:func:`planned_cells`). The replay's spikes are drawn, not sampled
