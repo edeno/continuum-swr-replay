@@ -837,6 +837,9 @@ def draw_donut(
     ax.set_xlim(-1.05, 1.2 + label_space)
     ax.set_ylim(-1.1, 1.1)
     ax.set_aspect("equal")
+    # an equal-aspect box narrower than its slot is drawn at the slot's top
+    # left, under the panel letter, not centred in it
+    ax.set_anchor("NW")
     ax.set_title(title, fontsize=SMALL_SIZE, pad=2, loc="left")
 
 
@@ -1338,6 +1341,11 @@ def generate_figure(
         - 0.004
     )
     fit_track_to_height(fig, ax_a, x_left + 0.02)
+    # panel c has no axis labels to fill the left margin: start its donut where
+    # panel a's track drawing starts, just right of the letter column, and keep
+    # its right edge, so the donut takes the freed width
+    box = ax_c.get_position(original=True)  # the slot, not the drawn box
+    ax_c.set_position([x_left + 0.02, box.y0, box.x1 - x_left - 0.02, box.height])
     fig.canvas.draw()
     positions = place_letters(
         fig,
