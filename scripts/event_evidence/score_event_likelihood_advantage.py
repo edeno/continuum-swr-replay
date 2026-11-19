@@ -11,8 +11,10 @@ on ``event_id``; every event of the table must have one.
 
 Writes ``{epoch_id}_likelihood_advantage.parquet`` per epoch (one row per event:
 ``event_id``, ``animal``, ``epoch_id``, ``group``, ``n_bins``, ``n_scored_bins``,
-``D``, ``D_bin``, ``n_spikes``, ``D_spike``) and ``manifest.json`` (with the
-SHA-256 of the event table and of the participation tables it read). The epochs
+``D``, ``D_bin``, ``n_spikes``, ``D_spike``), each epoch's record
+``{epoch_id}_likelihood_advantage.json`` (with the SHA-256 of the event table and
+of the participation tables it read) and ``manifest.json`` gathered from the
+records (``runs.epoch_records``). The epochs
 are those the participation run's manifest marks ok.
 
 Reads only stored files (no database).
@@ -28,9 +30,8 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import logging
+import sys
 import time as clock
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
@@ -57,26 +58,32 @@ from continuum_swr_replay.paths import (
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
     EVENT_PARTICIPATION_DIR,
     processed_data_dir,
-    replay_content_dir,
-    table_path,
 )
+from continuum_swr_replay.runs.epoch_records import gather_manifest
 from continuum_swr_replay.runs.io import (
     files_sha256,
     ok_epochs,
     ok_table_paths,
     output_path,
     read_manifest,
-    sha256_file,
-    write_json,
 )
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.io import write_table
 
+# Sibling-script import: run as a script, only this file's directory is on
+# sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.event_evidence._per_event_run import (  # noqa: E402
+    add_run_arguments,
+    event_table_input,
+    event_table_path,
+    run,
+    select_epochs,
+)
+
 PRODUCED_BY = produced_by(__file__)
 OUTPUT_NAME = "likelihood_advantage"
 PARTICIPATION_NAME = "participation"
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
 
 def epoch_events(
@@ -155,63 +162,42 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--epochs", nargs="+", help="epoch ids; default every epoch")
-    parser.add_argument("--data-dir", type=Path, default=None)
-    parser.add_argument("--output-dir", type=Path, default=None)
+    add_run_arguments(parser)
     parser.add_argument("--n-workers", type=int, default=1)
-    parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)
 
-    provenance = provenance_record(ROOT_DIR)
     data_dir = args.data_dir or processed_data_dir()
     output = args.output_dir or data_dir / EVENT_LIKELIHOOD_ADVANTAGE_DIR
-    output.mkdir(parents=True, exist_ok=True)
-    event_table = table_path(
-        "event_table", data_dir / replay_content_dir().relative_to(processed_data_dir())
-    )
+    event_table = event_table_path(data_dir)
     participation_dir = data_dir / EVENT_PARTICIPATION_DIR
-    inputs = {
-        "event_table": {"sha256": sha256_file(event_table)},
-        "event_participation": {
-            "sha256": files_sha256(
-                ok_table_paths(participation_dir, PARTICIPATION_NAME)
-            )
+    header = {
+        "produced_by": PRODUCED_BY,
+        "provenance": provenance_record(ROOT_DIR),
+        "settings": {},
+        "inputs": {
+            "event_table": event_table_input(event_table),
+            "event_participation": {
+                "sha256": files_sha256(
+                    ok_table_paths(participation_dir, PARTICIPATION_NAME)
+                ),
+                "path": str(participation_dir),
+            },
         },
     }
-    epochs = args.epochs or ok_epochs(read_manifest(participation_dir))
-    to_run = [
-        epoch_id
-        for epoch_id in epochs
-        if args.overwrite or not output_path(epoch_id, output, OUTPUT_NAME).exists()
-    ]
-    records: dict[str, dict] = {}
-    with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
-        futures = {
-            pool.submit(run_epoch, epoch_id, event_table, data_dir, output): epoch_id
-            for epoch_id in to_run
-        }
-        for k, future in enumerate(as_completed(futures), start=1):
-            epoch_id = futures[future]
-            try:
-                records[epoch_id] = future.result()
-            except Exception as error:  # noqa: BLE001 - recorded per epoch
-                records[epoch_id] = {"status": "failed", "error": repr(error)}
-            logging.info(f"[{k}/{len(to_run)}] {epoch_id}: {records[epoch_id]}")
-    write_json(
-        output / "manifest.json",
-        {
-            "produced_by": PRODUCED_BY,
-            "provenance": provenance,
-            "inputs": inputs,
-            "settings": {"event_table": str(event_table)},
-            "epochs": records,
-        },
-        indent=1,
-        sort_keys=True,
+    if args.gather:
+        gather_manifest(output, OUTPUT_NAME, header)
+        return
+    every_epoch = ok_epochs(read_manifest(participation_dir))
+    run(
+        epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
+        task=run_epoch,
+        task_args=(event_table, data_dir, output),
+        output=output,
+        name=OUTPUT_NAME,
+        header=header,
+        overwrite=args.overwrite,
+        max_workers=args.n_workers,
     )
-    failed = [e for e, r in records.items() if r["status"] != "ok"]
-    if failed:
-        raise SystemExit(f"{len(failed)} epochs failed: {failed[:5]}")
 
 
 if __name__ == "__main__":
