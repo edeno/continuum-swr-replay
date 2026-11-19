@@ -10,8 +10,9 @@ they overlap an SWR (Kay's detector, the SWR source). Each row asks one thing:
         c — Replay speed (each event's median).
         d — Arms the decoded position visits (of the track's nine).
     Where the content is
-        e — Start distance: track distance from the animal to the event's first
-            decoded position.
+        e — Content time by track distance from the animal, at a well (within
+            ``AT_WELL_CM`` of one) and elsewhere: content at a well far from
+            the animal is at another well, near it at the animal's own.
         f — Where on the track each kind's content is denser: the ratio of no-SWR
             to SWR content time per cm along every arm.
         g — Content time per cm from the center out to the junctions (trunk
@@ -21,12 +22,13 @@ they overlap an SWR (Kay's detector, the SWR source). Each row asks one thing:
             epochs' quiet rest and running. (Ripple power and MUA around the
             events are Figure 2's.)
 
-Panels a–c and e mark each class's median (``event_statistics.class_medians``),
+Panels a–c mark each class's median (``event_statistics.class_medians``),
 the events summary's ``<property>_median_*`` values
 (``paper/reported/events.json``). Panels
-f and g place every event time bin's MAP position on its arm
-(``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``) and
-draw ``content_along_arms.content_density_along_arms``, the animals' mean; g
+e–g place every event time bin's MAP position on its arm
+(``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``): e
+draws ``content_along_arms.distance_from_animal_shares``, f and g
+``content_along_arms.content_density_along_arms``, each the animals' mean; g
 quotes the share of content time within ``AT_WELL_CM`` of a well, the summary's
 ``*_content_at_well_fraction`` (``event_statistics.content_occupancy_shares``). Panel h's animal values are
 ``event_statistics.animal_signal_levels``: the values the summary's
@@ -58,6 +60,7 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
 )
 from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     content_density_along_arms,
+    distance_from_animal_shares,
     leaf_and_trunk_profiles,
     log2_density_ratio,
 )
@@ -78,7 +81,6 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.reported.events import (
     default_inputs,
     with_brain_state,
-    with_start_and_rest_theta,
 )
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
@@ -118,10 +120,12 @@ ARM_HALF_WIDTH_CM = 9.0
 N_SEGMENTS = 13
 # Panel f: the color scale's limit, log2 of the no-SWR to SWR density ratio.
 RATIO_LIMIT_LOG2 = 2
+# Panel e: distance from the animal, cm (the track's longest is under 240).
+DISTANCE_EDGES_CM = np.arange(0, 241, 8)
 # Panel d: the track's arms.
 N_ARMS = len(ALL_ARMS)
 
-# Panels a-c and e: (column, x label, scale, bin edges, log x).
+# Panels a-c: (column, x label, scale, bin edges, log x).
 HISTOGRAMS = {
     "duration": (
         "event_duration_s", "Duration (ms)", 1e3,
@@ -134,10 +138,6 @@ HISTOGRAMS = {
     "speed": (
         "replay_speed_median_cm_s", "Replay speed (cm/s)", 1.0,
         np.geomspace(1, 1e5, 41), True,
-    ),
-    "start_distance": (
-        "start_distance_cm", "Start distance\nfrom animal (cm)",
-        1.0, np.linspace(0, 240, 41), False,
     ),
 }  # fmt: skip
 
@@ -155,26 +155,27 @@ SIGNALS = (
 
 
 def read_inputs() -> dict:
-    """The events with their start distances and gamma, and the other inputs."""
+    """The events with their gamma, their content's time bins, and the other inputs."""
     inputs = default_inputs()
     events = read_swr_table(inputs.event_table)
     n_events = len(events)
     n_epochs = len(analysed_epoch_ids())
-    # As the summary does: the start distances and the brain state are joined to
-    # the events separately (the start-distance output carries theta columns
-    # of its own).
-    with_start, _ = with_start_and_rest_theta(
-        events, inputs.event_start_rest_theta, n_epochs
-    )
     events, reference, _ = with_brain_state(events, inputs, n_epochs)
-    events = events.merge(
-        with_start[["event_id", "start_distance_cm"]], on="event_id", validate="1:1"
-    )
     occupancy = pd.read_csv(
         content_occupancy_dir() / "content_occupancy_per_session.csv"
     )
     along = pd.concat(
-        pd.read_parquet(path, columns=["event_id", "arm", "fraction", "arm_length_cm"])
+        pd.read_parquet(
+            path,
+            columns=[
+                "event_id",
+                "arm",
+                "fraction",
+                "arm_length_cm",
+                "distance_to_well_cm",
+                "distance_to_animal_cm",
+            ],
+        )
         for path in sorted(
             (processed_data_dir() / CONTENT_ALONG_ARMS_DIR).glob("*.parquet")
         )
@@ -192,6 +193,9 @@ def read_inputs() -> dict:
         "reference": reference,
         "occupancy_shares": content_occupancy_shares(occupancy),
         "ratio": log2_density_ratio(density),
+        "distance_shares": distance_from_animal_shares(
+            along, DISTANCE_EDGES_CM, AT_WELL_CM
+        ),
         "profiles": leaf_and_trunk_profiles(density),
         "track_graph": env.track_graph,
         "edge_order": [tuple(edge) for edge in env.edge_order],
@@ -266,6 +270,40 @@ def draw_arm_counts(ax, events: pd.DataFrame) -> None:
         ax.bar(values + (k - 0.5) * 0.4, 100 * share, width=0.4, color=color, lw=0)
     ax.set_xticks(values)
     ax.set_xlim(0.4, N_ARMS + 0.6)
+
+
+def draw_distance_from_animal(axes, shares: pd.DataFrame) -> None:
+    """Each kind's content time by distance from the animal (``axes``: no SWR,
+    then SWR), stacked: at a well (dark) and elsewhere (light)."""
+    width = np.diff(DISTANCE_EDGES_CM)
+    top = 100 * shares.sum(axis=1).max()
+    for ax, (is_swr, name, color) in zip(axes, KINDS, strict=True):
+        kind = shares.loc[is_swr]
+        left = kind.index.to_numpy()
+        well = 100 * kind["at_well"].to_numpy()
+        ax.bar(left, well, width, align="edge", color=color, lw=0)
+        ax.bar(
+            left, 100 * kind["elsewhere"].to_numpy(), width, bottom=well,
+            align="edge", color=color, alpha=0.3, lw=0,
+        )  # fmt: skip
+        ax.set_xlim(DISTANCE_EDGES_CM[0], DISTANCE_EDGES_CM[-1])
+        ax.set_ylim(0, top * 1.05)
+        ax.text(
+            0.55, 0.95, name, transform=ax.transAxes, ha="center", va="top",
+            color=color, fontsize=SMALL_SIZE,
+        )  # fmt: skip
+    axes[0].tick_params(labelbottom=False)
+    axes[1].set_xlabel("Content distance\nfrom animal (cm)")
+    axes[0].set_ylabel("% content time", y=0.0)
+    handles = [
+        plt.Rectangle((0, 0), 1, 1, color="0.3", alpha=alpha, lw=0)
+        for alpha in (1.0, 0.3)
+    ]
+    axes[1].legend(
+        handles, [f"at a well (<{AT_WELL_CM:.0f} cm)", "elsewhere"],
+        frameon=False, loc="upper left", bbox_to_anchor=(0.0, 0.8),
+        fontsize=SMALL_SIZE, handlelength=0.8, borderaxespad=0,
+    )  # fmt: skip
 
 
 def draw_ratio_track(ax, track_graph, edge_order, ratio: pd.Series) -> None:
@@ -388,9 +426,10 @@ def generate_figure(inputs: dict):
     )  # fmt: skip
 
     row2 = outer[1].subgridspec(1, 3, width_ratios=[1.0, 1.6, 1.3], wspace=0.6)
-    ax_e = fig.add_subplot(row2[0])
-    draw_histogram(ax_e, events, "start_distance")
-    ax_e.set_ylabel("% events")
+    e_grid = row2[0].subgridspec(2, 1, hspace=0.15)
+    ax_e = [fig.add_subplot(e_grid[0])]
+    ax_e.append(fig.add_subplot(e_grid[1], sharex=ax_e[0]))
+    draw_distance_from_animal(ax_e, inputs["distance_shares"])
     ax_f = fig.add_subplot(row2[1])
     draw_ratio_track(ax_f, inputs["track_graph"], inputs["edge_order"], inputs["ratio"])
     ax_g = fig.add_subplot(row2[2])
@@ -403,7 +442,7 @@ def generate_figure(inputs: dict):
     fig.draw_without_rendering()
     rows = (
         ((ax_a, "a"), (ax_b, "b"), (ax_c, "c"), (ax_d, "d")),
-        ((ax_e, "e"), (ax_f, "f"), (ax_g, "g")),
+        ((ax_e[0], "e"), (ax_f, "f"), (ax_g, "g")),
         ((ax_h[0], "h"),),
     )
     for row in rows:

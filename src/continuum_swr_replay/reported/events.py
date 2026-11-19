@@ -157,7 +157,7 @@ TAGS = {
     "speed": Tags(("2d.2",), ("3c",)),
     "certainty": Tags(("2d.5",)),
     "stillness": Tags(("2d.4",)),
-    "location": Tags(("2d.1",), ("3e",)),
+    "location": Tags(("2d.1",)),
 }
 """Each group of values: the questions it answers and the figures that show it."""
 
