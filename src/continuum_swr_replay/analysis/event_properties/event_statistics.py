@@ -362,35 +362,13 @@ def event_signal_statistics(
         If an event has no value of a signal, or its epoch no running or
         quiet-rest level of one.
     """
-    joined = events.merge(
-        reference, on=list(SESSION_COLUMNS), how="left", validate="m:1"
-    )
     rows = {}
     for signal, column in signals.items():
-        missing = (
-            joined[[column, f"{signal}_running_median", f"{signal}_rest_median"]]
-            .isna()
-            .sum()
-        )
-        if missing.any():
-            raise ValueError(
-                f"events with no {signal} value, or whose epoch has no running or "
-                f"quiet-rest level of it:\n{missing[missing > 0]}"
-            )
+        joined = _with_signal_levels(events, reference, signal, column)
+        levels = _animal_levels(joined, signal, column)
         for is_swr in (False, True):
             group = joined[joined["is_swr"] == is_swr]
-            per_animal = pd.DataFrame(
-                {
-                    name: animal_session_values(
-                        group[source], group["animal"], group[_WITHIN_ANIMAL], "median"
-                    )
-                    for name, source in (
-                        ("event", column),
-                        ("running", f"{signal}_running_median"),
-                        ("rest", f"{signal}_rest_median"),
-                    )
-                }
-            )
+            per_animal = levels.loc[is_swr]
             rows[(signal, is_swr)] = {
                 "median": group[column].median(),
                 "n_animals_below_running": (
@@ -406,6 +384,84 @@ def event_signal_statistics(
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis(
         ["signal", "is_swr"]
     )
+
+
+def animal_signal_levels(
+    events: pd.DataFrame, reference: pd.DataFrame, signal: str, column: str
+) -> pd.DataFrame:
+    """Each animal's event value of a signal and its running and quiet-rest levels.
+
+    The values :func:`event_signal_statistics` compares, per class: the animal's
+    event value (event -> epoch -> animal medians), and the median over the same
+    epochs (its epochs with an event of the class) of each epoch's running and
+    quiet-rest level.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``is_swr``, the session columns and ``column``.
+    reference : pd.DataFrame, shape (n_epochs, n_columns)
+        The brain-state reference, one row per epoch, with
+        ``<signal>_running_median`` and ``<signal>_rest_median``.
+    signal : str
+        The signal's name in the reference (``"theta"``).
+    column : str
+        The signal's column in ``events`` (``"theta_z"``).
+
+    Returns
+    -------
+    levels : pd.DataFrame, shape (n_classes * n_animals, 3)
+        ``event``, ``running`` and ``rest``, z, indexed by ``is_swr`` and
+        ``animal``. An animal with no event of a class has no row for it.
+
+    Raises
+    ------
+    ValueError
+        If an event has no value of the signal, or its epoch no running or
+        quiet-rest level of it.
+    """
+    return _animal_levels(
+        _with_signal_levels(events, reference, signal, column), signal, column
+    )
+
+
+def _with_signal_levels(
+    events: pd.DataFrame, reference: pd.DataFrame, signal: str, column: str
+) -> pd.DataFrame:
+    """``events`` joined to their epoch's levels; raise if a value or level is missing."""
+    joined = events.merge(
+        reference, on=list(SESSION_COLUMNS), how="left", validate="m:1"
+    )
+    missing = (
+        joined[[column, f"{signal}_running_median", f"{signal}_rest_median"]]
+        .isna()
+        .sum()
+    )
+    if missing.any():
+        raise ValueError(
+            f"events with no {signal} value, or whose epoch has no running or "
+            f"quiet-rest level of it:\n{missing[missing > 0]}"
+        )
+    return joined
+
+
+def _animal_levels(joined: pd.DataFrame, signal: str, column: str) -> pd.DataFrame:
+    """Per class and animal: the event value and the running and rest levels."""
+    frames = {}
+    for is_swr, group in joined.groupby("is_swr"):
+        frames[is_swr] = pd.DataFrame(
+            {
+                name: animal_session_values(
+                    group[source], group["animal"], group[_WITHIN_ANIMAL], "median"
+                )
+                for name, source in (
+                    ("event", column),
+                    ("running", f"{signal}_running_median"),
+                    ("rest", f"{signal}_rest_median"),
+                )
+            }
+        )
+    return pd.concat(frames, names=["is_swr"])
 
 
 def power_change_statistics(reference: pd.DataFrame, bands: list[str]) -> pd.DataFrame:

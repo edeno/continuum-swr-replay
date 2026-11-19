@@ -30,11 +30,8 @@ f and g place every event time bin's MAP position on its arm
 draw ``content_along_arms.content_density_along_arms``, the animals' mean; g
 quotes the share of content time within ``AT_WELL_CM`` of a well, the summary's
 ``*_content_at_well_fraction`` (``event_statistics.content_occupancy_shares``). Panel h's animal values are
-event -> epoch -> animal medians (``shared_statistics.animal_session_values``), as
-``event_statistics.event_signal_statistics`` makes them.
-
-DRAFT: panel h's per-animal rest and running levels are computed here; no summary
-value holds them.
+``event_statistics.animal_signal_levels``: the values the summary's
+``<signal>_animals_*`` counts compare.
 
 Usage
 -----
@@ -66,10 +63,10 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     AT_WELL_CM,
+    animal_signal_levels,
     class_medians,
     content_occupancy_shares,
 )
-from continuum_swr_replay.analysis.shared_statistics import animal_session_values
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
@@ -124,7 +121,6 @@ C_SWR = COLORS["SWR"]
 C_REST = COLORS["Local"]
 C_RUN = COLORS["No-Spike"]
 KINDS = ((False, "no SWR", C_NL), (True, "SWR", C_SWR))
-_WITHIN_ANIMAL = [c for c in SESSION_COLUMNS if c != "animal"]
 
 # The track drawn in panel f: one epoch's track graph (every epoch's arms run the
 # same way, ``content_along_arms.check_arm_orientation``).
@@ -237,23 +233,24 @@ def animal_signal_values(
 ) -> pd.DataFrame:
     """Each animal's rest, no-SWR, SWR and running value of one signal, z.
 
-    Events: event -> epoch -> animal medians. Rest and running: the median over
-    the animal's epochs of each epoch's level.
+    ``event_statistics.animal_signal_levels``: the event values the summary's
+    animal counts compare, and the levels they are compared with. Each class's
+    levels come from the animal's epochs with an event of that class; every
+    analysed epoch holds both kinds, so the two classes' levels must be equal.
     """
-    out = {}
-    for is_swr, name, _ in KINDS:
-        group = events[events["is_swr"] == is_swr]
-        out[name] = animal_session_values(
-            group[column], group["animal"], group[_WITHIN_ANIMAL], "median"
-        )
-    for state in ("rest", "running"):
-        out[state] = animal_session_values(
-            reference[f"{signal}_{state}_median"],
-            reference["animal"],
-            reference[_WITHIN_ANIMAL],
-            "median",
-        )
-    return pd.DataFrame(out)[["rest", "no SWR", "SWR", "running"]]
+    levels = animal_signal_levels(events, reference, signal, column)
+    non_swr, swr = levels.loc[False], levels.loc[True]
+    for level in ("rest", "running"):
+        if not np.allclose(non_swr[level], swr.loc[non_swr.index, level]):
+            raise ValueError(f"{signal}: the classes' {level} levels differ")
+    return pd.DataFrame(
+        {
+            "rest": non_swr["rest"],
+            "no SWR": non_swr["event"],
+            "SWR": swr["event"],
+            "running": non_swr["running"],
+        }
+    )
 
 
 # ---------------------------------------------------------------------------

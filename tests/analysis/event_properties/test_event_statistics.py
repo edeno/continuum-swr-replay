@@ -220,6 +220,24 @@ def test_event_signal_statistics_compare_each_animal_s_epochs_with_their_levels(
     assert swr["reaches_running_fraction"] == 0.0
 
 
+def test_animal_signal_levels_are_the_values_the_statistics_compare():
+    events, reference = _signal_tables()
+    levels = stats.animal_signal_levels(events, reference, "theta", "theta_z")
+    # a, no SWR: the median of its epochs' medians 1.1 (e1) and 1.2 (e2); the
+    # median of e1's and e2's levels: running (1 + 2) / 2, rest (-1 + 0) / 2
+    assert levels.loc[(False, "a")].to_dict() == pytest.approx(
+        {"event": 1.15, "running": 1.5, "rest": -0.5}
+    )
+    # b, no SWR: one epoch, median event 1.0, its levels 1.0 and -0.5
+    assert levels.loc[(False, "b")].to_dict() == pytest.approx(
+        {"event": 1.0, "running": 1.0, "rest": -0.5}
+    )
+    # a, SWR: the median of -0.8 (e1) and -0.85 (e2)
+    assert levels.loc[(True, "a"), "event"] == pytest.approx(-0.825)
+    assert levels.index.names == ["is_swr", "animal"]
+    assert len(levels) == 4
+
+
 def test_event_signal_statistics_weigh_an_animal_s_epochs_not_its_events():
     # Both epochs of a have running level 0 and rest level -1. e1 has one
     # event, at -2; e2 three, at 0.5.
