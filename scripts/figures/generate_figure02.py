@@ -1059,11 +1059,11 @@ def draw_detector_overlap(
     events its events overlap. Both tables list the detectors in one order.
     """
     n_rows = len(overlap)
-    draw_detector_bars(ax_content, with_nonlocal, n_rows, "% events", True)
+    draw_detector_bars(ax_content, with_nonlocal, n_rows, "% of\ndetections", True)
     ax_content.set_title(
         "Detections with\nnon-local activity", fontsize=SMALL_SIZE, pad=3
     )
-    draw_detector_bars(ax_caught, overlap, n_rows, "% events", False)
+    draw_detector_bars(ax_caught, overlap, n_rows, "% of non-local\nevents", False)
     ax_caught.set_title("Non-local\nevents found", fontsize=SMALL_SIZE, pad=3)
     ax_caught.spines["left"].set_visible(False)
 
@@ -1075,17 +1075,18 @@ def draw_share_by_power(ax: Axes, shares: pd.DataFrame) -> None:
     """
     by_animal = shares.pivot(index="power_low", columns="group", values="share")
     centre = by_animal.index + np.diff(POWER_EDGES)[0] / 2
-    ax.plot(centre, by_animal.to_numpy(), color="k", lw=0.5, alpha=0.5)
-    ax.plot(centre, by_animal.mean(axis=1), color="k", lw=1.0)
+    ax.plot(centre, 100 * by_animal.to_numpy(), color="k", lw=0.5, alpha=0.5)
+    ax.plot(centre, 100 * by_animal.mean(axis=1), color="k", lw=1.0)
     ax.axvline(KAY_ZSCORE_THRESHOLD, color=C_SWR, lw=0.8, ls="--")
     ax.text(
-        KAY_ZSCORE_THRESHOLD + 0.3, 0.05, "SWR\nthreshold", fontsize=SMALL_SIZE,
+        KAY_ZSCORE_THRESHOLD + 0.3, 5, "SWR\nthreshold", fontsize=SMALL_SIZE,
         color=C_SWR, va="bottom",
     )  # fmt: skip
     ax.set_xlim(POWER_EDGES[0], POWER_EDGES[-1])
-    ax.set_ylim(0, 1.02)
+    ax.set_ylim(0, 102)
+    ax.set_yticks([0, 50, 100])
     ax.set_xlabel("Ripple power (z)")
-    ax.set_ylabel("Share of rest bins\nnon-local")
+    ax.set_ylabel("% of rest bins\nnon-local")
 
 
 OFFSET_BINS_MS = np.arange(-100, 101, 5)
