@@ -14,7 +14,7 @@ def _manifest(path, shards, epochs, commit="abc"):
                 "produced_by": "runner",
                 "provenance": {"commit": commit},
                 "inputs": {"event_table": {"sha256": "x"}},
-                "settings": {"n_folds": 5},
+                "settings": {"n_folds": 5, "event_table": f"/{commit}/table"},
                 "shards": shards,
                 "epochs": epochs,
             }

@@ -233,9 +233,15 @@ def merge_shards(output: Path, n_shards: int, retries: Sequence[str] = ()) -> No
     covered = sorted(i for m in manifests for i in m["shards"])
     if covered != list(range(n_shards)):
         raise ValueError(f"shards {covered} of {n_shards} found")
-    for key in ("inputs", "settings"):
-        if any(m[key] != manifests[0][key] for m in manifests + retried):
-            raise ValueError(f"the shards record different {key}")
+
+    def compared(m: dict) -> tuple:
+        # the event table's path differs between checkouts; its digest
+        # (``inputs``) is what is compared
+        settings = {k: v for k, v in m["settings"].items() if k != "event_table"}
+        return m["inputs"], settings
+
+    if any(compared(m) != compared(manifests[0]) for m in manifests + retried):
+        raise ValueError("the shards record different inputs or settings")
     if any(m["provenance"]["commit"] != manifests[0]["provenance"]["commit"]
            for m in manifests + retried):  # fmt: skip
         raise ValueError("the shards ran different commits")
