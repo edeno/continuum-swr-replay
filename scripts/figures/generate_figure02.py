@@ -67,7 +67,12 @@ import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.gridspec import GridSpec
+import xarray as xr
+from matplotlib.axes import Axes
+from matplotlib.backend_bases import RendererBase
+from matplotlib.figure import Figure
+from matplotlib.gridspec import GridSpec, SubplotSpec
+from non_local_detector.environment import Environment
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.detection.nonlocal_events import (
@@ -90,6 +95,7 @@ from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
     nonlocal_state_probability,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
+    event_table_epochs,
     ripple_power_inputs,
     swr_epoch_id,
     swr_source_name,
@@ -106,7 +112,7 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     nonlocal_share_by_power,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
-    OFFSET_TAILS_MS,
+    OFFSET_TAILS_S,
     boundary_offset_statistics,
     boundary_offsets,
     overlap_class_statistics,
@@ -370,8 +376,8 @@ def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) 
     """Run the expensive loads and derivations; return the cached render inputs.
 
     The example session's ``data``/``results``/``detector``/``env`` (panels a
-    and b), the triggered-average curves (f), the non-local share by ripple
-    power (h) and the frames' immobile non-local events by SWR overlap, which
+    and b), the triggered-average curves (j), the non-local share by ripple
+    power (k) and the frames' immobile non-local events by SWR overlap, which
     the canonical event table is checked against. The multi-GB
     ``data_over_time`` is consumed here and not returned.
     """
@@ -407,7 +413,7 @@ def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) 
     logging.info("Computing the non-local share by ripple power (panel k)...")
     share_by_power = rest_nonlocal_share(data_over_time)
     del data_over_time
-    logging.info("Reading the detector comparison (panels d and g)...")
+    logging.info("Reading the detector comparison (panels c, d and e)...")
     comparison = detector_comparison()
     return {
         "nwb_file_name": nwb_file_name,
@@ -442,7 +448,7 @@ def check_table_against_frames(classes: dict, frame_counts: dict[str, int]) -> N
 
 
 def example_windows(
-    events: pd.DataFrame, ripple_times: pd.DataFrame, results
+    events: pd.DataFrame, ripple_times: pd.DataFrame, results: xr.Dataset
 ) -> dict[str, tuple[float, float]]:
     """Panel b's examples as (start, end) seconds, each checked.
 
@@ -475,7 +481,7 @@ def example_windows(
             time=slice(start, end), states="Local"
         ).mean()
     )
-    if local <= 0.8:
+    if not local > 0.8:  # NaN (no decode bin in the SWR) fails too
         raise AssertionError(
             f"the decode is not mostly Local in the Local SWR ({local})"
         )
@@ -484,7 +490,7 @@ def example_windows(
 
 
 def detector_comparison() -> dict:
-    """Panels d and g: the event features run's comparison, as the summary reads it.
+    """Panels c, d and e: the event features run's comparison, as the summary reads it.
 
     Returns
     -------
@@ -492,7 +498,7 @@ def detector_comparison() -> dict:
         ``kay``: :func:`nonlocal_comparison.other_detector_statistics`'s row of
         Kay's SWRs (d); ``overlap``: the share of non-local events each of
         :data:`DETECTOR_LABELS` overlaps and ``with_nonlocal``, the share of
-        each one's events that overlap a non-local event (h); and, from
+        each one's events that overlap a non-local event (e); and, from
         ``left_out_statistics``, ``time_outside_swr``, the share of non-local
         time outside Kay's SWRs (c).
     """
@@ -517,7 +523,7 @@ def detector_comparison() -> dict:
 # ---------------------------------------------------------------------------
 
 
-def summed_posterior(window, env) -> np.ndarray:
+def summed_posterior(window: xr.Dataset, env: Environment) -> np.ndarray:
     """Posterior over position summed over the states with one, (n_time, n_bins)."""
     post = window.acausal_posterior
     states = post.state.values
@@ -529,7 +535,15 @@ def summed_posterior(window, env) -> np.ndarray:
     return total
 
 
-def draw_posterior(ax, data, results, env, sl: slice, t_offset: float, max_pos: float):
+def draw_posterior(
+    ax: Axes,
+    data: dict,
+    results: xr.Dataset,
+    env: Environment,
+    sl: slice,
+    t_offset: float,
+    max_pos: float,
+) -> None:
     """The decoded position (bone_r) with the animal's position (magenta dots)."""
     window = results.sel(time=sl)
     cmap = plt.get_cmap("bone_r").copy()
@@ -559,7 +573,7 @@ def draw_posterior(ax, data, results, env, sl: slice, t_offset: float, max_pos: 
     ax.set_ylim(0, max_pos)
 
 
-def draw_state_stack(ax, results, sl: slice, t_offset: float) -> None:
+def draw_state_stack(ax: Axes, results: xr.Dataset, sl: slice, t_offset: float) -> None:
     """Stacked state probabilities: Non-local (both states), Local, No-Spike."""
     sp = results.acausal_state_probabilities.sel(time=sl)
     ax.stackplot(
@@ -575,7 +589,7 @@ def draw_state_stack(ax, results, sl: slice, t_offset: float) -> None:
     ax.set_yticks([0, 1])
 
 
-def add_track_strip(ax, data, max_pos: float):
+def add_track_strip(ax: Axes, data: dict, max_pos: float) -> Axes:
     """The linearized track as the posterior's y key, flush to its left."""
     strip = ax.inset_axes([-0.075, 0.0, 0.07, 1.0])
     plot_linear_track_graph_strip(
@@ -596,7 +610,13 @@ def spans(mask: np.ndarray, t: np.ndarray) -> list[tuple[float, float]]:
     return [(t[a], t[b - 1]) for a, b in contiguous_true_runs(mask)]
 
 
-def draw_overview(fig, spec, inputs, session_events, max_pos: float):
+def draw_overview(
+    fig: Figure,
+    spec: SubplotSpec,
+    inputs: dict,
+    session_events: pd.DataFrame,
+    max_pos: float,
+) -> tuple[Axes, Axes]:
     """Panel a: the 2D track, then the decode over a run and the rest after it."""
     data, results, env = inputs["data"], inputs["results"], inputs["env"]
     start, dur = OVERVIEW_START_S, OVERVIEW_DURATION_S
@@ -700,7 +720,7 @@ def draw_overview(fig, spec, inputs, session_events, max_pos: float):
     return ax_track, ax_pos
 
 
-def fit_track_to_height(fig, ax_track, left: float) -> None:
+def fit_track_to_height(fig: Figure, ax_track: Axes, left: float) -> None:
     """Size the track's equal-aspect axes to fill its row's height, at ``left``."""
     box = ax_track.get_position(original=True)
     x0, x1 = ax_track.get_xlim()
@@ -710,7 +730,9 @@ def fit_track_to_height(fig, ax_track, left: float) -> None:
     ax_track.set_position([left, box.y0, width, box.height])
 
 
-def draw_examples(fig, spec, inputs, windows: dict, max_pos: float):
+def draw_examples(
+    fig: Figure, spec: SubplotSpec, inputs: dict, windows: dict, max_pos: float
+) -> Axes:
     """Panel b: one column per example (ripple, raster, decode, states)."""
     data, results, env, detector = (
         inputs["data"],
@@ -764,7 +786,11 @@ def draw_examples(fig, spec, inputs, windows: dict, max_pos: float):
 
 
 def draw_donut(
-    ax, wedges, centre: tuple[str, str], title, label_space: float = 2.2
+    ax: Axes,
+    wedges: list[tuple[str, float, str, bool]],
+    centre: tuple[str, str],
+    title: str,
+    label_space: float = 2.2,
 ) -> None:
     """A donut of (label, fraction, colour, highlighted) wedges.
 
@@ -809,7 +835,7 @@ def draw_donut(
     ax.set_title(title, fontsize=SMALL_SIZE, pad=2, loc="left")
 
 
-def draw_events_donut(ax, classes: dict, time_outside_swr: float) -> None:
+def draw_events_donut(ax: Axes, classes: dict, time_outside_swr: float) -> None:
     """Panel c: the non-local events by SWR overlap, and the time outside SWRs."""
     wedges = [
         (
@@ -837,7 +863,7 @@ def draw_events_donut(ax, classes: dict, time_outside_swr: float) -> None:
     )  # fmt: skip
 
 
-def draw_swr_donut(ax, kay: pd.Series) -> None:
+def draw_swr_donut(ax: Axes, kay: pd.Series) -> None:
     """Panel d: the SWRs by content."""
     no_nonlocal = kay["no_nonlocal_fraction"]
     mostly_local = kay["mostly_local_fraction"]
@@ -878,16 +904,18 @@ def animal_values(row: pd.Series, column: str, scale: float = 1.0) -> pd.Series:
     return scale * pd.Series(row[column], index=row["animal_names"])
 
 
-def draw_rest_to_event(ax, rest: pd.Series, event: pd.Series, group: str, color):
+def draw_rest_to_event(
+    ax: Axes, rest: pd.Series, event: pd.Series, group: str, color: str
+) -> None:
     """One line per animal from its Local-rest value to its event value."""
     x = REST_EVENT_X[group]
-    for animal in event.index:  # paired by animal, not by position
+    for animal in event.index.intersection(rest.index):  # paired by animal
         ax.plot(x, (rest[animal], event[animal]), color="#999999", lw=0.5, zorder=1)
     ax.scatter(np.full(rest.size, x[0]), rest, s=6, color=C_LOCAL, lw=0, zorder=2)
     ax.scatter(np.full(event.size, x[1]), event, s=6, color=color, lw=0, zorder=2)
 
 
-def rest_event_axis(ax, labels: bool = True) -> None:
+def rest_event_axis(ax: Axes, labels: bool = True) -> None:
     """Panels g and i's x axis: rest and event positions for each group."""
     ax.set_xlim(-0.5, 3.9)
     ticks = [x for pair in REST_EVENT_X.values() for x in pair]
@@ -895,7 +923,7 @@ def rest_event_axis(ax, labels: bool = True) -> None:
     ax.tick_params(labelbottom=labels)
 
 
-def draw_participation(ax_share, ax_rate, statistics: pd.DataFrame) -> None:
+def draw_participation(ax_share: Axes, ax_rate: Axes, statistics: pd.DataFrame) -> None:
     """Panel g: tetrode participation and spike rate, Local rest vs events.
 
     One line per animal from its length-matched Local-rest controls to its
@@ -919,7 +947,7 @@ def draw_participation(ax_share, ax_rate, statistics: pd.DataFrame) -> None:
         rest_event_axis(ax, labels=ax is ax_rate)
 
 
-def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
+def draw_state_composition(ax: Axes, statistics: pd.DataFrame) -> None:
     """Panel h: the mean share of an event in Continuous and in Fragmented.
 
     Bars are the animals' mean, dots the animals
@@ -952,7 +980,7 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
     )
 
 
-def draw_heldout_gain(ax, events: pd.DataFrame, controls: pd.DataFrame) -> None:
+def draw_heldout_gain(ax: Axes, events: pd.DataFrame, controls: pd.DataFrame) -> None:
     """Panel i: the held-out tetrode gain over local coding, per spike.
 
     One line per animal from its Local-rest controls to its events; the bar is
@@ -980,7 +1008,9 @@ def draw_heldout_gain(ax, events: pd.DataFrame, controls: pd.DataFrame) -> None:
     ax.set_title("Held-out tetrode", fontsize=SMALL_SIZE, pad=3)
 
 
-def draw_triggered(ax_rip, ax_mua, curves: dict, rest: pd.DataFrame) -> None:
+def draw_triggered(
+    ax_rip: Axes, ax_mua: Axes, curves: dict, rest: pd.DataFrame
+) -> None:
     """Panel j: ripple power and MUA around event starts, SWR vs no-SWR."""
     for ax, signal, label, word in (
         (ax_rip, "SWR_zscore", "Ripple (z)", "ripple"),
@@ -1020,7 +1050,7 @@ def draw_triggered(ax_rip, ax_mua, curves: dict, rest: pd.DataFrame) -> None:
 
 
 def draw_detector_bars(
-    ax, shares: pd.DataFrame, n_rows: int, xlabel: str, show_labels: bool
+    ax: Axes, shares: pd.DataFrame, n_rows: int, xlabel: str, show_labels: bool
 ) -> None:
     """One bar per detector (pooled share) with a dot per animal, top to bottom.
 
@@ -1048,7 +1078,10 @@ def draw_detector_bars(
 
 
 def draw_detector_overlap(
-    ax_caught, ax_content, overlap: pd.DataFrame, with_nonlocal: pd.DataFrame
+    ax_caught: Axes,
+    ax_content: Axes,
+    overlap: pd.DataFrame,
+    with_nonlocal: pd.DataFrame,
 ) -> None:
     """Panel e: what each detector catches, and what its events contain.
 
@@ -1067,7 +1100,7 @@ def draw_detector_overlap(
     ax_content.spines["left"].set_visible(False)
 
 
-def draw_share_by_power(ax, shares: pd.DataFrame) -> None:
+def draw_share_by_power(ax: Axes, shares: pd.DataFrame) -> None:
     """Panel k: the share of rest bins decoded non-local, by ripple power.
 
     One thin line per animal, their mean in bold.
@@ -1087,7 +1120,7 @@ def draw_share_by_power(ax, shares: pd.DataFrame) -> None:
     ax.set_ylabel("Share of rest bins\nnon-local")
 
 
-def draw_offsets(ax_start, ax_end, offsets: pd.DataFrame) -> None:
+def draw_offsets(ax_start: Axes, ax_end: Axes, offsets: pd.DataFrame) -> None:
     """Panel f: event minus SWR start (top) and end (bottom), log counts.
 
     Each row prints the share of event-SWR pairs whose bound differs by more
@@ -1103,8 +1136,9 @@ def draw_offsets(ax_start, ax_end, offsets: pd.DataFrame) -> None:
         ax.set_ylim(1, 2e6)
         ax.set_yticks([1, 100, 10000], ["1", "$10^2$", "$10^4$"])
         beyond = ", ".join(
-            f">{ms} ms {format_number(tails[f'{bound}_offset_beyond_{ms}ms_fraction'], 'pctnum')}%"
-            for ms in OFFSET_TAILS_MS
+            f">{1000 * tail_s:g} ms "
+            f"{format_number(tails[f'{bound}_offset_beyond_{name}_fraction'], 'pctnum')}%"
+            for name, tail_s in OFFSET_TAILS_S.items()
         )
         ax.text(
             0.02, 0.97, f"{label}\n{beyond}", transform=ax.transAxes, va="top",
@@ -1117,8 +1151,13 @@ def draw_offsets(ax_start, ax_end, offsets: pd.DataFrame) -> None:
 
 
 def letter(
-    fig, renderer, ax, text: str, x: float | None = None, y: float | None = None
-):
+    fig: Figure,
+    renderer: RendererBase,
+    ax: Axes,
+    text: str,
+    x: float | None = None,
+    y: float | None = None,
+) -> None:
     """A panel letter at the axes' drawn top-left, or at the given figure x / y.
 
     ``renderer`` is the canvas's after one draw; adding the letters moves no
@@ -1190,9 +1229,11 @@ def generate_figure(
         pd.read_parquet(data_dir / BRAIN_STATE_REFERENCE_DIR / "reference.parquet"),
         ["ripple", "mua"],
     )
+    # every analysed epoch with an event: an epoch with none has no table
+    event_epochs = event_table_epochs(events, analysed_epoch_ids())
     participation = participation_statistics(
         read_complete_run(
-            data_dir / EVENT_PARTICIPATION_DIR, "participation", analysed_epoch_ids()
+            data_dir / EVENT_PARTICIPATION_DIR, "participation", event_epochs
         )
     )
     heldout = window_scores(

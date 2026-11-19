@@ -756,9 +756,11 @@ def refit_encoding(
     """The decode's own encoding model, refit on other training bins.
 
     A copy of the detector is refit (``fit_encoding_model``: the same
-    clusterless KDE, settings and environment); the detector is not changed.
+    clusterless KDE, settings and environment); the detector is not changed. The
+    copy leaves out the detector's encoding model, which ``fit_encoding_model``
+    replaces without reading.
     """
-    refit = copy.deepcopy(detector)
+    refit = copy.deepcopy(detector, memo={id(detector.encoding_model_): {}})
     refit.clusterless_algorithm_params = {
         **(refit.clusterless_algorithm_params or {}),
         "disable_progress_bar": True,

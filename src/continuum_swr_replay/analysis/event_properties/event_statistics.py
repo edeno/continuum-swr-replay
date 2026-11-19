@@ -256,9 +256,9 @@ def boundary_offsets(events: pd.DataFrame) -> pd.DataFrame:
     return offsets
 
 
-OFFSET_TAILS_MS = (25, 50)
-"""How far (ms) an event's bound may sit from its SWR's before it counts in the
-tail (:func:`boundary_offset_statistics`)."""
+OFFSET_TAILS_S = {"twenty_five_ms": 0.025, "fifty_ms": 0.050}
+"""How far (s) an event's bound may sit from its SWR's before it counts in the
+tail (:func:`boundary_offset_statistics`), by the name its statistic carries."""
 
 
 def boundary_offset_statistics(offsets: pd.DataFrame) -> dict[str, float]:
@@ -274,8 +274,8 @@ def boundary_offset_statistics(offsets: pd.DataFrame) -> dict[str, float]:
     statistics : dict
         ``n_overlapping``, the events overlapping an SWR;
         ``start_offset_median_s`` and ``end_offset_median_s``, the medians of
-        their offsets; and, for each bound and each of :data:`OFFSET_TAILS_MS`,
-        ``{bound}_offset_beyond_{ms}ms_fraction``, the share of the events whose
+        their offsets; and, for each bound and each of :data:`OFFSET_TAILS_S`,
+        ``{bound}_offset_beyond_{name}_fraction``, the share of the events whose
         offset is larger than that in magnitude.
     """
     statistics = {
@@ -286,9 +286,9 @@ def boundary_offset_statistics(offsets: pd.DataFrame) -> dict[str, float]:
     for bound in ("start", "end"):
         # in whole microseconds, so a bound exactly at a tail's edge is not in it
         magnitude_us = np.round(1e6 * offsets[f"{bound}_offset_s"].abs())
-        for ms in OFFSET_TAILS_MS:
-            statistics[f"{bound}_offset_beyond_{ms}ms_fraction"] = float(
-                (magnitude_us > 1000 * ms).mean()
+        for name, tail_s in OFFSET_TAILS_S.items():
+            statistics[f"{bound}_offset_beyond_{name}_fraction"] = float(
+                (magnitude_us > round(1e6 * tail_s)).mean()
             )
     return statistics
 

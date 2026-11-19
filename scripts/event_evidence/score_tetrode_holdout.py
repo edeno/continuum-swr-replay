@@ -192,7 +192,7 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
     }
 
 
-def _use_gpu(queue, mem_fraction: float) -> None:
+def _use_gpu(queue: multiprocessing.Queue, mem_fraction: float) -> None:
     """Worker initializer: run JAX on the next card from ``queue``.
 
     Cards are assigned, several workers to a card, so the card is set here

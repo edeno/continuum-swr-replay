@@ -137,10 +137,10 @@ def test_boundary_offsets_are_event_bound_minus_swr_bound():
     assert result["end_offset_median_s"] == pytest.approx(0.04)
     # |start| 0.02, 0.01, 0.05, 0.04 and |end| 0.02, 0.05, 0.10, 0.20 s: beyond
     # 25 ms, 2 and 3 of 4; beyond 50 ms (strictly), 0 and 2 of 4
-    assert result["start_offset_beyond_25ms_fraction"] == pytest.approx(2 / 4)
-    assert result["end_offset_beyond_25ms_fraction"] == pytest.approx(3 / 4)
-    assert result["start_offset_beyond_50ms_fraction"] == pytest.approx(0)
-    assert result["end_offset_beyond_50ms_fraction"] == pytest.approx(2 / 4)
+    assert result["start_offset_beyond_twenty_five_ms_fraction"] == pytest.approx(2 / 4)
+    assert result["end_offset_beyond_twenty_five_ms_fraction"] == pytest.approx(3 / 4)
+    assert result["start_offset_beyond_fifty_ms_fraction"] == pytest.approx(0)
+    assert result["end_offset_beyond_fifty_ms_fraction"] == pytest.approx(2 / 4)
     # events none of which overlaps an SWR: no row, and the two columns
     none = stats.boundary_offsets(EVENTS[EVENTS["overlap_class"] == "non_swr"])
     assert none.empty

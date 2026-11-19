@@ -41,14 +41,16 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
     read_swr_table,
 )
 from continuum_swr_replay.analysis.event_definition.swr_source import (
-    swr_epoch_id_of_session,
+    event_epoch_ids,
 )
 from continuum_swr_replay.analysis.event_evidence import participation as pt
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
+    SWR_LABELS,
     event_bins,
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
+from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import (
     EVENT_PARTICIPATION_DIR,
@@ -77,16 +79,9 @@ SEED = 20261118
 """The control windows' seed, with the epoch id."""
 
 
-def epoch_ids(events: pd.DataFrame) -> pd.Series:
-    """Each event's epoch id (``swr_source.swr_epoch_id_of_session``)."""
-    keys = list(events[["animal", "session_date", "epoch"]].itertuples(index=False))
-    ids = {key: swr_epoch_id_of_session(*key) for key in set(keys)}
-    return pd.Series([ids[key] for key in keys], index=events.index)
-
-
 def epoch_events(events: pd.DataFrame, epoch_id: str) -> pd.DataFrame:
     """The table's events of one epoch, by start."""
-    mine = events[epoch_ids(events) == epoch_id]
+    mine = events[event_epoch_ids(events) == epoch_id]
     return mine.sort_values("event_start_s").reset_index(drop=True)
 
 
@@ -106,7 +101,7 @@ def epoch_table(epoch_id: str, events: pd.DataFrame, data_dir: Path) -> pd.DataF
     """One epoch's windows: its events and their Local-rest controls."""
     frame = read_dot_with_swr_source(decode_paths(epoch_id, data_dir).data_over_time)
     time = frame.index.to_numpy(dtype=float)
-    bin_s = float(np.median(np.diff(time)))  # for the margin only
+    bin_s = sample_step(time)  # for the margin only
     in_event = (frame["SWR_event"].to_numpy() > 0) | (
         frame["non_local_event"].to_numpy() > 0
     )
@@ -121,7 +116,9 @@ def epoch_table(epoch_id: str, events: pd.DataFrame, data_dir: Path) -> pd.DataF
     )
     controls = pt.control_windows(s, e, local_rest, seed=(SEED, epoch_id))
     spike_times = load_spike_times(epoch_id)
-    group = np.where(events["is_swr"].to_numpy(dtype=bool), "SWR", "no SWR")
+    group = np.where(
+        events["is_swr"].to_numpy(dtype=bool), SWR_LABELS[True], SWR_LABELS[False]
+    )
     has_control = controls["s"].to_numpy() >= 0
     parts = []
     for kind, keep, first, last in (
@@ -130,7 +127,7 @@ def epoch_table(epoch_id: str, events: pd.DataFrame, data_dir: Path) -> pd.DataF
     ):
         first, last = first[keep], last[keep]
         start, stop = time[first], pt.window_stops(time, last)
-        counts = pt.window_spike_counts(spike_times, start, stop)
+        counts = pt.tetrode_spike_counts(spike_times, start, stop)
         measures = pt.participation_and_rate(counts, stop - start)
         parts.append(
             measures.assign(
@@ -185,7 +182,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.gather:
         gather_manifest(output, OUTPUT_NAME, header)
         return
-    every_epoch = sorted(epoch_ids(read_swr_table(event_table)).unique())
+    every_epoch = sorted(set(event_epoch_ids(read_swr_table(event_table))))
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
         task=run_epoch,

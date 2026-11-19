@@ -19,6 +19,10 @@ def test_event_bins_map_times_to_the_decode_grid():
     np.testing.assert_array_equal(e, [10, 25])
     with pytest.raises(ValueError, match="decode's time bins"):
         event_bins(time, np.array([0.0105]), np.array([0.020]))
+    # a hair after a bin is that bin, as a hair before is
+    s, e = event_bins(time, np.array([0.010 + 5e-7]), np.array([0.020 - 5e-7]))
+    np.testing.assert_array_equal(s, [5])
+    np.testing.assert_array_equal(e, [10])
 
 
 def test_local_rest_needs_local_immobile_and_no_event_nearby():
@@ -48,9 +52,9 @@ def test_control_windows_have_the_events_lengths_and_lie_in_local_rest():
     pd.testing.assert_frame_equal(windows, again)
 
 
-def test_window_spike_counts_count_each_tetrode_in_half_open_windows():
+def test_tetrode_spike_counts_count_each_tetrode_in_half_open_windows():
     spikes = [np.array([0.001, 0.005, 0.010]), np.array([0.020]), np.array([])]
-    counts = pt.window_spike_counts(
+    counts = pt.tetrode_spike_counts(
         spikes, np.array([0.0, 0.010]), np.array([0.010, 0.030])
     )
     # [0, 10 ms) holds two of tetrode 0; [10, 30 ms) one of tetrode 0, one of 1

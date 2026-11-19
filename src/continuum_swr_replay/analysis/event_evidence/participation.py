@@ -28,6 +28,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import 
     keyed_rng,
 )
 from continuum_swr_replay.analysis.shared_statistics import animal_session_values
+from continuum_swr_replay.intervals import sample_step
 
 LOCAL_THRESHOLD = 0.8
 """A Local-rest bin's Local probability is above this (the event rule's 0.8)."""
@@ -125,12 +126,12 @@ def window_stops(time: NDArray, last: NDArray) -> NDArray:
     """
     time = np.asarray(time, dtype=float)
     last = np.asarray(last, dtype=np.int64)
-    step = float(np.median(np.diff(time)))
+    step = sample_step(time)
     padded = np.r_[time, time[-1] + step]
     return padded[last + 1]
 
 
-def window_spike_counts(
+def tetrode_spike_counts(
     spike_times: Sequence[NDArray], starts_s: NDArray, stops_s: NDArray
 ) -> NDArray[np.int64]:
     """Each tetrode's spikes in each half-open window [start, stop).

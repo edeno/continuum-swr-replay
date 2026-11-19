@@ -346,14 +346,8 @@ def build_windows(
     ).assign(kind="calib", state="")
     windows = pd.concat([*bouts, *matched, calibration], ignore_index=True)
     windows["clipped"] = windows["clipped"].astype("boolean")  # missing off bouts
-    windows["pool"] = windows.kind + "|" + windows.state + "|" + windows.regime
-    return _with_state_means(windows, probabilities)
-
-
-def _with_state_means(windows: pd.DataFrame, probabilities: NDArray) -> pd.DataFrame:
-    """The windows with ``n_bins`` and each state's mean posterior, ``p_{state}``,
-    and the leading columns the evidence reads first."""
     windows["n_bins"] = windows.e - windows.s + 1
+    windows["pool"] = windows.kind + "|" + windows.state + "|" + windows.regime
     cumulative = np.vstack(
         [np.zeros((1, len(STATES))), np.cumsum(probabilities, axis=0)]
     )
@@ -393,11 +387,19 @@ def event_bins(
     Raises
     ------
     ValueError
-        If an event does not start and end on a decode bin.
+        If an event does not start and end within :data:`ON_GRID_ATOL_S` of a
+        decode bin (either side).
     """
     time = np.asarray(time, dtype=float)
-    s = np.minimum(np.searchsorted(time, starts_s), time.size - 1)
-    e = np.minimum(np.searchsorted(time, ends_s), time.size - 1)
+
+    def nearest(t: NDArray) -> NDArray[np.int64]:
+        """The bin nearest each time, a hair either side of it."""
+        t = np.asarray(t, dtype=float)
+        after = np.clip(np.searchsorted(time, t), 1, time.size - 1)
+        closer_before = np.abs(t - time[after - 1]) <= np.abs(time[after] - t)
+        return np.where(closer_before, after - 1, after).astype(np.int64)
+
+    s, e = nearest(starts_s), nearest(ends_s)
     on_grid = (np.abs(time[s] - starts_s) <= ON_GRID_ATOL_S) & (
         np.abs(time[e] - ends_s) <= ON_GRID_ATOL_S
     )

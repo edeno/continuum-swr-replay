@@ -65,6 +65,7 @@ from continuum_swr_replay.analysis.detector_comparison.feature_run import (
     EVENT_FEATURES_RUN,
     STATE_SPACE_FEATURES_RUN,
 )
+from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_definition.analysed_time import read_swr_table
 from continuum_swr_replay.analysis.event_evidence import (
     likelihood_advantage,
@@ -73,6 +74,9 @@ from continuum_swr_replay.analysis.event_evidence import (
 )
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     SPIKE_EVIDENCE_METRICS,
+)
+from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
+    SWR_LABELS,
 )
 from continuum_swr_replay.analysis.event_properties import event_statistics
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
@@ -127,7 +131,7 @@ from continuum_swr_replay.runs.staleness import read_output_manifest, recorded_s
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 TAGS = {
-    "decoding_error": Tags(("2a.1",), ("decoder_validation",)),
+    "decoding_error": Tags(("2a.1",)),
     "calibration": Tags(("2a.1",), ("decoder_validation",)),
     "state_fractions": Tags(("2a.6",), ("decoder_validation",)),
     "cohort": Tags(("2b.2",), ("2c",)),
@@ -291,7 +295,7 @@ _STATE_WORDS = {
 
 
 def decoding_error_values(sessions: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2a.1: the Local-state decoding error over sessions (Figure 2e)."""
+    """Question 2a.1: the Local-state decoding error over sessions."""
     make = value_factory(decoding_error_values, source, TAGS["decoding_error"])
     stats = quality_metrics.local_decoding_error_statistics(sessions)
     return [
@@ -472,12 +476,8 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
     ]
 
 
-#: The offset tails' thresholds (``event_statistics.OFFSET_TAILS_MS``) as key words.
-_MS_WORDS = {25: "twenty_five", 50: "fifty"}
-
-
 def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2b.4: non-local event bounds against the matched SWR's (Figure 2d)."""
+    """Question 2b.4: non-local event bounds against the matched SWR's (Figure 2f)."""
     make = value_factory(boundary_offset_values, source, TAGS["boundaries"])
     stats = event_statistics.boundary_offset_statistics(
         event_statistics.boundary_offsets(events)
@@ -508,15 +508,15 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
         ),
         *(
             make(
-                f"{bound}_offset_beyond_{_MS_WORDS[ms]}_ms_fraction",
-                stats[f"{bound}_offset_beyond_{ms}ms_fraction"],
+                f"{bound}_offset_beyond_{name}_fraction",
+                stats[f"{bound}_offset_beyond_{name}_fraction"],
                 "fraction",
                 "pct",
                 f"share of SWR-overlapping events whose {bound} differs from the "
-                f"matched SWR's {bound} by more than {ms} ms",
+                f"matched SWR's {bound} by more than {1000 * tail_s:g} ms",
             )
             for bound in ("start", "end")
-            for ms in event_statistics.OFFSET_TAILS_MS
+            for name, tail_s in event_statistics.OFFSET_TAILS_S.items()
         ),
     ]
 
@@ -1178,7 +1178,7 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
 # --- what the events are -----------------------------------------------------------
 
 #: The event groups of the per-event runs, by the word their keys use.
-_RUN_GROUPS = {"non_swr": "no SWR", "swr": "SWR"}
+_RUN_GROUPS = {"non_swr": SWR_LABELS[False], "swr": SWR_LABELS[True]}
 
 
 def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
@@ -1267,7 +1267,7 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
 
 
 def _per_spike_interval(
-    make, key: str, row: pd.Series, description: str
+    make: Callable[..., Value], key: str, row: pd.Series, description: str
 ) -> list[Value]:
     """A per-animal per-spike estimate and the bounds of its 95 % interval
     (``likelihood_advantage_statistics``' ``estimate``, ``ci_low``, ``ci_high``)."""
@@ -2111,7 +2111,8 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.add(*content_occupancy_values(occupancy, rel(inputs.content_occupancy)))
     summary.inputs.append(file_record(inputs.content_occupancy, ROOT_DIR))
 
-    analysed = analysed_epoch_ids()
+    # every analysed epoch with an event: an epoch with none has no table
+    analysed = swr_source.event_table_epochs(events, analysed_epoch_ids())
     participation_table = read_complete_run(
         inputs.event_participation, "participation", analysed
     )

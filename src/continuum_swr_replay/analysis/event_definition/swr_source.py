@@ -287,6 +287,31 @@ def swr_epoch_id_of_session(animal: str, day: object, epoch: object) -> str:
     return swr_epoch_id(nwb_file_name(animal, day), str(epoch))
 
 
+def event_epoch_ids(events: pd.DataFrame) -> pd.Series:
+    """Each row's :func:`swr_epoch_id_of_session`, from its ``animal``,
+    ``session_date`` and ``epoch``; indexed as ``events``."""
+    keys = list(events[["animal", "session_date", "epoch"]].itertuples(index=False))
+    ids = {key: swr_epoch_id_of_session(*key) for key in set(keys)}
+    return pd.Series([ids[key] for key in keys], index=events.index, dtype=object)
+
+
+def event_table_epochs(events: pd.DataFrame, analysed: Iterable[str]) -> list[str]:
+    """The epochs with an event in ``events``, sorted: the epochs a per-event run
+    holds (an analysed epoch with no event has no table).
+
+    Raises
+    ------
+    ValueError
+        If an epoch of ``events`` is not in ``analysed``.
+    """
+    epochs = sorted(set(event_epoch_ids(events)))
+    if other := sorted(set(epochs) - set(analysed)):
+        raise ValueError(
+            f"{len(other)} epochs of the events are not analysed: {other[:3]}"
+        )
+    return epochs
+
+
 def swr_source_files(epoch_id: str) -> dict[str, dict[str, str]]:
     """The epoch's Kay events and observed stretches, checked against the manifest.
 

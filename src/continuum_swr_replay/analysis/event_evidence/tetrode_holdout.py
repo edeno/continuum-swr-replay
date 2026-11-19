@@ -59,11 +59,13 @@ from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
+    interior_bin_mask,
     nearest_interior_bins,
     per_tetrode_terms,
     refit_encoding,
     spikes_in_bins,
 )
+from continuum_swr_replay.decoding.results import ENCODING_KEY
 
 N_FOLDS = 5
 """Contiguous time blocks per epoch; each block's encodings are fit on the others."""
@@ -396,8 +398,8 @@ def holdout_scores(
     started = clock.time()
     time = np.asarray(time, dtype=float)
     is_missing = np.asarray(is_missing, dtype=bool)
-    environment = next(iter(detector.encoding_model_.values()))["environment"]
-    interior = np.asarray(environment.is_track_interior_).ravel()
+    environment = detector.encoding_model_[ENCODING_KEY]["environment"]
+    interior = interior_bin_mask(environment)
     centers = np.asarray(environment.place_bin_centers_)[interior]
     state_ind = np.asarray(detector.state_ind_)[detector.is_track_interior_state_bins_]
     state_names = list(detector.state_names)
@@ -415,6 +417,7 @@ def holdout_scores(
 
     t0 = clock.time()
     terms = fold_terms(encodings, spike_times, marks, time, centers, blocks)
+    del encodings  # their terms are all the scoring needs
     record["terms_s"] = round(clock.time() - t0, 1)
     record["n_spikes"] = int(terms.time_bin.size)
     log(f"terms: {terms.time_bin.size} spikes, {record['terms_s']} s")
@@ -435,11 +438,8 @@ def holdout_scores(
     s = windows["s"].to_numpy(dtype=np.int64)
     e = windows["e"].to_numpy(dtype=np.int64)
     rows = window_rows(s, e)
-    local_weights = np.exp(
-        kernel[rows] - logsumexp(kernel[rows], axis=1, keepdims=True)
-    )
-    with np.errstate(divide="ignore"):
-        log_local_weights = np.log(local_weights)
+    # the decoder's Local kernel at each scored bin, normalized over the bins
+    log_local_weights = kernel[rows] - logsumexp(kernel[rows], axis=1, keepdims=True)
     animal_bin = nearest_interior_bins(environment, np.asarray(linear_position)[rows])
     counts = terms.spike_counts()[rows]
     bin_cm = float(np.median(np.diff(np.sort(centers.ravel()))))
