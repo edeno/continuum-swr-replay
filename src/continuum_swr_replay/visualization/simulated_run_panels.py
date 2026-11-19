@@ -82,6 +82,33 @@ DATA_LEFT, DATA_RIGHT = 0.095, 0.985
 POSITION_MARGIN_CM = 8.0
 
 
+def set_publication_style() -> None:
+    """The paper figures' matplotlib style: Cell Press text sizes, thin axes and
+    ticks, no top or right spines, and no layout engine (the figures place
+    their own axes)."""
+    plt.rcParams.update(
+        {
+            "font.size": SMALL_SIZE,
+            "axes.labelsize": LABEL_SIZE,
+            "axes.titlesize": LABEL_SIZE,
+            "xtick.labelsize": SMALL_SIZE,
+            "ytick.labelsize": SMALL_SIZE,
+            "legend.fontsize": SMALL_SIZE,
+            "axes.linewidth": 0.6,
+            "xtick.major.width": 0.6,
+            "ytick.major.width": 0.6,
+            "xtick.minor.width": 0.5,
+            "ytick.minor.width": 0.5,
+            "xtick.major.size": 2.5,
+            "ytick.major.size": 2.5,
+            "lines.linewidth": 0.9,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "figure.constrained_layout.use": False,
+        }
+    )
+
+
 def example_badge(color: str) -> dict:
     """The ``bbox`` of a numbered example flag."""
     return {"boxstyle": "circle,pad=0.18", "facecolor": color, "edgecolor": "none"}

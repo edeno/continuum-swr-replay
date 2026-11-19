@@ -45,10 +45,10 @@ import warnings
 from collections.abc import Sequence
 from pathlib import Path
 
-import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.collections import PolyCollection
 from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
 from matplotlib.gridspec import GridSpec
 
@@ -59,6 +59,7 @@ from continuum_swr_replay.analysis.event_definition.analysed_time import (
 from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     content_density_along_arms,
     leaf_and_trunk_profiles,
+    log2_density_ratio,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     AT_WELL_CM,
@@ -67,48 +68,34 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     content_occupancy_shares,
 )
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
     CONTENT_ALONG_ARMS_DIR,
     content_occupancy_dir,
     processed_data_dir,
 )
-from continuum_swr_replay.reported.events import default_inputs
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.reported.events import (
+    default_inputs,
+    with_brain_state,
+    with_start_and_rest_theta,
+)
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.simulated_run_panels import (
     LABEL_SIZE,
-    PANEL_LETTER_SIZE,
     SMALL_SIZE,
     check_journal_limits,
+    drawn_extent,
+    letter_panel,
+    set_publication_style,
 )
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
 )
 figure_utilities.set_figure_defaults(context="paper")
-plt.rcParams.update(
-    {
-        "font.size": SMALL_SIZE,
-        "axes.labelsize": LABEL_SIZE,
-        "axes.titlesize": LABEL_SIZE,
-        "xtick.labelsize": SMALL_SIZE,
-        "ytick.labelsize": SMALL_SIZE,
-        "legend.fontsize": SMALL_SIZE,
-        "axes.linewidth": 0.6,
-        "xtick.major.width": 0.6,
-        "ytick.major.width": 0.6,
-        "xtick.minor.width": 0.5,
-        "ytick.minor.width": 0.5,
-        "xtick.major.size": 2.5,
-        "ytick.major.size": 2.5,
-        "lines.linewidth": 0.9,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "figure.constrained_layout.use": False,
-    }
-)
+set_publication_style()
 warnings.filterwarnings("ignore")
 
 # Inches: saved with 0.1 in margins, about 17.3 cm (Cell Press full width).
@@ -130,7 +117,7 @@ ARM_HALF_WIDTH_CM = 9.0
 # Panels f and g: segments per arm, about 4 cm (two 2-cm place bins) each.
 N_SEGMENTS = 13
 # Panel f: the color scale's limit, log2 of the no-SWR to SWR density ratio.
-RATIO_LIMIT_LOG2 = 2.0
+RATIO_LIMIT_LOG2 = 2
 # Panel d: the track's arms.
 N_ARMS = len(ALL_ARMS)
 
@@ -172,29 +159,16 @@ def read_inputs() -> dict:
     inputs = default_inputs()
     events = read_swr_table(inputs.event_table)
     n_events = len(events)
-    extras = pd.concat(
-        map(pd.read_parquet, sorted(inputs.event_start_rest_theta.glob("*.parquet")))
-    )[["event_id", "start_distance_cm"]]
-    gamma = pd.concat(
-        pd.read_parquet(path, columns=["event_id", "slow_gamma_z", "fast_gamma_z"])
-        for path in sorted(inputs.event_gamma.glob("*_events.parquet"))
+    n_epochs = len(analysed_epoch_ids())
+    # As the summary does: the start distances and the brain state are joined to
+    # the events separately (the start-distance output carries theta columns
+    # of its own).
+    with_start, _ = with_start_and_rest_theta(
+        events, inputs.event_start_rest_theta, n_epochs
     )
-    events = events.merge(extras, on="event_id", how="left", validate="1:1").merge(
-        gamma, on="event_id", how="left", validate="1:1"
-    )
-    assert len(events) == n_events
-    missing = events[["start_distance_cm", "slow_gamma_z", "fast_gamma_z"]].isna()
-    if missing.any().any():
-        raise ValueError(f"events missing a joined value:\n{missing.sum()}")
-
-    reference = pd.read_parquet(inputs.brain_state_reference)
-    gamma_reference = pd.read_parquet(inputs.event_gamma / "reference.parquet")
-    gamma_columns = [c for c in gamma_reference.columns if "gamma" in c]
-    reference = reference.merge(
-        gamma_reference[[*SESSION_COLUMNS, *gamma_columns]],
-        on=list(SESSION_COLUMNS),
-        how="inner",
-        validate="1:1",
+    events, reference, _ = with_brain_state(events, inputs, n_epochs)
+    events = events.merge(
+        with_start[["event_id", "start_distance_cm"]], on="event_id", validate="1:1"
     )
     occupancy = pd.read_csv(
         content_occupancy_dir() / "content_occupancy_per_session.csv"
@@ -212,12 +186,12 @@ def read_inputs() -> dict:
     if len(along) != n_bins or along["event_id"].nunique() != n_events:
         raise ValueError("the content-along-arms bins do not cover the event table")
     density = content_density_along_arms(along, N_SEGMENTS)
-    env = joblib.load(decode_paths(TRACK_EPOCH, processed_data_dir()).environment)
+    env = pd.read_pickle(decode_paths(TRACK_EPOCH, processed_data_dir()).environment)
     return {
         "events": events,
         "reference": reference,
         "occupancy_shares": content_occupancy_shares(occupancy),
-        "density": density,
+        "ratio": log2_density_ratio(density),
         "profiles": leaf_and_trunk_profiles(density),
         "track_graph": env.track_graph,
         "edge_order": [tuple(edge) for edge in env.edge_order],
@@ -294,14 +268,11 @@ def draw_arm_counts(ax, events: pd.DataFrame) -> None:
     ax.set_xlim(0.4, N_ARMS + 0.6)
 
 
-def draw_ratio_track(ax, track_graph, edge_order, density: pd.DataFrame) -> None:
+def draw_ratio_track(ax, track_graph, edge_order, ratio: pd.Series) -> None:
     """Each segment of the track colored by log2 of its no-SWR to SWR content
-    density, on a scale between the two kinds' colors."""
-    ratio = np.log2(
-        density.loc[False, "density_per_cm"] / density.loc[True, "density_per_cm"]
-    )
-    cmap = LinearSegmentedColormap.from_list("kinds", [C_SWR, "#f7f7f7", C_NL])
-    norm = TwoSlopeNorm(0.0, -RATIO_LIMIT_LOG2, RATIO_LIMIT_LOG2)
+    density (``content_along_arms.log2_density_ratio``), on a scale between the
+    two kinds' colors; the scale saturates at ``RATIO_LIMIT_LOG2``."""
+    polygons, values = [], []
     for first, second in edge_order:
         arm = track_graph.edges[first, second]["edge_id"]
         start = np.asarray(track_graph.nodes[first]["pos"], dtype=float)
@@ -310,17 +281,28 @@ def draw_ratio_track(ax, track_graph, edge_order, density: pd.DataFrame) -> None
         step = step / N_SEGMENTS
         for segment in range(N_SEGMENTS):
             a, b = start + step * segment, start + step * (segment + 1)
-            corners = np.array([a + normal, b + normal, b - normal, a - normal])
-            value = np.clip(ratio[(arm, segment)], -RATIO_LIMIT_LOG2, RATIO_LIMIT_LOG2)
-            # A filled band, not a thick line: the journal caps line width.
-            ax.fill(corners[:, 0], corners[:, 1], color=cmap(norm(value)), lw=0)
+            polygons.append([a + normal, b + normal, b - normal, a - normal])
+            values.append(ratio[(arm, segment)])
+    # Filled bands, not thick lines: the journal caps line width.
+    bands = PolyCollection(
+        polygons,
+        array=np.asarray(values),
+        cmap=LinearSegmentedColormap.from_list("kinds", [C_SWR, "#f7f7f7", C_NL]),
+        norm=TwoSlopeNorm(0.0, -RATIO_LIMIT_LOG2, RATIO_LIMIT_LOG2),
+        linewidths=0,
+    )
+    ax.add_collection(bands)
+    ax.autoscale_view()
     ax.set_aspect("equal")
     ax.axis("off")
+    steps = np.arange(-RATIO_LIMIT_LOG2, RATIO_LIMIT_LOG2 + 1)
     bar = plt.colorbar(
-        plt.cm.ScalarMappable(norm, cmap), ax=ax, shrink=0.7, aspect=12, pad=0.02,
-        ticks=[-2, -1, 0, 1, 2],
+        bands, ax=ax, shrink=0.7, aspect=12, pad=0.02, ticks=steps
     )  # fmt: skip
-    bar.ax.set_yticklabels(["4× SWR", "2×", "equal", "2×", "4× no SWR"])
+    labels = [f"{2 ** abs(k):g}×" if k else "equal" for k in steps]
+    labels[0] += " SWR"
+    labels[-1] += " no SWR"
+    bar.ax.set_yticklabels(labels)
     bar.ax.tick_params(length=2)
     bar.outline.set_linewidth(0.5)
     ax.set_title("Content time per cm,\nno SWR : SWR", fontsize=SMALL_SIZE, pad=2)
@@ -377,20 +359,6 @@ def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> Non
     axes[0].set_ylabel("Power (z)")
 
 
-def letter(fig, renderer, ax, text: str, x: float | None, y: float) -> None:
-    """A panel letter at figure height y, at the axes' drawn left or at x."""
-    box = ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
-    fig.text(
-        max(box.x0 - 0.004, 0.0) if x is None else x,
-        y,
-        text,
-        fontsize=PANEL_LETTER_SIZE,
-        fontweight="bold",
-        ha="left",
-        va="bottom",
-    )
-
-
 # ---------------------------------------------------------------------------
 # Figure
 # ---------------------------------------------------------------------------
@@ -424,9 +392,7 @@ def generate_figure(inputs: dict):
     draw_histogram(ax_e, events, "start_distance")
     ax_e.set_ylabel("% events")
     ax_f = fig.add_subplot(row2[1])
-    draw_ratio_track(
-        ax_f, inputs["track_graph"], inputs["edge_order"], inputs["density"]
-    )
+    draw_ratio_track(ax_f, inputs["track_graph"], inputs["edge_order"], inputs["ratio"])
     ax_g = fig.add_subplot(row2[2])
     draw_profiles(ax_g, inputs["profiles"], inputs["occupancy_shares"])
 
@@ -434,22 +400,17 @@ def generate_figure(inputs: dict):
     ax_h = [fig.add_subplot(row3[i]) for i in range(len(SIGNALS))]
     draw_brain_state(ax_h, events, inputs["reference"])
 
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    x_left = 0.005
+    fig.draw_without_rendering()
     rows = (
-        ((ax_a, "a", x_left), (ax_b, "b", None), (ax_c, "c", None),
-         (ax_d, "d", None)),
-        ((ax_e, "e", x_left), (ax_f, "f", None), (ax_g, "g", None)),
-        ((ax_h[0], "h", x_left),),
-    )  # fmt: skip
+        ((ax_a, "a"), (ax_b, "b"), (ax_c, "c"), (ax_d, "d")),
+        ((ax_e, "e"), (ax_f, "f"), (ax_g, "g")),
+        ((ax_h[0], "h"),),
+    )
     for row in rows:
-        top = max(
-            ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted()).y1
-            for ax, _, _ in row
-        )
-        for ax, text, x in row:
-            letter(fig, renderer, ax, text, x, min(top + 0.004, 0.985))
+        top = min(drawn_extent(fig, [ax for ax, _ in row]).y1 + 0.02, 0.985)
+        for i, (ax, text) in enumerate(row):
+            left = 0.005 if i == 0 else drawn_extent(fig, [ax]).x0 - 0.004
+            letter_panel(fig, text, left, top)
     return fig
 
 

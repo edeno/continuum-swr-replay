@@ -801,6 +801,9 @@ DECODE_FRAME_READERS = {
     "scripts/event_properties/measure_event_start_and_rest_theta.py": (
         "reads it through with_swr_source; read_pickle reads the environment"
     ),
+    "scripts/event_properties/measure_content_along_arms.py": (
+        "reads it through with_swr_source; read_pickle reads the environment"
+    ),
 }
 
 

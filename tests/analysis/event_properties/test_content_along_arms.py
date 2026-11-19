@@ -11,6 +11,7 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     check_arm_orientation,
     content_density_along_arms,
     leaf_and_trunk_profiles,
+    log2_density_ratio,
 )
 
 
@@ -92,3 +93,15 @@ def test_profiles_average_the_arms_of_each_type():
     # leaf arms 0 and 1 each hold 1/4 at segment 1: 0.05 per cm, mean 0.05.
     assert profiles[(True, "leaf", 1)] == pytest.approx(0.05)
     assert profiles[(True, "trunk", 0)] == pytest.approx(0.1)
+
+
+def test_the_ratio_is_log2_no_swr_over_swr_and_undefined_without_content():
+    # Arm 0, 2 segments of 5 cm. No SWR: 1 bin in each half; SWR: both bins in
+    # the far half. Densities: no SWR 0.1, 0.1; SWR 0, 0.2.
+    bins = pd.concat(
+        [_bins("a", False, [0, 0], [0.1, 0.9]), _bins("a", True, [0, 0], [0.9, 0.9])],
+        ignore_index=True,
+    )
+    ratio = log2_density_ratio(content_density_along_arms(bins, n_segments=2))
+    assert np.isnan(ratio[(0, 0)])
+    assert ratio[(0, 1)] == pytest.approx(-1.0)

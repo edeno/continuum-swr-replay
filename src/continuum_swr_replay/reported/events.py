@@ -138,7 +138,9 @@ TAGS = {
     "boundaries": Tags(("2b.4",), ("2f",)),
     "ripple": Tags(("2d.8", "2b.5"), ("2j",)),
     "mua": Tags(("2d.8",), ("2j",)),
-    "brain_state": Tags(("2d.8",), ("3h",)),
+    "theta": Tags(("2d.8",), ("3h",)),
+    "gamma_z": Tags(("2d.8",), ("3h",)),
+    "brain_state": Tags(("2d.8",)),
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
@@ -818,9 +820,9 @@ def brain_state_values(
         word: value_factory(
             brain_state_values,
             source,
-            {"ripple": TAGS["ripple"], "mua": TAGS["mua"]}.get(
-                word, TAGS["brain_state"]
-            ),
+            {"theta": TAGS["theta"], "ripple": TAGS["ripple"], "mua": TAGS["mua"]}[
+                word
+            ],
         )
         for word in ("theta", "ripple", "mua")
     }
@@ -837,7 +839,7 @@ def gamma_z_values(
     ``fast_gamma_z``, joined on ``event_id``, and its epochs' running and
     quiet-rest levels on the same scale.
     """
-    make = value_factory(gamma_z_values, source, TAGS["brain_state"])
+    make = value_factory(gamma_z_values, source, TAGS["gamma_z"])
     return _signal_values({"slow_gamma": make, "fast_gamma": make}, events, reference)
 
 
@@ -1858,6 +1860,68 @@ def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value
 # --- the summary ---------------------------------------------------------------
 
 
+def with_start_and_rest_theta(
+    events: pd.DataFrame, folder: Path, n_epochs: int
+) -> tuple[pd.DataFrame, list[Path]]:
+    """``events`` with each one's start distance and rest-theta columns
+    (``Processed-Data/event_start_rest_theta``), and the files read.
+
+    Raises
+    ------
+    ValueError
+        If ``folder`` does not hold ``n_epochs`` epochs, or an event has no row.
+    """
+    paths = sorted(folder.glob("*.parquet"))
+    if len(paths) != n_epochs:
+        raise ValueError(f"{folder} holds {len(paths)} epochs, not {n_epochs}")
+    extras = pd.concat(map(pd.read_parquet, paths), ignore_index=True)
+    joined = events.merge(
+        extras.drop(columns=["epoch_id", "decode_sha256"]),
+        on="event_id",
+        how="left",
+        validate="1:1",
+    )
+    if joined.n_bins.isna().any():
+        raise ValueError("an event has no start-distance and rest-theta row")
+    return joined, paths
+
+
+def with_brain_state(
+    events: pd.DataFrame, inputs: EventsInputs, n_epochs: int
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """``events`` with their slow and fast gamma, and the brain-state reference
+    with the gamma reference's columns joined; also the gamma reference itself.
+
+    Raises
+    ------
+    ValueError
+        If a reference does not hold ``n_epochs`` epochs, or an event has no
+        gamma value.
+    """
+    reference = pd.read_parquet(inputs.brain_state_reference)
+    gamma_reference = pd.read_parquet(inputs.event_gamma / "reference.parquet")
+    if len(reference) != n_epochs or len(gamma_reference) != n_epochs:
+        raise ValueError(
+            f"the brain-state reference holds {len(reference)} epochs and the gamma "
+            f"reference {len(gamma_reference)}, not {n_epochs}"
+        )
+    gamma_columns = [c for c in gamma_reference.columns if "gamma" in c]
+    reference = reference.merge(
+        gamma_reference[[*SESSION_COLUMNS, *gamma_columns]],
+        on=list(SESSION_COLUMNS),
+        how="inner",
+        validate="1:1",
+    )
+    gamma_events = pd.concat(
+        pd.read_parquet(path, columns=["event_id", "slow_gamma_z", "fast_gamma_z"])
+        for path in sorted(inputs.event_gamma.glob("*_events.parquet"))
+    )
+    joined = events.merge(gamma_events, on="event_id", how="left", validate="1:1")
+    if joined[["slow_gamma_z", "fast_gamma_z"]].isna().all(axis=1).any():
+        raise ValueError("an event has no gamma value")
+    return joined, reference, gamma_reference
+
+
 def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     """The events summary from ``inputs``."""
     summary = Summary(name="events", produced_by=produced_by)
@@ -1878,21 +1942,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.add(*boundary_offset_values(events, source))
     summary.add(*state_composition_values(events, source))
     summary.inputs.append(event_table_record)
-    extra_paths = sorted(inputs.event_start_rest_theta.glob("*.parquet"))
-    if len(extra_paths) != n_epochs:
-        raise ValueError(
-            f"{inputs.event_start_rest_theta} holds {len(extra_paths)} epochs, "
-            f"not {n_epochs}"
-        )
-    extras = pd.concat(map(pd.read_parquet, extra_paths), ignore_index=True)
-    events_with_extras = events.merge(
-        extras.drop(columns=["epoch_id", "decode_sha256"]),
-        on="event_id",
-        how="left",
-        validate="1:1",
+    events_with_extras, extra_paths = with_start_and_rest_theta(
+        events, inputs.event_start_rest_theta, n_epochs
     )
-    if events_with_extras.n_bins.isna().any():
-        raise ValueError("an event has no start-distance and rest-theta row")
     extras_source = (
         f"{source} and {rel(inputs.event_start_rest_theta)} "
         "(scripts/event_properties/measure_event_start_and_rest_theta.py)"
@@ -1924,29 +1976,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         file_record(inputs.property_bootstrap / name, ROOT_DIR)
         for name in ("intervals.csv", "manifest.json")
     ]
-    reference = pd.read_parquet(inputs.brain_state_reference)
-    gamma_reference = pd.read_parquet(inputs.event_gamma / "reference.parquet")
-    if len(reference) != n_epochs or len(gamma_reference) != n_epochs:
-        raise ValueError(
-            f"the brain-state reference holds {len(reference)} epochs and the gamma "
-            f"reference {len(gamma_reference)}, not {n_epochs}"
-        )
-    gamma_columns = [c for c in gamma_reference.columns if "gamma" in c]
-    reference = reference.merge(
-        gamma_reference[[*SESSION_COLUMNS, *gamma_columns]],
-        on=list(SESSION_COLUMNS),
-        how="inner",
-        validate="1:1",
+    events_with_gamma, reference, gamma_reference = with_brain_state(
+        events, inputs, n_epochs
     )
-    gamma_events = pd.concat(
-        pd.read_parquet(path, columns=["event_id", "slow_gamma_z", "fast_gamma_z"])
-        for path in sorted(inputs.event_gamma.glob("*_events.parquet"))
-    )
-    events_with_gamma = events.merge(
-        gamma_events, on="event_id", how="left", validate="1:1"
-    )
-    if events_with_gamma[["slow_gamma_z", "fast_gamma_z"]].isna().all(axis=1).any():
-        raise ValueError("an event has no gamma value")
     signal_source = (
         f"{rel(inputs.event_table)} (event theta_z, ripple_power_z, mua_rate_z) "
         f"and {rel(inputs.brain_state_reference)} (scripts/event_properties/"

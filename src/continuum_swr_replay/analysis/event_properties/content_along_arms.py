@@ -9,7 +9,8 @@ arm is the well, and arms of slightly different length in different animals line
 up when pooled.
 
 :func:`arm_positions` places bins on arms; :func:`content_density_along_arms`
-gives each kind's content time per cm along every arm, the animals' mean.
+gives each kind's content time per cm along every arm, the animals' mean, and
+:func:`log2_density_ratio` the no-SWR to SWR ratio of it.
 """
 
 from __future__ import annotations
@@ -17,13 +18,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.data_loaders.constants import LEAF_ARMS
+from continuum_swr_replay.data_loaders.constants import LEAF_ARMS, WELL_ARMS
 
 CENTER_NODE = 9
 """The track graph's center junction."""
-
-WELL_NODES = frozenset(range(6))
-"""The track graph's well nodes."""
 
 
 def check_arm_orientation(edge_order: list[tuple[int, int]]) -> None:
@@ -40,7 +38,7 @@ def check_arm_orientation(edge_order: list[tuple[int, int]]) -> None:
     ------
     ValueError
         If a trunk arm does not start at :data:`CENTER_NODE`, or a leaf arm does
-        not end at a well node.
+        not end at a well node (a well's node id is its arm's, ``WELL_ARMS``).
     """
     for first, second in edge_order:
         trunk = first == CENTER_NODE or second == CENTER_NODE
@@ -48,7 +46,7 @@ def check_arm_orientation(edge_order: list[tuple[int, int]]) -> None:
             raise ValueError(
                 f"trunk arm {(first, second)} does not start at the center"
             )
-        if not trunk and second not in WELL_NODES:
+        if not trunk and second not in WELL_ARMS:
             raise ValueError(f"leaf arm {(first, second)} does not end at a well")
 
 
@@ -171,3 +169,23 @@ def leaf_and_trunk_profiles(density: pd.DataFrame) -> pd.DataFrame:
     frame = density.reset_index()
     frame["arm_type"] = np.where(frame["arm"].isin(LEAF_ARMS), "leaf", "trunk")
     return frame.groupby(["is_swr", "arm_type", "segment"])[["density_per_cm"]].mean()
+
+
+def log2_density_ratio(density: pd.DataFrame) -> pd.Series:
+    """log2 of the no-SWR to SWR content density in each segment.
+
+    Parameters
+    ----------
+    density : pd.DataFrame
+        :func:`content_density_along_arms`'s output.
+
+    Returns
+    -------
+    ratio : pd.Series
+        Indexed by ``arm`` and ``segment``. NaN where either kind has no
+        content (the ratio is undefined there).
+    """
+    non_swr = density.loc[False, "density_per_cm"]
+    swr = density.loc[True, "density_per_cm"]
+    both = (non_swr > 0) & (swr > 0)
+    return np.log2(non_swr.where(both) / swr.where(both))

@@ -4,8 +4,7 @@ For every time bin of the canonical events (``event_sequence_table``), its
 epoch's decode MAP position (``map_estimate``, read through the SWR source; the
 decode's sha256 must be the one the event features run recorded) placed on the
 track by ``analysis/event_properties/content_along_arms.arm_positions``: its arm
-and the fraction of the arm behind it (1 on a leaf arm is the well), with the
-content's track distance to the animal (``|ahead_behind_distance|``).
+and the fraction of the arm behind it (1 on a leaf arm is the well).
 
 One table per epoch, ``Processed-Data/content_along_arms/<epoch>.parquet``, and
 a ``manifest.json``.
@@ -22,7 +21,6 @@ import argparse
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 
-import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.detector_comparison.feature_run import (
@@ -47,6 +45,7 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.io import read_manifest, sha256_file, write_json
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
+from continuum_swr_replay.tables.io import write_table
 
 
 def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
@@ -62,14 +61,14 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
     )
     env = pd.read_pickle(paths.environment)
     check_arm_orientation([tuple(edge) for edge in env.edge_order])
-    frame = dot[["map_estimate", "ahead_behind_distance"]]
-    missing = ~bins["time"].isin(frame.index)
-    if missing.any():
-        raise ValueError(f"{identifier}: {missing.sum()} event bins not in the frame")
-    joined = frame.loc[bins["time"].to_numpy()]
+    rows = dot.index.get_indexer(bins["time"].to_numpy())
+    if (rows < 0).any():
+        raise ValueError(
+            f"{identifier}: {(rows < 0).sum()} event bins not in the frame"
+        )
     try:
         placed = arm_positions(
-            joined["map_estimate"].to_numpy(), env.place_bin_centers_nodes_df_
+            dot["map_estimate"].to_numpy()[rows], env.place_bin_centers_nodes_df_
         )
     except ValueError as error:
         raise ValueError(f"{identifier}: {error}") from error
@@ -82,7 +81,6 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
             "arm": placed["arm"].to_numpy(),
             "fraction": placed["fraction"].to_numpy(),
             "arm_length_cm": placed["arm_length_cm"].to_numpy(),
-            "distance_to_animal_cm": np.abs(joined["ahead_behind_distance"].to_numpy()),
         }
     )
 
@@ -99,14 +97,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     bins = pd.read_parquet(
         sequence_table, columns=["animal", "session_date", "epoch", "event_id", "time"]
     )
-    if set(bins["event_id"]) != set(events["event_id"]):
+    if set(bins["event_id"].unique()) != set(events["event_id"]):
         raise ValueError("the sequence table's events are not the event table's")
-    bins["epoch_id"] = [
+    sessions = bins[["animal", "session_date", "epoch"]].drop_duplicates()
+    sessions["epoch_id"] = [
         swr_epoch_id_of_session(animal, day, epoch)
-        for animal, day, epoch in zip(
-            bins.animal, bins.session_date, bins.epoch, strict=True
-        )
+        for animal, day, epoch in sessions.itertuples(index=False)
     ]
+    bins = bins.merge(sessions, on=["animal", "session_date", "epoch"], validate="m:1")
     by_epoch = dict(tuple(bins.groupby("epoch_id")))
     identifiers = sorted(by_epoch)
     if args.epochs:
@@ -122,9 +120,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
         for table in pool.map(measure_epoch, jobs):
             identifier = table.epoch_id.iloc[0]
-            tmp = folder / f"{identifier}.parquet.tmp"
-            table.to_parquet(tmp, index=False)
-            tmp.replace(folder / f"{identifier}.parquet")
+            write_table(table, folder / f"{identifier}.parquet")
             print(f"{identifier}: {len(table)} bins", flush=True)
     if not args.epochs:
         write_json(
@@ -142,7 +138,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                     "sha256": sha256_file(sequence_table),
                 },
                 "n_epochs": len(jobs),
-                "n_bins": int(sum(len(job[2]) for job in jobs)),
+                "n_bins": len(bins),
                 "position": "the decode's map_estimate at each event bin, on its "
                 "nearest real place bin (edge_id >= 0); fraction 0 at the arm's first "
                 "node in the edge order, 1 at its second (a leaf arm's well)",
