@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
 | `detection.json` | `3455b5a13f61` | yes | 172 | 0 |
-| `events.json` | `68c3f78643a5` | yes | 414 | 0 |
+| `events.json` | `9c806c5fbc2c` | yes | 414 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
 
@@ -2967,7 +2967,7 @@ without being called, is not listed.
 | `events.start_distance_values` | `reported/events.py` | `analysis.event_properties.event_statistics.class_medians`, `analysis.event_properties.event_statistics.n_animals_in_direction` |  |
 | `events.state_composition_values` | `reported/events.py` | `analysis.event_properties.event_statistics.state_composition_statistics` |  |
 | `events.state_fraction_values` | `reported/events.py` | `analysis.decode_quality.quality_metrics.state_fraction_statistics` |  |
-| `events.tetrode_holdout_values` | `reported/events.py` | `analysis.event_evidence.likelihood_advantage.likelihood_advantage_statistics` |  |
+| `events.tetrode_holdout_values` | `reported/events.py` | `analysis.event_evidence.tetrode_holdout.holdout_statistics` |  |
 | `behavior.breadth_derived_values` | `reported/behavior/content.py` | `analysis.replay_models.content.content_statistics.concentration_contrast_statistics`, `analysis.replay_models.content.content_statistics.event_length_statistics` |  |
 | `behavior.choice_values` | `reported/behavior/choice.py` | `analysis.replay_models.coefficient_statistics.gated_coefficient_statistics` |  |
 | `behavior.cohort_audit_values` | `reported/behavior/rate.py` | none |  |

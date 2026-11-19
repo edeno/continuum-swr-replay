@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "68c3f78643a5",
+ "commit": "9c806c5fbc2c",
  "code": {
-  "head": "68c3f78643a5c0f9aab088baa4238ec9aa0d814a",
+  "head": "9c806c5fbc2c620034dccc34a34358d21911a506",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -207,12 +207,12 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_evidence/likelihood_advantage.py": {
-    "sha256": "282f583228f3ada4c8c3a48b4eaf004103ebdf7b0d75438e4cf2c2b25b269562",
-    "code_sha256": "3115b8c5d27efeb5c75c6d09156a45078afdbc93efcea47e640edfad768d924d"
+    "sha256": "64c6ca0c338577f029f3d097b5970dc79c8d9671d9f405b185122dc6ef063753",
+    "code_sha256": "213c9db0ed98a8ea7c44566864d6f6ea3dcce28996c17a7890507e8d57a79836"
    },
    "src/continuum_swr_replay/analysis/event_evidence/participation.py": {
-    "sha256": "1d2ba64ca3b98d9714bace144e0dae3616fcfb84954064a325a27e7d8ceb6f55",
-    "code_sha256": "c26c6c2edc58369353e7cae1393c345cf4b738012be902df1fb80c7c92efb601"
+    "sha256": "939f84e341fea71e3327afc3520afccc2840b2273e02dd66fd882d881835e4f5",
+    "code_sha256": "0d222ea92d575c535487bd5372717cb84a0c7e7884cc865ef2a5a9bd8a137fdf"
    },
    "src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py": {
     "sha256": "64b21ed6aafd6b777bfd727dba6ddf08adca9519005ded9623fa53b25a09e36b",
@@ -239,12 +239,12 @@
     "code_sha256": "69932ba8094916609194c2559ee5b32ae18939096f61cf3854dadfb39ba45a06"
    },
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/windows.py": {
-    "sha256": "8ed6644354ba05bf09a66b8f0f13759eb8626eae47a0d377cadc002a227d00a2",
-    "code_sha256": "c7f1dbcb79a20083ea2e52a033a239ba73f793a6492853f3956d8c23e4a76137"
+    "sha256": "7f80d466fa812f0863f12c2cb3a946cec8de9e0badfe2c1713ae0214cdfeb863",
+    "code_sha256": "588d2cca834dc7beb0b569a6e1fc53472e37ffb89f704ebbeb59eeb600d9cae4"
    },
    "src/continuum_swr_replay/analysis/event_evidence/tetrode_holdout.py": {
-    "sha256": "3ef0bb52bd0a5a728bb999edb9600a7cf52f3face49e83e5ec1c2d4f566675aa",
-    "code_sha256": "0a6ecdc17f957d79c71af5d2afec271c3699609db5642334d9f4830a7ae3e8c2"
+    "sha256": "0024fc81711f8ba3c83a1c4d925bb643c8f8efe6af9b1be0c58945f83b4bd44b",
+    "code_sha256": "70c694dbd7d96ef42c7a3fb704f34b8d730826d60bc2f13d57f2649147b0d88d"
    },
    "src/continuum_swr_replay/analysis/event_properties/__init__.py": {
     "sha256": "933f33706b5999a73702c0b687a36d8b0ca295a29f84600df0ec994258fec27a",
@@ -331,8 +331,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "447da75f62501cdeea88006d37f490e837efb1d7d20e903bbb0b267374991590",
-    "code_sha256": "68d1d1f78c1e4b6082d8e69190c55483744fbebe3a6b872878660f809a8796e9"
+    "sha256": "3f45afdbc06bced9a714538caee8dcc8f88bc10b751e4df0db3f6d546b04320b",
+    "code_sha256": "92ad093c431e7560df6653d938250a10f4e08c215563113a2d2e44aa4fe93a4f"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -347,8 +347,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/runs/io.py": {
-    "sha256": "8e2db0f4e5cc66cc6a3e39cbbd73730b7e45960830f455fe4d11ae8d24d9706f",
-    "code_sha256": "560971e338e3f63a03a53b1c5bdc03e6fdbdd77b0e66af12bff804d680f62289"
+    "sha256": "6648b8f8da8f24450050c43afe768db1686c812287ce27eec63141fd1c8a5942",
+    "code_sha256": "735a03da7299118c84df09dfb3494505b85d4d2cd8b68c1575e8b6c1db994d49"
    },
    "src/continuum_swr_replay/runs/provenance.py": {
     "sha256": "46207e3212c139ffc797b749bfa73f6202c8870d558b0883f6f70b08ff1d1ab5",
