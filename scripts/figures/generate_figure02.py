@@ -28,17 +28,19 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     h — Held-out tetrode score: each tetrode left out of the decoder's smoother in
         turn and scored at every bin of each event under the other tetrodes'
         position distribution against local coding around the animal (time-fold
-        encodings); the gain summed over tetrodes and bins, per spike. One line
-        per animal from its Local-rest controls to its events, for no-SWR and
-        SWR events, and the animals' mean with its interval
+        encodings); the gain summed over tetrodes and bins, per spike. A dot per
+        animal for no-SWR and SWR events, the animals' mean with its interval,
+        and the Local-rest controls' mean as a reference (near zero by
+        construction)
         (``event_evidence.tetrode_holdout``;
         ``Processed-Data/event_tetrode_holdout``).
     i — Around non-local event starts, SWR vs no-SWR: ripple power and MUA (mean
-        and SEM, with the epochs' rest level), then theta power and head speed
-        (median and interquartile range over events, with theta's running and
-        rest levels and the immobility threshold): not theta sequences.
-    j — The share of rest time bins decoded non-local by ripple power, one line
-        per animal: no step at the SWR threshold.
+        and SEM, with the epochs' level between events), then theta power and
+        head speed (median and interquartile range over events, with theta's
+        running and between-event levels and the immobility threshold): not
+        theta sequences.
+    j — The share of immobile time bins decoded non-local by ripple power, one
+        line per animal: no step at the SWR threshold.
 
 Panels d and f are drawn from the canonical event table by the functions the
 events summary uses (``event_statistics.overlap_class_statistics``,
@@ -310,7 +312,7 @@ def frame_event_counts(event_types: dict) -> dict[str, int]:
 
 
 def rest_nonlocal_share(data_over_time: pd.DataFrame) -> pd.DataFrame:
-    """Panel j: the share of rest bins decoded non-local, by ripple power.
+    """Panel j: the share of immobile bins decoded non-local, by ripple power.
 
     Rest bins are the immobile analysed ones (:func:`immobile_analysed_bins`);
     each animal is one group (:func:`nonlocal_share_by_power`).
@@ -867,7 +869,10 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
 
 
 REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
-"""Panels g and h: each group's Local-rest and event positions on the x axis."""
+"""Panel g: each group's Local-rest and event positions on the x axis."""
+
+HELDOUT_X = {"no SWR": 0.0, "SWR": 1.0}
+"""Panel h: each group's position on the x axis."""
 
 
 def animal_values(row: pd.Series, column: str, scale: float = 1.0) -> pd.Series:
@@ -887,10 +892,12 @@ def draw_rest_to_event(
 
 
 def rest_event_axis(ax: Axes, labels: bool = True) -> None:
-    """Panels g and h's x axis: rest and event positions for each group."""
+    """Panel g's x axis: Local-rest and event positions for each group."""
     ax.set_xlim(-0.5, 3.9)
     ticks = [x for pair in REST_EVENT_X.values() for x in pair]
-    ax.set_xticks(ticks, ["rest", "no SWR", "rest", "SWR"], rotation=45, ha="right")
+    ax.set_xticks(
+        ticks, ["Local rest", "no SWR", "Local rest", "SWR"], rotation=45, ha="right"
+    )
     ax.tick_params(labelbottom=labels)
 
 
@@ -921,27 +928,34 @@ def draw_participation(ax_share: Axes, ax_rate: Axes, statistics: pd.DataFrame) 
 def draw_heldout_gain(ax: Axes, events: pd.DataFrame, controls: pd.DataFrame) -> None:
     """Panel h: the held-out tetrode gain over local coding, per spike.
 
-    One line per animal from its Local-rest controls to its events; the bar is
-    the events' animal mean with its 95 % interval
-    (``tetrode_holdout.holdout_statistics``).
+    A dot per animal and the animals' mean with its 95 % interval
+    (``tetrode_holdout.holdout_statistics``). The dashed line is the mean of the
+    group's Local-rest controls, drawn as a reference rather than paired with
+    the events: in Local rest the decoded position is the animal's own, so the
+    population and local coding agree and the gain is near zero by construction.
     """
     for group, color in (("no SWR", C_NL), ("SWR", C_SWR)):
+        x = HELDOUT_X[group]
         event = events.loc[group]
-        draw_rest_to_event(
-            ax,
-            animal_values(controls.loc[group], "animals"),
-            animal_values(event, "animals"),
-            group,
-            color,
-        )
+        animals = animal_values(event, "animals")
+        ax.scatter(np.full(animals.size, x), animals, s=6, color=color, lw=0, zorder=2)
         ax.errorbar(
-            REST_EVENT_X[group][1] + 0.3, event["estimate"],
+            x + 0.25, event["estimate"],
             yerr=[[event["estimate"] - event["ci_low"]],
                   [event["ci_high"] - event["estimate"]]],
             fmt="_", color="black", ms=5, lw=0.8, capsize=0,
         )  # fmt: skip
-    ax.axhline(0, color="#999999", lw=0.5, ls=":", zorder=0)
-    rest_event_axis(ax)
+        ax.hlines(
+            controls.loc[group, "estimate"], x - 0.3, x + 0.4, color=C_LOCAL, lw=1.0,
+            ls="--", zorder=1,
+        )  # fmt: skip
+    ax.text(
+        HELDOUT_X["no SWR"] - 0.3, controls.loc["no SWR", "estimate"] - 0.02,
+        "Local rest", va="top", fontsize=SMALL_SIZE, color="#555555",
+    )  # fmt: skip
+    ax.set_xlim(-0.6, 1.6)
+    ax.set_xticks(list(HELDOUT_X.values()), list(HELDOUT_X), rotation=45, ha="right")
+    ax.set_ylim(-0.12, None)
     ax.set_ylabel("Held-out gain\nover local (nats/spike)")
     ax.set_title("Held-out tetrode", fontsize=SMALL_SIZE, pad=3)
 
@@ -952,7 +966,9 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     Ripple and MUA: the mean over events with its SEM (population activity rises
     at the start). Theta and head speed: the median over events with the
     interquartile band, so the spread is seen, not only the centre: theta at its
-    quiet-rest level, far below running, and the animal still.
+    level between events, far below running, and the animal still. The dashed
+    "between events" line is the epochs' level in immobile bins outside every
+    non-local, SWR and MUA event (``reference_medians``).
     """
     ax_rip, ax_mua, ax_theta, ax_speed = axes
     groups = (("overlap", C_SWR, "SWR"), ("no_overlap", C_NL, "No SWR"))
@@ -1007,9 +1023,9 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
         ax.tick_params(labelbottom=False)
     handles, labels = ax_rip.get_legend_handles_labels()
     handles.append(plt.Line2D([], [], color=C_NOSPIKE, ls="--", lw=0.6))
-    labels.append("rest")
+    labels.append("between events")
     ax_rip.legend(
-        handles, labels, frameon=False, loc="lower center", ncol=3,
+        handles, labels, frameon=False, loc="lower center", ncol=2,
         bbox_to_anchor=(0.5, 1.0), handlelength=0.8, columnspacing=0.8,
         borderaxespad=0.1,
     )  # fmt: skip
@@ -1086,7 +1102,7 @@ def draw_share_by_power(ax: Axes, shares: pd.DataFrame) -> None:
     ax.set_ylim(0, 102)
     ax.set_yticks([0, 50, 100])
     ax.set_xlabel("Ripple power (z)")
-    ax.set_ylabel("% of rest bins\nnon-local")
+    ax.set_ylabel("% of immobile bins\nnon-local")
 
 
 OFFSET_BINS_MS = np.arange(-100, 101, 5)
@@ -1246,8 +1262,8 @@ def generate_figure(
         4,
         1,
         figure=fig,
-        height_ratios=[1.8, 1.9, 1.3, 1.55],
-        hspace=0.55,
+        height_ratios=[1.9, 2.0, 1.3, 1.45],
+        hspace=0.62,
         left=0.1,
         right=0.99,
         top=0.985,
