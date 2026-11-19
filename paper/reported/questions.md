@@ -15,11 +15,11 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `7f3688443d68` | yes | 32 | 0 |
-| `detection.json` | `3455b5a13f61` | yes | 172 | 0 |
-| `events.json` | `b1b0e8e32259` | yes | 414 | 0 |
-| `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
-| `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
+| `survey.json` | `099b9dbb32c0` | yes | 32 | 0 |
+| `detection.json` | `099b9dbb32c0` | yes | 172 | 0 |
+| `events.json` | `099b9dbb32c0` | yes | 414 | 0 |
+| `behavior.json` | `099b9dbb32c0` | yes | 922 | 0 |
+| `mpfc.json` | `099b9dbb32c0` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -250,7 +250,7 @@ Status: partly computed; in sample only: no script measures the held-out decodin
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)
+- Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -273,7 +273,7 @@ Status: computed. Figures: memoryless_comparison. Values: 3.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)
+- Processed-Data/replay_detection_comparison/memoryless/e2331f976fd1-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit e2331f976fd1)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -293,7 +293,7 @@ Status: computed. Figures: decoder_validation. Values: 8.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)
+- Processed-Data/decoder_quality (scripts/decoding/measure_decoder_quality.py: each analysed epoch's decode)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -314,7 +314,7 @@ Status: computed. Values: 33.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)
+- Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/event_evidence/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -374,7 +374,7 @@ Status: computed. Figures: 2, 2c. Values: 33.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)
+- Processed-Data/replay_content/event_table.parquet (canonical event table)
 - event features run e2331f976fd1 (every inventory's compared events) and inventory comparison run e2331f976fd1 (its observations, counts and cells, pooled by animal)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
@@ -536,7 +536,7 @@ Status: computed. Figures: 2f. Values: 7.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)
+- Processed-Data/replay_content/event_table.parquet (canonical event table)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -554,8 +554,8 @@ Status: computed. Figures: 2j. Values: 15.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)
+- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -593,10 +593,10 @@ Status: computed. Figures: 2, 2i. Values: 59.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)
+- Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv
+- Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)
+- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
+- Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -666,7 +666,7 @@ Status: computed. Values: 4.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
+- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -703,9 +703,9 @@ Status: partly computed; the own-well share waits for the wider-Local-kernel re-
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -736,9 +736,9 @@ Status: computed. Figures: 3c. Values: 9.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -758,9 +758,9 @@ Status: computed. Figures: 3b, 3d. Values: 17.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -788,8 +788,8 @@ Status: computed. Values: 24.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -824,9 +824,9 @@ Status: computed. Values: 25.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -862,9 +862,9 @@ Status: computed. Figures: 3a. Values: 6.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -883,9 +883,9 @@ Status: computed. Figures: 2j, 3h, decoder_validation. Values: 54.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)
+- Processed-Data/event_gamma/reference.parquet (scripts/event_properties/measure_event_gamma.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)
+- Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -952,8 +952,8 @@ Status: computed. Figures: 2, 2g. Values: 29.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
+- Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)
+- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -993,7 +993,7 @@ Status: computed. Figures: 2h. Values: 4.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)
+- Processed-Data/replay_content/event_table.parquet (canonical event table)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
