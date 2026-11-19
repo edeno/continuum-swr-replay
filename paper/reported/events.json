@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "89bf46131b00",
+ "commit": "00fd27775fcc",
  "code": {
-  "head": "89bf46131b00a77241fb60fd51bf24e66fe7b8fe",
+  "head": "00fd27775fcc692a1739423ceaba7a9125d0edd7",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -207,8 +207,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/analysis/event_evidence/likelihood_advantage.py": {
-    "sha256": "43c044483e1f5242c76d9277bce9f11a78b74e547b244fd907a78a93313a89be",
-    "code_sha256": "30969d71bf4ce09f372f823ec2d7286cbcc0a2db381e727434f0f7d6a49b7227"
+    "sha256": "282f583228f3ada4c8c3a48b4eaf004103ebdf7b0d75438e4cf2c2b25b269562",
+    "code_sha256": "3115b8c5d27efeb5c75c6d09156a45078afdbc93efcea47e640edfad768d924d"
    },
    "src/continuum_swr_replay/analysis/event_evidence/participation.py": {
     "sha256": "1d2ba64ca3b98d9714bace144e0dae3616fcfb84954064a325a27e7d8ceb6f55",
@@ -241,6 +241,10 @@
    "src/continuum_swr_replay/analysis/event_evidence/state_evidence/windows.py": {
     "sha256": "8ed6644354ba05bf09a66b8f0f13759eb8626eae47a0d377cadc002a227d00a2",
     "code_sha256": "c7f1dbcb79a20083ea2e52a033a239ba73f793a6492853f3956d8c23e4a76137"
+   },
+   "src/continuum_swr_replay/analysis/event_evidence/tetrode_holdout.py": {
+    "sha256": "3ef0bb52bd0a5a728bb999edb9600a7cf52f3face49e83e5ec1c2d4f566675aa",
+    "code_sha256": "0a6ecdc17f957d79c71af5d2afec271c3699609db5642334d9f4830a7ae3e8c2"
    },
    "src/continuum_swr_replay/analysis/event_properties/__init__.py": {
     "sha256": "933f33706b5999a73702c0b687a36d8b0ca295a29f84600df0ec994258fec27a",
@@ -327,8 +331,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "72482f17276d27de110b8ec61df555b41f0b80015b905b45fe9cef5e9e05b182",
-    "code_sha256": "6e1839c71e1cb2cd02b0206e1952d17804e957835ae17ffcbec9d03b6253cf3f"
+    "sha256": "24ddeb1995608fe58e478e45156ae6a35db87d7e45fdbf68f475201e65b3bf83",
+    "code_sha256": "ae8ad89bffe5dcf0ce21dc8e7b497fd3f24f0df0f49a54facf427b52bb9e8a6d"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -477,6 +481,15 @@
   {
    "path": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "sha256": "b0fd39ceeee50b3f1332b411528c442e5b0eed82b9027aa8ca549dc949276872"
+  },
+  {
+   "path": "Processed-Data/event_tetrode_holdout/*_tetrode_holdout.parquet",
+   "n_files": 242,
+   "sha256": "6fac97fea23d80cff60f7271eafda5972941f020d439be13db9bcd4c16c51ff7"
+  },
+  {
+   "path": "Processed-Data/event_tetrode_holdout/manifest.json",
+   "sha256": "303e27febe2b57937c263bb07603d11087c4a46fb0d58583a0e7ef6b0717dfc0"
   },
   {
    "path": "Processed-Data/event_participation/*_participation.parquet",
@@ -3226,6 +3239,166 @@
    "function": "state_composition_values",
    "pending": null
   },
+  "non_swr_heldout_control_gain_per_spike": {
+   "value": 0.0006563444777474195,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "held-out tetrode score of no SWR Local-rest controls: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_control_gain_per_spike_ci_high": {
+   "value": 0.001269654969592681,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_control_gain_per_spike_ci_low": {
+   "value": 4.303398590215814e-05,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_events_scored": {
+   "value": 42974,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "no SWR events with a held-out score per spike",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_gain_per_spike": {
+   "value": 0.43068929638226316,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "held-out tetrode score of no SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_gain_per_spike_ci_high": {
+   "value": 0.5553944906759918,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_gain_per_spike_ci_low": {
+   "value": 0.30598410208853455,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_spiking_gain_per_spike": {
+   "value": 0.643162527995799,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "held-out tetrode score of no SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_spiking_gain_per_spike_ci_high": {
+   "value": 0.7444525117593225,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "non_swr_heldout_spiking_gain_per_spike_ci_low": {
+   "value": 0.5418725442322755,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
   "non_swr_likelihood_advantage_events": {
    "value": 42974,
    "kind": "count",
@@ -3235,9 +3408,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "2i"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
@@ -3251,9 +3422,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "2i"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
@@ -3267,9 +3436,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "2i"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
@@ -3283,9 +3450,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "2i"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
@@ -3299,9 +3464,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "2i"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
@@ -5279,6 +5442,166 @@
    "function": "state_composition_values",
    "pending": null
   },
+  "swr_heldout_control_gain_per_spike": {
+   "value": 0.0006631322641881888,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "held-out tetrode score of SWR Local-rest controls: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_control_gain_per_spike_ci_high": {
+   "value": 0.001245791803689795,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_control_gain_per_spike_ci_low": {
+   "value": 8.04727246865825e-05,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_events_scored": {
+   "value": 32701,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "SWR events with a held-out score per spike",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_gain_per_spike": {
+   "value": 0.7248239600179666,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "held-out tetrode score of SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_gain_per_spike_ci_high": {
+   "value": 0.8813159195167803,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_gain_per_spike_ci_low": {
+   "value": 0.5683320005191528,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_spiking_gain_per_spike": {
+   "value": 0.914478271198411,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "held-out tetrode score of SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_spiking_gain_per_spike_ci_high": {
+   "value": 1.0736571980341412,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of that interval",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
+  "swr_heldout_spiking_gain_per_spike_ci_low": {
+   "value": 0.7552993443626809,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals)",
+   "questions": [
+    "2c.3"
+   ],
+   "figures": [
+    "2i"
+   ],
+   "source": "Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)",
+   "function": "tetrode_holdout_values",
+   "pending": null
+  },
   "swr_likelihood_advantage_events": {
    "value": 32701,
    "kind": "count",
@@ -5288,9 +5611,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "2i"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
@@ -5304,9 +5625,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "2i"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
@@ -5320,9 +5639,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "2i"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
@@ -5336,9 +5653,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "2i"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null
@@ -5352,9 +5667,7 @@
    "questions": [
     "2c.3"
    ],
-   "figures": [
-    "2i"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)",
    "function": "likelihood_advantage_values",
    "pending": null

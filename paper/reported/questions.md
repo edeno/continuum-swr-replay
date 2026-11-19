@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `7f3688443d68` | yes | 32 | 0 |
 | `detection.json` | `3455b5a13f61` | yes | 172 | 0 |
-| `events.json` | `89bf46131b00` | yes | 394 | 0 |
+| `events.json` | `00fd27775fcc` | yes | 414 | 0 |
 | `behavior.json` | `d7d80592187f` | yes | 922 | 0 |
 | `mpfc.json` | `7f3688443d68` | yes | 604 | 0 |
 
@@ -587,7 +587,7 @@ Status: dropped; framing with no values: the introduction's argument, not a meas
 
 ### 2c.3. Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?
 
-Status: computed. Figures: 2, 2i. Values: 39.
+Status: computed. Figures: 2, 2i. Values: 59.
 
 *Note:* The held-out test split by SWR (the heldout_* values) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.
 
@@ -596,6 +596,7 @@ Sources:
 - Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv
 - Processed-Data/event_likelihood_advantage (scripts/event_evidence/score_event_likelihood_advantage.py)
 - Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
+- Processed-Data/event_tetrode_holdout (scripts/event_evidence/score_tetrode_holdout.py)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
@@ -618,21 +619,41 @@ Sources:
 | `\EventsNonSwrCloseEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrCloseEpochsScored` | 242 |  | epochs with a scored nonSWR-close event | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrLikelihoodAdvantageEvents` | 42,974 |  | no SWR events scored | `events.likelihood_advantage_values` | 2i |
-| `\EventsNonSwrLikelihoodAdvantageEventsScored` | 42,974 |  | no SWR events with a per-spike score (at least one spike) | `events.likelihood_advantage_values` | 2i |
-| `\EventsNonSwrLikelihoodAdvantagePerSpike` | 0.70 | nats per spike | log-likelihood of no SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median | `events.likelihood_advantage_values` | 2i |
-| `\EventsNonSwrLikelihoodAdvantagePerSpikeCiHigh` | 0.88 | nats per spike | upper bound of that interval | `events.likelihood_advantage_values` | 2i |
-| `\EventsNonSwrLikelihoodAdvantagePerSpikeCiLow` | 0.52 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.likelihood_advantage_values` | 2i |
+| `\EventsNonSwrHeldoutControlGainPerSpike` | 0.00 | nats per spike | held-out tetrode score of no SWR Local-rest controls: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrHeldoutControlGainPerSpikeCiHigh` | 0.00 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrHeldoutControlGainPerSpikeCiLow` | 0.00 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrHeldoutEventsScored` | 42,974 |  | no SWR events with a held-out score per spike | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrHeldoutGainPerSpike` | 0.43 | nats per spike | held-out tetrode score of no SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrHeldoutGainPerSpikeCiHigh` | 0.56 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrHeldoutGainPerSpikeCiLow` | 0.31 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrHeldoutSpikingGainPerSpike` | 0.64 | nats per spike | held-out tetrode score of no SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrHeldoutSpikingGainPerSpikeCiHigh` | 0.74 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrHeldoutSpikingGainPerSpikeCiLow` | 0.54 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
+| `\EventsNonSwrLikelihoodAdvantageEvents` | 42,974 |  | no SWR events scored | `events.likelihood_advantage_values` |  |
+| `\EventsNonSwrLikelihoodAdvantageEventsScored` | 42,974 |  | no SWR events with a per-spike score (at least one spike) | `events.likelihood_advantage_values` |  |
+| `\EventsNonSwrLikelihoodAdvantagePerSpike` | 0.70 | nats per spike | log-likelihood of no SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median | `events.likelihood_advantage_values` |  |
+| `\EventsNonSwrLikelihoodAdvantagePerSpikeCiHigh` | 0.88 | nats per spike | upper bound of that interval | `events.likelihood_advantage_values` |  |
+| `\EventsNonSwrLikelihoodAdvantagePerSpikeCiLow` | 0.52 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.likelihood_advantage_values` |  |
 | `\EventsNonSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteDllPerSpikeMedian` | 0.71 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteEpochsScored` | 242 |  | epochs with a scored nonSWR-remote event | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
-| `\EventsSwrLikelihoodAdvantageEvents` | 32,701 |  | SWR events scored | `events.likelihood_advantage_values` | 2i |
-| `\EventsSwrLikelihoodAdvantageEventsScored` | 32,701 |  | SWR events with a per-spike score (at least one spike) | `events.likelihood_advantage_values` | 2i |
-| `\EventsSwrLikelihoodAdvantagePerSpike` | 1.06 | nats per spike | log-likelihood of SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median | `events.likelihood_advantage_values` | 2i |
-| `\EventsSwrLikelihoodAdvantagePerSpikeCiHigh` | 1.32 | nats per spike | upper bound of that interval | `events.likelihood_advantage_values` | 2i |
-| `\EventsSwrLikelihoodAdvantagePerSpikeCiLow` | 0.80 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.likelihood_advantage_values` | 2i |
+| `\EventsSwrHeldoutControlGainPerSpike` | 0.00 | nats per spike | held-out tetrode score of SWR Local-rest controls: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrHeldoutControlGainPerSpikeCiHigh` | 0.00 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrHeldoutControlGainPerSpikeCiLow` | 0.00 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrHeldoutEventsScored` | 32,701 |  | SWR events with a held-out score per spike | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrHeldoutGainPerSpike` | 0.72 | nats per spike | held-out tetrode score of SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrHeldoutGainPerSpikeCiHigh` | 0.88 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrHeldoutGainPerSpikeCiLow` | 0.57 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrHeldoutSpikingGainPerSpike` | 0.91 | nats per spike | held-out tetrode score of SWR events: each tetrode's log predictive score under the other tetrodes' position distribution minus under local coding around the animal in the bins where the scored tetrode spiked, summed over tetrodes and bins and divided by the window's spikes; mean over animals of each animal's median over epochs of each epoch's median | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrHeldoutSpikingGainPerSpikeCiHigh` | 1.07 | nats per spike | upper bound of that interval | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrHeldoutSpikingGainPerSpikeCiLow` | 0.76 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.tetrode_holdout_values` | 2i |
+| `\EventsSwrLikelihoodAdvantageEvents` | 32,701 |  | SWR events scored | `events.likelihood_advantage_values` |  |
+| `\EventsSwrLikelihoodAdvantageEventsScored` | 32,701 |  | SWR events with a per-spike score (at least one spike) | `events.likelihood_advantage_values` |  |
+| `\EventsSwrLikelihoodAdvantagePerSpike` | 1.06 | nats per spike | log-likelihood of SWR events' spikes at the decoded positions minus at the animal's, summed over each event and divided by its spikes: mean over animals of each animal's median over epochs of each epoch's median | `events.likelihood_advantage_values` |  |
+| `\EventsSwrLikelihoodAdvantagePerSpikeCiHigh` | 1.32 | nats per spike | upper bound of that interval | `events.likelihood_advantage_values` |  |
+| `\EventsSwrLikelihoodAdvantagePerSpikeCiLow` | 0.80 | nats per spike | lower bound of its 95 % interval (nested bootstrap of the animals and their epochs, small-sample t correction over the 5 animals) | `events.likelihood_advantage_values` |  |
 | `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike, each the median over the animal's epochs of the epoch's median | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteDllPerSpikeMedian` | 1.18 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
@@ -2857,7 +2878,7 @@ Panel g: `\EventsNonSwrControlParticipation`, `\EventsNonSwrControlSpikeRateHz`,
 
 Panel h: `\EventsNonSwrContinuousShare`, `\EventsNonSwrFragmentedShare`, `\EventsSwrContinuousShare`, `\EventsSwrFragmentedShare`
 
-Panel i: `\EventsNonSwrLikelihoodAdvantageEventsScored`, `\EventsNonSwrLikelihoodAdvantageEvents`, `\EventsNonSwrLikelihoodAdvantagePerSpikeCiHigh`, `\EventsNonSwrLikelihoodAdvantagePerSpikeCiLow`, `\EventsNonSwrLikelihoodAdvantagePerSpike`, `\EventsSwrLikelihoodAdvantageEventsScored`, `\EventsSwrLikelihoodAdvantageEvents`, `\EventsSwrLikelihoodAdvantagePerSpikeCiHigh`, `\EventsSwrLikelihoodAdvantagePerSpikeCiLow`, `\EventsSwrLikelihoodAdvantagePerSpike`
+Panel i: `\EventsNonSwrHeldoutControlGainPerSpikeCiHigh`, `\EventsNonSwrHeldoutControlGainPerSpikeCiLow`, `\EventsNonSwrHeldoutControlGainPerSpike`, `\EventsNonSwrHeldoutEventsScored`, `\EventsNonSwrHeldoutGainPerSpikeCiHigh`, `\EventsNonSwrHeldoutGainPerSpikeCiLow`, `\EventsNonSwrHeldoutGainPerSpike`, `\EventsNonSwrHeldoutSpikingGainPerSpikeCiHigh`, `\EventsNonSwrHeldoutSpikingGainPerSpikeCiLow`, `\EventsNonSwrHeldoutSpikingGainPerSpike`, `\EventsSwrHeldoutControlGainPerSpikeCiHigh`, `\EventsSwrHeldoutControlGainPerSpikeCiLow`, `\EventsSwrHeldoutControlGainPerSpike`, `\EventsSwrHeldoutEventsScored`, `\EventsSwrHeldoutGainPerSpikeCiHigh`, `\EventsSwrHeldoutGainPerSpikeCiLow`, `\EventsSwrHeldoutGainPerSpike`, `\EventsSwrHeldoutSpikingGainPerSpikeCiHigh`, `\EventsSwrHeldoutSpikingGainPerSpikeCiLow`, `\EventsSwrHeldoutSpikingGainPerSpike`
 
 ### Figure 3: Non-local events outside SWRs
 
@@ -2946,6 +2967,7 @@ without being called, is not listed.
 | `events.start_distance_values` | `reported/events.py` | `analysis.event_properties.event_statistics.class_medians`, `analysis.event_properties.event_statistics.n_animals_in_direction` |  |
 | `events.state_composition_values` | `reported/events.py` | `analysis.event_properties.event_statistics.state_composition_statistics` |  |
 | `events.state_fraction_values` | `reported/events.py` | `analysis.decode_quality.quality_metrics.state_fraction_statistics` |  |
+| `events.tetrode_holdout_values` | `reported/events.py` | `analysis.event_evidence.likelihood_advantage.likelihood_advantage_statistics` |  |
 | `behavior.breadth_derived_values` | `reported/behavior/content.py` | `analysis.replay_models.content.content_statistics.concentration_contrast_statistics`, `analysis.replay_models.content.content_statistics.event_length_statistics` |  |
 | `behavior.choice_values` | `reported/behavior/choice.py` | `analysis.replay_models.coefficient_statistics.gated_coefficient_statistics` |  |
 | `behavior.cohort_audit_values` | `reported/behavior/rate.py` | none |  |
