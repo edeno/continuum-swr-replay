@@ -1425,7 +1425,7 @@ def test_figure03_distance_labels_say_which_wells(offline):
     )
     fig = plt.figure(figsize=(figure03.WIDTH, figure03.HEIGHT))
     # panel e's two axes, at their size in the figure
-    axes = [fig.add_axes([0.08, y, 0.144, 0.149]) for y in (0.30, 0.13)]
+    axes = [fig.add_axes([0.08, y, 0.153, 0.149]) for y in (0.30, 0.13)]
     figure03.draw_distance_from_animal(axes, shares)
     labels = {t.get_text(): t for t in axes[0].texts}
     assert labels["own well"].get_position()[0] < FAR_CM
@@ -1441,8 +1441,9 @@ def test_figure03_distance_labels_say_which_wells(offline):
 
 
 def test_figure03_distance_key_is_off_the_bars(offline):
-    """Panel f's key (at a well, elsewhere) is drawn outside both axes, so it
-    cannot cover a bar."""
+    """Panel e's key (at a well, elsewhere) is drawn outside both axes, so it
+    cannot cover a bar, and no wider than them, so it does not reach under the
+    next panel's letter."""
     import matplotlib.pyplot as plt
 
     figure03 = offline("scripts.figures.generate_figure03")
@@ -1458,4 +1459,46 @@ def test_figure03_distance_key_is_off_the_bars(offline):
     key_box = key.get_window_extent()
     for ax in axes:
         assert not key_box.overlaps(ax.get_window_extent())
+    plt.close(fig)
+
+    fig = plt.figure(figsize=(figure03.WIDTH, figure03.HEIGHT))
+    # panel e's two axes, at their size in the figure
+    axes = [fig.add_axes([0.08, y, 0.153, 0.149]) for y in (0.30, 0.13)]
+    figure03.draw_distance_from_animal(axes, shares)
+    fig.draw_without_rendering()
+    assert axes[0].get_legend().get_window_extent().x1 <= axes[0].get_window_extent().x1
+    plt.close(fig)
+
+
+def test_figure03_letters_share_a_height_by_row_and_a_left_edge_by_column(offline):
+    """The letters of a row sit at one height, above the row's highest drawn
+    top; the letters of a column sit at one left edge, the leftmost drawn extent
+    of the column's panels, whatever each panel's own labels."""
+    import matplotlib.pyplot as plt
+
+    from continuum_swr_replay.visualization.simulated_run_panels import drawn_extent
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    fig, grid = plt.subplots(2, 4, figsize=(figure03.WIDTH, figure03.HEIGHT))
+    panels = {
+        letter: [grid[r, c]]
+        for r, row in enumerate(figure03.LETTER_ROWS)
+        for c, letter in enumerate(row)
+    }
+    panels["b"][0].set_ylabel("a label\nof two lines")  # wider than f's
+    panels["g"][0].set_title("a title")  # higher than its row's other panels
+    fig.draw_without_rendering()
+    positions = figure03.letter_positions(fig, panels)
+
+    for row in figure03.LETTER_ROWS:
+        tops = {positions[letter][1] for letter in row}
+        assert len(tops) == 1
+        assert tops.pop() > max(drawn_extent(fig, panels[letter]).y1 for letter in row)
+    for column in figure03.LETTER_COLUMNS:
+        lefts = {positions[letter][0] for letter in column}
+        assert len(lefts) == 1
+        assert lefts.pop() < min(
+            drawn_extent(fig, panels[letter]).x0 for letter in column
+        )
+    assert positions["f"][0] < drawn_extent(fig, panels["f"]).x0 - 0.01
     plt.close(fig)

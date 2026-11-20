@@ -329,11 +329,12 @@ def draw_distance_from_animal(axes, shares: pd.DataFrame) -> None:
         plt.Rectangle((0, 0), 1, 1, color="0.3", alpha=alpha, lw=0)
         for alpha in (1.0, 0.3)
     ]
-    # Above the panel: inside it, the key covers the bars.
+    # Above the panel: inside it, the key covers the bars. One entry per line:
+    # side by side they reach under the next panel's letter.
     axes[0].legend(
         handles, [f"at a well (<{AT_WELL_CM:.0f} cm)", "elsewhere"],
-        frameon=False, loc="lower left", bbox_to_anchor=(0.0, 1.04), ncol=2,
-        fontsize=SMALL_SIZE, handlelength=0.8, columnspacing=1.0,
+        frameon=False, loc="lower left", bbox_to_anchor=(0.0, 1.04), ncol=1,
+        fontsize=SMALL_SIZE, handlelength=0.8, labelspacing=0.2,
         handletextpad=0.4, borderaxespad=0,
     )  # fmt: skip
 
@@ -474,19 +475,53 @@ def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> Non
 # Figure
 # ---------------------------------------------------------------------------
 
+# The panel letters as they sit in the figure: the letters of a row share a
+# height, the letters of a column a left edge.
+LETTER_ROWS = ("abcd", "efgh")
+LETTER_COLUMNS = ("ae", "bf", "cg", "dh")
+
+
+def letter_positions(fig, panels: dict[str, list]) -> dict[str, tuple[float, float]]:
+    """Each panel letter's top left corner, in figure fractions.
+
+    The letters of a row sit at one height, just above the highest of the row's
+    drawn tops; the letters of a column sit at one left edge, the leftmost of
+    the column's drawn extents (the rule of Figure 2's ``place_letters``). The
+    figure must already be drawn.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+    panels : dict
+        Each letter's axes.
+    """
+    extents = {letter: drawn_extent(fig, axes) for letter, axes in panels.items()}
+    tops = {
+        letter: min(max(extents[other].y1 for other in row) + 0.02, 0.985)
+        for row in LETTER_ROWS
+        for letter in row
+    }
+    lefts = {
+        letter: max(min(extents[other].x0 for other in column) - 0.004, 0.0)
+        for column in LETTER_COLUMNS
+        for letter in column
+    }
+    return {letter: (lefts[letter], tops[letter]) for letter in panels}
+
 
 def generate_figure(inputs: dict):
     """Build Figure 3 from :func:`read_inputs`."""
     events = inputs["events"]
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
-    outer = GridSpec(
-        2, 1, figure=fig, height_ratios=[1.0, 1.25], hspace=0.7,
+    # One grid for both rows, so the panels of a column share a left edge.
+    grid = GridSpec(
+        2, 4, figure=fig, height_ratios=[1.0, 1.25], hspace=0.7,
+        width_ratios=[1.0, 1.15, 1.05, 0.95], wspace=0.58,
         left=0.08, right=0.99, top=0.91, bottom=0.13,
     )  # fmt: skip
 
-    row1 = outer[0].subgridspec(1, 4, width_ratios=[1, 0.7, 1, 1], wspace=0.55)
-    ax_a, ax_b, ax_c = (fig.add_subplot(row1[i]) for i in range(3))
-    d_grid = row1[3].subgridspec(2, 1, hspace=0.25)
+    ax_a, ax_b, ax_c = (fig.add_subplot(grid[0, i]) for i in range(3))
+    d_grid = grid[0, 3].subgridspec(2, 1, hspace=0.25)
     ax_d = fig.add_subplot(d_grid[0])
     ax_d_cumulative = fig.add_subplot(d_grid[1], sharex=ax_d)
     draw_state_composition(ax_b, state_composition_statistics(events))
@@ -504,32 +539,26 @@ def generate_figure(inputs: dict):
         bbox_to_anchor=(0.5, 1.0), ncol=2, handlelength=0.8, columnspacing=1.5,
     )  # fmt: skip
 
-    row2 = outer[1].subgridspec(
-        1, 4, width_ratios=[1.0, 1.35, 1.1, 0.9], wspace=0.6
-    )  # fmt: skip
-    e_grid = row2[0].subgridspec(2, 1, hspace=0.15)
+    e_grid = grid[1, 0].subgridspec(2, 1, hspace=0.15)
     ax_e = [fig.add_subplot(e_grid[0])]
     ax_e.append(fig.add_subplot(e_grid[1], sharex=ax_e[0]))
     draw_distance_from_animal(ax_e, inputs["distance_shares"])
-    ax_f = fig.add_subplot(row2[1])
+    ax_f = fig.add_subplot(grid[1, 1])
     draw_ratio_track(ax_f, inputs["track_graph"], inputs["edge_order"], inputs["ratio"])
-    ax_g = fig.add_subplot(row2[2])
+    ax_g = fig.add_subplot(grid[1, 2])
     draw_profiles(ax_g, inputs["profiles"], inputs["place_shares"])
-    h_grid = row2[3].subgridspec(2, 1, hspace=0.4)
+    h_grid = grid[1, 3].subgridspec(2, 1, hspace=0.4)
     ax_h = [fig.add_subplot(h_grid[0])]
     ax_h.append(fig.add_subplot(h_grid[1], sharex=ax_h[0]))
     draw_brain_state(ax_h, events, inputs["reference"])
 
     fig.draw_without_rendering()
-    rows = (
-        ((ax_a, "a"), (ax_b, "b"), (ax_c, "c"), (ax_d, "d")),
-        ((ax_e[0], "e"), (ax_f, "f"), (ax_g, "g"), (ax_h[0], "h")),
-    )
-    for row in rows:
-        top = min(drawn_extent(fig, [ax for ax, _ in row]).y1 + 0.02, 0.985)
-        for i, (ax, text) in enumerate(row):
-            left = 0.005 if i == 0 else drawn_extent(fig, [ax]).x0 - 0.004
-            letter_panel(fig, text, left, top)
+    panels_by_letter = {
+        "a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d, ax_d_cumulative],
+        "e": ax_e, "f": [ax_f], "g": [ax_g], "h": ax_h,
+    }  # fmt: skip
+    for letter, (left, top) in letter_positions(fig, panels_by_letter).items():
+        letter_panel(fig, letter, left, top)
     return fig
 
 
