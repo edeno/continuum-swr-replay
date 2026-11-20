@@ -1,0 +1,100 @@
+"""Count each epoch's immobile time bins, and those decoded non-local, by ripple power.
+
+Where the non-local time sits against the SWR threshold: how much of it has
+ripple power below the threshold, and the share of bins that are non-local at
+each power (Figure 2j). One row per epoch and ripple-power bin
+(``analysis.event_properties.class_or_continuum.rest_power_counts``), for the
+``ok`` epochs of an event features run, from the same decodes (each decode's
+sha256 must be the one the run recorded), written to
+``Processed-Data/nonlocal_by_ripple_power/counts.parquet`` with a
+``manifest.json`` beside it.
+
+Usage::
+
+    uv run python scripts/event_properties/measure_nonlocal_by_ripple_power.py \\
+        --event-features-run e2331f976fd1 --n-workers 8
+"""
+
+from __future__ import annotations
+
+import argparse
+from collections.abc import Sequence
+from concurrent.futures import ProcessPoolExecutor
+
+import pandas as pd
+
+from continuum_swr_replay.analysis.detector_comparison import inventory_run
+from continuum_swr_replay.analysis.event_definition import analyzed_time
+from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
+    KAY_ZSCORE_THRESHOLD,
+    rest_power_counts,
+)
+from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+)
+from continuum_swr_replay.paths import (
+    NONLOCAL_BY_RIPPLE_POWER_DIR,
+    event_features_root,
+    processed_data_dir,
+)
+from continuum_swr_replay.runs.io import ok_epochs, read_manifest, write_json
+from continuum_swr_replay.runs.provenance import described_commit, produced_by
+
+
+def _epoch(job: tuple[str, str]) -> pd.DataFrame:
+    identifier, expected_sha256 = job
+    dot = analyzed_time.read_verified_dot_with_swr_source(
+        inventory_run.decode_path(identifier), expected_sha256
+    )
+    animal, day, epoch = (dot[c].iloc[0] for c in ("animal", "day", "epoch"))
+    counts = rest_power_counts(dot)
+    counts.insert(0, "decode_sha256", expected_sha256)
+    counts.insert(0, "epoch", str(epoch))
+    counts.insert(0, "session_date", int(day))
+    counts.insert(0, "animal", str(animal))
+    counts.insert(0, "epoch_id", identifier)
+    return counts
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--event-features-run", required=True)
+    parser.add_argument("--n-workers", type=int, default=1)
+    args = parser.parse_args(argv)
+    manifest = read_manifest(event_features_root() / args.event_features_run)
+    jobs = [
+        (identifier, manifest["epochs"][identifier]["decode"]["sha256"])
+        for identifier in ok_epochs(manifest)
+    ]
+    with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
+        tables = list(pool.map(_epoch, jobs))
+    out_dir = processed_data_dir() / NONLOCAL_BY_RIPPLE_POWER_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    table = pd.concat(tables, ignore_index=True)
+    tmp = out_dir / "counts.parquet.tmp"
+    table.to_parquet(tmp, index=False)
+    tmp.replace(out_dir / "counts.parquet")
+    write_json(
+        out_dir / "manifest.json",
+        {
+            "produced_by": produced_by(__file__),
+            "commit": described_commit(),
+            "event_features_run": args.event_features_run,
+            "n_epochs": len(tables),
+            "bins": f"head_speed below {DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC:g} "
+            "cm/s, outside excluded time",
+            "nonlocal": "non-local probability (Continuous plus Fragmented) above "
+            f"{DEFAULT_NON_LOCAL_THRESHOLD:g}",
+            "power": "SWR_zscore, in bins 0.25 z wide from -2 to 10 with an open "
+            f"bin at each end; the Kay threshold ({KAY_ZSCORE_THRESHOLD:g} z) is "
+            "an edge",
+        },
+        indent=1,
+        final_newline=True,
+    )
+    print(f"wrote {len(tables)} epochs to {out_dir / 'counts.parquet'}")
+
+
+if __name__ == "__main__":
+    main()

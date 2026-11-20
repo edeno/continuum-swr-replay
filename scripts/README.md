@@ -58,6 +58,7 @@ them importable.
 ## `event_properties/` — what the events are like (Part 2)
 - `measure_ripple_class_structure.py` — do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power.
 - `measure_brain_state_reference.py`, `measure_event_gamma.py`, `measure_event_start_and_rest_theta.py` — each epoch's running and rest reference levels, each event's gamma power, start distance and rest theta.
+- `measure_nonlocal_by_ripple_power.py` — each epoch's immobile time bins, and those decoded non-local, by ripple power (Figure 2j).
 - `bootstrap_event_properties.py` — bootstrap of the SWR against non-SWR property contrasts.
 
 ## `tables/` — the event, stop and time-bin tables

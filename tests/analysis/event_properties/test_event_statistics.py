@@ -766,3 +766,76 @@ def test_overlap_class_animal_shares_are_epoch_then_animal_means():
     assert shares.loc["a", "swr_contained"] == pytest.approx(0.25)
     assert shares.loc["b", "swr_partial"] == pytest.approx(1.0)
     assert list(shares.columns) == list(stats.OVERLAP_CLASSES)
+
+
+def _epoch_power_counts() -> pd.DataFrame:
+    """Two animals' epochs over three power bins split at 2 z.
+
+    Animal a: 40 non-local bins, 30 of them below 2 z (two epochs); animal b:
+    4 non-local bins, 1 below.
+    """
+    rows = [
+        # epoch, animal, power_low, power_high, n_bins, n_nonlocal
+        ("a1", "a", -np.inf, 2.0, 100, 10),
+        ("a1", "a", 2.0, 4.0, 10, 4),
+        ("a1", "a", 4.0, np.inf, 0, 0),
+        ("a2", "a", -np.inf, 2.0, 300, 20),
+        ("a2", "a", 2.0, 4.0, 10, 5),
+        ("a2", "a", 4.0, np.inf, 1, 1),
+        ("b1", "b", -np.inf, 2.0, 50, 1),
+        ("b1", "b", 2.0, 4.0, 4, 2),
+        ("b1", "b", 4.0, np.inf, 1, 1),
+    ]
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "epoch_id",
+            "animal",
+            "power_low",
+            "power_high",
+            "n_bins",
+            "n_nonlocal",
+        ],
+    )
+
+
+def test_animal_power_counts_sum_the_epochs_of_each_animal_and_bin():
+    counts = stats.animal_power_counts(_epoch_power_counts())
+    a = counts[counts["animal"] == "a"].set_index("power_low")
+    assert a["n_bins"].tolist() == [400, 20, 1]
+    assert a["n_nonlocal"].tolist() == [30, 9, 1]
+    assert a["share"].tolist() == pytest.approx([30 / 400, 9 / 20, 1.0])
+    # each animal's non-local bins, spread over the power bins
+    assert a["nonlocal_fraction"].tolist() == pytest.approx([0.75, 0.225, 0.025])
+    b = counts[counts["animal"] == "b"].set_index("power_low")
+    assert b["nonlocal_fraction"].tolist() == pytest.approx([0.25, 0.5, 0.25])
+
+
+def test_animal_power_counts_give_no_share_where_an_animal_has_no_bin():
+    epochs = _epoch_power_counts()
+    epochs = epochs[epochs["animal"] == "b"].assign(
+        n_bins=[50, 0, 1], n_nonlocal=[1, 0, 1]
+    )
+    counts = stats.animal_power_counts(epochs).set_index("power_low")
+    assert np.isnan(counts.loc[2.0, "share"])
+    assert counts.loc[2.0, "nonlocal_fraction"] == 0.0
+
+
+def test_nonlocal_below_threshold_statistics_weigh_each_animal_once():
+    counts = stats.animal_power_counts(_epoch_power_counts())
+    statistics = stats.nonlocal_below_threshold_statistics(counts, threshold=2.0)
+    # animal a 0.75, animal b 0.25: their mean, not the pooled 31 / 44
+    assert statistics == {
+        "fraction_animal_mean": pytest.approx(0.5),
+        "fraction_animal_min": pytest.approx(0.25),
+        "fraction_animal_max": pytest.approx(0.75),
+        "n_animals": 2,
+    }
+    above = stats.nonlocal_below_threshold_statistics(counts, threshold=4.0)
+    assert above["fraction_animal_mean"] == pytest.approx((0.975 + 0.75) / 2)
+
+
+def test_nonlocal_below_threshold_statistics_refuse_a_threshold_between_edges():
+    counts = stats.animal_power_counts(_epoch_power_counts())
+    with pytest.raises(ValueError, match="not an edge"):
+        stats.nonlocal_below_threshold_statistics(counts, threshold=3.0)
