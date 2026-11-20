@@ -1250,7 +1250,7 @@ def test_no_swr_events_have_one_color_in_every_figure(offline):
     no_swr = COLORS["No SWR"]
     assert no_swr not in (COLORS["Non-Local"], COLORS["SWR"])
     assert figure02.CLASS_COLORS["non_swr"] == no_swr
-    assert {name: color for _, name, color in figure03.KINDS}["no SWR"] == no_swr
+    assert {name: color for _, name, color in figure03.KINDS}["No SWR"] == no_swr
     bars = {label: COLORS[color] for label, _, color in figure04.SIGNIFICANCE_BARS}
     assert bars["no-SWR"] == no_swr
     assert bars["Replay"] == COLORS["Non-Local"]  # every non-local event
@@ -1264,11 +1264,15 @@ def test_no_swr_events_have_one_color_in_every_figure(offline):
 
 
 def _figure03_events(n: int = 400) -> pd.DataFrame:
-    """Events of both kinds whose durations pass the duration axis and whose
-    speeds fall below the speed axis, as the real ones do."""
+    """Events of both kinds, of two animals with two epochs each, whose
+    durations pass the duration axis and whose speeds fall below the speed
+    axis, as the real ones do."""
     rng = np.random.default_rng(0)
     return pd.DataFrame(
         {
+            "animal": np.where(np.arange(n) < n // 2, "a", "b"),
+            "session_date": "d1",
+            "epoch": np.where(np.arange(n) % 4 < 2, "e1", "e2"),
             "is_swr": np.arange(n) % 2 == 0,
             "event_duration_s": np.r_[rng.uniform(0.02, 0.3, n - 2), 0.45, 0.6],
             "spatial_extent_cm": rng.uniform(0, 220, n),
@@ -1326,6 +1330,84 @@ def test_figure03_histogram_labels_the_ends_that_hold_clipped_events(offline):
     too_wide = events.assign(spatial_extent_cm=300.0)
     with pytest.raises(ValueError, match="beyond the axis, unmarked"):
         figure03.draw_histogram(ax_extent, too_wide, "extent")
+    plt.close(fig)
+
+
+def test_figure03_histogram_marks_each_animal_s_median(offline):
+    """Under each kind's median, one tick per animal at the animal's own median
+    (``event_statistics.animal_class_medians``), in the kind's color."""
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import LineCollection
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        animal_class_medians,
+    )
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    events = _figure03_events()
+    fig, ax = plt.subplots()
+    figure03.draw_histogram(ax, events, "extent")
+    expected = animal_class_medians(events, "spatial_extent_cm")
+    ticks = [c for c in ax.collections if isinstance(c, LineCollection)]
+    assert len(ticks) == 2
+    for (_, _, color), word, drawn in zip(
+        figure03.KINDS, ("non_swr", "swr"), ticks, strict=True
+    ):
+        x = [segment[0, 0] for segment in drawn.get_segments()]
+        np.testing.assert_allclose(x, expected[word])
+        np.testing.assert_allclose(drawn.get_colors()[0], to_rgba(color))
+    plt.close(fig)
+
+
+def test_figure03_legend_counts_every_event_of_each_kind(offline):
+    """The legend's n is each kind's number of events, and a histogram is not
+    drawn from fewer: an event without a value raises."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    events = _figure03_events(n=2400)
+    assert figure03.kind_labels(events) == [
+        "No SWR (n = 1,200 events)",
+        "SWR (n = 1,200 events)",
+    ]
+    fig, ax = plt.subplots()
+    missing = events.assign(
+        spatial_extent_cm=events["spatial_extent_cm"].where(events.index > 0)
+    )
+    with pytest.raises(ValueError, match="an event has no value"):
+        figure03.draw_histogram(ax, missing, "extent")
+    plt.close(fig)
+
+
+def test_figure03_distance_labels_say_which_wells(offline):
+    """Panel e's upper axis names the dark bars near the animal and far from
+    it, each on its side of ``FAR_CM``; at the panel's printed size no text in
+    the axis runs into another."""
+    import matplotlib.pyplot as plt
+
+    from continuum_swr_replay.analysis.event_properties.event_statistics import FAR_CM
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    left = figure03.DISTANCE_EDGES_CM[:-1]
+    index = pd.MultiIndex.from_product([[False, True], left])
+    shares = pd.DataFrame(
+        {"at_well": 0.5 / len(left), "elsewhere": 0.5 / len(left)}, index=index
+    )
+    fig = plt.figure(figsize=(figure03.WIDTH, figure03.HEIGHT))
+    # panel e's two axes, at their size in the figure
+    axes = [fig.add_axes([0.08, y, 0.144, 0.149]) for y in (0.30, 0.13)]
+    figure03.draw_distance_from_animal(axes, shares)
+    labels = {t.get_text(): t for t in axes[0].texts}
+    assert labels["own well"].get_position()[0] < FAR_CM
+    assert labels["other wells"].get_position()[0] > FAR_CM
+    assert not {"own well", "other wells"} & {t.get_text() for t in axes[1].texts}
+    fig.draw_without_rendering()
+    boxes = [t.get_window_extent() for t in axes[0].texts]
+    assert len(boxes) == 3  # the two labels and the kind's name
+    for i, box in enumerate(boxes):
+        for other in boxes[i + 1 :]:
+            assert not box.overlaps(other)
     plt.close(fig)
 
 

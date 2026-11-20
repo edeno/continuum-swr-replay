@@ -7,7 +7,8 @@ numbers: a dict,
 or a table with one row per group (per animal, for
 :func:`animal_occupancy_shares`). :func:`boundary_offsets` returns one row per
 event (what a histogram draws), :func:`most_steps` a count with the properties
-that attain it, and :func:`n_animals_in_direction` and
+that attain it, :func:`animal_class_medians` each animal's median of each
+class, and :func:`n_animals_in_direction` and
 :func:`n_animals_non_swr_more_at_well` one count. They are the statistics the
 events summary reports (``continuum_swr_replay.reported.events`` names and
 describes them) and a figure that shows one of them calls the same function.
@@ -992,13 +993,44 @@ def class_medians(events: pd.DataFrame, column: str) -> dict[str, float]:
     return {"median_non_swr": median[False], "median_swr": median[True]}
 
 
+def animal_class_medians(events: pd.DataFrame, column: str) -> pd.DataFrame:
+    """Each animal's median of a per-event property in non-SWR and in SWR events.
+
+    An animal's median of a class is event -> epoch -> animal: the median over
+    its epochs with an event of the class (with a value) of each epoch's
+    median.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``is_swr``, the session columns
+        (:data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`) and
+        ``column``.
+    column : str
+        The property.
+
+    Returns
+    -------
+    medians : pd.DataFrame, shape (n_animals, 2)
+        Indexed by animal, with the columns ``non_swr`` and ``swr``. An animal
+        without an event of a class (with a value) has no median there.
+    """
+    return pd.DataFrame(
+        {
+            _CLASS_WORDS[is_swr]: animal_session_values(
+                group[column], group["animal"], group[_WITHIN_ANIMAL], "median"
+            )
+            for is_swr, group in events.groupby("is_swr")
+        }
+    )
+
+
 def n_animals_in_direction(events: pd.DataFrame, column: str, direction: str) -> int:
     """The animals whose own non-SWR median of a per-event property is
     ``direction`` than their SWR median.
 
-    An animal's median of a class is event -> epoch -> animal: the median over
-    its epochs with an event of the class (with a value) of each epoch's
-    median. An animal without one of the classes is in neither direction.
+    The medians are :func:`animal_class_medians`. An animal without one of the
+    classes is in neither direction.
 
     Parameters
     ----------
@@ -1022,16 +1054,9 @@ def n_animals_in_direction(events: pd.DataFrame, column: str, direction: str) ->
     """
     if direction not in ("lower", "higher"):
         raise ValueError(f"direction {direction!r} is neither 'lower' nor 'higher'")
-    by_animal = pd.DataFrame(
-        {
-            is_swr: animal_session_values(
-                group[column], group["animal"], group[_WITHIN_ANIMAL], "median"
-            )
-            for is_swr, group in events.groupby("is_swr")
-        }
-    )
+    medians = animal_class_medians(events, column)
     compare = pd.Series.lt if direction == "lower" else pd.Series.gt
-    return int(compare(by_animal[False], by_animal[True]).sum())
+    return int(compare(medians["non_swr"], medians["swr"]).sum())
 
 
 # --- where content sits -----------------------------------------------------------

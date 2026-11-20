@@ -625,6 +625,21 @@ def test_class_medians_pool_the_events_with_a_value():
     assert medians == {"median_non_swr": 3.0, "median_swr": 6.0}
 
 
+def test_animal_class_medians_give_each_animal_s_median_of_each_class():
+    medians = stats.animal_class_medians(_property_events(), "extent")
+    # a: non-SWR 1, 3 and SWR 5; b: non-SWR 8 and SWR 4 (its other SWR event
+    # has no value); c: 1 and 9; d: 7 and 7
+    expected = pd.DataFrame(
+        {"non_swr": [2.0, 8.0, 1.0, 7.0], "swr": [5.0, 4.0, 9.0, 7.0]},
+        index=pd.Index(["a", "b", "c", "d"], name="animal"),
+    )
+    pd.testing.assert_frame_equal(medians, expected)
+    # an animal without an SWR event has no SWR median
+    events = _property_events()
+    no_swr = events[~((events.animal == "c") & events.is_swr)]
+    assert np.isnan(stats.animal_class_medians(no_swr, "extent").loc["c", "swr"])
+
+
 def test_n_animals_in_direction_counts_animals_in_the_stated_direction():
     events = _property_events()
     # a: 2 < 5; b: 8 > 4; c: 1 < 9; d: 7 against 7, in neither direction

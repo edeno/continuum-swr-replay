@@ -2,7 +2,10 @@
 """Generate Figure 3: what SWR and no-SWR non-local events are like.
 
 The immobile non-local events of the canonical event table, split by whether
-they overlap an SWR (Kay's detector, the SWR source). Each row asks one thing:
+they overlap an SWR (Kay's detector, the SWR source). The starting hypothesis
+is that the two are different kinds of event, so every panel draws them
+separately and none pools them; the legend gives each kind's number of events.
+Each row asks one thing:
 
     Size and movement
         a — Duration.
@@ -15,7 +18,9 @@ they overlap an SWR (Kay's detector, the SWR source). Each row asks one thing:
     Where the content is, and the brain state
         e — Content time by track distance from the animal, at a well (within
             ``AT_WELL_CM`` of one) and elsewhere: content at a well far from
-            the animal is at another well, near it at the animal's own.
+            the animal is at another well, near it at the animal's own (the
+            two labels; the summary's ``*_content_remote_well_fraction`` and
+            ``*_content_own_well_fraction`` divide at ``FAR_CM``).
         f — Where on the track each kind's content is denser: the ratio of no-SWR
             to SWR content time per cm along every arm.
         g — Content time per cm from the center out to the junctions (trunk
@@ -30,9 +35,11 @@ events with Fragmented time. The number of arms the decoded position touches is
 not drawn: it restates c in arms, and an arm counts when one time bin's position
 is on it. Its values stay in the events summary.
 
-Panels a, c and d mark each class's median (``event_statistics.class_medians``),
-the events summary's ``<property>_median_*`` values
-(``paper/reported/events.json``). Panels
+Panels a, c and d mark each class's median (triangle;
+``event_statistics.class_medians``), the events summary's
+``<property>_median_*`` values (``paper/reported/events.json``), and under it
+each animal's median (ticks; ``event_statistics.animal_class_medians``), the
+medians the summary's ``<property>_animals_in_direction`` counts compare. Panels
 e–g place every event time bin's MAP position on its arm
 (``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``): e
 draws ``content_along_arms.distance_from_animal_shares``, f and g
@@ -80,6 +87,8 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     AT_WELL_CM,
+    FAR_CM,
+    animal_class_medians,
     animal_signal_levels,
     class_medians,
     state_composition_statistics,
@@ -120,7 +129,8 @@ C_SWR = COLORS["SWR"]
 # Panel h's rest and running levels: neutral, not decoder-state colors.
 C_REST = "white"
 C_RUN = "black"
-KINDS = ((False, "no SWR", C_NO_SWR), (True, "SWR", C_SWR))
+# The two kinds of event, named as in Figure 2.
+KINDS = ((False, "No SWR", C_NO_SWR), (True, "SWR", C_SWR))
 
 # The track drawn in panel f: one epoch's track graph (every epoch's arms run the
 # same way, ``content_along_arms.check_arm_orientation``).
@@ -205,15 +215,27 @@ def read_inputs() -> dict:
 # ---------------------------------------------------------------------------
 
 
+def kind_labels(events: pd.DataFrame) -> list[str]:
+    """Each kind's name with its number of events, for the figure's legend."""
+    return [
+        f"{name} (n = {int((events['is_swr'] == is_swr).sum()):,} events)"
+        for is_swr, name, _ in KINDS
+    ]
+
+
 def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
     """A property's distribution for each kind, % of the kind's events per bin,
-    with each kind's median (triangle).
+    with each kind's median (triangle) and, under it, each animal's (ticks).
 
     The events beyond an end of the axis are counted in its end bin, whose tick
-    then says so (≤ or ≥). An event beyond an end that is not marked raises.
+    then says so (≤ or ≥). An event beyond an end that is not marked raises, and
+    so does an event without a value: the legend's n is every event.
     """
     column, label, scale, edges, log_x, ticks = HISTOGRAMS[key]
+    if events[column].isna().any():
+        raise ValueError(f"{label}: an event has no value")
     medians = class_medians(events, column)
+    animals = animal_class_medians(events, column)
     marked_below = ticks.get(edges[0], "").startswith("≤")
     marked_above = ticks.get(edges[-1], "").startswith("≥")
     top = 0.0
@@ -228,21 +250,25 @@ def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
         ax.stairs(share, edges, color=color, fill=True, alpha=0.25, lw=0)
         ax.stairs(share, edges, color=color, lw=0.8)
         top = max(top, share.max())
-    for (_, _, color), m in zip(
-        KINDS, (medians["median_non_swr"], medians["median_swr"]), strict=True
-    ):
-        ax.plot(scale * m, top * 1.08, marker="v", ms=3.5, color=color, lw=0)
+    for (_, _, color), word in zip(KINDS, ("non_swr", "swr"), strict=True):
+        ax.plot(
+            scale * medians[f"median_{word}"], top * 1.19, marker="v", ms=3.5,
+            color=color, lw=0,
+        )  # fmt: skip
+        ax.vlines(scale * animals[word], top * 1.04, top * 1.12, color=color, lw=0.6)
     if log_x:
         ax.set_xscale("log")
     ax.set_xlim(edges[0], edges[-1])
-    ax.set_ylim(0, top * 1.15)
+    ax.set_ylim(0, top * 1.26)
     ax.set_xlabel(label)
     ax.set_xticks(list(ticks), list(ticks.values()))
 
 
 def draw_distance_from_animal(axes, shares: pd.DataFrame) -> None:
     """Each kind's content time by distance from the animal (``axes``: no SWR,
-    then SWR), stacked: at a well (dark) and elsewhere (light)."""
+    then SWR), stacked: at a well (dark) and elsewhere (light). The upper axis
+    says which wells the dark bars are: the animal's own within ``FAR_CM`` of it,
+    other wells beyond."""
     width = np.diff(DISTANCE_EDGES_CM)
     top = 100 * shares.sum(axis=1).max()
     for ax, (is_swr, name, color) in zip(axes, KINDS, strict=True):
@@ -259,6 +285,16 @@ def draw_distance_from_animal(axes, shares: pd.DataFrame) -> None:
         ax.text(
             0.55, 0.95, name, transform=ax.transAxes, ha="center", va="top",
             color=color, fontsize=SMALL_SIZE,
+        )  # fmt: skip
+    # One row, over the bars they name: side by side they fit only from the
+    # axis's left edge to the far wells' bars.
+    for x, align, name in (
+        (DISTANCE_EDGES_CM[0] + 2, "left", "own well"),
+        (DISTANCE_EDGES_CM[-1] - 2 * FAR_CM - 4, "right", "other wells"),
+    ):
+        axes[0].text(
+            x, 0.70, name, transform=axes[0].get_xaxis_transform(), ha=align,
+            va="bottom", color="0.3", fontsize=SMALL_SIZE,
         )  # fmt: skip
     axes[0].tick_params(labelbottom=False)
     axes[1].set_xlabel("Content distance\nfrom animal (cm)")
@@ -311,11 +347,11 @@ def draw_ratio_track(ax, track_graph, edge_order, ratio: pd.Series) -> None:
     )  # fmt: skip
     # The ends and the middle are labeled; the ticks between are 2×.
     limit = f"{2**RATIO_LIMIT_LOG2:g}×"
-    labels = {steps[0]: f"{limit} SWR", 0: "equal", steps[-1]: f"{limit} no SWR"}
+    labels = {steps[0]: f"{limit} SWR", 0: "equal", steps[-1]: f"{limit} No SWR"}
     bar.ax.set_xticklabels([labels.get(k, "") for k in steps])
     bar.ax.tick_params(length=2)
     bar.outline.set_linewidth(0.5)
-    ax.set_title("Content time per cm,\nno SWR : SWR", fontsize=SMALL_SIZE, pad=2)
+    ax.set_title("Content time per cm,\nNo SWR : SWR", fontsize=SMALL_SIZE, pad=2)
 
 
 def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame) -> None:
@@ -355,8 +391,8 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
     Bars are the animals' mean, dots the animals
     (``event_statistics.state_composition_statistics``).
     """
-    for g, (_, group, color) in enumerate(KINDS):
-        row = statistics.loc[group]
+    for g, (is_swr, _, color) in enumerate(KINDS):
+        row = statistics.loc["SWR" if is_swr else "no SWR"]  # the statistic's names
         for x, state in enumerate(("continuous", "fragmented")):
             position = x + (g - 0.5) * 0.36
             ax.bar(position, 100 * row[f"{state}_animal_mean"], width=0.34, color=color)
@@ -431,7 +467,7 @@ def generate_figure(inputs: dict):
         ax.set_ylabel("% events")
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for _, _, c in KINDS]
     fig.legend(
-        handles, [n for _, n, _ in KINDS], frameon=False, loc="upper center",
+        handles, kind_labels(events), frameon=False, loc="upper center",
         bbox_to_anchor=(0.5, 1.0), ncol=2, handlelength=0.8, columnspacing=1.5,
     )  # fmt: skip
 
