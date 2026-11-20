@@ -17,21 +17,19 @@ Each row asks one thing:
         d — Replay speed (each event's median over its time bins), twice on
             one axis: the distribution, and under it the share of events at
             or below each speed.
-    Where the content is, and the brain state
+    Where the content is
         e — Content time by track distance from the animal, at a well (within
-            ``AT_WELL_CM`` of one) and elsewhere. Content at a well far from
-            the animal is at another well, and those bars are labeled so (the
-            summary's ``*_content_remote_well_fraction``, beyond ``FAR_CM``).
+            ``AT_WELL_CM`` of one) and elsewhere.
         f — Where on the track each kind's content is denser: the ratio of no-SWR
             to SWR content time per cm along every arm.
         g — Content time per cm from the center out to the junctions (trunk
             arms) and from the junctions out to the wells (leaf arms), against
             what content spread evenly over the track would give (the dashed
             line; ``content_along_arms.even_content``).
-        h — Slow and fast gamma during each kind of event, between the levels
-            of the same epochs' quiet-rest and running windows as long as the
-            kind's events. (Ripple power, MUA, theta and head speed around the
-            events are Figure 2's.)
+
+The state the events occur in is not drawn here: ripple power, MUA, theta and
+head speed around the events are Figure 2's, and slow and fast gamma during them
+are a supplementary figure (``generate_supp_event_gamma.py``).
 
 b comes before c and d because the far mode of c and the fastest events of d
 (its end bin) are the events with Fragmented time. d's axis is linear: a decoded
@@ -54,11 +52,7 @@ draws ``content_along_arms.distance_from_animal_shares``, f and g
 quotes the share of content time within ``AT_WELL_CM`` of a well, the summary's
 ``*_content_at_well_fraction`` (``content_along_arms.content_place_shares``,
 ``place_share_statistics``). Every one of them weighs each epoch of an animal the
-same and each animal the same. Panel h's animal values are
-``event_statistics.animal_signal_levels`` with ``matched``: the values the
-summary's ``<signal>_animals_*`` counts compare. An event's gamma is a mean
-over its bins, and a mean of skewed power over a window sits above the median
-of single bins, so the reference is windows of the events' own length.
+same and each animal the same.
 
 Usage
 -----
@@ -95,9 +89,7 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
     AT_WELL_CM,
-    FAR_CM,
     animal_class_medians,
-    animal_signal_levels,
     class_medians,
     state_composition_statistics,
 )
@@ -109,7 +101,6 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.reported.events import (
     content_along_arms_bins,
     default_inputs,
-    with_brain_state,
 )
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
@@ -134,9 +125,6 @@ HEIGHT = 4.6
 
 C_NO_SWR = COLORS["No SWR"]
 C_SWR = COLORS["SWR"]
-# Panel h's rest and running levels: neutral, not decoder-state colors.
-C_REST = "white"
-C_RUN = "black"
 # The two kinds of event, named as in Figure 2.
 KINDS = ((False, "No SWR", C_NO_SWR), (True, "SWR", C_SWR))
 
@@ -171,12 +159,6 @@ HISTOGRAMS = {
     ),
 }  # fmt: skip
 
-# Panel h: (signal, event column, label). Theta is Figure 2's.
-SIGNALS = (
-    ("slow_gamma", "slow_gamma_z", "Slow γ"),
-    ("fast_gamma", "fast_gamma_z", "Fast γ"),
-)
-
 
 # ---------------------------------------------------------------------------
 # Inputs
@@ -184,11 +166,10 @@ SIGNALS = (
 
 
 def read_inputs() -> dict:
-    """The events with their gamma, their content's time bins, and the other inputs."""
+    """The events, their content's time bins, and the other inputs."""
     inputs = default_inputs()
     events = read_swr_table(inputs.event_table)
     n_epochs = len(analyzed_epoch_ids())
-    events, reference, _ = with_brain_state(events, inputs, n_epochs)
     along, _ = content_along_arms_bins(
         events,
         inputs.content_along_arms,
@@ -207,7 +188,6 @@ def read_inputs() -> dict:
     env = pd.read_pickle(decode_paths(TRACK_EPOCH, processed_data_dir()).environment)
     return {
         "events": events,
-        "reference": reference,
         "place_shares": place_share_statistics(content_place_shares(along))["means"],
         "ratio": log2_density_ratio(density),
         "distance_shares": distance_from_animal_shares(
@@ -295,8 +275,7 @@ def draw_cumulative(ax, events: pd.DataFrame, key: str) -> None:
 
 def draw_distance_from_animal(axes, shares: pd.DataFrame) -> None:
     """Each kind's content time by distance from the animal (``axes``: no SWR,
-    then SWR), stacked: at a well (dark) and elsewhere (light). The upper axis
-    names the dark bars far from the animal: other wells."""
+    then SWR), stacked: at a well (dark) and elsewhere (light)."""
     width = np.diff(DISTANCE_EDGES_CM)
     top = 100 * shares.sum(axis=1).max()
     for ax, (is_swr, name, color) in zip(axes, KINDS, strict=True):
@@ -314,12 +293,6 @@ def draw_distance_from_animal(axes, shares: pd.DataFrame) -> None:
             0.55, 0.95, name, transform=ax.transAxes, ha="center", va="top",
             color=color, fontsize=SMALL_SIZE,
         )  # fmt: skip
-    # Beside the far wells' bars, which it names.
-    axes[0].text(
-        DISTANCE_EDGES_CM[-1] - 2 * FAR_CM - 4, 0.70, "other wells",
-        transform=axes[0].get_xaxis_transform(), ha="right", va="bottom",
-        color="0.3", fontsize=SMALL_SIZE,
-    )  # fmt: skip
     axes[0].tick_params(labelbottom=False)
     axes[1].set_xlabel("Content distance\nfrom animal (cm)")
     axes[0].set_ylabel("% content time", y=0.0)
@@ -447,50 +420,14 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
     ax.set_ylabel("% of event\n(mean over events)")
 
 
-def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
-    """Each animal's level of each signal in each kind of event, between the
-    levels of quiet-rest (white) and running (black) windows as long as the
-    kind's events (``axes``: one per signal, stacked, sharing the x axis)."""
-    for ax, (signal, column, label) in zip(axes, SIGNALS, strict=True):
-        levels = animal_signal_levels(events, reference, signal, column, matched=True)
-        centers = []
-        for k, (is_swr, _, color) in enumerate(KINDS):
-            x = 3.7 * k + np.arange(3)
-            values = levels.loc[is_swr, ["rest", "event", "running"]]
-            for _, row in values.iterrows():
-                ax.plot(x, row.to_numpy(), color="#999999", lw=0.5, zorder=1)
-            for i, dot_color in enumerate((C_REST, color, C_RUN)):
-                ax.scatter(
-                    np.full(len(values), x[i]), values.iloc[:, i], s=7,
-                    color=dot_color, edgecolors="black", linewidths=0.5, zorder=2,
-                )  # fmt: skip
-            centers.append(x[1])
-        ax.axhline(0, color="0.85", lw=0.5, zorder=0)
-        ax.set_title(label, fontsize=SMALL_SIZE, pad=2)
-        # One label per kind; the key says which dots are rest and running.
-        ax.set_xticks(centers, [name for _, name, _ in KINDS])
-        ax.set_xlim(-0.7, centers[-1] + 1.7)
-    axes[0].tick_params(labelbottom=False)
-    axes[0].set_ylabel("Power (z)", y=-0.2)
-    handles = [
-        plt.Line2D([], [], marker="o", ls="", ms=2.6, mfc=color, mec="black", mew=0.5)
-        for color in (C_REST, C_RUN)
-    ]
-    axes[0].legend(
-        handles, ["rest", "running"], frameon=False, loc="lower left",
-        bbox_to_anchor=(-0.05, 1.22), ncol=2, fontsize=SMALL_SIZE,
-        handletextpad=0.0, columnspacing=0.6, borderaxespad=0,
-    )  # fmt: skip
-
-
 # ---------------------------------------------------------------------------
 # Figure
 # ---------------------------------------------------------------------------
 
 # The panel letters as they sit in the figure: the letters of a row share a
 # height, the letters of a column a left edge.
-LETTER_ROWS = ("abcd", "efgh")
-LETTER_COLUMNS = ("ae", "bf", "cg", "dh")
+LETTER_ROWS = ("abcd", "efg")
+LETTER_COLUMNS = ("ae", "bf", "cg", "d")
 
 
 def letter_positions(fig, panels: dict[str, list]) -> dict[str, tuple[float, float]]:
@@ -557,17 +494,13 @@ def generate_figure(inputs: dict):
     draw_distance_from_animal(ax_e, inputs["distance_shares"])
     ax_f = fig.add_subplot(grid[1, 1])
     draw_ratio_track(ax_f, inputs["track_graph"], inputs["edge_order"], inputs["ratio"])
-    ax_g = fig.add_subplot(grid[1, 2])
+    ax_g = fig.add_subplot(grid[1, 2:])  # the last two columns
     draw_profiles(ax_g, inputs["profiles"], inputs["place_shares"], inputs["even"])
-    h_grid = grid[1, 3].subgridspec(2, 1, hspace=0.4)
-    ax_h = [fig.add_subplot(h_grid[0])]
-    ax_h.append(fig.add_subplot(h_grid[1], sharex=ax_h[0]))
-    draw_brain_state(ax_h, events, inputs["reference"])
 
     fig.draw_without_rendering()
     panels_by_letter = {
         "a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d, ax_d_cumulative],
-        "e": ax_e, "f": [ax_f], "g": [ax_g], "h": ax_h,
+        "e": ax_e, "f": [ax_f], "g": [ax_g],
     }  # fmt: skip
     for letter, (left, top) in letter_positions(fig, panels_by_letter).items():
         letter_panel(fig, letter, left, top)

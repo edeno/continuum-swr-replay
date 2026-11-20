@@ -1409,13 +1409,10 @@ def test_figure03_legend_counts_every_event_of_each_kind(offline):
     plt.close(fig)
 
 
-def test_figure03_distance_label_names_the_other_wells(offline):
-    """Panel e's upper axis names the dark bars far from the animal, beyond
-    ``FAR_CM``, and nothing names the well the animal is at; at the panel's
-    printed size no text in the axis runs into another."""
+def test_figure03_distance_panel_names_no_well(offline):
+    """Panel e writes each kind's name in its axis and nothing else: the dark
+    bars are at a well by the key, and no label says which well."""
     import matplotlib.pyplot as plt
-
-    from continuum_swr_replay.analysis.event_properties.event_statistics import FAR_CM
 
     figure03 = offline("scripts.figures.generate_figure03")
     left = figure03.DISTANCE_EDGES_CM[:-1]
@@ -1423,20 +1420,10 @@ def test_figure03_distance_label_names_the_other_wells(offline):
     shares = pd.DataFrame(
         {"at_well": 0.5 / len(left), "elsewhere": 0.5 / len(left)}, index=index
     )
-    fig = plt.figure(figsize=(figure03.WIDTH, figure03.HEIGHT))
-    # panel e's two axes, at their size in the figure
-    axes = [fig.add_axes([0.08, y, 0.153, 0.149]) for y in (0.30, 0.13)]
+    fig, axes = plt.subplots(2, 1, sharex=True)
     figure03.draw_distance_from_animal(axes, shares)
-    labels = {t.get_text(): t for t in axes[0].texts}
-    assert labels["other wells"].get_position()[0] > FAR_CM
-    assert "other wells" not in {t.get_text() for t in axes[1].texts}
-    assert not any("own" in t.get_text() for ax in axes for t in ax.texts)
-    fig.draw_without_rendering()
-    boxes = [t.get_window_extent() for t in axes[0].texts]
-    assert len(boxes) == 2  # the label and the kind's name
-    for i, box in enumerate(boxes):
-        for other in boxes[i + 1 :]:
-            assert not box.overlaps(other)
+    names = [name for _, name, _ in figure03.KINDS]
+    assert [[t.get_text() for t in ax.texts] for ax in axes] == [[n] for n in names]
     plt.close(fig)
 
 
@@ -1491,6 +1478,74 @@ def test_figure03_profiles_carry_the_even_content_line(offline):
     texts = [text.get_text() for text in ax.texts]
     assert "even" in texts
     assert "even: 25% at a well" in texts
+    plt.close(fig)
+
+
+def test_figure03_draws_seven_panels_and_no_gamma(offline):
+    """Figure 3 is a to g: gamma during the events is the supplementary
+    figure's, and the script's letters are the question list's."""
+    from continuum_swr_replay.reported.questions import FIGURES
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    assert "".join(figure03.LETTER_ROWS) == FIGURES["3"].panels == "abcdefg"
+    assert sorted("".join(figure03.LETTER_COLUMNS)) == list("abcdefg")
+    assert not hasattr(figure03, "draw_brain_state")
+
+
+def test_the_gamma_figure_draws_each_animal_between_its_rest_and_running_levels(
+    offline,
+):
+    """The supplementary gamma figure: per band and kind, each animal's event
+    level (``event_statistics.animal_signal_levels`` with ``matched``) between
+    its quiet-rest and running levels, in the kind's color."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        animal_signal_levels,
+    )
+
+    figure = offline("scripts.figures.generate_supp_event_gamma")
+    rng = np.random.default_rng(0)
+    epochs = [("a", "e1"), ("a", "e2"), ("b", "e1")]
+    events = pd.DataFrame(
+        [
+            {"animal": animal, "session_date": "d1", "epoch": epoch, "is_swr": is_swr}
+            for animal, epoch in epochs
+            for is_swr in (False, True)
+            for _ in range(4)
+        ]
+    )
+    reference = pd.DataFrame(epochs, columns=["animal", "epoch"]).assign(
+        session_date="d1"
+    )
+    for band, column, _ in figure.SIGNALS:
+        events[column] = rng.normal(size=len(events))
+        for regime in ("rest", "running"):
+            for group in ("non_swr", "swr"):
+                reference[f"{band}_{regime}_matched_{group}"] = rng.normal(size=3)
+
+    fig, axes = plt.subplots(1, 2)
+    figure.draw_gamma(axes, events, reference)
+    assert [ax.get_title() for ax in axes] == [
+        "Slow gamma (25–55 Hz)",
+        "Fast gamma (65–100 Hz)",
+    ]
+    for ax, (band, column, _) in zip(axes, figure.SIGNALS, strict=True):
+        levels = animal_signal_levels(events, reference, band, column, matched=True)
+        # per kind, three sets of dots: rest, events, running
+        dots = ax.collections
+        assert len(dots) == 6
+        for k, (is_swr, _, color) in enumerate(figure.KINDS):
+            rest, event, running = dots[3 * k : 3 * k + 3]
+            for drawn, word in ((rest, "rest"), (event, "event"), (running, "running")):
+                np.testing.assert_allclose(
+                    drawn.get_offsets()[:, 1], levels.loc[is_swr, word]
+                )
+            np.testing.assert_allclose(event.get_facecolors()[0], to_rgba(color))
+            np.testing.assert_allclose(rest.get_facecolors()[0], to_rgba("white"))
+            np.testing.assert_allclose(running.get_facecolors()[0], to_rgba("black"))
+        assert [t.get_text() for t in ax.get_xticklabels()] == ["No SWR", "SWR"]
     plt.close(fig)
 
 

@@ -155,7 +155,7 @@ TAGS = {
     "ripple": Tags(("2d.8", "2b.5"), ("2i",)),
     "mua": Tags(("2d.8",), ("2i",)),
     "theta": Tags(("2d.8",), ("2i",)),
-    "gamma_z": Tags(("2d.8",), ("3h",)),
+    "gamma_z": Tags(("2d.8",), ("event_gamma",)),
     "brain_state": Tags(("2d.8",)),
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),

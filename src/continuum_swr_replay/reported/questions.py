@@ -104,7 +104,7 @@ FIGURES: dict[str, Figure] = {
     "3": Figure(
         "What SWR and no-SWR events are like",
         "scripts/figures/generate_figure03.py",
-        "abcdefgh",
+        "abcdefg",
     ),
     "4": Figure(
         "mPFC responses to SWR and non-SWR events",
@@ -117,6 +117,10 @@ FIGURES: dict[str, Figure] = {
     "memoryless_comparison": Figure(
         "Our detector and the Widloski & Foster detector on simulated replays",
         "scripts/figures/generate_supp_memoryless_comparison.py",
+    ),
+    "event_gamma": Figure(
+        "Slow and fast gamma during SWR and no-SWR events",
+        "scripts/figures/generate_supp_event_gamma.py",
     ),
     "content_estimators": Figure(
         "Content models under three estimators",
@@ -299,7 +303,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.8",
         "How do theta z-score and speed compare across SWR events, non-SWR events and running?",
-        figures=("2i", "3h", "decoder_validation"),
+        figures=("2i", "event_gamma", "decoder_validation"),
         note="Was question 2c.1: the state the events occur in, not evidence that their content is real.",
     ),
     Question(
