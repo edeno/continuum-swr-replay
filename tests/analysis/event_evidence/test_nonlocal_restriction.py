@@ -146,7 +146,7 @@ def test_the_scores_match_the_brute_force_sums_over_paths(name, chunk_bins):
     np.testing.assert_allclose(np.cumsum(filter_score), prefix, rtol=0, atol=1e-5)
     np.testing.assert_allclose(two_sided, expected_two_sided, rtol=0, atol=1e-5)
     np.testing.assert_allclose(record["marginal"], prefix[-1], atol=1e-5)
-    assert record["marginal_agrees"]
+    assert record["filter_identity_deviation"] < 1e-5
     assert record["causal_mass_deviation"] < 1e-5
     assert record["predicted_mass_deviation"] < 1e-5
 
@@ -192,6 +192,24 @@ def test_a_missing_bin_scores_zero():
         )
         np.testing.assert_allclose(filter_score[[0, 3, 5]], 0.0, atol=1e-6)
         np.testing.assert_allclose(two_sided[[0, 3, 5]], 0.0, atol=1e-6)
+
+
+def test_filter_identity_deviation_by_hand():
+    predicted = np.array([[0.5, 0.5, 0.0], [0.2, 0.8, 0.0], [0.0, 0.0, 1.0]])
+    log_likelihood = np.array(
+        [[np.log(3.0), 0.0, -np.inf], [0.0, 0.0, -np.inf], [0.0, 0.0, -np.inf]]
+    )
+    causal = np.array([[0.75, 0.25, 0.0], [0.2, 0.8, 0.0], [0.0, 0.0, 1.0]])
+    # the third bin's predicted mass is all on a bin with no likelihood: NaN
+    assert np.isnan(nr.filter_identity_deviation(causal, predicted, log_likelihood))
+    # the first bin updated, the second a missing bin (causal = predicted)
+    assert nr.filter_identity_deviation(
+        causal[:2], predicted[:2], log_likelihood[:2]
+    ) == pytest.approx(0.0, abs=1e-15)
+    # the arrays swapped: the first bin's update of (0.75, 0.25) is (0.9, 0.1)
+    assert nr.filter_identity_deviation(
+        predicted[:2], causal[:2], log_likelihood[:2]
+    ) == pytest.approx(0.4)
 
 
 def test_a_row_with_no_allowed_destination_raises():
@@ -417,7 +435,7 @@ def _record(**changes):
     record = {"continuous_block_deviation": 1e-12}
     for model in ("none", "swr", "full"):
         record |= {
-            f"marginal_agrees_{model}": True,
+            f"filter_identity_deviation_{model}": 1e-7,
             f"marginal_log_likelihood_{model}": -10.0,
             f"marginal_difference_{model}": 0.0,
             f"causal_mass_deviation_{model}": 1e-6,
@@ -433,7 +451,8 @@ def test_a_clean_record_passes_the_checks():
 @pytest.mark.parametrize(
     ("changes", "expected"),
     [
-        ({"marginal_agrees_full": False}, "full: library marginal"),
+        ({"filter_identity_deviation_full": 0.5}, "full: the filtered posterior"),
+        ({"filter_identity_deviation_swr": float("nan")}, "swr: the filtered"),
         ({"causal_mass_deviation_none": 2e-3}, "none: filtered posterior mass"),
         ({"causal_mass_deviation_swr": float("nan")}, "swr: filtered"),
         ({"predicted_mass_deviation_full": 4e-4}, "full: predictive posterior mass"),

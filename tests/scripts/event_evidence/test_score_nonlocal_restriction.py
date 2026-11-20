@@ -91,7 +91,7 @@ def _record(**changes) -> dict:
     record = {"continuous_block_deviation": 1e-15, "n_in_swr": int(IN_SWR.sum())}
     for model in nr.MODELS:
         record |= {
-            f"marginal_agrees_{model}": True,
+            f"filter_identity_deviation_{model}": 1e-7,
             f"marginal_log_likelihood_{model}": -12.0,
             f"marginal_difference_{model}": 0.0,
             f"causal_mass_deviation_{model}": 1e-7,

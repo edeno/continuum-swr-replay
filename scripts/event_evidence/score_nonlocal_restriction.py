@@ -204,7 +204,7 @@ def main(argv: list[str] | None = None) -> None:
             "immobility_threshold_cm_per_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
             "swr_source": swr_source.swr_source_name(),
             "models": list(nr.MODELS),
-            "marginal_tolerance": nr.MARGINAL_TOLERANCE,
+            "filter_identity_tolerance": nr.FILTER_IDENTITY_TOLERANCE,
             "causal_mass_tolerance": nr.CAUSAL_MASS_TOLERANCE,
             "predicted_mass_tolerance": nr.PREDICTED_MASS_TOLERANCE,
             "continuous_block_tolerance": nr.CONTINUOUS_BLOCK_TOLERANCE,

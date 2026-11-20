@@ -279,21 +279,47 @@ def continuous_block_deviation(continuous: NDArray, state_ind: NDArray) -> float
 #: Bins per batch of the two-sided step.
 CHUNK_BINS = 20_000
 
-MARGINAL_TOLERANCE = 5e-3
-"""Allowed relative difference between the library's marginal log-likelihood
-and the sum of the per-bin filter scores.
+IDENTITY_SAMPLE_BINS = 2_000
+"""Bins, evenly spaced over the epoch and the first and last among them, on which
+:func:`filter_identity_deviation` checks the library's filter."""
 
-The check guards the wiring (the order of the arrays the library returns, the
-alignment of the likelihood with the transitions), not precision: it could not
-catch an error the size of a model contrast, and no contrast uses the library's
-total. The tolerance is loose because the pinned library (non_local_detector
-2d730c3a in ``uv.lock``) adds its per-bin terms into a float32 total whose
-rounding grows with the number of bins: 1.8e-4 of the total over 93,000 bins of
-the simulated recording, and about 8e-4 over the 654,000 bins of a real epoch
-(``wilbur20210329_02_r1_HPC``), where the total drifted by 5,100 to 6,600 nats,
-by a different amount for each model. The per-bin terms themselves agree to
-about 1e-5 nats. Upstream main fixed the total (23369aa3, 2026-11-11); the
-tolerance stays harmless after an upgrade."""
+FILTER_IDENTITY_TOLERANCE = 1e-4
+"""Largest allowed :func:`filter_identity_deviation`: float32 gives about 1e-6,
+a swapped or misaligned array a difference of order 1."""
+
+
+def filter_identity_deviation(
+    causal: NDArray, predicted: NDArray, log_likelihood: NDArray
+) -> float:
+    """How far the library's filtered posterior is from its own update of the
+    predictive posterior by the likelihood, ``causal_t = pred_t exp(ll_t)``
+    renormalized, at the given bins: the largest absolute difference.
+
+    It checks the wiring per bin, where float32 does not accumulate: the order
+    of the arrays the library returns and the alignment of the likelihood with
+    the posteriors. Computed in float64.
+
+    Parameters
+    ----------
+    causal, predicted : ndarray, shape (n_bins, n_state_bins)
+        The library's filtered and predictive posteriors at the bins.
+    log_likelihood : ndarray, shape (n_bins, n_state_bins)
+        The likelihood the library was given at the bins (forbidden state bins
+        at -inf). A missing bin, a row of zeros, gives ``causal = pred``.
+
+    Returns
+    -------
+    float
+        NaN when a bin has no predicted mass where its likelihood is finite.
+    """
+    ll = np.asarray(log_likelihood, dtype=np.float64)
+    pred = np.asarray(predicted, dtype=np.float64)
+    with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
+        top = np.where(pred > 0, ll, -np.inf).max(axis=1, keepdims=True)
+        weights = pred * np.exp(ll - top)
+        expected = weights / weights.sum(axis=1, keepdims=True)
+    difference = np.abs(np.asarray(causal, dtype=np.float64) - expected)
+    return float(difference.max())
 
 
 @jax.jit
@@ -388,11 +414,18 @@ def predictive_log_scores(
     two_sided : ndarray of float32, shape (n_time,)
         ``log p(y_t | y_{-t})``.
     record : dict
-        ``library_s``, ``two_sided_s``, ``marginal`` (the library's),
-        ``filter_score_sum`` (the float64 sum of the filter scores),
-        ``marginal_difference`` (``marginal`` minus ``filter_score_sum``),
-        ``marginal_agrees`` (within :data:`MARGINAL_TOLERANCE` of the total),
-        ``causal_mass_deviation`` (the largest distance of a filtered
+        ``library_s``, ``two_sided_s``; ``marginal`` (the library's log
+        marginal likelihood), ``filter_score_sum`` (the float64 sum of the
+        filter scores) and ``marginal_difference`` (``marginal`` minus
+        ``filter_score_sum``), recorded and not checked: the pinned library
+        (non_local_detector 2d730c3a in ``uv.lock``) adds its per-bin terms into
+        a float32 total whose error grows with the number of bins, about 8e-4
+        of the total at 654,000 bins (``wilbur20210329_02_r1_HPC``) and about
+        6e-3 at 1.94 million (``chimi20200213_06_r3_HPC``), by a different
+        amount for each model, so no contrast uses it (upstream main fixed the
+        total, 23369aa3, 2026-11-11); ``filter_identity_deviation``
+        (:func:`filter_identity_deviation` on :data:`IDENTITY_SAMPLE_BINS`
+        bins), ``causal_mass_deviation`` (the largest distance of a filtered
         posterior's sum from 1) and ``predicted_mass_deviation`` (the largest
         distance of a predictive posterior's sum from 1, summed in float64).
 
@@ -455,8 +488,13 @@ def predictive_log_scores(
             log_likelihoods=masked,
         )
     )
-    del masked
     record["library_s"] = round(clock.time() - started, 2)
+    sample = np.unique(np.linspace(0, n_time - 1, IDENTITY_SAMPLE_BINS).round())
+    sample = sample.astype(np.int64)
+    record["filter_identity_deviation"] = filter_identity_deviation(
+        causal[sample], predicted[sample], masked[sample]
+    )
+    del masked
     record["causal_mass_deviation"] = float(np.abs(causal.sum(axis=1) - 1.0).max())
     del causal
 
@@ -498,9 +536,6 @@ def predictive_log_scores(
     record["marginal"] = float(marginal)
     record["filter_score_sum"] = total
     record["marginal_difference"] = float(marginal) - total
-    record["marginal_agrees"] = bool(
-        abs(record["marginal_difference"]) <= MARGINAL_TOLERANCE * abs(total)
-    )
     return filter_score, two_sided, record
 
 
@@ -580,7 +615,7 @@ _MODEL_RECORD_KEYS = {
     "marginal": "marginal_log_likelihood_{}",
     "filter_score_sum": "filter_score_sum_{}",
     "marginal_difference": "marginal_difference_{}",
-    "marginal_agrees": "marginal_agrees_{}",
+    "filter_identity_deviation": "filter_identity_deviation_{}",
     "causal_mass_deviation": "causal_mass_deviation_{}",
     "predicted_mass_deviation": "predicted_mass_deviation_{}",
 }
@@ -620,7 +655,7 @@ def model_scores(
         ``continuous_block_deviation``; per model the library's
         ``marginal_log_likelihood_<model>`` as it returned it, the
         ``filter_score_sum_<model>``, their ``marginal_difference_<model>``,
-        ``marginal_agrees_<model>`` (:data:`MARGINAL_TOLERANCE`),
+        ``filter_identity_deviation_<model>``,
         ``causal_mass_deviation_<model>``, ``predicted_mass_deviation_<model>``,
         ``library_<model>_s`` and ``two_sided_<model>_s``.
     """
@@ -740,8 +775,9 @@ def restriction_scores(
 def check_failures(record: dict) -> list[str]:
     """The model checks a :func:`restriction_scores` record fails, as messages.
 
-    A model's library marginal must agree with its summed filter scores
-    (``marginal_agrees_<model>``), its filtered posterior mass must be within
+    A model's filtered posterior must be the library's own update of its
+    predictive posterior (``filter_identity_deviation_<model>`` within
+    :data:`FILTER_IDENTITY_TOLERANCE`), its filtered posterior mass must be within
     :data:`CAUSAL_MASS_TOLERANCE` of 1 and its predictive posterior mass within
     :data:`PREDICTED_MASS_TOLERANCE`; the blocks of ``C`` must have rows that sum
     to 1 within :data:`CONTINUOUS_BLOCK_TOLERANCE`.
@@ -754,11 +790,11 @@ def check_failures(record: dict) -> list[str]:
             f"summing to 1 (tolerance {CONTINUOUS_BLOCK_TOLERANCE})"
         )
     for model in MODELS:
-        if not record[f"marginal_agrees_{model}"]:
+        deviation = record[f"filter_identity_deviation_{model}"]
+        if not deviation <= FILTER_IDENTITY_TOLERANCE:
             failures.append(
-                f"{model}: library marginal {record[f'marginal_log_likelihood_{model}']}"
-                f" differs from the summed filter scores by "
-                f"{record[f'marginal_difference_{model}']}"
+                f"{model}: the filtered posterior is {deviation} from the update "
+                f"of the predictive posterior (tolerance {FILTER_IDENTITY_TOLERANCE})"
             )
         deviation = record[f"causal_mass_deviation_{model}"]
         if not deviation <= CAUSAL_MASS_TOLERANCE:
