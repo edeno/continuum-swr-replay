@@ -417,6 +417,18 @@ answer are 1 to 5; 6 was open before.
   as the time the animal leaves. The poke times are cached for five sessions only; the other sessions need a
   read of the lab database and two added columns in the stop table.
 
+### Second round (lead, 2026-11-20)
+
+- **4:** "ok delete" for the within-arm comparison and the older all-bins history model. The older history
+  model goes in the first commit of the build (nothing reports it). The within-arm comparison goes when the
+  content model's Q5 values replace its values in the summary, by the rule of section 7.
+- **5:** "uncertainty would be a new result if true". So the second definition of uncertainty is wanted;
+  which measures, and how they are declared before the fit, is still being discussed.
+- **2:** still deciding; the lead wants to talk it through and explore the implications.
+- Calls confirmed by the lead ("ok"): one scale for covariates, one shared fitter, the fold rule written
+  once in the shared package, the table of proposed fates. Calls still being explained: the end of a stop,
+  the form of reward history, the declared list of tests, and what changes in the mPFC models.
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
