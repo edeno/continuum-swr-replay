@@ -1,31 +1,47 @@
-"""Does allowing non-local states outside sharp-wave ripples predict the spikes
-better? Three decoders that differ only in when the non-local states may be
-entered, scored by how well each predicts each bin's spikes.
+"""Is the non-local activity of rest the activity of sharp-wave ripples? Three
+decoders that differ only in when the non-local states may be occupied, scored
+by how well each predicts each bin's spikes.
 
 The models share the epoch's decoder: its encoding, its continuous transitions
 ``C`` and its fitted discrete transitions ``D`` (no per-model refit). They differ
 only in the discrete states allowed at each time bin, ``a_t`` in {0, 1}^S:
 
-- ``none``: Local and No-Spike only, at every bin;
-- ``swr_only``: every state in the bins inside an SWR (not padded), Local and
-  No-Spike elsewhere;
+- ``none``: the local states (Local and No-Spike) only, at every bin;
+- ``swr``: an SWR is non-local activity. Inside an SWR bin (not padded) only
+  the non-local states, outside SWRs only the local states: the SWR times set
+  the state;
 - ``full``: every state at every bin (the paper's decoder).
 
 **The restricted model.** State bins s = 1..N (the track-interior bins of every
 state), with discrete state ``d(s)``. The library's joint transition is
 ``T[s', s] = C[s', s] D[d(s'), d(s)]`` (row: the bin at t - 1). Where a state is
 forbidden at t, the transitions into it are removed and the rows of the
-*discrete* matrix renormalized:
+*discrete* matrix renormalized over the allowed destinations:
 
 - ``D~_t[i, j] = D[i, j] a_t[j] / sum_k D[i, k] a_t[k]``;
 - ``T~_t[s', s] = C[s', s] D~_t[d(s'), d(s)]``, ``a_t`` the allowed set at the
   destination time t.
 
-With every state allowed, ``D~ = D`` and the model is the library's decoder. Each
-restricted model is a hidden Markov model whose transitions depend on a known
-input (the SWR indicator). It is a proper one (rows of ``T~_t`` sum to 1) because
-each block of ``C``, the columns of one destination state, has rows that sum to 1
+So at an SWR's first bin ``swr`` enters a non-local state with probability 1,
+split between Continuous and Fragmented as the row's renormalized entries say,
+and at the first bin after it returns to Local or No-Spike the same way. A row
+with no allowed destination is an error. With every state allowed, ``D~ = D``
+and the model is the library's decoder. Each restricted model is a hidden
+Markov model whose transitions depend on a known input (the SWR indicator). It
+is a proper one (rows of ``T~_t`` sum to 1) because each block of ``C``, the
+columns of one destination state, has rows that sum to 1
 (:func:`continuous_block_deviation` reports how far they are from it).
+
+**Reading the contrasts.** ``swr - none`` is what calling every SWR non-local
+buys. ``full`` and ``swr`` differ in two places: inside SWRs ``swr`` must be
+non-local where ``full`` may stay local, and outside SWRs ``swr`` cannot be
+non-local where ``full`` may be. ``full - swr`` over a set of bins mixes the
+two, so it is read per category of bins (:func:`restriction_sums`): over bins
+inside SWRs it is the cost of forcing the state, over bins outside them what
+the non-local states buy there. The share of the non-local gain that lies
+outside SWRs (:func:`share_outside_swr`) is taken from ``full - none`` alone.
+Allowing a state is not free: a model that may leave Local puts predictive
+mass on the non-local states, which costs it wherever activity stays local.
 
 **Two scores**, both read from the library's filter and smoother
 (``chunked_filter_smoother_covariate_dependent``, started from
@@ -43,20 +59,19 @@ exp(ll[t])``:
   probability, and ``p(x_t | y_{-t})`` is proportional to ``pred_t r_t``, so
   ``p(y_t | y_{-t}) = c_t / sum_s pred_t[s] r_t[s]`` and ``sum_s pred_t[s]
   r_t[s] = sum_s q_{t+1}[s] gamma_{t+1}[s] / pred_{t+1}[s]``, ``q_{t+1} = pred_t
-  T~_{t+1}`` (0 / 0 is 0). The last bin's two-sided score is its filter score.
-  The two-sided scores do not add up to a likelihood.
+  T~_{t+1}``. The term of a state bin with ``pred_{t+1}[s] = 0`` is dropped.
+  That is exact: ``gamma_{t+1}`` is proportional to ``pred_{t+1}``, so it is 0
+  there too, and ``q_{t+1}[s]`` is 0 wherever the bin is forbidden at t + 1;
+  only a predicted mass that underflows to 0 in float32 where the exact one is
+  positive (and its smoothed mass with it) is lost. The last bin's two-sided
+  score is its filter score. The two-sided scores do not add up to a
+  likelihood.
 
 The log-likelihood ``ll`` is held out in time, as in :mod:`.tetrode_holdout`:
 the epoch is cut into :data:`~.tetrode_holdout.N_FOLDS` blocks and each block's
 bins are scored with encodings fit on the other blocks, with every tetrode in
-the model. A missing bin's likelihood is 0 and scores 0 on both.
-
-``swr_only - none`` over the immobile bins is the positive control: what letting
-the decoder go non-local during SWRs buys. ``full - swr_only`` is the claim: what
-letting it go non-local outside SWRs buys. Allowing a state is not free: a model
-that may leave Local puts predictive mass on the non-local states, which costs
-it wherever activity stays local, so ``full - swr_only`` is positive only where
-the spikes outside SWRs are predicted better by non-local states than that cost.
+the model. A missing bin's likelihood is 0, so it scores 0 on both, to float32
+rounding of the posterior's mass.
 
 What the score does not show: that the activity it credits is coherent spatial
 content. Any activity the Local state predicts poorly and a non-local state
@@ -64,9 +79,11 @@ predicts less poorly is credited: in simulation
 (``tests/integration/test_nonlocal_restriction_simulated.py``) a burst whose
 tetrodes each follow their own random place gains over ``none`` about as much
 as one whose tetrodes share a random place, because at 2 ms a bin holds about
-one spike and the Non-Local Fragmented state can follow each spike's place. Nor
-does it show anything about a transition matrix other than the fitted one,
-which was fit on the same epoch with every state allowed.
+one spike and the Non-Local Fragmented state can follow each spike's place.
+SWRs are not padded, so non-local activity that begins before its SWR or ends
+after it is counted outside SWRs. Nor does it show anything about a transition
+matrix other than the fitted one, which was fit on the same epoch with every
+state allowed.
 """
 
 from __future__ import annotations
@@ -96,11 +113,11 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 
-MODELS = ("none", "swr_only", "full")
-"""The three models, from fewest bins allowing the non-local states to most."""
+MODELS = ("none", "swr", "full")
+"""The three models: never non-local, non-local exactly in SWRs, unrestricted."""
 
-ALWAYS_ALLOWED = (LOCAL, NO_SPIKE)
-"""The states every model allows at every bin."""
+LOCAL_STATES = (LOCAL, NO_SPIKE)
+"""The local states; every other state is a non-local one."""
 
 FAMILIES = ("filter", "two_sided")
 """The two scores: ``log p(y_t | y_1..y_{t-1})`` and ``log p(y_t | y_{-t})``."""
@@ -122,15 +139,17 @@ def allowed_states(
     Returns
     -------
     dict of str to ndarray of bool, shape (n_time, n_states)
-        ``none``, ``swr_only`` and ``full`` (:data:`MODELS`).
+        ``none`` (the local states at every bin), ``swr`` (the non-local
+        states inside SWRs, the local states outside them) and ``full`` (every
+        state at every bin) (:data:`MODELS`).
     """
     in_swr = np.asarray(in_swr, dtype=bool)
-    always = np.isin(np.asarray(state_names), ALWAYS_ALLOWED)
-    every = np.ones(always.size, dtype=bool)
+    local = np.isin(np.asarray(state_names), LOCAL_STATES)
+    every = np.ones(local.size, dtype=bool)
     return {
-        "none": np.broadcast_to(always, (in_swr.size, always.size)),
-        "swr_only": np.where(in_swr[:, None], every, always),
-        "full": np.broadcast_to(every, (in_swr.size, always.size)),
+        "none": np.broadcast_to(local, (in_swr.size, local.size)),
+        "swr": np.where(in_swr[:, None], ~local, local),
+        "full": np.broadcast_to(every, (in_swr.size, local.size)),
     }
 
 
@@ -196,9 +215,13 @@ CHUNK_BINS = 20_000
 MARGINAL_TOLERANCE = 5e-3
 """Allowed relative difference between the library's marginal log-likelihood
 and the sum of the per-bin filter scores. The library adds its per-bin terms
-into a float32 total, whose rounding grows with the number of bins (1.8e-4 of
-the total over 93,000 bins of the simulated recording); the per-bin terms
-themselves agree to about 1e-5 nats."""
+into a float32 total, whose rounding grows with the number of bins: 1.8e-4 of
+the total over 93,000 bins of the simulated recording, and about 8e-4 over the
+654,000 bins of a real epoch (``wilbur20210329_02_r1_HPC``), where the
+library's total drifted by 5,100 to 6,600 nats, by a different amount for each
+model. The per-bin terms themselves agree to about 1e-5 nats. So contrasts are
+taken from the float64 sums of the per-bin scores, never from the library's
+totals."""
 
 
 @jax.jit
@@ -238,9 +261,15 @@ def _bin_scores(
     filter_score = jnp.log(jnp.exp(terms - top).sum(axis=1)) + top[:, 0]
     # q[t + 1] = pred[t] @ T~_{t+1}: the prediction of bin t + 1 that skips
     # bin t's spikes
+    # at full float32 precision: at the GPU's default (reduced) precision this
+    # product shifted the two-sided scores by about 5e-4 nats a bin, by a
+    # different amount for each model, which moved a two-sided model contrast
+    # of a real epoch by about 1 % (the filter score was unaffected)
     skipped = jnp.zeros_like(predicted)
     for p in range(joint.shape[0]):
-        skipped = skipped + (next_pattern == p)[:, None] * (predicted @ joint[p])
+        skipped = skipped + (next_pattern == p)[:, None] * jnp.matmul(
+            predicted, joint[p], precision=jax.lax.Precision.HIGHEST
+        )
     next_mass = predicted_next > 0
     ratio = jnp.where(
         next_mass, smoothed_next / jnp.where(next_mass, predicted_next, 1.0), 0.0
@@ -264,7 +293,8 @@ def predictive_log_scores(
     Parameters
     ----------
     log_likelihood : ndarray, shape (n_time, n_state_bins)
-        ``ll[t, s]``; a row of zeros (a missing bin) scores 0 on both.
+        ``ll[t, s]``; a row of zeros (a missing bin) scores 0 on both, to
+        float32 rounding.
     initial : ndarray, shape (n_state_bins,)
         ``pi``, restricted to the states allowed at the first bin and
         renormalized.
@@ -295,12 +325,19 @@ def predictive_log_scores(
     Raises
     ------
     ValueError
-        When a bin's allowed states leave a row of ``D`` with no allowed
-        destination, or none of the first bin's allowed states has initial
-        mass.
+        When ``allowed`` and ``log_likelihood`` differ in their number of bins,
+        ``discrete`` is not 2-D, a bin's allowed states leave a row of ``D``
+        with no allowed destination, or none of the first bin's allowed states
+        has initial mass.
     """
     from non_local_detector.core import chunked_filter_smoother_covariate_dependent
 
+    if len(allowed) != len(log_likelihood):
+        raise ValueError(
+            f"allowed has {len(allowed)} bins, log_likelihood {len(log_likelihood)}"
+        )
+    if np.ndim(discrete) != 2:
+        raise ValueError(f"discrete must be 2-D, not {np.ndim(discrete)}-D")
     record: dict[str, Any] = {}
     state_ind = np.asarray(state_ind)
     patterns, pattern = np.unique(
@@ -503,7 +540,7 @@ def restriction_scores(
     is_training, is_missing : ndarray of bool, shape (n_time,)
         The decode's masks.
     in_swr : ndarray of bool, shape (n_time,)
-        The bins inside an SWR, where ``swr_only`` allows the non-local states.
+        The bins inside an SWR, where ``swr`` allows only the non-local states.
     n_folds : int
     refit : callable
         ``refit(detector, time, position, spike_times, marks, is_training)``,
@@ -513,9 +550,9 @@ def restriction_scores(
     Returns
     -------
     scores : pd.DataFrame
-        One row per bin: ``time``; ``none``, ``swr_only``, ``full`` (float32
+        One row per bin: ``time``; ``none``, ``swr``, ``full`` (float32
         filter scores, ``log p(y_t | y_1..y_{t-1})``) and ``none_two_sided``,
-        ``swr_only_two_sided``, ``full_two_sided`` (``log p(y_t | y_{-t})``);
+        ``swr_two_sided``, ``full_two_sided`` (``log p(y_t | y_{-t})``);
         ``in_swr`` and ``block`` (the bin's time block).
     record : dict
         Timings (``refit_s``, ``terms_s``, ``library_<model>_s``,
@@ -525,9 +562,17 @@ def restriction_scores(
         ``marginal_agrees_<model>`` (:data:`MARGINAL_TOLERANCE`) and
         ``causal_mass_deviation_<model>``; and ``n_spikes``, ``n_in_swr``,
         ``n_missing``, ``continuous_block_deviation``, ``all_finite``.
+
+    Raises
+    ------
+    ValueError
+        When ``in_swr`` and ``time`` differ in length, or as
+        :func:`predictive_log_scores`.
     """
     started = clock.time()
     in_swr = np.asarray(in_swr, dtype=bool)
+    if in_swr.shape != np.shape(time):
+        raise ValueError(f"in_swr has shape {in_swr.shape}, time {np.shape(time)}")
     likelihood, blocks, record = heldout_log_likelihood(
         detector,
         time,
@@ -613,10 +658,23 @@ def restriction_sums(scores: pd.DataFrame, labels: Sequence) -> pd.DataFrame:
         One row per category (index ``category``): ``n_bins`` and every model's
         summed score (nats) of both families, ``<model>`` (filter) and
         ``<model>_two_sided``.
+
+    Raises
+    ------
+    ValueError
+        When a labeled bin has a score that is not finite.
     """
     labels = pd.Series(np.asarray(labels, dtype=object), index=scores.index)
     columns = [*score_columns("filter").values(), *score_columns("two_sided").values()]
     kept = labels.notna()
+    not_finite = ~np.isfinite(scores.loc[kept, columns].to_numpy(np.float64))
+    if not_finite.any():
+        counts = {
+            column: n
+            for column, n in zip(columns, not_finite.sum(axis=0).tolist(), strict=True)
+            if n
+        }
+        raise ValueError(f"labeled bins with a score that is not finite: {counts}")
     grouped = (
         scores.loc[kept, columns]
         .astype(np.float64)
@@ -645,10 +703,9 @@ def restriction_contrasts(
     -------
     dict
         ``n_bins``, ``seconds``; for each family (no suffix for the filter score,
-        ``_two_sided`` for the two-sided one): ``swr_only_minus_none``,
-        ``full_minus_swr_only`` and ``full_minus_none`` (nats), each per second
-        (``..._per_s``, NaN without bins), and ``share_outside_swr``,
-        ``(full - swr_only) / (full - none)``, NaN when ``full - none <= 0``.
+        ``_two_sided`` for the two-sided one): ``swr_minus_none``,
+        ``full_minus_swr`` and ``full_minus_none`` (nats), each per second
+        (``..._per_s``, NaN without bins).
     """
     combined = sums.reindex(list(categories)).fillna(0.0).sum()
     seconds = float(combined["n_bins"]) * bin_s
@@ -657,8 +714,8 @@ def restriction_contrasts(
         suffix = "" if family == "filter" else TWO_SIDED
         column = score_columns(family)
         for name, (a, b) in {
-            "swr_only_minus_none": ("swr_only", "none"),
-            "full_minus_swr_only": ("full", "swr_only"),
+            "swr_minus_none": ("swr", "none"),
+            "full_minus_swr": ("full", "swr"),
             "full_minus_none": ("full", "none"),
         }.items():
             difference = float(combined[column[a]] - combined[column[b]])
@@ -666,10 +723,42 @@ def restriction_contrasts(
             out[f"{name}{suffix}_per_s"] = (
                 difference / seconds if seconds > 0 else float("nan")
             )
-        denominator = out[f"full_minus_none{suffix}"]
-        out[f"share_outside_swr{suffix}"] = (
-            out[f"full_minus_swr_only{suffix}"] / denominator
-            if denominator > 0
-            else float("nan")
+    return out
+
+
+def share_outside_swr(
+    sums: pd.DataFrame, inside: str, outside: str
+) -> dict[str, float]:
+    """Of the nats the non-local states buy over the bins of two categories,
+    the part in the bins outside SWRs, both score families.
+
+    ``(full - none)`` summed over ``outside`` divided by ``(full - none)``
+    summed over ``inside`` and ``outside`` together. Only ``full`` and ``none``
+    enter, so the share is a split of the non-local gain by where it lies, not
+    a model contrast.
+
+    Parameters
+    ----------
+    sums : pd.DataFrame
+        :func:`restriction_sums`' output.
+    inside, outside : str
+        The categories of the bins inside and outside SWRs (for example
+        ``immobile_in_swr`` and ``immobile_outside_swr``); a category with no
+        bins adds nothing.
+
+    Returns
+    -------
+    dict
+        ``share_outside_swr`` (filter) and ``share_outside_swr_two_sided``,
+        NaN when the gain over both categories is not positive.
+    """
+    rows = sums.reindex([inside, outside]).fillna(0.0)
+    out: dict[str, float] = {}
+    for family in FAMILIES:
+        column = score_columns(family)
+        gain = rows[column["full"]] - rows[column["none"]]
+        total = float(gain.sum())
+        out[f"share_outside_swr{'' if family == 'filter' else TWO_SIDED}"] = (
+            float(gain[outside]) / total if total > 0 else float("nan")
         )
     return out

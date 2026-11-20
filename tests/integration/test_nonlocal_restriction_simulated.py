@@ -2,16 +2,23 @@
 known content (``tests.support.tetrode_holdout_simulation``).
 
 Three decoders share the fitted detector and differ only in when the non-local
-states are allowed: never (``none``), inside SWRs (``swr_only``), always
-(``full``). Checked, for the filter score and the two-sided score:
+states are allowed: never (``none``), exactly inside SWRs and nowhere else
+(``swr``), always (``full``). Checked, for the filter score and the two-sided
+score:
 
+- the likelihood is held out: each block is scored with the encoding of its
+  own fold, and no fold's encoding is fit on its block;
 - the filter scores add up to the library's marginal log-likelihood, and the
-  library's covariate-dependent ``_predict`` agrees with the ``swr_only`` model;
-- replay only inside SWRs: ``swr_only`` gains over ``none`` and ``full`` gains
-  nothing over ``swr_only``;
-- replay outside SWRs too: ``full`` gains over ``swr_only``, in the bins of the
-  remote events no SWR marks;
-- bursts with no shared content (each tetrode its own random place each bin):
+  library's covariate-dependent ``_predict`` agrees with the ``swr`` model;
+- A, replay only inside SWRs (the SWRs are the remote events): ``swr`` gains
+  over ``none``, and ``full`` gains nothing over ``swr`` outside SWRs;
+- B, replay outside SWRs too: ``full`` gains over ``swr`` outside SWRs, in the
+  bins of the remote events no SWR marks;
+- D, SWRs with no non-local content (plain rest and local bursts marked as
+  SWRs beside the remote events): the forced state costs ``swr`` inside those
+  SWRs, and ``full`` still gains nothing over ``swr`` outside SWRs, so the
+  split by category puts the cost inside SWRs;
+- C, bursts with no shared content (each tetrode its own random place each bin):
   ``full`` gains over ``none`` almost as much as for content the tetrodes share.
   At 2 ms a bin holds about one spike, and a non-local state can follow each
   spike's place from bin to bin, so this score cannot tell a burst without
@@ -27,6 +34,12 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
+from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
+    refit_encoding,
+)
+from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
+    fold_training_masks,
+)
 from tests.support import tetrode_holdout_simulation as sim
 
 pytestmark = pytest.mark.integration
@@ -53,15 +66,38 @@ def _rest_id(recording: sim.Recording) -> np.ndarray:
     return np.cumsum(np.r_[0, np.diff(rest)] == 1)
 
 
+def _plain_rest(recording: sim.Recording, n_bins: int = 60) -> np.ndarray:
+    """A stretch of ``n_bins`` of plain rest (500 ms or more from every event)
+    in the middle of each rest."""
+    near = np.zeros(recording.time.size, dtype=bool)
+    for s, e in zip(recording.events.s, recording.events.e, strict=True):
+        near[max(0, s - 250) : e + 250] = True
+    plain = ~recording.is_running & ~near
+    rest = _rest_id(recording)
+    mask = np.zeros(recording.time.size, dtype=bool)
+    for r in np.unique(rest[plain]):
+        bins = np.flatnonzero(plain & (rest == r))
+        start = bins[bins.size // 2]
+        if plain[start : start + n_bins].all():
+            mask[start : start + n_bins] = True
+    return mask
+
+
 def swr_masks(recording: sim.Recording) -> dict[str, np.ndarray]:
-    """``in_swr`` of scenario A (every remote event) and B (the remote events
-    of every other rest), and B's remote events without an SWR."""
+    """``in_swr`` of scenario A (every remote event), B (the remote events of
+    every other rest) and D (every remote event, every local burst and a
+    stretch of plain rest in each rest); B's remote events without an SWR, and
+    D's SWRs with no non-local content."""
     remote = recording.events[~recording.events.kind.isin(NOT_REMOTE)]
     marked = _rest_id(recording)[remote.s.to_numpy()] % 2 == 0
+    local_bursts = recording.events[recording.events.kind == "local_burst"]
+    decoys = _event_mask(recording, local_bursts) | _plain_rest(recording)
     return {
         "A": _event_mask(recording, remote),
         "B": _event_mask(recording, remote[marked]),
         "B_unmarked": _event_mask(recording, remote[~marked]),
+        "D": _event_mask(recording, remote) | decoys,
+        "D_decoys": decoys,
     }
 
 
@@ -90,25 +126,22 @@ def model_scores(detector, log_likelihood, in_swr, models=nr.MODELS) -> pd.DataF
 
 
 def gains(scores: pd.DataFrame, mask: np.ndarray) -> dict[str, float]:
-    """``full - none``, ``swr_only - none`` and ``full - swr_only`` summed over
-    ``mask``, both families."""
+    """``full - none``, ``swr - none`` and ``full - swr`` summed over ``mask``,
+    both families."""
     out = {}
     for suffix in ("", "_two_sided"):
         full, swr, none = (
             scores[f"{m}{suffix}"].to_numpy(np.float64)[mask]
-            for m in ("full", "swr_only", "none")
+            for m in ("full", "swr", "none")
         )
         out[f"full_minus_none{suffix}"] = float((full - none).sum())
-        out[f"swr_only_minus_none{suffix}"] = float((swr - none).sum())
-        out[f"full_minus_swr_only{suffix}"] = float((full - swr).sum())
+        out[f"swr_minus_none{suffix}"] = float((swr - none).sum())
+        out[f"full_minus_swr{suffix}"] = float((full - swr).sum())
     return out
 
 
-@pytest.fixture(scope="module")
-def simulated():
-    recording = sim.simulate_recording(seed=0)
-    detector = sim.fit_detector(recording)
-    log_likelihood, _, _ = nr.heldout_log_likelihood(
+def _heldout(recording, detector, refit):
+    return nr.heldout_log_likelihood(
         detector,
         recording.time,
         recording.position[:, None],
@@ -116,18 +149,69 @@ def simulated():
         recording.marks,
         recording.is_running,
         np.zeros(recording.time.size, dtype=bool),
+        refit=refit,
         log=_quiet,
     )
-    return recording, detector, log_likelihood
+
+
+@pytest.fixture(scope="module")
+def simulated():
+    """The recording, its detector, the held-out likelihood and its blocks, and
+    each fold's training mask and encoding as ``heldout_log_likelihood`` asked
+    for them."""
+    recording = sim.simulate_recording(seed=0)
+    detector = sim.fit_detector(recording)
+    folds = []
+
+    def recording_refit(detector, time, position, spike_times, marks, is_training):
+        encoding = refit_encoding(
+            detector, time, position, spike_times, marks, is_training
+        )
+        folds.append((np.asarray(is_training, dtype=bool).copy(), encoding))
+        return encoding
+
+    log_likelihood, blocks, _ = _heldout(recording, detector, recording_refit)
+    return recording, detector, log_likelihood, blocks, folds
 
 
 @pytest.fixture(scope="module")
 def scenarios(simulated):
-    recording, detector, log_likelihood = simulated
+    recording, detector, log_likelihood, _, _ = simulated
     masks = {**swr_masks(recording), "running": recording.is_running}
     return masks, {
-        name: model_scores(detector, log_likelihood, masks[name]) for name in "AB"
+        name: model_scores(detector, log_likelihood, masks[name]) for name in "ABD"
     }
+
+
+def test_no_fold_is_fit_on_its_own_block(simulated):
+    """Fails if every fold's encoding is fit on all training bins."""
+    recording, _, _, blocks, folds = simulated
+    assert len(folds) == nr.N_FOLDS
+    expected = fold_training_masks(recording.is_running, blocks, nr.N_FOLDS)
+    for k, (mask, _) in enumerate(folds):
+        assert not (mask & (blocks == k)).any()
+        np.testing.assert_array_equal(mask, expected[k])
+
+
+def test_each_block_is_scored_with_its_own_folds_encoding(simulated):
+    """Fold 0's encoding replaced by one fit on every training bin changes the
+    likelihood of block 0 and of no other block. Fails if a block is scored
+    with another block's encoding."""
+    recording, detector, log_likelihood, blocks, folds = simulated
+    replacement = refit_encoding(
+        detector,
+        recording.time,
+        recording.position[:, None],
+        recording.spike_times,
+        recording.marks,
+        recording.is_running,
+    )
+    encodings = [replacement] + [encoding for _, encoding in folds[1:]]
+    calls = iter(encodings)
+    changed, _, _ = _heldout(recording, detector, lambda *args: next(calls))
+    own = blocks == 0
+    np.testing.assert_allclose(changed[~own], log_likelihood[~own], rtol=0, atol=1e-6)
+    assert np.abs(changed[own] - log_likelihood[own]).max() > 0.1
 
 
 @pytest.fixture(scope="module")
@@ -154,7 +238,7 @@ def chance():
 def test_the_filter_scores_add_up_to_the_librarys_marginal(simulated):
     """The tolerance is the library's float32 running total (its per-bin terms
     agree to about 1e-5 nats; its sum of 93,000 of them is off by about 60)."""
-    recording, detector, log_likelihood = simulated
+    recording, detector, log_likelihood, _, _ = simulated
     full = model_scores(
         detector, log_likelihood, np.zeros(recording.time.size, bool), ["full"]
     )
@@ -173,20 +257,19 @@ def test_the_filter_scores_add_up_to_the_librarys_marginal(simulated):
     np.testing.assert_allclose(full["full"], per_bin, atol=1e-4)
 
 
-def test_the_librarys_covariate_dependent_predict_is_the_swr_only_model(
+def test_the_librarys_covariate_dependent_predict_is_the_swr_model(
     simulated, scenarios
 ):
     """``_predict`` with a (n_time, S, S) discrete matrix pairs index t with
     the move into t + 1; given the restricted likelihood (forbidden bins at
-    -inf) and D~ of bin t + 1 at index t, its per-bin terms are the
-    ``swr_only`` scores. (Its initial distribution is unrestricted, which
-    changes nothing here: the first bin is outside SWRs and ``pi`` is all on
-    Local.)"""
-    recording, detector, log_likelihood = simulated
+    -inf) and D~ of bin t + 1 at index t, its per-bin terms are the ``swr``
+    scores. (Its initial distribution is unrestricted, which changes nothing
+    here: the first bin is outside SWRs and ``pi`` is all on Local.)"""
+    recording, detector, log_likelihood, _, _ = simulated
     masks, scores = scenarios
     interior = detector.is_track_interior_state_bins_
     state_ind = np.asarray(detector.state_ind_)[interior]
-    allowed = nr.allowed_states(detector.state_names, masks["B"])["swr_only"]
+    allowed = nr.allowed_states(detector.state_names, masks["B"])["swr"]
     patterns = np.array([allowed[~masks["B"]][0], allowed[masks["B"]][0]])
     restricted = nr.restricted_discrete_transitions(
         detector.discrete_state_transitions_, patterns
@@ -204,36 +287,54 @@ def test_the_librarys_covariate_dependent_predict_is_the_swr_only_model(
         terms = np.log(predicted) + log_likelihood.astype(np.float64)
     top = terms.max(axis=1, keepdims=True)
     per_bin = np.log(np.exp(terms - top).sum(axis=1)) + top[:, 0]
-    np.testing.assert_allclose(scores["B"]["swr_only"], per_bin, atol=1e-4)
+    np.testing.assert_allclose(scores["B"]["swr"], per_bin, atol=1e-4)
+
+
+def _contrasts(scenarios, name: str) -> tuple[dict, dict, dict]:
+    """Scenario ``name``'s contrasts inside SWRs, outside them (rest bins
+    only), and its share of the non-local gain outside SWRs."""
+    _, scores = scenarios
+    sums = nr.restriction_sums(scores[name], _labels(scenarios, name))
+    inside = nr.restriction_contrasts(sums, ["immobile_in_swr"], BIN_S)
+    outside = nr.restriction_contrasts(sums, ["immobile_outside_swr"], BIN_S)
+    return inside, outside, nr.share_outside_swr(sums, *IMMOBILE)
 
 
 @pytest.mark.parametrize("suffix", ["", "_two_sided"])
 def test_replay_only_inside_swrs_gains_nothing_outside_them(scenarios, suffix):
-    masks, scores = scenarios
-    sums = nr.restriction_sums(scores["A"], _labels(scenarios, "A"))
-    immobile = nr.restriction_contrasts(sums, IMMOBILE, BIN_S)
-    assert immobile[f"swr_only_minus_none{suffix}"] > 5000
+    inside, outside, share = _contrasts(scenarios, "A")
+    assert inside[f"swr_minus_none{suffix}"] > 5000
     # allowing the non-local states where nothing is non-local costs a little
-    assert (
-        immobile[f"full_minus_swr_only{suffix}"]
-        < 0.01 * (immobile[f"swr_only_minus_none{suffix}"])
-    )
+    assert outside[f"full_minus_swr{suffix}"] < 0.01 * inside[f"swr_minus_none{suffix}"]
+    assert share[f"share_outside_swr{suffix}"] < 0.01
 
 
 @pytest.mark.parametrize("suffix", ["", "_two_sided"])
 def test_replay_outside_swrs_is_what_the_full_model_gains(scenarios, suffix):
     masks, scores = scenarios
-    sums = nr.restriction_sums(scores["B"], _labels(scenarios, "B"))
-    immobile = nr.restriction_contrasts(sums, IMMOBILE, BIN_S)
-    assert immobile[f"swr_only_minus_none{suffix}"] > 3000
-    assert immobile[f"full_minus_swr_only{suffix}"] > 3000
+    inside, outside, share = _contrasts(scenarios, "B")
+    assert inside[f"swr_minus_none{suffix}"] > 3000
+    assert outside[f"full_minus_swr{suffix}"] > 3000
     # the gain is in the remote events no SWR marks
     unmarked = gains(scores["B"], masks["B_unmarked"])
-    assert (
-        unmarked[f"full_minus_swr_only{suffix}"]
-        > (immobile[f"full_minus_swr_only{suffix}"])
-    )
-    assert 0.3 < immobile[f"share_outside_swr{suffix}"] < 0.7
+    assert unmarked[f"full_minus_swr{suffix}"] > outside[f"full_minus_swr{suffix}"]
+    assert 0.3 < share[f"share_outside_swr{suffix}"] < 0.7
+
+
+@pytest.mark.parametrize("suffix", ["", "_two_sided"])
+def test_swrs_without_non_local_content_cost_the_swr_model_inside_them(
+    scenarios, suffix
+):
+    """The forced state's cost lands in the bins inside SWRs, not outside."""
+    masks, scores = scenarios
+    inside, outside, _ = _contrasts(scenarios, "D")
+    decoys = gains(scores["D"], masks["D_decoys"])
+    # about 0.1 nats a bin over 720 bins of plain rest and local bursts
+    assert decoys[f"swr_minus_none{suffix}"] < -25
+    assert decoys[f"full_minus_swr{suffix}"] > 25
+    # the remote events still carry the SWR model's gain
+    assert inside[f"swr_minus_none{suffix}"] > 3000
+    assert outside[f"full_minus_swr{suffix}"] < 0.01 * inside[f"swr_minus_none{suffix}"]
 
 
 def _labels(scenarios, name: str) -> np.ndarray:
@@ -256,14 +357,17 @@ def test_the_library_record_checks_hold(chance):
     assert list(scores.columns) == [
         "time",
         "none",
-        "swr_only",
+        "swr",
         "full",
         "none_two_sided",
-        "swr_only_two_sided",
+        "swr_two_sided",
         "full_two_sided",
         "in_swr",
         "block",
     ]
+    # no SWRs: the swr model is the none model
+    np.testing.assert_array_equal(scores["swr"], scores["none"])
+    np.testing.assert_array_equal(scores["swr_two_sided"], scores["none_two_sided"])
 
 
 @pytest.mark.parametrize("suffix", ["", "_two_sided"])

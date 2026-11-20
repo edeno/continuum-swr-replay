@@ -47,7 +47,7 @@ def test_categories_reject_a_mismatched_swr_mask():
 
 def _record(**changes):
     record = {"all_finite": True}
-    for model in ("none", "swr_only", "full"):
+    for model in ("none", "swr", "full"):
         record |= {
             f"marginal_agrees_{model}": True,
             f"marginal_log_likelihood_{model}": -10.0,
@@ -66,7 +66,7 @@ def test_a_clean_record_passes_the_checks():
     [
         ({"marginal_agrees_full": False}, "full: library marginal"),
         ({"causal_mass_deviation_none": 2e-3}, "none: filtered posterior mass"),
-        ({"causal_mass_deviation_swr_only": float("nan")}, "swr_only: filtered"),
+        ({"causal_mass_deviation_swr": float("nan")}, "swr: filtered"),
         ({"all_finite": False}, "not finite"),
     ],
 )

@@ -2,14 +2,14 @@
 """Per-bin scores of the three non-local restriction models on every analyzed epoch.
 
 For each analyzed HPC epoch (``data_loaders.epoch_register.analyzed_epoch_ids``):
-the decoders ``none``, ``swr_only`` and ``full``, which differ only in when the
-two Non-Local states may be entered, scored at every bin with a likelihood held
-out in time (``analysis.event_evidence.nonlocal_restriction``). ``swr_only``
-allows the non-local states in every bin inside a detected SWR of the epoch's
-SWR source (``swr_source.epoch_source(epoch_id).events``, the Kay inventory),
-whether or not the SWR was immobile as a whole event: the model's best case.
-That is deliberately not the frame's ``SWR_event`` labels, which keep only the
-SWRs the analyzed-time rule keeps.
+the decoders ``none``, ``swr`` and ``full``, which differ only in when the two
+Non-Local states may be occupied, scored at every bin with a likelihood held
+out in time (``analysis.event_evidence.nonlocal_restriction``). ``swr`` is
+non-local in every bin inside a detected SWR of the epoch's SWR source
+(``swr_source.epoch_source(epoch_id).events``, the Kay inventory), whether or
+not the SWR was immobile as a whole event, and local everywhere else. That is
+deliberately not the frame's ``SWR_event`` labels, which keep only the SWRs the
+analyzed-time rule keeps.
 
 Each bin is labeled (:func:`bin_categories`): ``excluded`` (in excluded time),
 ``immobile_in_swr`` / ``immobile_outside_swr`` (analyzed, head speed below the
@@ -27,8 +27,9 @@ Writes, per epoch, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR
   the six float32 score columns, ``in_swr``, ``block`` and ``category``, so a
   later per-event or per-ripple-power analysis needs no rerun;
 - ``{epoch_id}_nonlocal_restriction.json``: the epoch's record (status,
-  ``restriction_scores``' record, bin counts, the per-epoch input digests,
-  settings, provenance);
+  ``restriction_scores``' record, bin counts, the share of the non-local gain
+  outside SWRs over the immobile bins (``share_outside_swr``, both families),
+  the per-epoch input digests, settings, provenance);
 
 and ``manifest.json`` gathered from the records (``runs.epoch_records``).
 
@@ -36,6 +37,8 @@ An epoch whose models fail a check (a library marginal that disagrees with the
 summed filter scores, a non-finite score, or a filtered posterior whose mass is
 more than :data:`CAUSAL_MASS_TOLERANCE` from 1) gets status ``failed_check``
 and a message naming the failures; its tables are still written, for diagnosis.
+A labeled bin with a score that is not finite fails the epoch when its sums are
+taken (``restriction_sums`` raises), after its per-bin table is written.
 
 Spike times and waveform features are read through ``load_data`` (read-only).
 Each worker is given one GPU, ``--workers-per-gpu`` to a card, as in
@@ -206,15 +209,15 @@ def run_epoch(epoch_id: str, data_dir: Path, output: Path) -> dict:
         in_swr,
         log=log,
     )
-    animal = parse_epoch_identifier(epoch_id).animal
-    sums = (
-        nr.restriction_sums(scores, np.asarray(categories))
-        .reset_index()
-        .assign(epoch_id=epoch_id, animal=animal)
-    )
-    write_table(sums, output_path(epoch_id, output, OUTPUT_NAME))
     bins_path = write_table(
         scores.assign(category=categories), output_path(epoch_id, output, BINS_NAME)
+    )
+    sums = nr.restriction_sums(scores, np.asarray(categories))
+    share = nr.share_outside_swr(sums, "immobile_in_swr", "immobile_outside_swr")
+    animal = parse_epoch_identifier(epoch_id).animal
+    write_table(
+        sums.reset_index().assign(epoch_id=epoch_id, animal=animal),
+        output_path(epoch_id, output, OUTPUT_NAME),
     )
 
     analyzed = analyzed_bins(frame)
@@ -226,6 +229,7 @@ def run_epoch(epoch_id: str, data_dir: Path, output: Path) -> dict:
             "status": "failed_check" if failures else "ok",
             **({"error": "; ".join(failures)} if failures else {}),
             **record,
+            **share,
             "n_bins": len(frame),
             "n_bins_by_category": {
                 c: int(n) for c, n in pd.Series(categories).value_counts().items()

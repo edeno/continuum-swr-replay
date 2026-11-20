@@ -162,9 +162,9 @@ Spike likelihood at decoded and actual positions, over each whole non-local even
 
 ### `src/continuum_swr_replay/analysis/event_evidence/nonlocal_restriction.py`
 
-Does allowing non-local states outside sharp-wave ripples predict the spikes better? Three decoders that differ only in when the non-local states may be entered, scored by how well each predicts each bin's spikes.
+Is the non-local activity of rest the activity of sharp-wave ripples? Three decoders that differ only in when the non-local states may be occupied, scored by how well each predicts each bin's spikes.
 
-`allowed_states`, `restricted_discrete_transitions`, `continuous_block_deviation`, `predictive_log_scores`, `heldout_log_likelihood`, `restriction_scores`, `score_columns`, `restriction_sums`, `restriction_contrasts`
+`allowed_states`, `restricted_discrete_transitions`, `continuous_block_deviation`, `predictive_log_scores`, `heldout_log_likelihood`, `restriction_scores`, `score_columns`, `restriction_sums`, `restriction_contrasts`, `share_outside_swr`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/participation.py`
 

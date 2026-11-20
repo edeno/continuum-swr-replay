@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
+from continuum_swr_replay.decoding.transitions import nonlocal_transition_settings
 
 # three discrete states with 1, 2 and 2 state bins
 STATE_IND = np.array([0, 1, 1, 2, 2])
@@ -99,23 +100,45 @@ ALLOWED = {
         ],
         dtype=bool,
     ),
+    # the strict model's kind: state 2 alone, or states 0 and 1 alone
+    "forced": np.array(
+        [
+            [1, 1, 0],
+            [0, 0, 1],
+            [0, 0, 1],
+            [1, 1, 0],
+            [0, 0, 1],
+            [1, 1, 0],
+        ],
+        dtype=bool,
+    ),
 }
 
 
-def _scores(log_likelihood, initial, continuous, discrete, allowed):
+def _scores(
+    log_likelihood, initial, continuous, discrete, allowed, chunk_bins=nr.CHUNK_BINS
+):
     return nr.predictive_log_scores(
-        log_likelihood, initial, continuous, discrete, STATE_IND, allowed
+        log_likelihood,
+        initial,
+        continuous,
+        discrete,
+        STATE_IND,
+        allowed,
+        chunk_bins=chunk_bins,
     )
 
 
+@pytest.mark.parametrize("chunk_bins", [1, 2, nr.CHUNK_BINS])
 @pytest.mark.parametrize("name", list(ALLOWED))
-def test_the_scores_match_the_brute_force_sums_over_paths(name):
+def test_the_scores_match_the_brute_force_sums_over_paths(name, chunk_bins):
     """The library's index convention (transition t is the move into t + 1)
-    and the two-sided formula, against the model's definition."""
+    and the two-sided formula, against the model's definition; batches of 1
+    and 2 bins put a batch boundary of the two-sided step at every bin."""
     initial, continuous, discrete, log_likelihood = _toy_model()
     allowed = ALLOWED[name]
     filter_score, two_sided, record = _scores(
-        log_likelihood, initial, continuous, discrete, allowed
+        log_likelihood, initial, continuous, discrete, allowed, chunk_bins
     )
     prefix, expected_two_sided = _brute_force(
         initial, continuous, discrete, log_likelihood, allowed
@@ -177,6 +200,51 @@ def test_a_row_with_no_allowed_destination_raises():
         _scores(log_likelihood, initial, continuous, discrete, ALLOWED["time-varying"])
 
 
+def test_the_inputs_must_agree():
+    initial, continuous, discrete, log_likelihood = _toy_model()
+    allowed = ALLOWED["everything"]
+    with pytest.raises(ValueError, match="bins"):
+        _scores(log_likelihood, initial, continuous, discrete, allowed[:-1])
+    with pytest.raises(ValueError, match="2-D"):
+        _scores(log_likelihood, initial, continuous, discrete[None], allowed)
+    with pytest.raises(ValueError, match="in_swr"):
+        nr.restriction_scores(
+            None, np.arange(5.0), None, [], [], None, None, np.zeros(4, bool)
+        )
+
+
+CANONICAL_NAMES = ["Local", "No-Spike", "Non-Local Continuous", "Non-Local Fragmented"]
+
+
+def _canonical_discrete() -> np.ndarray:
+    """The decoders' discrete transitions before EM (P30-B), whose No-Spike row
+    EM leaves as it is."""
+    return np.asarray(nonlocal_transition_settings()["discrete_transition_type"].values)
+
+
+def test_the_canonical_transitions_give_a_forced_entry_from_every_row():
+    """Inside an SWR the ``swr`` model must be non-local: every row, the frozen
+    No-Spike row too, enters Continuous or Fragmented with probability 1, and
+    leaves them for the local states outside SWRs."""
+    discrete = _canonical_discrete()
+    allowed = nr.allowed_states(CANONICAL_NAMES, np.array([False, True]))["swr"]
+    outside, inside = nr.restricted_discrete_transitions(discrete, allowed)
+    np.testing.assert_allclose(inside.sum(axis=1), 1.0)
+    assert (inside[:, :2] == 0).all() and (inside[:, 2:] > 0).all()
+    np.testing.assert_allclose(outside.sum(axis=1), 1.0)
+    assert (outside[:, 2:] == 0).all() and (outside[:, :2] > 0).all()
+    # the No-Spike row's exits to the two non-local states, renormalized
+    np.testing.assert_allclose(inside[1, 2:], [0.5, 0.5])
+
+
+def test_a_row_that_cannot_reach_a_non_local_state_raises():
+    discrete = _canonical_discrete()
+    discrete[1] = [0.02, 0.98, 0.0, 0.0]
+    allowed = nr.allowed_states(CANONICAL_NAMES, np.array([True]))["swr"]
+    with pytest.raises(ValueError, match="discrete state 1"):
+        nr.restricted_discrete_transitions(discrete, allowed)
+
+
 def test_restricted_discrete_transitions_by_hand():
     discrete = np.array([[0.5, 0.3, 0.2], [0.2, 0.6, 0.2], [0.1, 0.1, 0.8]])
     patterns = np.array([[1, 1, 1], [1, 1, 0]], dtype=bool)
@@ -199,7 +267,7 @@ def test_allowed_states_by_model():
     allowed = nr.allowed_states(names, np.array([False, True, False]))
     np.testing.assert_array_equal(allowed["none"], [[1, 1, 0, 0]] * 3)
     np.testing.assert_array_equal(
-        allowed["swr_only"], [[1, 1, 0, 0], [1, 1, 1, 1], [1, 1, 0, 0]]
+        allowed["swr"], [[1, 1, 0, 0], [0, 0, 1, 1], [1, 1, 0, 0]]
     )
     np.testing.assert_array_equal(allowed["full"], [[1, 1, 1, 1]] * 3)
 
@@ -209,7 +277,7 @@ def _table() -> pd.DataFrame:
     table = pd.DataFrame(
         {
             "none": [-1.0, -2.0, -3.0, -1.0, -5.0],
-            "swr_only": [-1.0, -1.0, -2.0, -1.0, -5.0],
+            "swr": [-1.5, -1.0, -2.0, -1.0, -5.0],
             "full": [-0.5, -1.0, -2.0, -0.5, -4.0],
             "in_swr": [False, True, True, False, False],
         }
@@ -227,10 +295,10 @@ def test_restriction_sums_by_hand():
     assert sums.loc["inside"].to_dict() == {
         "n_bins": 2,
         "none": -5.0,
-        "swr_only": -3.0,
+        "swr": -3.0,
         "full": -3.0,
         "none_two_sided": 15.0,
-        "swr_only_two_sided": 17.0,
+        "swr_two_sided": 17.0,
         "full_two_sided": 17.0,
     }
     assert sums.loc["outside", "full"] == -1.0
@@ -247,33 +315,60 @@ def test_an_unlabeled_bin_is_in_no_category():
     assert sums.loc["inside", "none"] == -3.0
 
 
+def test_a_labeled_bin_with_a_score_that_is_not_finite_raises():
+    table = _table()
+    table.loc[1, "swr"] = np.nan
+    table.loc[3, "full_two_sided"] = -np.inf
+    with pytest.raises(ValueError, match="'swr': 1, 'full_two_sided': 1"):
+        nr.restriction_sums(table, LABELS)
+    # an unlabeled bin's score is not summed, so it may be anything
+    sums = nr.restriction_sums(table, ["outside", None, "inside", None, "moving"])
+    assert sums.loc["inside", "swr"] == -2.0
+
+
 def test_restriction_contrasts_by_hand():
     sums = nr.restriction_sums(_table(), LABELS)
     inside = nr.restriction_contrasts(sums, ["inside"], bin_s=0.5)
     assert inside["n_bins"] == 2 and inside["seconds"] == 1.0
-    assert inside["swr_only_minus_none"] == 2.0
-    assert inside["swr_only_minus_none_per_s"] == 2.0
-    assert inside["full_minus_swr_only"] == 0.0
-    assert inside["swr_only_minus_none_two_sided"] == 2.0
+    assert inside["swr_minus_none"] == 2.0
+    assert inside["swr_minus_none_per_s"] == 2.0
+    assert inside["full_minus_swr"] == 0.0
+    assert inside["swr_minus_none_two_sided"] == 2.0
     immobile = nr.restriction_contrasts(sums, ["inside", "outside"], bin_s=0.5)
     assert immobile["seconds"] == 2.0
-    assert immobile["swr_only_minus_none"] == 2.0
-    assert immobile["full_minus_swr_only"] == 1.0
+    assert immobile["swr_minus_none"] == 1.5
+    assert immobile["full_minus_swr"] == 1.5
     assert immobile["full_minus_none"] == 3.0
     assert immobile["full_minus_none_per_s"] == 1.5
-    assert immobile["share_outside_swr"] == pytest.approx(1 / 3)
-    assert immobile["share_outside_swr_two_sided"] == pytest.approx(1 / 3)
+    assert immobile["full_minus_swr_two_sided"] == 1.5
     # moving is its own category, not part of the immobile result
     moving = nr.restriction_contrasts(sums, ["moving"], bin_s=0.5)
-    assert moving["full_minus_none"] == 1.0 and moving["full_minus_swr_only"] == 1.0
+    assert moving["full_minus_none"] == 1.0 and moving["full_minus_swr"] == 1.0
+
+
+def test_share_outside_swr_by_hand():
+    """full - none is 2 nats inside (bins 1, 2) and 1 outside (bins 0, 3)."""
+    sums = nr.restriction_sums(_table(), LABELS)
+    share = nr.share_outside_swr(sums, "inside", "outside")
+    assert share == {
+        "share_outside_swr": pytest.approx(1 / 3),
+        "share_outside_swr_two_sided": pytest.approx(1 / 3),
+    }
+    # the moving bin's gain is in neither category
+    assert nr.share_outside_swr(sums, "inside", "moving")["share_outside_swr"] == (
+        pytest.approx(1 / 3)
+    )
+    assert nr.share_outside_swr(sums, "excluded", "outside")["share_outside_swr"] == 1
 
 
 def test_the_share_is_nan_without_a_full_model_gain():
     table = _table()
     table["full"] = table["none"]
+    table["full_two_sided"] = table["none_two_sided"]
     sums = nr.restriction_sums(table, LABELS)
-    contrasts = nr.restriction_contrasts(sums, ["inside", "outside"], bin_s=0.002)
-    assert np.isnan(contrasts["share_outside_swr"])
+    share = nr.share_outside_swr(sums, "inside", "outside")
+    assert np.isnan(share["share_outside_swr"])
+    assert np.isnan(share["share_outside_swr_two_sided"])
     empty = nr.restriction_contrasts(sums, ["excluded"], bin_s=0.002)
     assert empty["n_bins"] == 0
     assert np.isnan(empty["full_minus_none_per_s"])
