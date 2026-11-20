@@ -9,13 +9,15 @@ through the SWR source, and the epoch's ``event_participation`` table), sum each
 window's bins (``restriction_windows.restriction_window_sums``) and add its
 spike count over every tetrode from the epoch's held-out tetrode table
 (``restriction_windows.window_spike_counts``, which fails when the two runs'
-windows differ). CPU only: pandas and numpy, nothing is decoded or refit.
+windows differ by id, event, kind, group or length, or a window lacks a
+tetrode's row). An epoch that is ``ok`` in only one of the two runs is left out
+and named in a warning. CPU only: pandas and numpy, nothing is decoded or refit.
 
 Writes, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR``:
 
 - ``{epoch_id}_nonlocal_restriction_windows.parquet``: one row per window,
   ``epoch_id``, ``animal``, ``window_id``, ``event_id``, ``kind``, ``group``,
-  ``s``, ``e``, ``n_bins``, ``n_bins_in_swr``, ``n_bins_scored``,
+  ``s``, ``e``, ``n_bins``, ``n_bins_in_swr``, ``n_bins_immobile``,
   ``n_bins_excluded``, ``n_bins_not_finite``, ``duration_s``, the six summed
   scores (float64 nats) and ``n_spikes``;
 - ``{epoch_id}_nonlocal_restriction_windows.json``: the epoch's record (the
@@ -42,6 +44,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import logging
 import multiprocessing
 import sys
 import time as clock
@@ -98,7 +101,7 @@ OUTPUT_NAME = "nonlocal_restriction_windows"
 BINS_NAME = "nonlocal_restriction_bins"
 HOLDOUT_NAME = "tetrode_holdout"
 PARTICIPATION_NAME = "participation"
-HOLDOUT_COLUMNS = [*rw.WINDOW_KEYS, "n_bins", "n_spikes"]
+HOLDOUT_COLUMNS = [*rw.WINDOW_KEYS, "tetrode", "n_bins", "n_spikes"]
 
 
 def decode_time(epoch_id: str, data_dir: Path) -> np.ndarray:
@@ -151,8 +154,8 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
                 for (kind, group), n in table.groupby(["kind", "group"]).size().items()
             },
             "n_windows_with_excluded_bins": int((table["n_bins_excluded"] > 0).sum()),
-            "n_windows_with_unscored_bins": int(
-                (table["n_bins_scored"] < table["n_bins"]).sum()
+            "n_windows_with_bins_not_immobile": int(
+                (table["n_bins_immobile"] < table["n_bins"]).sum()
             ),
             "n_windows_not_finite": int((table["n_bins_not_finite"] > 0).sum()),
             "n_windows_without_spikes": int((table["n_spikes"] == 0).sum()),
@@ -241,10 +244,16 @@ def main(argv: list[str] | None = None) -> None:
         return
     holdout_manifest = read_manifest(holdout_dir)
     check_holdout_inputs(header["inputs"], holdout_manifest)
-    every_epoch = sorted(
-        set(ok_epochs(read_manifest(restriction_dir)))
-        & set(ok_epochs(holdout_manifest))
-    )
+    restriction_ok = set(ok_epochs(read_manifest(restriction_dir)))
+    holdout_ok = set(ok_epochs(holdout_manifest))
+    in_one_run = sorted(restriction_ok ^ holdout_ok)
+    if in_one_run:
+        logging.getLogger(__name__).warning(
+            "%d epochs are ok in only one of the two runs and are left out: %s",
+            len(in_one_run),
+            in_one_run,
+        )
+    every_epoch = sorted(restriction_ok & holdout_ok)
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
         task=run_epoch,

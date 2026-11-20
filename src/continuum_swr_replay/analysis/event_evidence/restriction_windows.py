@@ -6,7 +6,11 @@ over its matched Local-rest control window: the windows of the held-out tetrode
 score (``state_evidence.windows.epoch_windows``), so the two methods are read on
 the same bins and summarized by the same statistic
 (``likelihood_advantage.likelihood_advantage_statistics``: one value per animal,
-their mean and its nested-bootstrap interval).
+their mean and its nested-bootstrap interval). The held-out encodings are not
+the same: the restriction run's folds are whole trials
+(``tetrode_holdout.trial_folds``), the held-out tetrode run's are contiguous
+blocks of time (``tetrode_holdout.time_blocks``), so the two differ in more
+than what is scored.
 
 A window's contrast ``a - b`` (:data:`CONTRASTS`) is its sum of ``a``'s per-bin
 score less its sum of ``b``'s, in nats, for each score family
@@ -21,12 +25,23 @@ score less its sum of ``b``'s, in nats, for each score family
 ``full - swr`` in events without an SWR is what the non-local states buy outside
 SWRs, where ``swr`` may not use them; in the Local-rest controls it is the same
 contrast where the decoder saw no non-local activity; ``swr - none`` in events
-that overlap an SWR is what calling the SWR's bins non-local buys.
+that overlap an SWR is what calling the SWR's bins non-local buys. "Without an
+SWR" is the event table's class (strict overlap with a kept SWR), not the
+``swr`` model's bins: an event that only shares an edge bin with an SWR, or
+that lies in an SWR the cohort drops for speed, is without an SWR and still
+holds bins where ``swr`` is forced non-local. The table counts them
+(``n_bins_in_swr``) and the runner's records total them
+(``n_no_swr_events_with_in_swr_bins``, ``n_in_swr_bins_of_no_swr_events``: 12
+of the 42,974 such events and 32 bins in the 242-epoch run).
+
+The filter family's window sum is the window's share of the model's log
+likelihood; the two-sided family's is a sum of scores that do not add up to a
+likelihood (:mod:`.nonlocal_restriction`), read the same way.
 
 **Windows with an excluded bin or a score that is not finite.** The sums are
 taken over every bin of the window whatever its category, and the table counts
 its bins in excluded time (``n_bins_excluded``), its bins outside the immobile
-categories (``n_bins`` less ``n_bins_scored``) and its bins with any score that
+categories (``n_bins`` less ``n_bins_immobile``) and its bins with any score that
 is not finite (``n_bins_not_finite``). A score that is not finite makes that
 column's sum NaN; it is not replaced. :func:`window_contrasts` gives a window
 with an excluded bin NaN in every contrast, so the statistics leave it out and
@@ -88,7 +103,7 @@ def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.Dat
     pd.DataFrame
         One row per window, in ``windows``' order: :data:`WINDOW_KEYS`, ``s``,
         ``e``, ``n_bins``, ``n_bins_in_swr`` (bins with ``in_swr``),
-        ``n_bins_scored`` (bins in an immobile category), ``n_bins_excluded``
+        ``n_bins_immobile`` (bins in an immobile category), ``n_bins_excluded``
         (bins in excluded time), ``n_bins_not_finite`` (bins with any score
         that is not finite), ``duration_s`` (``n_bins`` times the time grid's
         step) and the float64 sum of each score column (NaN where a bin of the
@@ -127,7 +142,7 @@ def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.Dat
     out = windows[[*WINDOW_KEYS, "s", "e"]].reset_index(drop=True)
     out["n_bins"] = n_bins
     for j, name in enumerate(
-        ["n_bins_in_swr", "n_bins_scored", "n_bins_excluded", "n_bins_not_finite"]
+        ["n_bins_in_swr", "n_bins_immobile", "n_bins_excluded", "n_bins_not_finite"]
     ):
         out[name] = np.rint(summed[:, j]).astype(np.int64)
     out["duration_s"] = n_bins * sample_step(bins["time"].to_numpy(dtype=float))
@@ -144,7 +159,7 @@ def window_spike_counts(holdout: pd.DataFrame, windows: pd.DataFrame) -> pd.Seri
     ----------
     holdout : pd.DataFrame
         The epoch's ``tetrode_holdout`` table, one row per window and tetrode:
-        :data:`WINDOW_KEYS`, ``n_bins`` and ``n_spikes``.
+        :data:`WINDOW_KEYS`, ``tetrode``, ``n_bins`` and ``n_spikes``.
     windows : pd.DataFrame
         The epoch's windows (``epoch_windows``).
 
@@ -156,11 +171,21 @@ def window_spike_counts(holdout: pd.DataFrame, windows: pd.DataFrame) -> pd.Seri
     Raises
     ------
     ValueError
-        If the two runs' windows differ: not the same windows, or a window with
-        another event, kind, group or length.
+        If the two runs' windows differ by id, event, kind, group or length
+        (the held-out tetrode table does not hold a window's first bin, so a
+        window of the same length at another place is not seen here; the
+        runner checks that both runs read the same event and participation
+        tables), or if a window does not have one row for each of the table's
+        tetrodes (its spike count would miss a tetrode).
     """
     keys = list(WINDOW_KEYS)
     by_window = holdout.groupby(keys, sort=False)
+    tetrodes = by_window["tetrode"].agg(["size", "nunique"])
+    n_tetrodes = holdout["tetrode"].nunique()
+    if not (tetrodes.to_numpy() == n_tetrodes).all():
+        raise ValueError(
+            "a window of the held-out tetrode run does not have one row per tetrode"
+        )
     held = by_window["n_spikes"].sum().reset_index()
     held["n_bins"] = by_window["n_bins"].max().to_numpy()
     if not (by_window["n_bins"].nunique() == 1).all():
@@ -199,7 +224,10 @@ def window_contrasts(windows: pd.DataFrame) -> pd.DataFrame:
         ``windows`` with one column per contrast, family and unit
         (:func:`contrast_column`): the contrast's window sum (nats) divided by
         ``n_spikes`` (NaN without spikes) or by ``duration_s``. Every contrast
-        of a window with a bin in excluded time is NaN.
+        of a window with a bin in excluded time is NaN. So the two units do not
+        cover the same windows: a window without spikes has a value per second
+        and none per spike (153 Local-rest controls in the cohort; the
+        statistics' ``n_scored`` counts the windows with a value).
     """
     out = windows.copy()
     kept = out["n_bins_excluded"].to_numpy() == 0

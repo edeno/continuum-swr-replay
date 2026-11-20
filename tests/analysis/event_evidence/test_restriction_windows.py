@@ -57,7 +57,7 @@ def test_window_sums_count_and_sum_each_windows_bins():
     sums = rw.restriction_window_sums(_bins(), _windows())
     np.testing.assert_array_equal(sums["n_bins"], [2, 3, 2, 2])
     np.testing.assert_array_equal(sums["n_bins_in_swr"], [0, 2, 0, 0])
-    np.testing.assert_array_equal(sums["n_bins_scored"], [2, 3, 1, 1])
+    np.testing.assert_array_equal(sums["n_bins_immobile"], [2, 3, 1, 1])
     np.testing.assert_array_equal(sums["n_bins_excluded"], [0, 0, 0, 1])
     np.testing.assert_array_equal(sums["n_bins_not_finite"], [0, 0, 0, 0])
     np.testing.assert_allclose(sums["duration_s"], np.array([2, 3, 2, 2]) * STEP)
@@ -93,6 +93,7 @@ def _holdout(windows: pd.DataFrame) -> pd.DataFrame:
     3 and 0 in 2, 1 and 1 in 3."""
     rows = windows.loc[np.repeat(windows.index, 2), list(rw.WINDOW_KEYS)]
     rows = rows.assign(
+        tetrode=np.tile([0, 1], len(windows)),
         n_bins=np.repeat((windows["e"] - windows["s"] + 1).to_numpy(), 2),
         n_spikes=[1, 2, 0, 0, 3, 0, 1, 1],
     )
@@ -116,6 +117,17 @@ def test_spike_counts_sum_the_tetrodes_of_each_window_in_window_order():
 def test_windows_that_are_not_the_holdout_runs_raise(change):
     with pytest.raises(ValueError, match="not the held-out"):
         rw.window_spike_counts(change(_holdout(_windows())), _windows())
+
+
+def test_a_window_without_one_of_the_tetrodes_rows_raises():
+    """Its spike count would leave that tetrode's spikes out."""
+    holdout = _holdout(_windows())
+    missing = holdout[~((holdout["window_id"] == 2) & (holdout["tetrode"] == 0))]
+    with pytest.raises(ValueError, match="one row per tetrode"):
+        rw.window_spike_counts(missing, _windows())
+    twice = pd.concat([holdout, holdout.iloc[[0]]], ignore_index=True)
+    with pytest.raises(ValueError, match="one row per tetrode"):
+        rw.window_spike_counts(twice, _windows())
 
 
 def _scored() -> pd.DataFrame:
