@@ -11,6 +11,20 @@ not the SWR was immobile as a whole event, and local everywhere else. That is
 deliberately not the frame's ``SWR_event`` labels, which keep only the SWRs the
 analyzed-time rule keeps.
 
+The likelihood is held out by folds of whole trials (``--fold-design trials``,
+the default): a segment runs from one departure from a well (the trial's
+``movement_start_time``, the final poke-out at its origin) to the next, so the
+run to a well and the whole stay there are one segment, and the segments are
+dealt into ``N_FOLDS`` folds balanced by destination well
+(``tetrode_holdout.trial_folds``), with a margin of ``TRIAL_MARGIN_S``. The
+time before the first trial and after the last trial's end are segments of
+their own two classes, and a segment longer than ``MAX_SEGMENT_S`` is cut into
+equal pieces, each a group of its own, so that long stays are spread over the
+folds.
+``--fold-design contiguous`` reproduces the earlier design, ``N_FOLDS``
+contiguous time blocks with a margin of ``MARGIN_BINS`` bins. The design and its
+margin are in the header's settings, so a resume cannot mix designs.
+
 Each bin is labeled (``nonlocal_restriction.bin_categories``): ``excluded``
 (in excluded time), ``immobile_in_swr`` / ``immobile_outside_swr`` (analyzed,
 head speed below the immobility threshold, inside or outside a source SWR), or
@@ -24,11 +38,16 @@ Writes, per epoch, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR
   and two-sided score) with ``epoch_id`` and ``animal``; the table downstream
   statistics read;
 - ``{epoch_id}_nonlocal_restriction_bins.parquet``: one row per bin, ``time``,
-  the six float32 score columns, ``in_swr``, ``block`` and ``category``, so a
-  later per-event or per-ripple-power analysis needs no rerun;
+  the six float32 score columns, ``in_swr``, ``block`` (the bin's fold),
+  ``place_sampling_s`` (the seconds its fold's encoding was fit on at the
+  animal's place bin) and ``category``, so a later per-event or
+  per-ripple-power analysis needs no rerun;
 - ``{epoch_id}_nonlocal_restriction.json``: the epoch's record (status,
   ``restriction_scores``' record, bin counts, the share of the non-local gain
   outside SWRs over the immobile bins (``share_outside_swr``, both families),
+  the folds (``n_segments``, ``n_groups``, the smallest and largest fold's share of the
+  bins, the margin in bins), the share of the immobile bins whose fold's
+  encoding had 0 s and at most 10 s of training data at the animal's place,
   the per-epoch input digests, settings, provenance);
 
 and ``manifest.json`` gathered from the records (``runs.epoch_records``).
@@ -80,6 +99,7 @@ from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     ROOT_DIR,
+    SAMPLING_FREQUENCY,
 )
 from continuum_swr_replay.paths import (
     EVENT_NONLOCAL_RESTRICTION_DIR,
@@ -106,13 +126,86 @@ PRODUCED_BY = produced_by(__file__)
 OUTPUT_NAME = "nonlocal_restriction"
 BINS_NAME = "nonlocal_restriction_bins"
 
+FOLD_DESIGNS = ("trials", "contiguous")
+"""``trials``: whole trials balanced by destination well
+(``tetrode_holdout.trial_folds``); ``contiguous``: contiguous time blocks."""
 
-def run_epoch(epoch_id: str, data_dir: Path, output: Path) -> dict:
+SPARSE_SAMPLING_S = 10.0
+"""The record's second sampling share: immobile bins whose fold's encoding had
+at most this many seconds of training data at the animal's place."""
+
+
+def fold_settings(fold_design: str) -> dict:
+    """The header's record of a fold design: its name and margin in seconds."""
+    if fold_design == "trials":
+        return {
+            "fold_design": "trials",
+            "fold_classes": "to_well",
+            "margin_s": th.TRIAL_MARGIN_S,
+            "max_segment_s": th.MAX_SEGMENT_S,
+        }
+    if fold_design == "contiguous":
+        return {
+            "fold_design": "contiguous",
+            "margin_s": th.MARGIN_BINS / SAMPLING_FREQUENCY,
+            "margin_bins": th.MARGIN_BINS,
+        }
+    raise ValueError(f"unknown fold design {fold_design!r}, not one of {FOLD_DESIGNS}")
+
+
+def epoch_folds(
+    time: np.ndarray, trials: pd.DataFrame | None, fold_design: str
+) -> tuple[np.ndarray | None, int, dict]:
+    """Each bin's fold, the margin in bins and the folds' counts under
+    ``fold_design``.
+
+    For ``trials``, the segments are ``tetrode_holdout.task_segment_starts``'
+    (each trial from its ``movement_start_time`` to the next, of class
+    ``to_well``; the time before the first trial and after the last trial's
+    ``end_time``, each its own class), cut into pieces of at most
+    ``MAX_SEGMENT_S`` (``tetrode_holdout.trial_folds``); ``contiguous`` returns
+    no folds (``heldout_terms``' default time blocks) and
+    :data:`~.tetrode_holdout.MARGIN_BINS`.
+
+    Returns
+    -------
+    folds : ndarray of int, shape (n_time,), or None
+    margin_bins : int
+    counts : dict
+        ``n_segments`` (the segments holding a bin) and ``n_groups`` (their
+        pieces after the cap), None for ``contiguous``.
+    """
+    if fold_design == "contiguous":
+        return None, th.MARGIN_BINS, {"n_segments": None, "n_groups": None}
+    if fold_design != "trials":
+        raise ValueError(f"unknown fold design {fold_design!r}")
+    trials = trials.sort_values("movement_start_time")
+    starts, classes = th.task_segment_starts(
+        time,
+        trials["movement_start_time"].to_numpy(dtype=float),
+        trials["to_well"].to_numpy(),
+        float(trials["end_time"].iloc[-1]),
+    )
+    folds = th.trial_folds(time, starts, classes, nr.N_FOLDS, th.MAX_SEGMENT_S)
+    segment = th.trial_segments(time, starts)
+    counts = {
+        "n_segments": int(np.unique(segment).size),
+        "n_groups": int(th.capped_groups(time, segment, th.MAX_SEGMENT_S)[-1]) + 1,
+    }
+    return folds, th.margin_in_bins(th.TRIAL_MARGIN_S, time), counts
+
+
+def run_epoch(
+    epoch_id: str, data_dir: Path, output: Path, fold_design: str = "trials"
+) -> dict:
     """Score one epoch, write its two tables and return its record."""
     started = clock.time()
     log = logging.getLogger(epoch_id).info
-    epoch = epoch_inputs(epoch_id, data_dir)
+    epoch = epoch_inputs(epoch_id, data_dir, trials=fold_design == "trials")
     frame = epoch.frame
+    folds, margin_bins, fold_counts = epoch_folds(
+        epoch.time, epoch.loaded.get("trials"), fold_design
+    )
     source_events = swr_source.epoch_source(epoch_id).events
     in_swr = interval_mask(epoch.time, source_events)
     in_label = frame[swr_source.SWR_LABEL_COLUMN].to_numpy() > 0
@@ -132,6 +225,9 @@ def run_epoch(epoch_id: str, data_dir: Path, output: Path) -> dict:
         epoch.loaded["is_training"],
         epoch.loaded["is_missing"],
         in_swr,
+        folds=folds,
+        margin_bins=margin_bins,
+        linear_position=frame["linear_position"].to_numpy(dtype=float),
         log=log,
     )
     bins_path = write_table(
@@ -148,6 +244,8 @@ def run_epoch(epoch_id: str, data_dir: Path, output: Path) -> dict:
     labels = np.asarray(categories)
     analyzed = labels != "excluded"
     immobile = np.isin(labels, [nr.IMMOBILE_IN_SWR, nr.IMMOBILE_OUTSIDE_SWR])
+    sampling = scores["place_sampling_s"].to_numpy()[immobile]
+    fold_share = np.bincount(scores["block"], minlength=nr.N_FOLDS) / len(scores)
     failures = nr.check_failures(record)
     return json_ready(
         {
@@ -155,6 +253,16 @@ def run_epoch(epoch_id: str, data_dir: Path, output: Path) -> dict:
             **({"error": "; ".join(failures)} if failures else {}),
             **record,
             **share,
+            "fold_design": fold_design,
+            "margin_bins": margin_bins,
+            **fold_counts,
+            "fold_share_min": float(fold_share.min()),
+            "fold_share_max": float(fold_share.max()),
+            "immobile_share_place_sampling_0s": float(np.mean(sampling == 0)),
+            "immobile_share_place_sampling_le_10s": float(
+                np.mean(sampling <= SPARSE_SAMPLING_S)
+            ),
+            "n_immobile_without_place": int(np.isnan(sampling).sum()),
             "n_bins": len(frame),
             "n_bins_by_category": {
                 c: int(n) for c, n in pd.Series(categories).value_counts().items()
@@ -191,6 +299,13 @@ def main(argv: list[str] | None = None) -> None:
     )
     add_run_arguments(parser)
     add_gpu_arguments(parser)
+    parser.add_argument(
+        "--fold-design",
+        choices=FOLD_DESIGNS,
+        default="trials",
+        help="whole trials balanced by destination well (default), or the "
+        "earlier contiguous time blocks",
+    )
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
@@ -200,7 +315,8 @@ def main(argv: list[str] | None = None) -> None:
         "provenance": provenance_record(ROOT_DIR),
         "settings": {
             "n_folds": nr.N_FOLDS,
-            "margin_bins": th.MARGIN_BINS,
+            **fold_settings(args.fold_design),
+            "sparse_sampling_s": SPARSE_SAMPLING_S,
             "immobility_threshold_cm_per_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
             "swr_source": swr_source.swr_source_name(),
             "models": list(nr.MODELS),
@@ -222,7 +338,7 @@ def main(argv: list[str] | None = None) -> None:
             args.epochs or analyzed_epoch_ids(), args.shards, args.n_shards
         ),
         task=run_epoch,
-        task_args=(data_dir, output),
+        task_args=(data_dir, output, args.fold_design),
         output=output,
         name=OUTPUT_NAME,
         header=header,

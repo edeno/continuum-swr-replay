@@ -144,8 +144,9 @@ class EpochInputs:
     detector: Any
 
 
-def epoch_inputs(epoch_id: str, data_dir: Path) -> EpochInputs:
-    """Read an epoch's decode frame, spikes, masks and detector.
+def epoch_inputs(epoch_id: str, data_dir: Path, *, trials: bool = False) -> EpochInputs:
+    """Read an epoch's decode frame, spikes, masks and detector; with
+    ``trials``, also its trials (``loaded["trials"]``), in the same load.
 
     Raises
     ------
@@ -163,7 +164,7 @@ def epoch_inputs(epoch_id: str, data_dir: Path) -> EpochInputs:
     paths = decode_paths(epoch_id, data_dir)
     frame = read_dot_with_swr_source(paths.data_over_time)
     time = frame.index.to_numpy(dtype=float)
-    loaded = load_marks_and_training_mask(epoch_id)
+    loaded = load_marks_and_training_mask(epoch_id, trials=trials)
     if not np.array_equal(loaded["time"], time):
         raise ValueError("the loader's time axis is not the decode's")
     return EpochInputs(paths, frame, time, loaded, load_detector(epoch_id, data_dir))

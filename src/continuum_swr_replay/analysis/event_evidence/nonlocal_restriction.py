@@ -67,11 +67,22 @@ exp(ll[t])``:
   score is its filter score. The two-sided scores do not add up to a
   likelihood.
 
-The log-likelihood ``ll`` is held out in time, as in :mod:`.tetrode_holdout`:
-the epoch is cut into :data:`~.tetrode_holdout.N_FOLDS` blocks and each block's
-bins are scored with encodings fit on the other blocks, with every tetrode in
-the model. A missing bin's likelihood is 0, so it scores 0 on both, to float32
-rounding of the posterior's mass.
+The log-likelihood ``ll`` is held out: the epoch's bins are split into
+:data:`~.tetrode_holdout.N_FOLDS` folds and each fold's bins are scored with
+encodings fit on the other folds (:func:`.tetrode_holdout.heldout_terms`), with
+every tetrode in the model. Unlike :mod:`.tetrode_holdout`, whose folds are
+contiguous blocks of time, the runner's folds are whole trials balanced by
+destination well (:func:`.tetrode_holdout.trial_folds`), with a margin of
+:data:`~.tetrode_holdout.TRIAL_MARGIN_S`. The time before the first trial and
+after the last are segments of their own two classes, and a segment longer than
+:data:`~.tetrode_holdout.MAX_SEGMENT_S` is cut into equal pieces, so a long stay
+is spread over the folds. In this task the animal stays in one
+patch for long stretches, so place and time are confounded: a place visited in
+only one time block has no data in that block's encoding, the Local state cannot
+explain its spikes there, and ``full`` gains by explaining them with place
+fields from elsewhere. Each bin's ``place_sampling_s`` records how much training
+data its fold's encoding had at the animal's place. A missing bin's likelihood
+is 0, so it scores 0 on both, to float32 rounding of the posterior's mass.
 
 What the score does not show: that the activity it credits is coherent spatial
 content. Any activity the Local state predicts poorly and a non-local state
@@ -107,11 +118,15 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     LOCAL,
+    MARGIN_BINS,
     N_FOLDS,
     NO_SPIKE,
+    animal_place_bins,
     heldout_terms,
+    place_sampling,
     state_log_likelihood,
 )
+from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
 MODELS = ("none", "swr", "full")
@@ -557,11 +572,13 @@ def heldout_log_likelihood(
     is_missing: NDArray,
     *,
     n_folds: int = N_FOLDS,
+    folds: NDArray | None = None,
+    margin_bins: int = MARGIN_BINS,
     refit: Callable[..., dict] = refit_encoding,
     log: Callable[[str], None] = print,
 ) -> tuple[NDArray[np.float32], NDArray[np.int64], dict]:
     """The decoder's four-state log-likelihood, every tetrode in the model,
-    each bin under the encodings of its time block (fit on the other blocks).
+    each bin under the encodings of its fold (fit on the other folds).
 
     The held-out stage of :func:`.tetrode_holdout.holdout_scores`
     (:func:`.tetrode_holdout.heldout_terms`), with no tetrode left out.
@@ -578,6 +595,11 @@ def heldout_log_likelihood(
     is_training, is_missing : ndarray of bool, shape (n_time,)
         The decode's masks; a missing bin's likelihood is 0.
     n_folds : int
+    folds : ndarray of int, shape (n_time,), optional
+        Each bin's fold (``tetrode_holdout.trial_folds``); by default
+        ``n_folds`` contiguous time blocks.
+    margin_bins : int
+        The folds' margin (``tetrode_holdout.fold_training_masks``).
     refit : callable
         ``refit(detector, time, position, spike_times, marks, is_training)``,
         an encoding model.
@@ -587,7 +609,7 @@ def heldout_log_likelihood(
     -------
     log_likelihood : ndarray of float32, shape (n_time, n_state_bins)
     blocks : ndarray of int, shape (n_time,)
-        Each bin's time block.
+        Each bin's fold.
     record : dict
         ``refit_s``, ``terms_s``, ``n_spikes``
         (:func:`.tetrode_holdout.heldout_terms`).
@@ -600,6 +622,8 @@ def heldout_log_likelihood(
         marks,
         is_training,
         n_folds=n_folds,
+        folds=folds,
+        margin_bins=margin_bins,
         refit=refit,
         log=log,
     )
@@ -705,6 +729,9 @@ def restriction_scores(
     in_swr: NDArray,
     *,
     n_folds: int = N_FOLDS,
+    folds: NDArray | None = None,
+    margin_bins: int = MARGIN_BINS,
+    linear_position: NDArray | None = None,
     refit: Callable[..., dict] = refit_encoding,
     log: Callable[[str], None] = print,
 ) -> tuple[pd.DataFrame, dict]:
@@ -725,6 +752,14 @@ def restriction_scores(
     in_swr : ndarray of bool, shape (n_time,)
         The bins inside an SWR, where ``swr`` allows only the non-local states.
     n_folds : int
+    folds : ndarray of int, shape (n_time,), optional
+        Each bin's fold (``tetrode_holdout.trial_folds``); by default
+        ``n_folds`` contiguous time blocks.
+    margin_bins : int
+        The folds' margin (``tetrode_holdout.fold_training_masks``).
+    linear_position : ndarray, shape (n_time,), optional
+        The animal's linear position, cm. Given, the table also has
+        ``place_sampling_s``.
     refit : callable
         ``refit(detector, time, position, spike_times, marks, is_training)``,
         an encoding model.
@@ -736,7 +771,11 @@ def restriction_scores(
         One row per bin: ``time``; ``none``, ``swr``, ``full`` (float32
         filter scores, ``log p(y_t | y_1..y_{t-1})``) and ``none_two_sided``,
         ``swr_two_sided``, ``full_two_sided`` (``log p(y_t | y_{-t})``);
-        ``in_swr`` and ``block`` (the bin's time block).
+        ``in_swr`` and ``block`` (the bin's fold); with ``linear_position``,
+        ``place_sampling_s`` (float32): the seconds the training bins of the
+        bin's fold's encodings spend at the animal's place bin
+        (``tetrode_holdout.place_sampling``), NaN where the position is not
+        finite. It is computed from the positions and folds, not the scores.
     record : dict
         :func:`heldout_log_likelihood`'s (``refit_s``, ``terms_s``,
         ``n_spikes``) and :func:`model_scores`' records, and ``n_in_swr``,
@@ -761,6 +800,8 @@ def restriction_scores(
         is_training,
         is_missing,
         n_folds=n_folds,
+        folds=folds,
+        margin_bins=margin_bins,
         refit=refit,
         log=log,
     )
@@ -777,6 +818,16 @@ def restriction_scores(
             "block": blocks,
         }
     )
+    if linear_position is not None:
+        environment = detector.encoding_model_[ENCODING_KEY]["environment"]
+        table["place_sampling_s"] = place_sampling(
+            animal_place_bins(environment, linear_position),
+            is_training,
+            blocks,
+            n_folds,
+            margin_bins,
+            float(np.median(np.diff(np.asarray(time, dtype=float)))),
+        )
     return table, record
 
 

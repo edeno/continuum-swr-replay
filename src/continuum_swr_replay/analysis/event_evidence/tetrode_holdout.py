@@ -75,6 +75,24 @@ MARGIN_BINS = 2
 library pads each training run by one bin width (``training_spike_bins``), and
 two bins cannot leave a sliver of the block in the fit."""
 
+TRIAL_MARGIN_S = 1.0
+"""The margin of :func:`trial_folds`' folds, s: training bins this close to any
+bin of a fold are left out of its encodings' fit. A trial fold is many separate
+segments, so its scored bins neighbor other folds' training bins about a hundred
+times an epoch; 1 s is longer than the longest non-local event, so no event is
+scored with an encoding fit on its own edges."""
+
+MAX_SEGMENT_S = 30.0
+"""The longest piece of a segment :func:`trial_folds` keeps whole, s: a longer
+segment is cut into equal pieces, each its own group, so a long stay is spread
+over the folds."""
+
+BEFORE_FIRST_TRIAL = -1
+"""The class of the segment before an epoch's first trial."""
+
+AFTER_LAST_TRIAL = -2
+"""The class of the segment after an epoch's last trial."""
+
 NO_SPIKE = "No-Spike"
 LOCAL = "Local"
 
@@ -99,28 +117,344 @@ def time_blocks(time: NDArray, n_folds: int = N_FOLDS) -> NDArray[np.int64]:
     return np.minimum(block, n_folds - 1)
 
 
+def trial_segments(time: NDArray, segment_starts: NDArray) -> NDArray[np.int64]:
+    """Each bin's segment: segment i runs from ``segment_starts[i]`` up to the
+    next start. Bins before the first start belong to segment 0, bins after the
+    last start to the last segment.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode's time axis, s, increasing.
+    segment_starts : ndarray, shape (n_segments,)
+        Each segment's first time, s, strictly increasing.
+
+    Returns
+    -------
+    ndarray of int, shape (n_time,)
+        0 .. n_segments - 1.
+
+    Raises
+    ------
+    ValueError
+        When there is no start, or the starts are not finite and strictly
+        increasing.
+    """
+    starts = np.asarray(segment_starts, dtype=float)
+    if starts.size == 0:
+        raise ValueError("no segment starts")
+    if not np.isfinite(starts).all() or (np.diff(starts) <= 0).any():
+        raise ValueError("segment starts must be finite and strictly increasing")
+    segment = np.searchsorted(starts, np.asarray(time, dtype=float), side="right") - 1
+    return np.maximum(segment, 0).astype(np.int64)
+
+
+def task_segment_starts(
+    time: NDArray,
+    departures: NDArray,
+    destinations: NDArray,
+    last_trial_end: float,
+) -> tuple[NDArray[np.float64], NDArray[np.int64]]:
+    """The segments of an epoch of the bandit task and their classes.
+
+    One segment per trial, from its departure from a well (``movement_start_time``,
+    the final poke-out at its origin) to the next departure, so the run to a well
+    and the whole stay there are one segment, its class the destination well
+    (``to_well``). The time before the first departure is a segment of class
+    :data:`BEFORE_FIRST_TRIAL` and the time from the last trial's end (its final
+    poke-out at its destination, ``end_time``) a segment of class
+    :data:`AFTER_LAST_TRIAL`, when the epoch has bins there.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode's time axis, s, increasing.
+    departures : ndarray, shape (n_trials,)
+        Each trial's departure, s, strictly increasing.
+    destinations : ndarray of int, shape (n_trials,)
+        Each trial's destination well.
+    last_trial_end : float
+        The last trial's end, s, after its departure.
+
+    Returns
+    -------
+    starts : ndarray, shape (n_segments,)
+        Each segment's first time, s (:func:`trial_segments`).
+    classes : ndarray of int, shape (n_segments,)
+
+    Raises
+    ------
+    ValueError
+        When there is no trial, a destination is missing, the departures and
+        destinations differ in length, or the last trial ends before it departs.
+    """
+    time = np.asarray(time, dtype=float)
+    departures = np.asarray(departures, dtype=float)
+    destinations = np.asarray(destinations)
+    if departures.size == 0:
+        raise ValueError("no trials")
+    if destinations.shape != departures.shape:
+        raise ValueError(
+            f"{destinations.size} destinations for {departures.size} departures"
+        )
+    if destinations.dtype.kind == "f" and not np.isfinite(destinations).all():
+        raise ValueError("every trial needs a destination well")
+    if not last_trial_end > departures[-1]:
+        raise ValueError("the last trial ends before its departure")
+    starts = [departures]
+    classes = [destinations.astype(np.int64)]
+    if departures[0] > time[0]:
+        starts.insert(0, time[:1])
+        classes.insert(0, np.array([BEFORE_FIRST_TRIAL]))
+    if last_trial_end <= time[-1]:
+        starts.append(np.array([last_trial_end]))
+        classes.append(np.array([AFTER_LAST_TRIAL]))
+    return np.concatenate(starts), np.concatenate(classes)
+
+
+def capped_groups(
+    time: NDArray, segment: NDArray, max_segment_s: float | None = MAX_SEGMENT_S
+) -> NDArray[np.int64]:
+    """Each bin's group: its segment, cut into equal pieces where the segment
+    is longer than ``max_segment_s``.
+
+    A segment of ``n`` bins longer than the cap (``m`` bins, the cap over the
+    median bin width, rounded down) is cut into ``ceil(n / m)`` pieces of
+    consecutive bins whose lengths differ by at most one bin, each at most
+    ``m`` bins; a segment of at most ``m`` bins is one group.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+    segment : ndarray of int, shape (n_time,)
+        Each bin's segment (:func:`trial_segments`), nondecreasing.
+    max_segment_s : float or None
+        The cap, s; None leaves every segment whole.
+
+    Returns
+    -------
+    ndarray of int, shape (n_time,)
+        0 .. n_groups - 1, nondecreasing.
+    """
+    segment = np.asarray(segment, dtype=np.int64)
+    if (np.diff(segment) < 0).any():
+        raise ValueError("segments must be runs of consecutive bins")
+    first = np.r_[0, np.flatnonzero(np.diff(segment)) + 1]
+    lengths = np.diff(np.r_[first, segment.size])
+    if max_segment_s is None:
+        pieces = np.ones(lengths.size, dtype=np.int64)
+    else:
+        bin_s = float(np.median(np.diff(np.asarray(time, dtype=float))))
+        cap_bins = max(int(np.floor(max_segment_s / bin_s + 1e-6)), 1)
+        pieces = -(-lengths // cap_bins)  # ceil
+    run = np.repeat(np.arange(lengths.size), lengths)
+    rank = np.arange(segment.size) - first[run]
+    piece = rank * pieces[run] // lengths[run]
+    offset = np.r_[0, np.cumsum(pieces)[:-1]]
+    return (offset[run] + piece).astype(np.int64)
+
+
+def trial_folds(
+    time: NDArray,
+    segment_starts: NDArray,
+    segment_classes: NDArray,
+    n_folds: int = N_FOLDS,
+    max_segment_s: float | None = MAX_SEGMENT_S,
+) -> NDArray[np.int64]:
+    """Each bin's fold: whole groups of bins, the folds balanced by class.
+
+    scikit-learn's ``StratifiedGroupKFold(n_splits=n_folds, shuffle=False)``
+    with one sample per bin, its class the class of the bin's segment
+    (:func:`trial_segments`) and its group the bin's piece of that segment
+    (:func:`capped_groups`: a segment longer than ``max_segment_s`` is cut into
+    equal pieces, so a long stay is spread over the folds). Every bin of a group
+    is in one fold, and each class's time is spread over the folds as evenly as
+    whole groups allow. Deterministic: without shuffling the splitter places the
+    groups in a fixed order (the most bins first).
+
+    With the segments of :func:`task_segment_starts` the folds sample every well
+    in every fold, where contiguous blocks of time (:func:`time_blocks`) leave a
+    patch the animal visits in one stretch of the epoch to a single block.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode's time axis, s, increasing.
+    segment_starts : ndarray, shape (n_segments,)
+        Each segment's first time, s, strictly increasing.
+    segment_classes : ndarray of int, shape (n_segments,)
+        Each segment's class.
+    n_folds : int
+    max_segment_s : float or None
+        The longest group, s; None leaves every segment whole.
+
+    Returns
+    -------
+    ndarray of int, shape (n_time,)
+        0 .. n_folds - 1; every fold has bins.
+
+    Raises
+    ------
+    ValueError
+        When the classes are not one per start or not all finite, when fewer
+        groups than ``n_folds`` hold a bin, or when a fold is left empty.
+    """
+    from sklearn.model_selection import StratifiedGroupKFold
+
+    classes = np.asarray(segment_classes)
+    if classes.shape != np.shape(segment_starts):
+        raise ValueError(
+            f"{classes.size} segment classes for {np.size(segment_starts)} starts"
+        )
+    if classes.dtype.kind == "f" and not np.isfinite(classes).all():
+        raise ValueError("every segment needs a class (a destination well)")
+    segment = trial_segments(time, segment_starts)
+    group = capped_groups(time, segment, max_segment_s)
+    n_groups = int(group[-1]) + 1
+    if n_groups < n_folds:
+        raise ValueError(
+            f"{n_groups} segments (trials) hold bins, fewer than the {n_folds} folds"
+        )
+    folds = np.full(segment.size, -1, dtype=np.int64)
+    splitter = StratifiedGroupKFold(n_splits=n_folds, shuffle=False)
+    for fold, (_, scored) in enumerate(
+        splitter.split(np.zeros(segment.size), classes[segment], group)
+    ):
+        folds[scored] = fold
+    empty = np.setdiff1d(np.arange(n_folds), folds)
+    if empty.size:
+        raise ValueError(f"folds {empty.tolist()} hold no segment")
+    return folds
+
+
+def margin_in_bins(margin_s: float, time: NDArray) -> int:
+    """``margin_s`` in bins of the time axis (its median bin width), rounded up.
+
+    Parameters
+    ----------
+    margin_s : float
+        s.
+    time : ndarray, shape (n_time,)
+
+    Returns
+    -------
+    int
+    """
+    bin_s = float(np.median(np.diff(np.asarray(time, dtype=float))))
+    # the tolerance keeps 1.0 / 0.002 at 500 bins, whatever its last float bit
+    return int(np.ceil(margin_s / bin_s - 1e-6))
+
+
 def fold_training_masks(
     is_training: NDArray, blocks: NDArray, n_folds: int, margin_bins: int = MARGIN_BINS
 ) -> list[NDArray[np.bool_]]:
-    """The training bins of each block's encodings: the decode's, outside the
-    block and ``margin_bins`` from it.
+    """The training bins of each fold's encodings: the decode's, outside the
+    fold and more than ``margin_bins`` from every bin of it.
+
+    A fold may be one contiguous block (:func:`time_blocks`) or many separate
+    segments (:func:`trial_folds`): a training bin is left out when any bin of
+    the fold lies within ``margin_bins`` of it.
+
+    Parameters
+    ----------
+    is_training : ndarray of bool, shape (n_time,)
+        The decode's training bins.
+    blocks : ndarray of int, shape (n_time,)
+        Each bin's fold.
+    n_folds : int
+    margin_bins : int
 
     Returns
     -------
     list of ndarray of bool, length n_folds, each shape (n_time,)
     """
     is_training = np.asarray(is_training, dtype=bool)
-    width = 2 * margin_bins + 1
+    blocks = np.asarray(blocks)
+    n_time = blocks.size
+    index = np.arange(n_time)
+    # the fold's bins in [t - margin, t + margin], from a running count
+    first = np.maximum(index - margin_bins, 0)
+    last = np.minimum(index + margin_bins + 1, n_time)
     masks = []
     for b in range(n_folds):
-        near = (
-            np.convolve(
-                (blocks == b).astype(np.int64), np.ones(width, np.int64), "same"
-            )
-            > 0
-        )
+        count = np.r_[0, np.cumsum(blocks == b, dtype=np.int64)]
+        near = count[last] - count[first] > 0
         masks.append(is_training & ~near)
     return masks
+
+
+def animal_place_bins(environment: Any, linear_position: NDArray) -> NDArray[np.int64]:
+    """The decoder's real place bin of the animal at each bin
+    (:func:`~.state_evidence.terms.nearest_interior_bins`); -1 where the
+    position is not finite.
+
+    Parameters
+    ----------
+    environment : non_local_detector.environment.Environment
+        The decoder's, fitted.
+    linear_position : ndarray, shape (n_time,)
+        cm.
+
+    Returns
+    -------
+    ndarray of int, shape (n_time,)
+        Index into the interior bins, or -1.
+    """
+    linear_position = np.asarray(linear_position, dtype=float)
+    out = np.full(linear_position.size, -1, dtype=np.int64)
+    finite = np.isfinite(linear_position)
+    out[finite] = nearest_interior_bins(environment, linear_position[finite])
+    return out
+
+
+def place_sampling(
+    place_bin: NDArray,
+    is_training: NDArray,
+    blocks: NDArray,
+    n_folds: int,
+    margin_bins: int,
+    bin_s: float,
+) -> NDArray[np.float32]:
+    """At each bin, the seconds its fold's encodings were fit on at the
+    animal's place.
+
+    The training bins of a fold's encodings are :func:`fold_training_masks`'
+    (the decode's training bins outside the fold and its margin). A bin's value
+    is ``bin_s`` times the number of them whose place bin is the bin's own: 0
+    where the encoding saw no data at the animal's place. Computed from the
+    positions and folds alone, not from any score.
+
+    Parameters
+    ----------
+    place_bin : ndarray of int, shape (n_time,)
+        The animal's place bin at each bin (:func:`animal_place_bins`), -1
+        where unknown.
+    is_training : ndarray of bool, shape (n_time,)
+    blocks : ndarray of int, shape (n_time,)
+        Each bin's fold.
+    n_folds, margin_bins : int
+        As :func:`fold_training_masks`.
+    bin_s : float
+        The bin width, s.
+
+    Returns
+    -------
+    ndarray of float32, shape (n_time,)
+        s; NaN where the place is unknown.
+    """
+    place_bin = np.asarray(place_bin, dtype=np.int64)
+    blocks = np.asarray(blocks, dtype=np.int64)
+    known = place_bin >= 0
+    n_places = int(place_bin.max()) + 1 if known.any() else 1
+    occupancy = np.stack(
+        [
+            np.bincount(place_bin[mask & known], minlength=n_places)
+            for mask in fold_training_masks(is_training, blocks, n_folds, margin_bins)
+        ]
+    )  # (n_folds, n_places), training bins
+    out = np.full(place_bin.size, np.nan, dtype=np.float32)
+    out[known] = occupancy[blocks[known], place_bin[known]] * bin_s
+    return out
 
 
 def _add_rows(out: NDArray, index: NDArray, values: NDArray) -> None:
@@ -345,6 +679,8 @@ def heldout_terms(
     is_training: NDArray,
     *,
     n_folds: int = N_FOLDS,
+    folds: NDArray | None = None,
+    margin_bins: int = MARGIN_BINS,
     refit: Callable[..., dict] = refit_encoding,
     log: Callable[[str], None] = print,
 ) -> tuple[FoldTerms, NDArray, NDArray, NDArray[np.int64], dict]:
@@ -367,6 +703,12 @@ def heldout_terms(
     is_training : ndarray of bool, shape (n_time,)
         The decode's training bins.
     n_folds : int
+    folds : ndarray of int, shape (n_time,), optional
+        Each bin's fold, 0 .. n_folds - 1 (for example :func:`trial_folds`);
+        by default ``n_folds`` contiguous blocks (:func:`time_blocks`).
+    margin_bins : int
+        Training bins within this many bins of a fold are left out of its
+        encodings' fit (:func:`fold_training_masks`).
     refit : callable
         ``refit(detector, time, position, spike_times, marks, is_training)``,
         an encoding model.
@@ -381,9 +723,15 @@ def heldout_terms(
     kernel : ndarray, shape (n_time, n_place_bins)
         The decoder's Local position kernel.
     blocks : ndarray of int, shape (n_time,)
-        Each bin's time block.
+        Each bin's fold: its time block, or ``folds``.
     record : dict
         ``refit_s``, ``terms_s`` (the terms, No-Spike and kernel), ``n_spikes``.
+
+    Raises
+    ------
+    ValueError
+        When ``folds`` is not one fold per bin in 0 .. n_folds - 1, each with
+        bins.
     """
     from non_local_detector.likelihoods.no_spike import (
         predict_no_spike_log_likelihood,
@@ -395,8 +743,18 @@ def heldout_terms(
     environment = detector.encoding_model_[ENCODING_KEY]["environment"]
     centers = np.asarray(environment.place_bin_centers_)[interior_bin_mask(environment)]
 
-    blocks = time_blocks(time, n_folds)
-    masks = fold_training_masks(is_training, blocks, n_folds)
+    if folds is None:
+        blocks = time_blocks(time, n_folds)
+    else:
+        blocks = np.asarray(folds, dtype=np.int64)
+        if blocks.shape != time.shape or not np.array_equal(
+            np.unique(blocks), np.arange(n_folds)
+        ):
+            raise ValueError(
+                f"folds must give each of the {time.size} bins a fold in "
+                f"0 .. {n_folds - 1}, each fold with bins"
+            )
+    masks = fold_training_masks(is_training, blocks, n_folds, margin_bins)
     encodings = [
         refit(detector, time, head_position, spike_times, marks, mask) for mask in masks
     ]

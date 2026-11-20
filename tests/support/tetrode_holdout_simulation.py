@@ -202,6 +202,25 @@ def simulate_recording(
     )
 
 
+def trials(recording: Recording) -> tuple[np.ndarray, np.ndarray]:
+    """The recording's trials as ``tetrode_holdout.trial_folds`` takes them:
+    each lap is a trial, from its departure (the first running bin) through the
+    rest at the end it runs to.
+
+    Returns
+    -------
+    starts : ndarray, shape (n_laps,)
+        Each trial's departure, s.
+    classes : ndarray of int, shape (n_laps,)
+        Its destination: 0 for the track's start, 1 for its end.
+    """
+    running = recording.is_running.astype(np.int8)
+    first = np.flatnonzero(np.diff(np.r_[0, running]) == 1)
+    last = np.flatnonzero(np.diff(np.r_[running, 0]) == -1)
+    classes = (recording.position[last] > TRACK_CM / 2).astype(np.int64)
+    return recording.time[first], classes
+
+
 def fit_detector(recording: Recording) -> NonLocalClusterlessDetector:
     """The real decodes' detector, fit by EM on the running bins."""
     config = NonLocalDecodingConfig()

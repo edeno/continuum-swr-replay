@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
+from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.decoding.files import DecodePaths
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import score_nonlocal_restriction as runner
@@ -40,6 +41,22 @@ CATEGORY = [
     "immobile_outside_swr",
     "excluded",
 ]
+# Six trials: departures at bins 0, 2, 4, 6, 8 and 10, to wells 2, 3, 2, 3, 2, 3,
+# each ending at the next departure and the last at bin 11, so bin 11 is the
+# time after the last trial.
+TRIALS = pd.DataFrame(
+    {
+        "movement_start_time": TIME[[0, 2, 4, 6, 8, 10]],
+        "end_time": TIME[[2, 4, 6, 8, 10, 11]],
+        "to_well": [2, 3, 2, 3, 2, 3],
+    }
+)
+# Seconds of training data at the animal's place: bins 0 and 3 none, bin 7
+# 4 s, the other immobile bins 30 s; NaN at the excluded bin.
+SAMPLING = np.full(N, 30.0, dtype=np.float32)
+SAMPLING[[0, 3]] = 0.0
+SAMPLING[7] = 4.0
+SAMPLING[11] = np.nan
 
 
 def _frame(swr_label=None) -> pd.DataFrame:
@@ -56,6 +73,7 @@ def _frame(swr_label=None) -> pd.DataFrame:
             "in_excluded_time": np.arange(N) == 11,
             "head_position_x": np.arange(N, dtype=float),
             "head_position_y": -np.arange(N, dtype=float),
+            "linear_position": 2.0 * np.arange(N, dtype=float),
             "SWR_event": label,
         },
         index=pd.Index(TIME, name="time"),
@@ -82,7 +100,8 @@ def _scores() -> pd.DataFrame:
                 for c in ("none", "swr", "full")
             },
             "in_swr": IN_SWR,
-            "block": np.zeros(N, dtype=np.int64),
+            "block": np.r_[np.zeros(N - 3), np.ones(3)].astype(np.int64),
+            "place_sampling_s": SAMPLING,
         }
     )
 
@@ -126,7 +145,7 @@ def patched(tmp_path, monkeypatch):
         },
     )
 
-    def run(frame, record):
+    def run(frame, record, fold_design="trials"):
         loaded = {
             "spike_times": [np.array([100.001])],
             "marks": [np.ones((1, 4))],
@@ -134,17 +153,48 @@ def patched(tmp_path, monkeypatch):
             "is_missing": np.zeros(N, dtype=bool),
         }
         detector = object()
-        monkeypatch.setattr(
-            runner,
-            "epoch_inputs",
-            lambda epoch_id, data_dir: EpochInputs(
-                paths, frame, frame.index.to_numpy(), loaded, detector
-            ),
-        )
+
+        def epoch_inputs(epoch_id, data_dir, *, trials):
+            assert trials == (fold_design == "trials")
+            return EpochInputs(
+                paths,
+                frame,
+                frame.index.to_numpy(),
+                loaded | ({"trials": TRIALS} if trials else {}),
+                detector,
+            )
+
+        monkeypatch.setattr(runner, "epoch_inputs", epoch_inputs)
 
         def restriction_scores(
-            d, time, position, spikes, marks, training, missing, in_swr, *, log
+            d,
+            time,
+            position,
+            spikes,
+            marks,
+            training,
+            missing,
+            in_swr,
+            *,
+            folds,
+            margin_bins,
+            linear_position,
+            log,
         ):
+            if fold_design == "trials":
+                np.testing.assert_array_equal(
+                    folds,
+                    th.trial_folds(
+                        TIME,
+                        TIME[[0, 2, 4, 6, 8, 10, 11]],
+                        np.r_[TRIALS["to_well"], th.AFTER_LAST_TRIAL],
+                        nr.N_FOLDS,
+                    ),
+                )
+                assert margin_bins == 500  # 1 s of 2 ms bins
+            else:
+                assert folds is None and margin_bins == th.MARGIN_BINS
+            np.testing.assert_array_equal(linear_position, 2.0 * np.arange(N))
             assert d is detector
             np.testing.assert_array_equal(time, TIME)
             np.testing.assert_array_equal(
@@ -158,7 +208,7 @@ def patched(tmp_path, monkeypatch):
 
         monkeypatch.setattr(runner.nr, "restriction_scores", restriction_scores)
         output = tmp_path / "out"
-        return runner.run_epoch(EPOCH, tmp_path, output), output
+        return runner.run_epoch(EPOCH, tmp_path, output, fold_design), output
 
     return run
 
@@ -169,6 +219,7 @@ def test_run_epoch_labels_sums_and_records_the_epoch(patched):
 
     bins = pd.read_parquet(output_path(EPOCH, output, runner.BINS_NAME))
     assert list(bins["category"].astype(str)) == CATEGORY
+    assert bins["place_sampling_s"].dtype == np.float32
     np.testing.assert_array_equal(bins["in_swr"], IN_SWR)
 
     sums = pd.read_parquet(output_path(EPOCH, output, runner.OUTPUT_NAME))
@@ -201,7 +252,43 @@ def test_run_epoch_labels_sums_and_records_the_epoch(patched):
         "swr_events",
         "swr_observed",
     }
+    # the folds: seven segments, 9 and 3 of the 12 bins in the two folds the
+    # scores name; of the 8 immobile bins, 2 had no training data at the
+    # animal's place and 3 had 10 s or less
+    assert record["fold_design"] == "trials"
+    assert record["margin_bins"] == 500
+    assert record["n_segments"] == 7  # six trials and the time after them
+    assert record["n_groups"] == 7
+    assert record["fold_share_min"] == 0.0
+    assert record["fold_share_max"] == pytest.approx(0.75)
+    assert record["immobile_share_place_sampling_0s"] == pytest.approx(2 / 8)
+    assert record["immobile_share_place_sampling_le_10s"] == pytest.approx(3 / 8)
+    assert record["n_immobile_without_place"] == 0
     json.dumps(record, allow_nan=False)
+
+
+def test_the_contiguous_design_passes_no_folds(patched):
+    record, _ = patched(_frame(), _record(), fold_design="contiguous")
+    assert record["status"] == "ok"
+    assert record["fold_design"] == "contiguous"
+    assert record["margin_bins"] == th.MARGIN_BINS
+    assert record["n_segments"] is None and record["n_groups"] is None
+
+
+def test_the_header_names_the_fold_design_and_its_margin():
+    assert runner.fold_settings("trials") == {
+        "fold_design": "trials",
+        "fold_classes": "to_well",
+        "margin_s": 1.0,
+        "max_segment_s": th.MAX_SEGMENT_S,
+    }
+    assert runner.fold_settings("contiguous") == {
+        "fold_design": "contiguous",
+        "margin_s": 0.004,
+        "margin_bins": 2,
+    }
+    with pytest.raises(ValueError, match="unknown fold design"):
+        runner.fold_settings("chunks")
 
 
 def test_a_failed_check_is_recorded_with_its_message(patched):
