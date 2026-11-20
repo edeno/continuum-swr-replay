@@ -411,6 +411,81 @@ def event_bins(
     return s.astype(np.int64), e.astype(np.int64)
 
 
+def epoch_windows(
+    time: NDArray, event_table: pd.DataFrame, participation: pd.DataFrame
+) -> pd.DataFrame:
+    """The epoch's events and their Local-rest controls as decode-bin windows.
+
+    The windows Figure 2's held-out tetrode score
+    (``scripts/event_evidence/score_tetrode_holdout.py``) and the non-local
+    restriction windows (``scripts/event_evidence/sum_nonlocal_restriction_windows.py``)
+    are taken over.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode's time axis, s.
+    event_table : pd.DataFrame
+        The canonical event table (``event_id``, ``event_start_s``,
+        ``event_end_s``); events of other epochs are ignored.
+    participation : pd.DataFrame
+        The epoch's participation table (``event_participation``): one row per
+        window, ``event_id``, ``kind`` (``"event"`` or ``"control"``),
+        ``group``, and for a control ``start_s`` and ``n_bins``.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per window, the events first, then the controls:
+        ``window_id`` (0, 1, ...), ``event_id`` (for a control, the event it
+        matches), ``kind``, ``group``, and the first and last decode bin
+        ``s`` and ``e`` (inclusive).
+
+    Raises
+    ------
+    ValueError
+        If an event is not in the event table, or a window is off the decode's
+        grid.
+    """
+    measured = participation[participation["kind"] == "event"][["event_id", "group"]]
+    events = event_table.merge(measured, on="event_id", validate="one_to_one")
+    if len(events) != len(measured):
+        raise ValueError("a measured event is not in the event table")
+    s, e = event_bins(
+        time, events["event_start_s"].to_numpy(), events["event_end_s"].to_numpy()
+    )
+    controls = participation[participation["kind"] == "control"]
+    control_start = controls["start_s"].to_numpy()
+    cs, _ = event_bins(time, control_start, control_start)
+    return (
+        pd.concat(
+            [
+                pd.DataFrame(
+                    {
+                        "event_id": events["event_id"].to_numpy(),
+                        "kind": "event",
+                        "group": events["group"].to_numpy(),
+                        "s": s,
+                        "e": e,
+                    }
+                ),
+                pd.DataFrame(
+                    {
+                        "event_id": controls["event_id"].to_numpy(),
+                        "kind": "control",
+                        "group": controls["group"].to_numpy(),
+                        "s": cs,
+                        "e": cs + controls["n_bins"].to_numpy() - 1,
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+        .rename_axis("window_id")
+        .reset_index()
+    )
+
+
 def tetrode_halves(
     n_tetrodes: int, *, n_partitions: int = 10, seed: Seed = 0
 ) -> list[tuple[NDArray, NDArray]]:

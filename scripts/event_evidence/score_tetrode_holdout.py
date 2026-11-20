@@ -50,7 +50,6 @@ import sys
 import time as clock
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
@@ -58,7 +57,7 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
 )
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
-    event_bins,
+    epoch_windows,
 )
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import ROOT_DIR
@@ -95,56 +94,6 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
 PRODUCED_BY = produced_by(__file__)
 OUTPUT_NAME = "tetrode_holdout"
 PARTICIPATION_NAME = "participation"
-
-
-def epoch_windows(
-    time: np.ndarray, event_table: pd.DataFrame, participation: pd.DataFrame
-) -> pd.DataFrame:
-    """The epoch's events and their Local-rest controls as decode-bin windows.
-
-    Raises
-    ------
-    ValueError
-        If an event is not in the event table, or a window is off the decode's
-        grid.
-    """
-    measured = participation[participation["kind"] == "event"][["event_id", "group"]]
-    events = event_table.merge(measured, on="event_id", validate="one_to_one")
-    if len(events) != len(measured):
-        raise ValueError("a measured event is not in the event table")
-    s, e = event_bins(
-        time, events["event_start_s"].to_numpy(), events["event_end_s"].to_numpy()
-    )
-    controls = participation[participation["kind"] == "control"]
-    control_start = controls["start_s"].to_numpy()
-    cs, _ = event_bins(time, control_start, control_start)
-    return (
-        pd.concat(
-            [
-                pd.DataFrame(
-                    {
-                        "event_id": events["event_id"].to_numpy(),
-                        "kind": "event",
-                        "group": events["group"].to_numpy(),
-                        "s": s,
-                        "e": e,
-                    }
-                ),
-                pd.DataFrame(
-                    {
-                        "event_id": controls["event_id"].to_numpy(),
-                        "kind": "control",
-                        "group": controls["group"].to_numpy(),
-                        "s": cs,
-                        "e": cs + controls["n_bins"].to_numpy() - 1,
-                    }
-                ),
-            ],
-            ignore_index=True,
-        )
-        .rename_axis("window_id")
-        .reset_index()
-    )
 
 
 def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) -> dict:
