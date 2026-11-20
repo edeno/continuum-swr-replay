@@ -141,9 +141,14 @@ def test_epoch_gamma_measures_events_and_references_on_analyzed_time():
     lfp, time, dot, grid, excluded, events = _epoch()
     before = dot.copy()
 
-    columns, reference = epoch_gamma(lfp, time, FS, dot, grid, excluded, events)
+    columns, reference, on_grid = epoch_gamma(
+        lfp, time, FS, dot, grid, excluded, events, 5, np.random.default_rng(0)
+    )
 
     pd.testing.assert_frame_equal(dot, before)
+    # the z-scored power of each band at every bin of the decode grid
+    assert list(on_grid) == ["slow_gamma_z", "fast_gamma_z"]
+    assert on_grid["slow_gamma_z"].shape == grid.shape
     assert list(columns) == [
         "slow_gamma_z",
         "slow_gamma_power",
@@ -179,3 +184,50 @@ def test_epoch_gamma_measures_events_and_references_on_analyzed_time():
         "fast_gamma_db_swr",
         "fast_gamma_db_non_swr",
     ]
+
+
+def _rest_only_epoch(n_events: int = 1500, event_s: float = 0.05):
+    """240 s of white-noise LFP at 1 kHz with the animal at rest throughout. The
+    non-SWR events, one every 0.15 s, are windows of that same rest: nothing
+    happens in them."""
+    rng = np.random.default_rng(0)
+    time = np.arange(240_000) / FS
+    lfp = rng.standard_normal((time.size, 2))
+    grid = np.round(np.arange(1.0, 239.0, 0.002), 6)
+    starts = np.round(1.5 + 0.15 * np.arange(n_events), 6)
+    ends = np.round(starts + event_s, 6)
+    label = np.zeros(grid.size, dtype=int)
+    for k, (start, end) in enumerate(zip(starts, ends, strict=True), start=1):
+        label[(grid >= start) & (grid <= end)] = k
+    dot = pd.DataFrame(
+        {
+            "head_speed": 1.0,
+            "in_excluded_time": False,
+            "non_local_event": label,
+            "SWR_event": 0,
+            "MUA_event": 0,
+        },
+        index=grid,
+    )
+    excluded = pd.DataFrame({"start_time": [], "end_time": []})
+    events = pd.DataFrame(
+        {"event_start_s": starts, "event_end_s": ends, "is_swr": False}
+    )
+    return lfp, time, dot, grid, excluded, events
+
+
+def test_an_events_reference_is_rest_windows_of_its_own_length():
+    """Band power is skewed, so a mean over an event's bins sits above the median
+    of single rest bins even when the event is itself rest. Against rest windows
+    as long as the events, it does not."""
+    lfp, time, dot, grid, excluded, events = _rest_only_epoch()
+    columns, reference, _ = epoch_gamma(
+        lfp, time, FS, dot, grid, excluded, events, 50, np.random.default_rng(1)
+    )
+    for band in GAMMA_BANDS:
+        event_level = np.median(columns[f"{band}_z"])
+        assert event_level - reference[f"{band}_rest_median"] > 0.08
+        assert abs(event_level - reference[f"{band}_rest_matched_non_swr"]) < 0.03
+        # no SWR event, and the animal never runs: no level to give
+        assert np.isnan(reference[f"{band}_rest_matched_swr"])
+        assert np.isnan(reference[f"{band}_running_matched_non_swr"])
