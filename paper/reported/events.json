@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "cfa31d371dd9",
+ "commit": "39cef4695084",
  "code": {
-  "head": "cfa31d371dd9cacc88b02b11100e0fedb3ca1d7e",
+  "head": "39cef4695084aae5e90107eabf77753d47d11c54",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -339,8 +339,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "41e18917c3b5e850752213a0ba2a00ed7a159653dd5ff2c176efbd7f2d013b25",
-    "code_sha256": "4268bf0c071e6e31e61d62acd6978db20e64ea184dd44b5988173d443a5525db"
+    "sha256": "0d467b42cdaa80f7c631f03a7b041b23a2a3b81c07360bf0b0e3d1611a189e56",
+    "code_sha256": "c8f3d715a2d4a0dabd34b29c9837e107268badf853896bca1450c71cdc057bdf"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -598,6 +598,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
@@ -630,7 +631,6 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
     "3d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
@@ -647,7 +647,6 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
     "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
@@ -664,7 +663,6 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
     "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
@@ -681,7 +679,6 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
     "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
@@ -698,7 +695,6 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
     "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
@@ -715,7 +711,6 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
     "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
@@ -732,7 +727,6 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
     "3d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
@@ -749,7 +743,6 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
     "3d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
@@ -1387,8 +1380,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -1404,8 +1396,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3b"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1421,8 +1412,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3b"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1438,8 +1428,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3b"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1455,8 +1444,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3b"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1472,8 +1460,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3b"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1489,8 +1476,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -1506,8 +1492,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -3074,6 +3059,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
@@ -3090,6 +3076,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
@@ -3106,6 +3093,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
@@ -3122,6 +3110,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
@@ -3138,6 +3127,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
@@ -4059,6 +4049,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
@@ -5295,6 +5286,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
@@ -5311,6 +5303,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
@@ -5327,6 +5320,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
@@ -5343,6 +5337,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
@@ -5359,6 +5354,7 @@
     "2d.1"
    ],
    "figures": [
+    "3f",
     "3h"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",

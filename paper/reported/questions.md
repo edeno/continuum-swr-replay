@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `cfa31d371dd9` | yes | 32 | 0 |
 | `detection.json` | `cfa31d371dd9` | yes | 172 | 0 |
-| `events.json` | `cfa31d371dd9` | yes | 417 | 0 |
+| `events.json` | `39cef4695084` | yes | 417 | 0 |
 | `behavior.json` | `cfa31d371dd9` | yes | 922 | 0 |
 | `mpfc.json` | `cfa31d371dd9` | yes | 604 | 0 |
 
@@ -713,13 +713,13 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's epochs | `events.content_occupancy_values` | 3h |
-| `\EventsNonSwrContentAtWellFraction` | 51 % |  | share of non-SWR non-local content time at well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3h |
-| `\EventsNonSwrContentNearOffFraction` | 1 % |  | share of non-SWR non-local content time near off (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3h |
-| `\EventsNonSwrContentOwnWellFraction` | 11 % |  | share of non-SWR non-local content time own well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3h |
-| `\EventsNonSwrContentRemotePathFraction` | 48 % |  | share of non-SWR non-local content time remote path (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3h |
-| `\EventsNonSwrContentRemoteWellFraction` | 40 % |  | share of non-SWR non-local content time remote well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3h |
-| `\EventsOccupancyEpochs` | 242 |  | epochs whose event time bins place content on the track | `events.content_occupancy_values` | 3h |
+| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's epochs | `events.content_occupancy_values` | 3f, 3h |
+| `\EventsNonSwrContentAtWellFraction` | 51 % |  | share of non-SWR non-local content time at well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3f, 3h |
+| `\EventsNonSwrContentNearOffFraction` | 1 % |  | share of non-SWR non-local content time near off (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3f, 3h |
+| `\EventsNonSwrContentOwnWellFraction` | 11 % |  | share of non-SWR non-local content time own well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3f, 3h |
+| `\EventsNonSwrContentRemotePathFraction` | 48 % |  | share of non-SWR non-local content time remote path (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3f, 3h |
+| `\EventsNonSwrContentRemoteWellFraction` | 40 % |  | share of non-SWR non-local content time remote well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3f, 3h |
+| `\EventsOccupancyEpochs` | 242 |  | epochs whose event time bins place content on the track | `events.content_occupancy_values` | 3f, 3h |
 | `\EventsStartDistanceAnimalsInDirection` | 3 |  | animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.start_distance_values` |  |
 | `\EventsStartDistanceDifferenceHigh` | +28 | cm | upper bound of that interval | `events.property_interval_values` |  |
 | `\EventsStartDistanceDifferenceLow` | −15 | cm | lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) | `events.property_interval_values` |  |
@@ -728,11 +728,11 @@ Sources:
 | `\EventsStartDistanceMatchedDifferenceLow` | −39 | cm | lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` |  |
 | `\EventsStartDistanceMedianNonSwr` | 110 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile non-SWR non-local events | `events.start_distance_values` |  |
 | `\EventsStartDistanceMedianSwr` | 120 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile SWR-overlapping non-local events | `events.start_distance_values` |  |
-| `\EventsSwrContentAtWellFraction` | 23 % |  | share of SWR non-local content time at well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3h |
-| `\EventsSwrContentNearOffFraction` | 0 % |  | share of SWR non-local content time near off (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3h |
-| `\EventsSwrContentOwnWellFraction` | 4 % |  | share of SWR non-local content time own well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3h |
-| `\EventsSwrContentRemotePathFraction` | 77 % |  | share of SWR non-local content time remote path (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3h |
-| `\EventsSwrContentRemoteWellFraction` | 19 % |  | share of SWR non-local content time remote well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3h |
+| `\EventsSwrContentAtWellFraction` | 23 % |  | share of SWR non-local content time at well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3f, 3h |
+| `\EventsSwrContentNearOffFraction` | 0 % |  | share of SWR non-local content time near off (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3f, 3h |
+| `\EventsSwrContentOwnWellFraction` | 4 % |  | share of SWR non-local content time own well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3f, 3h |
+| `\EventsSwrContentRemotePathFraction` | 77 % |  | share of SWR non-local content time remote path (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3f, 3h |
+| `\EventsSwrContentRemoteWellFraction` | 19 % |  | share of SWR non-local content time remote well (wells are the track graph's end points; each epoch's share, averaged over the animal's epochs, then over animals) | `events.content_occupancy_values` | 3f, 3h |
 
 ### 2d.2. How does replay speed differ between SWR and non-SWR events?
 
@@ -768,22 +768,22 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsArmsAnimalsInDirection` | 5 |  | animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` | 3b, 3d |
-| `\EventsArmsDifferenceHigh` | +3.3 |  | upper bound of that interval | `events.property_interval_values` | 3b, 3d |
-| `\EventsArmsDifferenceLow` | +0.68 |  | lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median number of arms the decoded position visits | `events.property_interval_values` | 3b, 3d |
-| `\EventsArmsMatchedDifference` | +0.98 |  | SWR minus non-SWR difference of median number of arms the decoded position visits at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3b, 3d |
-| `\EventsArmsMatchedDifferenceHigh` | +1.4 |  | upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) | `events.property_interval_values` | 3b, 3d |
-| `\EventsArmsMatchedDifferenceLow` | +0.61 |  | lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3b, 3d |
-| `\EventsArmsMedianNonSwr` | 1 |  | median number of arms the decoded position visits of immobile non-SWR non-local events | `events.property_values` | 3b, 3d |
-| `\EventsArmsMedianSwr` | 3 |  | median number of arms the decoded position visits of immobile SWR-overlapping non-local events | `events.property_values` | 3b, 3d |
-| `\EventsExtentAnimalsInDirection` | 5 |  | animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` | 3b, 3d |
-| `\EventsExtentDifferenceHigh` | +65 | cm | upper bound of that interval | `events.property_interval_values` | 3b, 3d |
-| `\EventsExtentDifferenceLow` | +18 | cm | lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median spatial extent of the decoded content | `events.property_interval_values` | 3b, 3d |
-| `\EventsExtentMatchedDifference` | +35 | cm | SWR minus non-SWR difference of median spatial extent of the decoded content at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3b, 3d |
-| `\EventsExtentMatchedDifferenceHigh` | +52 | cm | upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) | `events.property_interval_values` | 3b, 3d |
-| `\EventsExtentMatchedDifferenceLow` | +17 | cm | lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3b, 3d |
-| `\EventsExtentMedianNonSwr` | 8.0 | cm | median spatial extent of the decoded content of immobile non-SWR non-local events | `events.property_values` | 3b, 3d |
-| `\EventsExtentMedianSwr` | 50 | cm | median spatial extent of the decoded content of immobile SWR-overlapping non-local events | `events.property_values` | 3b, 3d |
+| `\EventsArmsAnimalsInDirection` | 5 |  | animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` | 3d |
+| `\EventsArmsDifferenceHigh` | +3.3 |  | upper bound of that interval | `events.property_interval_values` | 3d |
+| `\EventsArmsDifferenceLow` | +0.68 |  | lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median number of arms the decoded position visits | `events.property_interval_values` | 3d |
+| `\EventsArmsMatchedDifference` | +0.98 |  | SWR minus non-SWR difference of median number of arms the decoded position visits at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3d |
+| `\EventsArmsMatchedDifferenceHigh` | +1.4 |  | upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) | `events.property_interval_values` | 3d |
+| `\EventsArmsMatchedDifferenceLow` | +0.61 |  | lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3d |
+| `\EventsArmsMedianNonSwr` | 1 |  | median number of arms the decoded position visits of immobile non-SWR non-local events | `events.property_values` | 3d |
+| `\EventsArmsMedianSwr` | 3 |  | median number of arms the decoded position visits of immobile SWR-overlapping non-local events | `events.property_values` | 3d |
+| `\EventsExtentAnimalsInDirection` | 5 |  | animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median, each the median over the animal's epochs of the epoch's median | `events.property_values` | 3b |
+| `\EventsExtentDifferenceHigh` | +65 | cm | upper bound of that interval | `events.property_interval_values` | 3b |
+| `\EventsExtentDifferenceLow` | +18 | cm | lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median spatial extent of the decoded content | `events.property_interval_values` | 3b |
+| `\EventsExtentMatchedDifference` | +35 | cm | SWR minus non-SWR difference of median spatial extent of the decoded content at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3b |
+| `\EventsExtentMatchedDifferenceHigh` | +52 | cm | upper bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) | `events.property_interval_values` | 3b |
+| `\EventsExtentMatchedDifferenceLow` | +17 | cm | lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3b |
+| `\EventsExtentMedianNonSwr` | 8.0 | cm | median spatial extent of the decoded content of immobile non-SWR non-local events | `events.property_values` | 3b |
+| `\EventsExtentMedianSwr` | 50 | cm | median spatial extent of the decoded content of immobile SWR-overlapping non-local events | `events.property_values` | 3b |
 | `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | `events.class_step_values` |  |
 
 ### 2d.4. How much does content move within an event (pauses, largest step, reversals), SWR against non-SWR?
@@ -2892,13 +2892,15 @@ Script: `scripts/figures/generate_figure03.py`. Questions: 2d.1, 2d.2, 2d.3, 2d.
 
 Panel a: `\EventsDurationAnimalsInDirection`, `\EventsDurationDifferenceHigh`, `\EventsDurationDifferenceLow`, `\EventsDurationMedianNonSwr`, `\EventsDurationMedianSwr`
 
-Panel b: `\EventsArmsAnimalsInDirection`, `\EventsArmsDifferenceHigh`, `\EventsArmsDifferenceLow`, `\EventsArmsMatchedDifferenceHigh`, `\EventsArmsMatchedDifferenceLow`, `\EventsArmsMatchedDifference`, `\EventsArmsMedianNonSwr`, `\EventsArmsMedianSwr`, `\EventsExtentAnimalsInDirection`, `\EventsExtentDifferenceHigh`, `\EventsExtentDifferenceLow`, `\EventsExtentMatchedDifferenceHigh`, `\EventsExtentMatchedDifferenceLow`, `\EventsExtentMatchedDifference`, `\EventsExtentMedianNonSwr`, `\EventsExtentMedianSwr`
+Panel b: `\EventsExtentAnimalsInDirection`, `\EventsExtentDifferenceHigh`, `\EventsExtentDifferenceLow`, `\EventsExtentMatchedDifferenceHigh`, `\EventsExtentMatchedDifferenceLow`, `\EventsExtentMatchedDifference`, `\EventsExtentMedianNonSwr`, `\EventsExtentMedianSwr`
 
 Panel c: `\EventsSpeedAnimalsInDirection`, `\EventsSpeedDifferenceHigh`, `\EventsSpeedDifferenceLow`, `\EventsSpeedMatchedDifferenceHigh`, `\EventsSpeedMatchedDifferenceLow`, `\EventsSpeedMatchedDifference`, `\EventsSpeedMedianNonSwr`, `\EventsSpeedMedianSwr`
 
-Panel d: `\EventsArmsAnimalsInDirection`, `\EventsArmsDifferenceHigh`, `\EventsArmsDifferenceLow`, `\EventsArmsMatchedDifferenceHigh`, `\EventsArmsMatchedDifferenceLow`, `\EventsArmsMatchedDifference`, `\EventsArmsMedianNonSwr`, `\EventsArmsMedianSwr`, `\EventsExtentAnimalsInDirection`, `\EventsExtentDifferenceHigh`, `\EventsExtentDifferenceLow`, `\EventsExtentMatchedDifferenceHigh`, `\EventsExtentMatchedDifferenceLow`, `\EventsExtentMatchedDifference`, `\EventsExtentMedianNonSwr`, `\EventsExtentMedianSwr`
+Panel d: `\EventsArmsAnimalsInDirection`, `\EventsArmsDifferenceHigh`, `\EventsArmsDifferenceLow`, `\EventsArmsMatchedDifferenceHigh`, `\EventsArmsMatchedDifferenceLow`, `\EventsArmsMatchedDifference`, `\EventsArmsMedianNonSwr`, `\EventsArmsMedianSwr`
 
 Panel e: `\EventsNonSwrContinuousShare`, `\EventsNonSwrFragmentedShare`, `\EventsSwrContinuousShare`, `\EventsSwrFragmentedShare`
+
+Panel f: `\EventsAnimalsNonSwrMoreAtWell`, `\EventsNonSwrContentAtWellFraction`, `\EventsNonSwrContentNearOffFraction`, `\EventsNonSwrContentOwnWellFraction`, `\EventsNonSwrContentRemotePathFraction`, `\EventsNonSwrContentRemoteWellFraction`, `\EventsOccupancyEpochs`, `\EventsSwrContentAtWellFraction`, `\EventsSwrContentNearOffFraction`, `\EventsSwrContentOwnWellFraction`, `\EventsSwrContentRemotePathFraction`, `\EventsSwrContentRemoteWellFraction`
 
 Panel h: `\EventsAnimalsNonSwrMoreAtWell`, `\EventsNonSwrContentAtWellFraction`, `\EventsNonSwrContentNearOffFraction`, `\EventsNonSwrContentOwnWellFraction`, `\EventsNonSwrContentRemotePathFraction`, `\EventsNonSwrContentRemoteWellFraction`, `\EventsOccupancyEpochs`, `\EventsSwrContentAtWellFraction`, `\EventsSwrContentNearOffFraction`, `\EventsSwrContentOwnWellFraction`, `\EventsSwrContentRemotePathFraction`, `\EventsSwrContentRemoteWellFraction`
 
