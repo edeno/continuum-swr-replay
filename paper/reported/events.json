@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "39cef4695084",
+ "commit": "26238b32b7d7",
  "code": {
-  "head": "39cef4695084aae5e90107eabf77753d47d11c54",
+  "head": "26238b32b7d792d3c10ba200f82a5b45d2b66be3",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -255,8 +255,8 @@
     "code_sha256": "ef936210972a70fd67d41f6d6730bf18f39dff3427aa6c8595c0ce398b8b1bbf"
    },
    "src/continuum_swr_replay/analysis/event_properties/content_along_arms.py": {
-    "sha256": "bd01826046e02e2eb1c1eab7b4948f95fa9c5bd44d8088806e0a9ac24c1c612b",
-    "code_sha256": "7bfb24e78bcbd59c324c0db854de4890c5a7faa6785a21dedc9b817fb656162e"
+    "sha256": "e61fc784f7afaefe170b706db7fdf55a67521aede75e8ceee8638cde7bbe38dd",
+    "code_sha256": "c3490bca0d57002a36f5f68eb6147854d9e5c34485917eb10ba173490d1082e3"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
     "sha256": "51485f4aaa98134dc21e48daef94c4de26bc8a7673001d0eeba648104e814216",
@@ -339,8 +339,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "0d467b42cdaa80f7c631f03a7b041b23a2a3b81c07360bf0b0e3d1611a189e56",
-    "code_sha256": "c8f3d715a2d4a0dabd34b29c9837e107268badf853896bca1450c71cdc057bdf"
+    "sha256": "cfda1510a6ee5d2529f93b33519435f60fa78e0b11bfe963006e75d6f41dab28",
+    "code_sha256": "948bc1c5af02696158f7438e53df37f7d5d8fa1e228a8d718ad56218ff5e6b55"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -489,11 +489,11 @@
   {
    "path": "Processed-Data/content_along_arms/*.parquet",
    "n_files": 242,
-   "sha256": "979e1657725c8f37a686fe629387c44862090751e7222b6ba381a500f309cbd5"
+   "sha256": "2c62e79706e6490a9d05327de881c23922cdecd297b5b5754e47eb85c8680090"
   },
   {
    "path": "Processed-Data/content_along_arms/manifest.json",
-   "sha256": "fa83c6feebace2a2ec994c16239944e33da260064dc4749e99b1e3cbaf8ff45f"
+   "sha256": "9d922f50fe77b8b5d77abdff0bbd1a93cad988fafa06c6991f40896d6d0128e5"
   },
   {
    "path": "Processed-Data/event_tetrode_holdout/*_tetrode_holdout.parquet",
@@ -598,8 +598,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -630,9 +630,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
@@ -646,9 +644,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -662,9 +658,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -678,9 +672,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -694,9 +686,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -710,9 +700,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -726,9 +714,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
@@ -742,9 +728,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
@@ -1380,7 +1364,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b"
+    "3c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -1396,7 +1380,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b"
+    "3c"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1412,7 +1396,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b"
+    "3c"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1428,7 +1412,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b"
+    "3c"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1444,7 +1428,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b"
+    "3c"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1460,7 +1444,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b"
+    "3c"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1476,7 +1460,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b"
+    "3c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -1492,7 +1476,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b"
+    "3c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -1508,7 +1492,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1524,7 +1508,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1540,7 +1524,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1556,7 +1540,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1628,7 +1612,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1644,7 +1628,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1660,7 +1644,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1676,7 +1660,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -3059,8 +3043,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -3076,8 +3060,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -3093,8 +3077,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -3110,8 +3094,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -3127,8 +3111,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -3144,7 +3128,7 @@
     "2d.10"
    ],
    "figures": [
-    "3e"
+    "3b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
@@ -3268,7 +3252,7 @@
     "2d.10"
    ],
    "figures": [
-    "3e"
+    "3b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
@@ -4049,8 +4033,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -4610,7 +4594,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4626,7 +4610,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4642,7 +4626,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4658,7 +4642,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4730,7 +4714,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4746,7 +4730,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4762,7 +4746,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4778,7 +4762,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "3h"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4794,7 +4778,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -4810,7 +4794,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -4826,7 +4810,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -4842,7 +4826,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -4858,7 +4842,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -4874,7 +4858,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -4890,7 +4874,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -4906,7 +4890,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -5286,8 +5270,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -5303,8 +5287,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -5320,8 +5304,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -5337,8 +5321,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -5354,8 +5338,8 @@
     "2d.1"
    ],
    "figures": [
-    "3f",
-    "3h"
+    "3e",
+    "3g"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -5371,7 +5355,7 @@
     "2d.10"
    ],
    "figures": [
-    "3e"
+    "3b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
@@ -5447,7 +5431,7 @@
     "2d.10"
    ],
    "figures": [
-    "3e"
+    "3b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
