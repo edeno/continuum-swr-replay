@@ -378,8 +378,8 @@ def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> Non
     kind's events (``axes``: one per signal, stacked, sharing the x axis)."""
     for ax, (signal, column, label) in zip(axes, SIGNALS, strict=True):
         levels = animal_signal_levels(events, reference, signal, column, matched=True)
-        ticks, names = [], []
-        for k, (is_swr, name, color) in enumerate(KINDS):
+        centers = []
+        for k, (is_swr, _, color) in enumerate(KINDS):
             x = 3.7 * k + np.arange(3)
             values = levels.loc[is_swr, ["rest", "event", "running"]]
             for _, row in values.iterrows():
@@ -389,14 +389,23 @@ def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> Non
                     np.full(len(values), x[i]), values.iloc[:, i], s=7,
                     color=dot_color, edgecolors="black", linewidths=0.5, zorder=2,
                 )  # fmt: skip
-            ticks += list(x)
-            names += ["rest", name, "running"]
+            centers.append(x[1])
         ax.axhline(0, color="0.85", lw=0.5, zorder=0)
         ax.set_title(label, fontsize=SMALL_SIZE, pad=2)
-        ax.set_xticks(ticks, names, rotation=45, ha="right")
-        ax.set_xlim(-0.6, ticks[-1] + 0.6)
+        # One label per kind; the key says which dots are rest and running.
+        ax.set_xticks(centers, [name for _, name, _ in KINDS])
+        ax.set_xlim(-0.7, centers[-1] + 1.7)
     axes[0].tick_params(labelbottom=False)
     axes[0].set_ylabel("Power (z)", y=-0.2)
+    handles = [
+        plt.Line2D([], [], marker="o", ls="", ms=2.6, mfc=color, mec="black", mew=0.5)
+        for color in (C_REST, C_RUN)
+    ]
+    axes[0].legend(
+        handles, ["rest", "running"], frameon=False, loc="lower left",
+        bbox_to_anchor=(-0.05, 1.22), ncol=2, fontsize=SMALL_SIZE,
+        handletextpad=0.0, columnspacing=0.6, borderaxespad=0,
+    )  # fmt: skip
 
 
 # ---------------------------------------------------------------------------
