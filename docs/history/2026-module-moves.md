@@ -759,6 +759,9 @@ module kept its place; one file was renamed. Paths are under `src/continuum_swr_
 | mpfc summary key `analysed_epochs` (macro `\MpfcAnalysedEpochs`) | `analyzed_epochs` (`\MpfcAnalyzedEpochs`) |
 | `run_retrospective_alignment.py` provenance key `n_sessions_analysed` | `n_sessions_analyzed` |
 | `compare_pfc_cohorts.py` columns `peak_penalised`, `median_abs_peak_penalised` | `peak_penalized`, `median_abs_peak_penalized` |
+| `class_or_continuum.StepFit.n_labelled`: the `n_labelled` column of `ripple_class_structure/step_fits.csv` and `step_simulation.csv` | `n_labeled` (files written before keep `n_labelled`; nothing reads the column by name) |
+| `run_memoryless_detection.py` left-out reason `NOT_ANALYSED` (`"not an analysed epoch in the epoch register"` in run manifests) | `NOT_ANALYZED` (`"not an analyzed epoch ..."`) |
+| keyword arguments `state_evidence.windows.null_partners(centre_bins=)`, `pfc.modulation.prior_binds(penalised_peak=)` | `center_bins=`, `penalized_peak=` |
 
 The PFC cohort records keep their key `n_analysed`: the records on disk carry it, and
 `reported/mpfc/population.py` reads it.

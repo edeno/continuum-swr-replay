@@ -14,11 +14,14 @@ part is checked. The case of each part is kept.
 What is read, and how much of it:
 
 * vendored and quoted text is not read: the agent skills (``.claude/skills/``),
-  the reference code of other labs (``reference/``), the bibliography (titles
-  are spelled as published) and ``LICENSE``;
+  the reference code of other labs (``reference/``), the bibliography and the
+  literature survey of Table S1 (``paper/tables/``; journals and titles are
+  spelled as published) and ``LICENSE``;
 * historical records -- the paths ``tests/repository/test_doc_paths_resolve.py``
   calls historical -- are read as prose only: their code spans and fenced
-  blocks name the code as it was then, and are left as written;
+  blocks name the code as it was then, and are left as written, as are the
+  scripts kept beside them (not read). Code named outside backticks, and quoted
+  commit messages, are read as prose;
 * a notebook's cell sources are read, not its outputs;
 * everything else is read whole.
 
@@ -27,8 +30,9 @@ What is read, and how much of it:
 ``make reported-values``), not edited.
 
 Some British spellings are names this repository does not own, and are kept
-(:data:`KEPT`): matplotlib's ``colColours`` keyword and ``Greys`` colormap, and
-the ``n_analysed`` key of the PFC cohort records already on disk.
+(:data:`KEPT`): matplotlib's ``colColours`` keyword and ``Greys`` colormap,
+XLA's ``CANCELLED`` status, and the ``n_analysed`` key of the PFC cohort
+records already on disk.
 
 Usage::
 
@@ -431,7 +435,7 @@ def americanize_notebook(raw: str) -> str:
 
 #: Not read: vendored or quoted text, and this script and its test, which
 #: spell the British words on purpose.
-_NOT_READ_PREFIXES = (".claude/skills/", "reference/")
+_NOT_READ_PREFIXES = (".claude/skills/", "reference/", "paper/tables/")
 _NOT_READ = {
     "paper/references.bib",
     "LICENSE",
@@ -467,10 +471,8 @@ def read_as(path: str) -> str | None:
         return None
     if path.endswith(".ipynb"):
         return "notebook"
-    if path.endswith(".md") and (
-        path.startswith(_RECORD_PREFIXES) or _DATED_DESIGN.fullmatch(path)
-    ):
-        return "prose"
+    if path.startswith(_RECORD_PREFIXES) or _DATED_DESIGN.fullmatch(path):
+        return "prose" if path.endswith(".md") else None
     return "whole"
 
 

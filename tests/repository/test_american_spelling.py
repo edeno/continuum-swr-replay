@@ -3,7 +3,9 @@
 ``scripts/checks/american_spelling.py`` holds the British spellings it knows and
 what it reads; this test fails on any it finds in the tracked files, and pins
 how it treats the cases that are easy to get wrong. To fix the spellings it
-finds, run ``uv run --frozen python scripts/checks/american_spelling.py --fix``.
+finds, run ``uv run --frozen python scripts/checks/american_spelling.py --fix``;
+for the summaries and macros, rebuild them (``make summaries``, then
+``make reported-values``).
 """
 
 from __future__ import annotations
@@ -12,6 +14,8 @@ import json
 
 import pytest
 
+import scripts.checks.american_spelling as spelling
+import tests.repository.test_doc_paths_resolve as doc_paths
 from scripts.checks.american_spelling import (
     americanize,
     americanize_notebook,
@@ -97,14 +101,26 @@ def test_vendored_and_quoted_text_is_not_read():
     assert read_as(".claude/skills/figure-critic/SKILL.md") is None
     assert read_as("reference/widloski_foster_2025/LICENSE") is None
     assert read_as("paper/references.bib") is None
+    assert read_as("paper/tables/table_s1_literature_parameters.csv") is None
+    assert read_as(".claude/docs/reviews/2026-10-27-refit/summarize.py") is None
     assert read_as(".claude/docs/reviews/2026-11-11-review.md") == "prose"
     assert read_as("docs/design/2026-10-09-swr-source.md") == "prose"
     assert read_as("docs/development.md") == "whole"
+
+
+def test_the_records_are_the_ones_the_doc_path_check_calls_historical():
+    # The agent skills are historical there and not read at all here.
+    assert set(spelling._RECORD_PREFIXES) | {".claude/skills/"} == set(
+        doc_paths.HISTORICAL_PREFIXES
+    )
+    assert spelling._DATED_DESIGN.pattern == doc_paths._DATED_DESIGN.pattern
 
 
 def test_the_tracked_files_have_no_british_spellings():
     found = british_spellings()
     assert not found, (
         f"{len(found)} British spellings (fix with `uv run --frozen python "
-        "scripts/checks/american_spelling.py --fix`):\n" + "\n".join(found[:50])
+        "scripts/checks/american_spelling.py --fix`; in paper/reported/ and "
+        "paper/reported_values.tex, rebuild with `make summaries` and "
+        "`make reported-values`):\n" + "\n".join(found[:50])
     )

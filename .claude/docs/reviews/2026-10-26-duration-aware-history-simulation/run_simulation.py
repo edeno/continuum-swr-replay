@@ -8,8 +8,8 @@ review's report comes from ``results.json``.
 Three parts:
 
 1. pooled: one long simulated session per scenario (bias / recovery);
-2. sessions: many session-sized simulations per scenario, summarized as
-   ``scripts/rate/fit_cross_history_rate.py`` summarizes real sessions;
+2. sessions: many session-sized simulations per scenario, summarised as
+   ``scripts/rate/fit_cross_history_rate.py`` summarises real sessions;
 3. identifiability: the fragmentation and onset-rhythm scenarios with the
    duration spread shrunk to zero (constant durations).
 
@@ -224,10 +224,10 @@ def _plot_kernels(pooled: dict, response: str) -> Path:
             if col == 0:
                 ax.set_ylabel("rate ratio")
     for ax in axes[-1]:
-        ax.set_xlabel("lag (ms; onset- or offset-locked as labeled)")
+        ax.set_xlabel("lag (ms; onset- or offset-locked as labelled)")
     fig.suptitle(
         f"Response stream {response}: fitted history kernels (lags with "
-        f"< {MIN_SUPPORT:g} expected onsets not drawn; gray = truth)",
+        f"< {MIN_SUPPORT:g} expected onsets not drawn; grey = truth)",
         fontsize=9,
     )
     fig.tight_layout()

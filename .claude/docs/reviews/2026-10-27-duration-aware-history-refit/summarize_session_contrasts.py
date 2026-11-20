@@ -8,7 +8,7 @@ population, per session (both rungs fit):
 - cross (the two non-local streams): self (both) -> + cross onset-only /
   offset-only / both; onset-only vs offset-only.
 
-A contrast is ``AIC(simpler) - AIC(richer)`` (positive favors the richer, or
+A contrast is ``AIC(simpler) - AIC(richer)`` (positive favours the richer, or
 for ``*_offset_vs_onset`` the offset anchor). Aggregation: session median and
 share positive; per animal the median and the summed likelihood-ratio
 statistic (``sum(dAIC + 2 * dk)``, chi-square with ``sum(dk)`` df under no

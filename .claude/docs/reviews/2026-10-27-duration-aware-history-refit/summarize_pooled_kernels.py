@@ -1,8 +1,8 @@
-"""Summarize the per-animal pooled kernels (``pooled_kernels_at_well.json``).
+"""Summarise the per-animal pooled kernels (``pooled_kernels_at_well.json``).
 
 A lag of a kernel is *measurable* when the animal's pooled support (expected
 onsets at that lag, ``lag_support``) is >= 3 and the kernel's Wald SE on the
-log scale is <= 0.5; unmeasurable lags are neither summarized nor drawn.
+log scale is <= 0.5; unmeasurable lags are neither summarised nor drawn.
 
 Per population, over the five animals:
 
