@@ -1409,10 +1409,10 @@ def test_figure03_legend_counts_every_event_of_each_kind(offline):
     plt.close(fig)
 
 
-def test_figure03_distance_labels_say_which_wells(offline):
-    """Panel e's upper axis names the dark bars near the animal and far from
-    it, each on its side of ``FAR_CM``; at the panel's printed size no text in
-    the axis runs into another."""
+def test_figure03_distance_label_names_the_other_wells(offline):
+    """Panel e's upper axis names the dark bars far from the animal, beyond
+    ``FAR_CM``, and nothing names the well the animal is at; at the panel's
+    printed size no text in the axis runs into another."""
     import matplotlib.pyplot as plt
 
     from continuum_swr_replay.analysis.event_properties.event_statistics import FAR_CM
@@ -1428,12 +1428,12 @@ def test_figure03_distance_labels_say_which_wells(offline):
     axes = [fig.add_axes([0.08, y, 0.153, 0.149]) for y in (0.30, 0.13)]
     figure03.draw_distance_from_animal(axes, shares)
     labels = {t.get_text(): t for t in axes[0].texts}
-    assert labels["own well"].get_position()[0] < FAR_CM
     assert labels["other wells"].get_position()[0] > FAR_CM
-    assert not {"own well", "other wells"} & {t.get_text() for t in axes[1].texts}
+    assert "other wells" not in {t.get_text() for t in axes[1].texts}
+    assert not any("own" in t.get_text() for ax in axes for t in ax.texts)
     fig.draw_without_rendering()
     boxes = [t.get_window_extent() for t in axes[0].texts]
-    assert len(boxes) == 3  # the two labels and the kind's name
+    assert len(boxes) == 2  # the label and the kind's name
     for i, box in enumerate(boxes):
         for other in boxes[i + 1 :]:
             assert not box.overlaps(other)

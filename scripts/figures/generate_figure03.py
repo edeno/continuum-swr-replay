@@ -19,10 +19,9 @@ Each row asks one thing:
             or below each speed.
     Where the content is, and the brain state
         e — Content time by track distance from the animal, at a well (within
-            ``AT_WELL_CM`` of one) and elsewhere: content at a well far from
-            the animal is at another well, near it at the animal's own (the
-            two labels; the summary's ``*_content_remote_well_fraction`` and
-            ``*_content_own_well_fraction`` divide at ``FAR_CM``).
+            ``AT_WELL_CM`` of one) and elsewhere. Content at a well far from
+            the animal is at another well, and those bars are labeled so (the
+            summary's ``*_content_remote_well_fraction``, beyond ``FAR_CM``).
         f — Where on the track each kind's content is denser: the ratio of no-SWR
             to SWR content time per cm along every arm.
         g — Content time per cm from the center out to the junctions (trunk
@@ -297,8 +296,7 @@ def draw_cumulative(ax, events: pd.DataFrame, key: str) -> None:
 def draw_distance_from_animal(axes, shares: pd.DataFrame) -> None:
     """Each kind's content time by distance from the animal (``axes``: no SWR,
     then SWR), stacked: at a well (dark) and elsewhere (light). The upper axis
-    says which wells the dark bars are: the animal's own within ``FAR_CM`` of it,
-    other wells beyond."""
+    names the dark bars far from the animal: other wells."""
     width = np.diff(DISTANCE_EDGES_CM)
     top = 100 * shares.sum(axis=1).max()
     for ax, (is_swr, name, color) in zip(axes, KINDS, strict=True):
@@ -316,16 +314,12 @@ def draw_distance_from_animal(axes, shares: pd.DataFrame) -> None:
             0.55, 0.95, name, transform=ax.transAxes, ha="center", va="top",
             color=color, fontsize=SMALL_SIZE,
         )  # fmt: skip
-    # One row, over the bars they name: side by side they fit only from the
-    # axis's left edge to the far wells' bars.
-    for x, align, name in (
-        (DISTANCE_EDGES_CM[0] + 2, "left", "own well"),
-        (DISTANCE_EDGES_CM[-1] - 2 * FAR_CM - 4, "right", "other wells"),
-    ):
-        axes[0].text(
-            x, 0.70, name, transform=axes[0].get_xaxis_transform(), ha=align,
-            va="bottom", color="0.3", fontsize=SMALL_SIZE,
-        )  # fmt: skip
+    # Beside the far wells' bars, which it names.
+    axes[0].text(
+        DISTANCE_EDGES_CM[-1] - 2 * FAR_CM - 4, 0.70, "other wells",
+        transform=axes[0].get_xaxis_transform(), ha="right", va="bottom",
+        color="0.3", fontsize=SMALL_SIZE,
+    )  # fmt: skip
     axes[0].tick_params(labelbottom=False)
     axes[1].set_xlabel("Content distance\nfrom animal (cm)")
     axes[0].set_ylabel("% content time", y=0.0)
