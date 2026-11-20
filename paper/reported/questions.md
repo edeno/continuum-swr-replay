@@ -18,7 +18,7 @@ it calls.
 | `survey.json` | `cfa31d371dd9` | yes | 32 | 0 |
 | `detection.json` | `cfa31d371dd9` | yes | 172 | 0 |
 | `events.json` | `330bad489f20` | yes | 421 | 0 |
-| `behavior.json` | `cfa31d371dd9` | yes | 922 | 0 |
+| `behavior.json` | `ab277338643b` | yes | 922 | 0 |
 | `mpfc.json` | `cfa31d371dd9` | yes | 604 | 0 |
 
 ## Part 0: introduction
