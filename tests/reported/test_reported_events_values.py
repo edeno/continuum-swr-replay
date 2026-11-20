@@ -638,6 +638,17 @@ def test_rest_theta_values_name_each_class():
     }
 
 
+def test_figure_3_values_are_tagged_to_the_panel_that_shows_them():
+    """Spatial extent is panel b and the arm count panel d. The content's place
+    shares (own and remote, at a well and elsewhere) are read off panel f and
+    the at-well share is quoted on panel h."""
+    values = _by_key(builder.property_values(_property_events(), "s"))
+    assert values["extent_median_swr"].figures == ("3b",)
+    assert values["arms_median_swr"].figures == ("3d",)
+    assert values["arms_median_swr"].questions == values["extent_median_swr"].questions
+    assert builder.TAGS["content_occupancy"].figures == ("3f", "3h")
+
+
 def test_content_occupancy_values_name_each_group_and_place():
     # Remote: over 20 cm from the animal; at a well: under 20 cm from one.
     def rows(animal, epoch, is_swr, d_animal, d_well):

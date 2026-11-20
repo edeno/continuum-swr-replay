@@ -170,9 +170,10 @@ TAGS = {
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
     "spike_gpi": Tags(("2c.4",)),
-    "content_occupancy": Tags(("2d.1",), ("3h",)),
+    "content_occupancy": Tags(("2d.1",), ("3f", "3h")),
     "duration": Tags(("2d.6",), ("3a",)),
-    "extent": Tags(("2d.3",), ("3b", "3d")),
+    "extent": Tags(("2d.3",), ("3b",)),
+    "arms": Tags(("2d.3",), ("3d",)),
     "speed": Tags(("2d.2",), ("3c",)),
     "certainty": Tags(("2d.5",)),
     "stillness": Tags(("2d.4",)),
@@ -1712,7 +1713,7 @@ _PROPERTIES = (
         "",
         "int",
         "lower",
-        TAGS["extent"],
+        TAGS["arms"],
     ),
 )
 
