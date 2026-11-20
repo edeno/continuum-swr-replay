@@ -28,7 +28,7 @@ each epoch:
    - population: ``log sum_x exp(l_k(t, x)) pi_{-k}(t, x)``;
    - local: ``log sum_x exp(l_k(t, x)) K(x | animal(t))``, ``K`` the decoder's
      Local kernel normalized over the place bins;
-   - local at the animal's bin: ``l_k(t, animal bin)`` (panel h's definition);
+   - local at the animal's bin: ``l_k(t, animal bin)``;
    - uniform: ``log mean_x exp(l_k(t, x))``, no place preferred.
 
    A window's gain for tetrode k is the sum over its bins of population minus

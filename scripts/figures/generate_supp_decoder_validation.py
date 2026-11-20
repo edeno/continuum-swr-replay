@@ -23,9 +23,9 @@ Panels:
         events, which the main text alludes to but does not visualize.
 
     e — Full four-signal event-triggered averages.
-        The reduced two-signal version sits in main Figure 2c; here we
-        show theta and MUA alongside non-local probability and SWR
-        z-score for completeness.
+        Main Figure 2i shows ripple power, MUA, theta and head speed
+        around event starts; here theta and MUA sit alongside non-local
+        probability and SWR z-score.
 
 Usage
 -----

@@ -5,7 +5,7 @@ Goal
 ----
 Sanity-check that the SWR-overlap categories used in the replay-content
 regressions make sense against the real decoded data. For a stratified
-sample of events, render the same 4-row decoding stack used in Figure 2a
+sample of events, render the same 4-row decoding stack used in Figure 2b
 (SWR z-score trace / spike raster / conditional non-local posterior /
 acausal state probabilities) and annotate each plot with *how that event is
 scored in the regression* (its ``is_swr`` covariate, regression-population

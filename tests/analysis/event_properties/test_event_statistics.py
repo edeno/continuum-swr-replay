@@ -749,3 +749,20 @@ def test_state_composition_is_the_mean_share_by_epoch_then_animal():
     swr = composition.loc["SWR"]
     assert swr["n_animals"] == 1
     assert swr["fragmented_animal_mean"] == pytest.approx(0.7)
+
+
+def test_overlap_class_animal_shares_are_epoch_then_animal_means():
+    events = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a", "b"],
+            "session_date": ["d1", "d1", "d2", "d1"],
+            "epoch": ["02_r1"] * 4,
+            "overlap_class": ["non_swr", "swr_contained", "non_swr", "swr_partial"],
+        }
+    )
+    shares = stats.overlap_class_animal_shares(events)
+    # a: epoch d1 half non-SWR, half inside; epoch d2 all non-SWR
+    assert shares.loc["a", "non_swr"] == pytest.approx(0.75)
+    assert shares.loc["a", "swr_contained"] == pytest.approx(0.25)
+    assert shares.loc["b", "swr_partial"] == pytest.approx(1.0)
+    assert list(shares.columns) == list(stats.OVERLAP_CLASSES)

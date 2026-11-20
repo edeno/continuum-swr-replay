@@ -99,12 +99,12 @@ FIGURES: dict[str, Figure] = {
     "2": Figure(
         "Non-local events and SWRs",
         "scripts/figures/generate_figure02.py",
-        "abcdefghijk",
+        "abcdefghij",
     ),
     "3": Figure(
         "What SWR and no-SWR events are like",
         "scripts/figures/generate_figure03.py",
-        "abcdefgh",
+        "abcdefghi",
     ),
     "4": Figure(
         "mPFC responses to SWR and non-SWR events",
@@ -232,13 +232,13 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2b.2",
         "How many immobile non-local events overlap no SWR, and what fraction of them is that?",
-        figures=("2", "2c"),
+        figures=("2", "2d"),
         note="The retired claims table (in git history) read these as the events SWR-triggered detection misses; that reading belongs in the Results.",
     ),
     Question(
         "2b.3",
         "How do SWR detection and non-local detection overlap: for each other detector, what share of its events overlaps no non-local event, how do those divide by decoder state, and, for the ones that do overlap, what share of their time bins does each state take?",
-        figures=("2", "2d", "2e"),
+        figures=("2", "2c", "2e"),
     ),
     Question(
         "2b.4",
@@ -248,12 +248,12 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2b.5",
         "How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?",
-        figures=("2j",),
+        figures=("2i", "2j"),
     ),
     Question(
         "2c.3",
         "Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?",
-        figures=("2", "2i"),
+        figures=("2", "2h"),
         note="The held-out test split by SWR (the heldout_* values) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
     ),
     Question(
@@ -271,7 +271,7 @@ QUESTIONS: tuple[Question, ...] = (
         "Where does content sit relative to the animal and to the reward wells, SWR against non-SWR?",
         status="partly computed",
         reason="the own-well share waits for the wider-Local-kernel re-decode (question 2c.6)",
-        figures=("3e", "3f", "3g"),
+        figures=("3f", "3g", "3h"),
     ),
     Question(
         "2d.2",
@@ -299,7 +299,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.8",
         "How do theta z-score and speed compare across SWR events, non-SWR events and running?",
-        figures=("2j", "3h", "decoder_validation"),
+        figures=("2i", "3i", "decoder_validation"),
         note="Was question 2c.1: the state the events occur in, not evidence that their content is real.",
     ),
     Question(
@@ -311,7 +311,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.10",
         "On average, how much of an SWR or non-SWR event is Continuous, and how much Fragmented?",
-        figures=("2h",),
+        figures=("3e",),
     ),
     Question(
         "3.1",

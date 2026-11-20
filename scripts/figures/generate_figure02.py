@@ -10,41 +10,42 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     b — Six examples: a non-local event inside an SWR, one that starts before
         its SWR, one that ends after it, two with no SWR (a trajectory and a
         stationary event), and an SWR whose content is Local.
-    c — The non-local events by SWR overlap (donut), with the animals' range of
-        the no-SWR share and the share of non-local time outside SWRs.
-    d — The SWRs by content (donut): with a non-local event, mostly Local, or
-        other.
-    e — For each SWR definition, MUA and the Widloski detector: the share of
-        non-local events its events overlap, and the share of its own events
-        that overlap a non-local event.
-    f — Each SWR-overlapping event's start and end minus its SWR's, on a log
-        count axis, with the share of pairs beyond 25 and 50 ms.
-    g — Tetrode participation (share of tetrodes with a spike) and spike rate of
+    c — The SWRs by content (bars pooled over SWRs, dots one per animal): with a
+        non-local event, mostly Local, or other. The decoder finds the replay
+        SWRs are known for.
+    d — The non-local events by SWR overlap (bars and animal dots as in c): most
+        events have no SWR.
+    e — For each SWR definition, MUA and the Widloski detector, c's and d's
+        questions: the share of its own events that overlap a non-local event,
+        and the share of non-local events its events overlap.
+    f — Each SWR-overlapping event's start and end minus its SWR's: the percent
+        of event-SWR pairs per 5 ms on a log axis, bars the animals' mean and
+        outlines the animals.
+    g — Tetrode participation (share of tetrodes with a spike) and spike rate (summed over tetrodes) of
         each non-local event against a Local-rest window of its length, one line
         per animal, for no-SWR and SWR events
         (``event_evidence.participation``; ``Processed-Data/event_participation``).
-    h — The mean share of an event in Continuous and in Fragmented (each event's
-        mean state probability, each event weighted alike), no-SWR and SWR events; bars the animals' mean,
-        dots the animals (``event_statistics.state_composition_statistics``).
-    i — Held-out tetrode score: each tetrode left out of the decoder's smoother in
+    h — Held-out tetrode score: each tetrode left out of the decoder's smoother in
         turn and scored at every bin of each event under the other tetrodes'
         position distribution against local coding around the animal (time-fold
-        encodings); the gain summed over tetrodes and bins, per spike. One line
-        per animal from its Local-rest controls to its events, for no-SWR and
-        SWR events, and the animals' mean with its interval
+        encodings); the gain summed over tetrodes and bins, per spike. A dot per
+        animal for no-SWR and SWR events, the animals' mean with its interval,
+        and the Local-rest controls' mean as a reference (near zero by
+        construction)
         (``event_evidence.tetrode_holdout``;
         ``Processed-Data/event_tetrode_holdout``).
-    j — Ripple power and MUA around non-local event starts, SWR vs no-SWR, with
-        the epochs' rest level (rest bins in no event).
-    k — The share of rest time bins decoded non-local by ripple power, one line
-        per animal: no step at the SWR threshold.
+    i — Around non-local event starts, SWR vs no-SWR: ripple power, MUA, theta
+        power and head speed, each the median and interquartile range over
+        events, with the epochs' level between events, theta's running level and
+        the immobility threshold: not theta sequences.
+    j — The share of immobile time bins decoded non-local by ripple power, one
+        line per animal: no step at the SWR threshold.
 
-Panels c and f are drawn from the canonical event table by the functions the
+Panels d and f are drawn from the canonical event table by the functions the
 events summary uses (``event_statistics.overlap_class_statistics``,
-``boundary_offsets``); d from ``nonlocal_comparison.other_detector_statistics``
-on the event features run the summary reads, and c's time share from
-``left_out_statistics``; j's rest lines from ``event_statistics.reference_medians``
-of the brain-state reference. Panels j and k are per-time-bin signals no stored
+``boundary_offsets``); c and e from ``nonlocal_comparison`` on the event
+features run the summary reads; i's between-events and running lines from
+``event_statistics.reference_medians`` of the brain-state reference. Panels i and j are per-time-bin signals no stored
 output holds, computed from the aggregated decode frames (cached), whose event
 counts by SWR overlap must equal the canonical table's.
 
@@ -60,7 +61,7 @@ import argparse
 import hashlib
 import logging
 import warnings
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import joblib
@@ -72,6 +73,8 @@ from matplotlib.axes import Axes
 from matplotlib.backend_bases import RendererBase
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec, SubplotSpec
+from matplotlib.ticker import NullLocator
+from matplotlib.transforms import Bbox
 from non_local_detector.environment import Environment
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
@@ -112,12 +115,10 @@ from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     nonlocal_share_by_power,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
-    OFFSET_TAILS_S,
-    boundary_offset_statistics,
     boundary_offsets,
+    overlap_class_animal_shares,
     overlap_class_statistics,
     reference_medians,
-    state_composition_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
     compute_triggered_average_curves,
@@ -149,7 +150,7 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.reported.formatting import format_number
-from continuum_swr_replay.runs.io import read_complete_run
+from continuum_swr_replay.runs.io import read_complete_run, read_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.inventory_examples import detector_color
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
@@ -169,18 +170,14 @@ from continuum_swr_replay.visualization.simulated_run_panels import (
 )
 
 # The render cache's version, part of its file name. The name also carries the
-# SWR source's name, a fingerprint of the epoch register's analyzed epochs and
-# a fingerprint of the decode files read, so a new SWR inventory, artifact run,
-# register change or rewritten decode makes a new cache by itself. Bump this
-# whenever the cached values could change for any other reason.
-# 4: panel a's examples read from the event table when drawn; frame event counts.
-# 5: Figure 2 redrawn: triggered ripple and MUA (f) and the non-local share by
-#    ripple power (h) are cached; the decoding-error panel left the figure.
-# 6: the detector comparison's statistics (d, g) are cached; the event features
-#    run is part of the name.
-# 7: the comparison's share of non-local time outside Kay's SWRs is cached (c).
-# 8: each detector's share of its events overlapping a non-local event (h).
-FIGURE02_CACHE_VERSION = 8
+# SWR source's name and fingerprints of the epoch register's analyzed epochs, of
+# the decode files and the detector comparison's files read, and of the panel
+# settings (``_settings_fingerprint``), so a change to any of them makes a new
+# cache by itself. Bump this whenever the cached values could change for any
+# other reason; git history holds what each earlier bump was for.
+# 13: e's animal dots from per-event memberships, each animal's mean over its
+#     epochs, as c's and d's.
+FIGURE02_CACHE_VERSION = 13
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%d-%b-%y %H:%M:%S"
@@ -215,6 +212,11 @@ HEIGHT = 7.72
 
 C_LOCAL = COLORS["Local"]
 C_NOSPIKE = COLORS["No-Spike"]
+C_OTHER = "white"
+"""Panel c's 'Other' SWRs: an outlined bar, no state's color (they are mostly
+mixed-state, not No-Spike)."""
+C_BETWEEN = "#777777"
+"""Panel i's between-events level: a neutral gray, not the No-Spike state's."""
 C_NL = COLORS["Non-Local"]
 C_SWR = COLORS["SWR"]
 C_QUIET = COLORS["All Events"]
@@ -241,22 +243,25 @@ EXAMPLE_HALF_WINDOW_S = 0.2
 # Panel b's examples, chosen by eye from contact sheets of the example session's
 # events with peak non-local probability >= 0.95, no other event and no other
 # SWR within the window, and a sharp posterior (small HPD coverage): each
-# title's event_id and the overlap class it is drawn as.
+# title's event_id and the overlap subclass it is drawn as, which
+# ``example_windows`` checks.
 EXAMPLES = {
-    "Inside SWR": (2185516843327500879, "swr_contained"),
-    "Starts before SWR": (63427667006281341, "swr_partial"),
-    "Ends after SWR": (3628740333881355820, "swr_partial"),
-    "No SWR, trajectory": (5216998177801911428, "non_swr"),
-    "No SWR, stationary": (8826983562067101773, "non_swr"),
+    "Inside SWR": (2185516843327500879, "swr_contains_event"),
+    "Starts before SWR": (63427667006281341, "single_swr_partial"),
+    "Ends after SWR": (3628740333881355820, "single_swr_partial"),
+    "No SWR, trajectory": (5216998177801911428, "no_overlap"),
+    "No SWR, stationary": (8826983562067101773, "no_overlap"),
 }
+# Panel b's partial examples: the one side on which the event runs past its SWR.
+PARTIAL_SIDE = {"Starts before SWR": "start", "Ends after SWR": "end"}
 # The SWR with Local content: its start in the SWR source, seconds. No non-local
 # event overlaps it and the decode is Local through it.
 LOCAL_SWR_START_S = 1617036373.982971
-# Panel j: the triggered averages' window (``compute_triggered_average_curves``'s
+# Panel i: the triggered averages' window (``compute_triggered_average_curves``'s
 # window_sec; the curves span half of it either side of the start), seconds.
 TRIGGERED_WINDOW_S = 0.3
-TRIGGERED_SIGNALS = ["SWR_zscore", "MUA_zscore"]
-# Panel k: ripple-power bins, z.
+TRIGGERED_SIGNALS = ["SWR_zscore", "MUA_zscore", "theta_power_zscore", "head_speed"]
+# Panel j: ripple-power bins, z.
 POWER_EDGES = np.arange(-2.0, 10.01, 0.25)
 # Panel e: the detectors, in the order drawn, and their labels.
 DETECTOR_LABELS = {
@@ -305,7 +310,7 @@ def frame_event_counts(event_types: dict) -> dict[str, int]:
 
 
 def rest_nonlocal_share(data_over_time: pd.DataFrame) -> pd.DataFrame:
-    """Panel k: the share of rest bins decoded non-local, by ripple power.
+    """Panel j: the share of immobile bins decoded non-local, by ripple power.
 
     Rest bins are the immobile analyzed ones (:func:`immobile_analyzed_bins`);
     each animal is one group (:func:`nonlocal_share_by_power`).
@@ -342,6 +347,11 @@ def _decode_files_fingerprint(
         example.results,
         example.detector,
     ]
+    return _stat_fingerprint(files)
+
+
+def _stat_fingerprint(files: Sequence[Path]) -> str:
+    """A hash of each file's path, size and ``st_mtime_ns`` (or ``missing``)."""
     lines = []
     for path in files:
         if path.exists():
@@ -350,6 +360,26 @@ def _decode_files_fingerprint(
         else:
             lines.append(f"{path}\tmissing")
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()
+
+
+def _comparison_fingerprint() -> str:
+    """A stat fingerprint of the detector comparison's files; a run without a
+    manifest is fingerprinted as missing (``detector_comparison`` then raises)."""
+    run = event_features_root() / EVENT_FEATURES_RUN
+    if not (run / "manifest.json").exists():
+        return _stat_fingerprint([run / "manifest.json"])
+    return _stat_fingerprint(nonlocal_comparison.comparison_files(run))
+
+
+def _settings_fingerprint() -> str:
+    """A hash of the module settings the cached inputs are computed with."""
+    settings = (
+        TRIGGERED_WINDOW_S,
+        TRIGGERED_SIGNALS,
+        POWER_EDGES.tolist(),
+        list(DETECTOR_LABELS),
+    )
+    return hashlib.sha256(repr(settings).encode()).hexdigest()
 
 
 def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) -> Path:
@@ -362,22 +392,52 @@ def _figure02_cache_path(nwb_file_name: str, epoch_name: str, data_dir: Path) ->
     """
     cohort = hashlib.sha256("\n".join(analyzed_epoch_ids()).encode()).hexdigest()
     decodes = _decode_files_fingerprint(nwb_file_name, epoch_name, data_dir)
+    comparison = _comparison_fingerprint()
     return (
         data_dir
         / "intermediates"
         / f"{session_name(nwb_file_name, epoch_name)}_figure02_v{FIGURE02_CACHE_VERSION}_"
         f"{swr_source_name()}_register{cohort[:12]}_decodes{decodes[:12]}"
-        f"_features{EVENT_FEATURES_RUN}"
-        "_cache.joblib"
+        f"_features{EVENT_FEATURES_RUN}_comparison{comparison[:12]}"
+        f"_settings{_settings_fingerprint()[:12]}_cache.joblib"
     )
+
+
+def checked_reference(reference: pd.DataFrame) -> pd.DataFrame:
+    """The brain-state reference, if it was made from the decodes the event
+    features run records for every analyzed epoch.
+
+    Raises
+    ------
+    ValueError
+        If an analyzed epoch is missing or extra, or its decode hash differs.
+    """
+    manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
+    expected = {
+        epoch_id: manifest["epochs"][epoch_id]["decode"]["sha256"]
+        for epoch_id in analyzed_epoch_ids()
+    }
+    recorded = dict(zip(reference["epoch_id"], reference["decode_sha256"], strict=True))
+    if recorded != expected:
+        differ = sorted(
+            epoch_id
+            for epoch_id in expected.keys() | recorded.keys()
+            if expected.get(epoch_id) != recorded.get(epoch_id)
+        )
+        raise ValueError(
+            f"the brain-state reference was not made from the decodes of event "
+            f"features run {EVENT_FEATURES_RUN}: {len(differ)} epochs differ, "
+            f"e.g. {differ[:3]}"
+        )
+    return reference
 
 
 def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) -> dict:
     """Run the expensive loads and derivations; return the cached render inputs.
 
     The example session's ``data``/``results``/``detector``/``env`` (panels a
-    and b), the triggered-average curves (j), the non-local share by ripple
-    power (k) and the frames' immobile non-local events by SWR overlap, which
+    and b), the triggered-average curves (i), the non-local share by ripple
+    power (j) and the frames' immobile non-local events by SWR overlap, which
     the canonical event table is checked against. The multi-GB
     ``data_over_time`` is consumed here and not returned.
     """
@@ -393,7 +453,7 @@ def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) 
     results, detector, env = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC", root=data_dir
     )
-    logging.info("Loading the aggregated decode frames (panels j and k)...")
+    logging.info("Loading the aggregated decode frames (panels i and j)...")
     data_over_time = load_data_over_time(data_dir)
     # The SWRs drawn: the session's SWR source intervals, the ones the event
     # table's classes are computed against.
@@ -402,7 +462,7 @@ def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) 
     )
     event_types = get_event_types(data_over_time)
     event_counts = frame_event_counts(event_types)
-    logging.info("Computing the triggered averages (panel j)...")
+    logging.info("Computing the triggered averages (panel i)...")
     triggered_curves = compute_triggered_average_curves(
         data_over_time,
         event_types,
@@ -410,10 +470,10 @@ def _compute_figure_inputs(nwb_file_name: str, epoch_name: str, data_dir: Path) 
         time_col="start_time",
         window_sec=TRIGGERED_WINDOW_S,
     )
-    logging.info("Computing the non-local share by ripple power (panel k)...")
+    logging.info("Computing the non-local share by ripple power (panel j)...")
     share_by_power = rest_nonlocal_share(data_over_time)
     del data_over_time
-    logging.info("Reading the detector comparison (panels c, d and e)...")
+    logging.info("Reading the detector comparison (panels c and e)...")
     comparison = detector_comparison()
     return {
         "nwb_file_name": nwb_file_name,
@@ -455,19 +515,32 @@ def example_windows(
     Raises
     ------
     AssertionError
-        If an example's ``event_id`` is not one row of the table or its class is
-        not the one it is drawn as; or if the Local SWR is not one of the
-        source's SWRs, a non-local event overlaps it, or the decode is not
-        mostly Local through it.
+        If an example's ``event_id`` is not one row of the table, its overlap
+        subclass is not the one it is drawn as, or a partial example does not
+        run past its SWR on its title's side alone; or if the Local SWR is not
+        one of the source's SWRs, a non-local event overlaps it, or the decode is
+        not mostly Local through it.
     """
     windows = {}
-    for title, (event_id, overlap_class) in EXAMPLES.items():
+    for title, (event_id, subclass) in EXAMPLES.items():
         rows = events[events["event_id"] == event_id]
         if len(rows) != 1:
             raise AssertionError(f"event_id {event_id} matches {len(rows)} rows")
         row = rows.iloc[0]
-        if row["overlap_class"] != overlap_class:
-            raise AssertionError(f"{title}: event {event_id} is {row['overlap_class']}")
+        if row["overlap_subclass"] != subclass:
+            raise AssertionError(
+                f"{title}: event {event_id} is {row['overlap_subclass']}"
+            )
+        side = PARTIAL_SIDE.get(title)
+        sides = (
+            row["event_start_s"] < row["matched_swr_start"],
+            row["event_end_s"] > row["matched_swr_end"],
+        )
+        if side is not None and sides != (side == "start", side == "end"):
+            raise AssertionError(
+                f"{title}: event {event_id} does not run past its SWR at the "
+                f"{side} alone"
+            )
         windows[title] = (float(row["event_start_s"]), float(row["event_end_s"]))
     starts = ripple_times["start_time"].to_numpy()
     k = int(np.argmin(np.abs(starts - LOCAL_SWR_START_S)))
@@ -490,31 +563,33 @@ def example_windows(
 
 
 def detector_comparison() -> dict:
-    """Panels c, d and e: the event features run's comparison, as the summary reads it.
+    """Panels c and e: the event features run's comparison, as the summary reads it.
 
     Returns
     -------
     dict
         ``kay``: :func:`nonlocal_comparison.other_detector_statistics`'s row of
-        Kay's SWRs (d); ``overlap``: the share of non-local events each of
+        Kay's SWRs (c); ``overlap``: the share of non-local events each of
         :data:`DETECTOR_LABELS` overlaps and ``with_nonlocal``, the share of
-        each one's events that overlap a non-local event (e); and, from
-        ``left_out_statistics``, ``time_outside_swr``, the share of non-local
-        time outside Kay's SWRs (c).
+        each one's events that overlap a non-local event (e); and
+        ``kay_content_animals``, each animal's share of Kay's SWRs in each
+        content class (c).
     """
     run = event_features_root() / EVENT_FEATURES_RUN
     comparison = nonlocal_comparison.read_comparison(run)
     others, directional = comparison.others, comparison.directional
-    left_out = nonlocal_comparison.left_out_statistics(run, comparison.inventory_dir)
     return {
         "kay": nonlocal_comparison.other_detector_statistics(others).loc["kay"],
+        "kay_content_animals": nonlocal_comparison.content_class_animal_shares(
+            others, "kay"
+        ),
         "overlap": nonlocal_comparison.nonlocal_events_overlapped(
-            directional, tuple(DETECTOR_LABELS)
+            nonlocal_comparison.nonlocal_event_memberships(run, directional),
+            tuple(DETECTOR_LABELS),
         ),
         "with_nonlocal": nonlocal_comparison.events_overlapping_nonlocal(
-            directional, tuple(DETECTOR_LABELS)
+            others, tuple(DETECTOR_LABELS)
         ),
-        "time_outside_swr": left_out["nonlocal_time_outside_kay_fraction"],
     }
 
 
@@ -630,6 +705,7 @@ def draw_overview(
         edge_order=data["linear_edge_order"],
         occupancy_linewidth=TRACK_LINEWIDTH,
     )
+    label_reward_well(ax_track, data["track_graph"])
     rows = gs[1].subgridspec(
         5, 1, height_ratios=[1.5, 1.05, 0.42, 0.42, 0.42], hspace=0.14
     )
@@ -694,6 +770,10 @@ def draw_overview(
     ripple = ripple.iloc[:, 0] if ripple.ndim > 1 else ripple
     ax_rip.plot(ripple.index - start, ripple.to_numpy(), color="k", lw=0.5)
     ax_rip.axhline(KAY_ZSCORE_THRESHOLD, color=C_SWR, lw=0.5, ls="--")
+    ax_rip.text(
+        1.0, KAY_ZSCORE_THRESHOLD, "SWR threshold", transform=ax_rip.get_yaxis_transform(),
+        ha="right", va="bottom", fontsize=SMALL_SIZE, color=C_SWR,
+    )  # fmt: skip
     ax_rip.set_ylim(-2, 8)
     ax_rip.set_yticks([0, 5])
     draw_state_stack(ax_st, results, sl, start)
@@ -718,6 +798,21 @@ def draw_overview(
     for ax in (ax_pos, ax_lane, ax_rip, ax_st):
         ax.tick_params(labelbottom=False)
     return ax_track, ax_pos
+
+
+def label_reward_well(ax: Axes, track_graph) -> None:
+    """Name the wells once: label the top-left well (a degree-1 node) as a
+    reward well; the other well dots, here and on the decode's axis, match it."""
+    wells = [
+        track_graph.nodes[n]["pos"]
+        for n in track_graph.nodes
+        if track_graph.degree(n) == 1
+    ]
+    x, y = min(wells, key=lambda pos: (-round(pos[1]), pos[0]))
+    ax.annotate(
+        "Reward well", (x, y), xytext=(-5, 0), textcoords="offset points",
+        ha="right", va="center", fontsize=SMALL_SIZE,
+    )  # fmt: skip
 
 
 def fit_track_to_height(fig: Figure, ax_track: Axes, left: float) -> None:
@@ -785,118 +880,89 @@ def draw_examples(
     return first[0]
 
 
-def draw_donut(
+def draw_class_bars(
     ax: Axes,
-    wedges: list[tuple[str, float, str, bool]],
-    center: tuple[str, str],
+    rows: Sequence[tuple[str, float, pd.Series, str, bool]],
     title: str,
-    label_space: float = 2.2,
+    xlabel: str,
 ) -> None:
-    """A donut of (label, fraction, color, highlighted) wedges.
+    """Classes as horizontal bars, top to bottom: the pooled share as a bar with
+    its percent in a column past the axis's 100, each animal's share as a dot.
 
-    The wedges with a label are listed, one line each, to the right of the
-    donut in their colors, the highlighted ones in bold; the others are faded. ``center`` is
-    a number and its caption, written in the hole. ``label_space`` is the room
-    kept right of the donut for the labels, in donut radii: the labels' width
-    over the donut's sets the donut's size in its axes.
+    ``rows`` are (label, pooled share, the animals' shares, color, bold label).
     """
-    patches, _ = ax.pie(
-        [w[1] for w in wedges],
-        colors=[w[2] for w in wedges],
-        startangle=90,
-        counterclock=False,
-        wedgeprops={"width": 0.28, "edgecolor": "white", "linewidth": 0.6},
-    )
-    k = 0
-    for patch, (label, _, color, highlighted) in zip(patches, wedges, strict=True):
-        if not highlighted:
-            patch.set_alpha(0.5)
-        if label:
-            ax.text(
-                1.2, 0.4 - 0.4 * k, label, ha="left", va="center",
-                fontsize=SMALL_SIZE, fontweight="bold" if highlighted else "normal",
-                color=readable_text_color(color),
-            )  # fmt: skip
-            k += 1
-    number, caption = center
-    ax.text(
-        0,
-        0.17,
-        number,
-        ha="center",
-        va="center",
-        fontsize=SMALL_SIZE,
-        fontweight="bold",
-    )
-    ax.text(0, -0.19, caption, ha="center", va="center", fontsize=SMALL_SIZE)
-    ax.set_xlim(-1.05, 1.2 + label_space)
-    ax.set_ylim(-1.1, 1.1)
-    ax.set_aspect("equal")
-    ax.set_title(title, fontsize=SMALL_SIZE, pad=2, loc="left")
+    n_rows = len(rows)
+    for i, (_, pooled, animals, color, _) in enumerate(rows):
+        y = n_rows - 1 - i
+        ax.barh(
+            y, 100 * pooled, color=color, height=0.65, linewidth=0.5,
+            edgecolor="#777777" if color == C_OTHER else "none",
+        )  # fmt: skip
+        ax.scatter(
+            100 * animals.to_numpy(), y + np.linspace(-0.18, 0.18, len(animals)),
+            s=3, color="k", lw=0, zorder=3,
+        )  # fmt: skip
+        ax.text(
+            1.0, y, f"{format_number(pooled, 'pctnum')}%",
+            transform=ax.get_yaxis_transform(), ha="right", va="center",
+            fontsize=SMALL_SIZE, fontweight="bold" if rows[i][4] else "normal",
+        )  # fmt: skip
+    ax.set_yticks(range(n_rows), [label for label, *_ in rows][::-1])
+    for tick, (*_, bold) in zip(ax.get_yticklabels()[::-1], rows, strict=True):
+        tick.set_fontweight("bold" if bold else "normal")
+    ax.tick_params(axis="y", length=0)
+    ax.set_ylim(-0.6, n_rows - 0.4)
+    ax.set_xlim(0, 125)  # 100 to 125 holds the percents
+    ax.spines["bottom"].set_bounds(0, 100)
+    ax.set_xticks([0, 50, 100])
+    ax.set_xlabel(xlabel)
+    # right-aligned, so a title wider than the bars runs over the class labels
+    # rather than under the next panel's letter
+    ax.set_title(title, fontsize=SMALL_SIZE, pad=3, loc="right")
 
 
-def draw_events_donut(ax: Axes, classes: dict, time_outside_swr: float) -> None:
-    """Panel c: the non-local events by SWR overlap, and the time outside SWRs."""
-    wedges = [
+def draw_events_bars(ax: Axes, classes: dict, animals: pd.DataFrame) -> None:
+    """Panel d: the non-local events by SWR overlap.
+
+    Bars pool the events (``overlap_class_statistics``); dots are the animals
+    (``overlap_class_animal_shares``).
+    """
+    rows = [
         (
-            f"{CLASS_LABELS[c]} {format_number(classes[f'{c}_fraction'], 'pctnum')}%",
+            CLASS_LABELS[c],
             classes[f"{c}_fraction"],
+            animals[c],
             CLASS_COLORS[c],
             c == "non_swr",
         )
         for c in CLASS_ORDER
     ]
-    draw_donut(
-        ax,
-        wedges,
-        (f"{classes['n_non_swr']:,}", "no SWR"),
-        f"Non-local events (n = {classes['n_events']:,})",
-        label_space=1.6,
+    draw_class_bars(
+        ax, rows, f"Non-local events (n = {classes['n_events']:,})", "% events"
     )
-    low = format_number(classes["non_swr_fraction_animal_min"], "pctnum")
-    high = format_number(classes["non_swr_fraction_animal_max"], "pctnum")
-    ax.text(
-        -1.05, -1.2,
-        f"No SWR: {low}–{high}% across animals\n"
-        f"{format_number(time_outside_swr, 'pctnum')}% of non-local time outside SWRs",
-        ha="left", va="top", fontsize=SMALL_SIZE,
-    )  # fmt: skip
 
 
-def draw_swr_donut(ax: Axes, kay: pd.Series) -> None:
-    """Panel d: the SWRs by content."""
+def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
+    """Panel c: the SWRs by content.
+
+    Bars pool Kay's SWRs (``other_detector_statistics``); dots are the animals
+    (``content_class_animal_shares``).
+    """
     no_nonlocal = kay["no_nonlocal_fraction"]
     mostly_local = kay["mostly_local_fraction"]
-    wedges = [
-        (
-            f"With non-local {format_number(1 - no_nonlocal, 'pctnum')}%",
-            1 - no_nonlocal,
-            C_NL,
-            False,
-        ),
-        (
-            f"Mostly Local {format_number(mostly_local, 'pctnum')}%",
-            mostly_local,
-            C_LOCAL,
-            True,
-        ),
-        (
-            f"Other {format_number(no_nonlocal - mostly_local, 'pctnum')}%",
-            no_nonlocal - mostly_local,
-            C_NOSPIKE,
-            False,
-        ),
+    rows = [
+        ("With non-local", 1 - no_nonlocal, animals["with_nonlocal"], C_NL, True),
+        ("Mostly Local", mostly_local, animals["mostly_local"], C_LOCAL, False),
+        ("Other", no_nonlocal - mostly_local, animals["other"], C_OTHER, False),
     ]
-    draw_donut(
-        ax,
-        wedges,
-        (f"{format_number(no_nonlocal, 'pctnum')}%", "no non-local"),
-        f"SWRs (n = {int(kay['n_events']):,})",
-    )
+    draw_class_bars(ax, rows, f"SWRs (n = {int(kay['n_events']):,})", "% SWRs")
 
 
 REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
-"""Panels g and i: each group's Local-rest and event positions on the x axis."""
+"""Panel g: each group's Local-rest and event positions on the x axis."""
+
+HELDOUT_X = {"no SWR": 0.0, "SWR": 1.0}
+"""Panel h: each group's position on the x axis."""
 
 
 def animal_values(row: pd.Series, column: str, scale: float = 1.0) -> pd.Series:
@@ -916,10 +982,12 @@ def draw_rest_to_event(
 
 
 def rest_event_axis(ax: Axes, labels: bool = True) -> None:
-    """Panels g and i's x axis: rest and event positions for each group."""
+    """Panel g's x axis: Local-rest and event positions for each group."""
     ax.set_xlim(-0.5, 3.9)
     ticks = [x for pair in REST_EVENT_X.values() for x in pair]
-    ax.set_xticks(ticks, ["rest", "no SWR", "rest", "SWR"], rotation=45, ha="right")
+    ax.set_xticks(
+        ticks, ["Local rest", "No SWR", "Local rest", "SWR"], rotation=45, ha="right"
+    )
     ax.tick_params(labelbottom=labels)
 
 
@@ -931,7 +999,7 @@ def draw_participation(ax_share: Axes, ax_rate: Axes, statistics: pd.DataFrame) 
     """
     for ax, measure, label in (
         (ax_share, "participation", "Tetrodes\nactive (%)"),
-        (ax_rate, "spike_rate_hz", "Spike rate\n(spikes/s)"),
+        (ax_rate, "spike_rate_hz", "Summed spike\nrate (spikes/s)"),
     ):
         scale = 100 if measure == "participation" else 1
         for group, color in (("no SWR", C_NL), ("SWR", C_SWR)):
@@ -945,108 +1013,111 @@ def draw_participation(ax_share: Axes, ax_rate: Axes, statistics: pd.DataFrame) 
         ax.set_ylabel(label)
         ax.set_ylim(0, None)
         rest_event_axis(ax, labels=ax is ax_rate)
-
-
-def draw_state_composition(ax: Axes, statistics: pd.DataFrame) -> None:
-    """Panel h: the mean share of an event in Continuous and in Fragmented.
-
-    Bars are the animals' mean, dots the animals
-    (``event_statistics.state_composition_statistics``).
-    """
-    for g, (group, color) in enumerate((("no SWR", C_NL), ("SWR", C_SWR))):
-        row = statistics.loc[group]
-        for x, state in enumerate(("continuous", "fragmented")):
-            position = x + (g - 0.5) * 0.36
-            ax.bar(position, 100 * row[f"{state}_animal_mean"], width=0.34, color=color)
-            animals = 100 * row[f"{state}_animals"]
-            ax.scatter(
-                position + np.linspace(-0.08, 0.08, len(animals)), animals, s=3,
-                color="k", lw=0, zorder=3,
-            )  # fmt: skip
-    ax.set_xticks([0, 1], ["Continuous", "Fragmented"], rotation=30, ha="right")
-    ax.set_xlim(-0.55, 1.55)
-    ax.set_ylim(0, 100)
-    ax.set_yticks([0, 50, 100])
-    ax.set_ylabel("% of event\n(mean over events)")
-    handles = [plt.Rectangle((0, 0), 1, 1, color=color) for color in (C_NL, C_SWR)]
-    ax.legend(
-        handles,
-        ["no SWR", "SWR"],
-        frameon=False,
-        fontsize=SMALL_SIZE,
-        loc="upper right",
-        handlelength=0.8,
-        borderaxespad=0,
-    )
+    ax_share.figure.align_ylabels([ax_share, ax_rate])
 
 
 def draw_heldout_gain(ax: Axes, events: pd.DataFrame, controls: pd.DataFrame) -> None:
-    """Panel i: the held-out tetrode gain over local coding, per spike.
+    """Panel h: the held-out tetrode gain over local coding, per spike.
 
-    One line per animal from its Local-rest controls to its events; the bar is
-    the events' animal mean with its 95 % interval
-    (``tetrode_holdout.holdout_statistics``).
+    A dot per animal and the animals' mean with its 95 % interval
+    (``tetrode_holdout.holdout_statistics``). The dashed line is the mean of the
+    group's Local-rest controls, drawn as a reference rather than paired with
+    the events: in Local rest the decoded position is the animal's own, so the
+    population and local coding agree and the gain is near zero by construction.
     """
     for group, color in (("no SWR", C_NL), ("SWR", C_SWR)):
+        x = HELDOUT_X[group]
         event = events.loc[group]
-        draw_rest_to_event(
-            ax,
-            animal_values(controls.loc[group], "animals"),
-            animal_values(event, "animals"),
-            group,
-            color,
-        )
+        animals = animal_values(event, "animals")
+        ax.scatter(np.full(animals.size, x), animals, s=6, color=color, lw=0, zorder=2)
         ax.errorbar(
-            REST_EVENT_X[group][1] + 0.3, event["estimate"],
+            x + 0.25, event["estimate"],
             yerr=[[event["estimate"] - event["ci_low"]],
                   [event["ci_high"] - event["estimate"]]],
             fmt="_", color="black", ms=5, lw=0.8, capsize=0,
         )  # fmt: skip
-    ax.axhline(0, color="#999999", lw=0.5, ls=":", zorder=0)
-    rest_event_axis(ax)
+        ax.hlines(
+            controls.loc[group, "estimate"], x - 0.3, x + 0.4, color=C_LOCAL, lw=1.0,
+            ls="--", zorder=1,
+        )  # fmt: skip
+    ax.text(
+        HELDOUT_X["no SWR"] - 0.3, controls.loc["no SWR", "estimate"] - 0.02,
+        "Local rest", va="top", fontsize=SMALL_SIZE, color="#555555",
+    )  # fmt: skip
+    ax.set_xlim(-0.6, 1.6)
+    ax.set_xticks(list(HELDOUT_X.values()), ["No SWR", "SWR"], rotation=45, ha="right")
+    ax.set_ylim(-0.12, None)
     ax.set_ylabel("Held-out gain\nover local (nats/spike)")
     ax.set_title("Held-out tetrode", fontsize=SMALL_SIZE, pad=3)
 
 
-def draw_triggered(
-    ax_rip: Axes, ax_mua: Axes, curves: dict, rest: pd.DataFrame
-) -> None:
-    """Panel j: ripple power and MUA around event starts, SWR vs no-SWR."""
-    for ax, signal, label, word in (
-        (ax_rip, "SWR_zscore", "Ripple (z)", "ripple"),
-        (ax_mua, "MUA_zscore", "MUA (z)", "mua"),
+def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> None:
+    """Panel i: ripple power, MUA, theta and head speed around event starts.
+
+    Every row is the median over events with the interquartile band, so the
+    spread over events is seen, not only the center, and the line is the
+    statistic the text quotes: ripple and MUA rise at the start, theta stays at
+    its level between events, far below running, and the animal is still. The
+    dashed "between events" line is the epochs' median in immobile bins outside
+    every non-local, SWR and MUA event (``reference_medians``).
+    """
+    ax_rip, ax_mua, ax_theta, ax_speed = axes
+    groups = (("overlap", C_SWR, "SWR"), ("no_overlap", C_NL, "No SWR"))
+    for ax, signal in (
+        (ax_rip, "SWR_zscore"),
+        (ax_mua, "MUA_zscore"),
+        (ax_theta, "theta_power_zscore"),
+        (ax_speed, "head_speed"),
     ):
         curve = curves[signal]
         t_ms = 1000 * np.asarray(curve["time"])
-        for key, color, name in (
-            ("overlap", C_SWR, "SWR"),
-            ("no_overlap", C_NL, "No SWR"),
-        ):
-            mean, sem = (
-                np.asarray(curve[f"{key}_mean"]),
-                np.asarray(curve[f"{key}_sem"]),
-            )
-            ax.fill_between(t_ms, mean - sem, mean + sem, color=color, alpha=0.3, lw=0)
-            ax.plot(t_ms, mean, color=color, lw=1.0, label=name)
-        ax.axvline(0, color="k", lw=0.5, ls=":")
-        ax.axhline(rest.loc[word, "rest"], color=C_NOSPIKE, lw=0.6, ls="--")
-        ax.set_ylabel(label)
-        ax.set_xlim(t_ms[0], t_ms[-1])
-        ax.set_ylim(rest.loc[word, "rest"] - 0.3, None)
-    handles, labels = ax_rip.get_legend_handles_labels()
-    handles.append(plt.Line2D([], [], color=C_NOSPIKE, ls="--", lw=0.6))
-    labels.append("rest")
-    ax_rip.legend(
-        handles,
-        labels,
-        frameon=False,
-        loc="upper left",
-        handlelength=0.8,
-        borderaxespad=0.1,
-        labelspacing=0.2,
+        for key, color, name in groups:
+            ax.fill_between(
+                t_ms, curve[f"{key}_q25"], curve[f"{key}_q75"], color=color,
+                alpha=0.25, lw=0,
+            )  # fmt: skip
+            ax.plot(t_ms, curve[f"{key}_median"], color=color, lw=1.0, label=name)
+    for ax, signal, word in (
+        (ax_rip, "SWR_zscore", "ripple"),
+        (ax_mua, "MUA_zscore", "mua"),
+    ):
+        curve = curves[signal]
+        ax.axhline(rest.loc[word, "rest"], color=C_BETWEEN, lw=0.6, ls="--", zorder=3)
+        low = min(np.nanmin(curve[f"{key}_q25"]) for key, _, _ in groups)
+        top = max(np.nanmax(curve[f"{key}_q75"]) for key, _, _ in groups)
+        ax.set_ylim(min(low, rest.loc[word, "rest"]) - 0.3, top + 1.2)
+    ax_theta.axhline(
+        rest.loc["theta", "rest"], color=C_BETWEEN, lw=0.6, ls="--", zorder=3
     )
-    ax_rip.tick_params(labelbottom=False)
-    ax_mua.set_xlabel("Time from event start (ms)")
+    ax_theta.axhline(rest.loc["theta", "running"], color="k", lw=0.6, ls="--")
+    ax_theta.text(
+        t_ms[-1] - 5, rest.loc["theta", "running"], "running", ha="right",
+        va="bottom", fontsize=SMALL_SIZE,
+    )  # fmt: skip
+    ax_theta.set_ylim(None, rest.loc["theta", "running"] + 1.3)
+    ax_speed.axhline(DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, color="k", lw=0.6, ls=":")
+    ax_speed.set_ylim(0, 1.6 * DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC)
+    ax_speed.set_yticks([0, DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC])
+    for ax, label in zip(
+        axes, ("Ripple (z)", "MUA (z)", "Theta (z)", "Speed (cm/s)"), strict=True
+    ):
+        ax.axvline(0, color="k", lw=0.5, ls=":")
+        ax.set_xlim(t_ms[0], t_ms[-1])
+        ax.text(
+            0.03, 1.0, label, transform=ax.transAxes, ha="left", va="top",
+            fontsize=SMALL_SIZE,
+        )  # fmt: skip
+    for ax in axes[:-1]:
+        ax.tick_params(labelbottom=False)
+    handles, labels = ax_rip.get_legend_handles_labels()
+    handles.append(plt.Line2D([], [], color=C_BETWEEN, ls="--", lw=0.6))
+    labels.append("between events")
+    ax_rip.legend(
+        handles, labels, frameon=False, loc="lower center", ncol=2,
+        bbox_to_anchor=(0.5, 1.0), handlelength=0.8, columnspacing=0.8,
+        borderaxespad=0.1,
+    )  # fmt: skip
+    ax_speed.set_xlabel("Time from event start (ms)")
 
 
 def draw_detector_bars(
@@ -1072,107 +1143,135 @@ def draw_detector_bars(
     ax.tick_params(axis="y", labelleft=show_labels)
     ax.set_ylim(-0.6, n_rows - 0.4)
     ax.tick_params(axis="y", length=0)
-    ax.set_xlim(0, 100)
+    ax.set_xlim(0, 104)  # a dot at 100 % is drawn whole
+    ax.spines["bottom"].set_bounds(0, 100)
     ax.set_xticks([0, 50, 100])
     ax.set_xlabel(xlabel)
 
 
 def draw_detector_overlap(
-    ax_caught: Axes,
     ax_content: Axes,
+    ax_caught: Axes,
     overlap: pd.DataFrame,
     with_nonlocal: pd.DataFrame,
 ) -> None:
-    """Panel e: what each detector catches, and what its events contain.
+    """Panel e: what each detector's events contain, and what it catches.
 
     Bars pool all events; dots are animals (for the caption).
 
-    Left, the share of non-local events each detector's events overlap; right,
-    the share of its own events that overlap a non-local event.
+    Left, panel c's question for every detector: the share of its own events
+    that overlap a non-local event; right, panel d's: the share of non-local
+    events its events overlap. Both tables list the detectors in one order.
     """
     n_rows = len(overlap)
-    draw_detector_bars(ax_caught, overlap, n_rows, "% events", True)
-    ax_caught.set_title("Non-local\nevents found", fontsize=SMALL_SIZE, pad=3)
-    draw_detector_bars(ax_content, with_nonlocal, n_rows, "% events", False)
+    draw_detector_bars(ax_content, with_nonlocal, n_rows, "% of\ndetections", True)
     ax_content.set_title(
         "Detections with\nnon-local activity", fontsize=SMALL_SIZE, pad=3
     )
-    ax_content.spines["left"].set_visible(False)
+    draw_detector_bars(ax_caught, overlap, n_rows, "% of non-local\nevents", False)
+    ax_caught.set_title("Non-local\nevents found", fontsize=SMALL_SIZE, pad=3)
+    ax_caught.spines["left"].set_visible(False)
 
 
 def draw_share_by_power(ax: Axes, shares: pd.DataFrame) -> None:
-    """Panel k: the share of rest bins decoded non-local, by ripple power.
+    """Panel j: the share of immobile bins decoded non-local, by ripple power.
 
     One thin line per animal, their mean in bold.
     """
     by_animal = shares.pivot(index="power_low", columns="group", values="share")
     center = by_animal.index + np.diff(POWER_EDGES)[0] / 2
-    ax.plot(center, by_animal.to_numpy(), color="k", lw=0.5, alpha=0.5)
-    ax.plot(center, by_animal.mean(axis=1), color="k", lw=1.0)
+    ax.plot(center, 100 * by_animal.to_numpy(), color="k", lw=0.5, alpha=0.5)
+    ax.plot(center, 100 * by_animal.mean(axis=1), color="k", lw=1.0)
     ax.axvline(KAY_ZSCORE_THRESHOLD, color=C_SWR, lw=0.8, ls="--")
     ax.text(
-        KAY_ZSCORE_THRESHOLD + 0.3, 0.05, "SWR\nthreshold", fontsize=SMALL_SIZE,
+        KAY_ZSCORE_THRESHOLD + 0.3, 5, "SWR\nthreshold", fontsize=SMALL_SIZE,
         color=C_SWR, va="bottom",
     )  # fmt: skip
     ax.set_xlim(POWER_EDGES[0], POWER_EDGES[-1])
-    ax.set_ylim(0, 1.02)
+    ax.set_ylim(0, 102)
+    ax.set_yticks([0, 50, 100])
     ax.set_xlabel("Ripple power (z)")
-    ax.set_ylabel("Share of rest bins\nnon-local")
+    ax.set_ylabel("% of immobile bins\nnon-local")
 
 
-def draw_offsets(ax_start: Axes, ax_end: Axes, offsets: pd.DataFrame) -> None:
-    """Panel f: event minus SWR start (top) and end (bottom), log counts.
+OFFSET_BINS_MS = np.arange(-100, 101, 5)
+"""Panel f's bins, ms: event bound minus SWR bound."""
 
-    Each row prints the share of event-SWR pairs whose bound differs by more
-    than 25 and 50 ms (``boundary_offset_statistics``).
+
+def draw_offsets(
+    ax_start: Axes, ax_end: Axes, offsets: pd.DataFrame, animal: pd.Series
+) -> None:
+    """Panel f: event minus SWR start (top) and end (bottom), as the percent of
+    event-SWR pairs in each 5 ms bin on a log axis.
+
+    Bars are the animals' mean, outlines the animals. ``offsets`` are
+    ``boundary_offsets``; ``animal`` is the event table's column, matched on the
+    index. An animal's percent counts all its pairs, those beyond the bins too.
     """
-    tails = boundary_offset_statistics(offsets)
-    bins = np.arange(-150, 151, 4)
+    width = np.diff(OFFSET_BINS_MS)[0]
+    centers = OFFSET_BINS_MS[:-1] + width / 2
     for ax, bound, label in ((ax_start, "start", "Start"), (ax_end, "end", "End")):
-        ax.hist(1000 * offsets[f"{bound}_offset_s"], bins=bins, color="#555555", lw=0)
-        ax.set_yscale("log")
-        ax.axvline(0, color="k", lw=0.5, ls=":")
-        ax.set_xlim(-150, 150)
-        ax.set_ylim(1, 2e6)
-        ax.set_yticks([1, 100, 10000], ["1", "$10^2$", "$10^4$"])
-        beyond = ", ".join(
-            f">{1000 * tail_s:g} ms "
-            f"{format_number(tails[f'{bound}_offset_beyond_{name}_fraction'], 'pctnum')}%"
-            for name, tail_s in OFFSET_TAILS_S.items()
+        offsets_ms = 1000 * offsets[f"{bound}_offset_s"]
+        shares = np.column_stack(
+            [
+                100 * np.histogram(values, OFFSET_BINS_MS)[0] / len(values)
+                for _, values in offsets_ms.groupby(animal)
+            ]
         )
+        ax.bar(centers, shares.mean(axis=1), width=width, color="#bbbbbb", lw=0)
+        ax.step(centers, shares, where="mid", color="k", lw=0.5, alpha=0.35)
+        ax.axvline(0, color="k", lw=0.5, ls=":")
+        ax.set_xlim(OFFSET_BINS_MS[0], OFFSET_BINS_MS[-1])
+        ax.set_yscale("log")
+        ax.set_ylim(0.03, 60)
+        ax.set_yticks([0.1, 1, 10], ["0.1", "1", "10"])
+        ax.yaxis.set_minor_locator(NullLocator())
         ax.text(
-            0.02, 0.97, f"{label}\n{beyond}", transform=ax.transAxes, va="top",
-            fontsize=SMALL_SIZE,
+            0.03, 0.95, label, transform=ax.transAxes, va="top", fontsize=SMALL_SIZE
         )  # fmt: skip
     ax_start.tick_params(labelbottom=False)
-    ax_end.set_xlabel("Event − SWR bound (ms)\n< 0: event first")
-    ax_start.set_ylabel("Event–SWR pairs")
+    ax_end.set_xlabel("Event − SWR bound (ms)")
+    ax_start.set_ylabel("% of pairs per 5 ms")
     ax_start.yaxis.set_label_coords(-0.3, 0.0)
 
 
-def letter(
+def panel_extent(fig: Figure, renderer: RendererBase, axes: Sequence[Axes]) -> Bbox:
+    """The drawn extent of a panel's axes (labels, titles and legends included),
+    in figure coordinates."""
+    return Bbox.union(
+        [
+            ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
+            for ax in axes
+        ]
+    )
+
+
+def place_letters(
     fig: Figure,
     renderer: RendererBase,
-    ax: Axes,
-    text: str,
-    x: float | None = None,
-    y: float | None = None,
-) -> None:
-    """A panel letter at the axes' drawn top-left, or at the given figure x / y.
+    panels: Mapping[str, Sequence[Axes]],
+    rows: Sequence[str],
+    columns: Sequence[str],
+) -> dict[str, tuple[float, float]]:
+    """Each panel letter's figure position, aligned by row and by column.
 
-    ``renderer`` is the canvas's after one draw; adding the letters moves no
-    axes (the figure has no layout engine), so one draw serves them all.
+    The letters of a row (each string of ``rows``, such as ``"cdef"``) share the
+    height just above the highest of their panels' drawn tops; the letters of a
+    column (each string of ``columns``, such as ``"dh"``) share the left edge of
+    the leftmost of their panels' drawn extents.
     """
-    box = ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
-    fig.text(
-        max(box.x0 - 0.004, 0.0) if x is None else x,
-        min(box.y1 + 0.002, 0.985) if y is None else y,
-        text,
-        fontsize=PANEL_LETTER_SIZE,
-        fontweight="bold",
-        ha="left",
-        va="bottom",
-    )
+    extents = {name: panel_extent(fig, renderer, axes) for name, axes in panels.items()}
+    y = {
+        name: min(max(extents[n].y1 for n in row) + 0.002, 0.985)
+        for row in rows
+        for name in row
+    }
+    x = {
+        name: max(min(extents[n].x0 for n in column) - 0.004, 0.0)
+        for column in columns
+        for name in column
+    }
+    return {name: (x[name], y[name]) for name in panels}
 
 
 # ---------------------------------------------------------------------------
@@ -1226,8 +1325,10 @@ def generate_figure(
     )
 
     reference = reference_medians(
-        pd.read_parquet(data_dir / BRAIN_STATE_REFERENCE_DIR / "reference.parquet"),
-        ["ripple", "mua"],
+        checked_reference(
+            pd.read_parquet(data_dir / BRAIN_STATE_REFERENCE_DIR / "reference.parquet")
+        ),
+        ["ripple", "mua", "theta"],
     )
     # every analyzed epoch with an event: an epoch with none has no table
     event_epochs = event_table_epochs(events, analyzed_epoch_ids())
@@ -1252,8 +1353,8 @@ def generate_figure(
         4,
         1,
         figure=fig,
-        height_ratios=[2.2, 1.95, 1.1, 1.2],
-        hspace=0.55,
+        height_ratios=[1.9, 2.0, 1.3, 1.45],
+        hspace=0.62,
         left=0.1,
         right=0.99,
         top=0.985,
@@ -1262,36 +1363,35 @@ def generate_figure(
     max_pos = float(np.ceil(inputs["data"]["position_info"].linear_position.max()))
     ax_a, ax_a_top = draw_overview(fig, outer[0], inputs, session_events, max_pos)
     ax_b = draw_examples(fig, outer[1], inputs, windows, max_pos)
-    row3 = outer[2].subgridspec(1, 4, width_ratios=[1.1, 1.3, 1.3, 1.05], wspace=0.5)
+    row3 = outer[2].subgridspec(1, 4, width_ratios=[1.1, 1.1, 1.4, 1.15], wspace=0.7)
     ax_c = fig.add_subplot(row3[0])
-    draw_events_donut(ax_c, classes, inputs["time_outside_swr"])
+    draw_swr_bars(ax_c, inputs["kay"], inputs["kay_content_animals"])
     ax_d = fig.add_subplot(row3[1])
-    draw_swr_donut(ax_d, inputs["kay"])
+    draw_events_bars(ax_d, classes, overlap_class_animal_shares(events))
     detectors = row3[2].subgridspec(1, 2, wspace=0.3)
     ax_e = fig.add_subplot(detectors[0])
     ax_e2 = fig.add_subplot(detectors[1])
     draw_detector_overlap(ax_e, ax_e2, inputs["overlap"], inputs["with_nonlocal"])
-    offsets_grid = row3[3].subgridspec(2, 1, hspace=0.15)
+    offsets_grid = row3[3].subgridspec(2, 1, hspace=0.35)
     ax_f1 = fig.add_subplot(offsets_grid[0])
     ax_f2 = fig.add_subplot(offsets_grid[1], sharex=ax_f1)
-    draw_offsets(ax_f1, ax_f2, boundary_offsets(events))
-    row4 = outer[3].subgridspec(
-        1, 5, width_ratios=[1.0, 0.95, 0.8, 0.95, 0.95], wspace=0.9
-    )
+    draw_offsets(ax_f1, ax_f2, boundary_offsets(events), events["animal"])
+    row4 = outer[3].subgridspec(1, 4, width_ratios=[1.05, 0.85, 1.0, 1.0], wspace=0.85)
     participation_grid = row4[0].subgridspec(2, 1, hspace=0.15)
     ax_g = fig.add_subplot(participation_grid[0])
     ax_g2 = fig.add_subplot(participation_grid[1])
     draw_participation(ax_g, ax_g2, participation)
     ax_h = fig.add_subplot(row4[1])
-    draw_state_composition(ax_h, state_composition_statistics(events))
-    ax_i = fig.add_subplot(row4[2])
-    draw_heldout_gain(ax_i, heldout_events, heldout_controls)
-    triggered = row4[3].subgridspec(2, 1, hspace=0.15)
-    ax_j1 = fig.add_subplot(triggered[0])
-    ax_j2 = fig.add_subplot(triggered[1], sharex=ax_j1)
-    draw_triggered(ax_j1, ax_j2, inputs["triggered_curves"], reference)
-    ax_k = fig.add_subplot(row4[4])
-    draw_share_by_power(ax_k, inputs["share_by_power"])
+    draw_heldout_gain(ax_h, heldout_events, heldout_controls)
+    triggered = row4[2].subgridspec(4, 1, hspace=0.2)
+    ax_i = fig.add_subplot(triggered[0])
+    triggered_axes = [
+        ax_i,
+        *(fig.add_subplot(triggered[r], sharex=ax_i) for r in (1, 2, 3)),
+    ]
+    draw_triggered(triggered_axes, inputs["triggered_curves"], reference)
+    ax_j = fig.add_subplot(row4[3])
+    draw_share_by_power(ax_j, inputs["share_by_power"])
 
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
@@ -1302,21 +1402,33 @@ def generate_figure(
         )
         - 0.004
     )
-    fit_track_to_height(fig, ax_a, x_left + 0.02)
-    letter(fig, renderer, ax_a, "a", x=x_left, y=ax_a_top.get_position().y1 + 0.004)
-    for ax, text, x in (
-        (ax_b, "b", x_left),
-        (ax_c, "c", x_left),
-        (ax_d, "d", None),
-        (ax_e, "e", None),
-        (ax_f1, "f", None),
-        (ax_g, "g", x_left),
-        (ax_h, "h", None),
-        (ax_i, "i", None),
-        (ax_j1, "j", None),
-        (ax_k, "k", None),
-    ):
-        letter(fig, renderer, ax, text, x=x)
+    fit_track_to_height(fig, ax_a, x_left)
+    fig.canvas.draw()
+    positions = place_letters(
+        fig,
+        renderer,
+        {
+            "a": [ax_a],
+            "b": [ax_b],
+            "c": [ax_c],
+            "d": [ax_d],
+            "e": [ax_e, ax_e2],
+            "f": [ax_f1, ax_f2],
+            "g": [ax_g, ax_g2],
+            "h": [ax_h],
+            "i": triggered_axes,
+            "j": [ax_j],
+        },
+        rows=["a", "b", "cdef", "ghij"],
+        columns=["abcg", "dh", "ei", "fj"],
+    )
+    # panel a's letter sits at the top of its decode, not of the track drawing
+    positions["a"] = (positions["a"][0], ax_a_top.get_position().y1 + 0.004)
+    for name, (x, y) in positions.items():
+        fig.text(
+            x, y, name, fontsize=PANEL_LETTER_SIZE, fontweight="bold", ha="left",
+            va="bottom",
+        )  # fmt: skip
     return fig
 
 

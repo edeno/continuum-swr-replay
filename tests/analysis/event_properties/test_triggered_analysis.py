@@ -450,3 +450,8 @@ def test_triggered_average_curves_are_mean_and_sem_over_events_by_class():
     # Event 2 alone: its value, and no SEM from one event.
     np.testing.assert_allclose(curve["overlap_mean"], [4.0, 4.0, 4.0])
     assert np.isnan(curve["overlap_sem"]).all()
+    # quartiles over events 1 and 3 (values 1 and 9): 3, 5 and 7
+    np.testing.assert_allclose(curve["no_overlap_q25"], [3.0, 3.0, 3.0])
+    np.testing.assert_allclose(curve["no_overlap_median"], [5.0, 5.0, 5.0])
+    np.testing.assert_allclose(curve["no_overlap_q75"], [7.0, 7.0, 7.0])
+    np.testing.assert_allclose(curve["overlap_median"], [4.0, 4.0, 4.0])

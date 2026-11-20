@@ -345,7 +345,7 @@ FIGURE02_FRAME_COUNTS = {"swr": 3, "non_swr": 5, "total": 8}
 
 
 def test_figure02_refuses_an_event_table_that_is_not_the_frames(offline):
-    """Panel c's counts come from the event table the summary cites, and the
+    """Panel d's counts come from the event table the summary cites, and the
     figure is refused when that table's event counts by SWR overlap are not the
     decode frames', or the table holds an event that is not immobile."""
     from continuum_swr_replay.analysis.event_properties.event_statistics import (
@@ -365,12 +365,14 @@ def test_figure02_refuses_an_event_table_that_is_not_the_frames(offline):
         overlap_class_statistics(moving)
 
 
-def test_figure02_panel_c_prints_the_digits_of_the_events_summary(offline):
-    """The percents written on the donut are rounded by the summary's rule (a
-    half rounds away from zero: 12.5 % is 13), and the middle gives the count."""
+def test_figure02_panel_d_prints_the_digits_of_the_events_summary(offline):
+    """The percents beside the bars are rounded by the summary's rule (a half
+    rounds away from zero: 12.5 % is 13), the title gives the count, and each
+    animal is one dot per bar."""
     import matplotlib.pyplot as plt
 
     from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        overlap_class_animal_shares,
         overlap_class_statistics,
     )
     from continuum_swr_replay.reported.events import event_cohort_values
@@ -378,14 +380,15 @@ def test_figure02_panel_c_prints_the_digits_of_the_events_summary(offline):
 
     figure02 = offline("scripts.figures.generate_figure02")
     events = _figure02_events()
+    animals = overlap_class_animal_shares(events)
     fig, ax = plt.subplots()
-    figure02.draw_events_donut(ax, overlap_class_statistics(events), 0.5)
+    figure02.draw_events_bars(ax, overlap_class_statistics(events), animals)
     texts = [t.get_text() for t in ax.texts]
-    assert "Inside SWR 13%" in texts
-    assert "Partly in SWR 25%" in texts
-    assert "No SWR 63%" in texts
-    assert "5" in texts
-    assert any("50% of non-local time outside SWRs" in t for t in texts)
+    assert texts == ["13%", "25%", "63%"]
+    labels = [t.get_text() for t in ax.get_yticklabels()]
+    assert labels == ["No SWR", "Partly in SWR", "Inside SWR"]  # bottom to top
+    assert ax.get_title(loc="right") == "Non-local events (n = 8)"
+    assert all(len(dots.get_offsets()) == len(animals) for dots in ax.collections)
     cohort = {v.key: v for v in event_cohort_values(events, "s")}
     assert formatted(cohort["non_swr_fraction"]) == "63 %"
     plt.close(fig)
@@ -426,15 +429,20 @@ def test_figure02_checks_the_event_table_against_the_cached_frame_counts(
 
 
 def _figure02_example_table(figure02) -> pd.DataFrame:
-    """One row per fixed example, each of its drawn class, and one other."""
+    """One row per fixed example, each of its drawn subclass, and one other.
+    The partial examples run past their SWR at the start (20 s) and at the end
+    (30 s)."""
     ids = [event_id for event_id, _ in figure02.EXAMPLES.values()]
-    classes = [overlap_class for _, overlap_class in figure02.EXAMPLES.values()]
+    subclasses = [subclass for _, subclass in figure02.EXAMPLES.values()]
+    nan = np.nan
     return pd.DataFrame(
         {
             "event_id": [*ids, 1],
-            "overlap_class": [*classes, "non_swr"],
+            "overlap_subclass": [*subclasses, "no_overlap"],
             "event_start_s": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
             "event_end_s": [10.1, 20.1, 30.1, 40.1, 50.1, 60.1],
+            "matched_swr_start": [9.9, 20.05, 29.9, nan, nan, nan],
+            "matched_swr_end": [10.2, 20.2, 30.05, nan, nan, nan],
         }
     )
 
@@ -465,12 +473,18 @@ def test_figure02_examples_are_checked_rows_of_the_event_table(offline):
     assert windows["Inside SWR"] == (10.0, 10.1)
     assert windows["SWR, mostly Local"] == (start, start + 0.1)
 
-    # an example of another class than it is drawn as is refused
-    wrong = events.assign(overlap_class=["non_swr", *events["overlap_class"][1:]])
+    # an example of another subclass than it is drawn as is refused
+    wrong = events.assign(
+        overlap_subclass=["no_overlap", *events["overlap_subclass"][1:]]
+    )
     with pytest.raises(AssertionError, match="Inside SWR"):
         figure02.example_windows(
             wrong, ripples, _figure02_local_results(figure02, 0.95)
         )
+    # a "starts before" example that also ends after its SWR is refused
+    both = events.assign(matched_swr_end=[10.2, 20.08, 30.05, *[np.nan] * 3])
+    with pytest.raises(AssertionError, match="Starts before SWR.*start alone"):
+        figure02.example_windows(both, ripples, _figure02_local_results(figure02, 0.95))
     # the Local SWR must be the source's, empty of events, and mostly Local
     with pytest.raises(AssertionError, match="not one of the source's"):
         figure02.example_windows(
@@ -484,7 +498,7 @@ def test_figure02_examples_are_checked_rows_of_the_event_table(offline):
             pd.DataFrame(
                 {
                     "event_id": [2],
-                    "overlap_class": ["swr_contained"],
+                    "overlap_subclass": ["swr_contains_event"],
                     "event_start_s": [start + 0.01],
                     "event_end_s": [start + 0.05],
                 }
