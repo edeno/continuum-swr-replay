@@ -155,7 +155,11 @@ Work that is deferred on purpose. Each item says when it should be done.
   each epoch's input digests (`epoch_inputs`) but nothing reads them back, and
   `score_tetrode_holdout.py` and `score_event_likelihood_advantage.py` record none. Let a task
   give `epochs_to_run` a per-epoch input function and rerun an epoch whose digests differ.
-  *When:* before the next re-decode, or when one of these runners is resumed across one.
+  A resume does not compare the code either: the commit is recorded (`provenance`) and not
+  read back, so an `ok` record made by older scoring code is reused unless the change shows
+  in `settings`.
+  *When:* before the next re-decode, or when one of these runners is resumed across one or
+  across a change to its scoring code.
 - [ ] **One GPU-per-worker setup.** `scripts/event_evidence/_per_event_run.use_gpu` repeats the
   environment setup and device check of `runs/device.configure_jax_gpu`, which it cannot call
   because that allows one process per card. Move the shared part into `runs/device` and have

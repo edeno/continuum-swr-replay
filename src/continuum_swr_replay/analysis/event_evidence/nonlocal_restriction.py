@@ -138,6 +138,22 @@ CATEGORIES = ("excluded", IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR, "moving")
 CAUSAL_MASS_TOLERANCE = 1e-3
 """Largest allowed distance of a model's filtered posterior mass from 1."""
 
+PREDICTED_MASS_TOLERANCE = 1e-4
+"""Largest allowed distance of a model's predictive posterior mass,
+``sum_s pred_t[s]``, from 1 at any bin.
+
+A deviation d biases that bin's scores by about d nats, and differently for
+each model, so it would enter the contrasts. Observed: at most 6e-7 on the GPU
+and 1.4e-5 on the CPU (``full``, 100,000 bins of ``wilbur20210329_02_r1_HPC``).
+The case the check is for, the library's filter run at reduced matrix-product
+precision on the GPU, would be about 4e-4. The filtered posterior's mass
+(:data:`CAUSAL_MASS_TOLERANCE`) does not show it: the filter renormalizes."""
+
+CONTINUOUS_BLOCK_TOLERANCE = 1e-6
+"""Largest allowed :func:`continuous_block_deviation`: rows of a destination
+state's block of ``C`` that do not sum to 1 would make the restricted model
+improper (5.8e-15 on ``wilbur20210329_02_r1_HPC``)."""
+
 
 def bin_categories(
     frame: pd.DataFrame,
@@ -375,9 +391,10 @@ def predictive_log_scores(
         ``library_s``, ``two_sided_s``, ``marginal`` (the library's),
         ``filter_score_sum`` (the float64 sum of the filter scores),
         ``marginal_difference`` (``marginal`` minus ``filter_score_sum``),
-        ``marginal_agrees`` (within :data:`MARGINAL_TOLERANCE` of the total) and
+        ``marginal_agrees`` (within :data:`MARGINAL_TOLERANCE` of the total),
         ``causal_mass_deviation`` (the largest distance of a filtered
-        posterior's sum from 1).
+        posterior's sum from 1) and ``predicted_mass_deviation`` (the largest
+        distance of a predictive posterior's sum from 1, summed in float64).
 
     Raises
     ------
@@ -450,13 +467,19 @@ def predictive_log_scores(
     )
     filter_score = np.empty(n_time, dtype=np.float32)
     two_sided = np.empty(n_time, dtype=np.float32)
+    predicted_mass_deviation = 0.0
     for start in range(0, n_time, chunk_bins):
         stop = min(start + chunk_bins, n_time)
+        chunk = np.asarray(predicted[start:stop])
+        predicted_mass_deviation = max(
+            predicted_mass_deviation,
+            float(np.abs(chunk.astype(np.float64).sum(axis=1) - 1.0).max()),
+        )
         # the next bin of the last bin is a stand-in; its two-sided score is set
         # below
         following = np.minimum(np.arange(start, stop) + 1, n_time - 1)
         scores = _bin_scores(
-            jnp.asarray(predicted[start:stop]),
+            jnp.asarray(chunk),
             log_likelihood[start:stop],
             jnp.asarray(predicted[following]),
             jnp.asarray(smoothed[following]),
@@ -468,6 +491,7 @@ def predictive_log_scores(
         )
     two_sided[-1] = filter_score[-1]
     record["two_sided_s"] = round(clock.time() - started, 2)
+    record["predicted_mass_deviation"] = predicted_mass_deviation
     del smoothed, predicted
 
     total = float(filter_score.astype(np.float64).sum())
@@ -558,6 +582,7 @@ _MODEL_RECORD_KEYS = {
     "marginal_difference": "marginal_difference_{}",
     "marginal_agrees": "marginal_agrees_{}",
     "causal_mass_deviation": "causal_mass_deviation_{}",
+    "predicted_mass_deviation": "predicted_mass_deviation_{}",
 }
 
 
@@ -596,8 +621,8 @@ def model_scores(
         ``marginal_log_likelihood_<model>`` as it returned it, the
         ``filter_score_sum_<model>``, their ``marginal_difference_<model>``,
         ``marginal_agrees_<model>`` (:data:`MARGINAL_TOLERANCE`),
-        ``causal_mass_deviation_<model>``, ``library_<model>_s`` and
-        ``two_sided_<model>_s``.
+        ``causal_mass_deviation_<model>``, ``predicted_mass_deviation_<model>``,
+        ``library_<model>_s`` and ``two_sided_<model>_s``.
     """
     likelihood = jnp.asarray(log_likelihood)  # on the device once for the models
     interior = np.asarray(detector.is_track_interior_state_bins_)
@@ -716,10 +741,18 @@ def check_failures(record: dict) -> list[str]:
     """The model checks a :func:`restriction_scores` record fails, as messages.
 
     A model's library marginal must agree with its summed filter scores
-    (``marginal_agrees_<model>``), and its filtered posterior mass must be
-    within :data:`CAUSAL_MASS_TOLERANCE` of 1.
+    (``marginal_agrees_<model>``), its filtered posterior mass must be within
+    :data:`CAUSAL_MASS_TOLERANCE` of 1 and its predictive posterior mass within
+    :data:`PREDICTED_MASS_TOLERANCE`; the blocks of ``C`` must have rows that sum
+    to 1 within :data:`CONTINUOUS_BLOCK_TOLERANCE`.
     """
     failures = []
+    deviation = record["continuous_block_deviation"]
+    if not deviation <= CONTINUOUS_BLOCK_TOLERANCE:
+        failures.append(
+            f"rows of the continuous transitions' blocks are {deviation} from "
+            f"summing to 1 (tolerance {CONTINUOUS_BLOCK_TOLERANCE})"
+        )
     for model in MODELS:
         if not record[f"marginal_agrees_{model}"]:
             failures.append(
@@ -732,6 +765,12 @@ def check_failures(record: dict) -> list[str]:
             failures.append(
                 f"{model}: filtered posterior mass is {deviation} from 1 "
                 f"(tolerance {CAUSAL_MASS_TOLERANCE})"
+            )
+        deviation = record[f"predicted_mass_deviation_{model}"]
+        if not deviation <= PREDICTED_MASS_TOLERANCE:
+            failures.append(
+                f"{model}: predictive posterior mass is {deviation} from 1 "
+                f"(tolerance {PREDICTED_MASS_TOLERANCE})"
             )
     return failures
 

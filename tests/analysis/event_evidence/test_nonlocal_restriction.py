@@ -148,6 +148,7 @@ def test_the_scores_match_the_brute_force_sums_over_paths(name, chunk_bins):
     np.testing.assert_allclose(record["marginal"], prefix[-1], atol=1e-5)
     assert record["marginal_agrees"]
     assert record["causal_mass_deviation"] < 1e-5
+    assert record["predicted_mass_deviation"] < 1e-5
 
 
 def test_a_forbidden_state_holds_no_mass():
@@ -413,13 +414,14 @@ def test_categories_reject_a_mismatched_swr_mask():
 
 
 def _record(**changes):
-    record = {}
+    record = {"continuous_block_deviation": 1e-12}
     for model in ("none", "swr", "full"):
         record |= {
             f"marginal_agrees_{model}": True,
             f"marginal_log_likelihood_{model}": -10.0,
             f"marginal_difference_{model}": 0.0,
             f"causal_mass_deviation_{model}": 1e-6,
+            f"predicted_mass_deviation_{model}": 1e-6,
         }
     return record | changes
 
@@ -434,6 +436,9 @@ def test_a_clean_record_passes_the_checks():
         ({"marginal_agrees_full": False}, "full: library marginal"),
         ({"causal_mass_deviation_none": 2e-3}, "none: filtered posterior mass"),
         ({"causal_mass_deviation_swr": float("nan")}, "swr: filtered"),
+        ({"predicted_mass_deviation_full": 4e-4}, "full: predictive posterior mass"),
+        ({"predicted_mass_deviation_none": float("nan")}, "none: predictive"),
+        ({"continuous_block_deviation": 1e-3}, "continuous transitions' blocks"),
     ],
 )
 def test_each_failed_check_is_named(changes, expected):

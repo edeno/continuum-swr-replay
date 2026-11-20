@@ -39,7 +39,11 @@ posterior whose mass is more than ``CAUSAL_MASS_TOLERANCE`` from 1) gets status
 ``failed_check`` and a message naming the failures; its tables are still
 written, for diagnosis.
 A labeled bin with a score that is not finite fails the epoch when its sums are
-taken (``restriction_sums`` raises), after its per-bin table is written.
+taken (``restriction_sums`` raises), after its per-bin table is written. A
+failed or ``failed_check`` epoch can leave tables on disk (and, after an
+``--overwrite`` rerun that fails, a sums table older than its bins table), so a
+reader takes only the epochs whose record is ``ok`` (``runs.io.ok_table_paths``,
+as the other per-epoch outputs are read).
 
 Spike times and waveform features are read through ``load_data`` (read-only).
 Each worker is given one GPU, ``--workers-per-gpu`` to a card, as in
@@ -111,6 +115,12 @@ def run_epoch(epoch_id: str, data_dir: Path, output: Path) -> dict:
     frame = epoch.frame
     source_events = swr_source.epoch_source(epoch_id).events
     in_swr = interval_mask(epoch.time, source_events)
+    in_label = frame[swr_source.SWR_LABEL_COLUMN].to_numpy() > 0
+    if (in_label & ~in_swr).any():
+        raise ValueError(
+            f"{int((in_label & ~in_swr).sum())} bins the frame labels as an SWR "
+            "are outside every SWR of the source"
+        )
     categories = nr.bin_categories(frame, in_swr)
 
     scores, record = nr.restriction_scores(
@@ -138,7 +148,6 @@ def run_epoch(epoch_id: str, data_dir: Path, output: Path) -> dict:
     labels = np.asarray(categories)
     analyzed = labels != "excluded"
     immobile = np.isin(labels, [nr.IMMOBILE_IN_SWR, nr.IMMOBILE_OUTSIDE_SWR])
-    in_label = frame[swr_source.SWR_LABEL_COLUMN].to_numpy() > 0
     failures = nr.check_failures(record)
     return json_ready(
         {
@@ -194,8 +203,11 @@ def main(argv: list[str] | None = None) -> None:
             "margin_bins": th.MARGIN_BINS,
             "immobility_threshold_cm_per_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
             "swr_source": swr_source.swr_source_name(),
+            "models": list(nr.MODELS),
             "marginal_tolerance": nr.MARGINAL_TOLERANCE,
             "causal_mass_tolerance": nr.CAUSAL_MASS_TOLERANCE,
+            "predicted_mass_tolerance": nr.PREDICTED_MASS_TOLERANCE,
+            "continuous_block_tolerance": nr.CONTINUOUS_BLOCK_TOLERANCE,
         },
         # every input is the epoch's own (its decode, detector and SWR files):
         # each record holds their digests under "epoch_inputs"
