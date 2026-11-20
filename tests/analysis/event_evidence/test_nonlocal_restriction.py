@@ -489,3 +489,66 @@ def test_a_clean_record_passes_the_checks():
 def test_each_failed_check_is_named(changes, expected):
     failures = nr.check_failures(_record(**changes))
     assert len(failures) == 1 and expected in failures[0]
+
+
+def test_place_sampling_uses_the_folds_and_margin_it_is_given(monkeypatch):
+    """``restriction_scores``' ``place_sampling_s`` comes from the folds and
+    margin it hands the held-out stage, not the contiguous defaults. The
+    likelihood, the models and the place bins are stubbed."""
+    from types import SimpleNamespace
+
+    from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
+    from continuum_swr_replay.decoding.results import ENCODING_KEY
+
+    n = 2000
+    time = np.arange(n) * 0.002
+    rng = np.random.default_rng(5)
+    folds = np.repeat(rng.permutation(np.arange(20) % 5), n // 20)
+    place = (np.arange(n) // 7) % 30  # the animal's place bin
+    is_training = rng.random(n) < 0.9
+    margin = 13
+    environment = object()
+    detector = SimpleNamespace(
+        encoding_model_={ENCODING_KEY: {"environment": environment}}
+    )
+    linear_position = np.arange(n, dtype=float)
+
+    def heldout(*args, folds, margin_bins, **kwargs):
+        assert margin_bins == margin
+        return np.zeros((n, 3), dtype=np.float32), np.asarray(folds), {}
+
+    def scores(detector, likelihood, in_swr, log):
+        return {
+            column: np.zeros(n, dtype=np.float32) for column in nr.SCORE_COLUMNS
+        }, {}
+
+    def places(env, position):
+        assert env is environment
+        np.testing.assert_array_equal(position, linear_position)
+        return place
+
+    monkeypatch.setattr(nr, "heldout_log_likelihood", heldout)
+    monkeypatch.setattr(nr, "model_scores", scores)
+    monkeypatch.setattr(nr, "animal_place_bins", places)
+    table, _ = nr.restriction_scores(
+        detector,
+        time,
+        None,
+        [],
+        [],
+        is_training,
+        np.zeros(n, dtype=bool),
+        np.zeros(n, dtype=bool),
+        folds=folds,
+        margin_bins=margin,
+        linear_position=linear_position,
+        log=lambda message: None,
+    )
+    expected = th.place_sampling(place, is_training, folds, 5, margin, 0.002)
+    np.testing.assert_array_equal(table["place_sampling_s"], expected)
+    np.testing.assert_array_equal(table["block"], folds)
+    # the contiguous defaults would give something else
+    contiguous = th.place_sampling(
+        place, is_training, th.time_blocks(time), 5, th.MARGIN_BINS, 0.002
+    )
+    assert not np.array_equal(expected, contiguous)

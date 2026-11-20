@@ -94,7 +94,14 @@ one spike and the Non-Local Fragmented state can follow each spike's place.
 SWRs are not padded, so non-local activity that begins before its SWR or ends
 after it is counted outside SWRs. Nor does it show anything about a transition
 matrix other than the fitted one, which was fit on the same epoch with every
-state allowed.
+state allowed. The held-out encodings cost data: with the trial folds' margin
+each fold's encoding is fit on about 75 % of the decode's training bins (about
+80 % with contiguous blocks). And the comparison is biased against the
+non-local states outside SWRs: the decoder trains on every bin outside SWRs, so
+non-local activity outside SWRs at a well, from the other stays there, is in the
+data the Local state's encoding at that well is fit on, while spikes inside SWRs
+never are; the Local state explains part of that activity, so ``full - swr``
+outside SWRs and the share outside SWRs are understated, not overstated.
 """
 
 from __future__ import annotations

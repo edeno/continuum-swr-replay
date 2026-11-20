@@ -142,11 +142,11 @@ def test_capped_groups_cut_a_long_segment_into_equal_pieces_within_the_cap():
 
 
 def test_task_segment_starts_add_the_time_before_and_after_the_trials():
-    time = np.arange(0.0, 100.0, 0.1)
+    time = np.arange(0.0, 75.0, 0.1)
     starts, classes = th.task_segment_starts(
-        time, np.array([10.0, 30.0, 50.0]), np.array([2, 3, 2]), 70.0
+        time, np.array([5.0, 30.0, 50.0]), np.array([2, 3, 2]), 70.0
     )
-    np.testing.assert_array_equal(starts, [0.0, 10.0, 30.0, 50.0, 70.0])
+    np.testing.assert_array_equal(starts, [0.0, 5.0, 30.0, 50.0, 70.0])
     np.testing.assert_array_equal(
         classes, [th.BEFORE_FIRST_TRIAL, 2, 3, 2, th.AFTER_LAST_TRIAL]
     )
@@ -164,14 +164,14 @@ def test_task_segment_starts_add_the_time_before_and_after_the_trials():
 
 
 def test_long_stays_before_and_after_the_trials_are_spread_over_the_folds():
-    """150 s before the first trial and 300 s after the last, around twenty
-    10 s trials: with the 30 s cap each fold holds a fifth of the time before
-    and of the time after; without it each sits in one fold."""
+    """150 s before the first trial and 300 s after the last, around two
+    hundred 10 s trials: with the 30 s cap each fold holds a fifth of the time
+    before and of the time after; without it each sits in one fold."""
     bin_s = 0.1
-    departures = 150.0 + 10.0 * np.arange(20)
-    time = np.arange(0.0, 650.0, bin_s)
+    departures = 150.0 + 10.0 * np.arange(200)
+    time = np.arange(0.0, 2450.0, bin_s)
     starts, classes = th.task_segment_starts(
-        time, departures, np.tile([0, 1], 10), 350.0
+        time, departures, np.tile([0, 1], 100), 2150.0
     )
     y = classes[th.trial_segments(time, starts)]
     folds = th.trial_folds(time, starts, classes, 5, max_segment_s=30.0)
@@ -358,3 +358,64 @@ def test_add_rows_is_np_add_at_to_the_bit():
     np.add.at(expected, index, values)
     th._add_rows(out, index, values)
     np.testing.assert_array_equal(out, expected)
+
+
+def test_trials_off_the_decodes_clock_raise():
+    time = 1000.0 + np.arange(0.0, 600.0, 0.1)
+    departures = 1000.0 + 10.0 * np.arange(1, 50)
+    wells = np.tile([2, 3], 25)[:49]
+    # the trials as they are: they cover 97.5 % of the bins
+    th.task_segment_starts(time, departures, wells, 595.0 + 1000.0)
+    assert th.trial_bin_share(time, departures, 1595.0) == pytest.approx(0.975)
+    # in milliseconds, or offset past the epoch: the departures leave the axis
+    with pytest.raises(ValueError, match="outside the time axis"):
+        th.task_segment_starts(time, departures * 1000.0, wells, 1595.0 * 1000.0)
+    with pytest.raises(ValueError, match="outside the time axis"):
+        th.task_segment_starts(time, departures + 600.0, wells, 2195.0)
+    # within the axis, but covering a fifth of it
+    with pytest.raises(ValueError, match="cover 19.8% of the bins"):
+        th.task_segment_starts(time, departures[:12], wells[:12], 1129.0)
+
+
+def test_the_leakage_check_passes_the_real_designs():
+    rng = np.random.default_rng(3)
+    time = np.arange(0.0, 300.0, 0.002)
+    position = rng.uniform(0, 100, time.size)
+    is_training = rng.random(time.size) < 0.9
+    blocks = th.time_blocks(time, 5)
+    th.check_no_fold_leakage(
+        time, position, th.fold_training_masks(is_training, blocks, 5), blocks
+    )
+    starts = np.arange(0.0, 300.0, 7.0)
+    folds = th.trial_folds(time, starts, np.arange(starts.size) % 3, 5)
+    margin = th.margin_in_bins(th.TRIAL_MARGIN_S, time)
+    th.check_no_fold_leakage(
+        time, position, th.fold_training_masks(is_training, folds, 5, margin), folds
+    )
+
+
+def test_the_leakage_check_raises_where_the_library_would_reach_a_fold():
+    time = np.arange(100) * 0.002
+    position = np.linspace(0, 50, 100)
+    is_training = np.ones(100, dtype=bool)
+    # interleaved folds with no margin: the library pads a run by one bin, so
+    # each run takes spikes from the bin of the other fold before it
+    blocks = (np.arange(100) // 10) % 2
+    with pytest.raises(ValueError, match="fold 0's encoding would train on"):
+        th.check_no_fold_leakage(
+            time, position, th.fold_training_masks(is_training, blocks, 2, 0), blocks
+        )
+    # a margin of two bins is enough
+    th.check_no_fold_leakage(
+        time, position, th.fold_training_masks(is_training, blocks, 2, 2), blocks
+    )
+    # but a gap without a position across the fold and its margin is bridged:
+    # the run spans it, and the fold's bins with it
+    blocks = np.zeros(100, dtype=np.int64)
+    blocks[45:55] = 1
+    gap = position.copy()
+    gap[43:57] = np.nan
+    masks = th.fold_training_masks(is_training, blocks, 2, 2)
+    with pytest.raises(ValueError, match="fold 1's encoding would train on 10"):
+        th.check_no_fold_leakage(time, gap, masks, blocks)
+    th.check_no_fold_leakage(time, position, masks, blocks)

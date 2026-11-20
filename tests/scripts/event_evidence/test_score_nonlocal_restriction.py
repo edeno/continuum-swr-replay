@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 import pytest
+import sklearn
 
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
@@ -259,6 +260,7 @@ def test_run_epoch_labels_sums_and_records_the_epoch(patched):
     assert record["margin_bins"] == 500
     assert record["n_segments"] == 7  # six trials and the time after them
     assert record["n_groups"] == 7
+    assert record["trial_bin_share"] == pytest.approx(11 / 12)
     assert record["fold_share_min"] == 0.0
     assert record["fold_share_max"] == pytest.approx(0.75)
     assert record["immobile_share_place_sampling_0s"] == pytest.approx(2 / 8)
@@ -273,6 +275,7 @@ def test_the_contiguous_design_passes_no_folds(patched):
     assert record["fold_design"] == "contiguous"
     assert record["margin_bins"] == th.MARGIN_BINS
     assert record["n_segments"] is None and record["n_groups"] is None
+    assert record["trial_bin_share"] is None
 
 
 def test_the_header_names_the_fold_design_and_its_margin():
@@ -281,6 +284,8 @@ def test_the_header_names_the_fold_design_and_its_margin():
         "fold_classes": "to_well",
         "margin_s": 1.0,
         "max_segment_s": th.MAX_SEGMENT_S,
+        "min_trial_bin_share": th.MIN_TRIAL_BIN_SHARE,
+        "sklearn_version": sklearn.__version__,
     }
     assert runner.fold_settings("contiguous") == {
         "fold_design": "contiguous",

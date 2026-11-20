@@ -64,6 +64,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
     per_tetrode_terms,
     refit_encoding,
     spikes_in_bins,
+    training_spike_bins,
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 
@@ -92,6 +93,14 @@ BEFORE_FIRST_TRIAL = -1
 
 AFTER_LAST_TRIAL = -2
 """The class of the segment after an epoch's last trial."""
+
+MIN_TRIAL_BIN_SHARE = 0.8
+"""The smallest share of an epoch's bins that its trials must cover
+(:func:`task_segment_starts`). Over the 242 analyzed epochs the trials cover
+93 % to 99.97 % (median 98.7 %; the time before the first trial is at most 65 s
+and after the last at most 120 s), so a smaller share means the trials are not
+on the decode's clock, where every bin would fall outside them and the cap would
+cut the epoch into blocks of one class."""
 
 NO_SPIKE = "No-Spike"
 LOCAL = "Local"
@@ -149,6 +158,22 @@ def trial_segments(time: NDArray, segment_starts: NDArray) -> NDArray[np.int64]:
     return np.maximum(segment, 0).astype(np.int64)
 
 
+def trial_bin_share(time: NDArray, departures: NDArray, last_trial_end: float) -> float:
+    """The share of the bins from the first departure to the last trial's end.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+    departures : ndarray, shape (n_trials,)
+        s, increasing.
+    last_trial_end : float
+        s.
+    """
+    time = np.asarray(time, dtype=float)
+    first = float(np.asarray(departures, dtype=float)[0])
+    return float(np.mean((time >= first) & (time < last_trial_end)))
+
+
 def task_segment_starts(
     time: NDArray,
     departures: NDArray,
@@ -186,7 +211,10 @@ def task_segment_starts(
     ------
     ValueError
         When there is no trial, a destination is missing, the departures and
-        destinations differ in length, or the last trial ends before it departs.
+        destinations differ in length, the last trial ends before it departs, a
+        departure lies outside the time axis, or the trials cover less than
+        :data:`MIN_TRIAL_BIN_SHARE` of the bins (:func:`trial_bin_share`): the
+        trials are then not on the decode's clock.
     """
     time = np.asarray(time, dtype=float)
     departures = np.asarray(departures, dtype=float)
@@ -201,6 +229,18 @@ def task_segment_starts(
         raise ValueError("every trial needs a destination well")
     if not last_trial_end > departures[-1]:
         raise ValueError("the last trial ends before its departure")
+    if departures[0] < time[0] or departures[-1] > time[-1]:
+        raise ValueError(
+            f"departures from {departures[0]} to {departures[-1]} s lie outside "
+            f"the time axis ({time[0]} to {time[-1]} s): are the trials on the "
+            "decode's clock?"
+        )
+    share = trial_bin_share(time, departures, last_trial_end)
+    if share < MIN_TRIAL_BIN_SHARE:
+        raise ValueError(
+            f"the trials cover {share:.1%} of the bins, less than "
+            f"{MIN_TRIAL_BIN_SHARE:.0%}: are the trials on the decode's clock?"
+        )
     starts = [departures]
     classes = [destinations.astype(np.int64)]
     if departures[0] > time[0]:
@@ -273,8 +313,12 @@ def trial_folds(
     groups in a fixed order (the most bins first).
 
     With the segments of :func:`task_segment_starts` the folds sample every well
-    in every fold, where contiguous blocks of time (:func:`time_blocks`) leave a
-    patch the animal visits in one stretch of the epoch to a single block.
+    with at least ``n_folds`` groups in every fold, where contiguous blocks of
+    time (:func:`time_blocks`) leave a patch the animal visits in one stretch of
+    the epoch to a single block. A well with fewer groups is not: its stays are
+    scored with encodings that may have no other stay there, which the per-bin
+    ``place_sampling_s`` (:func:`place_sampling`) and the runner's
+    ``immobile_share_place_sampling_0s`` show.
 
     Parameters
     ----------
@@ -381,6 +425,44 @@ def fold_training_masks(
         near = count[last] - count[first] > 0
         masks.append(is_training & ~near)
     return masks
+
+
+def check_no_fold_leakage(
+    time: NDArray,
+    position: NDArray,
+    masks: Sequence[NDArray],
+    blocks: NDArray,
+) -> None:
+    """Raise if a fold's encoding would take spikes from a bin of the fold.
+
+    The library trains on runs of training bins, padded by a bin width and
+    bridged over bins without a position
+    (:func:`~.state_evidence.terms.training_spike_bins`), so the bins it takes
+    spikes from can reach past the training mask.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+    position : ndarray, shape (n_time,) or (n_time, n_dims)
+        The position the encodings are fit with.
+    masks : sequence of ndarray of bool, each shape (n_time,)
+        Each fold's training bins (:func:`fold_training_masks`).
+    blocks : ndarray of int, shape (n_time,)
+        Each bin's fold.
+
+    Raises
+    ------
+    ValueError
+        Naming the fold and how many of its bins its encoding would train on.
+    """
+    blocks = np.asarray(blocks)
+    for b, mask in enumerate(masks):
+        leaked = training_spike_bins(time, position, mask) & (blocks == b)
+        if leaked.any():
+            raise ValueError(
+                f"fold {b}'s encoding would train on {int(leaked.sum())} of its own "
+                f"bins (first at bin {int(np.argmax(leaked))}): widen the margin"
+            )
 
 
 def animal_place_bins(environment: Any, linear_position: NDArray) -> NDArray[np.int64]:
@@ -731,7 +813,8 @@ def heldout_terms(
     ------
     ValueError
         When ``folds`` is not one fold per bin in 0 .. n_folds - 1, each with
-        bins.
+        bins, or when a fold's encoding would take spikes from one of its own
+        bins (:func:`check_no_fold_leakage`).
     """
     from non_local_detector.likelihoods.no_spike import (
         predict_no_spike_log_likelihood,
@@ -755,6 +838,7 @@ def heldout_terms(
                 f"0 .. {n_folds - 1}, each fold with bins"
             )
     masks = fold_training_masks(is_training, blocks, n_folds, margin_bins)
+    check_no_fold_leakage(time, head_position, masks, blocks)
     encodings = [
         refit(detector, time, head_position, spike_times, marks, mask) for mask in masks
     ]

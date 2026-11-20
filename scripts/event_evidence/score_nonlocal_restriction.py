@@ -136,13 +136,19 @@ at most this many seconds of training data at the animal's place."""
 
 
 def fold_settings(fold_design: str) -> dict:
-    """The header's record of a fold design: its name and margin in seconds."""
+    """The header's record of a fold design: its name and margin in seconds;
+    for ``trials`` also the segment cap and the scikit-learn version, whose
+    ``StratifiedGroupKFold`` heuristic assigns the folds."""
     if fold_design == "trials":
+        import sklearn
+
         return {
             "fold_design": "trials",
             "fold_classes": "to_well",
             "margin_s": th.TRIAL_MARGIN_S,
             "max_segment_s": th.MAX_SEGMENT_S,
+            "min_trial_bin_share": th.MIN_TRIAL_BIN_SHARE,
+            "sklearn_version": sklearn.__version__,
         }
     if fold_design == "contiguous":
         return {
@@ -172,25 +178,31 @@ def epoch_folds(
     folds : ndarray of int, shape (n_time,), or None
     margin_bins : int
     counts : dict
-        ``n_segments`` (the segments holding a bin) and ``n_groups`` (their
-        pieces after the cap), None for ``contiguous``.
+        ``n_segments`` (the segments holding a bin), ``n_groups`` (their
+        pieces after the cap) and ``trial_bin_share`` (the share of the bins
+        from the first departure to the last trial's end), None for
+        ``contiguous``.
     """
     if fold_design == "contiguous":
-        return None, th.MARGIN_BINS, {"n_segments": None, "n_groups": None}
+        return (
+            None,
+            th.MARGIN_BINS,
+            {"n_segments": None, "n_groups": None, "trial_bin_share": None},
+        )
     if fold_design != "trials":
         raise ValueError(f"unknown fold design {fold_design!r}")
     trials = trials.sort_values("movement_start_time")
+    departures = trials["movement_start_time"].to_numpy(dtype=float)
+    last_end = float(trials["end_time"].iloc[-1])
     starts, classes = th.task_segment_starts(
-        time,
-        trials["movement_start_time"].to_numpy(dtype=float),
-        trials["to_well"].to_numpy(),
-        float(trials["end_time"].iloc[-1]),
+        time, departures, trials["to_well"].to_numpy(), last_end
     )
     folds = th.trial_folds(time, starts, classes, nr.N_FOLDS, th.MAX_SEGMENT_S)
     segment = th.trial_segments(time, starts)
     counts = {
         "n_segments": int(np.unique(segment).size),
         "n_groups": int(th.capped_groups(time, segment, th.MAX_SEGMENT_S)[-1]) + 1,
+        "trial_bin_share": th.trial_bin_share(time, departures, last_end),
     }
     return folds, th.margin_in_bins(th.TRIAL_MARGIN_S, time), counts
 
