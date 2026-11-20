@@ -477,6 +477,31 @@ def test_class_distribution_values_count_the_animals_with_one_mode():
         builder.class_distribution_values(distribution.iloc[1:], "s")
 
 
+def test_nonlocal_power_values_give_the_share_of_nonlocal_time_below_the_threshold():
+    # each animal's non-local bins below 2 z are 1, 2, ... 5 of its 10
+    rows = [
+        (animal, f"{animal}_e", low, high, 100, n)
+        for i, animal in enumerate(analyzed_animals())
+        for low, high, n in ((-np.inf, 2.0, i + 1), (2.0, np.inf, 9 - i))
+    ]
+    counts = pd.DataFrame(
+        rows,
+        columns=[
+            "animal",
+            "epoch_id",
+            "power_low",
+            "power_high",
+            "n_bins",
+            "n_nonlocal",
+        ],
+    )
+    assert _numbers(builder.nonlocal_power_values(counts, "s")) == {
+        "nonlocal_time_below_swr_threshold_fraction": pytest.approx(0.3),
+        "nonlocal_time_below_swr_threshold_fraction_animal_min": pytest.approx(0.1),
+        "nonlocal_time_below_swr_threshold_fraction_animal_max": pytest.approx(0.5),
+    }
+
+
 def step_fits() -> pd.DataFrame:
     """Step fits of every analyzed animal at the main settings: 1 animal with a
     step in duration, 3 in spatial extent and in replay speed, 2 in spike

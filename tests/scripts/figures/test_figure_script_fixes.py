@@ -1178,3 +1178,60 @@ def test_the_uncertainty_annotation_refuses_a_metric_without_an_overall_row():
     contrasts = contrasts[~contrasts["metric"].eq("absolute_rate")]
     with pytest.raises(ValueError, match="no overall posterior row for absolute_rate"):
         figure._positive_animals_note(contrasts, "absolute_rate")
+
+
+def test_figure02_panel_j_writes_the_share_the_events_summary_gives(offline):
+    """The share of non-local time below the SWR threshold on the panel is the
+    events summary's value (the animals' mean, the bins beyond the axis
+    counted), rounded by the summary's rule; each animal is one line on each
+    axis, with the animals' mean."""
+    import matplotlib.pyplot as plt
+
+    from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
+        RIPPLE_POWER_EDGES,
+    )
+    from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        animal_power_counts,
+    )
+    from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
+    from continuum_swr_replay.reported.events import nonlocal_power_values
+    from continuum_swr_replay.reported.formatting import formatted
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    low, high = RIPPLE_POWER_EDGES[:-1], RIPPLE_POWER_EDGES[1:]
+    animals = list(analyzed_animals())
+    epochs = []
+    for i, animal in enumerate(animals):
+        # 8 non-local bins below the lowest finite edge, 4 above the highest,
+        # and 4 just above the threshold for every animal after the first
+        n_nonlocal = np.zeros(len(low), dtype=int)
+        n_nonlocal[0], n_nonlocal[-1] = 8, 4
+        n_nonlocal[np.flatnonzero(low == 2.0)[0]] = 4 * i
+        epochs.append(
+            pd.DataFrame(
+                {
+                    "animal": animal,
+                    "epoch_id": f"{animal}_e",
+                    "power_low": low,
+                    "power_high": high,
+                    "n_bins": 20,
+                    "n_nonlocal": n_nonlocal,
+                }
+            )
+        )
+    counts = pd.concat(epochs, ignore_index=True)
+    fig, (ax_spread, ax_share) = plt.subplots(2, 1, sharex=True)
+    figure02.draw_share_by_power(ax_spread, ax_share, animal_power_counts(counts))
+    value = {v.key: v for v in nonlocal_power_values(counts, "s")}[
+        "nonlocal_time_below_swr_threshold_fraction"
+    ]
+    # 8 / (12 + 4 i) over i = 0..4: mean 0.4371, although no bin on the axis
+    # below the threshold holds a non-local bin
+    assert formatted(value) == "44 %"
+    assert ax_spread.texts[0].get_text() == "44% below\nthreshold"
+    for ax in (ax_spread, ax_share):
+        assert (
+            len(ax.lines) == len(animals) + 2
+        )  # the animals, their mean, the threshold
+        assert ax.get_xlim() == (-2.0, 10.0)
+    plt.close(fig)

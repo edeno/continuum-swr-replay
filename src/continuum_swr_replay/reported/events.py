@@ -36,6 +36,9 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   ``scripts/event_properties/measure_event_gamma.py`` (``Processed-Data/event_gamma``):
   the z-scored gamma per event and epoch, and the band power's change against
   quiet rest in dB (its ``reference.parquet``);
+- each epoch's immobile time bins, and its non-local ones, by ripple power
+  (``Processed-Data/nonlocal_by_ripple_power``, from
+  ``scripts/event_properties/measure_nonlocal_by_ripple_power.py``);
 - the decoder quality of each analyzed epoch (``Processed-Data/decoder_quality``,
   from ``scripts/decoding/measure_decoder_quality.py``): the Local-state
   decoding error, the state fractions moving and immobile, and the calibration
@@ -83,6 +86,9 @@ from continuum_swr_replay.analysis.event_properties import (
     content_along_arms,
     event_statistics,
 )
+from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
+    KAY_ZSCORE_THRESHOLD,
+)
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
@@ -90,6 +96,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_animals,
     analyzed_epoch_ids,
 )
+from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     CONTENT_ALONG_ARMS_DIR,
@@ -101,6 +108,7 @@ from continuum_swr_replay.paths import (
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
     NL_BOUTS_BY_SWR_STEM,
+    NONLOCAL_BY_RIPPLE_POWER_DIR,
     RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
     STATE_EVIDENCE_DIR,
@@ -152,7 +160,9 @@ TAGS = {
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
+    "nonlocal_power": Tags(("2b.5",), ("2j",)),
     "participation": Tags(("2d.9",), ("2g",)),
+    "spike_rate": Tags(("2d.9",)),
     "state_composition": Tags(("2d.10",), ("3e",)),
     "likelihood_advantage": Tags(("2c.3",)),
     "tetrode_holdout": Tags(("2c.3",), ("2h",)),
@@ -197,6 +207,7 @@ class EventsInputs:
     brain_state_reference: Path
     event_gamma: Path
     class_structure: Path
+    nonlocal_by_ripple_power: Path
     event_start_rest_theta: Path
     property_bootstrap: Path
     decoder_quality: Path
@@ -220,6 +231,7 @@ def default_inputs() -> EventsInputs:
         / "reference.parquet",
         event_gamma=processed_data_dir() / EVENT_GAMMA_DIR,
         class_structure=processed_data_dir() / RIPPLE_CLASS_STRUCTURE_DIR,
+        nonlocal_by_ripple_power=processed_data_dir() / NONLOCAL_BY_RIPPLE_POWER_DIR,
         event_start_rest_theta=processed_data_dir() / EVENT_START_REST_THETA_DIR,
         property_bootstrap=processed_data_dir() / EVENT_PROPERTY_BOOTSTRAP_DIR,
         decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
@@ -1218,8 +1230,15 @@ def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.9: tetrode participation and spike rate of the events against
-    Local-rest windows of their length (Figure 2g)."""
-    make = value_factory(participation_values, source, TAGS["participation"])
+    Local-rest windows of their length (Figure 2g shows the participation)."""
+    makers = {
+        "participation": value_factory(
+            participation_values, source, TAGS["participation"]
+        ),
+        "spike_rate_hz": value_factory(
+            participation_values, source, TAGS["spike_rate"]
+        ),
+    }
     statistics = participation.participation_statistics(table)
     differences = participation.participation_differences(statistics)
     values = []
@@ -1229,6 +1248,7 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
             ("spike_rate_hz", "int", "spike rate summed over tetrodes", "spikes per s"),
         ):
             kind = "fraction" if measure == "participation" else "quantity"
+            make = makers[measure]
             for window, label in (
                 ("event", "events"),
                 ("control", "Local-rest windows"),
@@ -1255,7 +1275,7 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
                 )
             )
         values.append(
-            make(
+            makers["participation"](
                 f"{word}_participation_animals",
                 differences.loc[group, "n_animals"],
                 "count",
@@ -1264,7 +1284,7 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
             )
         )
     values.append(
-        make(
+        makers["participation"](
             "participation_events_without_control",
             int((table["kind"] == "event").sum() - (table["kind"] == "control").sum()),
             "count",
@@ -1443,6 +1463,46 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
             "dec2",
             "highest per-animal location of that mode",
             "z",
+        ),
+    ]
+
+
+def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2b.5: how much of the non-local time has ripple power below the
+    Kay threshold (Figure 2j)?
+
+    Over the immobile time bins decoded non-local, each animal's bins pooled
+    over its epochs.
+    """
+    make = value_factory(nonlocal_power_values, source, TAGS["nonlocal_power"])
+    stats = event_statistics.nonlocal_below_threshold_statistics(
+        event_statistics.animal_power_counts(counts), KAY_ZSCORE_THRESHOLD
+    )
+    key = "nonlocal_time_below_swr_threshold_fraction"
+    return [
+        make(
+            key,
+            stats["fraction_animal_mean"],
+            "fraction",
+            "pct",
+            "share of the immobile time bins decoded non-local (non-local "
+            f"probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}) whose ripple power "
+            f"is below the Kay SWR threshold ({KAY_ZSCORE_THRESHOLD:g} z): mean over "
+            "animals of each animal's share of its bins",
+        ),
+        make(
+            f"{key}_animal_min",
+            stats["fraction_animal_min"],
+            "fraction",
+            "pct",
+            "lowest per-animal share of non-local time bins below the Kay threshold",
+        ),
+        make(
+            f"{key}_animal_max",
+            stats["fraction_animal_max"],
+            "fraction",
+            "pct",
+            "highest per-animal share",
         ),
     ]
 
@@ -2324,4 +2384,23 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         )
     )
     summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]
+
+    folder = inputs.nonlocal_by_ripple_power
+    power_counts = pd.read_parquet(folder / "counts.parquet")
+    if set(power_counts["epoch_id"]) != set(analyzed_epoch_ids()):
+        raise ValueError(
+            f"{folder / 'counts.parquet'} holds {power_counts['epoch_id'].nunique()} "
+            f"epochs, not the {n_epochs} analyzed ones"
+        )
+    summary.add(
+        *nonlocal_power_values(
+            power_counts,
+            f"{rel(folder)} (scripts/event_properties/"
+            "measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+        )
+    )
+    summary.inputs += [
+        file_record(folder / name, ROOT_DIR)
+        for name in ("counts.parquet", "manifest.json")
+    ]
     return summary
