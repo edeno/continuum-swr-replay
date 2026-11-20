@@ -50,7 +50,7 @@ Work that is deferred on purpose. Each item says when it should be done.
 
 - [ ] **Scripts and figures that compute a reported statistic themselves.** Each
   summary's statistics are functions in `analysis/` (`docs/development.md`,
-  "Reported numbers"). Figure 2's panels b and d and Figure 4d call them, and the
+  "Reported numbers"). Figure 2's panels b and d and Figure 5d call them, and the
   `scripts/pfc/` reports take the summary's statistics from them (the
   marked-family summary's are `analysis/pfc/marked_family_statistics.py`'s); their
   audit-only tables are still computed in the scripts.
@@ -61,16 +61,16 @@ Work that is deferred on purpose. Each item says when it should be done.
 
   *When:* at each figure's or report's next regeneration.
 
-- [x] **Figure 4c: pooled or animal-balanced.** *Decided 2026-11-12: animal-balanced*,
+- [x] **Figure 5c: pooled or animal-balanced.** *Decided 2026-11-12: animal-balanced*,
   to match how the paper summarizes its other statistics. Panel c
-  (`scripts/figures/generate_figure04.py`, `plot_population_average`) takes each
+  (`scripts/figures/generate_figure05.py`, `plot_population_average`) takes each
   unit's curve less its own value at -200 ms and reduces it unit -> session ->
   animal, the mean over animals with the SEM over animals
   (`analysis/pfc/population_statistics.animal_balanced_unit_curve`, the reduction the
   marked-family population curves use). It drew the mean over all units with the SEM
   over units before; over half the units are one animal's (wilbur), and the
   animal-balanced curve peaks elsewhere. The mpfc summary reports no value for this
-  curve (its only 4c value is the unit count), so the figure copies no reported
+  curve (its only 5c value is the unit count), so the figure copies no reported
   number. The choice is open to a different method later: the panel's reduction is
   that one call, so changing it means swapping the function.
 

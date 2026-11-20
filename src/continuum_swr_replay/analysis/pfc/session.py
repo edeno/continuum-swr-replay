@@ -963,7 +963,7 @@ def run_session(
     Non-local events and their SWR classification are the canonical ones: the
     rows of ``Processed-Data/replay_content/event_table.parquet`` for this
     session, and that table's ``is_swr`` column (strict positive-duration
-    overlap with the SWR source's speed-gated ``SWR_event`` labels). Figure 4 therefore
+    overlap with the SWR source's speed-gated ``SWR_event`` labels). Figure 5 therefore
     describes the same ``event_id``s as the content and rate families.
 
     Immobility is ``head_speed`` strictly below

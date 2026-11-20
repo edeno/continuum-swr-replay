@@ -276,7 +276,10 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
     """One animal, one epoch, two non-SWR and two SWR events. Signal number k
     (theta 0, ripple 1, MUA 2, slow gamma 3, fast gamma 4) has non-SWR values
     10k + 1 and 10k + 2, SWR values 10k + 3 and 10k + 7, a running level of
-    10k + 4 and a quiet-rest level of 10k + 1.8."""
+    10k + 4 and a quiet-rest level of 10k + 1.8. In windows as long as each
+    class's events the levels are higher, the more so for the longer SWR
+    events: rest 10k + 1.2 (non-SWR) and 10k + 5.5 (SWR), running 10k + 4.5 and
+    10k + 4.8."""
     events = pd.DataFrame(
         {
             "animal": "a",
@@ -290,6 +293,10 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
         events[column] = 10.0 * k + np.array([1.0, 2.0, 3.0, 7.0])
         reference[f"{signal}_running_median"] = 10.0 * k + 4.0
         reference[f"{signal}_rest_median"] = 10.0 * k + 1.8
+        reference[f"{signal}_rest_matched_non_swr"] = 10.0 * k + 1.2
+        reference[f"{signal}_rest_matched_swr"] = 10.0 * k + 5.5
+        reference[f"{signal}_running_matched_non_swr"] = 10.0 * k + 4.5
+        reference[f"{signal}_running_matched_swr"] = 10.0 * k + 4.8
     return events, reference
 
 
@@ -320,6 +327,23 @@ def test_brain_state_values_name_each_signal_class_and_reference():
         if signal == "theta":
             # of the SWR events, 7 reaches the running level and 3 does not
             expected |= {"like_fraction_non_swr": 0.0, "like_fraction_swr": 0.5}
+        if signal.endswith("gamma"):
+            # Gamma is compared with windows as long as each class's events.
+            expected = {
+                "median_non_swr": 10 * k + 1.5,
+                "median_swr": 10 * k + 5.0,
+                "rest_matched_reference_non_swr": 10 * k + 1.2,
+                "rest_matched_reference_swr": 10 * k + 5.5,
+                "running_matched_reference_non_swr": 10 * k + 4.5,
+                "running_matched_reference_swr": 10 * k + 4.8,
+                # non-SWR: 1.5 is above its windows' rest (1.2), below running (4.5)
+                "animals_above_rest_non_swr": 1,
+                "animals_below_running_non_swr": 1,
+                # SWR: 5 is not above its windows' rest (5.5), though it is above
+                # the median of single rest bins (1.8); nor below running (4.8)
+                "animals_above_rest_swr": 0,
+                "animals_below_running_swr": 0,
+            }
         assert own == pytest.approx(expected), signal
     assert values["ripple_median_swr"].figures == ("2i",)
     assert values["mua_median_swr"].figures == ("2i",)
@@ -477,6 +501,31 @@ def test_class_distribution_values_count_the_animals_with_one_mode():
         builder.class_distribution_values(distribution.iloc[1:], "s")
 
 
+def test_nonlocal_power_values_give_the_share_of_nonlocal_time_below_the_threshold():
+    # each animal's non-local bins below 2 z are 1, 2, ... 5 of its 10
+    rows = [
+        (animal, f"{animal}_e", low, high, 100, n)
+        for i, animal in enumerate(analyzed_animals())
+        for low, high, n in ((-np.inf, 2.0, i + 1), (2.0, np.inf, 9 - i))
+    ]
+    counts = pd.DataFrame(
+        rows,
+        columns=[
+            "animal",
+            "epoch_id",
+            "power_low",
+            "power_high",
+            "n_bins",
+            "n_nonlocal",
+        ],
+    )
+    assert _numbers(builder.nonlocal_power_values(counts, "s")) == {
+        "nonlocal_time_below_swr_threshold_fraction": pytest.approx(0.3),
+        "nonlocal_time_below_swr_threshold_fraction_animal_min": pytest.approx(0.1),
+        "nonlocal_time_below_swr_threshold_fraction_animal_max": pytest.approx(0.5),
+    }
+
+
 def step_fits() -> pd.DataFrame:
     """Step fits of every analyzed animal at the main settings: 1 animal with a
     step in duration, 3 in spatial extent and in replay speed, 2 in spike
@@ -613,9 +662,27 @@ def test_rest_theta_values_name_each_class():
     }
 
 
+def test_figure_3_values_are_tagged_to_the_panel_that_shows_them():
+    """Spatial extent is panel c. The arm count answers the same question and is
+    in no panel. The share of content at a well is quoted on panel f; the
+    shares that depend on where the animal is (own and remote wells, remote
+    paths, near the animal) are in no panel."""
+    values = _by_key(builder.property_values(_property_events(), "s"))
+    assert values["extent_median_swr"].figures == ("3c",)
+    assert values["arms_median_swr"].figures == ()
+    assert values["arms_median_swr"].questions == values["extent_median_swr"].questions
+    assert builder.TAGS["content_occupancy"].figures == ("3f",)
+    assert builder.TAGS["content_by_animal"].figures == ()
+    assert (
+        builder.TAGS["content_by_animal"].questions
+        == builder.TAGS["content_occupancy"].questions
+    )
+
+
 def test_content_occupancy_values_name_each_group_and_place():
     # Remote: over 20 cm from the animal; at a well: under 20 cm from one.
-    def rows(animal, epoch, is_swr, d_animal, d_well):
+    # The track: a leaf arm (0) and a trunk arm (6), each of 25 2-cm place bins.
+    def rows(animal, epoch, is_swr, d_animal, d_well, arm=0):
         return pd.DataFrame(
             {
                 "event_id": 0,
@@ -624,6 +691,9 @@ def test_content_occupancy_values_name_each_group_and_place():
                 "is_swr": is_swr,
                 "distance_to_animal_cm": d_animal,
                 "distance_to_well_cm": d_well,
+                "arm": arm,
+                "arm_length_cm": 48.0,
+                "n_place_bins": 25,
             }
         )
 
@@ -635,13 +705,22 @@ def test_content_occupancy_values_name_each_group_and_place():
             rows("a", "e2", False, [5.0, 100.0], [5.0, 50.0]),
             # a, SWR: a remote path. b, no SWR: a remote well; b, SWR: near the
             # animal off the wells.
-            rows("a", "e1", True, [100.0], [50.0]),
+            rows("a", "e1", True, [100.0], [50.0], arm=6),
             rows("b", "e3", False, [100.0], [5.0]),
-            rows("b", "e3", True, [5.0], [50.0]),
+            rows("b", "e3", True, [5.0], [50.0], arm=6),
         ],
         ignore_index=True,
     )
-    assert _numbers(builder.content_occupancy_values(bins, "s")) == {
+    values = builder.content_occupancy_values(bins, "s")
+    shown = {value.key for value in values if value.figures}
+    assert shown == {
+        "occupancy_epochs",
+        "non_swr_content_at_well_fraction",
+        "swr_content_at_well_fraction",
+        "animals_non_swr_more_at_well",
+        "even_content_at_well_fraction",
+    }
+    assert _numbers(values) == {
         "occupancy_epochs": 3,
         # no SWR: a (0.5, 0.25, 0.25, 0), b (1, 0, 0, 0); the animals' mean
         "non_swr_content_remote_well_fraction": pytest.approx(0.75),
@@ -656,6 +735,8 @@ def test_content_occupancy_values_name_each_group_and_place():
         "swr_content_remote_path_fraction": pytest.approx(0.5),
         "swr_content_near_off_fraction": pytest.approx(0.5),
         "animals_non_swr_more_at_well": 2,
+        # 20 cm of the 50 cm leaf arm, of each animal's 100 cm track
+        "even_content_at_well_fraction": pytest.approx(0.2),
     }
 
 
@@ -664,7 +745,7 @@ def test_the_values_read_from_another_output_have_a_builder_of_their_own():
     gamma pass's are ``gamma_z_values``', the start-distance output's
     ``start_distance_values``'; the event table's are in neither."""
     gamma = _by_key(builder.gamma_z_values(*_signal_tables(), "s"))
-    assert len(gamma) == 16
+    assert len(gamma) == 20
     assert {key.split("_")[0] for key in gamma} == {"slow", "fast"}
     assert {v.function for v in gamma.values()} == {"gamma_z_values"}
     brain_state = _by_key(builder.brain_state_values(*_signal_tables(), "s"))
@@ -769,7 +850,7 @@ def test_state_composition_values_name_each_group_and_state():
     values = _by_key(builder.state_composition_values(events, "s"))
     assert values["non_swr_continuous_share"].value == pytest.approx(0.8)
     assert values["swr_fragmented_share"].value == pytest.approx(0.2)
-    assert values["swr_fragmented_share"].figures == ("3e",)
+    assert values["swr_fragmented_share"].figures == ("3b",)
     assert len(values) == 4
 
 

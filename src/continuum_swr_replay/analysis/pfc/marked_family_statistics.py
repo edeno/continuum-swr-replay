@@ -10,7 +10,7 @@ and writes the summary the mpfc summary builder reads.
   deviance improves with a target's kernel, and the deltas' scale.
 - The population curve of per-session curves and its standard error over
   animals are :mod:`~continuum_swr_replay.analysis.shared_statistics`'
-  :func:`animal_balanced_curve` and :func:`animal_curve_sem`, which Figure 4c
+  :func:`animal_balanced_curve` and :func:`animal_curve_sem`, which Figure 5c
   also uses.
 - :func:`population_curve_summary`: its peak, its pre- and post-onset means
   and how many sessions and animals share their signs.

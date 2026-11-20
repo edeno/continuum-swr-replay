@@ -500,13 +500,13 @@ def prepare_session_stop_context(
     sampling_frequency: float = SAMPLING_FREQUENCY,
     bundle_path: str | Path | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Assemble one session's table from the canonical Figure 4 inputs.
+    """Assemble one session's table from the canonical Figure 5 inputs.
 
     The session is assembled by the steps
     :func:`~continuum_swr_replay.analysis.pfc.marked_glm.prepare_marked_session_context`
     takes (decode/position alignment, the canonical fit mask with the
     analyzed-time rule, the canonical event sets on the at-well cohort), so
-    events, fitted bins and spike binning equal Figure 4's. The stop context is
+    events, fitted bins and spike binning equal Figure 5's. The stop context is
     the cohort stop's ``is_rewarded_outcome`` and the forward
     ``next_trip_switches_patch`` derived over every stop of the session.
 

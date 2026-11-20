@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "59f114b4acbc",
+ "commit": "96fc11f4e81d",
  "code": {
-  "head": "59f114b4acbcf3f5b0353b3e4477fedab36431ac",
+  "head": "96fc11f4e81d204a89565433cb9032aa5696bb32",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -250,13 +250,17 @@
     "sha256": "933f33706b5999a73702c0b687a36d8b0ca295a29f84600df0ec994258fec27a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
+   "src/continuum_swr_replay/analysis/event_properties/class_or_continuum.py": {
+    "sha256": "53a49744324d45f2fc8cd6cc25c1a2c7d2c5ac9723c61a73a9eafa46b14fd3ab",
+    "code_sha256": "ef936210972a70fd67d41f6d6730bf18f39dff3427aa6c8595c0ce398b8b1bbf"
+   },
    "src/continuum_swr_replay/analysis/event_properties/content_along_arms.py": {
-    "sha256": "bd01826046e02e2eb1c1eab7b4948f95fa9c5bd44d8088806e0a9ac24c1c612b",
-    "code_sha256": "7bfb24e78bcbd59c324c0db854de4890c5a7faa6785a21dedc9b817fb656162e"
+    "sha256": "83bc35c9b3c390372098ed012f5584d938d945afd8233f4934febcc19bb8e4f8",
+    "code_sha256": "d7b4bb815f91a50bc8639721cf7aa1dd0f6b293617a94eb7d9340177310a1e24"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
-    "sha256": "ac3626abe56ef579be40971053789093f4f91e66b134c670592d9b8846c578b4",
-    "code_sha256": "ec4ab6b6773fcfe0024f607301a141069c5b99aa3bef328114b3eaff7803026c"
+    "sha256": "ded3c6e84ab49e6caca480632c02f493fe873617a8c0b2a7368e376f56d5c22b",
+    "code_sha256": "d56bca392c3c43207311f8448673103913f90f056a1120f26d1003ed6a1b96eb"
    },
    "src/continuum_swr_replay/analysis/event_properties/property_contrast.py": {
     "sha256": "4989d4b201bbbbdd1551bb4ebd9c749e87f0bab6781cbfd6565296f28b4c8d1b",
@@ -327,16 +331,16 @@
     "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "ba6450c8ffa28ebf8719bf19abaa465681ead2eef84b6dfea0794621ac1cb506",
-    "code_sha256": "381a575815636a39364563c2d455f618bafe6434880a2f03c1266ab6914913e9"
+    "sha256": "e47174c87512da6a3ea19e7eda09682265041cd2468c305531aa8584b6756db5",
+    "code_sha256": "e7f0b6faf0bce1487c45fabd50b5c119ba1c8f213299f14e73276d3bcb50058a"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "99e885a71ddf34db756864522c20fff5bf2fc717c40c34308e7989fcb3f77cfe",
-    "code_sha256": "e5d5cfcc4dfa6972033abdf0ede9b4c3d238202a3468df0bf206e2abefc80c5d"
+    "sha256": "de9c90213e3818411fa6b46666663ff5302d1dc4c9f0a62e8d1f9e2b2d070723",
+    "code_sha256": "5baaa8afc8f33c654225b1353f61d79db04c23638c8914eacdc38d6b0d88f94d"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -420,16 +424,16 @@
   },
   {
    "path": "Processed-Data/event_gamma/manifest.json",
-   "sha256": "1b3bc6f40e5c4a53969d83fd8113ac4cd3969a21909f40967fd6ff44f865c7d8"
+   "sha256": "b1614d062ec85cd683e5b5c1b1bc6c6252179886f4601443577443ce266cdd68"
   },
   {
    "path": "Processed-Data/event_gamma/reference.parquet",
-   "sha256": "253abe749df602af0f91aad47c93778765cd0188ec5c0c7a77810e883eb6fd29"
+   "sha256": "fb3579e9e2553596517ae286a4b4f195d75a5ad81c5d91364a52a0e4fa75844a"
   },
   {
    "path": "Processed-Data/event_gamma/*_events.parquet",
    "n_files": 242,
-   "sha256": "4c7fabece8e648c85f0da19f623c16b798414bf38073098deb925fddb0332d50"
+   "sha256": "50c92038a4600922d00044e9339074cca4f0674d224f75c983dc71281998916c"
   },
   {
    "path": "Processed-Data/replay_detection_comparison/event_features/e2331f976fd1/*_features.parquet",
@@ -485,11 +489,11 @@
   {
    "path": "Processed-Data/content_along_arms/*.parquet",
    "n_files": 242,
-   "sha256": "979e1657725c8f37a686fe629387c44862090751e7222b6ba381a500f309cbd5"
+   "sha256": "2c62e79706e6490a9d05327de881c23922cdecd297b5b5754e47eb85c8680090"
   },
   {
    "path": "Processed-Data/content_along_arms/manifest.json",
-   "sha256": "fa83c6feebace2a2ec994c16239944e33da260064dc4749e99b1e3cbaf8ff45f"
+   "sha256": "9d922f50fe77b8b5d77abdff0bbd1a93cad988fafa06c6991f40896d6d0128e5"
   },
   {
    "path": "Processed-Data/event_tetrode_holdout/*_tetrode_holdout.parquet",
@@ -541,6 +545,14 @@
   {
    "path": "Processed-Data/ripple_class_structure/manifest.json",
    "sha256": "8756ababb8d26e05261876a13939d0275cf4dedcfea3b95e1cc1a4c90bf34824"
+  },
+  {
+   "path": "Processed-Data/nonlocal_by_ripple_power/counts.parquet",
+   "sha256": "1978408f70175c045c70218731046a25a9e84ff4269009165a5ad5d742aa532d"
+  },
+  {
+   "path": "Processed-Data/nonlocal_by_ripple_power/manifest.json",
+   "sha256": "edd765c1943ad494284b8b35e30ac0ba7baa338ef79f69bdd07e04b2824562e8"
   }
  ],
  "values": {
@@ -586,7 +598,7 @@
     "2d.1"
    ],
    "figures": [
-    "3h"
+    "3f"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -617,10 +629,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3b",
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
@@ -634,10 +643,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3b",
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -651,10 +657,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3b",
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -668,10 +671,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3b",
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -685,10 +685,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3b",
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -702,10 +699,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3b",
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
    "pending": null
@@ -719,10 +713,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3b",
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
@@ -736,10 +727,7 @@
    "questions": [
     "2d.3"
    ],
-   "figures": [
-    "3b",
-    "3d"
-   ],
+   "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
    "pending": null
@@ -1335,6 +1323,22 @@
    "function": "event_cohort_values",
    "pending": null
   },
+  "even_content_at_well_fraction": {
+   "value": 0.24509170524072657,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the track within 20 cm of a well (a track-graph end point): the share at a well of content spread evenly over the track",
+   "questions": [
+    "2d.1"
+   ],
+   "figures": [
+    "3f"
+   ],
+   "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
+   "function": "content_occupancy_values",
+   "pending": null
+  },
   "evidence_animals": {
    "value": 5,
    "kind": "count",
@@ -1375,8 +1379,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -1392,8 +1395,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3c"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1409,8 +1411,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3c"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1426,8 +1427,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3c"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1443,8 +1443,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3c"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1460,8 +1459,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3c"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -1477,8 +1475,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -1494,8 +1491,7 @@
     "2d.3"
    ],
    "figures": [
-    "3b",
-    "3d"
+    "3c"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -1506,12 +1502,12 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
+   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1522,12 +1518,12 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
+   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1538,28 +1534,28 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
+   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
   "fast_gamma_animals_below_running_swr": {
-   "value": 0,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
+   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1594,7 +1590,7 @@
    "pending": null
   },
   "fast_gamma_db_median_non_swr": {
-   "value": 0.5237300652177623,
+   "value": 0.5309050810235714,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "dB",
@@ -1608,7 +1604,7 @@
    "pending": null
   },
   "fast_gamma_db_median_swr": {
-   "value": 1.1488094096614931,
+   "value": 1.1786539741651505,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "dB",
@@ -1622,7 +1618,7 @@
    "pending": null
   },
   "fast_gamma_median_non_swr": {
-   "value": -0.21276955763535474,
+   "value": -0.2127689199142867,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -1631,7 +1627,7 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1647,39 +1643,71 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
-  "fast_gamma_rest_reference": {
-   "value": -0.4298946911128849,
+  "fast_gamma_rest_matched_reference_non_swr": {
+   "value": -0.357724044146009,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
-   "description": "median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest",
+   "description": "median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in quiet-rest windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
-  "fast_gamma_running_reference": {
-   "value": -0.1391173532811394,
+  "fast_gamma_rest_matched_reference_swr": {
+   "value": -0.3300154905638478,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
-   "description": "median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running",
+   "description": "median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in quiet-rest windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "function": "gamma_z_values",
+   "pending": null
+  },
+  "fast_gamma_running_matched_reference_non_swr": {
+   "value": -0.025773993653612257,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in running windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)",
+   "questions": [
+    "2d.8"
+   ],
+   "figures": [
+    "event_gamma"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "function": "gamma_z_values",
+   "pending": null
+  },
+  "fast_gamma_running_matched_reference_swr": {
+   "value": 0.012617123558419908,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in running windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)",
+   "questions": [
+    "2d.8"
+   ],
+   "figures": [
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -3062,7 +3090,7 @@
     "2d.1"
    ],
    "figures": [
-    "3h"
+    "3f"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -3077,9 +3105,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3h"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -3093,9 +3119,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3h"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -3109,9 +3133,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3h"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -3125,9 +3147,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3h"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -3142,7 +3162,7 @@
     "2d.10"
    ],
    "figures": [
-    "3e"
+    "3b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
@@ -3173,9 +3193,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -3205,9 +3223,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -3270,7 +3286,7 @@
     "2d.10"
    ],
    "figures": [
-    "3e"
+    "3b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
@@ -3672,9 +3688,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -3869,6 +3883,54 @@
    "function": "event_cohort_values",
    "pending": null
   },
+  "nonlocal_time_below_swr_threshold_fraction": {
+   "value": 0.7563727161109578,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the immobile time bins decoded non-local (non-local probability above 0.8) whose ripple power is below the Kay SWR threshold (2 z): mean over animals of each animal's share of its bins",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "2j"
+   ],
+   "source": "Processed-Data/nonlocal_by_ripple_power (scripts/event_properties/measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+   "function": "nonlocal_power_values",
+   "pending": null
+  },
+  "nonlocal_time_below_swr_threshold_fraction_animal_max": {
+   "value": 0.7903529357094728,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "2j"
+   ],
+   "source": "Processed-Data/nonlocal_by_ripple_power (scripts/event_properties/measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+   "function": "nonlocal_power_values",
+   "pending": null
+  },
+  "nonlocal_time_below_swr_threshold_fraction_animal_min": {
+   "value": 0.7265089666170936,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "lowest per-animal share of non-local time bins below the Kay threshold",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "2j"
+   ],
+   "source": "Processed-Data/nonlocal_by_ripple_power (scripts/event_properties/measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+   "function": "nonlocal_power_values",
+   "pending": null
+  },
   "nonlocal_time_outside_kay_fraction": {
    "value": 0.5310887375662227,
    "kind": "fraction",
@@ -4005,7 +4067,7 @@
     "2d.1"
    ],
    "figures": [
-    "3h"
+    "3f"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -4556,16 +4618,16 @@
    "pending": null
   },
   "slow_gamma_animals_above_rest_non_swr": {
-   "value": 5,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
+   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4576,28 +4638,28 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
+   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_animals_below_running_non_swr": {
-   "value": 1,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
+   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4608,12 +4670,12 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
+   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4648,7 +4710,7 @@
    "pending": null
   },
   "slow_gamma_db_median_non_swr": {
-   "value": 0.3631893555661309,
+   "value": 0.3699194568565598,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "dB",
@@ -4662,7 +4724,7 @@
    "pending": null
   },
   "slow_gamma_db_median_swr": {
-   "value": 1.632122006811644,
+   "value": 1.6585055915668172,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "dB",
@@ -4676,7 +4738,7 @@
    "pending": null
   },
   "slow_gamma_median_non_swr": {
-   "value": -0.10483297970275972,
+   "value": -0.10482267562055286,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -4685,14 +4747,14 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_median_swr": {
-   "value": 0.35792542553983864,
+   "value": 0.3578354770254885,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -4701,39 +4763,71 @@
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
-  "slow_gamma_rest_reference": {
-   "value": -0.28267979831698997,
+  "slow_gamma_rest_matched_reference_non_swr": {
+   "value": -0.20315353486291632,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
-   "description": "median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest",
+   "description": "median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in quiet-rest windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
-  "slow_gamma_running_reference": {
-   "value": -0.29710325399289655,
+  "slow_gamma_rest_matched_reference_swr": {
+   "value": -0.16093412339018648,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
-   "description": "median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running",
+   "description": "median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in quiet-rest windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)",
    "questions": [
     "2d.8"
    ],
    "figures": [
-    "3i"
+    "event_gamma"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "function": "gamma_z_values",
+   "pending": null
+  },
+  "slow_gamma_running_matched_reference_non_swr": {
+   "value": -0.20736054558424766,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in running windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)",
+   "questions": [
+    "2d.8"
+   ],
+   "figures": [
+    "event_gamma"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "function": "gamma_z_values",
+   "pending": null
+  },
+  "slow_gamma_running_matched_reference_swr": {
+   "value": -0.16079211577268682,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in running windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)",
+   "questions": [
+    "2d.8"
+   ],
+   "figures": [
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4749,7 +4843,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -4765,7 +4859,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -4781,7 +4875,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -4797,7 +4891,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -4813,7 +4907,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -4829,7 +4923,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/event_property_bootstrap (scripts/event_properties/bootstrap_event_properties.py)",
    "function": "property_interval_values",
@@ -4845,7 +4939,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -4861,7 +4955,7 @@
     "2d.2"
    ],
    "figures": [
-    "3c"
+    "3d"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/event_properties/measure_event_start_and_rest_theta.py)",
    "function": "property_values",
@@ -5241,7 +5335,7 @@
     "2d.1"
    ],
    "figures": [
-    "3h"
+    "3f"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -5256,9 +5350,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3h"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -5272,9 +5364,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3h"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -5288,9 +5378,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3h"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -5304,9 +5392,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3h"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -5321,7 +5407,7 @@
     "2d.10"
    ],
    "figures": [
-    "3e"
+    "3b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
@@ -5352,9 +5438,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -5384,9 +5468,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -5401,7 +5483,7 @@
     "2d.10"
    ],
    "figures": [
-    "3e"
+    "3b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "state_composition_values",
@@ -5835,9 +5917,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null

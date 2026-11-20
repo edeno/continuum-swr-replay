@@ -194,13 +194,13 @@ Theta, ripple and MUA levels of running and of quiet rest, the references for an
 
 One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
-`sarle_bimodality`, `dip_test`, `nonlocal_share_by_power`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
+`sarle_bimodality`, `dip_test`, `nonlocal_share_by_power`, `rest_power_counts`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`, `event_ripple_power`, `robust_sd`, `distribution_table`, `property_frame`, `design_rows`, `step_table`
 
 ### `src/continuum_swr_replay/analysis/event_properties/content_along_arms.py`
 
 Where along the track event content sits: each time bin's arm and place on it.
 
-`check_arm_orientation`, `arm_positions`, `distance_to_nearest_well`, `content_density_along_arms`, `leaf_and_trunk_profiles`, `log2_density_ratio`, `distance_from_animal_shares`, `content_place_shares`, `place_share_statistics`
+`check_arm_orientation`, `arm_positions`, `distance_to_nearest_well`, `arm_lengths_cm`, `even_content`, `content_density_along_arms`, `leaf_and_trunk_profiles`, `log2_density_against_even`, `log2_density_ratio`, `distance_from_animal_shares`, `content_place_shares`, `place_share_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_properties/content_occupancy.py`
 
@@ -218,13 +218,13 @@ Analysis functions for manipulating and characterizing detected events.
 
 Summary statistics of the immobile non-local events.
 
-`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
+`compute_swr_overlap_class_counts`, `overlap_class_animal_shares`, `overlap_class_statistics`, `state_composition_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `matched_reference_medians`, `event_signal_statistics`, `animal_signal_levels`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `animal_power_counts`, `nonlocal_below_threshold_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `animal_class_medians`, `n_animals_in_direction`, `quadrant_fractions`, `arm_occupancy_shares`, `content_occupancy_shares`, `animal_occupancy_shares`, `n_animals_non_swr_more_at_well`
 
 ### `src/continuum_swr_replay/analysis/event_properties/gamma_power.py`
 
 Slow- and fast-gamma power of CA1 on the decode grid: z-scored per epoch, and its change against quiet rest in dB (``power_change_db``).
 
-`band_power`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`, `epoch_gamma`
+`band_power`, `stretch_band_power`, `recorded_mask`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`, `matched_level`, `epoch_gamma`
 
 ### `src/continuum_swr_replay/analysis/event_properties/property_contrast.py`
 
@@ -933,6 +933,12 @@ Measure slow- and fast-gamma power during each non-local event, and during runni
 Measure each event's start distance and the theta-like share of duration-matched quiet rest.
 
 `measure_epoch`, `main`
+
+### `scripts/event_properties/measure_nonlocal_by_ripple_power.py`
+
+Count each epoch's immobile time bins, and those decoded non-local, by ripple power.
+
+`main`
 
 ### `scripts/event_properties/measure_ripple_class_structure.py`
 

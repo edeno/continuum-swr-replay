@@ -1,6 +1,6 @@
 """Simulated responses of known onset and size, fit as the mPFC kernels are.
 
-The Figure 4 curves are ridge-penalized cubic B-spline kernels with knots every
+The Figure 5 curves are ridge-penalized cubic B-spline kernels with knots every
 50 ms, fit on +/-250 ms and read on +/-200 ms. :func:`simulate_and_fit` plants a
 response in simulated Poisson units, fits it with the same knot spacing, prior
 and fitter as ``run_session``, and reads the fit with every rule of

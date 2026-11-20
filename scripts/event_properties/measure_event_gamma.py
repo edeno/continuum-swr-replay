@@ -10,11 +10,18 @@ Is a non-local event at rest accompanied by a rise in slow or fast gamma
    span outside excluded time, and read onto the decode grid;
 3. each immobile non-local event's mean (the canonical event table's events),
    and the epoch's running and quiet-rest levels (``brain_state_reference``);
-4. the same on band power itself (not z), and each class's change against the
+4. the level of quiet-rest and of running windows as long as each class's
+   events, ``--n-windows`` drawn per event (``gamma_power.matched_level``): an
+   event's mean over its bins is compared with these, not with the median of
+   single bins, which a mean over a window of skewed power exceeds when nothing
+   differs;
+5. the same on band power itself (not z), and each class's change against the
    epoch's quiet rest in dB: ``10 log10(mean power over the class's event
    samples / mean power over quiet rest)`` (``gamma_power.power_change_db``).
 
 Writes ``Processed-Data/<--out-name>/{epoch_id}_events.parquet`` per epoch,
+``{epoch_id}_gamma_z.parquet`` (each band's z-scored power at every bin of the
+decode grid, so that gamma around the events can be drawn without the LFP),
 ``reference.parquet`` (one row per epoch) and ``manifest.json``. Each epoch's
 ``{epoch_id}_reference.json`` and the manifest record the SHA-256 of the
 canonical event table the events were read from. A failing epoch is recorded
@@ -32,6 +39,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+import zlib
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -63,16 +71,20 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 KEYS = list(SESSION_COLUMNS)
 
+SEED = 20261120
+"""Seeds the matched windows, with the epoch's id."""
+
 
 def out_dir(name: str = EVENT_GAMMA_DIR) -> Path:
     return processed_data_dir() / name
 
 
 def epoch_gamma(
-    identifier: str, record: dict[str, Any], events: pd.DataFrame
-) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """One epoch's events with their mean gamma, and its reference levels
-    (``gamma_power.epoch_gamma`` on the epoch's LFP and decode frame)."""
+    identifier: str, record: dict[str, Any], events: pd.DataFrame, n_windows: int
+) -> tuple[pd.DataFrame, dict[str, Any], pd.DataFrame]:
+    """One epoch's events with their mean gamma, its reference levels, and its
+    gamma at every bin of the decode grid (``gamma_power.epoch_gamma`` on the
+    epoch's LFP and decode frame)."""
     inputs = get_ripple_band_inputs(record["nwb_file_name"], record["epoch_name"])
     keep = np.isin(inputs["electrode_ids"], np.asarray(record["electrode_ids"]))
     if keep.sum() != len(record["electrode_ids"]):
@@ -85,7 +97,7 @@ def epoch_gamma(
         pd.read_pickle(inventory_run.decode_path(identifier))
     )
     grid_time, _ = inventory_run.speed_trace(dot)
-    columns, reference = epoch_gamma_measures(
+    columns, reference, on_grid = epoch_gamma_measures(
         lfp,
         lfp_time,
         sampling_frequency,
@@ -93,19 +105,29 @@ def epoch_gamma(
         grid_time,
         analyzed_time.excluded_intervals(identifier),
         events,
+        n_windows,
+        np.random.default_rng([SEED, zlib.crc32(identifier.encode())]),
     )
     table = events[
         [*KEYS, "event_id", "event_start_s", "event_end_s", "is_swr"]
     ].assign(**columns)
-    return table.reset_index(drop=True), {
-        "epoch_id": identifier,
-        "animal": str(events["animal"].iloc[0]),
-        "session_date": int(events["session_date"].iloc[0]),
-        "epoch": str(events["epoch"].iloc[0]),
-        "n_kept_tetrodes": int(keep.sum()),
-        "sampling_frequency": sampling_frequency,
-        **reference,
-    }
+    per_bin = pd.DataFrame(
+        {"time": grid_time}
+        | {name: values.astype(np.float32) for name, values in on_grid.items()}
+    )
+    return (
+        table.reset_index(drop=True),
+        {
+            "epoch_id": identifier,
+            "animal": str(events["animal"].iloc[0]),
+            "session_date": int(events["session_date"].iloc[0]),
+            "epoch": str(events["epoch"].iloc[0]),
+            "n_kept_tetrodes": int(keep.sum()),
+            "sampling_frequency": sampling_frequency,
+            **reference,
+        },
+        per_bin,
+    )
 
 
 def epochs_to_measure(
@@ -150,27 +172,30 @@ def _written_from(ref_path: Path) -> str | None:
 
 
 def _run(
-    job: tuple[str, dict[str, Any], pd.DataFrame, bool, str, str],
+    job: tuple[str, dict[str, Any], pd.DataFrame, bool, str, str, int],
 ) -> tuple[str, dict[str, Any]]:
-    identifier, record, events, overwrite, name, event_table_sha256 = job
+    identifier, record, events, overwrite, name, event_table_sha256, n_windows = job
     path = out_dir(name) / f"{identifier}_events.parquet"
     ref_path = out_dir(name) / f"{identifier}_reference.json"
+    per_bin_path = out_dir(name) / f"{identifier}_gamma_z.parquet"
     # An epoch written from another event table describes other events.
     if (
         path.exists()
+        and per_bin_path.exists()
         and _written_from(ref_path) == event_table_sha256
         and not overwrite
     ):
         return identifier, {"status": "ok", "reused": True}
     started = time.perf_counter()
     try:
-        table, reference = epoch_gamma(identifier, record, events)
+        table, reference, per_bin = epoch_gamma(identifier, record, events, n_windows)
     except (ValueError, KeyError, OSError) as error:
         return identifier, {
             "status": "failed",
             "error": f"{type(error).__name__}: {error}",
         }
     table.to_parquet(path, index=False)
+    per_bin.to_parquet(per_bin_path, index=False)
     reference["event_table_sha256"] = event_table_sha256
     write_json(ref_path, reference, default=float, final_newline=True)
     return identifier, {"status": "ok", "wall_clock_s": time.perf_counter() - started}
@@ -182,6 +207,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--epoch-id", action="append", help="only these epochs")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--out-name", default=EVENT_GAMMA_DIR)
+    parser.add_argument(
+        "--n-windows",
+        type=int,
+        default=100,
+        help="quiet-rest and running windows drawn per event",
+    )
     args = parser.parse_args(argv)
 
     event_table = table_path("event_table", replay_content_dir())
@@ -198,6 +229,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             args.overwrite,
             args.out_name,
             event_table_sha256,
+            args.n_windows,
         )
         for identifier, record, frame in epochs_to_measure(events)
         if not args.epoch_id or identifier in args.epoch_id
@@ -234,6 +266,14 @@ def main(argv: Sequence[str] | None = None) -> None:
             "change_db": "10 log10 of the mean band power over each class's event "
             "samples over the mean over quiet rest (below 4 cm/s, in no non-local, "
             "SWR or MUA event, outside excluded time), on the decode grid",
+            "matched_windows": "for each class of events, the median over its events "
+            "of the mean z over a quiet-rest (running) window as long as the event, "
+            "averaged over the draws; windows drawn uniformly over every window of "
+            "the regime that long",
+            "n_windows": args.n_windows,
+            "seed": SEED,
+            "per_bin": "{epoch_id}_gamma_z.parquet: each band's z-scored power at "
+            "every bin of the decode grid (float32)",
             "epochs": epochs,
         },
         indent=1,

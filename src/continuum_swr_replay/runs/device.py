@@ -8,7 +8,7 @@ any computation, with :func:`default_jax_platforms` (which updates JAX's
 config, not only the environment). Nothing here imports JAX until it is called.
 
 A runner that fits on a GPU host (the PFC batched fitter, the cross-history
-ridge fit, Figure 4's refit) claims one card first, with
+ridge fit, Figure 5's refit) claims one card first, with
 :func:`configure_jax_gpu`. The host carries other people's jobs. Grabbing a busy card would
 evict them, and JAX grabs most of a card's memory by default, so a run has to
 say which card it wants and how much of it **before JAX initializes a

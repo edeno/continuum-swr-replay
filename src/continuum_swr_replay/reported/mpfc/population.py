@@ -1,5 +1,5 @@
-"""The mpfc summary's unit-population values (question 4.1, Figure 4c and
-4d): the cohort, the estimator and its fits, the prior binding, the called
+"""The mpfc summary's unit-population values (question 4.1, Figure 5c and
+5d): the cohort, the estimator and its fits, the prior binding, the called
 fractions, the null's geometry, and the overlap and size of the responses.
 The statistics are computed in ``analysis.pfc.population_statistics``.
 """
@@ -34,7 +34,7 @@ from continuum_swr_replay.reported.values import (
     Value,
 )
 
-#: The unit tests Figure 4 reports, by the word their keys use.
+#: The unit tests Figure 5 reports, by the word their keys use.
 CLASSES = {
     "swr": "SWR",
     "nonlocal": "non_local",
@@ -372,13 +372,13 @@ def prior_binding_values(
     ]
 
 
-# --- the unit fractions (Figure 4d) -----------------------------------------------
+# --- the unit fractions (Figure 5d) -----------------------------------------------
 
 
 def called_fraction_values(
     population: pd.DataFrame, make: Callable[..., Value]
 ) -> list[Value]:
-    """Figure 4d: the share of units at raw empirical p below ``ALPHA``, per test.
+    """Figure 5d: the share of units at raw empirical p below ``ALPHA``, per test.
 
     The denominator is the units tested for that class
     (:func:`~continuum_swr_replay.analysis.pfc.load_population.significant_fraction`).
@@ -453,7 +453,7 @@ def called_fraction_values(
                 "fraction",
                 "pct",
                 f"share of units whose best model by held-out deviance is {model}",
-                tags=TAGS["figure_4d"],
+                tags=TAGS["figure_5d"],
             )
         )
     return values

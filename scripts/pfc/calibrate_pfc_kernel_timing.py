@@ -1,6 +1,6 @@
 """What the mPFC kernel estimator does to the timing and size of a known response.
 
-The Figure 4 curves are ridge-penalized (sigma = 3) cubic B-spline kernels
+The Figure 5 curves are ridge-penalized (sigma = 3) cubic B-spline kernels
 with knots every 50 ms, fit on +/-250 ms and read on +/-200 ms. This script
 plants responses of known onset and size in simulated Poisson units, fits them
 as ``run_session`` does (same knot spacing, prior and fitter), and reads them

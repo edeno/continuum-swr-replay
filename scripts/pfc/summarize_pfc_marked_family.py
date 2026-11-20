@@ -29,7 +29,7 @@ The statistics are
 :mod:`~continuum_swr_replay.analysis.pfc.marked_family_statistics`'s, and the
 population curve's reduction (a session's unit mean, the animals' means and
 their standard error) is
-:mod:`~continuum_swr_replay.analysis.shared_statistics`'s, the one Figure 4c
+:mod:`~continuum_swr_replay.analysis.shared_statistics`'s, the one Figure 5c
 draws with; this script reads the bundles, writes the tables and
 draws the figures.
 

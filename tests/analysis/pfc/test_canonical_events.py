@@ -1,6 +1,6 @@
 """Tests for the PFC path's entry point to the canonical events and SWRs.
 
-The point of this module is that Figure 4's events are the *same objects* the
+The point of this module is that Figure 5's events are the *same objects* the
 content and rate families describe. So the tests check the two things that
 could silently break that: the session restriction and the SWR interval
 population, the latter against the builder these loaders promise to agree with.

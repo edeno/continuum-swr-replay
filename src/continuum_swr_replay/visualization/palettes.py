@@ -45,10 +45,13 @@ COLORS: dict[str, str] = {
     "SWR partial": "#b5825a",
     "MUA": "#7570b3",
     "Non-Local": "#1b9e77",
+    # A non-local event that overlaps no SWR, as a class of events: a wine, not
+    # the Non-Local state's green, which every non-local event is drawn in.
+    "No SWR": "#882255",
     "Local": "#add8e6",  # Soft Blue for Local
     "No-Spike": "#b0b0b0",  # Light Gray for No-Spike
     "All Events": "#d9d9d9",  # Light Gray for background/all-events reference
-    # Joint SWR + non-SWR-non-local model bar in Figure 4's AIC
+    # Joint SWR + non-SWR-non-local model bar in Figure 5's AIC
     # comparison. Same Dark2 family as SWR/MUA/Non-Local.
     "Combined": "#e6ab02",
 }

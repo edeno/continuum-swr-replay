@@ -104,11 +104,11 @@ FIGURES: dict[str, Figure] = {
     "3": Figure(
         "What SWR and no-SWR events are like",
         "scripts/figures/generate_figure03.py",
-        "abcdefghi",
+        "abcdef",
     ),
-    "4": Figure(
+    "5": Figure(
         "mPFC responses to SWR and non-SWR events",
-        "scripts/figures/generate_figure04.py",
+        "scripts/figures/generate_figure05.py",
         "abcd",
     ),
     "decoder_validation": Figure(
@@ -117,6 +117,10 @@ FIGURES: dict[str, Figure] = {
     "memoryless_comparison": Figure(
         "Our detector and the Widloski & Foster detector on simulated replays",
         "scripts/figures/generate_supp_memoryless_comparison.py",
+    ),
+    "event_gamma": Figure(
+        "Slow and fast gamma during SWR and no-SWR events",
+        "scripts/figures/generate_supp_event_gamma.py",
     ),
     "content_estimators": Figure(
         "Content models under three estimators",
@@ -271,17 +275,17 @@ QUESTIONS: tuple[Question, ...] = (
         "Where does content sit relative to the animal and to the reward wells, SWR against non-SWR?",
         status="partly computed",
         reason="the own-well share waits for the wider-Local-kernel re-decode (question 2c.6)",
-        figures=("3f", "3g", "3h"),
+        figures=("3e", "3f"),
     ),
     Question(
         "2d.2",
         "How does replay speed differ between SWR and non-SWR events?",
-        figures=("3c",),
+        figures=("3d",),
     ),
     Question(
         "2d.3",
         "How does spatial extent differ between SWR and non-SWR events?",
-        figures=("3b", "3d"),
+        figures=("3c",),
     ),
     Question(
         "2d.4",
@@ -299,7 +303,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.8",
         "How do theta z-score and speed compare across SWR events, non-SWR events and running?",
-        figures=("2i", "3i", "decoder_validation"),
+        figures=("2i", "event_gamma", "decoder_validation"),
         note="Was question 2c.1: the state the events occur in, not evidence that their content is real.",
     ),
     Question(
@@ -311,7 +315,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.10",
         "On average, how much of an SWR or non-SWR event is Continuous, and how much Fragmented?",
-        figures=("3e",),
+        figures=("3b",),
     ),
     Question(
         "3.1",
@@ -357,7 +361,7 @@ QUESTIONS: tuple[Question, ...] = (
         "Do non-SWR events modulate mPFC activity, against matched immobile non-event windows, and how does that compare with SWR events?",
         status="partly computed",
         reason="population inference and the SWR-controlled rung are pending, and equivalence is untested",
-        figures=("4", "4a", "4b", "4c", "4d"),
+        figures=("5", "5a", "5b", "5c", "5d"),
     ),
     Question(
         "2b.7",

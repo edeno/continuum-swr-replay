@@ -64,8 +64,17 @@ from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import SplineTransformer
 
 from continuum_swr_replay.analysis.detection.swr_detectors import DETECTOR_SETTINGS
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    immobile_analyzed_bins,
+)
+from continuum_swr_replay.analysis.event_definition.nonlocal_event_rule import (
+    nonlocal_probability,
+)
 from continuum_swr_replay.intervals import contiguous_true_runs
-from continuum_swr_replay.parameters import DECODE_SAMPLE_S
+from continuum_swr_replay.parameters import (
+    DECODE_SAMPLE_S,
+    DEFAULT_NON_LOCAL_THRESHOLD,
+)
 
 KAY_ZSCORE_THRESHOLD = float(DETECTOR_SETTINGS["kay"]["zscore_threshold"])
 """The z-score the Kay detector's SWRs must reach (2.0)."""
@@ -75,6 +84,11 @@ KAY_MINIMUM_DURATION_S = float(DETECTOR_SETTINGS["kay"]["minimum_duration"])
 
 SARLE_CUTOFF = 5.0 / 9.0
 """Sarle's coefficient of a uniform law; above it a sample is often called bimodal."""
+
+RIPPLE_POWER_EDGES = np.concatenate([[-np.inf], np.arange(-2.0, 10.01, 0.25), [np.inf]])
+"""The ripple-power bins of :func:`rest_power_counts`, z: 0.25 z wide from -2 to
+10 with an open bin at each end, so every time bin is counted.
+:data:`KAY_ZSCORE_THRESHOLD` is an edge."""
 
 
 # --- test 1: one mode or two -------------------------------------------------
@@ -148,9 +162,10 @@ def nonlocal_share_by_power(
 
     Returns
     -------
-    shares : pd.DataFrame, shape (n_groups * (n_edges - 1), 5)
+    shares : pd.DataFrame, shape (n_groups * (n_edges - 1), 6)
         One row per group and power bin: ``group``, ``power_low``,
-        ``power_high``, ``n_bins`` and ``share`` (NaN where ``n_bins`` is 0).
+        ``power_high``, ``n_bins``, ``n_nonlocal`` (the non-local ones) and
+        ``share`` (their share of ``n_bins``, NaN where ``n_bins`` is 0).
     """
     power = np.asarray(power, dtype=float)
     probability = np.asarray(nonlocal_probability, dtype=float)
@@ -169,18 +184,52 @@ def nonlocal_share_by_power(
     cell = codes * n_power + which
     size = len(names) * n_power
     n_bins = np.bincount(cell, minlength=size)
-    n_above = np.bincount(cell, weights=probability[keep] > threshold, minlength=size)
+    n_nonlocal = np.bincount(cell[probability[keep] > threshold], minlength=size)
     with np.errstate(invalid="ignore", divide="ignore"):
-        share = np.where(n_bins > 0, n_above / n_bins, np.nan)
+        share = np.where(n_bins > 0, n_nonlocal / n_bins, np.nan)
     return pd.DataFrame(
         {
             "group": np.repeat(names, n_power),
             "power_low": np.tile(edges[:-1], len(names)),
             "power_high": np.tile(edges[1:], len(names)),
             "n_bins": n_bins,
+            "n_nonlocal": n_nonlocal,
             "share": share,
         }
     )
+
+
+def rest_power_counts(dot: pd.DataFrame) -> pd.DataFrame:
+    """One epoch's immobile time bins, and those decoded non-local, by ripple power.
+
+    The bins are the immobile ones outside excluded time
+    (``analyzed_time.immobile_analyzed_bins``); one is non-local when its
+    non-local probability is above ``DEFAULT_NON_LOCAL_THRESHOLD``.
+
+    Parameters
+    ----------
+    dot : pd.DataFrame
+        One epoch's decode frame read through the SWR source
+        (``analyzed_time.with_swr_source``), with ``head_speed``,
+        ``in_excluded_time``, ``SWR_zscore`` and the two non-local state
+        probabilities.
+
+    Returns
+    -------
+    counts : pd.DataFrame, shape (n_power_bins, 4)
+        One row per bin of :data:`RIPPLE_POWER_EDGES`: ``power_low``,
+        ``power_high``, ``n_bins`` and ``n_nonlocal``. A bin without a finite
+        power or probability is in no row.
+    """
+    rest = immobile_analyzed_bins(dot)
+    counts = nonlocal_share_by_power(
+        dot["SWR_zscore"].to_numpy()[rest],
+        nonlocal_probability(dot).to_numpy()[rest],
+        np.zeros(int(rest.sum()), dtype=np.int64),
+        edges=RIPPLE_POWER_EDGES,
+        threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+    )
+    return counts[["power_low", "power_high", "n_bins", "n_nonlocal"]]
 
 
 def kde_modes(

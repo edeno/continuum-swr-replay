@@ -2,7 +2,7 @@
 
 **What this is.** The decision behind how `scripts/pfc/run_pfc_analysis_bandit.py` fits
 and tests each mPFC unit, the checks it passed, and its known limits. The settings and
-the sidecar fields are described below ("The bundles"); the Figure 4 population and its
+the sidecar fields are described below ("The bundles"); the Figure 5 population and its
 values are question 4.1 in
 [../../paper/reported/questions.md](../../paper/reported/questions.md).
 
@@ -81,7 +81,7 @@ time courses.
   own standard error.
 - **The time courses.** `SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR` and
   `matched_control`, the duration-matched non-event baseline. All five are read into the
-  Figure 4 population by `analysis/pfc/load_population.py`; the first four are NaN-free
+  Figure 5 population by `analysis/pfc/load_population.py`; the first four are NaN-free
   by its drop rule, while the matched-control curve may carry NaN and is reduced with
   `nanmean`.
 - **The cohort.** The bundles are fit on the well-anchored stop cohort, the same
@@ -158,7 +158,7 @@ of the units called at raw p < .05 for an event class have no positive held-out
 improvement of their own, and
 <!--v:mpfc.unmatchable_percent_class_min-->0.27<!--/v-->–<!--v:mpfc.unmatchable_percent_class_max-->0.60<!--/v-->%
 of a class's events have no legal within-bout control and enter neither side of its test.
-Figure 4 is regenerated from these bundles. The dated audits of the cohort change and of
+Figure 5 is regenerated from these bundles. The dated audits of the cohort change and of
 the canonical-events rerun are listed in
 [../history/2026-module-moves.md](../history/2026-module-moves.md).
 

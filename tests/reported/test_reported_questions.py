@@ -100,7 +100,7 @@ def test_a_figure_name_is_a_figure_or_a_lettered_panel():
 
 
 def test_tag_problems_names_each_mismatch():
-    assert tag_problems(("2d.2",), ("3c",)) == []
+    assert tag_problems(("2d.2",), ("3d",)) == []
     assert tag_problems(("2d.2",), ()) == []
     assert tag_problems(("nope",), ()) == ["no question 'nope'"]
     assert tag_problems(("2d.2",), ("supplement",)) == ["no figure 'supplement'"]

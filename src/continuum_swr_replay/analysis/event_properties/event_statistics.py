@@ -7,7 +7,8 @@ numbers: a dict,
 or a table with one row per group (per animal, for
 :func:`animal_occupancy_shares`). :func:`boundary_offsets` returns one row per
 event (what a histogram draws), :func:`most_steps` a count with the properties
-that attain it, and :func:`n_animals_in_direction` and
+that attain it, :func:`animal_class_medians` each animal's median of each
+class, and :func:`n_animals_in_direction` and
 :func:`n_animals_non_swr_more_at_well` one count. They are the statistics the
 events summary reports (``continuum_swr_replay.reported.events`` names and
 describes them) and a figure that shows one of them calls the same function.
@@ -346,8 +347,48 @@ def reference_medians(reference: pd.DataFrame, signals: list[str]) -> pd.DataFra
     )
 
 
+_CLASS_WORDS = {False: "non_swr", True: "swr"}
+"""Each class's word in a column name."""
+
+
+def matched_reference_medians(
+    reference: pd.DataFrame, signals: list[str]
+) -> pd.DataFrame:
+    """The typical level of each signal in running and quiet-rest windows as long
+    as each class's events.
+
+    Parameters
+    ----------
+    reference : pd.DataFrame, shape (n_epochs, n_columns)
+        For each signal, class (``swr``, ``non_swr``) and regime, each epoch's
+        ``<signal>_<regime>_matched_<class>`` (``gamma_power.matched_level``).
+    signals : list of str
+
+    Returns
+    -------
+    medians : pd.DataFrame, shape (2 * n_signals, 2)
+        ``running`` and ``rest``, indexed by signal and ``is_swr``: the median
+        over the epochs that have the level (an epoch with no event of the class
+        has none).
+    """
+    return pd.DataFrame.from_dict(
+        {
+            (signal, is_swr): {
+                regime: reference[f"{signal}_{regime}_matched_{word}"].median()
+                for regime in ("running", "rest")
+            }
+            for signal in signals
+            for is_swr, word in _CLASS_WORDS.items()
+        },
+        orient="index",
+    ).rename_axis(["signal", "is_swr"])
+
+
 def event_signal_statistics(
-    events: pd.DataFrame, reference: pd.DataFrame, signals: Mapping[str, str]
+    events: pd.DataFrame,
+    reference: pd.DataFrame,
+    signals: Mapping[str, str],
+    matched: bool = False,
 ) -> pd.DataFrame:
     """Each signal during events, against the same epochs' running and rest levels.
 
@@ -357,6 +398,13 @@ def event_signal_statistics(
     epoch's median event value. It is compared with the median over the same
     epochs of each epoch's running (quiet-rest) level, so every epoch counts
     once, and an epoch with no event of the class does not count.
+
+    An epoch's level is the median of its single running (quiet-rest) bins, or,
+    with ``matched``, the level of running (quiet-rest) windows as long as the
+    class's events (``<signal>_<regime>_matched_<class>``). A mean over an
+    event's bins of a skewed signal sits above the median of single bins when
+    nothing differs, so only the matched level is the same statistic as the
+    events' value.
 
     Parameters
     ----------
@@ -368,6 +416,8 @@ def event_signal_statistics(
         The brain-state reference (:func:`reference_medians`), one row per epoch.
     signals : mapping of str to str
         Each signal's column in ``events``, by signal.
+    matched : bool
+        Compare with the levels of windows as long as the class's events.
 
     Returns
     -------
@@ -392,8 +442,8 @@ def event_signal_statistics(
     """
     rows = {}
     for signal, column in signals.items():
-        joined = _with_signal_levels(events, reference, signal, column)
-        levels = _animal_levels(joined, signal, column)
+        joined = _with_signal_levels(events, reference, signal, column, matched)
+        levels = _animal_levels(joined, column)
         for is_swr in (False, True):
             group = joined[joined["is_swr"] == is_swr]
             per_animal = levels.loc[is_swr]
@@ -406,7 +456,7 @@ def event_signal_statistics(
                     per_animal["event"] > per_animal["rest"]
                 ).sum(),
                 "reaches_running_fraction": (
-                    group[column] >= group[f"{signal}_running_median"]
+                    group[column] >= group["running_level"]
                 ).mean(),
             }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis(
@@ -415,7 +465,11 @@ def event_signal_statistics(
 
 
 def animal_signal_levels(
-    events: pd.DataFrame, reference: pd.DataFrame, signal: str, column: str
+    events: pd.DataFrame,
+    reference: pd.DataFrame,
+    signal: str,
+    column: str,
+    matched: bool = False,
 ) -> pd.DataFrame:
     """Each animal's event value of a signal and its running and quiet-rest levels.
 
@@ -430,11 +484,15 @@ def animal_signal_levels(
         One row per event, with ``is_swr``, the session columns and ``column``.
     reference : pd.DataFrame, shape (n_epochs, n_columns)
         The brain-state reference, one row per epoch, with
-        ``<signal>_running_median`` and ``<signal>_rest_median``.
+        ``<signal>_running_median`` and ``<signal>_rest_median``, or, with
+        ``matched``, ``<signal>_<regime>_matched_<class>``.
     signal : str
         The signal's name in the reference (``"theta"``).
     column : str
         The signal's column in ``events`` (``"theta_z"``).
+    matched : bool
+        Take each class's levels from windows as long as its events
+        (:func:`event_signal_statistics`).
 
     Returns
     -------
@@ -449,21 +507,48 @@ def animal_signal_levels(
         quiet-rest level of it.
     """
     return _animal_levels(
-        _with_signal_levels(events, reference, signal, column), signal, column
+        _with_signal_levels(events, reference, signal, column, matched), column
     )
 
 
 def _with_signal_levels(
-    events: pd.DataFrame, reference: pd.DataFrame, signal: str, column: str
+    events: pd.DataFrame,
+    reference: pd.DataFrame,
+    signal: str,
+    column: str,
+    matched: bool = False,
 ) -> pd.DataFrame:
-    """``events`` joined to their epoch's levels; raise if a value or level is missing."""
+    """``events`` joined to their epoch's levels, each event's as ``running_level``
+    and ``rest_level``; raise if a value or level is missing.
+
+    The levels are the epoch's medians of single bins, or, with ``matched``, the
+    levels of windows as long as the event's class's events.
+    """
     joined = events.merge(
         reference, on=list(SESSION_COLUMNS), how="left", validate="m:1"
     )
+    is_swr = joined["is_swr"].to_numpy(dtype=bool)
+    for regime in ("running", "rest"):
+        if matched:
+            joined[f"{regime}_level"] = np.where(
+                is_swr,
+                joined[f"{signal}_{regime}_matched_{_CLASS_WORDS[True]}"],
+                joined[f"{signal}_{regime}_matched_{_CLASS_WORDS[False]}"],
+            )
+        else:
+            joined[f"{regime}_level"] = joined[f"{signal}_{regime}_median"]
+    # Counted under the reference's own column names, which the error names.
+    source = "matched" if matched else "median"
     missing = (
-        joined[[column, f"{signal}_running_median", f"{signal}_rest_median"]]
+        joined[[column, "running_level", "rest_level"]]
         .isna()
         .sum()
+        .rename(
+            {
+                f"{regime}_level": f"{signal}_{regime}_{source}"
+                for regime in ("running", "rest")
+            }
+        )
     )
     if missing.any():
         raise ValueError(
@@ -473,7 +558,7 @@ def _with_signal_levels(
     return joined
 
 
-def _animal_levels(joined: pd.DataFrame, signal: str, column: str) -> pd.DataFrame:
+def _animal_levels(joined: pd.DataFrame, column: str) -> pd.DataFrame:
     """Per class and animal: the event value and the running and rest levels."""
     frames = {}
     for is_swr, group in joined.groupby("is_swr"):
@@ -484,8 +569,8 @@ def _animal_levels(joined: pd.DataFrame, signal: str, column: str) -> pd.DataFra
                 )
                 for name, source in (
                     ("event", column),
-                    ("running", f"{signal}_running_median"),
-                    ("rest", f"{signal}_rest_median"),
+                    ("running", "running_level"),
+                    ("rest", "rest_level"),
                 )
             }
         )
@@ -745,6 +830,78 @@ def peak_ripple_mode_statistics(
     }
 
 
+def animal_power_counts(epoch_counts: pd.DataFrame) -> pd.DataFrame:
+    """Each animal's time bins, and its non-local ones, by ripple power.
+
+    Parameters
+    ----------
+    epoch_counts : pd.DataFrame, shape (n_epochs * n_power_bins, n_columns)
+        One row per epoch and ripple-power bin
+        (``class_or_continuum.rest_power_counts``), with ``animal``,
+        ``power_low``, ``power_high``, ``n_bins`` and ``n_nonlocal``.
+
+    Returns
+    -------
+    counts : pd.DataFrame, shape (n_animals * n_power_bins, 7)
+        One row per animal and power bin, in that order: ``animal``,
+        ``power_low``, ``power_high``, ``n_bins`` and ``n_nonlocal`` summed
+        over the animal's epochs, ``share`` (the non-local share of the bin's
+        time bins, NaN where the animal has none) and ``nonlocal_fraction``
+        (the bin's share of the animal's non-local bins).
+    """
+    counts = epoch_counts.groupby(
+        ["animal", "power_low", "power_high"], as_index=False
+    )[["n_bins", "n_nonlocal"]].sum()
+    counts["share"] = counts["n_nonlocal"] / counts["n_bins"].where(
+        counts["n_bins"] > 0
+    )
+    counts["nonlocal_fraction"] = counts["n_nonlocal"] / counts.groupby("animal")[
+        "n_nonlocal"
+    ].transform("sum")
+    return counts
+
+
+def nonlocal_below_threshold_statistics(
+    counts: pd.DataFrame, threshold: float
+) -> dict[str, float]:
+    """How much of the non-local time has ripple power below a threshold.
+
+    Parameters
+    ----------
+    counts : pd.DataFrame, shape (n_animals * n_power_bins, n_columns)
+        :func:`animal_power_counts`.
+    threshold : float
+        The ripple power, z; an edge of the power bins.
+
+    Returns
+    -------
+    statistics : dict
+        - ``fraction_animal_mean``: the mean over animals of each animal's
+          share of its non-local time bins whose power is below ``threshold``.
+        - ``fraction_animal_min``, ``fraction_animal_max``: the lowest and
+          highest of the animals' shares.
+        - ``n_animals``: the animals.
+
+    Raises
+    ------
+    ValueError
+        If ``threshold`` is not an edge of the power bins.
+    """
+    if not (counts["power_low"] == threshold).any():
+        raise ValueError(f"{threshold} is not an edge of the ripple-power bins")
+    below = (
+        counts[counts["power_high"] <= threshold]
+        .groupby("animal")["nonlocal_fraction"]
+        .sum()
+    )
+    return {
+        "fraction_animal_mean": float(below.mean()),
+        "fraction_animal_min": float(below.min()),
+        "fraction_animal_max": float(below.max()),
+        "n_animals": int(below.size),
+    }
+
+
 def threshold_step_statistics(
     steps: pd.DataFrame, n_knots: int, window_z: float, n_animals: int
 ) -> pd.DataFrame:
@@ -836,13 +993,44 @@ def class_medians(events: pd.DataFrame, column: str) -> dict[str, float]:
     return {"median_non_swr": median[False], "median_swr": median[True]}
 
 
+def animal_class_medians(events: pd.DataFrame, column: str) -> pd.DataFrame:
+    """Each animal's median of a per-event property in non-SWR and in SWR events.
+
+    An animal's median of a class is event -> epoch -> animal: the median over
+    its epochs with an event of the class (with a value) of each epoch's
+    median.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``is_swr``, the session columns
+        (:data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`) and
+        ``column``.
+    column : str
+        The property.
+
+    Returns
+    -------
+    medians : pd.DataFrame, shape (n_animals, 2)
+        Indexed by animal, with the columns ``non_swr`` and ``swr``. An animal
+        without an event of a class (with a value) has no median there.
+    """
+    return pd.DataFrame(
+        {
+            _CLASS_WORDS[is_swr]: animal_session_values(
+                group[column], group["animal"], group[_WITHIN_ANIMAL], "median"
+            )
+            for is_swr, group in events.groupby("is_swr")
+        }
+    )
+
+
 def n_animals_in_direction(events: pd.DataFrame, column: str, direction: str) -> int:
     """The animals whose own non-SWR median of a per-event property is
     ``direction`` than their SWR median.
 
-    An animal's median of a class is event -> epoch -> animal: the median over
-    its epochs with an event of the class (with a value) of each epoch's
-    median. An animal without one of the classes is in neither direction.
+    The medians are :func:`animal_class_medians`. An animal without one of the
+    classes is in neither direction.
 
     Parameters
     ----------
@@ -866,16 +1054,9 @@ def n_animals_in_direction(events: pd.DataFrame, column: str, direction: str) ->
     """
     if direction not in ("lower", "higher"):
         raise ValueError(f"direction {direction!r} is neither 'lower' nor 'higher'")
-    by_animal = pd.DataFrame(
-        {
-            is_swr: animal_session_values(
-                group[column], group["animal"], group[_WITHIN_ANIMAL], "median"
-            )
-            for is_swr, group in events.groupby("is_swr")
-        }
-    )
+    medians = animal_class_medians(events, column)
     compare = pd.Series.lt if direction == "lower" else pd.Series.gt
-    return int(compare(by_animal[False], by_animal[True]).sum())
+    return int(compare(medians["non_swr"], medians["swr"]).sum())
 
 
 # --- where content sits -----------------------------------------------------------

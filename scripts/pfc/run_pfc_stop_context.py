@@ -8,7 +8,7 @@ Two steps (the model and its estimators are described in
 ones ``pfc_cohort_mPFC.json`` leaves out; each must have a canonical mPFC
 bundle), the event-level table (unit x replay event: post-onset count, the
 stop's event-free baseline, the stop's reward outcome and next-trip patch
-switch, overlapping events) from the canonical Figure 4 session assembly, and
+switch, overlapping events) from the canonical Figure 5 session assembly, and
 caches it as ``<out>/sessions/<identifier>.parquet`` with a provenance JSON
 beside it. A cached session is reused only when its provenance records the
 current canonical event and stop tables. CPU only, about 2 min per session;

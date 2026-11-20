@@ -14,7 +14,9 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     content_place_shares,
     distance_from_animal_shares,
     distance_to_nearest_well,
+    even_content,
     leaf_and_trunk_profiles,
+    log2_density_against_even,
     log2_density_ratio,
     place_share_statistics,
 )
@@ -37,6 +39,14 @@ def test_a_position_takes_its_nearest_real_bins_arm_and_fraction(bin_nodes):
     assert positions["arm"].tolist() == [6, 6, 6, 0, 0]
     np.testing.assert_allclose(positions["fraction"], [0, 0.5, 1, 0.5, 1])
     np.testing.assert_allclose(positions["arm_length_cm"], [8, 8, 8, 20, 20])
+
+
+def test_a_position_names_its_place_bin_and_the_arms_bin_count(bin_nodes):
+    # Edge 6 has 5 real bins, edge 0 has 6; 31 cm is as near 29 as 33 and takes
+    # the lower one, as its fraction does.
+    positions = arm_positions(np.array([1.0, 5.0, 9.0, 31.0, 41.0]), bin_nodes)
+    assert positions["place_bin"].tolist() == [0, 2, 4, 2, 5]
+    assert positions["n_place_bins"].tolist() == [5, 5, 5, 6, 6]
 
 
 def test_a_junction_placeholder_is_never_an_arm(bin_nodes):
@@ -65,15 +75,20 @@ def test_arms_must_run_outward_to_the_graphs_end_points():
         check_arm_orientation([(9, 6), (6, 0)], nx.Graph([(9, 6), (6, 0), (0, 2)]))
 
 
-def _bins(animal, is_swr, arm, fraction, length=10.0, epoch="e1"):
+def _bins(animal, is_swr, arm, place_bin, n_place_bins=10, bin_cm=1.0, epoch="e1"):
+    """Time bins on the given place bins of arms of ``n_place_bins`` bins, each
+    ``bin_cm`` long: 10 cm arms by default, whose bins 0-4 are the first half."""
+    place_bin = np.asarray(place_bin)
     return pd.DataFrame(
         {
             "animal": animal,
             "epoch_id": epoch,
             "is_swr": is_swr,
             "arm": arm,
-            "fraction": fraction,
-            "arm_length_cm": length,
+            "place_bin": place_bin,
+            "n_place_bins": n_place_bins,
+            "fraction": place_bin / (n_place_bins - 1),
+            "arm_length_cm": (n_place_bins - 1) * bin_cm,  # the bin centers' span
         }
     )
 
@@ -84,8 +99,8 @@ def test_density_is_share_per_cm_and_the_animals_weigh_the_same():
     # Animal b: 1 bin at arm 0's well end only (its one bin weighs as a's four).
     bins = pd.concat(
         [
-            _bins("a", False, [0, 0, 0, 6], [0.9, 0.9, 1.0, 0.1]),
-            _bins("b", False, [0], [0.8]),
+            _bins("a", False, [0, 0, 0, 6], [8, 8, 9, 1]),
+            _bins("b", False, [0], [7]),
         ],
         ignore_index=True,
     )
@@ -98,8 +113,90 @@ def test_density_is_share_per_cm_and_the_animals_weigh_the_same():
     assert (density * 5).sum() == pytest.approx(1)
 
 
+@pytest.mark.parametrize("n_place_bins", [25, 27, 28, 31])
+def test_even_content_is_flat_along_the_arm_whatever_its_bin_count(n_place_bins):
+    # One time bin on every 2-cm place bin of arm 0: the same density in each of
+    # 13 segments, 1 over the arm's length. The arm's first and last segments
+    # hold no more than the others, though each holds an end-point bin center.
+    bins = _bins("a", False, 0, np.arange(n_place_bins), n_place_bins, bin_cm=2.0)
+    density = content_density_along_arms(bins, n_segments=13)["density_per_cm"]
+    np.testing.assert_allclose(density.to_numpy(), 1 / (2.0 * n_place_bins))
+
+
+def test_even_content_is_one_over_the_track_and_the_tracks_share_at_wells():
+    # Two leaf arms (0, 1) of 50 cm and a trunk arm (6) of 60 cm, in 2-cm bins:
+    # a track of 160 cm, 20 cm of each leaf arm within 20 cm of its well.
+    bins = pd.concat(
+        [
+            _bins("a", False, 0, np.arange(25), 25, bin_cm=2.0),
+            _bins("a", False, 1, np.arange(25), 25, bin_cm=2.0),
+            _bins("a", False, 6, np.arange(30), 30, bin_cm=2.0),
+        ],
+        ignore_index=True,
+    )
+    even = even_content(bins, at_well_cm=20.0)
+    assert even["density_per_cm"] == pytest.approx(1 / 160)
+    assert even["at_well_fraction"] == pytest.approx(40 / 160)
+    # one time bin on every place bin is even content: that density everywhere
+    density = content_density_along_arms(bins, n_segments=5)["density_per_cm"]
+    np.testing.assert_allclose(density.to_numpy(), even["density_per_cm"])
+    # past a leaf arm's length the reach of a well is not the arm's alone
+    with pytest.raises(ValueError, match="longer than a leaf arm"):
+        even_content(bins, at_well_cm=60.0)
+
+    # A second animal on a track twice as long: its share at wells is half, and
+    # the animals weigh the same. The density is over the lengths the density
+    # function divides by, each arm's median over all the bins (75, 75, 90 cm).
+    longer = pd.concat(
+        [
+            _bins("b", False, 0, np.arange(25), 25, bin_cm=4.0),
+            _bins("b", False, 1, np.arange(25), 25, bin_cm=4.0),
+            _bins("b", False, 6, np.arange(30), 30, bin_cm=4.0),
+        ],
+        ignore_index=True,
+    )
+    both = even_content(pd.concat([bins, longer], ignore_index=True), 20.0)
+    assert both["at_well_fraction"] == pytest.approx((40 / 160 + 40 / 320) / 2)
+    assert both["density_per_cm"] == pytest.approx(1 / 240)
+    # an animal with no content on an arm has a track of unknown length
+    with pytest.raises(ValueError, match="no content on some arm"):
+        even_content(
+            pd.concat([bins, longer[longer["arm"] != 6]], ignore_index=True), 20.0
+        )
+
+
+def test_density_against_even_is_zero_for_even_content_and_counts_doublings():
+    # Arm 0 of ten 1-cm bins in two segments. Even content: one time bin on every
+    # place bin. Then three on each bin of the far half and one on each of the
+    # near half: the far half holds 3/4 of the content in half the arm, 1.5 times
+    # even, the near half 0.5 times. Content on the far half alone leaves the
+    # near half with none.
+    even_bins = _bins("a", False, 0, np.arange(10))
+    even = even_content(even_bins, at_well_cm=5.0)["density_per_cm"]
+    flat = log2_density_against_even(content_density_along_arms(even_bins, 2), even)
+    np.testing.assert_allclose(flat.to_numpy(), 0.0, atol=1e-12)
+
+    far_heavy = _bins("a", False, 0, np.r_[np.arange(10), np.tile(np.arange(5, 10), 2)])
+    tilted = log2_density_against_even(content_density_along_arms(far_heavy, 2), even)
+    assert tilted[(False, 0, 0)] == pytest.approx(np.log2(0.5))
+    assert tilted[(False, 0, 1)] == pytest.approx(np.log2(1.5))
+
+    far_only = _bins("a", False, 0, np.arange(5, 10))
+    empty = log2_density_against_even(content_density_along_arms(far_only, 2), even)
+    assert empty[(False, 0, 0)] == -np.inf
+    assert empty[(False, 0, 1)] == pytest.approx(1.0)
+
+
+def test_a_place_bin_across_a_segment_edge_goes_to_each_by_the_part_in_it():
+    # Arm 0 has 3 place bins of 2 cm; the middle one straddles the two 3-cm
+    # segments evenly, so a time bin on it counts half in each.
+    bins = _bins("a", False, [0], [1], n_place_bins=3, bin_cm=2.0)
+    density = content_density_along_arms(bins, n_segments=2)["density_per_cm"]
+    np.testing.assert_allclose(density.to_numpy(), [0.5 / 3, 0.5 / 3])
+
+
 def test_profiles_average_the_arms_of_each_type():
-    bins = _bins("a", True, [0, 1, 6, 6], [0.9, 0.9, 0.1, 0.1])
+    bins = _bins("a", True, [0, 1, 6, 6], [8, 8, 1, 1])
     density = content_density_along_arms(bins, n_segments=2)
     profiles = leaf_and_trunk_profiles(density)["density_per_cm"]
     # leaf arms 0 and 1 each hold 1/4 at segment 1: 0.05 per cm, mean 0.05.
@@ -111,7 +208,7 @@ def test_the_ratio_is_log2_no_swr_over_swr_and_undefined_without_content():
     # Arm 0, 2 segments of 5 cm. No SWR: 1 bin in each half; SWR: both bins in
     # the far half. Densities: no SWR 0.1, 0.1; SWR 0, 0.2.
     bins = pd.concat(
-        [_bins("a", False, [0, 0], [0.1, 0.9]), _bins("a", True, [0, 0], [0.9, 0.9])],
+        [_bins("a", False, [0, 0], [1, 8]), _bins("a", True, [0, 0], [8, 8])],
         ignore_index=True,
     )
     ratio = log2_density_ratio(content_density_along_arms(bins, n_segments=2))
@@ -167,8 +264,8 @@ def test_an_animal_s_epochs_weigh_the_same_however_many_bins_they_hold():
     # not the pooled (0.25, 0.75).
     bins = pd.concat(
         [
-            _bins("a", False, [0, 0, 0], [0.9, 0.9, 0.9], epoch="e1"),
-            _bins("a", False, [0], [0.1], epoch="e2"),
+            _bins("a", False, [0, 0, 0], [8, 8, 8], epoch="e1"),
+            _bins("a", False, [0], [1], epoch="e2"),
         ],
         ignore_index=True,
     )

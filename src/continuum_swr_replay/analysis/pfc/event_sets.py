@@ -281,7 +281,7 @@ def build_session_event_sets(
     loaded by :mod:`continuum_swr_replay.analysis.pfc.canonical_events`. The SWR
     split is
     the event table's own ``is_swr`` column -- strict positive-duration overlap
-    with those same labels -- so a Figure 4 event and a content- or rate-family
+    with those same labels -- so a Figure 5 event and a content- or rate-family
     event with the same ``event_id`` are the same event, classified the same
     way.
 

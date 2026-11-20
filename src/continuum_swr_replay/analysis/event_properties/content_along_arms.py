@@ -89,10 +89,11 @@ def arm_positions(position_cm: np.ndarray, bin_nodes: pd.DataFrame) -> pd.DataFr
 
     Returns
     -------
-    positions : pd.DataFrame, shape (n_bins, 3)
+    positions : pd.DataFrame, shape (n_bins, 5)
         ``arm`` (the edge id), ``fraction`` (0 at the arm's first node, 1 at its
-        second, clipped to [0, 1]) and ``arm_length_cm`` (the span of the arm's
-        bin centers).
+        second, clipped to [0, 1]), ``arm_length_cm`` (the span of the arm's
+        bin centers), ``place_bin`` (the nearest real bin's place along the arm,
+        0 at the arm's first node) and ``n_place_bins`` (the arm's real bins).
 
     Raises
     ------
@@ -112,7 +113,10 @@ def arm_positions(position_cm: np.ndarray, bin_nodes: pd.DataFrame) -> pd.DataFr
     edge = real["edge_id"].to_numpy()[order]
     right = np.clip(np.searchsorted(centers, position_cm), 1, len(centers) - 1)
     nearer_left = position_cm - centers[right - 1] <= centers[right] - position_cm
-    arm = edge[np.where(nearer_left, right - 1, right)]
+    nearest = np.where(nearer_left, right - 1, right)
+    arm = edge[nearest]
+    # Each real bin's place along its own arm, by linear position.
+    place_in_arm = pd.Series(edge).groupby(edge).cumcount().to_numpy()
     low = spans.loc[arm, "min"].to_numpy()
     length = spans.loc[arm, "max"].to_numpy() - low
     return pd.DataFrame(
@@ -120,6 +124,8 @@ def arm_positions(position_cm: np.ndarray, bin_nodes: pd.DataFrame) -> pd.DataFr
             "arm": arm,
             "fraction": np.clip((position_cm - low) / length, 0.0, 1.0),
             "arm_length_cm": length,
+            "place_bin": place_in_arm[nearest],
+            "n_place_bins": spans.loc[arm, "size"].to_numpy(),
         }
     )
 
@@ -169,20 +175,98 @@ def distance_to_nearest_well(
     return np.minimum(along + first_cm[arm], length[arm] - along + second_cm[arm])
 
 
+def arm_lengths_cm(bins: pd.DataFrame) -> pd.Series:
+    """The length each arm's place bins cover.
+
+    The span of an arm's bin centers (``arm_length_cm``) and one bin more; the
+    median over all of ``bins``.
+
+    Parameters
+    ----------
+    bins : pd.DataFrame, shape (n_bins, n_columns)
+        One row per event time bin, with ``arm``, ``arm_length_cm`` and
+        ``n_place_bins`` (:func:`arm_positions`).
+
+    Returns
+    -------
+    lengths : pd.Series
+        Centimeters, indexed by ``arm``: the arms ``bins`` holds content on.
+    """
+    n_place_bins = bins["n_place_bins"].to_numpy()
+    arm_cm = bins["arm_length_cm"] * n_place_bins / (n_place_bins - 1)
+    return arm_cm.groupby(bins["arm"]).median()
+
+
+def even_content(bins: pd.DataFrame, at_well_cm: float) -> dict[str, float]:
+    """What content spread evenly over the track would give.
+
+    The reference for :func:`content_density_along_arms` and for the share of
+    content at a well: content as likely on any centimeter of the track as on
+    any other. The track is the arms ``bins`` holds content on.
+
+    Parameters
+    ----------
+    bins : pd.DataFrame, shape (n_bins, n_columns)
+        As :func:`arm_lengths_cm`, with ``animal``.
+    at_well_cm : float
+        Content this close to a well is at it.
+
+    Returns
+    -------
+    statistics : dict
+        ``density_per_cm``: 1 over the track's length (the sum of
+        :func:`arm_lengths_cm` over all of ``bins``, the lengths
+        :func:`content_density_along_arms` divides by), the density of every
+        segment; ``at_well_fraction``: the share of the track within
+        ``at_well_cm`` of a well, which is ``at_well_cm`` of each leaf arm (a
+        leaf arm ends at one well), on each animal's own track and averaged
+        over animals, as the shares of :func:`content_place_shares` are.
+
+    Raises
+    ------
+    ValueError
+        If ``at_well_cm`` is longer than a leaf arm (a well's reach would then
+        take in other arms), or an animal has no content on an arm the others
+        have (its track's length is then not known).
+    """
+    lengths = arm_lengths_cm(bins)
+    at_well = []
+    for animal, group in bins.groupby("animal"):
+        own = arm_lengths_cm(group)
+        if not own.index.equals(lengths.index):
+            raise ValueError(f"{animal} has no content on some arm of the track")
+        leaf = own[own.index.isin(LEAF_ARMS)]
+        if (leaf < at_well_cm).any():
+            raise ValueError(f"at_well_cm ({at_well_cm}) is longer than a leaf arm")
+        at_well.append(len(leaf) * at_well_cm / own.sum())
+    return {
+        "density_per_cm": 1.0 / float(lengths.sum()),
+        "at_well_fraction": float(np.mean(at_well)),
+    }
+
+
 def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFrame:
     """Each kind's content time per cm along every arm, the animals' mean.
 
-    Each arm is cut into ``n_segments`` equal segments. For an epoch and a kind,
-    a segment's density is the share of the kind's time bins in it over the
-    segment's length (the arm's median length over all of ``bins``, over
-    ``n_segments``), so an epoch's densities integrate to 1 over the track; an
-    animal's are the mean over its epochs, and the result the mean over animals.
+    Each arm is cut into ``n_segments`` equal segments. A decoded position is a
+    place bin, so a time bin's content is spread evenly over its place bin
+    (``place_bin`` of the arm's ``n_place_bins``) and each segment takes the part
+    of the place bin that lies in it. Counting bin centers per segment instead
+    would give a segment more content the more centers fall in it: the first and
+    the last segment of an arm each hold an end-point center. For an epoch and a
+    kind, a segment's density is the share of the kind's content time in it over
+    the segment's length, so an epoch's densities integrate to 1 over the track;
+    an animal's are the mean over its epochs, and the result the mean over
+    animals.
+
+    An arm's length is the length its place bins cover (:func:`arm_lengths_cm`).
 
     Parameters
     ----------
     bins : pd.DataFrame, shape (n_bins, n_columns)
         One row per event time bin, with ``animal``, ``epoch_id``, ``is_swr``,
-        ``arm``, ``fraction`` and ``arm_length_cm`` (:func:`arm_positions`).
+        ``arm``, ``arm_length_cm``, ``place_bin`` and ``n_place_bins``
+        (:func:`arm_positions`).
     n_segments : int
         Segments per arm.
 
@@ -191,32 +275,39 @@ def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFr
     density : pd.DataFrame, shape (2 * n_arms * n_segments, 1)
         ``density_per_cm``, indexed by ``is_swr``, ``arm`` and ``segment``
         (0 at the arm's first node). Every arm and segment of the arms in
-        ``bins`` is present, 0 where no bin falls.
+        ``bins`` is present, 0 where no content falls.
     """
-    segment = np.minimum((bins["fraction"] * n_segments).astype(int), n_segments - 1)
-    bins = bins.assign(segment=segment)
-    segment_cm = bins.groupby("arm")["arm_length_cm"].median() / n_segments
-    cells = pd.MultiIndex.from_product(
-        [segment_cm.index, range(n_segments)], names=["arm", "segment"]
+    segment_cm = arm_lengths_cm(bins) / n_segments
+    # Time bins per place bin, then the part of each place bin in each segment.
+    counts = (
+        bins.groupby([*_EPOCH_KEYS, "arm", "place_bin", "n_place_bins"])
+        .size()
+        .rename("n_time_bins")
+        .reset_index()
     )
-    per_cm_of_cell = np.repeat(segment_cm.to_numpy(), n_segments)
-    frames = []
-    for (is_swr, animal, epoch), group in bins.groupby(_EPOCH_KEYS):
-        share = group.groupby(["arm", "segment"]).size().reindex(
-            cells, fill_value=0
-        ) / len(group)
-        frames.append(
-            pd.DataFrame(
-                {
-                    "is_swr": is_swr,
-                    "animal": animal,
-                    "epoch_id": epoch,
-                    "density_per_cm": share.to_numpy() / per_cm_of_cell,
-                },
-                index=cells,
-            )
-        )
-    return _animals_mean(pd.concat(frames).reset_index(), ["arm", "segment"])
+    low = (counts["place_bin"] / counts["n_place_bins"]).to_numpy()[:, None]
+    high = ((counts["place_bin"] + 1) / counts["n_place_bins"]).to_numpy()[:, None]
+    edges = np.arange(n_segments + 1) / n_segments
+    covered = np.clip(
+        np.minimum(high, edges[1:]) - np.maximum(low, edges[:-1]), 0.0, None
+    )  # (n_place_bins_with_content, n_segments), the fraction of the arm
+    content = counts["n_time_bins"].to_numpy()[:, None] * covered / (high - low)
+    per_arm = (
+        pd.DataFrame(content, columns=pd.RangeIndex(n_segments, name="segment"))
+        .join(counts[[*_EPOCH_KEYS, "arm"]])
+        .groupby([*_EPOCH_KEYS, "arm"])
+        .sum()
+    )
+    per_cell = per_arm.unstack("arm", fill_value=0.0).reindex(
+        columns=pd.MultiIndex.from_product(
+            [range(n_segments), segment_cm.index], names=["segment", "arm"]
+        ),
+        fill_value=0.0,
+    )
+    share = per_cell.div(per_cell.sum(axis=1), axis=0)
+    per_epoch = share.melt(ignore_index=False, value_name="share").reset_index()
+    per_epoch["density_per_cm"] = per_epoch["share"] / per_epoch["arm"].map(segment_cm)
+    return _animals_mean(per_epoch.drop(columns="share"), ["arm", "segment"])
 
 
 def leaf_and_trunk_profiles(density: pd.DataFrame) -> pd.DataFrame:
@@ -236,6 +327,33 @@ def leaf_and_trunk_profiles(density: pd.DataFrame) -> pd.DataFrame:
     frame = density.reset_index()
     frame["arm_type"] = np.where(frame["arm"].isin(LEAF_ARMS), "leaf", "trunk")
     return frame.groupby(["is_swr", "arm_type", "segment"])[["density_per_cm"]].mean()
+
+
+def log2_density_against_even(
+    density: pd.DataFrame, even_density_per_cm: float
+) -> pd.Series:
+    """log2 of each kind's content density in each segment over the density of
+    content spread evenly over the track.
+
+    Parameters
+    ----------
+    density : pd.DataFrame
+        :func:`content_density_along_arms`'s output.
+    even_density_per_cm : float
+        :func:`even_content`'s ``density_per_cm``.
+
+    Returns
+    -------
+    against_even : pd.Series
+        Indexed by ``is_swr``, ``arm`` and ``segment``: 0 where a kind's content
+        is as dense as even content, 1 where twice as dense, -1 where half;
+        ``-inf`` where a segment holds none of the kind's content.
+    """
+    with np.errstate(divide="ignore"):
+        against_even: pd.Series = np.log2(
+            density["density_per_cm"] / even_density_per_cm
+        )
+    return against_even
 
 
 def log2_density_ratio(density: pd.DataFrame) -> pd.Series:

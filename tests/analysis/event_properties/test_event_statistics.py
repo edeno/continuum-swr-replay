@@ -238,6 +238,68 @@ def test_animal_signal_levels_are_the_values_the_statistics_compare():
     assert len(levels) == 4
 
 
+def _matched_reference() -> pd.DataFrame:
+    """The epochs of ``_signal_tables`` with, for each class, the level of rest
+    and of running windows as long as the class's events: the SWR events are the
+    longer ones, so their windows' levels are the higher ones."""
+    _, reference = _signal_tables()
+    return reference.assign(
+        theta_rest_matched_non_swr=[-0.9, 0.1, -0.4],
+        theta_rest_matched_swr=[-0.7, -0.9, 0.2],
+        theta_running_matched_non_swr=[1.2, 2.2, 1.2],
+        theta_running_matched_swr=[1.4, 2.4, 1.4],
+    )
+
+
+def test_matched_levels_are_each_class_s_own_windows():
+    events, _ = _signal_tables()
+    levels = stats.animal_signal_levels(
+        events, _matched_reference(), "theta", "theta_z", matched=True
+    )
+    # a, no SWR: the medians over its two epochs of the no-SWR windows' levels
+    assert levels.loc[(False, "a")].to_dict() == pytest.approx(
+        {"event": 1.15, "running": 1.7, "rest": -0.4}
+    )
+    # a, SWR: the SWR windows' levels, not the no-SWR ones
+    assert levels.loc[(True, "a")].to_dict() == pytest.approx(
+        {"event": -0.825, "running": 1.9, "rest": -0.8}
+    )
+    assert levels.loc[(True, "b")].to_dict() == pytest.approx(
+        {"event": 0.0, "running": 1.4, "rest": 0.2}
+    )
+
+
+def test_matched_statistics_count_animals_against_their_class_s_windows():
+    events, _ = _signal_tables()
+    result = stats.event_signal_statistics(
+        events, _matched_reference(), {"theta": "theta_z"}, matched=True
+    )
+    # SWR, a: -0.825 is below its windows' rest level -0.8; b: 0.0 is below 0.2.
+    # Against the epochs' rest medians (-0.5, -0.5), b would be above.
+    assert result.loc[("theta", True), "n_animals_above_rest"] == 0
+    # no SWR, a: 1.15 above -0.4; b: 1.0 above -0.4
+    assert result.loc[("theta", False), "n_animals_above_rest"] == 2
+    # no SWR, a: 1.15 below 1.7; b: 1.0 below 1.2 (it equals the running median)
+    assert result.loc[("theta", False), "n_animals_below_running"] == 2
+    levels = stats.matched_reference_medians(_matched_reference(), ["theta"])
+    assert levels.loc[("theta", False)].to_dict() == pytest.approx(
+        {"running": 1.2, "rest": -0.4}
+    )
+    assert levels.loc[("theta", True)].to_dict() == pytest.approx(
+        {"running": 1.4, "rest": -0.7}
+    )
+
+
+def test_matched_statistics_refuse_an_epoch_without_its_class_s_windows():
+    events, _ = _signal_tables()
+    broken = _matched_reference()
+    broken.loc[0, "theta_rest_matched_swr"] = np.nan
+    with pytest.raises(ValueError, match="theta"):
+        stats.event_signal_statistics(
+            events, broken, {"theta": "theta_z"}, matched=True
+        )
+
+
 def test_event_signal_statistics_weigh_an_animal_s_epochs_not_its_events():
     # Both epochs of a have running level 0 and rest level -1. e1 has one
     # event, at -2; e2 three, at 0.5.
@@ -563,6 +625,21 @@ def test_class_medians_pool_the_events_with_a_value():
     assert medians == {"median_non_swr": 3.0, "median_swr": 6.0}
 
 
+def test_animal_class_medians_give_each_animal_s_median_of_each_class():
+    medians = stats.animal_class_medians(_property_events(), "extent")
+    # a: non-SWR 1, 3 and SWR 5; b: non-SWR 8 and SWR 4 (its other SWR event
+    # has no value); c: 1 and 9; d: 7 and 7
+    expected = pd.DataFrame(
+        {"non_swr": [2.0, 8.0, 1.0, 7.0], "swr": [5.0, 4.0, 9.0, 7.0]},
+        index=pd.Index(["a", "b", "c", "d"], name="animal"),
+    )
+    pd.testing.assert_frame_equal(medians, expected)
+    # an animal without an SWR event has no SWR median
+    events = _property_events()
+    no_swr = events[~((events.animal == "c") & events.is_swr)]
+    assert np.isnan(stats.animal_class_medians(no_swr, "extent").loc["c", "swr"])
+
+
 def test_n_animals_in_direction_counts_animals_in_the_stated_direction():
     events = _property_events()
     # a: 2 < 5; b: 8 > 4; c: 1 < 9; d: 7 against 7, in neither direction
@@ -766,3 +843,76 @@ def test_overlap_class_animal_shares_are_epoch_then_animal_means():
     assert shares.loc["a", "swr_contained"] == pytest.approx(0.25)
     assert shares.loc["b", "swr_partial"] == pytest.approx(1.0)
     assert list(shares.columns) == list(stats.OVERLAP_CLASSES)
+
+
+def _epoch_power_counts() -> pd.DataFrame:
+    """Two animals' epochs over three power bins split at 2 z.
+
+    Animal a: 40 non-local bins, 30 of them below 2 z (two epochs); animal b:
+    4 non-local bins, 1 below.
+    """
+    rows = [
+        # epoch, animal, power_low, power_high, n_bins, n_nonlocal
+        ("a1", "a", -np.inf, 2.0, 100, 10),
+        ("a1", "a", 2.0, 4.0, 10, 4),
+        ("a1", "a", 4.0, np.inf, 0, 0),
+        ("a2", "a", -np.inf, 2.0, 300, 20),
+        ("a2", "a", 2.0, 4.0, 10, 5),
+        ("a2", "a", 4.0, np.inf, 1, 1),
+        ("b1", "b", -np.inf, 2.0, 50, 1),
+        ("b1", "b", 2.0, 4.0, 4, 2),
+        ("b1", "b", 4.0, np.inf, 1, 1),
+    ]
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "epoch_id",
+            "animal",
+            "power_low",
+            "power_high",
+            "n_bins",
+            "n_nonlocal",
+        ],
+    )
+
+
+def test_animal_power_counts_sum_the_epochs_of_each_animal_and_bin():
+    counts = stats.animal_power_counts(_epoch_power_counts())
+    a = counts[counts["animal"] == "a"].set_index("power_low")
+    assert a["n_bins"].tolist() == [400, 20, 1]
+    assert a["n_nonlocal"].tolist() == [30, 9, 1]
+    assert a["share"].tolist() == pytest.approx([30 / 400, 9 / 20, 1.0])
+    # each animal's non-local bins, spread over the power bins
+    assert a["nonlocal_fraction"].tolist() == pytest.approx([0.75, 0.225, 0.025])
+    b = counts[counts["animal"] == "b"].set_index("power_low")
+    assert b["nonlocal_fraction"].tolist() == pytest.approx([0.25, 0.5, 0.25])
+
+
+def test_animal_power_counts_give_no_share_where_an_animal_has_no_bin():
+    epochs = _epoch_power_counts()
+    epochs = epochs[epochs["animal"] == "b"].assign(
+        n_bins=[50, 0, 1], n_nonlocal=[1, 0, 1]
+    )
+    counts = stats.animal_power_counts(epochs).set_index("power_low")
+    assert np.isnan(counts.loc[2.0, "share"])
+    assert counts.loc[2.0, "nonlocal_fraction"] == 0.0
+
+
+def test_nonlocal_below_threshold_statistics_weigh_each_animal_once():
+    counts = stats.animal_power_counts(_epoch_power_counts())
+    statistics = stats.nonlocal_below_threshold_statistics(counts, threshold=2.0)
+    # animal a 0.75, animal b 0.25: their mean, not the pooled 31 / 44
+    assert statistics == {
+        "fraction_animal_mean": pytest.approx(0.5),
+        "fraction_animal_min": pytest.approx(0.25),
+        "fraction_animal_max": pytest.approx(0.75),
+        "n_animals": 2,
+    }
+    above = stats.nonlocal_below_threshold_statistics(counts, threshold=4.0)
+    assert above["fraction_animal_mean"] == pytest.approx((0.975 + 0.75) / 2)
+
+
+def test_nonlocal_below_threshold_statistics_refuse_a_threshold_between_edges():
+    counts = stats.animal_power_counts(_epoch_power_counts())
+    with pytest.raises(ValueError, match="not an edge"):
+        stats.nonlocal_below_threshold_statistics(counts, threshold=3.0)

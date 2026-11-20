@@ -17,11 +17,11 @@ from continuum_swr_replay.reported.values import (
 
 TAGS = {
     "modulation": Tags(("4.1",)),
-    "figure_4d": Tags(("4.1",), ("4d",)),
-    "units": Tags(("4.1",), ("4c", "4d")),
+    "figure_5d": Tags(("4.1",), ("5d",)),
+    "units": Tags(("4.1",), ("5c", "5d")),
 }
 """Each group of values: every mPFC value answers question 4.1; the groups
-differ in the panels of Figure 4 that show them."""
+differ in the panels of Figure 5 that show them."""
 
 
 CLASS_LABELS = {

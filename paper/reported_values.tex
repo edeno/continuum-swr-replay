@@ -2,7 +2,7 @@
 % Every value is read from a summary file, paper/reported/<summary>.json;
 % each macro's comment names its key and what it is.
 
-% --- survey (commit 59f114b4acbc)
+% --- survey (commit 96fc11f4e81d)
 \newcommand{\SurveyBandHighMax}{300}  % survey.band_high_max: Largest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
 \newcommand{\SurveyBandHighMin}{200}  % survey.band_high_min: Smallest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
 \newcommand{\SurveyBandHighMode}{250}  % survey.band_high_mode: Most common upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
@@ -36,7 +36,7 @@
 \newcommand{\SurveyTimeBinMin}{2}  % survey.time_bin_min: Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)
 \newcommand{\SurveyTimeBinMode}{20}  % survey.time_bin_mode: Most common decoding time bin, over the 46 numeric cells of Time bin (ms)
 
-% --- detection (commit 59f114b4acbc)
+% --- detection (commit 96fc11f4e81d)
 \newcommand{\DetectionControlsContinuingOursOnePerPartLongestFraction}{96}  % detection.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingOursSpanningShortestFraction}{96}  % detection.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingSlidingOnePerPartLongestFraction}{50}  % detection.controls_continuing_sliding_one_per_part_longest_fraction: continuing chains at the longest gap: share of trials the sliding window reports as one event per part
@@ -210,7 +210,7 @@
 \newcommand{\DetectionSweepTimingStateSpaceOnsetMinMs}{\ensuremath{-}20}  % detection.sweep_timing_state_space_onset_min_ms: smallest onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 \newcommand{\DetectionSweepTimingStateSpaceOnsetUpperQuartileMs}{\ensuremath{-}2}  % detection.sweep_timing_state_space_onset_upper_quartile_ms: upper quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 
-% --- events (commit 59f114b4acbc)
+% --- events (commit 96fc11f4e81d)
 \newcommand{\EventsAnimals}{5}  % events.animals: animals in the event table
 \newcommand{\EventsAnimalsNonSwrMajority}{4}  % events.animals_non_swr_majority: animals whose share of non-SWR events (the mean over their epochs) is above one half
 \newcommand{\EventsAnimalsNonSwrMoreAtWell}{5}  % events.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's epochs
@@ -262,6 +262,7 @@
 \newcommand{\EventsEndOffsetBeyondTwentyFiveMsFraction}{24}  % events.end_offset_beyond_twenty_five_ms_fraction: share of SWR-overlapping events whose end differs from the matched SWR's end by more than 25 ms
 \newcommand{\EventsEndOffsetMedianMs}{\ensuremath{-}4}  % events.end_offset_median_ms: median of event end minus matched SWR end
 \newcommand{\EventsEpochs}{242}  % events.epochs: epochs in the event table
+\newcommand{\EventsEvenContentAtWellFraction}{25}  % events.even_content_at_well_fraction: share of the track within 20 cm of a well (a track-graph end point): the share at a well of content spread evenly over the track
 \newcommand{\EventsEvidenceAnimals}{5}  % events.evidence_animals: animals in the spike-evidence run
 \newcommand{\EventsEvidenceEpochs}{242}  % events.evidence_epochs: epochs in the spike-evidence run
 \newcommand{\EventsExtentAnimalsInDirection}{5}  % events.extent_animals_in_direction: animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median, each the median over the animal's epochs of the epoch's median
@@ -272,18 +273,20 @@
 \newcommand{\EventsExtentMatchedDifferenceLow}{+17}  % events.extent_matched_difference_low: lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate
 \newcommand{\EventsExtentMedianNonSwr}{8.0}  % events.extent_median_non_swr: median spatial extent of the decoded content of immobile non-SWR non-local events
 \newcommand{\EventsExtentMedianSwr}{50}  % events.extent_median_swr: median spatial extent of the decoded content of immobile SWR-overlapping non-local events
-\newcommand{\EventsFastGammaAnimalsAboveRestNonSwr}{5}  % events.fast_gamma_animals_above_rest_non_swr: animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
-\newcommand{\EventsFastGammaAnimalsAboveRestSwr}{5}  % events.fast_gamma_animals_above_rest_swr: animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
-\newcommand{\EventsFastGammaAnimalsBelowRunningNonSwr}{5}  % events.fast_gamma_animals_below_running_non_swr: animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
-\newcommand{\EventsFastGammaAnimalsBelowRunningSwr}{0}  % events.fast_gamma_animals_below_running_swr: animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
+\newcommand{\EventsFastGammaAnimalsAboveRestNonSwr}{5}  % events.fast_gamma_animals_above_rest_non_swr: animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events
+\newcommand{\EventsFastGammaAnimalsAboveRestSwr}{5}  % events.fast_gamma_animals_above_rest_swr: animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events
+\newcommand{\EventsFastGammaAnimalsBelowRunningNonSwr}{5}  % events.fast_gamma_animals_below_running_non_swr: animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events
+\newcommand{\EventsFastGammaAnimalsBelowRunningSwr}{2}  % events.fast_gamma_animals_below_running_swr: animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events
 \newcommand{\EventsFastGammaDbAnimalsAboveRestNonSwr}{5}  % events.fast_gamma_db_animals_above_rest_non_swr: animals whose median over epochs of that change (non-SWR events) is above 0 dB
 \newcommand{\EventsFastGammaDbAnimalsAboveRestSwr}{5}  % events.fast_gamma_db_animals_above_rest_swr: animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB
-\newcommand{\EventsFastGammaDbMedianNonSwr}{+0.52}  % events.fast_gamma_db_median_non_swr: median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers
-\newcommand{\EventsFastGammaDbMedianSwr}{+1.1}  % events.fast_gamma_db_median_swr: median over epochs of the change in fast-gamma power (65-100 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers
+\newcommand{\EventsFastGammaDbMedianNonSwr}{+0.53}  % events.fast_gamma_db_median_non_swr: median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers
+\newcommand{\EventsFastGammaDbMedianSwr}{+1.2}  % events.fast_gamma_db_median_swr: median over epochs of the change in fast-gamma power (65-100 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers
 \newcommand{\EventsFastGammaMedianNonSwr}{\ensuremath{-}0.21}  % events.fast_gamma_median_non_swr: median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean)
 \newcommand{\EventsFastGammaMedianSwr}{0.11}  % events.fast_gamma_median_swr: median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean)
-\newcommand{\EventsFastGammaRestReference}{\ensuremath{-}0.43}  % events.fast_gamma_rest_reference: median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest
-\newcommand{\EventsFastGammaRunningReference}{\ensuremath{-}0.14}  % events.fast_gamma_running_reference: median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running
+\newcommand{\EventsFastGammaRestMatchedReferenceNonSwr}{\ensuremath{-}0.36}  % events.fast_gamma_rest_matched_reference_non_swr: median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in quiet-rest windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)
+\newcommand{\EventsFastGammaRestMatchedReferenceSwr}{\ensuremath{-}0.33}  % events.fast_gamma_rest_matched_reference_swr: median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in quiet-rest windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)
+\newcommand{\EventsFastGammaRunningMatchedReferenceNonSwr}{\ensuremath{-}0.03}  % events.fast_gamma_running_matched_reference_non_swr: median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in running windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)
+\newcommand{\EventsFastGammaRunningMatchedReferenceSwr}{0.01}  % events.fast_gamma_running_matched_reference_swr: median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in running windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)
 \newcommand{\EventsHeldoutNonSwrAnimals}{5}  % events.heldout_non_swr_animals: animals in that test
 \newcommand{\EventsHeldoutNonSwrAnimalsPositive}{5}  % events.heldout_non_swr_animals_positive: animals with a positive mean
 \newcommand{\EventsHeldoutNonSwrPerSpike}{0.20}  % events.heldout_non_swr_per_spike: held-out evidence per held-out spike for immobile Non-Local Continuous bouts without an SWR, against the animal's position: mean over animals
@@ -429,6 +432,9 @@
 \newcommand{\EventsNonlocalEventsOutsideWidloskiPerHour}{1800}  % events.nonlocal_events_outside_widloski_per_hour: non-local events no Widloski event overlaps, per hour of analyzed immobility
 \newcommand{\EventsNonlocalEventsSwrContained}{16{,}037}  % events.nonlocal_events_swr_contained: events lying inside an SWR (overlap_class swr_contained)
 \newcommand{\EventsNonlocalEventsSwrPartial}{16{,}664}  % events.nonlocal_events_swr_partial: events partly overlapping an SWR (overlap_class swr_partial)
+\newcommand{\EventsNonlocalTimeBelowSwrThresholdFraction}{76}  % events.nonlocal_time_below_swr_threshold_fraction: share of the immobile time bins decoded non-local (non-local probability above 0.8) whose ripple power is below the Kay SWR threshold (2 z): mean over animals of each animal's share of its bins
+\newcommand{\EventsNonlocalTimeBelowSwrThresholdFractionAnimalMax}{79}  % events.nonlocal_time_below_swr_threshold_fraction_animal_max: highest per-animal share
+\newcommand{\EventsNonlocalTimeBelowSwrThresholdFractionAnimalMin}{73}  % events.nonlocal_time_below_swr_threshold_fraction_animal_min: lowest per-animal share of non-local time bins below the Kay threshold
 \newcommand{\EventsNonlocalTimeOutsideKayFraction}{53}  % events.nonlocal_time_outside_kay_fraction: share of non-local event time that Kay's SWRs do not cover
 \newcommand{\EventsNonlocalTimeOutsideKayS}{3485}  % events.nonlocal_time_outside_kay_s: seconds of non-local event time that Kay's SWRs do not cover
 \newcommand{\EventsNonlocalTimeOutsideSwrFraction}{31}  % events.nonlocal_time_outside_swr_fraction: share of non-local event time that the five SWR definitions together do not cover
@@ -476,18 +482,20 @@
 \newcommand{\EventsRipplePeakModeAnimalMin}{0.90}  % events.ripple_peak_mode_animal_min: lowest per-animal location of the main KDE mode of the events' peak ripple power
 \newcommand{\EventsRippleRestReference}{\ensuremath{-}0.60}  % events.ripple_rest_reference: median over epochs of the epoch's median z-scored ripple power in quiet rest
 \newcommand{\EventsRippleRunningReference}{0.33}  % events.ripple_running_reference: median over epochs of the epoch's median z-scored ripple power while running
-\newcommand{\EventsSlowGammaAnimalsAboveRestNonSwr}{5}  % events.slow_gamma_animals_above_rest_non_swr: animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
-\newcommand{\EventsSlowGammaAnimalsAboveRestSwr}{5}  % events.slow_gamma_animals_above_rest_swr: animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level
-\newcommand{\EventsSlowGammaAnimalsBelowRunningNonSwr}{1}  % events.slow_gamma_animals_below_running_non_swr: animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
-\newcommand{\EventsSlowGammaAnimalsBelowRunningSwr}{0}  % events.slow_gamma_animals_below_running_swr: animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level
+\newcommand{\EventsSlowGammaAnimalsAboveRestNonSwr}{3}  % events.slow_gamma_animals_above_rest_non_swr: animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events
+\newcommand{\EventsSlowGammaAnimalsAboveRestSwr}{5}  % events.slow_gamma_animals_above_rest_swr: animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events
+\newcommand{\EventsSlowGammaAnimalsBelowRunningNonSwr}{2}  % events.slow_gamma_animals_below_running_non_swr: animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events
+\newcommand{\EventsSlowGammaAnimalsBelowRunningSwr}{0}  % events.slow_gamma_animals_below_running_swr: animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events
 \newcommand{\EventsSlowGammaDbAnimalsAboveRestNonSwr}{3}  % events.slow_gamma_db_animals_above_rest_non_swr: animals whose median over epochs of that change (non-SWR events) is above 0 dB
 \newcommand{\EventsSlowGammaDbAnimalsAboveRestSwr}{5}  % events.slow_gamma_db_animals_above_rest_swr: animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB
-\newcommand{\EventsSlowGammaDbMedianNonSwr}{+0.36}  % events.slow_gamma_db_median_non_swr: median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers
-\newcommand{\EventsSlowGammaDbMedianSwr}{+1.6}  % events.slow_gamma_db_median_swr: median over epochs of the change in slow-gamma power (25-55 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers
+\newcommand{\EventsSlowGammaDbMedianNonSwr}{+0.37}  % events.slow_gamma_db_median_non_swr: median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers
+\newcommand{\EventsSlowGammaDbMedianSwr}{+1.7}  % events.slow_gamma_db_median_swr: median over epochs of the change in slow-gamma power (25-55 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers
 \newcommand{\EventsSlowGammaMedianNonSwr}{\ensuremath{-}0.10}  % events.slow_gamma_median_non_swr: median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean)
 \newcommand{\EventsSlowGammaMedianSwr}{0.36}  % events.slow_gamma_median_swr: median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean)
-\newcommand{\EventsSlowGammaRestReference}{\ensuremath{-}0.28}  % events.slow_gamma_rest_reference: median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest
-\newcommand{\EventsSlowGammaRunningReference}{\ensuremath{-}0.30}  % events.slow_gamma_running_reference: median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running
+\newcommand{\EventsSlowGammaRestMatchedReferenceNonSwr}{\ensuremath{-}0.20}  % events.slow_gamma_rest_matched_reference_non_swr: median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in quiet-rest windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)
+\newcommand{\EventsSlowGammaRestMatchedReferenceSwr}{\ensuremath{-}0.16}  % events.slow_gamma_rest_matched_reference_swr: median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in quiet-rest windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)
+\newcommand{\EventsSlowGammaRunningMatchedReferenceNonSwr}{\ensuremath{-}0.21}  % events.slow_gamma_running_matched_reference_non_swr: median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in running windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)
+\newcommand{\EventsSlowGammaRunningMatchedReferenceSwr}{\ensuremath{-}0.16}  % events.slow_gamma_running_matched_reference_swr: median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in running windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)
 \newcommand{\EventsSpeedAnimalsInDirection}{5}  % events.speed_animals_in_direction: animals whose non-SWR median replay speed (median over the event) is lower than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsSpeedDifferenceHigh}{+270}  % events.speed_difference_high: upper bound of that interval
 \newcommand{\EventsSpeedDifferenceLow}{+78}  % events.speed_difference_low: lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median replay speed (median over the event)
@@ -626,7 +634,7 @@
 \newcommand{\EventsZugaroOverlapNonlocalShareMedian}{100}  % events.zugaro_overlap_nonlocal_share_median: median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\EventsZugaroOverlapUncertainShareMedian}{0}  % events.zugaro_overlap_uncertain_share_median: median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8
 
-% --- behavior (commit 59f114b4acbc)
+% --- behavior (commit 96fc11f4e81d)
 \newcommand{\BehaviorArmrewardAll}{\ensuremath{-}0.082}  % behavior.armreward_all: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient
 \newcommand{\BehaviorArmrewardAllAnimalsPositive}{2}  % behavior.armreward_all_animals_positive: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median
 \newcommand{\BehaviorArmrewardAllQ}{0.34}  % behavior.armreward_all_q: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
@@ -1550,7 +1558,7 @@
 \newcommand{\BehaviorUpdateCurrentSwrQ}{\ensuremath{1.3\times10^{-19}}}  % behavior.update_current_swr_q: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
 \newcommand{\BehaviorUpdateCurrentSwrSessions}{241}  % behavior.update_current_swr_sessions: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps
 
-% --- mpfc (commit 59f114b4acbc)
+% --- mpfc (commit 96fc11f4e81d)
 \newcommand{\MpfcAnalyzedEpochs}{242}  % mpfc.analyzed_epochs: analyzed epochs the PFC cohort is drawn from
 \newcommand{\MpfcAnimals}{5}  % mpfc.animals: animals in the mPFC population
 \newcommand{\MpfcBestModelConstantFraction}{52}  % mpfc.best_model_constant_fraction: share of units whose best model by held-out deviance is constant
@@ -1839,10 +1847,10 @@
 \newcommand{\MpfcSwrNoReplayTimingUnitsEnhancedMinEvents}{390}  % mpfc.swr_no_replay_timing_units_enhanced_min_events: units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)
 \newcommand{\MpfcSwrNoReplayTimingUnitsSuppressedAll}{859}  % mpfc.swr_no_replay_timing_units_suppressed_all: units called for SWRs without replay whose peak is a decrease (every session)
 \newcommand{\MpfcSwrNoReplayTimingUnitsSuppressedMinEvents}{677}  % mpfc.swr_no_replay_timing_units_suppressed_min_events: units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)
-\newcommand{\MpfcSwrNoReplayUnitsAll}{18{,}410}  % mpfc.swr_no_replay_units_all: units in every session (Figure 4's population)
+\newcommand{\MpfcSwrNoReplayUnitsAll}{18{,}410}  % mpfc.swr_no_replay_units_all: units in every session (Figure 5's population)
 \newcommand{\MpfcSwrNoReplayUnitsCalledAll}{1{,}324}  % mpfc.swr_no_replay_units_called_all: units called for SWRs without replay (every session)
 \newcommand{\MpfcSwrNoReplayUnitsCalledMinEvents}{1{,}067}  % mpfc.swr_no_replay_units_called_min_events: units called for SWRs without replay (sessions with at least 10 SWRs without replay)
-\newcommand{\MpfcSwrNoReplayUnitsMinEvents}{14{,}054}  % mpfc.swr_no_replay_units_min_events: units in sessions with at least 10 SWRs without replay (Figure 4's population)
+\newcommand{\MpfcSwrNoReplayUnitsMinEvents}{14{,}054}  % mpfc.swr_no_replay_units_min_events: units in sessions with at least 10 SWRs without replay (Figure 5's population)
 \newcommand{\MpfcSwrNoReplayUnitsTestedAll}{17{,}944}  % mpfc.swr_no_replay_units_tested_all: of those, units with a finite p-value for SWRs without replay (every session)
 \newcommand{\MpfcSwrNoReplayUnitsTestedMinEvents}{14{,}053}  % mpfc.swr_no_replay_units_tested_min_events: of those, units with a finite p-value for SWRs without replay (sessions with at least 10 SWRs without replay)
 \newcommand{\MpfcSwrReplayCalledFraction}{27}  % mpfc.swr_replay_called_fraction: share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive)

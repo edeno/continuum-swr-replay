@@ -1178,3 +1178,518 @@ def test_the_uncertainty_annotation_refuses_a_metric_without_an_overall_row():
     contrasts = contrasts[~contrasts["metric"].eq("absolute_rate")]
     with pytest.raises(ValueError, match="no overall posterior row for absolute_rate"):
         figure._positive_animals_note(contrasts, "absolute_rate")
+
+
+def test_figure02_panel_j_writes_the_share_the_events_summary_gives(offline):
+    """The share of non-local time below the SWR threshold on the panel is the
+    events summary's value (the animals' mean, the bins beyond the axis
+    counted), rounded by the summary's rule; each animal is one line on each
+    axis, with the animals' mean."""
+    import matplotlib.pyplot as plt
+
+    from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
+        RIPPLE_POWER_EDGES,
+    )
+    from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        animal_power_counts,
+    )
+    from continuum_swr_replay.data_loaders.epoch_register import analyzed_animals
+    from continuum_swr_replay.reported.events import nonlocal_power_values
+    from continuum_swr_replay.reported.formatting import formatted
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    low, high = RIPPLE_POWER_EDGES[:-1], RIPPLE_POWER_EDGES[1:]
+    animals = list(analyzed_animals())
+    epochs = []
+    for i, animal in enumerate(animals):
+        # 8 non-local bins below the lowest finite edge, 4 above the highest,
+        # and 4 just above the threshold for every animal after the first
+        n_nonlocal = np.zeros(len(low), dtype=int)
+        n_nonlocal[0], n_nonlocal[-1] = 8, 4
+        n_nonlocal[np.flatnonzero(low == 2.0)[0]] = 4 * i
+        epochs.append(
+            pd.DataFrame(
+                {
+                    "animal": animal,
+                    "epoch_id": f"{animal}_e",
+                    "power_low": low,
+                    "power_high": high,
+                    "n_bins": 20,
+                    "n_nonlocal": n_nonlocal,
+                }
+            )
+        )
+    counts = pd.concat(epochs, ignore_index=True)
+    fig, (ax_spread, ax_share) = plt.subplots(2, 1, sharex=True)
+    figure02.draw_share_by_power(ax_spread, ax_share, animal_power_counts(counts))
+    value = {v.key: v for v in nonlocal_power_values(counts, "s")}[
+        "nonlocal_time_below_swr_threshold_fraction"
+    ]
+    # 8 / (12 + 4 i) over i = 0..4: mean 0.4371, although no bin on the axis
+    # below the threshold holds a non-local bin
+    assert formatted(value) == "44 %"
+    assert ax_spread.texts[0].get_text() == "44% below\nthreshold"
+    for ax in (ax_spread, ax_share):
+        assert (
+            len(ax.lines) == len(animals) + 2
+        )  # the animals, their mean, the threshold
+        assert ax.get_xlim() == (-2.0, 10.0)
+    plt.close(fig)
+
+
+def test_no_swr_events_have_one_color_in_every_figure(offline):
+    """A non-local event that overlaps no SWR is drawn in ``COLORS["No SWR"]`` in
+    Figures 2, 3 and 5 and in the shared per-event panels: not in the Non-Local
+    state's green, which every non-local event is drawn in."""
+    from continuum_swr_replay.visualization import figure_panels
+    from continuum_swr_replay.visualization.palettes import COLORS
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    figure03 = offline("scripts.figures.generate_figure03")
+    figure05 = offline("scripts.figures.generate_figure05")
+    no_swr = COLORS["No SWR"]
+    assert no_swr not in (COLORS["Non-Local"], COLORS["SWR"])
+    assert figure02.CLASS_COLORS["non_swr"] == no_swr
+    assert {name: color for _, name, color in figure03.KINDS}["No SWR"] == no_swr
+    bars = {label: COLORS[color] for label, _, color in figure05.SIGNIFICANCE_BARS}
+    assert bars["No SWR"] == no_swr
+    assert bars["Non-local"] == COLORS["Non-Local"]  # every non-local event
+    classes = {word: color for _, word, color, _ in figure_panels._EVENT_CLASSES}
+    assert classes["non_swr"] == no_swr
+
+
+# ---------------------------------------------------------------------------
+# Figure 3: what a reader can read off the axes
+# ---------------------------------------------------------------------------
+
+
+def _figure03_events(n: int = 400) -> pd.DataFrame:
+    """Events of both kinds, of two animals with two epochs each, whose
+    durations pass the duration axis and whose speeds pass the speed axis, as
+    the real ones do."""
+    rng = np.random.default_rng(0)
+    return pd.DataFrame(
+        {
+            "animal": np.where(np.arange(n) < n // 2, "a", "b"),
+            "session_date": "d1",
+            "epoch": np.where(np.arange(n) % 4 < 2, "e1", "e2"),
+            "is_swr": np.arange(n) % 2 == 0,
+            "event_duration_s": np.r_[rng.uniform(0.02, 0.3, n - 2), 0.45, 0.6],
+            "spatial_extent_cm": rng.uniform(0, 220, n),
+            "replay_speed_median_cm_s": np.r_[
+                np.zeros(4), rng.lognormal(6, 2, n - 4)
+            ].clip(0, 9e4),
+        }
+    )
+
+
+def _tick_labels(fig, ax):
+    """The drawn x tick labels of an axis, left to right, with their extents."""
+    fig.draw_without_rendering()
+    labels = [
+        label
+        for label in ax.get_xticklabels()
+        if label.get_visible() and label.get_text()
+    ]
+    labels.sort(key=lambda label: label.get_window_extent().x0)
+    return labels
+
+
+@pytest.mark.parametrize("key", ["duration", "extent", "speed"])
+def test_figure03_histogram_tick_labels_do_not_collide(offline, key):
+    """At the panel's printed width, no x tick label runs into the next one."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    fig = plt.figure(figsize=(figure03.WIDTH, figure03.HEIGHT))
+    ax = fig.add_axes([0.1, 0.6, 0.12, 0.2])  # a row-1 panel's size
+    figure03.draw_histogram(ax, _figure03_events(), key)
+    extents = [label.get_window_extent() for label in _tick_labels(fig, ax)]
+    assert len(extents) >= 2
+    for left, right in zip(extents[:-1], extents[1:], strict=True):
+        assert left.x1 < right.x0
+    plt.close(fig)
+
+
+def test_figure03_histogram_labels_the_ends_that_hold_clipped_events(offline):
+    """An end bin that holds the events beyond the axis says so on its tick; an
+    end with no such label holds none, and the panel is not drawn if it would."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    events = _figure03_events()
+    fig, (ax_duration, ax_speed, ax_extent) = plt.subplots(1, 3)
+    figure03.draw_histogram(ax_duration, events, "duration")
+    assert _tick_labels(fig, ax_duration)[-1].get_text() == "≥400"
+    figure03.draw_histogram(ax_speed, events, "speed")
+    assert _tick_labels(fig, ax_speed)[-1].get_text() == "≥1500"
+
+    too_wide = events.assign(spatial_extent_cm=300.0)
+    with pytest.raises(ValueError, match="beyond the axis, unmarked"):
+        figure03.draw_histogram(ax_extent, too_wide, "extent")
+    plt.close(fig)
+
+
+def test_figure03_histogram_marks_each_animal_s_median(offline):
+    """Under each kind's median, one tick per animal at the animal's own median
+    (``event_statistics.animal_class_medians``), in the kind's color."""
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import LineCollection
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        animal_class_medians,
+    )
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    events = _figure03_events()
+    fig, ax = plt.subplots()
+    figure03.draw_histogram(ax, events, "extent")
+    expected = animal_class_medians(events, "spatial_extent_cm")
+    ticks = [c for c in ax.collections if isinstance(c, LineCollection)]
+    assert len(ticks) == 2
+    for (_, _, color), word, drawn in zip(
+        figure03.KINDS, ("non_swr", "swr"), ticks, strict=True
+    ):
+        x = [segment[0, 0] for segment in drawn.get_segments()]
+        np.testing.assert_allclose(x, expected[word])
+        np.testing.assert_allclose(drawn.get_colors()[0], to_rgba(color))
+    plt.close(fig)
+
+
+def test_figure03_cumulative_is_the_share_of_events_at_or_below(offline):
+    """Panel d's lower axis: each kind's curve is the share of its events at or
+    below each speed, so it crosses 50 % at the kind's median and ends short of
+    100 % by the share of events beyond the axis; an event without a value
+    raises, as in the histogram above it."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    events = _figure03_events(n=2400)
+    column, _, _, edges, _ = figure03.HISTOGRAMS["speed"]
+    fig, ax = plt.subplots()
+    figure03.draw_cumulative(ax, events, "speed")
+    curves = [line for line in ax.lines if len(line.get_xdata()) > 2]
+    assert len(curves) == 2
+    for (is_swr, _, _), curve in zip(figure03.KINDS, curves, strict=True):
+        speed, share = curve.get_xdata(), curve.get_ydata()
+        values = events.loc[events["is_swr"] == is_swr, column].to_numpy()
+        assert (np.diff(share) >= 0).all()
+        assert share[-1] == pytest.approx(100 * (values <= edges[-1]).mean())
+        assert share[-1] < 100  # some events lie beyond the axis
+        median = np.median(values)
+        assert share[speed <= median][-1] <= 50 <= share[speed >= median][0]
+    assert ax.get_xlim() == (edges[0], edges[-1])
+
+    missing = events.assign(
+        replay_speed_median_cm_s=events[column].where(events.index > 0)
+    )
+    with pytest.raises(ValueError, match="an event has no value"):
+        figure03.draw_cumulative(ax, missing, "speed")
+    plt.close(fig)
+
+
+def test_figure03_legend_counts_every_event_of_each_kind(offline):
+    """The legend's n is each kind's number of events, and a histogram is not
+    drawn from fewer: an event without a value raises."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    events = _figure03_events(n=2400)
+    assert figure03.kind_labels(events) == [
+        "No SWR (n = 1,200 events)",
+        "SWR (n = 1,200 events)",
+    ]
+    fig, ax = plt.subplots()
+    missing = events.assign(
+        spatial_extent_cm=events["spatial_extent_cm"].where(events.index > 0)
+    )
+    with pytest.raises(ValueError, match="an event has no value"):
+        figure03.draw_histogram(ax, missing, "extent")
+    plt.close(fig)
+
+
+def _spider_track():
+    """The task's track: a center (9), three patch junctions (6, 7, 8) and six
+    wells (0-5), at one epoch's positions (cm); arms 0-5 are the leaf arms, 6-8
+    the trunk arms. Returns the graph and its arms in drawing order."""
+    import networkx as nx
+
+    positions = {
+        0: (177.0, 45.1), 1: (223.7, 122.3), 2: (181.7, 202.5), 3: (87.9, 204.2),
+        4: (40.9, 126.5), 5: (86.2, 45.1), 6: (179.6, 98.7), 7: (135.4, 178.0),
+        8: (86.5, 99.6), 9: (134.6, 124.8),
+    }  # fmt: skip
+    arms = {0: (6, 0), 1: (6, 1), 2: (7, 2), 3: (7, 3), 4: (8, 4), 5: (8, 5),
+            6: (9, 6), 7: (9, 7), 8: (9, 8)}  # fmt: skip
+    graph = nx.Graph()
+    for node, position in positions.items():
+        graph.add_node(node, pos=position)
+    for arm, (first, second) in arms.items():
+        graph.add_edge(first, second, edge_id=arm)
+    return graph, [arms[arm] for arm in (6, 0, 1, 7, 2, 3, 8, 4, 5)]
+
+
+def test_figure03_track_bands_meet_at_a_junction_without_overlapping(offline):
+    """Where three arms meet, each arm's band ends on the lines halfway to its
+    neighbors: every point of the track lies in exactly one segment's band, at
+    the junctions as along the arms, and no segment is left without a band."""
+    from matplotlib.path import Path
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    graph, edge_order = _spider_track()
+    values = pd.Series(
+        0.0,
+        index=pd.MultiIndex.from_product([range(9), range(figure03.N_SEGMENTS)]),
+    )
+    polygons, shown = figure03.track_bands(graph, edge_order, values)
+    assert len(polygons) == len(shown) == 9 * figure03.N_SEGMENTS
+    assert all(len(polygon) >= 3 for polygon in polygons)
+
+    half = figure03.ARM_HALF_WIDTH_CM
+    rng = np.random.default_rng(0)
+    # points around every junction and the center, and over the whole track
+    near = np.concatenate(
+        [
+            np.asarray(graph.nodes[node]["pos"]) + rng.uniform(-25, 25, (2000, 2))
+            for node in (6, 7, 8, 9)
+        ]
+    )
+    points = np.concatenate([near, rng.uniform((20, 30), (245, 220), (6000, 2))])
+    in_band = np.zeros(len(points), dtype=bool)
+    for first, second in edge_order:
+        start = np.asarray(graph.nodes[first]["pos"])
+        along = np.asarray(graph.nodes[second]["pos"]) - start
+        length = np.hypot(*along)
+        offset = points - start
+        forward = offset @ along / length
+        sideways = np.abs(offset @ np.array([-along[1], along[0]]) / length)
+        in_band |= (forward >= 0) & (forward <= length) & (sideways <= half)
+    n_holding = sum(Path(polygon).contains_points(points) for polygon in polygons)
+    assert in_band.sum() > 3000
+    assert (n_holding[in_band] == 1).all()
+    assert (n_holding[~in_band] == 0).all()
+
+
+def test_figure03_density_tracks_draw_each_kind_against_even(offline):
+    """Panel e: one track per kind, each segment colored by the kind's density
+    against even content, on a scale that saturates and says so at its ends."""
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import PolyCollection
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    graph, edge_order = _spider_track()
+    index = pd.MultiIndex.from_product(
+        [[False, True], range(9), range(figure03.N_SEGMENTS)],
+        names=["is_swr", "arm", "segment"],
+    )
+    against_even = pd.Series(np.linspace(-3, 3, len(index)), index=index)
+    against_even[(False, 6, 0)] = -np.inf  # a segment without content
+    fig, axes = plt.subplots(1, 2)
+    figure03.draw_density_tracks(axes, graph, edge_order, against_even)
+    limit = figure03.DENSITY_LIMIT_LOG2
+    for ax, (is_swr, name, _) in zip(axes, figure03.KINDS, strict=True):
+        assert ax.get_title() == name
+        (bands,) = [c for c in ax.collections if isinstance(c, PolyCollection)]
+        _, values = figure03.track_bands(graph, edge_order, against_even.loc[is_swr])
+        np.testing.assert_allclose(bands.get_array(), np.clip(values, -limit, limit))
+        assert np.isfinite(bands.get_array()).all()
+    bars = [ax for ax in fig.axes if ax not in list(axes)]
+    assert len(bars) == 2
+    for bar in bars:
+        assert [t.get_text() for t in bar.get_xticklabels()] == ["≤¼×", "even", "≥4×"]
+    plt.close(fig)
+
+
+def test_figure03_track_map_names_the_center_a_junction_and_a_well(offline):
+    """The profile's axis runs from the center to a junction to a well; the
+    track map says where those are. Each name belongs to a node of its sort and
+    sits beside it, with no line to it; at the map's printed size no name lies
+    over a band or over another name."""
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import PolyCollection
+    from matplotlib.path import Path
+
+    from continuum_swr_replay.visualization.simulated_run_panels import (
+        overlapping_texts,
+    )
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    graph, edge_order = _spider_track()
+    values = pd.Series(
+        0.0,
+        index=pd.MultiIndex.from_product([range(9), range(figure03.N_SEGMENTS)]),
+    )
+    polygons, _ = figure03.track_bands(graph, edge_order, values)
+    fig = plt.figure(figsize=(figure03.WIDTH, figure03.HEIGHT), layout="none")
+    ax = fig.add_axes([0.08, 0.15, 0.17, 0.33])  # one map, at its size in the figure
+    ax.add_collection(PolyCollection(polygons))
+    ax.autoscale_view()
+    ax.set_aspect("equal")
+    ax.axis("off")
+    figure03.label_track(ax, graph)
+
+    named = {text.get_text(): text for text in ax.texts}
+    assert sorted(named) == ["center", "junction", "well"]
+    position = {node: np.asarray(graph.nodes[node]["pos"]) for node in graph}
+    np.testing.assert_allclose(named["center"].xy, position[9])
+    assert any(np.allclose(named["junction"].xy, position[n]) for n in (6, 7, 8))
+    assert any(np.allclose(named["well"].xy, position[n]) for n in range(6))
+    assert all(text.arrow_patch is None for text in named.values())
+
+    fig.draw_without_rendering()
+    bands = [Path(ax.transData.transform(polygon)) for polygon in polygons]
+    for text in named.values():
+        box = text.get_window_extent()
+        outline = Path(
+            [(box.x0, box.y0), (box.x1, box.y0), (box.x1, box.y1), (box.x0, box.y1)]
+        )
+        assert not any(outline.intersects_path(band, filled=True) for band in bands)
+        # and beside its node: within two band widths of it
+        node = ax.transData.transform(text.xy)
+        nearest = np.hypot(
+            np.clip(node[0], box.x0, box.x1) - node[0],
+            np.clip(node[1], box.y0, box.y1) - node[1],
+        )
+        two_widths = 4 * figure03.ARM_HALF_WIDTH_CM
+        assert nearest <= np.hypot(
+            *(ax.transData.transform((two_widths, 0)) - ax.transData.transform((0, 0)))
+        )
+    assert overlapping_texts(fig) == []
+    plt.close(fig)
+
+
+def test_figure03_profiles_carry_the_even_content_line(offline):
+    """Panel g draws what content spread evenly over the track would give: one
+    density across both halves, labeled, and its share at a well beside the two
+    kinds' shares."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    index = pd.MultiIndex.from_product(
+        [[False, True], ["trunk", "leaf"], range(figure03.N_SEGMENTS)],
+        names=["is_swr", "arm_type", "segment"],
+    )
+    profiles = pd.DataFrame({"density_per_cm": 0.003}, index=index)
+    shares = pd.DataFrame({"at_well": [0.5, 0.2]}, index=[False, True])
+    even = {"density_per_cm": 0.002, "at_well_fraction": 0.25}
+    fig, ax = plt.subplots()
+    figure03.draw_profiles(ax, profiles, shares, even)
+    (line,) = [line for line in ax.lines if line.get_gid() == "even"]
+    np.testing.assert_allclose(line.get_ydata(), 0.2)  # % per cm
+    texts = [text.get_text() for text in ax.texts]
+    assert "even" in texts
+    assert "even: 25% at a well" in texts
+    plt.close(fig)
+
+
+def test_figure03_draws_six_panels_from_the_decode_and_the_track(offline):
+    """Figure 3 is a to f, and the script's letters are the question list's.
+    Gamma during the events is the supplementary figure's, and content against
+    the animal is the behavior figure's: neither is drawn here."""
+    from continuum_swr_replay.reported.questions import FIGURES
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    assert "".join(figure03.LETTER_ROWS) == FIGURES["3"].panels == "abcdef"
+    assert sorted("".join(figure03.LETTER_COLUMNS)) == list("abcdef")
+    assert not hasattr(figure03, "draw_brain_state")
+    assert not hasattr(figure03, "draw_distance_from_animal")
+
+
+def test_the_gamma_figure_draws_each_animal_between_its_rest_and_running_levels(
+    offline,
+):
+    """The supplementary gamma figure: per band and kind, each animal's event
+    level (``event_statistics.animal_signal_levels`` with ``matched``) between
+    its quiet-rest and running levels, in the kind's color."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+
+    from continuum_swr_replay.analysis.event_properties.event_statistics import (
+        animal_signal_levels,
+    )
+
+    figure = offline("scripts.figures.generate_supp_event_gamma")
+    rng = np.random.default_rng(0)
+    epochs = [("a", "e1"), ("a", "e2"), ("b", "e1")]
+    events = pd.DataFrame(
+        [
+            {"animal": animal, "session_date": "d1", "epoch": epoch, "is_swr": is_swr}
+            for animal, epoch in epochs
+            for is_swr in (False, True)
+            for _ in range(4)
+        ]
+    )
+    reference = pd.DataFrame(epochs, columns=["animal", "epoch"]).assign(
+        session_date="d1"
+    )
+    for band, column, _ in figure.SIGNALS:
+        events[column] = rng.normal(size=len(events))
+        for regime in ("rest", "running"):
+            for group in ("non_swr", "swr"):
+                reference[f"{band}_{regime}_matched_{group}"] = rng.normal(size=3)
+
+    fig, axes = plt.subplots(1, 2)
+    figure.draw_gamma(axes, events, reference)
+    assert [ax.get_title() for ax in axes] == [
+        "Slow gamma (25–55 Hz)",
+        "Fast gamma (65–100 Hz)",
+    ]
+    for ax, (band, column, _) in zip(axes, figure.SIGNALS, strict=True):
+        levels = animal_signal_levels(events, reference, band, column, matched=True)
+        # per kind, three sets of dots: rest, events, running
+        dots = ax.collections
+        assert len(dots) == 6
+        for k, (is_swr, _, color) in enumerate(figure.KINDS):
+            rest, event, running = dots[3 * k : 3 * k + 3]
+            for drawn, word in ((rest, "rest"), (event, "event"), (running, "running")):
+                np.testing.assert_allclose(
+                    drawn.get_offsets()[:, 1], levels.loc[is_swr, word]
+                )
+            np.testing.assert_allclose(event.get_facecolors()[0], to_rgba(color))
+            np.testing.assert_allclose(rest.get_facecolors()[0], to_rgba("white"))
+            np.testing.assert_allclose(running.get_facecolors()[0], to_rgba("black"))
+        assert [t.get_text() for t in ax.get_xticklabels()] == ["No SWR", "SWR"]
+    plt.close(fig)
+
+
+def test_figure03_letters_share_a_height_by_row_and_a_left_edge_by_column(offline):
+    """The letters of a row sit at one height, above the row's highest drawn
+    top; the letters of a column sit at one left edge, the leftmost drawn extent
+    of the column's panels, whatever each panel's own labels."""
+    import matplotlib.pyplot as plt
+
+    from continuum_swr_replay.visualization.simulated_run_panels import drawn_extent
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    rows, columns = figure03.LETTER_ROWS, figure03.LETTER_COLUMNS
+    fig, grid = plt.subplots(
+        len(rows), len(columns), figsize=(figure03.WIDTH, figure03.HEIGHT)
+    )
+    panels = {
+        letter: [grid[r, c]]
+        for r, row in enumerate(rows)
+        for c, column in enumerate(columns)
+        for letter in row
+        if letter in column
+    }
+    assert sorted(panels) == sorted("".join(rows))
+    shared = next(column for column in columns if len(column) > 1 and "a" not in column)
+    upper, lower = shared
+    panels[upper][0].set_ylabel("a label\nof two lines")  # wider than the lower's
+    panels[rows[1][0]][0].set_title("a title")  # higher than its row's other panels
+    fig.draw_without_rendering()
+    positions = figure03.letter_positions(fig, panels)
+
+    for row in rows:
+        tops = {positions[letter][1] for letter in row}
+        assert len(tops) == 1
+        assert tops.pop() > max(drawn_extent(fig, panels[letter]).y1 for letter in row)
+    for column in columns:
+        lefts = {positions[letter][0] for letter in column}
+        assert len(lefts) == 1
+        assert lefts.pop() < min(
+            drawn_extent(fig, panels[letter]).x0 for letter in column
+        )
+    assert positions[lower][0] < drawn_extent(fig, panels[lower]).x0 - 0.01
+    plt.close(fig)

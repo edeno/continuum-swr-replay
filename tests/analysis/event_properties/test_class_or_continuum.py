@@ -423,3 +423,54 @@ def test_nonlocal_share_by_power_leaves_out_bins_outside_the_edges_and_not_finit
     )
     assert shares["n_bins"].tolist() == [1]
     assert shares["share"].tolist() == [1.0]
+
+
+def test_nonlocal_share_by_power_counts_the_nonlocal_bins():
+    power = np.array([0.5, 0.5, 0.5, 2.5, 2.5, 0.5, 2.5, 2.5])
+    probability = np.array([0.9, 0.1, 0.1, 0.9, 0.95, 0.85, 0.2, 0.9])
+    group = np.array(["a", "a", "a", "a", "a", "b", "b", "b"])
+    shares = cc.nonlocal_share_by_power(
+        power, probability, group, edges=np.array([0.0, 1.0, 2.0, 3.0]), threshold=0.8
+    )
+    counts = shares.set_index(["group", "power_low"])["n_nonlocal"]
+    assert counts.to_dict() == {
+        ("a", 0.0): 1,
+        ("a", 1.0): 0,
+        ("a", 2.0): 2,
+        ("b", 0.0): 1,
+        ("b", 1.0): 0,
+        ("b", 2.0): 1,
+    }
+
+
+def test_ripple_power_edges_count_every_power_and_split_at_the_kay_threshold():
+    edges = cc.RIPPLE_POWER_EDGES
+    assert edges[0] == -np.inf and edges[-1] == np.inf
+    assert (np.diff(edges) > 0).all()
+    assert cc.KAY_ZSCORE_THRESHOLD in edges
+    # a power below the lowest finite edge, at the threshold and above the highest
+    power = np.array([-7.0, cc.KAY_ZSCORE_THRESHOLD, 40.0])
+    shares = cc.nonlocal_share_by_power(
+        power, np.full(3, 0.9), np.zeros(3, dtype=int), edges=edges, threshold=0.8
+    )
+    assert shares["n_bins"].sum() == 3
+    occupied = shares[shares["n_bins"] > 0]
+    assert occupied["power_low"].tolist() == [-np.inf, cc.KAY_ZSCORE_THRESHOLD, 10.0]
+
+
+def test_rest_power_counts_count_the_immobile_analyzed_bins_only():
+    dot = pd.DataFrame(
+        {
+            # immobile, moving, immobile in excluded time, immobile, immobile
+            "head_speed": [1.0, 20.0, 1.0, 1.0, 1.0],
+            "in_excluded_time": [False, False, True, False, False],
+            "SWR_zscore": [0.1, 0.1, 0.1, 0.1, 3.1],
+            "Non-Local_Continuous_prob": [0.5, 0.9, 0.9, 0.1, 0.9],
+            "Non-Local_Fragmented_prob": [0.4, 0.0, 0.0, 0.1, 0.0],
+        }
+    )
+    counts = cc.rest_power_counts(dot).set_index("power_low")
+    assert len(counts) == len(cc.RIPPLE_POWER_EDGES) - 1
+    assert counts["n_bins"].sum() == 3
+    assert counts.loc[0.0, ["n_bins", "n_nonlocal"]].tolist() == [2, 1]
+    assert counts.loc[3.0, ["n_bins", "n_nonlocal"]].tolist() == [1, 1]

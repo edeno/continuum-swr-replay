@@ -585,7 +585,7 @@ def test_end_to_end_planted_gain_from_spike_trains():
 
 
 # ---------------------------------------------------------------------------
-# Real data: the table is built on the canonical Figure 4 assembly
+# Real data: the table is built on the canonical Figure 5 assembly
 # ---------------------------------------------------------------------------
 
 

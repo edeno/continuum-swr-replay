@@ -11,7 +11,7 @@ already hold is copied out. The inputs (:class:`~.inputs.MpfcInputs`):
 
 - the at-well mPFC unit bundles (``Processed-Data/{epoch}_mPFC_modulation.pkl``
   and their ``*.provenance.json`` sidecars, from
-  ``scripts/pfc/run_pfc_analysis_bandit.py``), read through Figure 4's loader
+  ``scripts/pfc/run_pfc_analysis_bandit.py``), read through Figure 5's loader
   (:func:`~continuum_swr_replay.analysis.pfc.load_population.load_population_data`,
   no firing-rate cutoff: every unit with a usable fit) for every per-unit value,
   with a 1 Hz cutoff as a check;
@@ -33,7 +33,7 @@ already hold is copied out. The inputs (:class:`~.inputs.MpfcInputs`):
   session table or table they read has changed
   (:func:`~.followups.stop_context_staleness`).
 
-Figure 4 (``scripts/figures/generate_figure04.py``) draws the unit fractions
+Figure 5 (``scripts/figures/generate_figure05.py``) draws the unit fractions
 with the same functions. ``scripts/pfc/compare_pfc_cohorts.py`` calls them for
 the called fractions and ``scripts/pfc/measure_pfc_null_geometry.py`` for the
 units called without improvement; the cohort, fit-count, prior-binding and
@@ -43,7 +43,7 @@ they are not population inference.
 
 Every value answers question 4.1, so the values are made by what they describe
 rather than by question: :mod:`.population` (the cohort, the estimator and its
-fits, the called fractions of Figure 4d, the null's geometry, the overlap and
+fits, the called fractions of Figure 5d, the null's geometry, the overlap and
 size of the responses), :mod:`.timing` (when the responses peak and start),
 :mod:`.swr_without_replay` (the extended event set), :mod:`.followups` (the
 marked-family models and the stop-context fits, with their staleness rules) and
@@ -110,7 +110,7 @@ def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
     source = (
         f"{rel(inputs.bundle_dir)}/*{MPFC_STEM}.pkl and their provenance sidecars "
         f"(scripts/pfc/run_pfc_analysis_bandit.py), {len(sidecars)} bundles, "
-        "read by Figure 4's loader (analysis/pfc/load_population.py, no "
+        "read by Figure 5's loader (analysis/pfc/load_population.py, no "
         "firing-rate cutoff)"
     )
     main = TAGS["modulation"]
@@ -129,7 +129,7 @@ def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
         ),
         *called_fraction_values(
             population,
-            value_factory(called_fraction_values, source, TAGS["figure_4d"], pending),
+            value_factory(called_fraction_values, source, TAGS["figure_5d"], pending),
         ),
         *null_geometry_values(
             population,
@@ -191,7 +191,7 @@ def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
                     f"{rel(extended_dir)}/*{MPFC_STEM}.pkl and sidecars "
                     "(scripts/pfc/run_pfc_analysis_bandit.py --event-set "
                     f"with_swr_without_replay), {len(extended_sidecars)} bundles, "
-                    "Figure 4's loader (no firing-rate cutoff)",
+                    "Figure 5's loader (no firing-rate cutoff)",
                     TAGS["modulation"],
                     extended_pending,
                 ),

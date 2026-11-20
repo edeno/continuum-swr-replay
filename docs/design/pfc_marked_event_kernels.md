@@ -45,7 +45,7 @@ window, at-well stop cohort, ridge-Poisson estimator, and support-separated
 blocked folds as the canonical PFC analysis. The session is assembled by the
 canonical PFC assembly (`analysis/pfc/session.py`), so the fit mask (with the
 analyzed-time rule: no fitted bin's ±250 ms basis window reaches excluded
-time) and the replay-class onsets are exactly the ones Figure 4 is fit on.
+time) and the replay-class onsets are exactly the ones Figure 5 is fit on.
 
 ## Nested held-out comparisons
 

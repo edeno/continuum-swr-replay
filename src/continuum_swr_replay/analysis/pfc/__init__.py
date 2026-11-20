@@ -25,7 +25,7 @@ prepare_session, PreparedSession
     ``run_session``'s preparation of a session, as one call: the decode and
     data trimmed to their shared timestamps, the fit mask with theta phase
     blanked in excluded time, and the event sets with the matched control.
-    Figure 4 and the PFC check scripts prepare a session with it.
+    Figure 5 and the PFC check scripts prepare a session with it.
 load_aligned_session, session_fit_population, session_events
     The three steps of ``prepare_session``, in order.
 build_session_fit_mask, build_session_event_sets
@@ -50,7 +50,7 @@ Population (``load_population``)
 --------------------------------
 ``load_population_data`` reads the per-session bundles back, refuses bundles
 from another estimator or inference setting, applies the firing-rate gate, and
-returns the unit table and the stacked curves Figure 4 draws;
+returns the unit table and the stacked curves Figure 5 draws;
 ``significant_fraction`` is the descriptive raw-p fraction; and
 ``penalty_sigma_suffix`` names a bundle fit at a non-canonical prior.
 

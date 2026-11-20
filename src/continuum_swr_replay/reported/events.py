@@ -36,6 +36,9 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   ``scripts/event_properties/measure_event_gamma.py`` (``Processed-Data/event_gamma``):
   the z-scored gamma per event and epoch, and the band power's change against
   quiet rest in dB (its ``reference.parquet``);
+- each epoch's immobile time bins, and its non-local ones, by ripple power
+  (``Processed-Data/nonlocal_by_ripple_power``, from
+  ``scripts/event_properties/measure_nonlocal_by_ripple_power.py``);
 - the decoder quality of each analyzed epoch (``Processed-Data/decoder_quality``,
   from ``scripts/decoding/measure_decoder_quality.py``): the Local-state
   decoding error, the state fractions moving and immobile, and the calibration
@@ -83,6 +86,9 @@ from continuum_swr_replay.analysis.event_properties import (
     content_along_arms,
     event_statistics,
 )
+from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
+    KAY_ZSCORE_THRESHOLD,
+)
 from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
@@ -90,6 +96,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     analyzed_animals,
     analyzed_epoch_ids,
 )
+from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
     CONTENT_ALONG_ARMS_DIR,
@@ -101,6 +108,7 @@ from continuum_swr_replay.paths import (
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
     NL_BOUTS_BY_SWR_STEM,
+    NONLOCAL_BY_RIPPLE_POWER_DIR,
     RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
     STATE_EVIDENCE_DIR,
@@ -147,23 +155,27 @@ TAGS = {
     "ripple": Tags(("2d.8", "2b.5"), ("2i",)),
     "mua": Tags(("2d.8",), ("2i",)),
     "theta": Tags(("2d.8",), ("2i",)),
-    "gamma_z": Tags(("2d.8",), ("3i",)),
+    "gamma_z": Tags(("2d.8",), ("event_gamma",)),
     "brain_state": Tags(("2d.8",)),
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
+    "nonlocal_power": Tags(("2b.5",), ("2j",)),
     "participation": Tags(("2d.9",), ("2g",)),
-    "state_composition": Tags(("2d.10",), ("3e",)),
+    "spike_rate": Tags(("2d.9",)),
+    "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
     "tetrode_holdout": Tags(("2c.3",), ("2h",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
     "spike_gpi": Tags(("2c.4",)),
-    "content_occupancy": Tags(("2d.1",), ("3h",)),
+    "content_occupancy": Tags(("2d.1",), ("3f",)),
+    "content_by_animal": Tags(("2d.1",)),
     "duration": Tags(("2d.6",), ("3a",)),
-    "extent": Tags(("2d.3",), ("3b", "3d")),
-    "speed": Tags(("2d.2",), ("3c",)),
+    "extent": Tags(("2d.3",), ("3c",)),
+    "arms": Tags(("2d.3",)),
+    "speed": Tags(("2d.2",), ("3d",)),
     "certainty": Tags(("2d.5",)),
     "stillness": Tags(("2d.4",)),
     "location": Tags(("2d.1",)),
@@ -197,6 +209,7 @@ class EventsInputs:
     brain_state_reference: Path
     event_gamma: Path
     class_structure: Path
+    nonlocal_by_ripple_power: Path
     event_start_rest_theta: Path
     property_bootstrap: Path
     decoder_quality: Path
@@ -220,6 +233,7 @@ def default_inputs() -> EventsInputs:
         / "reference.parquet",
         event_gamma=processed_data_dir() / EVENT_GAMMA_DIR,
         class_structure=processed_data_dir() / RIPPLE_CLASS_STRUCTURE_DIR,
+        nonlocal_by_ripple_power=processed_data_dir() / NONLOCAL_BY_RIPPLE_POWER_DIR,
         event_start_rest_theta=processed_data_dir() / EVENT_START_REST_THETA_DIR,
         property_bootstrap=processed_data_dir() / EVENT_PROPERTY_BOOTSTRAP_DIR,
         decoder_quality=processed_data_dir() / DECODER_QUALITY_DIR,
@@ -839,15 +853,80 @@ def brain_state_values(
 def gamma_z_values(
     events: pd.DataFrame, reference: pd.DataFrame, source: str
 ) -> list[Value]:
-    """Question 2d.8: slow and fast gamma during events, against running and quiet
-    rest.
+    """Question 2d.8: slow and fast gamma during events, against quiet-rest and
+    running windows as long as the events.
 
-    As :func:`brain_state_values`, on the gamma pass's ``slow_gamma_z`` and
-    ``fast_gamma_z``, joined on ``event_id``, and its epochs' running and
-    quiet-rest levels on the same scale.
+    On the gamma pass's ``slow_gamma_z`` and ``fast_gamma_z``, joined on
+    ``event_id``. An event's value is the mean over its bins, and band power is
+    skewed, so it is compared with the level of windows of the same length
+    (``gamma_power.matched_level``), each class with its own: not with the
+    median of single bins, which a window's mean exceeds when nothing differs.
     """
     make = value_factory(gamma_z_values, source, TAGS["gamma_z"])
-    return _signal_values({"slow_gamma": make, "fast_gamma": make}, events, reference)
+    words = ["slow_gamma", "fast_gamma"]
+    levels = event_statistics.matched_reference_medians(reference, words)
+    statistics = event_statistics.event_signal_statistics(
+        events,
+        reference,
+        {word: _SIGNAL_EVENT_COLUMNS[word] for word in words},
+        matched=True,
+    )
+    values: list[Value] = []
+    for word in words:
+        label = _SIGNAL_LABELS[word]
+        for group, is_swr in (("non_swr", False), ("swr", True)):
+            stats = statistics.loc[(word, is_swr)]
+            name = "non-SWR" if group == "non_swr" else "SWR-overlapping"
+            animal_value = (
+                f"animals whose median {name} event {label} (the median over their "
+                "epochs of each epoch's median)"
+            )
+            values.append(
+                make(
+                    f"{word}_median_{group}",
+                    stats["median"],
+                    "quantity",
+                    "dec2",
+                    f"median z-scored {label} of immobile {name} non-local events (event mean)",
+                    "z",
+                )
+            )
+            for regime, words_of_regime in (
+                ("rest", "quiet-rest"),
+                ("running", "running"),
+            ):
+                values.append(
+                    make(
+                        f"{word}_{regime}_matched_reference_{group}",
+                        levels.loc[(word, is_swr), regime],
+                        "quantity",
+                        "dec2",
+                        f"median over epochs of the epoch's z-scored {label} in "
+                        f"{words_of_regime} windows as long as its {name} events (the "
+                        "median over the events of one window's mean each, averaged "
+                        "over the draws)",
+                        "z",
+                    )
+                )
+            values += [
+                make(
+                    f"{word}_animals_below_running_{group}",
+                    stats["n_animals_below_running"],
+                    "count",
+                    "count",
+                    f"{animal_value} is below the median over the same epochs of the "
+                    "epoch's level in running windows as long as those events",
+                ),
+                make(
+                    f"{word}_animals_above_rest_{group}",
+                    stats["n_animals_above_rest"],
+                    "count",
+                    "count",
+                    f"{animal_value} is above the median over the same epochs of the "
+                    "epoch's level in quiet-rest windows as long as those events",
+                ),
+            ]
+    return values
 
 
 def _signal_values(
@@ -1192,7 +1271,7 @@ _RUN_GROUPS = {"non_swr": SWR_LABELS[False], "swr": SWR_LABELS[True]}
 
 def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.10: the mean share of an SWR or no-SWR event in Continuous and in
-    Fragmented (Figure 3e)."""
+    Fragmented (Figure 3b)."""
     make = value_factory(state_composition_values, source, TAGS["state_composition"])
     statistics = event_statistics.state_composition_statistics(events)
     values = []
@@ -1218,8 +1297,15 @@ def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.9: tetrode participation and spike rate of the events against
-    Local-rest windows of their length (Figure 2g)."""
-    make = value_factory(participation_values, source, TAGS["participation"])
+    Local-rest windows of their length (Figure 2g shows the participation)."""
+    makers = {
+        "participation": value_factory(
+            participation_values, source, TAGS["participation"]
+        ),
+        "spike_rate_hz": value_factory(
+            participation_values, source, TAGS["spike_rate"]
+        ),
+    }
     statistics = participation.participation_statistics(table)
     differences = participation.participation_differences(statistics)
     values = []
@@ -1229,6 +1315,7 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
             ("spike_rate_hz", "int", "spike rate summed over tetrodes", "spikes per s"),
         ):
             kind = "fraction" if measure == "participation" else "quantity"
+            make = makers[measure]
             for window, label in (
                 ("event", "events"),
                 ("control", "Local-rest windows"),
@@ -1255,7 +1342,7 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
                 )
             )
         values.append(
-            make(
+            makers["participation"](
                 f"{word}_participation_animals",
                 differences.loc[group, "n_animals"],
                 "count",
@@ -1264,7 +1351,7 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
             )
         )
     values.append(
-        make(
+        makers["participation"](
             "participation_events_without_control",
             int((table["kind"] == "event").sum() - (table["kind"] == "control").sum()),
             "count",
@@ -1443,6 +1530,46 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
             "dec2",
             "highest per-animal location of that mode",
             "z",
+        ),
+    ]
+
+
+def nonlocal_power_values(counts: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2b.5: how much of the non-local time has ripple power below the
+    Kay threshold (Figure 2j)?
+
+    Over the immobile time bins decoded non-local, each animal's bins pooled
+    over its epochs.
+    """
+    make = value_factory(nonlocal_power_values, source, TAGS["nonlocal_power"])
+    stats = event_statistics.nonlocal_below_threshold_statistics(
+        event_statistics.animal_power_counts(counts), KAY_ZSCORE_THRESHOLD
+    )
+    key = "nonlocal_time_below_swr_threshold_fraction"
+    return [
+        make(
+            key,
+            stats["fraction_animal_mean"],
+            "fraction",
+            "pct",
+            "share of the immobile time bins decoded non-local (non-local "
+            f"probability above {DEFAULT_NON_LOCAL_THRESHOLD:g}) whose ripple power "
+            f"is below the Kay SWR threshold ({KAY_ZSCORE_THRESHOLD:g} z): mean over "
+            "animals of each animal's share of its bins",
+        ),
+        make(
+            f"{key}_animal_min",
+            stats["fraction_animal_min"],
+            "fraction",
+            "pct",
+            "lowest per-animal share of non-local time bins below the Kay threshold",
+        ),
+        make(
+            f"{key}_animal_max",
+            stats["fraction_animal_max"],
+            "fraction",
+            "pct",
+            "highest per-animal share",
         ),
     ]
 
@@ -1652,7 +1779,7 @@ _PROPERTIES = (
         "",
         "int",
         "lower",
-        TAGS["extent"],
+        TAGS["arms"],
     ),
 )
 
@@ -1878,14 +2005,21 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
 def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.1: where content sits against the animal and the wells.
 
-    ``bins``: each event time bin with its kind and its content's track distance
-    to the animal and to the nearest well (a track-graph end point), as
-    :func:`content_along_arms_bins` reads them. The shares at a remote well, at
-    the animal's own well, on a remote path and near the animal off the wells
-    (``content_along_arms.content_place_shares``): each epoch's share of its
-    time bins, averaged over the animal's epochs, then over animals.
+    ``bins``: each event time bin with its kind, its content's track distance
+    to the animal and to the nearest well (a track-graph end point) and its arm
+    with the arm's length, as :func:`content_along_arms_bins` reads them. The
+    shares at a remote well, at the animal's own well, on a remote path and near
+    the animal off the wells (``content_along_arms.content_place_shares``): each
+    epoch's share of its time bins, averaged over the animal's epochs, then over
+    animals. And the share at a well of content spread evenly over the track
+    (``content_along_arms.even_content``), which those shares are read against.
     """
     make = value_factory(content_occupancy_values, source, TAGS["content_occupancy"])
+    # The places that depend on where the animal is are in no panel: content
+    # against the animal is the behavior figure's.
+    make_by_animal = value_factory(
+        content_occupancy_values, source, TAGS["content_by_animal"]
+    )
     statistics = content_along_arms.place_share_statistics(
         content_along_arms.content_place_shares(bins)
     )
@@ -1901,7 +2035,7 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
     for word, is_swr, name in (("non_swr", False, "non-SWR"), ("swr", True, "SWR")):
         for column in event_statistics.OCCUPANCY_PLACES:
             values.append(
-                make(
+                (make if column == "at_well" else make_by_animal)(
                     f"{word}_content_{column}_fraction",
                     statistics["means"].loc[is_swr, column],
                     "fraction",
@@ -1920,6 +2054,19 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
             "count",
             "animals whose non-SWR content is at a well more often than their SWR "
             "content, each share the mean over the animal's epochs",
+        )
+    )
+    values.append(
+        make(
+            "even_content_at_well_fraction",
+            content_along_arms.even_content(bins, event_statistics.AT_WELL_CM)[
+                "at_well_fraction"
+            ],
+            "fraction",
+            "pct",
+            "share of the track within "
+            f"{event_statistics.AT_WELL_CM:.0f} cm of a well (a track-graph end "
+            "point): the share at a well of content spread evenly over the track",
         )
     )
     return values
@@ -2184,7 +2331,13 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         events,
         inputs.content_along_arms,
         n_epochs,
-        ["distance_to_animal_cm", "distance_to_well_cm"],
+        [
+            "distance_to_animal_cm",
+            "distance_to_well_cm",
+            "arm",
+            "arm_length_cm",
+            "n_place_bins",
+        ],
     )
     summary.add(
         *pend(
@@ -2324,4 +2477,23 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         )
     )
     summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]
+
+    folder = inputs.nonlocal_by_ripple_power
+    power_counts = pd.read_parquet(folder / "counts.parquet")
+    if set(power_counts["epoch_id"]) != set(analyzed_epoch_ids()):
+        raise ValueError(
+            f"{folder / 'counts.parquet'} holds {power_counts['epoch_id'].nunique()} "
+            f"epochs, not the {n_epochs} analyzed ones"
+        )
+    summary.add(
+        *nonlocal_power_values(
+            power_counts,
+            f"{rel(folder)} (scripts/event_properties/"
+            "measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+        )
+    )
+    summary.inputs += [
+        file_record(folder / name, ROOT_DIR)
+        for name in ("counts.parquet", "manifest.json")
+    ]
     return summary

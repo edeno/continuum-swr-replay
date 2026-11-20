@@ -1,50 +1,49 @@
 #!/usr/bin/env python
-"""Generate Figure 4: PFC neurons respond to replay regardless of SWR detection.
+"""Generate Figure 5: mPFC units respond to SWRs and to no-SWR non-local events.
 
-Composite figure with 4 panels in 3 rows:
+The two kinds of event are drawn separately and named as in Figures 2 and 3
+("SWR", "No SWR"); the figure's legend gives their colors. Here "SWR" is every
+detected SWR (the SWR source's events) and "No SWR" every non-local event that
+overlaps none: the two kernel blocks of the joint ``SWR + non_local_no_SWR``
+model. Each row asks one thing:
 
-    Row 1 (panel a):
-        Single-neuron example — overlaid GLM modulation curves and PSTHs
-        for SWR and non-SWR replay events on the same mPFC neuron. Shows
-        that the neuron responds to both event types with similar shape.
-        The curves are the two kernel blocks of the joint
-        ``SWR + non_local_no_SWR`` model, the same quantity panels b and c
-        draw for the population.
+    One unit, then every unit
+        a — An example mPFC unit: its fitted modulation by each kind of event
+            (band: the pointwise penalized posterior-mode standard error, from
+            the joint fit's coefficient covariance) over its firing rate around
+            the starts of each kind's events.
+        b — Every unit's modulation by each kind, the units in one order (the
+            time of the peak of their SWR modulation). The color scale's ends
+            say that they also hold the changes beyond them.
+    The population
+        c — Population modulation by each kind, each unit's curve relative to
+            its own value at -200 ms (the reference of the Part 4 timing
+            values), reduced unit -> session -> animal: the mean over animals,
+            ± SEM over animals.
+        d — Left: the share of units whose event term improves held-out
+            deviance beyond the matched non-event control's null, bars pooled
+            over units (the mpfc summary's ``*_called_fraction`` values) and
+            dots one per animal
+            (``population_statistics.called_fraction_by_animal``). Right: each
+            unit's best model by held-out deviance.
 
-    Row 2 (panel b):
-        Population heatmaps — SWR and non-SWR replay modulation with the
-        same neuron sort order, showing parallel response structure
-        across the whole population.
+Every fitted quantity in the figure comes from the estimator the bundles were
+fit with: a Poisson GLM with a Gaussian prior on the event-basis coefficients,
+and a peri-event kernel that returns to baseline at both ends of the ±250 ms
+fit window. The population significance is an empirical p-value from repeated
+matched-control draws (R = 1,000, with the finite-sample plus-one correction,
+so its minimum is 1/(R+1) ≈ 0.001). Panel d's unit share is a descriptive
+raw-p preview; population inference requires aggregation through session and
+animal.
 
-    Row 3 (panels c, d):
-        c: Population modulation curves for SWR vs non-SWR replay, each
-           unit's curve relative to its own value at −200 ms (the reference
-           of the Part 4 timing values), averaged unit -> session -> animal:
-           the mean over animals, ± SEM over animals.
-        d: Consolidated statistics — fraction of neurons whose event
-           regressor improves held-out deviance beyond the matched
-           non-event control's null, and the distribution of the best
-           model by held-out deviance across the population.
-
-Every fitted quantity in the figure comes from the same estimator the
-bundles were fit with: a Poisson GLM with a Gaussian prior on the
-event-basis coefficients, and a peri-event kernel that returns to
-baseline at both ends of the ±250 ms fit window. The example neuron's
-band is the pointwise penalized posterior-mode standard error of each
-curve, from the joint fit's coefficient covariance, and the population
-significance is an empirical p-value from repeated matched-control
-draws (R = 1,000, with the finite-sample plus-one correction, so its minimum is
-1/(R+1) ≈ 0.001). Panel d's unit fraction is a descriptive raw-p preview;
-population inference requires aggregation through session and animal.
-
-April 2026: the figure was tightened from 6 panels to 4. The previous
-standalone single-neuron model selection was dropped (it duplicated the
-population one), and the two side-by-side single-neuron columns were
-collapsed into one overlay panel.
+The figure follows the standards of Figures 1 to 3: the publication style, one
+column grid for both rows, letters placed by row and column, and the checks
+that no text or panel runs into another (``check_placement``) and that the
+saved figure is inside the journal's limits (``check_journal_limits``).
 
 Usage:
-    python scripts/figures/generate_figure04.py
-    python scripts/figures/generate_figure04.py --output-dir paper/figures/figure04
+    python scripts/figures/generate_figure05.py
+    python scripts/figures/generate_figure05.py --output-dir paper/figures/figure05
 """
 
 import argparse
@@ -56,6 +55,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.gridspec import GridSpec
+from matplotlib.ticker import MaxNLocator
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
@@ -92,16 +92,32 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.device import configure_jax_gpu
-from continuum_swr_replay.visualization.figure_utilities import (
-    PAGE_HEIGHT,
-    TWO_COLUMN,
-    label_panels,
-    save_figure,
-)
+from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
+from continuum_swr_replay.visualization.simulated_run_panels import (
+    SMALL_SIZE,
+    check_journal_limits,
+    check_placement,
+    drawn_extent,
+    letter_panel,
+    set_publication_style,
+)
 
 figure_utilities.set_figure_defaults(context="paper")
+set_publication_style()
 warnings.filterwarnings("ignore")
+
+# Inches: saved with 0.1 in margins, about 17 cm (Cell Press full width).
+WIDTH = 6.5
+HEIGHT = 5.0
+
+# The two kinds of event, named and colored as in Figures 2 and 3: the bundle's
+# curve, the example session's event set, the population's curve, the name and
+# the color.
+KINDS = (
+    ("no_SWR", "non_local_no_SWR", "no_swr", "No SWR", COLORS["No SWR"]),
+    ("SWR", "SWR", "swr", "SWR", COLORS["SWR"]),
+)
 
 # ---------------------------------------------------------------------------
 # Panel a — Single-neuron example (overlaid SWR + non-SWR modulation)
@@ -162,15 +178,17 @@ def plot_single_neuron_overlay(
     event_times,
     model_configs,
 ):
-    """Plot overlaid GLM modulation curves for one neuron + per-event PSTHs.
+    """Plot one unit's modulation by each kind of event over its firing rate
+    around the starts of each kind's events.
 
-    Sub-row 1 : one modulation-curve axis with a curve per config
-                (typically SWR and non-SWR replay on the same axes).
-    Sub-row 2 : overlaid PSTHs — one line per event type.
+    Sub-row 1 : one modulation-curve axis with a curve per config (the two
+                kinds of event on the same axes).
+    Sub-row 2 : the firing rate around event starts, one line per kind.
 
     Each curve is read off its model's basis block exactly as the bundle's
     shipped curves are (:data:`~continuum_swr_replay.analysis.pfc.modulation.CURVE_SOURCES`),
-    so the example neuron shows the quantity the population panels draw.
+    so the example unit shows the quantity the population panels draw. The
+    kinds are named by the figure's legend, so no legend is drawn here.
 
     Parameters
     ----------
@@ -181,7 +199,7 @@ def plot_single_neuron_overlay(
     spline_basis : np.ndarray, shape (n_lags, n_basis)
         Spline basis one event block of the parameters multiplies.
     neuron_spike_times : np.ndarray
-        Spike times for the example neuron (seconds).
+        Spike times for the example unit (seconds).
     glm_results : dict[str, fitted GLM result]
         Full dict of fitted GLMs; only the models the configs' curves are read
         off are plotted. Each needs ``params`` and ``covariance``, the
@@ -197,11 +215,12 @@ def plot_single_neuron_overlay(
         "event_key": str}``. ``curve`` is a key into ``CURVE_SOURCES`` (e.g.
         ``"SWR"`` or ``"no_SWR"``, the two blocks of the joint
         ``SWR + non_local_no_SWR`` model), ``event_key`` is a key into
-        ``event_times`` (used for the PSTH).
+        ``event_times`` (used for the firing rate).
 
     """
     ax_mod, ax_psth = axes
     lag_bounds = lag_time[0], lag_time[-1]
+    lag_ms = 1e3 * lag_time
 
     # ── Sub-row 1: overlaid modulation curves ──
     # The block is the design's own order (``CURVE_SOURCES``), not the order
@@ -220,48 +239,26 @@ def plot_single_neuron_overlay(
         lower = modulation - standard_error
         drawn += [modulation, upper, lower]
 
-        ax_mod.plot(
-            lag_time,
-            modulation,
-            color=cfg["color"],
-            linewidth=1.2,
-            label=cfg["label"],
-        )
-        ax_mod.fill_between(
-            lag_time,
-            lower,
-            upper,
-            color=cfg["color"],
-            alpha=0.2,
-        )
+        ax_mod.plot(lag_ms, modulation, color=cfg["color"], label=cfg["label"])
+        ax_mod.fill_between(lag_ms, lower, upper, color=cfg["color"], alpha=0.2, lw=0)
 
     ax_mod.axhline(0, color="black", linestyle="--", linewidth=0.5)
     ax_mod.axvline(0, color="black", linestyle="--", linewidth=0.5)
     modulation_bounds = modulation_axis_bounds(drawn)
     ax_mod.set_ylim(modulation_bounds)
-    ax_mod.set_xticks((lag_bounds[0], 0, lag_bounds[1]))
     modulation_ticks = modulation_axis_ticks(modulation_bounds)
     ax_mod.set_yticks(np.log(modulation_ticks))
     ax_mod.set_yticklabels([f"{tick:g}" for tick in modulation_ticks])
     ax_mod.set_ylabel("GLM\nmodulation")
-    # In the empty margin to the right of the axes: inside them it covered the
-    # non-SWR replay curve and its band. Left out of the layout so the axes keep
-    # the width they had.
-    legend = ax_mod.legend(
-        frameon=False,
-        fontsize=6,
-        loc="upper left",
-        bbox_to_anchor=(1.02, 1.0),
-        borderaxespad=0.0,
-    )
-    legend.set_in_layout(False)
     ax_mod.tick_params(labelbottom=False)
     ax_mod.set_title(
-        "Example mPFC neuron (penalized fit, ±1 posterior SE)", fontsize=8, pad=4
+        "Example mPFC unit (penalized fit, ±1 posterior SE)",
+        fontsize=SMALL_SIZE,
+        pad=4,
     )
 
-    # ── Sub-row 2: overlaid PSTHs ──
-    # The rate in 10-ms lag bins around each event start, per event type.
+    # ── Sub-row 2: the firing rate around event starts ──
+    # The rate in 10-ms lag bins around each event start, per kind of event.
     for cfg in model_configs:
         events = event_times[cfg["event_key"]]
         if len(events) == 0:
@@ -272,17 +269,12 @@ def plot_single_neuron_overlay(
             lag_bounds,
             bin_s=PSTH_BIN_S,
         )
-        ax_psth.plot(
-            psth_centers,
-            rate,
-            color=cfg["color"],
-            linewidth=1.2,
-            label=cfg["label"],
-        )
+        ax_psth.plot(1e3 * psth_centers, rate, color=cfg["color"], label=cfg["label"])
 
     ax_psth.axvline(0, color="black", linestyle="--", linewidth=0.5)
-    ax_psth.set_xlim(lag_bounds)
-    ax_psth.set_xlabel("Time from event (s)")
+    ax_psth.set_xlim(lag_ms[0], lag_ms[-1])
+    ax_psth.set_xticks((lag_ms[0], 0, lag_ms[-1]))
+    ax_psth.set_xlabel("Time from event start (ms)")
     ax_psth.set_ylabel("Firing\nrate (Hz)")
 
 
@@ -291,46 +283,50 @@ def plot_single_neuron_overlay(
 # ---------------------------------------------------------------------------
 
 
-def plot_population_heatmaps(swr_mod, no_swr_mod, lag_time, axes):
-    """Plot side-by-side heatmaps on provided (ax1, ax2) axes."""
-    ax1, ax2 = axes
-    peak_times = lag_time[np.argmax(np.abs(swr_mod), axis=0)]
-    sort_idx = np.argsort(peak_times)
+#: Panel b's color scale ends at this rate change and its inverse; a larger
+#: change is drawn in the end's color, which the scale's end labels say.
+MODULATION_COLOR_LIMIT = 2.0
 
-    swr_sorted = swr_mod[:, sort_idx]
-    no_swr_sorted = no_swr_mod[:, sort_idx]
 
-    vmin, vmax = -np.log(2), np.log(2)
-    lag_ms = lag_time * 1000
+def plot_population_heatmaps(modulations, lag_time, axes):
+    """Every unit's modulation by each kind of event, on ``axes`` (SWR, then
+    No SWR), the units in one order: the time of the peak of their SWR
+    modulation. The SWR panel is first because it sets the order.
 
-    im1 = ax1.imshow(
-        swr_sorted.T,
-        aspect="auto",
-        cmap="RdBu_r",
-        vmin=vmin,
-        vmax=vmax,
-        extent=[lag_ms[0], lag_ms[-1], swr_sorted.shape[1], 0],
-        interpolation="none",
-    )
-    ax1.axvline(0, color="k", linewidth=0.5, linestyle="--")
-    ax1.set_xlabel("Time from SWR (ms)")
-    ax1.set_ylabel("Neuron")
-    ax1.set_title("SWR modulation")
+    Parameters
+    ----------
+    modulations : dict[str, np.ndarray], each (n_lag, n_neuron)
+        Population modulation curves (log rate), keys ``swr`` and ``no_swr``.
+    lag_time : np.ndarray, shape (n_lag,)
+        Lags of ``modulations``, in seconds.
+    axes : list of 2 matplotlib.axes.Axes
+        The SWR panel and the No SWR panel.
 
-    ax2.imshow(
-        no_swr_sorted.T,
-        aspect="auto",
-        cmap="RdBu_r",
-        vmin=vmin,
-        vmax=vmax,
-        extent=[lag_ms[0], lag_ms[-1], no_swr_sorted.shape[1], 0],
-        interpolation="none",
-    )
-    ax2.axvline(0, color="k", linewidth=0.5, linestyle="--")
-    ax2.set_xlabel("Time from replay (ms)")
-    ax2.set_title("Non-SWR replay modulation")
-
-    return im1
+    Returns
+    -------
+    matplotlib.image.AxesImage
+        The last image, for the shared color scale.
+    """
+    peak_times = lag_time[np.argmax(np.abs(modulations["swr"]), axis=0)]
+    order = np.argsort(peak_times)
+    limit = np.log(MODULATION_COLOR_LIMIT)
+    lag_ms = 1e3 * lag_time
+    for ax, (_, _, key, name, color) in zip(axes, reversed(KINDS), strict=True):
+        image = ax.imshow(
+            modulations[key][:, order].T,
+            aspect="auto",
+            cmap="RdBu_r",
+            vmin=-limit,
+            vmax=limit,
+            extent=[lag_ms[0], lag_ms[-1], len(order), 0],
+            interpolation="none",
+        )
+        ax.axvline(0, color="k", linewidth=0.5, linestyle="--")
+        # Half way to each end: the two panels' end ticks would run together.
+        ax.set_xticks((0.5 * lag_ms[0], 0, 0.5 * lag_ms[-1]))
+        ax.yaxis.set_major_locator(MaxNLocator(4, integer=True))
+        ax.set_title(name, fontsize=SMALL_SIZE, color=color, pad=2)
+    return image
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +343,8 @@ def plot_population_average(modulations, pop_df, lag_time, ax):
     units carry. The curves are then reduced unit -> session -> animal
     (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.animal_balanced_unit_curve`):
     every animal weighs the same however many of the units are its, and the
-    band is the standard error over animals.
+    band is the standard error over animals. The kinds are named by the
+    figure's legend.
 
     Parameters
     ----------
@@ -365,27 +362,26 @@ def plot_population_average(modulations, pop_df, lag_time, ax):
     sessions = (pop_df["nwb_file_name"] + "_" + pop_df["epoch_name"]).to_numpy()
     animals = pop_df["animal"].to_numpy()
 
-    for name, color, label in [
-        ("swr", COLORS["SWR"], "SWR"),
-        ("no_swr", COLORS["Non-Local"], "Non-SWR replay"),
-    ]:
+    for _, _, name, label, color in KINDS:
         arr = modulations[name] - modulations[name][:1]
         mean, sem = population_statistics.animal_balanced_unit_curve(
             arr, sessions, animals
         )
 
-        ax.plot(lag_ms, mean, color=color, linewidth=1.5, label=label)
-        ax.fill_between(lag_ms, mean - sem, mean + sem, color=color, alpha=0.2)
+        ax.plot(lag_ms, mean, color=color, label=label)
+        ax.fill_between(lag_ms, mean - sem, mean + sem, color=color, alpha=0.2, lw=0)
 
     ax.axhline(0, color="k", linewidth=0.5, linestyle="--")
     ax.axvline(0, color="k", linewidth=0.5, linestyle="--")
-    ax.set_xlabel("Time from event (ms)")
+    ax.set_xlabel("Time from event start (ms)")
     ax.set_ylabel(f"Log firing rate change re {lag_ms[0]:.0f} ms\n(mean over animals)")
     ax.set_xlim(lag_ms[0], lag_ms[-1])
-    ax.legend(title="± SEM over animals", frameon=False)
+    ax.set_xticks((lag_ms[0], 0, lag_ms[-1]))
     ax.set_title(
-        f"Mean over {pop_df['animal'].nunique()} animals "
-        f"({modulations['swr'].shape[1]:,} units)"
+        f"Mean over {pop_df['animal'].nunique()} animals ± SEM "
+        f"({modulations['swr'].shape[1]:,} units)",
+        fontsize=SMALL_SIZE,
+        pad=4,
     )
 
 
@@ -393,66 +389,115 @@ def plot_population_average(modulations, pop_df, lag_time, ax):
 # Panel d — Held-out significance + best model (accepts axes)
 # ---------------------------------------------------------------------------
 
-#: Panel d's bars: which held-out test each one reads, and how it is labeled.
-#: The "beyond control" bar is the engagement comparison -- does non-SWR replay
+#: Panel d's bars: how each is labeled, which held-out test it reads, and its
+#: color. "Non-local" is every non-local event, with or without an SWR. The
+#: "beyond control" bar is the engagement comparison -- does a no-SWR event
 #: predict held-out spikes beyond a duration-matched non-event baseline drawn
 #: from the same bouts?
 SIGNIFICANCE_BARS = (
     ("SWR", "SWR", "SWR"),
-    ("Replay", "non_local", "Non-Local"),
-    ("no-SWR", "non_local_no_SWR", "Non-Local"),
+    ("Non-local", "non_local", "Non-Local"),
+    ("No SWR", "non_local_no_SWR", "No SWR"),
     ("Beyond\ncontrol", "engagement", "Combined"),
 )
+
+
+def _label_bars(ax, heights):
+    """Write each bar's percent above it, in one row along the top of the axes:
+    clear of the bars and of the animals' dots, whose spread would otherwise
+    set each label's height."""
+    for x, height in enumerate(heights):
+        if height > 2:
+            ax.annotate(
+                f"{height:.0f}%",
+                (x, 1.0),
+                xycoords=ax.get_xaxis_transform(),
+                xytext=(0, -1),
+                textcoords="offset points",
+                ha="center",
+                va="top",
+                fontsize=SMALL_SIZE,
+            )
 
 
 def plot_significance(
     df, ax, alpha=CALLED_ALPHA, n_control_draws=DEFAULT_CONTROL_DRAWS
 ):
-    """Descriptive fraction of units whose regressor beats the control null.
+    """Descriptive share of units whose regressor beats the control null: bars
+    pooled over units, dots one per animal.
 
     A unit counts when its plus-one Monte Carlo p-value is below ``alpha``.
     The denominator is the units actually tested for that class: a unit whose
     session had no events of a class is untested for it, not a negative
     (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_fractions`).
+    An animal's share is the mean of its sessions' shares
+    (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_fraction_by_animal`).
     This is a descriptive implementation preview, not population inference:
     units within a session and animal are not independent replicates.
 
     The p-value is ``(r + 1) / (R + 1)`` over ``R`` usable draws, so it cannot
-    be zero. Every fraction here inherits that resolution, which is why
-    ``n_control_draws`` is drawn on the panel.
+    be zero. Every share here inherits that resolution, which is why
+    ``n_control_draws`` is drawn on the panel. The dashed line is ``alpha``,
+    the share called by chance.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        One row per unit: the held-out p-value columns, and the ``animal``,
+        ``nwb_file_name`` and ``epoch_name`` the animals' shares group by.
+    ax : matplotlib.axes.Axes
+    alpha : float
+        The raw empirical-p threshold.
+    n_control_draws : int
+        Matched-control draws in each unit's null.
     """
     fractions = population_statistics.called_fractions(df, alpha)["fraction"]
-    labels, fracs, colors_list = [], [], []
-    for label, name, color in SIGNIFICANCE_BARS:
+    ax.axhline(100 * alpha, color="0.5", linewidth=0.6, linestyle="--")
+    ax.annotate(
+        "chance",
+        (1.0, 100 * alpha),
+        xycoords=ax.get_yaxis_transform(),
+        xytext=(2, 0),
+        textcoords="offset points",
+        ha="left",
+        va="center",
+        color="0.4",
+        fontsize=SMALL_SIZE,
+    )
+    labels, heights, tops = [], [], []
+    for x, (label, name, color) in enumerate(SIGNIFICANCE_BARS):
+        height = 100 * fractions[name]
+        animals = (
+            100
+            * population_statistics.called_fraction_by_animal(df, name, alpha)[
+                "fraction"
+            ].to_numpy()
+        )
+        ax.bar(x, height, width=0.7, color=COLORS[color], edgecolor="none")
+        ax.scatter(
+            x + np.linspace(-0.16, 0.16, len(animals)) * (len(animals) > 1),
+            animals,
+            s=3,
+            color="k",
+            lw=0,
+            zorder=3,
+        )
         labels.append(label)
-        fracs.append(100 * fractions[name])
-        colors_list.append(COLORS[color])
+        heights.append(height)
+        tops.append(max(height, animals.max()))
+    _label_bars(ax, heights)
 
-    bars = ax.bar(labels, fracs, color=colors_list, alpha=0.7, edgecolor="none")
-    for bar, frac in zip(bars, fracs, strict=True):
-        if frac > 2:
-            ax.text(
-                bar.get_x() + bar.get_width() / 2,
-                frac + 1,
-                f"{frac:.0f}%",
-                ha="center",
-                fontsize=5,
-            )
-
-    ax.axhline(100 * alpha, color="gray", linewidth=0.5, linestyle="--")
+    ax.set_xticks(range(len(labels)), labels, rotation=30, ha="right")
     ax.set_ylabel("% units")
-    ax.set_ylim(0, max(100 * alpha * 1.2, max(fracs) * 1.3))
-    ax.tick_params(axis="x", labelsize=5)
+    ax.set_ylim(0, max(100 * alpha * 1.2, max(tops) * 1.25))
     # Say both the raw-p threshold and R on the panel: this is a descriptive
     # preview, and its Monte Carlo resolution is part of what the bars mean.
-    # Left-aligned: the title is wider than the axes, and centered it ran under
-    # the panel letter.
+    # Left-aligned and in short lines: the panel is narrow.
     min_pvalue = empirical_pvalue_floor(n_control_draws)["min_pvalue"]
     ax.set_title(
-        "Raw empirical p < "
-        f"{alpha:g} (descriptive)\n"
+        f"Raw empirical p < {alpha:g}\n(descriptive)\n"
         f"R={n_control_draws}, min p={min_pvalue:.3f}",
-        fontsize=7,
+        fontsize=SMALL_SIZE,
         loc="left",
     )
 
@@ -464,25 +509,20 @@ def plot_best_model_selection(df, ax):
     (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.best_model_fractions`).
     """
     model_order = ["constant", "SWR", "non_local", "SWR + non_local_no_SWR"]
-    model_labels = ["Const.", "SWR", "Replay", "SWR+\nno-SWR"]
-    model_colors = ["gray", COLORS["SWR"], COLORS["Non-Local"], COLORS["Combined"]]
+    model_labels = ["Constant", "SWR", "Non-local", "SWR +\nNo SWR"]
+    model_colors = ["0.6", COLORS["SWR"], COLORS["Non-Local"], COLORS["Combined"]]
 
     fractions = population_statistics.best_model_fractions(df, model_order)
-    vals = [100 * fractions[m] for m in model_order]
+    heights = [100 * fractions[m] for m in model_order]
 
-    bars = ax.bar(model_labels, vals, color=model_colors, alpha=0.7, edgecolor="none")
-    for bar, val in zip(bars, vals, strict=True):
-        if val > 2:
-            ax.text(
-                bar.get_x() + bar.get_width() / 2,
-                val + 1,
-                f"{val:.0f}%",
-                ha="center",
-                fontsize=5,
-            )
+    ax.bar(
+        range(len(heights)), heights, width=0.7, color=model_colors, edgecolor="none"
+    )
+    _label_bars(ax, heights)
+    ax.set_xticks(range(len(model_labels)), model_labels, rotation=30, ha="right")
     ax.set_ylabel("% units")
-    ax.tick_params(axis="x", labelsize=5)
-    ax.set_title("Best model\n(held-out deviance)", fontsize=7, loc="left")
+    ax.set_ylim(0, max(heights) * 1.25)
+    ax.set_title("Best model\n(held-out deviance)", fontsize=SMALL_SIZE, loc="left")
 
 
 # ---------------------------------------------------------------------------
@@ -499,7 +539,7 @@ def generate_figure(
     fitter="jax",
     penalty_sigma=DEFAULT_PENALTY_SIGMA,
 ):
-    """Generate composite Figure 4.
+    """Generate composite Figure 5.
 
     Parameters
     ----------
@@ -541,7 +581,7 @@ def generate_figure(
             f"penalty_sigma={penalty_sigma} names a sensitivity bundle, which "
             "run_pfc_analysis_bandit.py writes without "
             "the matched-control null (n_control_draws=0), so panel d has no "
-            f"held-out p-values to draw. Figure 4 is drawn at the canonical "
+            f"held-out p-values to draw. Figure 5 is drawn at the canonical "
             f"prior ({DEFAULT_PENALTY_SIGMA})."
         )
     # --- Load single-neuron data ---
@@ -550,7 +590,7 @@ def generate_figure(
     # aligned decode and data, the fit mask and excluded time, and the canonical
     # event sets with the matched non-event control drawn on the session's seed.
     print(f"Loading data for {nwb_file_name}, {epoch_name}...")
-    logger = logging.getLogger(f"figure04.{nwb_file_name}.{epoch_name}")
+    logger = logging.getLogger(f"figure05.{nwb_file_name}.{epoch_name}")
     cohort_stops = None
     if stop_cohort != "all_stops":
         cohort_stops, cohort_report = load_session_stop_cohort(
@@ -639,6 +679,44 @@ def generate_figure(
     )
 
 
+# The panel letters as they sit in the figure: the letters of a row share a
+# height, the letters of a column a left edge.
+LETTER_ROWS = ("ab", "cd")
+LETTER_COLUMNS = ("ac", "bd")
+
+
+def letter_positions(fig, panels):
+    """Each panel letter's top left corner, in figure fractions.
+
+    The letters of a row sit at one height, just above the highest of the row's
+    drawn tops; the letters of a column sit at one left edge, the leftmost of
+    the column's drawn extents (the rule of Figure 2's ``place_letters`` and
+    Figure 3's ``letter_positions``). The figure must already be drawn.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+    panels : dict[str, list of matplotlib.axes.Axes]
+        Each letter's axes.
+
+    Returns
+    -------
+    dict[str, tuple[float, float]]
+    """
+    extents = {letter: drawn_extent(fig, axes) for letter, axes in panels.items()}
+    tops = {
+        letter: min(max(extents[other].y1 for other in row) + 0.02, 0.985)
+        for row in LETTER_ROWS
+        for letter in row
+    }
+    lefts = {
+        letter: max(min(extents[other].x0 for other in column) - 0.004, 0.0)
+        for column in LETTER_COLUMNS
+        for letter in column
+    }
+    return {letter: (lefts[letter], tops[letter]) for letter in panels}
+
+
 def assemble_figure(
     lag_time,
     spline_basis,
@@ -652,25 +730,25 @@ def assemble_figure(
     """Lay out and draw the four panels from already-loaded inputs.
 
     Split from ``generate_figure`` so the layout can be drawn, and checked for
-    overlapping text, without loading a session or fitting a neuron.
+    overlapping text, without loading a session or fitting a unit.
 
     Parameters
     ----------
     lag_time : np.ndarray, shape (n_report_lags,)
-        Reported lags of the example neuron's curves, in seconds.
+        Reported lags of the example unit's curves, in seconds.
     spline_basis : np.ndarray, shape (n_report_lags, n_basis)
         Spline basis one event block of the parameters multiplies.
     neuron_spike_times : np.ndarray
-        Spike times of the example neuron (seconds).
+        Spike times of the example unit (seconds).
     glm_results : dict[str, fitted GLM result]
-        The example neuron's fits; the two kernel blocks of
+        The example unit's fits; the two kernel blocks of
         ``SWR + non_local_no_SWR`` are drawn, with its ``covariance``.
     event_times : dict[str, pd.DataFrame]
-        Event interval tables for the example neuron's PSTHs.
+        Event interval tables for the example unit's firing rate.
     pop_df : pd.DataFrame
         One row per population unit (held-out p-values, best model, and the
-        ``nwb_file_name``, ``epoch_name`` and ``animal`` panel c groups by),
-        in the order of the columns of ``modulations``.
+        ``nwb_file_name``, ``epoch_name`` and ``animal`` panels c and d group
+        by), in the order of the columns of ``modulations``.
     modulations : dict[str, np.ndarray], each (n_lag, n_neuron)
         Population modulation curves, keys ``swr`` and ``no_swr``.
     pop_lag_time : np.ndarray, shape (n_lag,)
@@ -679,48 +757,26 @@ def assemble_figure(
     Returns
     -------
     fig : matplotlib.figure.Figure
+
+    Raises
+    ------
+    ValueError
+        If a text runs into another or a panel's drawing into another panel's
+        (``check_placement``).
     """
-    # --- Create figure ---
-    # 4-panel layout (was 6): the standalone single-neuron AIC was dropped
-    # because it duplicated the population model selection in the stats
-    # panel, and the two side-by-side single-neuron columns were collapsed
-    # into one overlay panel.
-    #
-    #     Row 1: panel a — single neuron overlay (modulation + PSTH,
-    #                      overlaid SWR and non-SWR replay)
-    #     Row 2: panel b — population heatmaps (2 side by side)
-    #     Row 3: panel c — population average
-    #            panel d — consolidated stats (% over the null + best model)
     print("Assembling composite figure...")
-    fig_height = min(8.5, PAGE_HEIGHT)
-    fig = plt.figure(figsize=(TWO_COLUMN, fig_height), dpi=450, constrained_layout=True)
-    gs = GridSpec(3, 1, figure=fig, height_ratios=[1.4, 1.4, 1.2], hspace=0.4)
+    fig = plt.figure(figsize=(WIDTH, HEIGHT), layout="none")
+    # One grid for both rows, so the panels of a column share a left edge:
+    # a over c, b over d.
+    grid = GridSpec(
+        2, 4, figure=fig, height_ratios=[1.25, 1.0], hspace=0.62, wspace=0.75,
+        left=0.085, right=0.935, top=0.9, bottom=0.12,
+    )  # fmt: skip
 
-    # ── Row 1: panel a — overlaid single-neuron example ──
-    # Two sub-rows inside the row: modulation curve on top, PSTH below.
-    # Center it within the row with a 1:2:1 left/mid/right width split so
-    # the curves don't stretch to full 2-column width.
-    gs_a_outer = gs[0].subgridspec(1, 3, width_ratios=[0.6, 2.0, 0.6])
-    gs_a = gs_a_outer[0, 1].subgridspec(2, 1, hspace=0.1, height_ratios=[1.0, 0.8])
-    ax_a_mod = fig.add_subplot(gs_a[0])
-    ax_a_psth = fig.add_subplot(gs_a[1], sharex=ax_a_mod)
-
-    # The joint model's two kernels, as panels b and c draw them for the
-    # population: the bundle's ``SWR`` and ``no_SWR`` curves.
-    model_configs = [
-        {
-            "curve": "SWR",
-            "label": "SWR",
-            "color": COLORS["SWR"],
-            "event_key": "SWR",
-        },
-        {
-            "curve": "no_SWR",
-            "label": "non-SWR replay",
-            "color": COLORS["Non-Local"],
-            "event_key": "non_local_no_SWR",
-        },
-    ]
+    # ── Panel a: one unit, its modulation over its firing rate ──
+    a_grid = grid[0, :2].subgridspec(2, 1, hspace=0.12, height_ratios=[1.0, 0.8])
+    ax_a_mod = fig.add_subplot(a_grid[0])
+    ax_a_psth = fig.add_subplot(a_grid[1], sharex=ax_a_mod)
     plot_single_neuron_overlay(
         axes=[ax_a_mod, ax_a_psth],
         lag_time=lag_time,
@@ -728,52 +784,55 @@ def assemble_figure(
         neuron_spike_times=neuron_spike_times,
         glm_results=glm_results,
         event_times=event_times,
-        model_configs=model_configs,
+        model_configs=[
+            {"curve": curve, "label": name, "color": color, "event_key": event_key}
+            for curve, event_key, _, name, color in KINDS
+        ],
     )
 
-    # ── Row 2: panel b — population heatmaps (side by side) ──
-    gs_b = gs[1].subgridspec(1, 2, wspace=0.15)
-    ax_b1 = fig.add_subplot(gs_b[0])
-    ax_b2 = fig.add_subplot(gs_b[1])
-    im = plot_population_heatmaps(
-        modulations["swr"],
-        modulations["no_swr"],
-        pop_lag_time,
-        [ax_b1, ax_b2],
+    # ── Panel b: every unit, each kind, one order, one color scale ──
+    b_grid = grid[0, 2:].subgridspec(1, 3, width_ratios=[1, 1, 0.07], wspace=0.14)
+    ax_b = [fig.add_subplot(b_grid[0])]
+    ax_b.append(fig.add_subplot(b_grid[1], sharey=ax_b[0]))
+    image = plot_population_heatmaps(modulations, pop_lag_time, ax_b)
+    ax_b[0].set_ylabel("mPFC unit, by time of SWR peak")
+    ax_b[1].tick_params(labelleft=False)
+    # One x label for both: centered under the pair, as a label of the first.
+    first, second = (ax.get_position() for ax in ax_b)
+    ax_b[0].set_xlabel("Time from event start (ms)")
+    ax_b[0].xaxis.label.set_x((0.5 * (first.x0 + second.x1) - first.x0) / first.width)
+    limit = np.log(MODULATION_COLOR_LIMIT)
+    ax_b_scale = fig.add_subplot(b_grid[2])
+    scale = fig.colorbar(image, cax=ax_b_scale, ticks=[-limit, 0, limit])
+    scale.ax.set_yticklabels(
+        [f"≤{1 / MODULATION_COLOR_LIMIT:g}×", "1×", f"≥{MODULATION_COLOR_LIMIT:g}×"]
     )
-    vmin, vmax = -np.log(2), np.log(2)
-    cbar = fig.colorbar(im, ax=[ax_b1, ax_b2], shrink=0.8, pad=0.02)
-    cbar.set_label("Log FR change")
-    cbar.set_ticks([vmin, 0, vmax])
-    cbar.set_ticklabels(["0.5x", "1x", "2x"])
+    scale.ax.tick_params(length=2)
+    scale.outline.set_linewidth(0.5)
+    scale.set_label("Firing rate change", labelpad=1)
 
-    # ── Row 3: panel c (population average) + panel d (stats) ──
-    # Panel d needs the width: each of its bar plots has four category labels.
-    # The narrow gap gives panel d the room without shrinking panel c.
-    gs_cd = gs[2].subgridspec(1, 2, width_ratios=[1.0, 1.4], wspace=0.1)
-
-    # Panel c: population modulation, mean over animals
-    ax_c = fig.add_subplot(gs_cd[0])
+    # ── Panel c: the population's modulation, the mean over animals ──
+    ax_c = fig.add_subplot(grid[1, :2])
     plot_population_average(modulations, pop_df, pop_lag_time, ax_c)
 
-    # Panel d: consolidated stats — % beating the control null + best model.
-    # A small wspace, so each bar plot is wide enough for its four category
-    # labels.
-    gs_d = gs_cd[1].subgridspec(1, 2, wspace=0.05)
-    ax_d1 = fig.add_subplot(gs_d[0])
-    ax_d2 = fig.add_subplot(gs_d[1])
-    plot_significance(pop_df, ax_d1)
-    plot_best_model_selection(pop_df, ax_d2)
+    # ── Panel d: the share of units called, and each unit's best model ──
+    ax_d = [fig.add_subplot(grid[1, 2]), fig.add_subplot(grid[1, 3])]
+    plot_significance(pop_df, ax_d[0])
+    plot_best_model_selection(pop_df, ax_d[1])
 
-    # ── Panel Labels ──
-    label_panels(
-        [ax_a_mod, ax_b1, ax_c, ax_d1],
-        labels=["a", "b", "c", "d"],
-        xpos=-0.08,
-        ypos=1.15,
-        fontsize=11,
-    )
+    handles = [plt.Rectangle((0, 0), 1, 1, color=color) for *_, color in KINDS]
+    fig.legend(
+        handles, [name for *_, name, _ in KINDS], frameon=False, loc="upper center",
+        bbox_to_anchor=(0.5, 1.0), ncol=2, handlelength=0.8, columnspacing=1.5,
+    )  # fmt: skip
 
+    fig.draw_without_rendering()
+    panels_by_letter = {
+        "a": [ax_a_mod, ax_a_psth], "b": [*ax_b, ax_b_scale], "c": [ax_c], "d": ax_d,
+    }  # fmt: skip
+    for letter, (left, top) in letter_positions(fig, panels_by_letter).items():
+        letter_panel(fig, letter, left, top)
+    check_placement(fig, panels_by_letter)
     return fig
 
 
@@ -785,7 +844,7 @@ def main(argv: Sequence[str] | None = None):
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("paper/figures/figure04"),
+        default=Path("paper/figures/figure05"),
     )
     parser.add_argument("--nwb-file-name", type=str, default="wilbur20210329_.nwb")
     parser.add_argument("--epoch-name", type=str, default="02_r1")
@@ -858,8 +917,9 @@ def main(argv: Sequence[str] | None = None):
         penalty_sigma=args.penalty_sigma,
     )
 
+    check_journal_limits(fig)
     print(f"Saving to {args.output_dir}...")
-    save_figure(fig, "figure04", base_dir=args.output_dir)
+    save_figure(fig, "figure05", base_dir=args.output_dir)
 
     if args.show:
         plt.show()

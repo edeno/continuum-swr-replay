@@ -2544,8 +2544,8 @@ class TestTheRetiredEventConstructionIsGone:
 
         pfc_dir = Path(pfc_package.__file__).parent
         repo = Path(pfc_package.__file__).resolve().parents[4]
-        figure = repo / "scripts" / "figures" / "generate_figure04.py"
-        assert figure.exists(), f"expected the Figure 4 script at {figure}"
+        figure = repo / "scripts" / "figures" / "generate_figure05.py"
+        assert figure.exists(), f"expected the Figure 5 script at {figure}"
         return [*sorted(pfc_dir.glob("*.py")), figure]
 
     def test_no_pfc_source_rebuilds_its_own_events(self):

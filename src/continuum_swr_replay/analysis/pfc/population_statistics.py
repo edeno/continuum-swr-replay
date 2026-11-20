@@ -28,7 +28,7 @@ reported window, signed.
 A population curve is taken unit -> session -> animal
 (:func:`animal_balanced_unit_curve`, from
 :mod:`~continuum_swr_replay.analysis.shared_statistics`' :func:`session_mean_curve`,
-:func:`animal_balanced_curve` and :func:`animal_curve_sem`): Figure 4c and the
+:func:`animal_balanced_curve` and :func:`animal_curve_sem`): Figure 5c and the
 marked-family population curves are reduced by these.
 """
 
@@ -397,7 +397,7 @@ def bh_called_fraction(population: pd.DataFrame, name: str, alpha: float) -> flo
     return (q[np.isfinite(q)] < alpha).mean()
 
 
-#: Figure 4d's best-model bars: the models :func:`best_model_fractions` counts,
+#: Figure 5d's best-model bars: the models :func:`best_model_fractions` counts,
 #: by the word the mpfc summary's keys use.
 BEST_MODELS = {
     "constant": "constant",

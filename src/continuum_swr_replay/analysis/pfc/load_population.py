@@ -1,6 +1,6 @@
 """Shared data loading for PFC population figure panels.
 
-Loads and filters the batch PFC GLM results for use by figure04 panel scripts.
+Loads and filters the batch PFC GLM results for use by figure05 panel scripts.
 
 The bundles are fit under a Gaussian prior on the event-basis coefficients and
 tested out of fold: a unit's evidence for an event class is the improvement in
@@ -109,12 +109,12 @@ REQUIRED_COLUMNS = (
 MIN_FIRING_RATE_HZ = 0.0
 """The population's firing-rate cutoff, in Hz: none (the lead, 2026-10-29), so
 every unit with a usable fit. A unit with no spike in the fitted bins has no fit
-and drops out in the loader. The mpfc summary, Figure 4 and the
+and drops out in the loader. The mpfc summary, Figure 5 and the
 ``scripts/pfc/`` reports read this one value."""
 
 
 CALLED_ALPHA = 0.05
-"""The mPFC level, with two uses. It is Figure 4's raw empirical-p threshold: a
+"""The mPFC level, with two uses. It is Figure 5's raw empirical-p threshold: a
 unit is called for a test when its held-out p-value is below it
 (:func:`tested_and_called`). It is also the Benjamini-Hochberg q level: of the
 mpfc summary's ``engagement_bh_fraction``
