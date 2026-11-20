@@ -30,7 +30,7 @@ Part 4 fits.
 Figure 1 needs no data. Figures 2–4 need the lab's Spyglass database and the
 processed-data root ([reproduce.md](reproduce.md#requirements)).
 
-Figure 4, the events and behavior (Part 3 of the question list), has no script yet. Figures 1–3 are committed; Figure 5 is not yet. A main figure that does not
+Figure 4, the events and behavior (Part 3 of the question list), has no script yet. Figures 1–3 and 5 are committed, and Figure 4's files will be tracked as soon as its script writes them (`.gitignore` excepts all five). A main figure that does not
 exist yet is drawn in the PDF as a framed box naming its script. When a figure is
 final, add it to `.gitignore` as an exception, as Figure 1 is
 ([paper/README.md](../paper/README.md#figures)).
