@@ -1,6 +1,6 @@
 """How much do Part 4's mPFC values depend on the firing-rate gate?
 
-Part 4 reads its unit population through Figure 4's loader
+Part 4 reads its unit population through Figure 5's loader
 (:func:`~continuum_swr_replay.analysis.pfc.load_population.load_population_data`)
 with no gate on ``immobility_avg_firing_rate``, the rate over the bins the unit
 GLM was fit on, and repeats a few values with a 1 Hz gate as a check. The

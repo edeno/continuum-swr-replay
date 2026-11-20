@@ -479,7 +479,7 @@ Each builder's statistics:
   `rate/history_kernel_statistics.py`, and the stay/leave summaries in `choice/stay_leave.py`.
 
 A builder may count the size of an input it reads (its epochs, its animals) and copy a statistic a file
-already holds. Figure 4 and the `scripts/pfc/` reports call these functions; the scripts and figures that
+already holds. Figure 5 and the `scripts/pfc/` reports call these functions; the scripts and figures that
 still compute a reported statistic themselves are listed in `TODO.md`.
 
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and

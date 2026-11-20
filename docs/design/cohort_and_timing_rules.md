@@ -108,7 +108,7 @@ intervals are the `SWR_event` labels of the cached
 `{epoch_identifier_HPC}_80_data_over_time.pkl` frame, speed-gated by the read
 (`analyzed_time.with_swr_source`) and reduced to their sampled bounds by
 `intervals_from_labels`, as the hippocampal event table reads them. The SWR split is that table's own `is_swr` column — strict
-positive-duration overlap with those same labels — so a Figure 4 event and a
+positive-duration overlap with those same labels — so a Figure 5 event and a
 content- or rate-family event with the same `event_id` are one event, classified
 one way; `data["ripple_times"]` no longer enters any fit path. Events are
 restricted **by onset**: an event enters when its onset lies inside a kept stop,

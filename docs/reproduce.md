@@ -67,8 +67,8 @@ after a change to fitting code only, start at step 6.
 5. **Parts 1 and 2** on the decodes: the checks, the detector comparison and the decode-only figures (Figures 1–3,
    the supplements).
 6. **Part 3 fits and the figures that read them:** `workflows/run_refits.py`, or `make refits` (`make refits ARGS=--dry-run` lists the runs).
-7. **Part 4:** `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure04.py`.
-   `figures/generate_all_figures.py` draws Figures 1–4 in one go; run it only after this step.
+7. **Part 4:** `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure05.py`.
+   `figures/generate_all_figures.py` draws Figures 1–3 and 5 in one go; run it only after this step.
 8. **Summaries, macros, PDF.** Rebuild the five summary files (parts 0–4), write their
    values into the LaTeX macros and the docs, and build the PDF:
 

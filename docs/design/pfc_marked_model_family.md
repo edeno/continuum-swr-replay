@@ -315,7 +315,7 @@ rank (221/221). This cost is why interactions are opt-in.
 The three-session GPU smoke
 ([2026-09-18-pfc-marked-family-smoke.md](../../.claude/docs/reviews/2026-09-18-pfc-marked-family-smoke.md))
 ran end to end, but it also showed that a family bundle's `typical` curve is
-**not** the Figure 4 kernel: with the base kernels alone the family reproduces
+**not** the Figure 5 kernel: with the base kernels alone the family reproduces
 the canonical curves exactly, and adding the mark blocks under the σ = 3 prior
 inflates the base peaks by about 25 % (IQR 1.0–1.6) whether the marks are
 real or permuted within class, and lets held-out predictions blow up on
@@ -327,7 +327,7 @@ base-only model on the smoke sessions, so 0.5 is a stated operating point
 rather than an optimum: it restores the canonical base kernels within 2 %,
 removes the blow-ups, and still admits a per-SD modulation of roughly ×0.7 to
 ×1.4. Read target slopes only with their held-out delta and never quote a
-`typical` curve as a Figure 4 modulation; the two now agree closely but are
+`typical` curve as a Figure 5 modulation; the two now agree closely but are
 not the same fit.
 
 ## Artifacts
@@ -355,7 +355,7 @@ That corpus predates the analyzed-time rule: its sessions were assembled
 without excluded time and without the artifact-dropped events, on the
 218-session tables of that date. The runner now assembles each session with
 the canonical PFC assembly (`analysis/pfc/session.py`), so a refit's fit mask
-and event onsets are the Figure 4 ones. Contract-2 bundles (per-stop baseline,
+and event onsets are the Figure 5 ones. Contract-2 bundles (per-stop baseline,
 `tier`, `event_set`, the slope-reference keys) never match a contract-1
 sidecar, and contract-3 bundles (`well_unknown` added) never match a
 contract-2 one; the follow-up corpus is written to its own directory

@@ -1239,21 +1239,21 @@ def test_figure02_panel_j_writes_the_share_the_events_summary_gives(offline):
 
 def test_no_swr_events_have_one_color_in_every_figure(offline):
     """A non-local event that overlaps no SWR is drawn in ``COLORS["No SWR"]`` in
-    Figures 2, 3 and 4 and in the shared per-event panels: not in the Non-Local
+    Figures 2, 3 and 5 and in the shared per-event panels: not in the Non-Local
     state's green, which every non-local event is drawn in."""
     from continuum_swr_replay.visualization import figure_panels
     from continuum_swr_replay.visualization.palettes import COLORS
 
     figure02 = offline("scripts.figures.generate_figure02")
     figure03 = offline("scripts.figures.generate_figure03")
-    figure04 = offline("scripts.figures.generate_figure04")
+    figure05 = offline("scripts.figures.generate_figure05")
     no_swr = COLORS["No SWR"]
     assert no_swr not in (COLORS["Non-Local"], COLORS["SWR"])
     assert figure02.CLASS_COLORS["non_swr"] == no_swr
     assert {name: color for _, name, color in figure03.KINDS}["No SWR"] == no_swr
-    bars = {label: COLORS[color] for label, _, color in figure04.SIGNIFICANCE_BARS}
-    assert bars["no-SWR"] == no_swr
-    assert bars["Replay"] == COLORS["Non-Local"]  # every non-local event
+    bars = {label: COLORS[color] for label, _, color in figure05.SIGNIFICANCE_BARS}
+    assert bars["No SWR"] == no_swr
+    assert bars["Non-local"] == COLORS["Non-Local"]  # every non-local event
     classes = {word: color for _, word, color, _ in figure_panels._EVENT_CLASSES}
     assert classes["non_swr"] == no_swr
 

@@ -276,7 +276,7 @@ def _make_conv_spline_basis(
     sampling_frequency: float = SAMPLING_FREQUENCY,
     lags: NDArray | None = None,
 ) -> tuple[dict[str, NDArray], NDArray, NDArray]:
-    # Every production caller (``run_session`` and Figure 4) passes ``lags``
+    # Every production caller (``run_session`` and Figure 5) passes ``lags``
     # explicitly -- the +/-250 ms fit window, ``symmetric_lags(
     # DEFAULT_BASIS_HALF_WINDOW_S, ...)``. This +/-200 ms default is the
     # older window, kept because the unit tests build designs without lags.

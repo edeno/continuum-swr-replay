@@ -435,7 +435,7 @@ def test_the_overlap_geometry_count_reads_the_event_tables_classes(
 
 
 # --------------------------------------------------------------------------
-# The PFC path (Figure 4, Stage 5B, Stage 6, the PFC QA)
+# The PFC path (Figure 5, Stage 5B, Stage 6, the PFC QA)
 # --------------------------------------------------------------------------
 
 

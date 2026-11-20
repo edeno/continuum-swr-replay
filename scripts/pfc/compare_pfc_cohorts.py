@@ -14,7 +14,7 @@ the artifacts themselves:
   sidecars;
 - the leading-edge coverage diagnostic (dropped events whose regressor basis
   would still have covered fitted bins);
-- the population that reaches Figure 4, loaded from both bundle trees with
+- the population that reaches Figure 5, loaded from both bundle trees with
   ``load_population_data`` -- neurons passing the firing-rate gate and the
   legacy FDR-significant fraction or the held-out analysis's descriptive raw-p
   fraction per test, overall and per animal.
@@ -2089,7 +2089,7 @@ def build_report(
     )
     add(_md(affected))
 
-    add("## The population that reaches Figure 4\n")
+    add("## The population that reaches Figure 5\n")
     add(
         f"Loaded with `load_population_data(min_firing_rate={min_firing_rate})` "
         "from each tree. A neuron enters when its GLM produced a finite primary "
@@ -2452,7 +2452,7 @@ def build_estimator_report(
         )
         add(_md(sigma_table.drop(columns=["sessions"])))
 
-    add("## The population that reaches Figure 4\n")
+    add("## The population that reaches Figure 5\n")
     add(
         f"Loaded with `load_population_data(min_firing_rate={min_firing_rate})` "
         "from each tree. A unit enters when its fit exists, its four shipped "
@@ -2544,7 +2544,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         default=MIN_FIRING_RATE_HZ,
         help=(
             "Inclusion gate on the immobility firing rate, in Hz; by default "
-            "the summary's and Figure 4's (none)."
+            "the summary's and Figure 5's (none)."
         ),
     )
     parser.add_argument("--alpha", type=float, default=CALLED_ALPHA)

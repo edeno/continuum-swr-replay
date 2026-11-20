@@ -140,7 +140,7 @@ def swr_without_replay_values(
             stats["n_units"],
             "count",
             "count",
-            f"units in {label} (Figure 4's population)",
+            f"units in {label} (Figure 5's population)",
         )
         add(
             f"swr_no_replay_units_tested_{subset}",

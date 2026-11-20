@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-"""Generate the four main manuscript figures, Figures 1-4.
+"""Generate the main manuscript figures that have a script: Figures 1-3 and 5.
+
+Figure 4 (the events and behavior) has no script yet.
 
 Runs each script in ``FIGURE_SCRIPTS`` in turn, each in its own subprocess
 with this Python interpreter, so no matplotlib state carries from one figure
@@ -13,7 +15,7 @@ Figures it covers (``FIGURE_SCRIPTS``):
   distributions + triggered avg)
 - figure03 (``generate_figure03.py``): what SWR and no-SWR events are like
   (size and movement, where the content is, brain state)
-- figure04 (``generate_figure04.py``): PFC responds regardless (GLM +
+- figure05 (``generate_figure05.py``): PFC responds regardless (GLM +
   population heatmaps + significance)
 
 It does not draw the other figure scripts in ``scripts/figures/`` (the
@@ -23,7 +25,7 @@ supplementary, gallery and diagnostic figures, such as
 
 Usage:
     uv run python scripts/figures/generate_all_figures.py
-    uv run python scripts/figures/generate_all_figures.py --skip figure01 figure04
+    uv run python scripts/figures/generate_all_figures.py --skip figure01 figure05
     uv run python scripts/figures/generate_all_figures.py --only figure02 figure03
 """
 
@@ -56,9 +58,9 @@ FIGURE_SCRIPTS = {
         "script": "scripts/figures/generate_figure03.py",
         "output_dir": "paper/figures/figure03",
     },
-    "figure04": {
-        "script": "scripts/figures/generate_figure04.py",
-        "output_dir": "paper/figures/figure04",
+    "figure05": {
+        "script": "scripts/figures/generate_figure05.py",
+        "output_dir": "paper/figures/figure05",
     },
 }
 
@@ -125,7 +127,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--skip",
         nargs="*",
         default=[],
-        help="Figure(s) to skip (e.g., --skip figure01 figure04)",
+        help="Figure(s) to skip (e.g., --skip figure01 figure05)",
     )
     parser.add_argument(
         "--only",

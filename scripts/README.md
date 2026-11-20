@@ -104,7 +104,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `run_stay_leave.py` ("Stage 6") — content × reward outcome → stay or leave.
 
 ## `figures/` — publication figures
-- `generate_figure01.py`, `generate_figure02.py`, `generate_figure03.py`, `generate_figure04.py`, `generate_all_figures.py` (orchestrator).
+- `generate_figure01.py`, `generate_figure02.py`, `generate_figure03.py`, `generate_figure05.py`, `generate_all_figures.py` (orchestrator).
 - `generate_uncertainty_content_figure.py` — the uncertainty/content story and its diagnostic figures.
 - `generate_supp_*.py`, `generate_event_gallery.py`, `run_event_gallery.sh`.
 - `plot_swr_contrast_coefs.py` — per-animal coefficient forest plots for the `is_swr` rate and content contrast ladders.

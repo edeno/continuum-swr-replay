@@ -5,7 +5,7 @@ Written to check that a weak prior on the per-stop baseline columns
 units that converged without it. For every (session, model) present in both
 trees it pairs units by their recorded index (the second tree may leave out
 units with no spike; its sidecar lists ``kept_unit_indices``), keeps units at
-or above ``--min-rate`` Hz in the canonical Figure 4 bundle of the session
+or above ``--min-rate`` Hz in the canonical Figure 5 bundle of the session
 (``immobility_avg_firing_rate``; by default the population's cutoff,
 ``load_population.MIN_FIRING_RATE_HZ``, none), and reports per model,
 class and target the largest absolute difference of the slope curves (log-rate

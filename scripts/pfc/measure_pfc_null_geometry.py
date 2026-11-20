@@ -454,7 +454,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         default=MIN_FIRING_RATE_HZ,
         help=(
             "Inclusion gate on the immobility firing rate, in Hz; by default "
-            "the summary's and Figure 4's (none)."
+            "the summary's and Figure 5's (none)."
         ),
     )
     parser.add_argument("--out", type=Path, default=None, help="Write the report here.")

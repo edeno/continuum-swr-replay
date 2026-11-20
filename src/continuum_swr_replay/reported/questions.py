@@ -106,9 +106,9 @@ FIGURES: dict[str, Figure] = {
         "scripts/figures/generate_figure03.py",
         "abcdef",
     ),
-    "4": Figure(
+    "5": Figure(
         "mPFC responses to SWR and non-SWR events",
-        "scripts/figures/generate_figure04.py",
+        "scripts/figures/generate_figure05.py",
         "abcd",
     ),
     "decoder_validation": Figure(
@@ -361,7 +361,7 @@ QUESTIONS: tuple[Question, ...] = (
         "Do non-SWR events modulate mPFC activity, against matched immobile non-event windows, and how does that compare with SWR events?",
         status="partly computed",
         reason="population inference and the SWR-controlled rung are pending, and equivalence is untested",
-        figures=("4", "4a", "4b", "4c", "4d"),
+        figures=("5", "5a", "5b", "5c", "5d"),
     ),
     Question(
         "2b.7",
