@@ -3,9 +3,9 @@
 For every time bin of the canonical events (``event_sequence_table``), its
 epoch's decode MAP position (``map_estimate``, read through the SWR source; the
 decode's sha256 must be the one the event features run recorded) placed on the
-track by ``analysis/event_properties/content_along_arms.arm_positions``: its arm
-and the fraction of the arm behind it (1 on a leaf arm is its end at the well);
-the content's track distance to the nearest well
+track by ``analysis/event_properties/content_along_arms.arm_positions``: its arm,
+the fraction of the arm behind it (1 on a leaf arm is its end at the well), and
+the place bin it is on, of the arm's place bins; the content's track distance to the nearest well
 (``content_along_arms.distance_to_nearest_well``) and to the animal
 (``|ahead_behind_distance|``).
 
@@ -87,6 +87,8 @@ def measure_epoch(job: tuple[str, str, pd.DataFrame]) -> pd.DataFrame:
             "arm": placed["arm"].to_numpy(),
             "fraction": placed["fraction"].to_numpy(),
             "arm_length_cm": placed["arm_length_cm"].to_numpy(),
+            "place_bin": placed["place_bin"].to_numpy(),
+            "n_place_bins": placed["n_place_bins"].to_numpy(),
             "distance_to_well_cm": distance_to_nearest_well(
                 placed["arm"].to_numpy(),
                 placed["fraction"].to_numpy(),
@@ -156,7 +158,9 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "n_bins": len(bins),
                 "position": "the decode's map_estimate at each event bin, on its "
                 "nearest real place bin (edge_id >= 0); fraction 0 at the arm's first "
-                "node in the edge order, 1 at its second (a leaf arm's end, the well node)",
+                "node in the edge order, 1 at its second (a leaf arm's end, the well node); "
+                "place_bin is that bin's place along the arm (0 at the first node) of "
+                "the arm's n_place_bins real bins",
                 "distance_to_well": "track-graph distance to the nearest degree-1 "
                 "node, out through either end of the arm (graph edge lengths)",
                 "distance_to_animal": "|ahead_behind_distance| of the decode frame",

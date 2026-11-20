@@ -176,6 +176,8 @@ def read_inputs() -> dict:
             "arm",
             "fraction",
             "arm_length_cm",
+            "place_bin",
+            "n_place_bins",
             "distance_to_well_cm",
             "distance_to_animal_cm",
         ],
