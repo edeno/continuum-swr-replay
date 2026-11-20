@@ -3,9 +3,9 @@
  "summary": "behavior",
  "title": "the events and the task: event rate and represented content",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "2825f480b9ff",
+ "commit": "96fc11f4e81d",
  "code": {
-  "head": "2825f480b9ff6105df2dd67f82c8862996e7fe46",
+  "head": "96fc11f4e81d204a89565433cb9032aa5696bb32",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],

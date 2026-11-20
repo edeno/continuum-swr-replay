@@ -15,11 +15,11 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `cfa31d371dd9` | yes | 32 | 0 |
-| `detection.json` | `cfa31d371dd9` | yes | 172 | 0 |
-| `events.json` | `3228d372177d` | yes | 422 | 0 |
-| `behavior.json` | `2825f480b9ff` | yes | 922 | 0 |
-| `mpfc.json` | `cfa31d371dd9` | yes | 604 | 0 |
+| `survey.json` | `96fc11f4e81d` | yes | 32 | 0 |
+| `detection.json` | `96fc11f4e81d` | yes | 172 | 0 |
+| `events.json` | `96fc11f4e81d` | yes | 422 | 0 |
+| `behavior.json` | `96fc11f4e81d` | yes | 922 | 0 |
+| `mpfc.json` | `96fc11f4e81d` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -2249,23 +2249,23 @@ Status: dropped; invalidated by task autocorrelation; the one surviving thread, 
 
 ### 4.1. Do non-SWR events modulate mPFC activity, against matched immobile non-event windows, and how does that compare with SWR events?
 
-Status: partly computed; population inference and the SWR-controlled rung are pending, and equivalence is untested. Figures: 4, 4a, 4b, 4c, 4d. Values: 604.
+Status: partly computed; population inference and the SWR-controlled rung are pending, and equivalence is untested. Figures: 5, 5a, 5b, 5c, 5d. Values: 604.
 
 Sources:
 
-- Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, no firing-rate cutoff)
+- Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 5's loader (analysis/pfc/load_population.py, no firing-rate cutoff)
 - Processed-Data/pfc_response_followups/marked_family_well_unknown/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)
 - Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)
-- Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (no firing-rate cutoff)
+- Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 5's loader (no firing-rate cutoff)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\MpfcAnalyzedEpochs` | 242 |  | analyzed epochs the PFC cohort is drawn from | `mpfc.cohort_values` |  |
 | `\MpfcAnimals` | 5 |  | animals in the mPFC population | `mpfc.cohort_values` |  |
-| `\MpfcBestModelConstantFraction` | 52 % |  | share of units whose best model by held-out deviance is constant | `mpfc.called_fraction_values` | 4d |
-| `\MpfcBestModelJointFraction` | 6 % |  | share of units whose best model by held-out deviance is SWR + non_local_no_SWR | `mpfc.called_fraction_values` | 4d |
-| `\MpfcBestModelNonlocalFraction` | 28 % |  | share of units whose best model by held-out deviance is non_local | `mpfc.called_fraction_values` | 4d |
-| `\MpfcBestModelSwrFraction` | 14 % |  | share of units whose best model by held-out deviance is SWR | `mpfc.called_fraction_values` | 4d |
+| `\MpfcBestModelConstantFraction` | 52 % |  | share of units whose best model by held-out deviance is constant | `mpfc.called_fraction_values` | 5d |
+| `\MpfcBestModelJointFraction` | 6 % |  | share of units whose best model by held-out deviance is SWR + non_local_no_SWR | `mpfc.called_fraction_values` | 5d |
+| `\MpfcBestModelNonlocalFraction` | 28 % |  | share of units whose best model by held-out deviance is non_local | `mpfc.called_fraction_values` | 5d |
+| `\MpfcBestModelSwrFraction` | 14 % |  | share of units whose best model by held-out deviance is SWR | `mpfc.called_fraction_values` | 5d |
 | `\MpfcBinsFit` | 20,618,388 |  | immobile 2 ms bins inside a kept stop, the bins the GLM is fit on, summed over sessions | `mpfc.cohort_values` |  |
 | `\MpfcBinsFitFraction` | 92 % |  | share of the immobile bins the stop restriction keeps, pooled | `mpfc.cohort_values` |  |
 | `\MpfcBinsImmobile` | 22,360,999 |  | immobile 2 ms bins before the stop restriction, summed over sessions | `mpfc.cohort_values` |  |
@@ -2295,17 +2295,17 @@ Sources:
 | `\MpfcEngagementBhFraction` | 6 % |  | share of the tested units with a Benjamini-Hochberg q below 0.05 for the engagement test, BH applied once over the pooled plus-one empirical p-values of every tested unit (analysis.shared_statistics.benjamini_hochberg). For reference only: the units are not independent, and the p-values sit on a 1/(R + 1) grid | `mpfc.called_fraction_values` |  |
 | `\MpfcEngagementCalledFlat` | 259 |  | units called by the engagement test with no positive observed improvement | `mpfc.null_geometry_values` |  |
 | `\MpfcEngagementCalledFlatFraction` | 7 % |  | of the units called by the engagement test, the share whose own observed held-out improvement is not positive | `mpfc.null_geometry_values` |  |
-| `\MpfcEngagementCalledFraction` | 19 % |  | share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive) | `mpfc.called_fraction_values` | 4d |
-| `\MpfcEngagementCalledFractionChimi` | 32 % |  | share of chimi's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share | `mpfc.called_fraction_values` | 4d |
-| `\MpfcEngagementCalledFractionJsixteen` | 17 % |  | share of j16's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share | `mpfc.called_fraction_values` | 4d |
-| `\MpfcEngagementCalledFractionPeanut` | 22 % |  | share of peanut's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share | `mpfc.called_fraction_values` | 4d |
-| `\MpfcEngagementCalledFractionSenor` | 20 % |  | share of senor's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share | `mpfc.called_fraction_values` | 4d |
-| `\MpfcEngagementCalledFractionWilbur` | 18 % |  | share of wilbur's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share | `mpfc.called_fraction_values` | 4d |
+| `\MpfcEngagementCalledFraction` | 19 % |  | share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive) | `mpfc.called_fraction_values` | 5d |
+| `\MpfcEngagementCalledFractionChimi` | 32 % |  | share of chimi's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share | `mpfc.called_fraction_values` | 5d |
+| `\MpfcEngagementCalledFractionJsixteen` | 17 % |  | share of j16's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share | `mpfc.called_fraction_values` | 5d |
+| `\MpfcEngagementCalledFractionPeanut` | 22 % |  | share of peanut's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share | `mpfc.called_fraction_values` | 5d |
+| `\MpfcEngagementCalledFractionSenor` | 20 % |  | share of senor's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share | `mpfc.called_fraction_values` | 5d |
+| `\MpfcEngagementCalledFractionWilbur` | 18 % |  | share of wilbur's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share | `mpfc.called_fraction_values` | 5d |
 | `\MpfcEngagementNullOverlapMedian` | 11 % |  | median over sessions of each session's median share of an engagement null draw's windows that land on the shipped matched control | `mpfc.null_geometry_values` |  |
 | `\MpfcEngagementNullOverlapSessionMax` | 36 % |  | highest session median of that share | `mpfc.null_geometry_values` |  |
 | `\MpfcEngagementNullOverlapSessionMin` | 5 |  | lowest session median of that share | `mpfc.null_geometry_values` |  |
-| `\MpfcEngagementUnitsCalled` | 3,531 |  | units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control) | `mpfc.called_fraction_values` | 4d |
-| `\MpfcEngagementUnitsTested` | 18,410 |  | units with a finite p-value for the engagement test (matched_control + non_local_no_SWR vs. matched_control) | `mpfc.called_fraction_values` | 4d |
+| `\MpfcEngagementUnitsCalled` | 3,531 |  | units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control) | `mpfc.called_fraction_values` | 5d |
+| `\MpfcEngagementUnitsTested` | 18,410 |  | units with a finite p-value for the engagement test (matched_control + non_local_no_SWR vs. matched_control) | `mpfc.called_fraction_values` | 5d |
 | `\MpfcFolds` | 5 |  | blocked folds of whole immobility runs the held-out deviance is scored on | `mpfc.estimator_values` |  |
 | `\MpfcMarkedAnimals` | 5 |  | animals in the marked-family summary | `mpfc.marked_family_values` |  |
 | `\MpfcMarkedContentCurrentArmNonSwrReplayHeldoutGainFraction` | 34 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_no_SWR (per session, mean over sessions within animal, mean over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | `mpfc.marked_family_values` |  |
@@ -2385,18 +2385,18 @@ Sources:
 | `\MpfcMinPvalue` | 0.0010 |  | the smallest plus-one empirical p-value, 1/(R + 1) | `mpfc.estimator_values` |  |
 | `\MpfcMinPvalueDenominator` | 1,001 |  | R + 1: the smallest plus-one empirical p-value is one over it | `mpfc.estimator_values` |  |
 | `\MpfcModelFits` | 166,968 |  | neuron x model fits in the bundles | `mpfc.estimator_values` |  |
-| `\MpfcNonSwrReplayCalledFraction` | 19 % |  | share of tested units at raw empirical p < 0.05 for non-SWR replay, pooled (descriptive) | `mpfc.called_fraction_values` | 4d |
-| `\MpfcNonSwrReplayUnitsCalled` | 3,431 |  | units at raw empirical p < 0.05 for non-SWR replay | `mpfc.called_fraction_values` | 4d |
-| `\MpfcNonSwrReplayUnitsTested` | 18,410 |  | units with a finite p-value for non-SWR replay | `mpfc.called_fraction_values` | 4d |
+| `\MpfcNonSwrReplayCalledFraction` | 19 % |  | share of tested units at raw empirical p < 0.05 for non-SWR replay, pooled (descriptive) | `mpfc.called_fraction_values` | 5d |
+| `\MpfcNonSwrReplayUnitsCalled` | 3,431 |  | units at raw empirical p < 0.05 for non-SWR replay | `mpfc.called_fraction_values` | 5d |
+| `\MpfcNonSwrReplayUnitsTested` | 18,410 |  | units with a finite p-value for non-SWR replay | `mpfc.called_fraction_values` | 5d |
 | `\MpfcNonconvergedModelFits` | 432 |  | of those, fits that ran to maxiter without converging | `mpfc.estimator_values` |  |
 | `\MpfcNonconvergedNeurons` | 48 |  | neurons carrying at least one non-converged fit | `mpfc.estimator_values` |  |
 | `\MpfcNonconvergedPercent` | 0.26 | % | non-converged fits as a percent of model fits | `mpfc.estimator_values` |  |
-| `\MpfcNonlocalCalledFraction` | 32 % |  | share of tested units at raw empirical p < 0.05 for all non-local events, pooled (descriptive) | `mpfc.called_fraction_values` | 4d |
+| `\MpfcNonlocalCalledFraction` | 32 % |  | share of tested units at raw empirical p < 0.05 for all non-local events, pooled (descriptive) | `mpfc.called_fraction_values` | 5d |
 | `\MpfcNonlocalEventsBefore` | 17,726 |  | the session's non-local events before the stop restriction, summed | `mpfc.cohort_values` |  |
 | `\MpfcNonlocalEventsKept` | 16,419 |  | non-local events whose onset is in a kept stop, summed over sessions | `mpfc.cohort_values` |  |
 | `\MpfcNonlocalEventsKeptFraction` | 93 % |  | share of the non-local events the stop restriction keeps, pooled | `mpfc.cohort_values` |  |
-| `\MpfcNonlocalUnitsCalled` | 5,821 |  | units at raw empirical p < 0.05 for all non-local events | `mpfc.called_fraction_values` | 4d |
-| `\MpfcNonlocalUnitsTested` | 18,410 |  | units with a finite p-value for all non-local events | `mpfc.called_fraction_values` | 4d |
+| `\MpfcNonlocalUnitsCalled` | 5,821 |  | units at raw empirical p < 0.05 for all non-local events | `mpfc.called_fraction_values` | 5d |
+| `\MpfcNonlocalUnitsTested` | 18,410 |  | units with a finite p-value for all non-local events | `mpfc.called_fraction_values` | 5d |
 | `\MpfcNullDraws` | 1,000 |  | matched-control draws in each unit's null | `mpfc.estimator_values` |  |
 | `\MpfcOverlapAnimalsOddsRatioAboveOne` | 5 |  | animals whose odds ratio is above 1 | `mpfc.overlap_and_effect_values` |  |
 | `\MpfcOverlapOddsRatio` | 3.2 |  | odds ratio of being called for non-SWR replay given called for SWR-coupled replay, pooled over units (1 = independent) | `mpfc.overlap_and_effect_values` |  |
@@ -2470,7 +2470,7 @@ Sources:
 | `\MpfcStopContextSwitchGainSwrReplayIncreaseCiLow` | 0.96 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
 | `\MpfcStopContextSwitchGainSwrReplayIncreaseLoaoMax` | 1.01 | x | largest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
 | `\MpfcStopContextSwitchGainSwrReplayIncreaseLoaoMin` | 0.99 | x | smallest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
-| `\MpfcSwrCalledFraction` | 25 % |  | share of tested units at raw empirical p < 0.05 for SWR, pooled (descriptive) | `mpfc.called_fraction_values` | 4d |
+| `\MpfcSwrCalledFraction` | 25 % |  | share of tested units at raw empirical p < 0.05 for SWR, pooled (descriptive) | `mpfc.called_fraction_values` | 5d |
 | `\MpfcSwrCoupledShareSessionMedian` | 0.51 |  | median over sessions of the share of kept non-local events that are SWR-coupled (the canonical event table's is_swr) | `mpfc.cohort_values` |  |
 | `\MpfcSwrNoReplayAddsToSplitFractionAll` | 25 % |  | share of units whose held-out deviance improves when SWRs without replay are added to the replay split (every session) | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayAddsToSplitFractionMinEvents` | 21 % |  | share of units whose held-out deviance improves when SWRs without replay are added to the replay split (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
@@ -2548,17 +2548,17 @@ Sources:
 | `\MpfcSwrNoReplayTimingUnitsEnhancedMinEvents` | 390 |  | units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayTimingUnitsSuppressedAll` | 859 |  | units called for SWRs without replay whose peak is a decrease (every session) | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayTimingUnitsSuppressedMinEvents` | 677 |  | units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
-| `\MpfcSwrNoReplayUnitsAll` | 18,410 |  | units in every session (Figure 4's population) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayUnitsAll` | 18,410 |  | units in every session (Figure 5's population) | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayUnitsCalledAll` | 1,324 |  | units called for SWRs without replay (every session) | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayUnitsCalledMinEvents` | 1,067 |  | units called for SWRs without replay (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
-| `\MpfcSwrNoReplayUnitsMinEvents` | 14,054 |  | units in sessions with at least 10 SWRs without replay (Figure 4's population) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayUnitsMinEvents` | 14,054 |  | units in sessions with at least 10 SWRs without replay (Figure 5's population) | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayUnitsTestedAll` | 17,944 |  | of those, units with a finite p-value for SWRs without replay (every session) | `mpfc.swr_without_replay_values` |  |
 | `\MpfcSwrNoReplayUnitsTestedMinEvents` | 14,053 |  | of those, units with a finite p-value for SWRs without replay (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
-| `\MpfcSwrReplayCalledFraction` | 27 % |  | share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive) | `mpfc.called_fraction_values` | 4d |
-| `\MpfcSwrReplayUnitsCalled` | 4,952 |  | units at raw empirical p < 0.05 for SWR-coupled replay | `mpfc.called_fraction_values` | 4d |
-| `\MpfcSwrReplayUnitsTested` | 18,410 |  | units with a finite p-value for SWR-coupled replay | `mpfc.called_fraction_values` | 4d |
-| `\MpfcSwrUnitsCalled` | 4,512 |  | units at raw empirical p < 0.05 for SWR | `mpfc.called_fraction_values` | 4d |
-| `\MpfcSwrUnitsTested` | 18,410 |  | units with a finite p-value for SWR | `mpfc.called_fraction_values` | 4d |
+| `\MpfcSwrReplayCalledFraction` | 27 % |  | share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive) | `mpfc.called_fraction_values` | 5d |
+| `\MpfcSwrReplayUnitsCalled` | 4,952 |  | units at raw empirical p < 0.05 for SWR-coupled replay | `mpfc.called_fraction_values` | 5d |
+| `\MpfcSwrReplayUnitsTested` | 18,410 |  | units with a finite p-value for SWR-coupled replay | `mpfc.called_fraction_values` | 5d |
+| `\MpfcSwrUnitsCalled` | 4,512 |  | units at raw empirical p < 0.05 for SWR | `mpfc.called_fraction_values` | 5d |
+| `\MpfcSwrUnitsTested` | 18,410 |  | units with a finite p-value for SWR | `mpfc.called_fraction_values` | 5d |
 | `\MpfcSwrsKeptFraction` | 93 % |  | share of the SWRs the stop restriction keeps, pooled | `mpfc.cohort_values` |  |
 | `\MpfcTimingCalibrationBiasMsOnsetRiseAlphaEnhanced` | 2 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
 | `\MpfcTimingCalibrationBiasMsOnsetRiseAlphaShallowSuppressed` | 6 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
@@ -2859,7 +2859,7 @@ Sources:
 | `\MpfcTimingUnitsSwrReplayEnhanced` | 2,298 |  | units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
 | `\MpfcTimingUnitsSwrReplaySuppressed` | 2,654 |  | units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
 | `\MpfcTimingUnitsSwrSuppressed` | 2,272 |  | units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
-| `\MpfcUnits` | 18,410 |  | mPFC units in the population: every unit with a usable fit (no firing-rate cutoff; a unit with no spike in the fitted bins has none) and finite modulation curves | `mpfc.cohort_values` | 4c, 4d |
+| `\MpfcUnits` | 18,410 |  | mPFC units in the population: every unit with a usable fit (no firing-rate cutoff; a unit with no spike in the fitted bins has none) and finite modulation curves | `mpfc.cohort_values` | 5c, 5d |
 | `\MpfcUnmatchablePercentClassMax` | 0.60 | % | highest such percent (non_local_no_SWR) | `mpfc.null_geometry_values` |  |
 | `\MpfcUnmatchablePercentClassMin` | 0.27 | % | lowest percent, over event classes, of a class's events with no legal within-bout control, summed over sessions (non_local_SWR) | `mpfc.null_geometry_values` |  |
 | `\MpfcUnmatchableWorstExcluded` | 8 |  | events with no legal control in the worst session and class (j1620210709_10_r5 / non_local_SWR) | `mpfc.null_geometry_values` |  |
@@ -2905,9 +2905,9 @@ Panel d: `\EventsSpeedAnimalsInDirection`, `\EventsSpeedDifferenceHigh`, `\Event
 
 Panel f: `\EventsAnimalsNonSwrMoreAtWell`, `\EventsEvenContentAtWellFraction`, `\EventsNonSwrContentAtWellFraction`, `\EventsOccupancyEpochs`, `\EventsSwrContentAtWellFraction`
 
-### Figure 4: mPFC responses to SWR and non-SWR events
+### Figure 5: mPFC responses to SWR and non-SWR events
 
-Script: `scripts/figures/generate_figure04.py`. Questions: 4.1.
+Script: `scripts/figures/generate_figure05.py`. Questions: 4.1.
 
 Panel c: `\MpfcUnits`
 

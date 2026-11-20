@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "3228d372177d",
+ "commit": "96fc11f4e81d",
  "code": {
-  "head": "3228d372177da6e1781798c6622b220e1bc0eab9",
+  "head": "96fc11f4e81d204a89565433cb9032aa5696bb32",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],

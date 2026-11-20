@@ -2,7 +2,7 @@
 % Every value is read from a summary file, paper/reported/<summary>.json;
 % each macro's comment names its key and what it is.
 
-% --- survey (commit cfa31d371dd9)
+% --- survey (commit 96fc11f4e81d)
 \newcommand{\SurveyBandHighMax}{300}  % survey.band_high_max: Largest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
 \newcommand{\SurveyBandHighMin}{200}  % survey.band_high_min: Smallest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
 \newcommand{\SurveyBandHighMode}{250}  % survey.band_high_mode: Most common upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
@@ -36,7 +36,7 @@
 \newcommand{\SurveyTimeBinMin}{2}  % survey.time_bin_min: Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)
 \newcommand{\SurveyTimeBinMode}{20}  % survey.time_bin_mode: Most common decoding time bin, over the 46 numeric cells of Time bin (ms)
 
-% --- detection (commit cfa31d371dd9)
+% --- detection (commit 96fc11f4e81d)
 \newcommand{\DetectionControlsContinuingOursOnePerPartLongestFraction}{96}  % detection.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingOursSpanningShortestFraction}{96}  % detection.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingSlidingOnePerPartLongestFraction}{50}  % detection.controls_continuing_sliding_one_per_part_longest_fraction: continuing chains at the longest gap: share of trials the sliding window reports as one event per part
@@ -210,7 +210,7 @@
 \newcommand{\DetectionSweepTimingStateSpaceOnsetMinMs}{\ensuremath{-}20}  % detection.sweep_timing_state_space_onset_min_ms: smallest onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 \newcommand{\DetectionSweepTimingStateSpaceOnsetUpperQuartileMs}{\ensuremath{-}2}  % detection.sweep_timing_state_space_onset_upper_quartile_ms: upper quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 
-% --- events (commit 3228d372177d)
+% --- events (commit 96fc11f4e81d)
 \newcommand{\EventsAnimals}{5}  % events.animals: animals in the event table
 \newcommand{\EventsAnimalsNonSwrMajority}{4}  % events.animals_non_swr_majority: animals whose share of non-SWR events (the mean over their epochs) is above one half
 \newcommand{\EventsAnimalsNonSwrMoreAtWell}{5}  % events.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's epochs
@@ -634,7 +634,7 @@
 \newcommand{\EventsZugaroOverlapNonlocalShareMedian}{100}  % events.zugaro_overlap_nonlocal_share_median: median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\EventsZugaroOverlapUncertainShareMedian}{0}  % events.zugaro_overlap_uncertain_share_median: median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8
 
-% --- behavior (commit 2825f480b9ff)
+% --- behavior (commit 96fc11f4e81d)
 \newcommand{\BehaviorArmrewardAll}{\ensuremath{-}0.082}  % behavior.armreward_all: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient
 \newcommand{\BehaviorArmrewardAllAnimalsPositive}{2}  % behavior.armreward_all_animals_positive: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median
 \newcommand{\BehaviorArmrewardAllQ}{0.34}  % behavior.armreward_all_q: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
@@ -1558,7 +1558,7 @@
 \newcommand{\BehaviorUpdateCurrentSwrQ}{\ensuremath{1.3\times10^{-19}}}  % behavior.update_current_swr_q: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
 \newcommand{\BehaviorUpdateCurrentSwrSessions}{241}  % behavior.update_current_swr_sessions: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps
 
-% --- mpfc (commit cfa31d371dd9)
+% --- mpfc (commit 96fc11f4e81d)
 \newcommand{\MpfcAnalyzedEpochs}{242}  % mpfc.analyzed_epochs: analyzed epochs the PFC cohort is drawn from
 \newcommand{\MpfcAnimals}{5}  % mpfc.animals: animals in the mPFC population
 \newcommand{\MpfcBestModelConstantFraction}{52}  % mpfc.best_model_constant_fraction: share of units whose best model by held-out deviance is constant
@@ -1847,10 +1847,10 @@
 \newcommand{\MpfcSwrNoReplayTimingUnitsEnhancedMinEvents}{390}  % mpfc.swr_no_replay_timing_units_enhanced_min_events: units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)
 \newcommand{\MpfcSwrNoReplayTimingUnitsSuppressedAll}{859}  % mpfc.swr_no_replay_timing_units_suppressed_all: units called for SWRs without replay whose peak is a decrease (every session)
 \newcommand{\MpfcSwrNoReplayTimingUnitsSuppressedMinEvents}{677}  % mpfc.swr_no_replay_timing_units_suppressed_min_events: units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)
-\newcommand{\MpfcSwrNoReplayUnitsAll}{18{,}410}  % mpfc.swr_no_replay_units_all: units in every session (Figure 4's population)
+\newcommand{\MpfcSwrNoReplayUnitsAll}{18{,}410}  % mpfc.swr_no_replay_units_all: units in every session (Figure 5's population)
 \newcommand{\MpfcSwrNoReplayUnitsCalledAll}{1{,}324}  % mpfc.swr_no_replay_units_called_all: units called for SWRs without replay (every session)
 \newcommand{\MpfcSwrNoReplayUnitsCalledMinEvents}{1{,}067}  % mpfc.swr_no_replay_units_called_min_events: units called for SWRs without replay (sessions with at least 10 SWRs without replay)
-\newcommand{\MpfcSwrNoReplayUnitsMinEvents}{14{,}054}  % mpfc.swr_no_replay_units_min_events: units in sessions with at least 10 SWRs without replay (Figure 4's population)
+\newcommand{\MpfcSwrNoReplayUnitsMinEvents}{14{,}054}  % mpfc.swr_no_replay_units_min_events: units in sessions with at least 10 SWRs without replay (Figure 5's population)
 \newcommand{\MpfcSwrNoReplayUnitsTestedAll}{17{,}944}  % mpfc.swr_no_replay_units_tested_all: of those, units with a finite p-value for SWRs without replay (every session)
 \newcommand{\MpfcSwrNoReplayUnitsTestedMinEvents}{14{,}053}  % mpfc.swr_no_replay_units_tested_min_events: of those, units with a finite p-value for SWRs without replay (sessions with at least 10 SWRs without replay)
 \newcommand{\MpfcSwrReplayCalledFraction}{27}  % mpfc.swr_replay_called_fraction: share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive)
