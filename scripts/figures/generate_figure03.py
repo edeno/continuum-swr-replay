@@ -132,19 +132,21 @@ DISTANCE_EDGES_CM = np.arange(0, 241, 8)
 # Panel d: the track's arms.
 N_ARMS = len(ALL_ARMS)
 
-# Panels a-c: (column, x label, scale, bin edges, log x).
+# Panels a-c: (column, x label, scale, bin edges, log x, x ticks). A tick at an
+# end of the axis that starts with ≤ or ≥ says its bin also holds the events
+# beyond the axis; an end without one holds none (``draw_histogram`` checks).
 HISTOGRAMS = {
     "duration": (
         "event_duration_s", "Duration (ms)", 1e3,
-        np.arange(0, 401, 8), False,
+        np.arange(0, 401, 8), False, {0: "0", 200: "200", 400: "≥400"},
     ),
     "extent": (
         "spatial_extent_cm", "Spatial extent (cm)", 1.0,
-        np.linspace(0, 240, 41), False,
+        np.linspace(0, 240, 41), False, {0: "0", 100: "100", 200: "200"},
     ),
     "speed": (
         "replay_speed_median_cm_s", "Replay speed (cm/s)", 1.0,
-        np.geomspace(1, 1e5, 41), True,
+        np.geomspace(1, 1e5, 41), True, {1: "≤1", 1e2: "$10^2$", 1e4: "$10^4$"},
     ),
 }  # fmt: skip
 
@@ -226,12 +228,21 @@ def animal_signal_values(
 
 def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
     """A property's distribution for each kind, % of the kind's events per bin,
-    with each kind's median (triangle)."""
-    column, label, scale, edges, log_x = HISTOGRAMS[key]
+    with each kind's median (triangle).
+
+    The events beyond an end of the axis are counted in its end bin, whose tick
+    then says so (≤ or ≥). An event beyond an end that is not marked raises.
+    """
+    column, label, scale, edges, log_x, ticks = HISTOGRAMS[key]
     medians = class_medians(events, column)
+    marked_below = ticks.get(edges[0], "").startswith("≤")
+    marked_above = ticks.get(edges[-1], "").startswith("≥")
     top = 0.0
     for is_swr, _, color in KINDS:
         values = scale * events.loc[events["is_swr"] == is_swr, column].to_numpy()
+        below, above = (values < edges[0]).any(), (values > edges[-1]).any()
+        if (below and not marked_below) or (above and not marked_above):
+            raise ValueError(f"{label}: an event lies beyond the axis, unmarked")
         values = np.clip(values, edges[0], edges[-1])
         counts, _ = np.histogram(values, bins=edges)
         share = 100 * counts / counts.sum()
@@ -247,8 +258,7 @@ def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
     ax.set_xlim(edges[0], edges[-1])
     ax.set_ylim(0, top * 1.15)
     ax.set_xlabel(label)
-    if log_x:  # the end bins hold the clipped values
-        ax.set_xticks([1, 1e2, 1e4, 1e5], ["≤1", "$10^2$", "$10^4$", "≥$10^5$"])
+    ax.set_xticks(list(ticks), list(ticks.values()))
 
 
 def draw_arm_counts(ax, events: pd.DataFrame) -> None:
@@ -291,10 +301,12 @@ def draw_distance_from_animal(axes, shares: pd.DataFrame) -> None:
         plt.Rectangle((0, 0), 1, 1, color="0.3", alpha=alpha, lw=0)
         for alpha in (1.0, 0.3)
     ]
-    axes[1].legend(
+    # Above the panel: inside it, the key covers the bars.
+    axes[0].legend(
         handles, [f"at a well (<{AT_WELL_CM:.0f} cm)", "elsewhere"],
-        frameon=False, loc="upper left", bbox_to_anchor=(0.0, 0.8),
-        fontsize=SMALL_SIZE, handlelength=0.8, borderaxespad=0,
+        frameon=False, loc="lower left", bbox_to_anchor=(0.0, 1.04), ncol=2,
+        fontsize=SMALL_SIZE, handlelength=0.8, columnspacing=1.0,
+        handletextpad=0.4, borderaxespad=0,
     )  # fmt: skip
 
 
@@ -354,6 +366,7 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame) -> None:
             fontsize=SMALL_SIZE,
         )  # fmt: skip
     ax.set_yscale("log")
+    ax.set_yticks([0.1, 0.2, 0.5, 1], ["0.1", "0.2", "0.5", "1"])
     ax.axvline(1, color="0.8", lw=0.5, zorder=0)
     ax.set_xticks([0, 1, 2], ["center", "junction", "well"])
     ax.set_xlim(0, 2)

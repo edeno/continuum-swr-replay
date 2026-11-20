@@ -1256,3 +1256,95 @@ def test_no_swr_events_have_one_color_in_every_figure(offline):
     assert bars["Replay"] == COLORS["Non-Local"]  # every non-local event
     classes = {word: color for _, word, color, _ in figure_panels._EVENT_CLASSES}
     assert classes["non_swr"] == no_swr
+
+
+# ---------------------------------------------------------------------------
+# Figure 3: what a reader can read off the axes
+# ---------------------------------------------------------------------------
+
+
+def _figure03_events(n: int = 400) -> pd.DataFrame:
+    """Events of both kinds whose durations pass the duration axis and whose
+    speeds fall below the speed axis, as the real ones do."""
+    rng = np.random.default_rng(0)
+    return pd.DataFrame(
+        {
+            "is_swr": np.arange(n) % 2 == 0,
+            "event_duration_s": np.r_[rng.uniform(0.02, 0.3, n - 2), 0.45, 0.6],
+            "spatial_extent_cm": rng.uniform(0, 220, n),
+            "replay_speed_median_cm_s": np.r_[
+                np.zeros(4), rng.lognormal(6, 2, n - 4)
+            ].clip(0, 9e4),
+        }
+    )
+
+
+def _tick_labels(fig, ax):
+    """The drawn x tick labels of an axis, left to right, with their extents."""
+    fig.draw_without_rendering()
+    labels = [
+        label
+        for label in ax.get_xticklabels()
+        if label.get_visible() and label.get_text()
+    ]
+    labels.sort(key=lambda label: label.get_window_extent().x0)
+    return labels
+
+
+@pytest.mark.parametrize("key", ["duration", "extent", "speed"])
+def test_figure03_histogram_tick_labels_do_not_collide(offline, key):
+    """At the panel's printed width, no x tick label runs into the next one."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    fig = plt.figure(figsize=(figure03.WIDTH, figure03.HEIGHT))
+    ax = fig.add_axes([0.1, 0.6, 0.12, 0.2])  # a row-1 panel's size
+    figure03.draw_histogram(ax, _figure03_events(), key)
+    extents = [label.get_window_extent() for label in _tick_labels(fig, ax)]
+    assert len(extents) >= 2
+    for left, right in zip(extents[:-1], extents[1:], strict=True):
+        assert left.x1 < right.x0
+    plt.close(fig)
+
+
+def test_figure03_histogram_labels_the_ends_that_hold_clipped_events(offline):
+    """An end bin that holds the events beyond the axis says so on its tick; an
+    end with no such label holds none, and the panel is not drawn if it would."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    events = _figure03_events()
+    fig, (ax_duration, ax_speed, ax_extent) = plt.subplots(1, 3)
+    figure03.draw_histogram(ax_duration, events, "duration")
+    assert _tick_labels(fig, ax_duration)[-1].get_text() == "≥400"
+    figure03.draw_histogram(ax_speed, events, "speed")
+    assert _tick_labels(fig, ax_speed)[0].get_text() == "≤1"
+
+    too_fast = events.assign(replay_speed_median_cm_s=2e5)
+    with pytest.raises(ValueError, match="beyond the axis, unmarked"):
+        figure03.draw_histogram(ax_speed, too_fast, "speed")
+    too_wide = events.assign(spatial_extent_cm=300.0)
+    with pytest.raises(ValueError, match="beyond the axis, unmarked"):
+        figure03.draw_histogram(ax_extent, too_wide, "extent")
+    plt.close(fig)
+
+
+def test_figure03_distance_key_is_off_the_bars(offline):
+    """Panel f's key (at a well, elsewhere) is drawn outside both axes, so it
+    cannot cover a bar."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    left = figure03.DISTANCE_EDGES_CM[:-1]
+    index = pd.MultiIndex.from_product([[False, True], left])
+    shares = pd.DataFrame(
+        {"at_well": 0.5 / len(left), "elsewhere": 0.5 / len(left)}, index=index
+    )
+    fig, axes = plt.subplots(2, 1, figsize=(1.2, 1.6), sharex=True)
+    figure03.draw_distance_from_animal(axes, shares)
+    fig.draw_without_rendering()
+    (key,) = [ax.get_legend() for ax in axes if ax.get_legend() is not None]
+    key_box = key.get_window_extent()
+    for ax in axes:
+        assert not key_box.overlaps(ax.get_window_extent())
+    plt.close(fig)
