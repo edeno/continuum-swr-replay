@@ -208,8 +208,16 @@ reported.
   ddof = 0), stored with the fit.
 - A continuous factor that enters an interaction is centered at a fixed pooled reference. A 0/1 factor is
   not.
-- Reward history enters as the last outcome plus a penalized smooth over older outcomes, in place of three
-  overlapping bumps (**call**).
+- Reward history, in place of three overlapping bumps (lead, 2026-11-20: "A and D separately"), is asked by
+  two separate models:
+  - A: the last outcome alone, a 0/1 term. Its rate ratio is the tested estimand of Q2.
+  - D: one penalized smooth curve over the last ten outcomes (the effect of a reward at each lag; the form
+    mgcv documents as a linear functional of a smooth). It describes how the effect fades and is shown with a
+    band; it is not in the list of tests. The lags enter on a log scale, so the curve can change fast between
+    the first lags (**call**), and a simulation with a sharp effect at the last outcome checks what it returns.
+  The last outcome is only weakly related to older ones (a diagnostic on the stop table, 2026-11-20:
+  correlation about 0.03 with the outcome before it and about 0.14 three and five back), so A's ratio is close
+  to the effect of the last outcome alone.
 
 ### 4.3 Fit
 
@@ -428,6 +436,16 @@ answer are 1 to 5; 6 was open before.
 - Calls confirmed by the lead ("ok"): one scale for covariates, one shared fitter, the fold rule written
   once in the shared package, the table of proposed fates. Calls still being explained: the end of a stop,
   the form of reward history, the declared list of tests, and what changes in the mPFC models.
+
+### Third round (lead, 2026-11-20)
+
+- **5:** "ok" to two more measures of uncertainty, declared before the fit: how variable an arm's rewards
+  were, and how many times the animal has sampled the arm. Each is tested once, with recency in the model.
+- **Calls confirmed:** the declared list of tests; what changes in the mPFC models; the second clock for the
+  end of a stop ("A sounds good"), with the condition that the data are explored first: an exploration of
+  the decode frames is running to show whether the drop in event starts before a stop ends is made by the
+  counting rule or is in the data, and what the small movements at a well are (for decision 2).
+- **Reward history:** models A and D, separately (section 4.2).
 
 ## 10. Left to the builder
 
