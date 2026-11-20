@@ -11,11 +11,11 @@ not the SWR was immobile as a whole event, and local everywhere else. That is
 deliberately not the frame's ``SWR_event`` labels, which keep only the SWRs the
 analyzed-time rule keeps.
 
-Each bin is labeled (:func:`bin_categories`): ``excluded`` (in excluded time),
-``immobile_in_swr`` / ``immobile_outside_swr`` (analyzed, head speed below the
-immobility threshold, inside or outside a source SWR), or ``moving`` (analyzed
-and not immobile; a bin without a speed is not immobile, and the record counts
-those).
+Each bin is labeled (``nonlocal_restriction.bin_categories``): ``excluded``
+(in excluded time), ``immobile_in_swr`` / ``immobile_outside_swr`` (analyzed,
+head speed below the immobility threshold, inside or outside a source SWR), or
+``moving`` (analyzed and not immobile; a bin without a speed is not immobile,
+and the record counts those).
 
 Writes, per epoch, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR``:
 
@@ -33,10 +33,11 @@ Writes, per epoch, under ``processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR
 
 and ``manifest.json`` gathered from the records (``runs.epoch_records``).
 
-An epoch whose models fail a check (a library marginal that disagrees with the
-summed filter scores, a non-finite score, or a filtered posterior whose mass is
-more than :data:`CAUSAL_MASS_TOLERANCE` from 1) gets status ``failed_check``
-and a message naming the failures; its tables are still written, for diagnosis.
+An epoch whose models fail a check (``nonlocal_restriction.check_failures``: a
+library marginal that disagrees with the summed filter scores, or a filtered
+posterior whose mass is more than ``CAUSAL_MASS_TOLERANCE`` from 1) gets status
+``failed_check`` and a message naming the failures; its tables are still
+written, for diagnosis.
 A labeled bin with a score that is not finite fails the epoch when its sums are
 taken (``restriction_sums`` raises), after its per-bin table is written.
 
@@ -59,25 +60,17 @@ from __future__ import annotations
 
 import argparse
 import logging
-import multiprocessing
 import sys
 import time as clock
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.event_definition import swr_source
-from continuum_swr_replay.analysis.event_definition.analyzed_time import (
-    analyzed_bins,
-    immobile_analyzed_bins,
-    read_dot_with_swr_source,
-)
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
-from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.intervals import interval_mask
 from continuum_swr_replay.parameters import (
@@ -97,115 +90,37 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
+    add_gpu_arguments,
     add_run_arguments,
+    epoch_inputs,
+    gpu_pool,
     run,
     select_epochs,
-    use_gpu,
 )
 
 PRODUCED_BY = produced_by(__file__)
 OUTPUT_NAME = "nonlocal_restriction"
 BINS_NAME = "nonlocal_restriction_bins"
 
-CATEGORIES = ("excluded", "immobile_in_swr", "immobile_outside_swr", "moving")
-"""Each bin's category (:func:`bin_categories`)."""
-
-CAUSAL_MASS_TOLERANCE = 1e-3
-"""Largest allowed distance of a model's filtered posterior mass from 1."""
-
-
-def bin_categories(
-    frame: pd.DataFrame,
-    in_swr: NDArray[np.bool_],
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-) -> pd.Categorical:
-    """Each bin's category: excluded, immobile in or outside an SWR, or moving.
-
-    Parameters
-    ----------
-    frame : pd.DataFrame
-        A decode frame read through ``analyzed_time.read_dot_with_swr_source``
-        (``in_excluded_time`` and ``head_speed``), one row per bin.
-    in_swr : ndarray of bool, shape (n_time,)
-        Whether each bin lies inside an SWR.
-    speed_threshold : float
-        cm/s; a bin is immobile when its speed is strictly below it
-        (``analyzed_time.immobile_analyzed_bins``).
-
-    Returns
-    -------
-    pd.Categorical, length n_time
-        Categories :data:`CATEGORIES`: ``excluded`` where the bin is not
-        analyzed; else ``immobile_in_swr`` / ``immobile_outside_swr`` where it
-        is immobile; else ``moving`` (a bin without a speed included).
-    """
-    in_swr = np.asarray(in_swr, dtype=bool)
-    if in_swr.shape != (len(frame),):
-        raise ValueError(f"in_swr has shape {in_swr.shape}, not ({len(frame)},)")
-    analyzed = analyzed_bins(frame)
-    immobile = immobile_analyzed_bins(frame, speed_threshold)
-    labels = np.select(
-        [~analyzed, immobile & in_swr, immobile],
-        ["excluded", "immobile_in_swr", "immobile_outside_swr"],
-        default="moving",
-    )
-    return pd.Categorical(labels, categories=CATEGORIES)
-
-
-def check_failures(record: dict) -> list[str]:
-    """The model checks a ``restriction_scores`` record fails, as messages.
-
-    A model's library marginal must agree with its summed filter scores
-    (``marginal_agrees_<model>``), its filtered posterior mass must be within
-    :data:`CAUSAL_MASS_TOLERANCE` of 1, and every score must be finite.
-    """
-    failures = []
-    for model in nr.MODELS:
-        if not record[f"marginal_agrees_{model}"]:
-            failures.append(
-                f"{model}: library marginal {record[f'marginal_log_likelihood_{model}']}"
-                f" differs from the summed filter scores by "
-                f"{record[f'marginal_difference_{model}']}"
-            )
-        deviation = record[f"causal_mass_deviation_{model}"]
-        if not deviation <= CAUSAL_MASS_TOLERANCE:
-            failures.append(
-                f"{model}: filtered posterior mass is {deviation} from 1 "
-                f"(tolerance {CAUSAL_MASS_TOLERANCE})"
-            )
-    if not record["all_finite"]:
-        failures.append("a per-bin score is not finite")
-    return failures
-
 
 def run_epoch(epoch_id: str, data_dir: Path, output: Path) -> dict:
     """Score one epoch, write its two tables and return its record."""
-    from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
-        load_detector,
-        load_marks_and_training_mask,
-    )
-
     started = clock.time()
     log = logging.getLogger(epoch_id).info
-    paths = decode_paths(epoch_id, data_dir)
-    frame = read_dot_with_swr_source(paths.data_over_time)
-    time = frame.index.to_numpy(dtype=float)
-    inputs = load_marks_and_training_mask(epoch_id)
-    if not np.array_equal(inputs["time"], time):
-        raise ValueError("the loader's time axis is not the decode's")
-    detector = load_detector(epoch_id, data_dir)
+    epoch = epoch_inputs(epoch_id, data_dir)
+    frame = epoch.frame
     source_events = swr_source.epoch_source(epoch_id).events
-    in_swr = interval_mask(time, source_events)
-    categories = bin_categories(frame, in_swr)
+    in_swr = interval_mask(epoch.time, source_events)
+    categories = nr.bin_categories(frame, in_swr)
 
     scores, record = nr.restriction_scores(
-        detector,
-        time,
+        epoch.detector,
+        epoch.time,
         frame[["head_position_x", "head_position_y"]].to_numpy(dtype=float),
-        inputs["spike_times"],
-        inputs["marks"],
-        inputs["is_training"],
-        inputs["is_missing"],
+        epoch.loaded["spike_times"],
+        epoch.loaded["marks"],
+        epoch.loaded["is_training"],
+        epoch.loaded["is_missing"],
         in_swr,
         log=log,
     )
@@ -213,17 +128,18 @@ def run_epoch(epoch_id: str, data_dir: Path, output: Path) -> dict:
         scores.assign(category=categories), output_path(epoch_id, output, BINS_NAME)
     )
     sums = nr.restriction_sums(scores, np.asarray(categories))
-    share = nr.share_outside_swr(sums, "immobile_in_swr", "immobile_outside_swr")
+    share = nr.share_outside_swr(sums)
     animal = parse_epoch_identifier(epoch_id).animal
     write_table(
         sums.reset_index().assign(epoch_id=epoch_id, animal=animal),
         output_path(epoch_id, output, OUTPUT_NAME),
     )
 
-    analyzed = analyzed_bins(frame)
-    immobile = immobile_analyzed_bins(frame)
+    labels = np.asarray(categories)
+    analyzed = labels != "excluded"
+    immobile = np.isin(labels, [nr.IMMOBILE_IN_SWR, nr.IMMOBILE_OUTSIDE_SWR])
     in_label = frame[swr_source.SWR_LABEL_COLUMN].to_numpy() > 0
-    failures = check_failures(record)
+    failures = nr.check_failures(record)
     return json_ready(
         {
             "status": "failed_check" if failures else "ok",
@@ -238,19 +154,17 @@ def run_epoch(epoch_id: str, data_dir: Path, output: Path) -> dict:
                 (analyzed & ~np.isfinite(frame["head_speed"].to_numpy())).sum()
             ),
             "n_swr_source_events": len(source_events),
-            "n_in_source_swr": int(in_swr.sum()),
             "n_in_swr_label": int(in_label.sum()),
-            "n_immobile_in_source_swr": int((immobile & in_swr).sum()),
             "n_immobile_in_swr_label": int((immobile & in_label).sum()),
             "bins_table_bytes": bins_path.stat().st_size,
             "epoch_inputs": {
                 "data_over_time": {
-                    "sha256": sha256_file(paths.data_over_time),
-                    "path": str(paths.data_over_time),
+                    "sha256": sha256_file(epoch.paths.data_over_time),
+                    "path": str(epoch.paths.data_over_time),
                 },
                 "detector": {
-                    "sha256": sha256_file(paths.detector),
-                    "path": str(paths.detector),
+                    "sha256": sha256_file(epoch.paths.detector),
+                    "path": str(epoch.paths.detector),
                 },
                 **{
                     f"swr_{name}": entry
@@ -267,8 +181,7 @@ def main(argv: list[str] | None = None) -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     add_run_arguments(parser)
-    parser.add_argument("--gpus", type=int, nargs="+", help="the cards to use")
-    parser.add_argument("--workers-per-gpu", type=int, default=1)
+    add_gpu_arguments(parser)
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
@@ -282,7 +195,7 @@ def main(argv: list[str] | None = None) -> None:
             "immobility_threshold_cm_per_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
             "swr_source": swr_source.swr_source_name(),
             "marginal_tolerance": nr.MARGINAL_TOLERANCE,
-            "causal_mass_tolerance": CAUSAL_MASS_TOLERANCE,
+            "causal_mass_tolerance": nr.CAUSAL_MASS_TOLERANCE,
         },
         # every input is the epoch's own (its decode, detector and SWR files):
         # each record holds their digests under "epoch_inputs"
@@ -291,13 +204,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.gather:
         gather_manifest(output, OUTPUT_NAME, header)
         return
-    if not args.gpus:
-        parser.error("--gpus is required")
-    context = multiprocessing.get_context("spawn")
-    queue = context.Queue()
-    for gpu in args.gpus:
-        for _ in range(args.workers_per_gpu):
-            queue.put(gpu)
+    max_workers, pool_options = gpu_pool(parser, args)
     run(
         epochs=select_epochs(
             args.epochs or analyzed_epoch_ids(), args.shards, args.n_shards
@@ -308,12 +215,8 @@ def main(argv: list[str] | None = None) -> None:
         name=OUTPUT_NAME,
         header=header,
         overwrite=args.overwrite,
-        max_workers=len(args.gpus) * args.workers_per_gpu,
-        pool_options={
-            "mp_context": context,
-            "initializer": use_gpu,
-            "initargs": (queue, round(0.9 / args.workers_per_gpu, 3)),
-        },
+        max_workers=max_workers,
+        pool_options=pool_options,
     )
 
 

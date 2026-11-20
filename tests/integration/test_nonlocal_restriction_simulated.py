@@ -45,7 +45,6 @@ from tests.support import tetrode_holdout_simulation as sim
 pytestmark = pytest.mark.integration
 
 BIN_S = 0.002
-IMMOBILE = ["immobile_in_swr", "immobile_outside_swr"]
 NOT_REMOTE = ("local_burst", "silent")
 
 
@@ -66,13 +65,18 @@ def _rest_id(recording: sim.Recording) -> np.ndarray:
     return np.cumsum(np.r_[0, np.diff(rest)] == 1)
 
 
-def _plain_rest(recording: sim.Recording, n_bins: int = 60) -> np.ndarray:
-    """A stretch of ``n_bins`` of plain rest (500 ms or more from every event)
-    in the middle of each rest."""
+def _plain_rest_bins(recording: sim.Recording) -> np.ndarray:
+    """The rest bins 250 bins (500 ms) or more from every event."""
     near = np.zeros(recording.time.size, dtype=bool)
     for s, e in zip(recording.events.s, recording.events.e, strict=True):
         near[max(0, s - 250) : e + 250] = True
-    plain = ~recording.is_running & ~near
+    return ~recording.is_running & ~near
+
+
+def _plain_rest(recording: sim.Recording, n_bins: int = 60) -> np.ndarray:
+    """A stretch of ``n_bins`` of plain rest (:func:`_plain_rest_bins`) in the
+    middle of each rest."""
+    plain = _plain_rest_bins(recording)
     rest = _rest_id(recording)
     mask = np.zeros(recording.time.size, dtype=bool)
     for r in np.unique(rest[plain]):
@@ -101,28 +105,14 @@ def swr_masks(recording: sim.Recording) -> dict[str, np.ndarray]:
     }
 
 
-def model_scores(detector, log_likelihood, in_swr, models=nr.MODELS) -> pd.DataFrame:
-    """Every bin's scores under ``models``, on a shared likelihood."""
-    interior = detector.is_track_interior_state_bins_
-    state_ind = np.asarray(detector.state_ind_)[interior]
-    columns = {}
-    for model, allowed in nr.allowed_states(detector.state_names, in_swr).items():
-        if model not in models:
-            continue
-        filter_score, two_sided, record = nr.predictive_log_scores(
-            log_likelihood,
-            np.asarray(detector.initial_conditions_)[interior],
-            np.asarray(detector.continuous_state_transitions_)[
-                np.ix_(interior, interior)
-            ],
-            np.asarray(detector.discrete_state_transitions_),
-            state_ind,
-            allowed,
-        )
-        assert record["marginal_agrees"], record
-        columns[model] = filter_score
-        columns[f"{model}_two_sided"] = two_sided
-    return pd.DataFrame({**columns, "in_swr": in_swr})
+def _model_scores(detector, log_likelihood, in_swr, models) -> dict:
+    """``nr.model_scores`` of ``models``, its library checks asserted."""
+    scores, record = nr.model_scores(
+        detector, log_likelihood, in_swr, models=models, log=_quiet
+    )
+    for model in models:
+        assert record[f"marginal_agrees_{model}"], record
+    return scores
 
 
 def gains(scores: pd.DataFrame, mask: np.ndarray) -> dict[str, float]:
@@ -176,10 +166,21 @@ def simulated():
 
 @pytest.fixture(scope="module")
 def scenarios(simulated):
+    """Each scenario's SWR mask and scores. The scenarios share the likelihood,
+    and ``none`` and ``full`` do not depend on ``in_swr``, so they are scored
+    once and ``swr`` per scenario."""
     recording, detector, log_likelihood, _, _ = simulated
     masks = {**swr_masks(recording), "running": recording.is_running}
+    shared = _model_scores(detector, log_likelihood, masks["A"], ("none", "full"))
     return masks, {
-        name: model_scores(detector, log_likelihood, masks[name]) for name in "ABD"
+        name: pd.DataFrame(
+            {
+                **shared,
+                **_model_scores(detector, log_likelihood, masks[name], ("swr",)),
+                "in_swr": masks[name],
+            }
+        )
+        for name in "ABD"
     }
 
 
@@ -235,13 +236,13 @@ def chance():
     return recording, scores, record
 
 
-def test_the_filter_scores_add_up_to_the_librarys_marginal(simulated):
+def test_the_filter_scores_add_up_to_the_librarys_marginal(simulated, scenarios):
     """The tolerance is the library's float32 running total (its per-bin terms
-    agree to about 1e-5 nats; its sum of 93,000 of them is off by about 60)."""
+    agree to about 1e-5 nats; its sum of 93,000 of them is off by about 60).
+    ``full`` allows every state at every bin, so its scores are the same in
+    every scenario."""
     recording, detector, log_likelihood, _, _ = simulated
-    full = model_scores(
-        detector, log_likelihood, np.zeros(recording.time.size, bool), ["full"]
-    )
+    full = scenarios[1]["A"]
     smoothed = detector._predict(
         time=recording.time,
         log_likelihoods=log_likelihood,
@@ -295,9 +296,9 @@ def _contrasts(scenarios, name: str) -> tuple[dict, dict, dict]:
     only), and its share of the non-local gain outside SWRs."""
     _, scores = scenarios
     sums = nr.restriction_sums(scores[name], _labels(scenarios, name))
-    inside = nr.restriction_contrasts(sums, ["immobile_in_swr"], BIN_S)
-    outside = nr.restriction_contrasts(sums, ["immobile_outside_swr"], BIN_S)
-    return inside, outside, nr.share_outside_swr(sums, *IMMOBILE)
+    inside = nr.restriction_contrasts(sums, [nr.IMMOBILE_IN_SWR], BIN_S)
+    outside = nr.restriction_contrasts(sums, [nr.IMMOBILE_OUTSIDE_SWR], BIN_S)
+    return inside, outside, nr.share_outside_swr(sums)
 
 
 @pytest.mark.parametrize("suffix", ["", "_two_sided"])
@@ -343,13 +344,15 @@ def _labels(scenarios, name: str) -> np.ndarray:
     return np.where(
         masks["running"],
         "moving",
-        np.where(masks[name], "immobile_in_swr", "immobile_outside_swr"),
+        np.where(masks[name], nr.IMMOBILE_IN_SWR, nr.IMMOBILE_OUTSIDE_SWR),
     )
 
 
 def test_the_library_record_checks_hold(chance):
     _, scores, record = chance
-    assert record["all_finite"]
+    assert np.isfinite(scores[list(nr.SCORE_COLUMNS)].to_numpy()).all()
+    # the checks' keys are the real record's
+    assert nr.check_failures(record) == []
     for model in nr.MODELS:
         assert record[f"marginal_agrees_{model}"]
         assert record[f"causal_mass_deviation_{model}"] < 1e-3
@@ -393,8 +396,5 @@ def test_bursts_without_shared_content_are_credited_as_non_local(chance, suffix)
         per_event["shared_random"]
     )
     assert (np.abs(per_event["local_burst"]) < 1).all()
-    near = np.zeros(recording.time.size, dtype=bool)
-    for s, e in zip(events.s, events.e, strict=True):
-        near[max(0, s - 250) : e + 250] = True
-    plain = ~recording.is_running & ~near
+    plain = _plain_rest_bins(recording)
     assert abs(gain[plain].sum()) / (plain.sum() * BIN_S) < 1.0  # nats per s

@@ -336,6 +336,93 @@ def window_sums(
     return cumulative[last] - cumulative[first]
 
 
+def heldout_terms(
+    detector: Any,
+    time: NDArray,
+    head_position: NDArray,
+    spike_times: Sequence[NDArray],
+    marks: Sequence[NDArray],
+    is_training: NDArray,
+    *,
+    n_folds: int = N_FOLDS,
+    refit: Callable[..., dict] = refit_encoding,
+    log: Callable[[str], None] = print,
+) -> tuple[FoldTerms, NDArray, NDArray, NDArray[np.int64], dict]:
+    """The held-out stage of the decoder's likelihood: each time block's
+    tetrode terms under encodings refit on the other blocks, the per-tetrode
+    No-Spike likelihood and the Local kernel.
+
+    Shared by :func:`holdout_scores` and
+    ``nonlocal_restriction.heldout_log_likelihood``.
+
+    Parameters
+    ----------
+    detector : NonLocalClusterlessDetector
+        The epoch's fitted decoder (its environment and No-Spike rate).
+    time : ndarray, shape (n_time,)
+        Its time axis, s.
+    head_position : ndarray, shape (n_time, 2)
+        The position it was decoded with.
+    spike_times, marks : sequence of ndarray, one per tetrode
+    is_training : ndarray of bool, shape (n_time,)
+        The decode's training bins.
+    n_folds : int
+    refit : callable
+        ``refit(detector, time, position, spike_times, marks, is_training)``,
+        an encoding model.
+    log : callable
+
+    Returns
+    -------
+    terms : FoldTerms
+        Every spike's terms under the encodings of its bin's block.
+    no_spike : ndarray, shape (n_time, n_tetrodes)
+        Each tetrode's No-Spike log-likelihood.
+    kernel : ndarray, shape (n_time, n_place_bins)
+        The decoder's Local position kernel.
+    blocks : ndarray of int, shape (n_time,)
+        Each bin's time block.
+    record : dict
+        ``refit_s``, ``terms_s`` (the terms, No-Spike and kernel), ``n_spikes``.
+    """
+    from non_local_detector.likelihoods.no_spike import (
+        predict_no_spike_log_likelihood,
+    )
+
+    record: dict[str, Any] = {}
+    started = clock.time()
+    time = np.asarray(time, dtype=float)
+    environment = detector.encoding_model_[ENCODING_KEY]["environment"]
+    centers = np.asarray(environment.place_bin_centers_)[interior_bin_mask(environment)]
+
+    blocks = time_blocks(time, n_folds)
+    masks = fold_training_masks(is_training, blocks, n_folds)
+    encodings = [
+        refit(detector, time, head_position, spike_times, marks, mask) for mask in masks
+    ]
+    record["refit_s"] = round(clock.time() - started, 1)
+    log(f"refit {n_folds} encodings: {record['refit_s']} s")
+
+    t0 = clock.time()
+    terms = fold_terms(encodings, spike_times, marks, time, centers, blocks)
+    del encodings  # their terms are all the scoring needs
+    no_spike = np.column_stack(
+        [
+            np.asarray(
+                predict_no_spike_log_likelihood(time, [st], detector.no_spike_rate)
+            )[:, 0]
+            for st in spike_times
+        ]
+    )
+    kernel = np.asarray(
+        detector._compute_local_position_kernel(time, time, head_position, environment)
+    )
+    record["terms_s"] = round(clock.time() - t0, 1)
+    record["n_spikes"] = int(terms.time_bin.size)
+    log(f"terms: {terms.time_bin.size} spikes, {record['terms_s']} s")
+    return terms, no_spike, kernel, blocks, record
+
+
 def holdout_scores(
     detector: Any,
     time: NDArray,
@@ -390,11 +477,6 @@ def holdout_scores(
     record : dict
         Timings and checks.
     """
-    from non_local_detector.likelihoods.no_spike import (
-        predict_no_spike_log_likelihood,
-    )
-
-    record: dict[str, Any] = {}
     started = clock.time()
     time = np.asarray(time, dtype=float)
     is_missing = np.asarray(is_missing, dtype=bool)
@@ -407,31 +489,16 @@ def holdout_scores(
         s for s, name in enumerate(state_names) if name not in (LOCAL, NO_SPIKE)
     ]
 
-    blocks = time_blocks(time, n_folds)
-    masks = fold_training_masks(is_training, blocks, n_folds)
-    encodings = [
-        refit(detector, time, head_position, spike_times, marks, mask) for mask in masks
-    ]
-    record["refit_s"] = round(clock.time() - started, 1)
-    log(f"refit {n_folds} encodings: {record['refit_s']} s")
-
-    t0 = clock.time()
-    terms = fold_terms(encodings, spike_times, marks, time, centers, blocks)
-    del encodings  # their terms are all the scoring needs
-    record["terms_s"] = round(clock.time() - t0, 1)
-    record["n_spikes"] = int(terms.time_bin.size)
-    log(f"terms: {terms.time_bin.size} spikes, {record['terms_s']} s")
-
-    no_spike = np.column_stack(
-        [
-            np.asarray(
-                predict_no_spike_log_likelihood(time, [st], detector.no_spike_rate)
-            )[:, 0]
-            for st in spike_times
-        ]
-    )
-    kernel = np.asarray(
-        detector._compute_local_position_kernel(time, time, head_position, environment)
+    terms, no_spike, kernel, _, record = heldout_terms(
+        detector,
+        time,
+        head_position,
+        spike_times,
+        marks,
+        is_training,
+        n_folds=n_folds,
+        refit=refit,
+        log=log,
     )
     total = terms.total()
 

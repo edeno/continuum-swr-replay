@@ -46,7 +46,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import multiprocessing
 import sys
 import time as clock
 from pathlib import Path
@@ -55,14 +54,12 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
-    read_dot_with_swr_source,
     read_swr_table,
 )
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     event_bins,
 )
-from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import (
@@ -85,12 +82,14 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
+    add_gpu_arguments,
     add_run_arguments,
+    epoch_inputs,
     event_table_input,
     event_table_path,
+    gpu_pool,
     run,
     select_epochs,
-    use_gpu,
 )
 
 PRODUCED_BY = produced_by(__file__)
@@ -150,32 +149,22 @@ def epoch_windows(
 
 def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) -> dict:
     """Score one epoch and write its table; return its status record."""
-    from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
-        load_detector,
-        load_marks_and_training_mask,
-    )
-
     started = clock.time()
     log = logging.getLogger(epoch_id).info
-    frame = read_dot_with_swr_source(decode_paths(epoch_id, data_dir).data_over_time)
-    time = frame.index.to_numpy(dtype=float)
+    epoch = epoch_inputs(epoch_id, data_dir)
     participation = pd.read_parquet(
         output_path(epoch_id, data_dir / EVENT_PARTICIPATION_DIR, PARTICIPATION_NAME)
     )
-    windows = epoch_windows(time, read_swr_table(event_table), participation)
-    inputs = load_marks_and_training_mask(epoch_id)
-    if not np.array_equal(inputs["time"], time):
-        raise ValueError("the loader's time axis is not the decode's")
-    detector = load_detector(epoch_id, data_dir)
+    windows = epoch_windows(epoch.time, read_swr_table(event_table), participation)
     scores, record = th.holdout_scores(
-        detector,
-        time,
-        frame[["head_position_x", "head_position_y"]].to_numpy(dtype=float),
-        frame["linear_position"].to_numpy(dtype=float),
-        inputs["spike_times"],
-        inputs["marks"],
-        inputs["is_training"],
-        inputs["is_missing"],
+        epoch.detector,
+        epoch.time,
+        epoch.frame[["head_position_x", "head_position_y"]].to_numpy(dtype=float),
+        epoch.frame["linear_position"].to_numpy(dtype=float),
+        epoch.loaded["spike_times"],
+        epoch.loaded["marks"],
+        epoch.loaded["is_training"],
+        epoch.loaded["is_missing"],
         windows,
         log=log,
     )
@@ -198,8 +187,7 @@ def main(argv: list[str] | None = None) -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     add_run_arguments(parser)
-    parser.add_argument("--gpus", type=int, nargs="+", help="the cards to use")
-    parser.add_argument("--workers-per-gpu", type=int, default=1)
+    add_gpu_arguments(parser)
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
@@ -223,13 +211,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.gather:
         gather_manifest(output, OUTPUT_NAME, header)
         return
-    if not args.gpus:
-        parser.error("--gpus is required")
-    context = multiprocessing.get_context("spawn")
-    queue = context.Queue()
-    for gpu in args.gpus:
-        for _ in range(args.workers_per_gpu):
-            queue.put(gpu)
+    max_workers, pool_options = gpu_pool(parser, args)
     every_epoch = ok_epochs(read_manifest(participation_dir))
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
@@ -239,12 +221,8 @@ def main(argv: list[str] | None = None) -> None:
         name=OUTPUT_NAME,
         header=header,
         overwrite=args.overwrite,
-        max_workers=len(args.gpus) * args.workers_per_gpu,
-        pool_options={
-            "mp_context": context,
-            "initializer": use_gpu,
-            "initargs": (queue, round(0.9 / args.workers_per_gpu, 3)),
-        },
+        max_workers=max_workers,
+        pool_options=pool_options,
     )
 
 

@@ -164,7 +164,7 @@ Spike likelihood at decoded and actual positions, over each whole non-local even
 
 Is the non-local activity of rest the activity of sharp-wave ripples? Three decoders that differ only in when the non-local states may be occupied, scored by how well each predicts each bin's spikes.
 
-`allowed_states`, `restricted_discrete_transitions`, `continuous_block_deviation`, `predictive_log_scores`, `heldout_log_likelihood`, `restriction_scores`, `score_columns`, `restriction_sums`, `restriction_contrasts`, `share_outside_swr`
+`bin_categories`, `allowed_states`, `restricted_discrete_transitions`, `continuous_block_deviation`, `predictive_log_scores`, `heldout_log_likelihood`, `model_scores`, `restriction_scores`, `check_failures`, `restriction_sums`, `restriction_contrasts`, `share_outside_swr`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/participation.py`
 
@@ -182,7 +182,7 @@ Spike evidence of non-local events: does the prior-excluded spike likelihood fav
 
 Held-out tetrode score of each non-local event: does the rest of the population's position estimate predict a tetrode it never saw better than local coding does?
 
-`time_blocks`, `fold_training_masks`, `FoldTerms`, `fold_terms`, `state_log_likelihood`, `spatial_distribution`, `predictive_log_score`, `window_rows`, `window_sums`, `holdout_scores`, `window_scores`, `holdout_statistics`
+`time_blocks`, `fold_training_masks`, `FoldTerms`, `fold_terms`, `state_log_likelihood`, `spatial_distribution`, `predictive_log_score`, `window_rows`, `window_sums`, `heldout_terms`, `holdout_scores`, `window_scores`, `holdout_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_properties/brain_state_reference.py`
 
@@ -858,9 +858,9 @@ Does each detector's content reproduce in cells it never saw?
 
 ### `scripts/event_evidence/_per_event_run.py`
 
-What the per-event runners share: their arguments, the canonical event table, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
+What the per-event runners share: their arguments, the canonical event table, an epoch's decode inputs, the GPU worker pool, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
 
-`event_table_path`, `event_table_input`, `add_run_arguments`, `select_epochs`, `use_gpu`, `run`
+`event_table_path`, `event_table_input`, `add_run_arguments`, `select_epochs`, `use_gpu`, `add_gpu_arguments`, `gpu_pool`, `EpochInputs`, `epoch_inputs`, `run`
 
 ### `scripts/event_evidence/analyze_event_spike_evidence.py`
 
@@ -890,7 +890,7 @@ Spike likelihood at decoded and actual positions, for every canonical non-local 
 
 Per-bin scores of the three non-local restriction models on every analyzed epoch.
 
-`bin_categories`, `check_failures`, `run_epoch`, `main`
+`run_epoch`, `main`
 
 ### `scripts/event_evidence/score_tetrode_holdout.py`
 

@@ -98,20 +98,21 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+    analyzed_bins,
+    immobile_analyzed_bins,
+)
 from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
-    interior_bin_mask,
     refit_encoding,
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     LOCAL,
     N_FOLDS,
     NO_SPIKE,
-    fold_terms,
-    fold_training_masks,
+    heldout_terms,
     state_log_likelihood,
-    time_blocks,
 )
-from continuum_swr_replay.decoding.results import ENCODING_KEY
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 
 MODELS = ("none", "swr", "full")
 """The three models: never non-local, non-local exactly in SWRs, unrestricted."""
@@ -119,11 +120,61 @@ MODELS = ("none", "swr", "full")
 LOCAL_STATES = (LOCAL, NO_SPIKE)
 """The local states; every other state is a non-local one."""
 
-FAMILIES = ("filter", "two_sided")
-"""The two scores: ``log p(y_t | y_1..y_{t-1})`` and ``log p(y_t | y_{-t})``."""
+FAMILY_SUFFIX = {"filter": "", "two_sided": "_two_sided"}
+"""The two scores, ``log p(y_t | y_1..y_{t-1})`` and ``log p(y_t | y_{-t})``,
+and the suffix of their columns: a model's filter score is column ``<model>``,
+its two-sided score ``<model>_two_sided``."""
 
-TWO_SIDED = "_two_sided"
-"""The suffix of a model's two-sided score column."""
+SCORE_COLUMNS = tuple(
+    f"{model}{suffix}" for suffix in FAMILY_SUFFIX.values() for model in MODELS
+)
+"""The six score columns, the filter scores first."""
+
+IMMOBILE_IN_SWR = "immobile_in_swr"
+IMMOBILE_OUTSIDE_SWR = "immobile_outside_swr"
+CATEGORIES = ("excluded", IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR, "moving")
+"""Each bin's category (:func:`bin_categories`)."""
+
+CAUSAL_MASS_TOLERANCE = 1e-3
+"""Largest allowed distance of a model's filtered posterior mass from 1."""
+
+
+def bin_categories(
+    frame: pd.DataFrame,
+    in_swr: NDArray[np.bool_],
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+) -> pd.Categorical:
+    """Each bin's category: excluded, immobile in or outside an SWR, or moving.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        A decode frame read through ``analyzed_time.read_dot_with_swr_source``
+        (``in_excluded_time`` and ``head_speed``), one row per bin.
+    in_swr : ndarray of bool, shape (n_time,)
+        Whether each bin lies inside an SWR.
+    speed_threshold : float
+        cm/s; a bin is immobile when its speed is strictly below it
+        (``analyzed_time.immobile_analyzed_bins``).
+
+    Returns
+    -------
+    pd.Categorical, length n_time
+        Categories :data:`CATEGORIES`: ``excluded`` where the bin is not
+        analyzed; else :data:`IMMOBILE_IN_SWR` / :data:`IMMOBILE_OUTSIDE_SWR`
+        where it is immobile; else ``moving`` (a bin without a speed included).
+    """
+    in_swr = np.asarray(in_swr, dtype=bool)
+    if in_swr.shape != (len(frame),):
+        raise ValueError(f"in_swr has shape {in_swr.shape}, not ({len(frame)},)")
+    analyzed = analyzed_bins(frame)
+    immobile = immobile_analyzed_bins(frame, speed_threshold)
+    labels = np.select(
+        [~analyzed, immobile & in_swr, immobile],
+        ["excluded", IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR],
+        default="moving",
+    )
+    return pd.Categorical(labels, categories=CATEGORIES)
 
 
 def allowed_states(
@@ -214,14 +265,19 @@ CHUNK_BINS = 20_000
 
 MARGINAL_TOLERANCE = 5e-3
 """Allowed relative difference between the library's marginal log-likelihood
-and the sum of the per-bin filter scores. The library adds its per-bin terms
-into a float32 total, whose rounding grows with the number of bins: 1.8e-4 of
-the total over 93,000 bins of the simulated recording, and about 8e-4 over the
-654,000 bins of a real epoch (``wilbur20210329_02_r1_HPC``), where the
-library's total drifted by 5,100 to 6,600 nats, by a different amount for each
-model. The per-bin terms themselves agree to about 1e-5 nats. So contrasts are
-taken from the float64 sums of the per-bin scores, never from the library's
-totals."""
+and the sum of the per-bin filter scores.
+
+The check guards the wiring (the order of the arrays the library returns, the
+alignment of the likelihood with the transitions), not precision: it could not
+catch an error the size of a model contrast, and no contrast uses the library's
+total. The tolerance is loose because the pinned library (non_local_detector
+2d730c3a in ``uv.lock``) adds its per-bin terms into a float32 total whose
+rounding grows with the number of bins: 1.8e-4 of the total over 93,000 bins of
+the simulated recording, and about 8e-4 over the 654,000 bins of a real epoch
+(``wilbur20210329_02_r1_HPC``), where the total drifted by 5,100 to 6,600 nats,
+by a different amount for each model. The per-bin terms themselves agree to
+about 1e-5 nats. Upstream main fixed the total (23369aa3, 2026-11-11); the
+tolerance stays harmless after an upgrade."""
 
 
 @jax.jit
@@ -317,7 +373,8 @@ def predictive_log_scores(
         ``log p(y_t | y_{-t})``.
     record : dict
         ``library_s``, ``two_sided_s``, ``marginal`` (the library's),
-        ``marginal_difference`` (it minus the sum of the filter scores),
+        ``filter_score_sum`` (the float64 sum of the filter scores),
+        ``marginal_difference`` (``marginal`` minus ``filter_score_sum``),
         ``marginal_agrees`` (within :data:`MARGINAL_TOLERANCE` of the total) and
         ``causal_mass_deviation`` (the largest distance of a filtered
         posterior's sum from 1).
@@ -356,9 +413,11 @@ def predictive_log_scores(
     log_likelihood = jnp.asarray(log_likelihood, dtype=jnp.float32)
     # A forbidden bin holds no predicted mass, so its likelihood is not part of
     # the model; it is set to -inf so that the library subtracts the largest
-    # likelihood of a bin that can hold mass before exponentiating (its
-    # normalization adds 1e-15, which loses mass when every bin with mass is far
-    # below the subtracted maximum)
+    # likelihood of a bin that can hold mass before exponentiating. The pinned
+    # library (non_local_detector 2d730c3a) adds 1e-15 in its normalization,
+    # which loses mass when every bin with mass is far below the subtracted
+    # maximum; upstream main fixed that (23369aa3, 2026-11-11), and the mask is
+    # harmless after an upgrade.
     if not patterns.all():
         masked = jnp.where(
             jnp.asarray(destination)[jnp.asarray(pattern)], log_likelihood, -jnp.inf
@@ -413,6 +472,7 @@ def predictive_log_scores(
 
     total = float(filter_score.astype(np.float64).sum())
     record["marginal"] = float(marginal)
+    record["filter_score_sum"] = total
     record["marginal_difference"] = float(marginal) - total
     record["marginal_agrees"] = bool(
         abs(record["marginal_difference"]) <= MARGINAL_TOLERANCE * abs(total)
@@ -436,8 +496,8 @@ def heldout_log_likelihood(
     """The decoder's four-state log-likelihood, every tetrode in the model,
     each bin under the encodings of its time block (fit on the other blocks).
 
-    Built as :func:`.tetrode_holdout.holdout_scores` builds its likelihood,
-    with no tetrode left out.
+    The held-out stage of :func:`.tetrode_holdout.holdout_scores`
+    (:func:`.tetrode_holdout.heldout_terms`), with no tetrode left out.
 
     Parameters
     ----------
@@ -462,53 +522,108 @@ def heldout_log_likelihood(
     blocks : ndarray of int, shape (n_time,)
         Each bin's time block.
     record : dict
-        ``refit_s``, ``terms_s``, ``n_spikes``.
+        ``refit_s``, ``terms_s``, ``n_spikes``
+        (:func:`.tetrode_holdout.heldout_terms`).
     """
-    from non_local_detector.likelihoods.no_spike import (
-        predict_no_spike_log_likelihood,
+    terms, no_spike, kernel, blocks, record = heldout_terms(
+        detector,
+        time,
+        head_position,
+        spike_times,
+        marks,
+        is_training,
+        n_folds=n_folds,
+        refit=refit,
+        log=log,
     )
-
-    record: dict[str, Any] = {}
-    started = clock.time()
-    time = np.asarray(time, dtype=float)
-    environment = detector.encoding_model_[ENCODING_KEY]["environment"]
-    centers = np.asarray(environment.place_bin_centers_)[interior_bin_mask(environment)]
     state_ind = np.asarray(detector.state_ind_)[detector.is_track_interior_state_bins_]
-
-    blocks = time_blocks(time, n_folds)
-    masks = fold_training_masks(is_training, blocks, n_folds)
-    encodings = [
-        refit(detector, time, head_position, spike_times, marks, mask) for mask in masks
-    ]
-    record["refit_s"] = round(clock.time() - started, 1)
-    log(f"refit {n_folds} encodings: {record['refit_s']} s")
-
-    t0 = clock.time()
-    terms = fold_terms(encodings, spike_times, marks, time, centers, blocks)
-    del encodings
-    no_spike = np.column_stack(
-        [
-            np.asarray(
-                predict_no_spike_log_likelihood(time, [st], detector.no_spike_rate)
-            )[:, 0]
-            for st in spike_times
-        ]
-    ).sum(axis=1)
-    kernel = np.asarray(
-        detector._compute_local_position_kernel(time, time, head_position, environment)
-    )
     likelihood = state_log_likelihood(
         terms.total(),
-        no_spike,
+        no_spike.sum(axis=1),
         kernel,
         state_ind,
         list(detector.state_names),
         np.asarray(is_missing, dtype=bool),
     )
-    record["terms_s"] = round(clock.time() - t0, 1)
-    record["n_spikes"] = int(terms.time_bin.size)
-    log(f"terms: {terms.time_bin.size} spikes, {record['terms_s']} s")
     return likelihood, blocks, record
+
+
+#: Each per-model key of :func:`predictive_log_scores`' record and its name in
+#: :func:`model_scores`' record.
+_MODEL_RECORD_KEYS = {
+    "library_s": "library_{}_s",
+    "two_sided_s": "two_sided_{}_s",
+    "marginal": "marginal_log_likelihood_{}",
+    "filter_score_sum": "filter_score_sum_{}",
+    "marginal_difference": "marginal_difference_{}",
+    "marginal_agrees": "marginal_agrees_{}",
+    "causal_mass_deviation": "causal_mass_deviation_{}",
+}
+
+
+def model_scores(
+    detector: Any,
+    log_likelihood: NDArray,
+    in_swr: NDArray,
+    *,
+    models: Sequence[str] = MODELS,
+    log: Callable[[str], None] = print,
+) -> tuple[dict[str, NDArray[np.float32]], dict]:
+    """Every bin's scores under the three models (or ``models``), on a given
+    likelihood.
+
+    The decoder's ``C``, ``D``, ``pi`` and state bins are read from
+    ``detector``, restricted to its track-interior state bins.
+
+    Parameters
+    ----------
+    detector : NonLocalClusterlessDetector
+        The epoch's fitted decoder (its states and transitions).
+    log_likelihood : ndarray, shape (n_time, n_state_bins)
+        ``ll[t, s]`` (:func:`heldout_log_likelihood`).
+    in_swr : ndarray of bool, shape (n_time,)
+        The bins inside an SWR, where ``swr`` allows only the non-local states.
+    models : sequence of str
+        The models to score, of :data:`MODELS`.
+    log : callable
+
+    Returns
+    -------
+    scores : dict of str to ndarray of float32, shape (n_time,)
+        Each model's columns of :data:`SCORE_COLUMNS`.
+    record : dict
+        ``continuous_block_deviation``; per model the library's
+        ``marginal_log_likelihood_<model>`` as it returned it, the
+        ``filter_score_sum_<model>``, their ``marginal_difference_<model>``,
+        ``marginal_agrees_<model>`` (:data:`MARGINAL_TOLERANCE`),
+        ``causal_mass_deviation_<model>``, ``library_<model>_s`` and
+        ``two_sided_<model>_s``.
+    """
+    likelihood = jnp.asarray(log_likelihood)  # on the device once for the models
+    interior = np.asarray(detector.is_track_interior_state_bins_)
+    state_ind = np.asarray(detector.state_ind_)[interior]
+    continuous = np.asarray(detector.continuous_state_transitions_)[
+        np.ix_(interior, interior)
+    ]
+    discrete = np.asarray(detector.discrete_state_transitions_)
+    initial = np.asarray(detector.initial_conditions_)[interior]
+    record: dict[str, Any] = {
+        "continuous_block_deviation": continuous_block_deviation(continuous, state_ind)
+    }
+    scores: dict[str, NDArray[np.float32]] = {}
+    allowed = allowed_states(detector.state_names, in_swr)
+    for model in models:
+        filter_score, two_sided, part = predictive_log_scores(
+            likelihood, initial, continuous, discrete, state_ind, allowed[model]
+        )
+        scores[f"{model}{FAMILY_SUFFIX['filter']}"] = filter_score
+        scores[f"{model}{FAMILY_SUFFIX['two_sided']}"] = two_sided
+        for key, name in _MODEL_RECORD_KEYS.items():
+            record[name.format(model)] = part[key]
+        log(
+            f"{model}: library {part['library_s']} s, two-sided {part['two_sided_s']} s"
+        )
+    return scores, record
 
 
 def restriction_scores(
@@ -526,7 +641,7 @@ def restriction_scores(
     log: Callable[[str], None] = print,
 ) -> tuple[pd.DataFrame, dict]:
     """Every bin's score under the three models, with a likelihood held out
-    in time (:func:`heldout_log_likelihood`).
+    in time (:func:`heldout_log_likelihood`, then :func:`model_scores`).
 
     Parameters
     ----------
@@ -555,13 +670,9 @@ def restriction_scores(
         ``swr_two_sided``, ``full_two_sided`` (``log p(y_t | y_{-t})``);
         ``in_swr`` and ``block`` (the bin's time block).
     record : dict
-        Timings (``refit_s``, ``terms_s``, ``library_<model>_s``,
-        ``two_sided_<model>_s``, ``total_s``); per model the library's
-        ``marginal_log_likelihood_<model>`` as it returned it, the
-        ``filter_score_sum_<model>``, their ``marginal_difference_<model>``,
-        ``marginal_agrees_<model>`` (:data:`MARGINAL_TOLERANCE`) and
-        ``causal_mass_deviation_<model>``; and ``n_spikes``, ``n_in_swr``,
-        ``n_missing``, ``continuous_block_deviation``, ``all_finite``.
+        :func:`heldout_log_likelihood`'s (``refit_s``, ``terms_s``,
+        ``n_spikes``) and :func:`model_scores`' records, and ``n_in_swr``,
+        ``n_missing``, ``total_s``.
 
     Raises
     ------
@@ -585,45 +696,15 @@ def restriction_scores(
         refit=refit,
         log=log,
     )
-    likelihood = jnp.asarray(likelihood)  # on the device once for the three models
-    interior = np.asarray(detector.is_track_interior_state_bins_)
-    state_ind = np.asarray(detector.state_ind_)[interior]
-    continuous = np.asarray(detector.continuous_state_transitions_)[
-        np.ix_(interior, interior)
-    ]
-    discrete = np.asarray(detector.discrete_state_transitions_)
-    initial = np.asarray(detector.initial_conditions_)[interior]
-    record["continuous_block_deviation"] = continuous_block_deviation(
-        continuous, state_ind
-    )
-    scores: dict[str, NDArray] = {}
-    for model, allowed in allowed_states(detector.state_names, in_swr).items():
-        filter_score, two_sided, part = predictive_log_scores(
-            likelihood, initial, continuous, discrete, state_ind, allowed
-        )
-        scores[model] = filter_score
-        scores[f"{model}{TWO_SIDED}"] = two_sided
-        record[f"library_{model}_s"] = part["library_s"]
-        record[f"two_sided_{model}_s"] = part["two_sided_s"]
-        record[f"marginal_log_likelihood_{model}"] = part["marginal"]
-        record[f"filter_score_sum_{model}"] = (
-            part["marginal"] - part["marginal_difference"]
-        )
-        record[f"marginal_difference_{model}"] = part["marginal_difference"]
-        record[f"marginal_agrees_{model}"] = part["marginal_agrees"]
-        record[f"causal_mass_deviation_{model}"] = part["causal_mass_deviation"]
-        log(
-            f"{model}: library {part['library_s']} s, two-sided {part['two_sided_s']} s"
-        )
+    scores, part = model_scores(detector, likelihood, in_swr, log=log)
+    record.update(part)
     record["n_in_swr"] = int(in_swr.sum())
     record["n_missing"] = int(np.asarray(is_missing, dtype=bool).sum())
-    record["all_finite"] = bool(all(np.isfinite(v).all() for v in scores.values()))
     record["total_s"] = round(clock.time() - started, 1)
-    columns = [*score_columns("filter").values(), *score_columns("two_sided").values()]
     table = pd.DataFrame(
         {
             "time": np.asarray(time),
-            **{column: scores[column] for column in columns},
+            **{column: scores[column] for column in SCORE_COLUMNS},
             "in_swr": in_swr,
             "block": blocks,
         }
@@ -631,13 +712,28 @@ def restriction_scores(
     return table, record
 
 
-def score_columns(family: str) -> dict[str, str]:
-    """Each model's column of a score family (``"filter"`` or
-    ``"two_sided"``) in :func:`restriction_scores`' table."""
-    if family not in FAMILIES:
-        raise ValueError(f"unknown score family {family!r}")
-    suffix = "" if family == "filter" else TWO_SIDED
-    return {model: f"{model}{suffix}" for model in MODELS}
+def check_failures(record: dict) -> list[str]:
+    """The model checks a :func:`restriction_scores` record fails, as messages.
+
+    A model's library marginal must agree with its summed filter scores
+    (``marginal_agrees_<model>``), and its filtered posterior mass must be
+    within :data:`CAUSAL_MASS_TOLERANCE` of 1.
+    """
+    failures = []
+    for model in MODELS:
+        if not record[f"marginal_agrees_{model}"]:
+            failures.append(
+                f"{model}: library marginal {record[f'marginal_log_likelihood_{model}']}"
+                f" differs from the summed filter scores by "
+                f"{record[f'marginal_difference_{model}']}"
+            )
+        deviation = record[f"causal_mass_deviation_{model}"]
+        if not deviation <= CAUSAL_MASS_TOLERANCE:
+            failures.append(
+                f"{model}: filtered posterior mass is {deviation} from 1 "
+                f"(tolerance {CAUSAL_MASS_TOLERANCE})"
+            )
+    return failures
 
 
 def restriction_sums(scores: pd.DataFrame, labels: Sequence) -> pd.DataFrame:
@@ -665,7 +761,7 @@ def restriction_sums(scores: pd.DataFrame, labels: Sequence) -> pd.DataFrame:
         When a labeled bin has a score that is not finite.
     """
     labels = pd.Series(np.asarray(labels, dtype=object), index=scores.index)
-    columns = [*score_columns("filter").values(), *score_columns("two_sided").values()]
+    columns = list(SCORE_COLUMNS)
     kept = labels.notna()
     not_finite = ~np.isfinite(scores.loc[kept, columns].to_numpy(np.float64))
     if not_finite.any():
@@ -710,15 +806,13 @@ def restriction_contrasts(
     combined = sums.reindex(list(categories)).fillna(0.0).sum()
     seconds = float(combined["n_bins"]) * bin_s
     out: dict[str, float] = {"n_bins": int(combined["n_bins"]), "seconds": seconds}
-    for family in FAMILIES:
-        suffix = "" if family == "filter" else TWO_SIDED
-        column = score_columns(family)
+    for suffix in FAMILY_SUFFIX.values():
         for name, (a, b) in {
             "swr_minus_none": ("swr", "none"),
             "full_minus_swr": ("full", "swr"),
             "full_minus_none": ("full", "none"),
         }.items():
-            difference = float(combined[column[a]] - combined[column[b]])
+            difference = float(combined[f"{a}{suffix}"] - combined[f"{b}{suffix}"])
             out[f"{name}{suffix}"] = difference
             out[f"{name}{suffix}_per_s"] = (
                 difference / seconds if seconds > 0 else float("nan")
@@ -727,7 +821,9 @@ def restriction_contrasts(
 
 
 def share_outside_swr(
-    sums: pd.DataFrame, inside: str, outside: str
+    sums: pd.DataFrame,
+    inside: str = IMMOBILE_IN_SWR,
+    outside: str = IMMOBILE_OUTSIDE_SWR,
 ) -> dict[str, float]:
     """Of the nats the non-local states buy over the bins of two categories,
     the part in the bins outside SWRs, both score families.
@@ -742,9 +838,9 @@ def share_outside_swr(
     sums : pd.DataFrame
         :func:`restriction_sums`' output.
     inside, outside : str
-        The categories of the bins inside and outside SWRs (for example
-        ``immobile_in_swr`` and ``immobile_outside_swr``); a category with no
-        bins adds nothing.
+        The categories of the bins inside and outside SWRs (by default
+        :data:`IMMOBILE_IN_SWR` and :data:`IMMOBILE_OUTSIDE_SWR`); a category
+        with no bins adds nothing.
 
     Returns
     -------
@@ -754,11 +850,10 @@ def share_outside_swr(
     """
     rows = sums.reindex([inside, outside]).fillna(0.0)
     out: dict[str, float] = {}
-    for family in FAMILIES:
-        column = score_columns(family)
-        gain = rows[column["full"]] - rows[column["none"]]
+    for suffix in FAMILY_SUFFIX.values():
+        gain = rows[f"full{suffix}"] - rows[f"none{suffix}"]
         total = float(gain.sum())
-        out[f"share_outside_swr{'' if family == 'filter' else TWO_SIDED}"] = (
+        out[f"share_outside_swr{suffix}"] = (
             float(gain[outside]) / total if total > 0 else float("nan")
         )
     return out

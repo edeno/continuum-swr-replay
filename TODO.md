@@ -146,6 +146,22 @@ Work that is deferred on purpose. Each item says when it should be done.
 
   *When:* before the Results are drafted.
 
+## Run infrastructure
+
+- [ ] **A resumed run does not compare an epoch's own inputs.** `runs/epoch_records.same_run`
+  compares the run-wide header `inputs` only. A runner whose inputs are per epoch (a decode
+  frame, a saved detector) reuses an epoch's record after that epoch is re-decoded; only
+  `--overwrite` recomputes it. `scripts/event_evidence/score_nonlocal_restriction.py` records
+  each epoch's input digests (`epoch_inputs`) but nothing reads them back, and
+  `score_tetrode_holdout.py` and `score_event_likelihood_advantage.py` record none. Let a task
+  give `epochs_to_run` a per-epoch input function and rerun an epoch whose digests differ.
+  *When:* before the next re-decode, or when one of these runners is resumed across one.
+- [ ] **One GPU-per-worker setup.** `scripts/event_evidence/_per_event_run.use_gpu` repeats the
+  environment setup and device check of `runs/device.configure_jax_gpu`, which it cannot call
+  because that allows one process per card. Move the shared part into `runs/device` and have
+  both use it.
+  *When:* when a third runner needs several workers on a card.
+
 ## Checks
 
 - [ ] **Type checking.** `mypy src/` reports about 400 errors in 90 files.

@@ -1,6 +1,6 @@
 """What the per-event runners share: their arguments, the canonical event table,
-and the epoch loop that writes each epoch's record and gathers the run's
-manifest (``runs.epoch_records``).
+an epoch's decode inputs, the GPU worker pool, and the epoch loop that writes
+each epoch's record and gathers the run's manifest (``runs.epoch_records``).
 
 Used by ``measure_event_participation.py``, ``score_event_likelihood_advantage.py``,
 ``score_tetrode_holdout.py`` and ``score_nonlocal_restriction.py``.
@@ -13,9 +13,14 @@ import logging
 import multiprocessing
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+import pandas as pd
+
+from continuum_swr_replay.decoding.files import DecodePaths, decode_paths
 from continuum_swr_replay.paths import (
     processed_data_dir,
     replay_content_dir,
@@ -97,6 +102,71 @@ def use_gpu(queue: multiprocessing.Queue, mem_fraction: float) -> None:
             "gpu_name": card.name,
         }
     )
+
+
+def add_gpu_arguments(parser: argparse.ArgumentParser) -> None:
+    """``--gpus`` and ``--workers-per-gpu``, the arguments of :func:`gpu_pool`."""
+    parser.add_argument("--gpus", type=int, nargs="+", help="the cards to use")
+    parser.add_argument("--workers-per-gpu", type=int, default=1)
+
+
+def gpu_pool(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> tuple[int, dict[str, Any]]:
+    """:func:`run`'s ``max_workers`` and ``pool_options`` for ``args.gpus``,
+    ``args.workers_per_gpu`` workers to a card, each allowed that share of its
+    memory (:func:`use_gpu`); a parser error without ``--gpus``."""
+    if not args.gpus:
+        parser.error("--gpus is required")
+    context = multiprocessing.get_context("spawn")
+    queue = context.Queue()
+    for gpu in args.gpus:
+        for _ in range(args.workers_per_gpu):
+            queue.put(gpu)
+    return len(args.gpus) * args.workers_per_gpu, {
+        "mp_context": context,
+        "initializer": use_gpu,
+        "initargs": (queue, round(0.9 / args.workers_per_gpu, 3)),
+    }
+
+
+@dataclass(frozen=True)
+class EpochInputs:
+    """An epoch's decode frame, its spikes and masks, and its decoder."""
+
+    paths: DecodePaths
+    frame: pd.DataFrame
+    """The decode frame, read through the SWR source."""
+    time: np.ndarray
+    """Its time axis, s, shape (n_time,)."""
+    loaded: dict
+    """``load_marks_and_training_mask``'s spikes, marks and masks."""
+    detector: Any
+
+
+def epoch_inputs(epoch_id: str, data_dir: Path) -> EpochInputs:
+    """Read an epoch's decode frame, spikes, masks and detector.
+
+    Raises
+    ------
+    ValueError
+        If the loader's time axis is not the decode's.
+    """
+    from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+        read_dot_with_swr_source,
+    )
+    from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
+        load_detector,
+        load_marks_and_training_mask,
+    )
+
+    paths = decode_paths(epoch_id, data_dir)
+    frame = read_dot_with_swr_source(paths.data_over_time)
+    time = frame.index.to_numpy(dtype=float)
+    loaded = load_marks_and_training_mask(epoch_id)
+    if not np.array_equal(loaded["time"], time):
+        raise ValueError("the loader's time axis is not the decode's")
+    return EpochInputs(paths, frame, time, loaded, load_detector(epoch_id, data_dir))
 
 
 def run(
