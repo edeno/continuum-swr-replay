@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "2825f480b9ff",
+ "commit": "f1ede00e3c8a",
  "code": {
-  "head": "2825f480b9ff6105df2dd67f82c8862996e7fe46",
+  "head": "f1ede00e3c8ad5ec92fcba780edb2865eca36912",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -255,8 +255,8 @@
     "code_sha256": "ef936210972a70fd67d41f6d6730bf18f39dff3427aa6c8595c0ce398b8b1bbf"
    },
    "src/continuum_swr_replay/analysis/event_properties/content_along_arms.py": {
-    "sha256": "e61fc784f7afaefe170b706db7fdf55a67521aede75e8ceee8638cde7bbe38dd",
-    "code_sha256": "c3490bca0d57002a36f5f68eb6147854d9e5c34485917eb10ba173490d1082e3"
+    "sha256": "8846b04d809fc53422ae4cd46ddb50ef226ce8b3a82b288c96319846efcfc5c5",
+    "code_sha256": "15ab3fffdb310d5edc12eab9361f5a402a58600b7fe9612d98ed679b39c5a935"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
     "sha256": "ded3c6e84ab49e6caca480632c02f493fe873617a8c0b2a7368e376f56d5c22b",
@@ -339,8 +339,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "260a1b1db4edc01d30a4a75311191d24fe65784ad3c937581c0ced7d3a2f0d06",
-    "code_sha256": "78a88a5c906f17b3366a1309bb44ed8f9a7cb8dd6d617e685c25813ca0d867af"
+    "sha256": "7847988a256ac5cee2154bf2ce45ccf9d0ef4f6c3ba0487c7c4d0ee26216e25b",
+    "code_sha256": "367c6cc8707d850be6b8ebd16912d8d38b07d58f9d2af1daeb522d39a420fd8c"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -424,16 +424,16 @@
   },
   {
    "path": "Processed-Data/event_gamma/manifest.json",
-   "sha256": "b92d8d13255cce63d0382bee11ee0e548ed95145727026365b8dc748920fd713"
+   "sha256": "b1614d062ec85cd683e5b5c1b1bc6c6252179886f4601443577443ce266cdd68"
   },
   {
    "path": "Processed-Data/event_gamma/reference.parquet",
-   "sha256": "4d1977830095622635a87e3f2a9ce5af19451711080fe7f52dd0250f4c234cae"
+   "sha256": "fb3579e9e2553596517ae286a4b4f195d75a5ad81c5d91364a52a0e4fa75844a"
   },
   {
    "path": "Processed-Data/event_gamma/*_events.parquet",
    "n_files": 242,
-   "sha256": "4c7fabece8e648c85f0da19f623c16b798414bf38073098deb925fddb0332d50"
+   "sha256": "50c92038a4600922d00044e9339074cca4f0674d224f75c983dc71281998916c"
   },
   {
    "path": "Processed-Data/replay_detection_comparison/event_features/e2331f976fd1/*_features.parquet",
@@ -1324,6 +1324,23 @@
    "function": "event_cohort_values",
    "pending": null
   },
+  "even_content_at_well_fraction": {
+   "value": 0.24509170524072657,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the track within 20 cm of a well (a track-graph end point): the share at a well of content spread evenly over the track",
+   "questions": [
+    "2d.1"
+   ],
+   "figures": [
+    "3e",
+    "3g"
+   ],
+   "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
+   "function": "content_occupancy_values",
+   "pending": null
+  },
   "evidence_animals": {
    "value": 5,
    "kind": "count",
@@ -1492,7 +1509,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1508,7 +1525,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1524,7 +1541,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1540,7 +1557,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1575,7 +1592,7 @@
    "pending": null
   },
   "fast_gamma_db_median_non_swr": {
-   "value": 0.5237300652177623,
+   "value": 0.5309050810235714,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "dB",
@@ -1589,7 +1606,7 @@
    "pending": null
   },
   "fast_gamma_db_median_swr": {
-   "value": 1.1488094096614931,
+   "value": 1.1786539741651505,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "dB",
@@ -1603,7 +1620,7 @@
    "pending": null
   },
   "fast_gamma_median_non_swr": {
-   "value": -0.21276955763535474,
+   "value": -0.2127689199142867,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -1612,7 +1629,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1628,14 +1645,14 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
   "fast_gamma_rest_matched_reference_non_swr": {
-   "value": -0.3578498632427578,
+   "value": -0.357724044146009,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -1644,14 +1661,14 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
   "fast_gamma_rest_matched_reference_swr": {
-   "value": -0.32998792184410974,
+   "value": -0.3300154905638478,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -1660,14 +1677,14 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
   "fast_gamma_running_matched_reference_non_swr": {
-   "value": -0.02553020949985636,
+   "value": -0.025773993653612257,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -1676,7 +1693,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -1692,7 +1709,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4626,7 +4643,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4642,7 +4659,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4658,7 +4675,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4674,7 +4691,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
@@ -4709,7 +4726,7 @@
    "pending": null
   },
   "slow_gamma_db_median_non_swr": {
-   "value": 0.3631893555661309,
+   "value": 0.3699194568565598,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "dB",
@@ -4723,7 +4740,7 @@
    "pending": null
   },
   "slow_gamma_db_median_swr": {
-   "value": 1.632122006811644,
+   "value": 1.6585055915668172,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "dB",
@@ -4737,7 +4754,7 @@
    "pending": null
   },
   "slow_gamma_median_non_swr": {
-   "value": -0.10483297970275972,
+   "value": -0.10482267562055286,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -4746,14 +4763,14 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_median_swr": {
-   "value": 0.35792542553983864,
+   "value": 0.3578354770254885,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -4762,14 +4779,14 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_rest_matched_reference_non_swr": {
-   "value": -0.20447373937328403,
+   "value": -0.20315353486291632,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -4778,14 +4795,14 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_rest_matched_reference_swr": {
-   "value": -0.161448482474487,
+   "value": -0.16093412339018648,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -4794,14 +4811,14 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_running_matched_reference_non_swr": {
-   "value": -0.20737094298122488,
+   "value": -0.20736054558424766,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -4810,14 +4827,14 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_running_matched_reference_swr": {
-   "value": -0.16171946524648395,
+   "value": -0.16079211577268682,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
@@ -4826,7 +4843,7 @@
     "2d.8"
    ],
    "figures": [
-    "3h"
+    "event_gamma"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
    "function": "gamma_z_values",
