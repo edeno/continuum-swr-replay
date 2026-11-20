@@ -329,6 +329,33 @@ def leaf_and_trunk_profiles(density: pd.DataFrame) -> pd.DataFrame:
     return frame.groupby(["is_swr", "arm_type", "segment"])[["density_per_cm"]].mean()
 
 
+def log2_density_against_even(
+    density: pd.DataFrame, even_density_per_cm: float
+) -> pd.Series:
+    """log2 of each kind's content density in each segment over the density of
+    content spread evenly over the track.
+
+    Parameters
+    ----------
+    density : pd.DataFrame
+        :func:`content_density_along_arms`'s output.
+    even_density_per_cm : float
+        :func:`even_content`'s ``density_per_cm``.
+
+    Returns
+    -------
+    against_even : pd.Series
+        Indexed by ``is_swr``, ``arm`` and ``segment``: 0 where a kind's content
+        is as dense as even content, 1 where twice as dense, -1 where half;
+        ``-inf`` where a segment holds none of the kind's content.
+    """
+    with np.errstate(divide="ignore"):
+        against_even: pd.Series = np.log2(
+            density["density_per_cm"] / even_density_per_cm
+        )
+    return against_even
+
+
 def log2_density_ratio(density: pd.DataFrame) -> pd.Series:
     """log2 of the no-SWR to SWR content density in each segment.
 

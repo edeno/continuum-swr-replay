@@ -16,6 +16,7 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     distance_to_nearest_well,
     even_content,
     leaf_and_trunk_profiles,
+    log2_density_against_even,
     log2_density_ratio,
     place_share_statistics,
 )
@@ -162,6 +163,28 @@ def test_even_content_is_one_over_the_track_and_the_tracks_share_at_wells():
         even_content(
             pd.concat([bins, longer[longer["arm"] != 6]], ignore_index=True), 20.0
         )
+
+
+def test_density_against_even_is_zero_for_even_content_and_counts_doublings():
+    # Arm 0 of ten 1-cm bins in two segments. Even content: one time bin on every
+    # place bin. Then three on each bin of the far half and one on each of the
+    # near half: the far half holds 3/4 of the content in half the arm, 1.5 times
+    # even, the near half 0.5 times. Content on the far half alone leaves the
+    # near half with none.
+    even_bins = _bins("a", False, 0, np.arange(10))
+    even = even_content(even_bins, at_well_cm=5.0)["density_per_cm"]
+    flat = log2_density_against_even(content_density_along_arms(even_bins, 2), even)
+    np.testing.assert_allclose(flat.to_numpy(), 0.0, atol=1e-12)
+
+    far_heavy = _bins("a", False, 0, np.r_[np.arange(10), np.tile(np.arange(5, 10), 2)])
+    tilted = log2_density_against_even(content_density_along_arms(far_heavy, 2), even)
+    assert tilted[(False, 0, 0)] == pytest.approx(np.log2(0.5))
+    assert tilted[(False, 0, 1)] == pytest.approx(np.log2(1.5))
+
+    far_only = _bins("a", False, 0, np.arange(5, 10))
+    empty = log2_density_against_even(content_density_along_arms(far_only, 2), even)
+    assert empty[(False, 0, 0)] == -np.inf
+    assert empty[(False, 0, 1)] == pytest.approx(1.0)
 
 
 def test_a_place_bin_across_a_segment_edge_goes_to_each_by_the_part_in_it():

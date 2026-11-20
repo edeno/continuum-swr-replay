@@ -8,7 +8,7 @@ layout (rows spaced from what they draw, letters on measured edges) are defined
 once, here.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,9 +25,13 @@ from continuum_swr_replay.visualization.palettes import COLORS
 __all__ = [
     "axes_added",
     "check_journal_limits",
+    "check_placement",
     "drawn_extent",
+    "drawn_texts",
     "example_badge",
     "letter_panel",
+    "overlapping_panels",
+    "overlapping_texts",
     "plot_posterior",
     "plot_raster",
     "posterior_color_limit",
@@ -324,6 +328,157 @@ def drawn_extent(fig: Figure, axes: Sequence[Axes]) -> Bbox:
     return Bbox.union([ax.get_tightbbox() for ax in axes]).transformed(
         fig.transFigure.inverted()
     )
+
+
+def drawn_texts(fig: Figure) -> list[Text]:
+    """The text artists a draw of ``fig`` paints, in drawing order.
+
+    Not every text a figure holds is drawn: a tick label whose tick lies outside
+    the view is not. This draws the figure and keeps the texts the renderer is
+    handed.
+    """
+    renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
+    drawn: dict[int, Text] = {}
+    draw_text = renderer.draw_text
+
+    def record(gc, x, y, s, prop, angle, ismath=False, mtext=None):
+        if mtext is not None and s.strip():
+            drawn.setdefault(id(mtext), mtext)
+        return draw_text(gc, x, y, s, prop, angle, ismath=ismath, mtext=mtext)
+
+    renderer.draw_text = record
+    try:
+        fig.draw(renderer)
+    finally:
+        del renderer.draw_text  # the class's method again
+    return list(drawn.values())
+
+
+def _text_outline(text: Text) -> np.ndarray:
+    """The four corners of a text's own rectangle, in display pixels.
+
+    An upright text's rectangle is its window extent. A slanted text's extent is
+    the upright box around its slanted rectangle, which reaches well past the
+    letters; the rectangle itself has the text's unrotated size, the extent's
+    center and the text's angle.
+    """
+    extent = text.get_window_extent()
+    angle = np.deg2rad(text.get_rotation())
+    width, height = extent.width, extent.height
+    if not np.isclose(np.sin(angle), 0.0):
+        rotation = text.get_rotation()
+        text.set_rotation(0)
+        flat = text.get_window_extent()
+        text.set_rotation(rotation)
+        width, height = flat.width, flat.height
+    elif not np.isclose(np.cos(angle), 1.0):
+        angle = 0.0  # upside down: the same rectangle
+    corners = 0.5 * np.array(
+        [[-width, -height], [width, -height], [width, height], [-width, height]]
+    )
+    turn = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+    center = np.array([0.5 * (extent.x0 + extent.x1), 0.5 * (extent.y0 + extent.y1)])
+    return corners @ turn.T + center
+
+
+def _rectangles_overlap(first: np.ndarray, second: np.ndarray, by: float) -> bool:
+    """Whether two rectangles (corners, in order) overlap by more than ``by``
+    along every direction: no side of either separates them."""
+    for corners in (first, second):
+        for side in np.roll(corners, -1, axis=0) - corners:
+            normal = np.array([-side[1], side[0]]) / np.hypot(*side)
+            a, b = first @ normal, second @ normal
+            if min(a.max(), b.max()) - max(a.min(), b.min()) <= by:
+                return False
+    return True
+
+
+TEXT_OVERLAP_PT = 0.5
+"""Two texts overlap when their rectangles do by more than this, in points: a
+text's rectangle has a little room around its letters."""
+
+
+def overlapping_texts(fig: Figure) -> list[tuple[str, str]]:
+    """Each pair of drawn texts of ``fig`` whose rectangles overlap.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        The finished figure; it is drawn.
+
+    Returns
+    -------
+    pairs : list of (str, str)
+        The two texts of each pair, in drawing order. A slanted text is its own
+        slanted rectangle, not the upright box around it.
+    """
+    texts = drawn_texts(fig)
+    outlines = [_text_outline(text) for text in texts]
+    by = TEXT_OVERLAP_PT * fig.dpi / 72.0
+    return [
+        (texts[i].get_text(), texts[j].get_text())
+        for i in range(len(texts))
+        for j in range(i + 1, len(texts))
+        if _rectangles_overlap(outlines[i], outlines[j], by)
+    ]
+
+
+def overlapping_panels(
+    fig: Figure, panels: Mapping[str, Sequence[Axes]]
+) -> list[tuple[str, str]]:
+    """Each pair of panels whose drawings (labels included) overlap.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        The finished figure, already drawn.
+    panels : Mapping[str, Sequence[Axes]]
+        Each panel's name and its axes.
+
+    Returns
+    -------
+    pairs : list of (str, str)
+        The names of each pair whose :func:`drawn_extent` boxes overlap.
+    """
+    extents = {name: drawn_extent(fig, axes) for name, axes in panels.items()}
+    names = list(extents)
+    return [
+        (names[i], names[j])
+        for i in range(len(names))
+        for j in range(i + 1, len(names))
+        if extents[names[i]].overlaps(extents[names[j]])
+    ]
+
+
+def check_placement(fig: Figure, panels: Mapping[str, Sequence[Axes]]) -> None:
+    """Stop rather than save a figure in which a text runs into another or a
+    panel's drawing into another panel's.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        The finished figure.
+    panels : Mapping[str, Sequence[Axes]]
+        Each panel's name and its axes.
+
+    Raises
+    ------
+    ValueError
+        Naming each pair of overlapping texts (:func:`overlapping_texts`) and of
+        overlapping panels (:func:`overlapping_panels`).
+    """
+    problems = [
+        f"the texts {first!r} and {second!r} overlap"
+        for first, second in overlapping_texts(fig)
+    ]
+    problems += [
+        f"panels {first} and {second} overlap"
+        for first, second in overlapping_panels(fig, panels)
+    ]
+    if problems:
+        raise ValueError(
+            "The figure's parts run into each other: " + "; ".join(problems)
+        )
 
 
 def shift_vertically(axes: Sequence[Axes], dy: float) -> None:

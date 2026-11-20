@@ -1409,6 +1409,156 @@ def test_figure03_legend_counts_every_event_of_each_kind(offline):
     plt.close(fig)
 
 
+def _spider_track():
+    """The task's track: a center (9), three patch junctions (6, 7, 8) and six
+    wells (0-5), at one epoch's positions (cm); arms 0-5 are the leaf arms, 6-8
+    the trunk arms. Returns the graph and its arms in drawing order."""
+    import networkx as nx
+
+    positions = {
+        0: (177.0, 45.1), 1: (223.7, 122.3), 2: (181.7, 202.5), 3: (87.9, 204.2),
+        4: (40.9, 126.5), 5: (86.2, 45.1), 6: (179.6, 98.7), 7: (135.4, 178.0),
+        8: (86.5, 99.6), 9: (134.6, 124.8),
+    }  # fmt: skip
+    arms = {0: (6, 0), 1: (6, 1), 2: (7, 2), 3: (7, 3), 4: (8, 4), 5: (8, 5),
+            6: (9, 6), 7: (9, 7), 8: (9, 8)}  # fmt: skip
+    graph = nx.Graph()
+    for node, position in positions.items():
+        graph.add_node(node, pos=position)
+    for arm, (first, second) in arms.items():
+        graph.add_edge(first, second, edge_id=arm)
+    return graph, [arms[arm] for arm in (6, 0, 1, 7, 2, 3, 8, 4, 5)]
+
+
+def test_figure03_track_bands_meet_at_a_junction_without_overlapping(offline):
+    """Where three arms meet, each arm's band ends on the lines halfway to its
+    neighbors: every point of the track lies in exactly one segment's band, at
+    the junctions as along the arms, and no segment is left without a band."""
+    from matplotlib.path import Path
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    graph, edge_order = _spider_track()
+    values = pd.Series(
+        0.0,
+        index=pd.MultiIndex.from_product([range(9), range(figure03.N_SEGMENTS)]),
+    )
+    polygons, shown = figure03.track_bands(graph, edge_order, values)
+    assert len(polygons) == len(shown) == 9 * figure03.N_SEGMENTS
+    assert all(len(polygon) >= 3 for polygon in polygons)
+
+    half = figure03.ARM_HALF_WIDTH_CM
+    rng = np.random.default_rng(0)
+    # points around every junction and the center, and over the whole track
+    near = np.concatenate(
+        [
+            np.asarray(graph.nodes[node]["pos"]) + rng.uniform(-25, 25, (2000, 2))
+            for node in (6, 7, 8, 9)
+        ]
+    )
+    points = np.concatenate([near, rng.uniform((20, 30), (245, 220), (6000, 2))])
+    in_band = np.zeros(len(points), dtype=bool)
+    for first, second in edge_order:
+        start = np.asarray(graph.nodes[first]["pos"])
+        along = np.asarray(graph.nodes[second]["pos"]) - start
+        length = np.hypot(*along)
+        offset = points - start
+        forward = offset @ along / length
+        sideways = np.abs(offset @ np.array([-along[1], along[0]]) / length)
+        in_band |= (forward >= 0) & (forward <= length) & (sideways <= half)
+    n_holding = sum(Path(polygon).contains_points(points) for polygon in polygons)
+    assert in_band.sum() > 3000
+    assert (n_holding[in_band] == 1).all()
+    assert (n_holding[~in_band] == 0).all()
+
+
+def test_figure03_density_tracks_draw_each_kind_against_even(offline):
+    """Panel e: one track per kind, each segment colored by the kind's density
+    against even content, on a scale that saturates and says so at its ends."""
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import PolyCollection
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    graph, edge_order = _spider_track()
+    index = pd.MultiIndex.from_product(
+        [[False, True], range(9), range(figure03.N_SEGMENTS)],
+        names=["is_swr", "arm", "segment"],
+    )
+    against_even = pd.Series(np.linspace(-3, 3, len(index)), index=index)
+    against_even[(False, 6, 0)] = -np.inf  # a segment without content
+    fig, axes = plt.subplots(1, 2)
+    figure03.draw_density_tracks(axes, graph, edge_order, against_even)
+    limit = figure03.DENSITY_LIMIT_LOG2
+    for ax, (is_swr, name, _) in zip(axes, figure03.KINDS, strict=True):
+        assert ax.get_title() == name
+        (bands,) = [c for c in ax.collections if isinstance(c, PolyCollection)]
+        _, values = figure03.track_bands(graph, edge_order, against_even.loc[is_swr])
+        np.testing.assert_allclose(bands.get_array(), np.clip(values, -limit, limit))
+        assert np.isfinite(bands.get_array()).all()
+    bars = [ax for ax in fig.axes if ax not in list(axes)]
+    assert len(bars) == 2
+    for bar in bars:
+        assert [t.get_text() for t in bar.get_xticklabels()] == ["≤¼×", "even", "≥4×"]
+    plt.close(fig)
+
+
+def test_figure03_track_map_names_the_center_a_junction_and_a_well(offline):
+    """The profile's axis runs from the center to a junction to a well; the
+    track map says where those are. Each name belongs to a node of its sort and
+    sits beside it, with no line to it; at the map's printed size no name lies
+    over a band or over another name."""
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import PolyCollection
+    from matplotlib.path import Path
+
+    from continuum_swr_replay.visualization.simulated_run_panels import (
+        overlapping_texts,
+    )
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    graph, edge_order = _spider_track()
+    values = pd.Series(
+        0.0,
+        index=pd.MultiIndex.from_product([range(9), range(figure03.N_SEGMENTS)]),
+    )
+    polygons, _ = figure03.track_bands(graph, edge_order, values)
+    fig = plt.figure(figsize=(figure03.WIDTH, figure03.HEIGHT), layout="none")
+    ax = fig.add_axes([0.08, 0.15, 0.17, 0.33])  # one map, at its size in the figure
+    ax.add_collection(PolyCollection(polygons))
+    ax.autoscale_view()
+    ax.set_aspect("equal")
+    ax.axis("off")
+    figure03.label_track(ax, graph)
+
+    named = {text.get_text(): text for text in ax.texts}
+    assert sorted(named) == ["center", "junction", "well"]
+    position = {node: np.asarray(graph.nodes[node]["pos"]) for node in graph}
+    np.testing.assert_allclose(named["center"].xy, position[9])
+    assert any(np.allclose(named["junction"].xy, position[n]) for n in (6, 7, 8))
+    assert any(np.allclose(named["well"].xy, position[n]) for n in range(6))
+    assert all(text.arrow_patch is None for text in named.values())
+
+    fig.draw_without_rendering()
+    bands = [Path(ax.transData.transform(polygon)) for polygon in polygons]
+    for text in named.values():
+        box = text.get_window_extent()
+        outline = Path(
+            [(box.x0, box.y0), (box.x1, box.y0), (box.x1, box.y1), (box.x0, box.y1)]
+        )
+        assert not any(outline.intersects_path(band, filled=True) for band in bands)
+        # and beside its node: within two band widths of it
+        node = ax.transData.transform(text.xy)
+        nearest = np.hypot(
+            np.clip(node[0], box.x0, box.x1) - node[0],
+            np.clip(node[1], box.y0, box.y1) - node[1],
+        )
+        two_widths = 4 * figure03.ARM_HALF_WIDTH_CM
+        assert nearest <= np.hypot(
+            *(ax.transData.transform((two_widths, 0)) - ax.transData.transform((0, 0)))
+        )
+    assert overlapping_texts(fig) == []
+    plt.close(fig)
+
+
 def test_figure03_profiles_carry_the_even_content_line(offline):
     """Panel g draws what content spread evenly over the track would give: one
     density across both halves, labeled, and its share at a well beside the two

@@ -45,6 +45,7 @@ from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
     check_journal_limits,
+    check_placement,
     drawn_extent,
     letter_panel,
     set_publication_style,
@@ -127,6 +128,7 @@ def generate_figure(inputs: dict):
     top = max(drawn_extent(fig, [ax]).y1 for ax in axes) + 0.02
     for ax, letter in zip(axes, "ab", strict=True):
         letter_panel(fig, letter, max(drawn_extent(fig, [ax]).x0 - 0.004, 0.0), top)
+    check_placement(fig, {"a": [axes[0]], "b": [axes[1]]})
     return fig
 
 

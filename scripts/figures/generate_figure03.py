@@ -18,8 +18,11 @@ Each row asks one thing:
             one axis: the distribution, and under it the share of events at
             or below each speed.
     Where on the track the content is
-        e — Where each kind's content is denser: the ratio of no-SWR to SWR
-            content time per cm along every arm.
+        e — Where each kind's content is: its content time per cm along every
+            arm, drawn on the track once per kind, against what content spread
+            evenly over the track would give
+            (``content_along_arms.log2_density_against_even``). The track
+            names its center, a junction and a well, the ends of f's axis.
         f — Content time per cm from the center out to the junctions (trunk
             arms) and from the junctions out to the wells (leaf arms), against
             what content spread evenly over the track would give (the dashed
@@ -85,7 +88,7 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     content_place_shares,
     even_content,
     leaf_and_trunk_profiles,
-    log2_density_ratio,
+    log2_density_against_even,
     place_share_statistics,
 )
 from continuum_swr_replay.analysis.event_properties.event_statistics import (
@@ -108,6 +111,7 @@ from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.simulated_run_panels import (
     SMALL_SIZE,
     check_journal_limits,
+    check_placement,
     drawn_extent,
     letter_panel,
     set_publication_style,
@@ -136,8 +140,12 @@ TRACK_EPOCH = "wilbur20210329_02_r1_HPC"
 ARM_HALF_WIDTH_CM = 9.0
 # Panels e and f: segments per arm, about 4 cm (two 2-cm place bins) each.
 N_SEGMENTS = 13
-# Panel e: the color scale's limit, log2 of the no-SWR to SWR density ratio.
-RATIO_LIMIT_LOG2 = 2
+# Panel e: the color scale's limit, log2 of a kind's density over even content's,
+# and its tick labels: a segment beyond an end is drawn in the end's color.
+DENSITY_LIMIT_LOG2 = 2
+DENSITY_TICK_LABELS = ("≤¼×", "even", "≥4×")
+# Panel e: the color of content sparser than even content, for either kind.
+C_BELOW_EVEN = "#6e6e6e"
 
 # Panels a, c, d: (column, x label, scale, bin edges, x ticks). A tick at an
 # end of the axis that starts with ≤ or ≥ says its bin also holds the events
@@ -184,13 +192,14 @@ def read_inputs() -> dict:
         ],
     )
     density = content_density_along_arms(along, N_SEGMENTS)
+    even = even_content(along, AT_WELL_CM)
     env = pd.read_pickle(decode_paths(TRACK_EPOCH, processed_data_dir()).environment)
     return {
         "events": events,
         "place_shares": place_share_statistics(content_place_shares(along))["means"],
-        "ratio": log2_density_ratio(density),
         "profiles": leaf_and_trunk_profiles(density),
-        "even": even_content(along, AT_WELL_CM),
+        "even": even,
+        "against_even": log2_density_against_even(density, even["density_per_cm"]),
         "track_graph": env.track_graph,
         "edge_order": [tuple(edge) for edge in env.edge_order],
     }
@@ -269,46 +278,189 @@ def draw_cumulative(ax, events: pd.DataFrame, key: str) -> None:
     ax.set_xticks(list(ticks), list(ticks.values()))
 
 
-def draw_ratio_track(ax, track_graph, edge_order, ratio: pd.Series) -> None:
-    """Each segment of the track colored by log2 of its no-SWR to SWR content
-    density (``content_along_arms.log2_density_ratio``), on a scale between the
-    two kinds' colors; the scale saturates at ``RATIO_LIMIT_LOG2``."""
-    polygons, values = [], []
+def _keep_side(
+    polygon: np.ndarray, point: np.ndarray, toward: np.ndarray
+) -> np.ndarray:
+    """The part of a convex polygon on the side of the line through ``point``
+    that ``toward`` (the line's normal) points to."""
+    side = (polygon - point) @ toward
+    kept = []
+    for i in range(len(polygon)):
+        j = (i + 1) % len(polygon)
+        if side[i] >= 0:
+            kept.append(polygon[i])
+        if (side[i] >= 0) != (side[j] >= 0):
+            crossing = side[i] / (side[i] - side[j])
+            kept.append(polygon[i] + crossing * (polygon[j] - polygon[i]))
+    return np.asarray(kept).reshape(-1, 2)
+
+
+def track_bands(
+    track_graph, edge_order, values: pd.Series
+) -> tuple[list[np.ndarray], np.ndarray]:
+    """Each arm segment as a band ``ARM_HALF_WIDTH_CM`` to each side of its arm,
+    and its value.
+
+    Where arms meet, a band ends on the lines halfway between its arm and each
+    neighbor, so the bands of a junction fit together: none lies over another
+    and no segment is hidden.
+
+    Parameters
+    ----------
+    track_graph : networkx.Graph
+        Nodes with ``pos`` (cm), edges with ``edge_id`` (the arm).
+    edge_order : sequence of (node, node)
+        The arms, each from its first node (segment 0) to its second.
+    values : pd.Series
+        One value per segment, indexed by ``arm`` and ``segment``.
+
+    Returns
+    -------
+    polygons : list of NDArray, each shape (n_corners, 2)
+        One per arm and segment, in the order of ``edge_order``.
+    shown : NDArray, shape (n_arms * N_SEGMENTS,)
+        Each polygon's value.
+    """
+    position = {
+        node: np.asarray(track_graph.nodes[node]["pos"], dtype=float)
+        for node in track_graph
+    }
+    polygons, shown = [], []
     for first, second in edge_order:
         arm = track_graph.edges[first, second]["edge_id"]
-        start = np.asarray(track_graph.nodes[first]["pos"], dtype=float)
-        step = np.asarray(track_graph.nodes[second]["pos"], dtype=float) - start
-        normal = np.array([-step[1], step[0]]) / np.hypot(*step) * ARM_HALF_WIDTH_CM
-        step = step / N_SEGMENTS
+        along = position[second] - position[first]
+        unit = along / np.hypot(*along)
+        normal = np.array([-unit[1], unit[0]]) * ARM_HALF_WIDTH_CM
+        # At each end: nearer this arm than each other arm that leaves the node.
+        cuts = []
+        for node, outward in ((first, unit), (second, -unit)):
+            for other in track_graph.neighbors(node):
+                if other not in (first, second):
+                    toward = position[other] - position[node]
+                    cuts.append((position[node], outward - toward / np.hypot(*toward)))
         for segment in range(N_SEGMENTS):
-            a, b = start + step * segment, start + step * (segment + 1)
-            polygons.append([a + normal, b + normal, b - normal, a - normal])
-            values.append(ratio[(arm, segment)])
-    # Filled bands, not thick lines: the journal caps line width.
-    bands = PolyCollection(
-        polygons,
-        array=np.asarray(values),
-        cmap=LinearSegmentedColormap.from_list("kinds", [C_SWR, "#f7f7f7", C_NO_SWR]),
-        norm=TwoSlopeNorm(0.0, -RATIO_LIMIT_LOG2, RATIO_LIMIT_LOG2),
-        linewidths=0,
+            a = position[first] + along * segment / N_SEGMENTS
+            b = position[first] + along * (segment + 1) / N_SEGMENTS
+            polygon = np.array([a + normal, b + normal, b - normal, a - normal])
+            for point, toward in cuts:
+                polygon = _keep_side(polygon, point, toward)
+            if len(polygon) < 3:
+                raise ValueError(
+                    f"arm {arm}'s segment {segment} has no room to be drawn"
+                )
+            polygons.append(polygon)
+            shown.append(values[(arm, segment)])
+    return polygons, np.asarray(shown, dtype=float)
+
+
+def draw_density_tracks(axes, track_graph, edge_order, against_even: pd.Series) -> None:
+    """The track once per kind (``axes``: no SWR, then SWR), each segment colored
+    by log2 of the kind's content density over even content's
+    (``content_along_arms.log2_density_against_even``): gray where sparser than
+    even, the kind's color where denser. The scale saturates at
+    ``DENSITY_LIMIT_LOG2``, and its end labels say so."""
+    limit = DENSITY_LIMIT_LOG2
+    for ax, (is_swr, name, color) in zip(axes, KINDS, strict=True):
+        polygons, values = track_bands(
+            track_graph, edge_order, against_even.loc[is_swr]
+        )
+        # Filled bands, not thick lines: the journal caps line width.
+        bands = PolyCollection(
+            polygons,
+            array=np.clip(values, -limit, limit),
+            cmap=LinearSegmentedColormap.from_list(
+                name, [C_BELOW_EVEN, "#f4f4f4", color]
+            ),
+            norm=TwoSlopeNorm(0.0, -limit, limit),
+            linewidths=0,
+        )
+        ax.add_collection(bands)
+        ax.autoscale_view()
+        ax.set_aspect("equal")
+        ax.axis("off")
+        ax.set_title(name, fontsize=SMALL_SIZE, color=color, pad=2)
+        bar = plt.colorbar(
+            bands, ax=ax, orientation="horizontal", shrink=0.6, aspect=14, pad=0.03,
+            ticks=[-limit, 0, limit],
+        )  # fmt: skip
+        bar.ax.set_xticklabels(DENSITY_TICK_LABELS)
+        bar.ax.tick_params(length=2)
+        bar.outline.set_linewidth(0.5)
+
+
+def label_track(ax, track_graph) -> None:
+    """Name the track's places on a drawn track: its center, a junction and a
+    well, the ends of panel f's axis.
+
+    No name lies over a band and none needs a line. The well's name is beside
+    the end of its arm. The junction's and the center's sit in the notch where
+    two arms part: the junction's with a corner at the notch, the center's
+    under it, as far down as its width needs to clear the two arms. The
+    junction named is the topmost and the well its right one. The figure is
+    drawn once here, to measure the center's name.
+    """
+    position = {
+        node: np.asarray(track_graph.nodes[node]["pos"], dtype=float)
+        for node in track_graph
+    }
+    is_well = {node: track_graph.degree(node) == 1 for node in track_graph}
+    junctions = [
+        node
+        for node in track_graph
+        if not is_well[node] and any(is_well[n] for n in track_graph.neighbors(node))
+    ]
+    (center,) = [n for n in track_graph if not is_well[n] and n not in junctions]
+    junction = max(junctions, key=lambda node: position[node][1])
+    well = max(
+        (n for n in track_graph.neighbors(junction) if is_well[n]),
+        key=lambda node: position[node][0],
     )
-    ax.add_collection(bands)
-    ax.autoscale_view()
-    ax.set_aspect("equal")
-    ax.axis("off")
-    steps = np.arange(-RATIO_LIMIT_LOG2, RATIO_LIMIT_LOG2 + 1)
-    # Under the track and about as wide as it (the panel is two columns wide).
-    bar = plt.colorbar(
-        bands, ax=ax, orientation="horizontal", shrink=0.45, aspect=18, pad=0.03,
-        ticks=steps,
+    half = ARM_HALF_WIDTH_CM
+    gap = 2.0  # cm between a name and the nearest band
+
+    def notch(node, first, second):
+        """Where the bands of two arms that leave ``node`` part, the unit vector
+        from the node into the opening between them, and half its angle."""
+        toward = [
+            (position[other] - position[node])
+            / np.hypot(*(position[other] - position[node]))
+            for other in (first, second)
+        ]
+        opening = toward[0] + toward[1]
+        sine = abs(toward[0][0] * toward[1][1] - toward[0][1] * toward[1][0])
+        half_angle = 0.5 * np.arccos(np.clip(toward[0] @ toward[1], -1, 1))
+        return (
+            position[node] + opening * half / sine,
+            opening / np.hypot(*opening),
+            half_angle,
+        )
+
+    style = {"color": "0.3", "fontsize": SMALL_SIZE}
+    ax.annotate(
+        "well", position[well], position[well] + [half + gap, 0], ha="left",
+        va="center", **style,
     )  # fmt: skip
-    # The ends and the middle are labeled; the ticks between are 2×.
-    limit = f"{2**RATIO_LIMIT_LOG2:g}×"
-    labels = {steps[0]: f"{limit} SWR", 0: "equal", steps[-1]: f"{limit} No SWR"}
-    bar.ax.set_xticklabels([labels.get(k, "") for k in steps])
-    bar.ax.tick_params(length=2)
-    bar.outline.set_linewidth(0.5)
-    ax.set_title("Content time per cm,\nNo SWR : SWR", fontsize=SMALL_SIZE, pad=2)
+    # The junction: a corner of its name at the notch between its trunk arm and
+    # the named well's arm, the name running into the opening.
+    tip, into, _ = notch(junction, center, well)
+    ax.annotate(
+        "junction", position[junction], tip + gap * into,
+        ha="left" if into[0] > 0 else "right",
+        va="top" if into[1] < 0 else "bottom", **style,
+    )  # fmt: skip
+    # The center: under the notch between the two arms that leave it downward.
+    lower = sorted(track_graph.neighbors(center), key=lambda n: position[n][1])[:2]
+    tip, into, half_angle = notch(center, *lower)
+    name = ax.annotate(
+        "center", position[center], tip, ha="center",
+        va="top" if into[1] < 0 else "bottom", **style,
+    )  # fmt: skip
+    ax.figure.draw_without_rendering()
+    extent = name.get_window_extent().transformed(ax.transData.inverted())
+    name.set_position(
+        tip
+        + (0.5 * extent.width / np.tan(half_angle) + gap / np.sin(half_angle)) * into
+    )
 
 
 def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) -> None:
@@ -421,10 +573,11 @@ def generate_figure(inputs: dict):
     """Build Figure 3 from :func:`read_inputs`."""
     events = inputs["events"]
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
-    # One grid for both rows, so the panels of a column share a left edge.
+    # One grid for both rows, so the panels of a column share a left edge. The
+    # widths are the upper row's needs: four bars in b, two stacked axes in d.
     grid = GridSpec(
         2, 4, figure=fig, height_ratios=[1.0, 1.1], hspace=0.7,
-        width_ratios=[1.0, 1.15, 1.05, 0.95], wspace=0.58,
+        width_ratios=[1.1, 0.72, 1.0, 1.3], wspace=0.62,
         left=0.08, right=0.99, top=0.91, bottom=0.13,
     )  # fmt: skip
 
@@ -447,19 +600,30 @@ def generate_figure(inputs: dict):
         bbox_to_anchor=(0.5, 1.0), ncol=2, handlelength=0.8, columnspacing=1.5,
     )  # fmt: skip
 
-    # The lower row's two panels are each two columns wide.
-    ax_e = fig.add_subplot(grid[1, :2])
-    draw_ratio_track(ax_e, inputs["track_graph"], inputs["edge_order"], inputs["ratio"])
+    # The lower row's two panels are each two columns wide. Panel e is the track
+    # once per kind under one title, at the height of f's.
+    ax_e_frame = fig.add_subplot(grid[1, :2])
+    ax_e_frame.axis("off")
+    ax_e_frame.set_title(
+        "Content time per cm, against even", fontsize=SMALL_SIZE, pad=8
+    )
+    e_grid = grid[1, :2].subgridspec(1, 2, wspace=0.1)
+    ax_e = [fig.add_subplot(e_grid[0]), fig.add_subplot(e_grid[1])]
+    draw_density_tracks(
+        ax_e, inputs["track_graph"], inputs["edge_order"], inputs["against_even"]
+    )
+    label_track(ax_e[0], inputs["track_graph"])
     ax_f = fig.add_subplot(grid[1, 2:])
     draw_profiles(ax_f, inputs["profiles"], inputs["place_shares"], inputs["even"])
 
     fig.draw_without_rendering()
     panels_by_letter = {
         "a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d, ax_d_cumulative],
-        "e": [ax_e], "f": [ax_f],
+        "e": [ax_e_frame, *ax_e], "f": [ax_f],
     }  # fmt: skip
     for letter, (left, top) in letter_positions(fig, panels_by_letter).items():
         letter_panel(fig, letter, left, top)
+    check_placement(fig, panels_by_letter)
     return fig
 
 
