@@ -194,7 +194,7 @@ One class or two: do SWR-coupled and non-SWR non-local events differ by kind or 
 
 Where along the track event content sits: each time bin's arm and place on it.
 
-`check_arm_orientation`, `arm_positions`, `distance_to_nearest_well`, `content_density_along_arms`, `leaf_and_trunk_profiles`, `log2_density_ratio`, `distance_from_animal_shares`, `content_place_shares`, `place_share_statistics`
+`check_arm_orientation`, `arm_positions`, `distance_to_nearest_well`, `arm_lengths_cm`, `even_content`, `content_density_along_arms`, `leaf_and_trunk_profiles`, `log2_density_ratio`, `distance_from_animal_shares`, `content_place_shares`, `place_share_statistics`
 
 ### `src/continuum_swr_replay/analysis/event_properties/content_occupancy.py`
 

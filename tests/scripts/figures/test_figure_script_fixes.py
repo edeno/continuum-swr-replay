@@ -1470,6 +1470,30 @@ def test_figure03_distance_key_is_off_the_bars(offline):
     plt.close(fig)
 
 
+def test_figure03_profiles_carry_the_even_content_line(offline):
+    """Panel g draws what content spread evenly over the track would give: one
+    density across both halves, labeled, and its share at a well beside the two
+    kinds' shares."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    index = pd.MultiIndex.from_product(
+        [[False, True], ["trunk", "leaf"], range(figure03.N_SEGMENTS)],
+        names=["is_swr", "arm_type", "segment"],
+    )
+    profiles = pd.DataFrame({"density_per_cm": 0.003}, index=index)
+    shares = pd.DataFrame({"at_well": [0.5, 0.2]}, index=[False, True])
+    even = {"density_per_cm": 0.002, "at_well_fraction": 0.25}
+    fig, ax = plt.subplots()
+    figure03.draw_profiles(ax, profiles, shares, even)
+    (line,) = [line for line in ax.lines if line.get_gid() == "even"]
+    np.testing.assert_allclose(line.get_ydata(), 0.2)  # % per cm
+    texts = [text.get_text() for text in ax.texts]
+    assert "even" in texts
+    assert "even: 25% at a well" in texts
+    plt.close(fig)
+
+
 def test_figure03_letters_share_a_height_by_row_and_a_left_edge_by_column(offline):
     """The letters of a row sit at one height, above the row's highest drawn
     top; the letters of a column sit at one left edge, the leftmost drawn extent

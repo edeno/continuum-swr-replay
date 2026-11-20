@@ -675,7 +675,8 @@ def test_figure_3_values_are_tagged_to_the_panel_that_shows_them():
 
 def test_content_occupancy_values_name_each_group_and_place():
     # Remote: over 20 cm from the animal; at a well: under 20 cm from one.
-    def rows(animal, epoch, is_swr, d_animal, d_well):
+    # The track: a leaf arm (0) and a trunk arm (6), each of 25 2-cm place bins.
+    def rows(animal, epoch, is_swr, d_animal, d_well, arm=0):
         return pd.DataFrame(
             {
                 "event_id": 0,
@@ -684,6 +685,9 @@ def test_content_occupancy_values_name_each_group_and_place():
                 "is_swr": is_swr,
                 "distance_to_animal_cm": d_animal,
                 "distance_to_well_cm": d_well,
+                "arm": arm,
+                "arm_length_cm": 48.0,
+                "n_place_bins": 25,
             }
         )
 
@@ -695,9 +699,9 @@ def test_content_occupancy_values_name_each_group_and_place():
             rows("a", "e2", False, [5.0, 100.0], [5.0, 50.0]),
             # a, SWR: a remote path. b, no SWR: a remote well; b, SWR: near the
             # animal off the wells.
-            rows("a", "e1", True, [100.0], [50.0]),
+            rows("a", "e1", True, [100.0], [50.0], arm=6),
             rows("b", "e3", False, [100.0], [5.0]),
-            rows("b", "e3", True, [5.0], [50.0]),
+            rows("b", "e3", True, [5.0], [50.0], arm=6),
         ],
         ignore_index=True,
     )
@@ -716,6 +720,8 @@ def test_content_occupancy_values_name_each_group_and_place():
         "swr_content_remote_path_fraction": pytest.approx(0.5),
         "swr_content_near_off_fraction": pytest.approx(0.5),
         "animals_non_swr_more_at_well": 2,
+        # 20 cm of the 50 cm leaf arm, of each animal's 100 cm track
+        "even_content_at_well_fraction": pytest.approx(0.2),
     }
 
 

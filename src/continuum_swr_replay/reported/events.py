@@ -2004,12 +2004,14 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
 def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.1: where content sits against the animal and the wells.
 
-    ``bins``: each event time bin with its kind and its content's track distance
-    to the animal and to the nearest well (a track-graph end point), as
-    :func:`content_along_arms_bins` reads them. The shares at a remote well, at
-    the animal's own well, on a remote path and near the animal off the wells
-    (``content_along_arms.content_place_shares``): each epoch's share of its
-    time bins, averaged over the animal's epochs, then over animals.
+    ``bins``: each event time bin with its kind, its content's track distance
+    to the animal and to the nearest well (a track-graph end point) and its arm
+    with the arm's length, as :func:`content_along_arms_bins` reads them. The
+    shares at a remote well, at the animal's own well, on a remote path and near
+    the animal off the wells (``content_along_arms.content_place_shares``): each
+    epoch's share of its time bins, averaged over the animal's epochs, then over
+    animals. And the share at a well of content spread evenly over the track
+    (``content_along_arms.even_content``), which those shares are read against.
     """
     make = value_factory(content_occupancy_values, source, TAGS["content_occupancy"])
     statistics = content_along_arms.place_share_statistics(
@@ -2046,6 +2048,19 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
             "count",
             "animals whose non-SWR content is at a well more often than their SWR "
             "content, each share the mean over the animal's epochs",
+        )
+    )
+    values.append(
+        make(
+            "even_content_at_well_fraction",
+            content_along_arms.even_content(bins, event_statistics.AT_WELL_CM)[
+                "at_well_fraction"
+            ],
+            "fraction",
+            "pct",
+            "share of the track within "
+            f"{event_statistics.AT_WELL_CM:.0f} cm of a well (a track-graph end "
+            "point): the share at a well of content spread evenly over the track",
         )
     )
     return values
@@ -2310,7 +2325,13 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         events,
         inputs.content_along_arms,
         n_epochs,
-        ["distance_to_animal_cm", "distance_to_well_cm"],
+        [
+            "distance_to_animal_cm",
+            "distance_to_well_cm",
+            "arm",
+            "arm_length_cm",
+            "n_place_bins",
+        ],
     )
     summary.add(
         *pend(

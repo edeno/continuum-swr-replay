@@ -14,6 +14,7 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     content_place_shares,
     distance_from_animal_shares,
     distance_to_nearest_well,
+    even_content,
     leaf_and_trunk_profiles,
     log2_density_ratio,
     place_share_statistics,
@@ -119,6 +120,48 @@ def test_even_content_is_flat_along_the_arm_whatever_its_bin_count(n_place_bins)
     bins = _bins("a", False, 0, np.arange(n_place_bins), n_place_bins, bin_cm=2.0)
     density = content_density_along_arms(bins, n_segments=13)["density_per_cm"]
     np.testing.assert_allclose(density.to_numpy(), 1 / (2.0 * n_place_bins))
+
+
+def test_even_content_is_one_over_the_track_and_the_tracks_share_at_wells():
+    # Two leaf arms (0, 1) of 50 cm and a trunk arm (6) of 60 cm, in 2-cm bins:
+    # a track of 160 cm, 20 cm of each leaf arm within 20 cm of its well.
+    bins = pd.concat(
+        [
+            _bins("a", False, 0, np.arange(25), 25, bin_cm=2.0),
+            _bins("a", False, 1, np.arange(25), 25, bin_cm=2.0),
+            _bins("a", False, 6, np.arange(30), 30, bin_cm=2.0),
+        ],
+        ignore_index=True,
+    )
+    even = even_content(bins, at_well_cm=20.0)
+    assert even["density_per_cm"] == pytest.approx(1 / 160)
+    assert even["at_well_fraction"] == pytest.approx(40 / 160)
+    # one time bin on every place bin is even content: that density everywhere
+    density = content_density_along_arms(bins, n_segments=5)["density_per_cm"]
+    np.testing.assert_allclose(density.to_numpy(), even["density_per_cm"])
+    # past a leaf arm's length the reach of a well is not the arm's alone
+    with pytest.raises(ValueError, match="longer than a leaf arm"):
+        even_content(bins, at_well_cm=60.0)
+
+    # A second animal on a track twice as long: its share at wells is half, and
+    # the animals weigh the same. The density is over the lengths the density
+    # function divides by, each arm's median over all the bins (75, 75, 90 cm).
+    longer = pd.concat(
+        [
+            _bins("b", False, 0, np.arange(25), 25, bin_cm=4.0),
+            _bins("b", False, 1, np.arange(25), 25, bin_cm=4.0),
+            _bins("b", False, 6, np.arange(30), 30, bin_cm=4.0),
+        ],
+        ignore_index=True,
+    )
+    both = even_content(pd.concat([bins, longer], ignore_index=True), 20.0)
+    assert both["at_well_fraction"] == pytest.approx((40 / 160 + 40 / 320) / 2)
+    assert both["density_per_cm"] == pytest.approx(1 / 240)
+    # an animal with no content on an arm has a track of unknown length
+    with pytest.raises(ValueError, match="no content on some arm"):
+        even_content(
+            pd.concat([bins, longer[longer["arm"] != 6]], ignore_index=True), 20.0
+        )
 
 
 def test_a_place_bin_across_a_segment_edge_goes_to_each_by_the_part_in_it():

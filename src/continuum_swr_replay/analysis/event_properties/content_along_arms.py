@@ -175,6 +175,76 @@ def distance_to_nearest_well(
     return np.minimum(along + first_cm[arm], length[arm] - along + second_cm[arm])
 
 
+def arm_lengths_cm(bins: pd.DataFrame) -> pd.Series:
+    """The length each arm's place bins cover.
+
+    The span of an arm's bin centers (``arm_length_cm``) and one bin more; the
+    median over all of ``bins``.
+
+    Parameters
+    ----------
+    bins : pd.DataFrame, shape (n_bins, n_columns)
+        One row per event time bin, with ``arm``, ``arm_length_cm`` and
+        ``n_place_bins`` (:func:`arm_positions`).
+
+    Returns
+    -------
+    lengths : pd.Series
+        Centimeters, indexed by ``arm``: the arms ``bins`` holds content on.
+    """
+    n_place_bins = bins["n_place_bins"].to_numpy()
+    arm_cm = bins["arm_length_cm"] * n_place_bins / (n_place_bins - 1)
+    return arm_cm.groupby(bins["arm"]).median()
+
+
+def even_content(bins: pd.DataFrame, at_well_cm: float) -> dict[str, float]:
+    """What content spread evenly over the track would give.
+
+    The reference for :func:`content_density_along_arms` and for the share of
+    content at a well: content as likely on any centimeter of the track as on
+    any other. The track is the arms ``bins`` holds content on.
+
+    Parameters
+    ----------
+    bins : pd.DataFrame, shape (n_bins, n_columns)
+        As :func:`arm_lengths_cm`, with ``animal``.
+    at_well_cm : float
+        Content this close to a well is at it.
+
+    Returns
+    -------
+    statistics : dict
+        ``density_per_cm``: 1 over the track's length (the sum of
+        :func:`arm_lengths_cm` over all of ``bins``, the lengths
+        :func:`content_density_along_arms` divides by), the density of every
+        segment; ``at_well_fraction``: the share of the track within
+        ``at_well_cm`` of a well, which is ``at_well_cm`` of each leaf arm (a
+        leaf arm ends at one well), on each animal's own track and averaged
+        over animals, as the shares of :func:`content_place_shares` are.
+
+    Raises
+    ------
+    ValueError
+        If ``at_well_cm`` is longer than a leaf arm (a well's reach would then
+        take in other arms), or an animal has no content on an arm the others
+        have (its track's length is then not known).
+    """
+    lengths = arm_lengths_cm(bins)
+    at_well = []
+    for animal, group in bins.groupby("animal"):
+        own = arm_lengths_cm(group)
+        if not own.index.equals(lengths.index):
+            raise ValueError(f"{animal} has no content on some arm of the track")
+        leaf = own[own.index.isin(LEAF_ARMS)]
+        if (leaf < at_well_cm).any():
+            raise ValueError(f"at_well_cm ({at_well_cm}) is longer than a leaf arm")
+        at_well.append(len(leaf) * at_well_cm / own.sum())
+    return {
+        "density_per_cm": 1.0 / float(lengths.sum()),
+        "at_well_fraction": float(np.mean(at_well)),
+    }
+
+
 def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFrame:
     """Each kind's content time per cm along every arm, the animals' mean.
 
@@ -189,9 +259,7 @@ def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFr
     an animal's are the mean over its epochs, and the result the mean over
     animals.
 
-    An arm's length is the length its place bins cover: the span of its bin
-    centers (``arm_length_cm``) and one bin more; the median over all of
-    ``bins``.
+    An arm's length is the length its place bins cover (:func:`arm_lengths_cm`).
 
     Parameters
     ----------
@@ -209,9 +277,7 @@ def content_density_along_arms(bins: pd.DataFrame, n_segments: int) -> pd.DataFr
         (0 at the arm's first node). Every arm and segment of the arms in
         ``bins`` is present, 0 where no content falls.
     """
-    n_place_bins = bins["n_place_bins"].to_numpy()
-    arm_cm = bins["arm_length_cm"] * n_place_bins / (n_place_bins - 1)
-    segment_cm = arm_cm.groupby(bins["arm"]).median() / n_segments
+    segment_cm = arm_lengths_cm(bins) / n_segments
     # Time bins per place bin, then the part of each place bin in each segment.
     counts = (
         bins.groupby([*_EPOCH_KEYS, "arm", "place_bin", "n_place_bins"])

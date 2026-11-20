@@ -26,7 +26,9 @@ Each row asks one thing:
         f — Where on the track each kind's content is denser: the ratio of no-SWR
             to SWR content time per cm along every arm.
         g — Content time per cm from the center out to the junctions (trunk
-            arms) and from the junctions out to the wells (leaf arms).
+            arms) and from the junctions out to the wells (leaf arms), against
+            what content spread evenly over the track would give (the dashed
+            line; ``content_along_arms.even_content``).
         h — Slow and fast gamma during each kind of event, between the levels
             of the same epochs' quiet-rest and running windows as long as the
             kind's events. (Ripple power, MUA, theta and head speed around the
@@ -87,6 +89,7 @@ from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     content_density_along_arms,
     content_place_shares,
     distance_from_animal_shares,
+    even_content,
     leaf_and_trunk_profiles,
     log2_density_ratio,
     place_share_statistics,
@@ -212,6 +215,7 @@ def read_inputs() -> dict:
             along, DISTANCE_EDGES_CM, AT_WELL_CM
         ),
         "profiles": leaf_and_trunk_profiles(density),
+        "even": even_content(along, AT_WELL_CM),
         "track_graph": env.track_graph,
         "edge_order": [tuple(edge) for edge in env.edge_order],
     }
@@ -381,10 +385,24 @@ def draw_ratio_track(ax, track_graph, edge_order, ratio: pd.Series) -> None:
     ax.set_title("Content time per cm,\nNo SWR : SWR", fontsize=SMALL_SIZE, pad=2)
 
 
-def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame) -> None:
+def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame, even: dict) -> None:
     """Content time per cm along the trunk arms (center to junction) and the
-    leaf arms (junction to well), each kind, with its share at a well."""
+    leaf arms (junction to well), each kind, with its share at a well; and what
+    content spread evenly over the track would give (``even``:
+    ``content_along_arms.even_content``), a flat line and its share at a well."""
     x = (np.arange(N_SEGMENTS) + 0.5) / N_SEGMENTS
+    even_percent = 100 * even["density_per_cm"]
+    ax.axhline(even_percent, color="0.5", lw=0.6, ls=(0, (4, 2)), zorder=0, gid="even")
+    ax.annotate(
+        "even", (0.03, even_percent), xycoords=ax.get_yaxis_transform(),
+        xytext=(0, -1.5), textcoords="offset points", ha="left", va="top",
+        color="0.4", fontsize=SMALL_SIZE,
+    )  # fmt: skip
+    ax.text(
+        0.03, 0.79, f"even: {100 * even['at_well_fraction']:.0f}% at a well",
+        transform=ax.transAxes, color="0.4", ha="left", va="top",
+        fontsize=SMALL_SIZE,
+    )  # fmt: skip
     for is_swr, name, color in KINDS:
         trunk = profiles.loc[(is_swr, "trunk"), "density_per_cm"].to_numpy()
         leaf = profiles.loc[(is_swr, "leaf"), "density_per_cm"].to_numpy()
@@ -546,7 +564,7 @@ def generate_figure(inputs: dict):
     ax_f = fig.add_subplot(grid[1, 1])
     draw_ratio_track(ax_f, inputs["track_graph"], inputs["edge_order"], inputs["ratio"])
     ax_g = fig.add_subplot(grid[1, 2])
-    draw_profiles(ax_g, inputs["profiles"], inputs["place_shares"])
+    draw_profiles(ax_g, inputs["profiles"], inputs["place_shares"], inputs["even"])
     h_grid = grid[1, 3].subgridspec(2, 1, hspace=0.4)
     ax_h = [fig.add_subplot(h_grid[0])]
     ax_h.append(fig.add_subplot(h_grid[1], sharex=ax_h[0]))
