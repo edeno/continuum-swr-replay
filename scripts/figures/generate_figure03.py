@@ -20,9 +20,10 @@ they overlap an SWR (Kay's detector, the SWR source). Each row asks one thing:
             to SWR content time per cm along every arm.
         g — Content time per cm from the center out to the junctions (trunk
             arms) and from the junctions out to the wells (leaf arms).
-        h — Slow and fast gamma during the events, against the same epochs'
-            quiet rest and running. (Ripple power, MUA, theta and head speed
-            around the events are Figure 2's.)
+        h — Slow and fast gamma during each kind of event, between the levels
+            of the same epochs' quiet-rest and running windows as long as the
+            kind's events. (Ripple power, MUA, theta and head speed around the
+            events are Figure 2's.)
 
 b comes before c and d because the far mode of c and the fast mode of d are the
 events with Fragmented time. The number of arms the decoded position touches is
@@ -40,8 +41,10 @@ quotes the share of content time within ``AT_WELL_CM`` of a well, the summary's
 ``*_content_at_well_fraction`` (``content_along_arms.content_place_shares``,
 ``place_share_statistics``). Every one of them weighs each epoch of an animal the
 same and each animal the same. Panel h's animal values are
-``event_statistics.animal_signal_levels``: the values the summary's
-``<signal>_animals_*`` counts compare.
+``event_statistics.animal_signal_levels`` with ``matched``: the values the
+summary's ``<signal>_animals_*`` counts compare. An event's gamma is a mean
+over its bins, and a mean of skewed power over a window sits above the median
+of single bins, so the reference is windows of the events' own length.
 
 Usage
 -----
@@ -195,31 +198,6 @@ def read_inputs() -> dict:
         "track_graph": env.track_graph,
         "edge_order": [tuple(edge) for edge in env.edge_order],
     }
-
-
-def animal_signal_values(
-    events: pd.DataFrame, reference: pd.DataFrame, signal: str, column: str
-) -> pd.DataFrame:
-    """Each animal's rest, no-SWR, SWR and running value of one signal, z.
-
-    ``event_statistics.animal_signal_levels``: the event values the summary's
-    animal counts compare, and the levels they are compared with. Each class's
-    levels come from the animal's epochs with an event of that class; every
-    analyzed epoch holds both kinds, so the two classes' levels must be equal.
-    """
-    levels = animal_signal_levels(events, reference, signal, column)
-    non_swr, swr = levels.loc[False], levels.loc[True]
-    for level in ("rest", "running"):
-        if not np.allclose(non_swr[level], swr.loc[non_swr.index, level]):
-            raise ValueError(f"{signal}: the classes' {level} levels differ")
-    return pd.DataFrame(
-        {
-            "rest": non_swr["rest"],
-            "no SWR": non_swr["event"],
-            "SWR": swr["event"],
-            "running": non_swr["running"],
-        }
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -395,23 +373,28 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
 
 
 def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
-    """Each animal's rest, no-SWR, SWR and running level of each signal
-    (``axes``: one per signal, stacked, sharing the x axis)."""
-    colors = (C_REST, C_NO_SWR, C_SWR, C_RUN)
+    """Each animal's level of each signal in each kind of event, between the
+    levels of quiet-rest (white) and running (black) windows as long as the
+    kind's events (``axes``: one per signal, stacked, sharing the x axis)."""
     for ax, (signal, column, label) in zip(axes, SIGNALS, strict=True):
-        values = animal_signal_values(events, reference, signal, column)
-        x = np.arange(4)
-        for _, row in values.iterrows():
-            ax.plot(x, row.to_numpy(), color="#999999", lw=0.5, zorder=1)
-        for i, color in enumerate(colors):
-            ax.scatter(
-                np.full(len(values), i), values.iloc[:, i], s=7, color=color,
-                edgecolors="black", linewidths=0.5, zorder=2,
-            )  # fmt: skip
+        levels = animal_signal_levels(events, reference, signal, column, matched=True)
+        ticks, names = [], []
+        for k, (is_swr, name, color) in enumerate(KINDS):
+            x = 3.7 * k + np.arange(3)
+            values = levels.loc[is_swr, ["rest", "event", "running"]]
+            for _, row in values.iterrows():
+                ax.plot(x, row.to_numpy(), color="#999999", lw=0.5, zorder=1)
+            for i, dot_color in enumerate((C_REST, color, C_RUN)):
+                ax.scatter(
+                    np.full(len(values), x[i]), values.iloc[:, i], s=7,
+                    color=dot_color, edgecolors="black", linewidths=0.5, zorder=2,
+                )  # fmt: skip
+            ticks += list(x)
+            names += ["rest", name, "running"]
         ax.axhline(0, color="0.85", lw=0.5, zorder=0)
         ax.set_title(label, fontsize=SMALL_SIZE, pad=2)
-        ax.set_xticks(x, values.columns, rotation=45, ha="right")
-        ax.set_xlim(-0.5, 3.5)
+        ax.set_xticks(ticks, names, rotation=45, ha="right")
+        ax.set_xlim(-0.6, ticks[-1] + 0.6)
     axes[0].tick_params(labelbottom=False)
     axes[0].set_ylabel("Power (z)", y=-0.2)
 
@@ -444,7 +427,7 @@ def generate_figure(inputs: dict):
     )  # fmt: skip
 
     row2 = outer[1].subgridspec(
-        1, 4, width_ratios=[1.0, 1.5, 1.15, 0.7], wspace=0.6
+        1, 4, width_ratios=[1.0, 1.35, 1.1, 0.9], wspace=0.6
     )  # fmt: skip
     e_grid = row2[0].subgridspec(2, 1, hspace=0.15)
     ax_e = [fig.add_subplot(e_grid[0])]

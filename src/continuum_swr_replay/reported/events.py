@@ -852,15 +852,80 @@ def brain_state_values(
 def gamma_z_values(
     events: pd.DataFrame, reference: pd.DataFrame, source: str
 ) -> list[Value]:
-    """Question 2d.8: slow and fast gamma during events, against running and quiet
-    rest.
+    """Question 2d.8: slow and fast gamma during events, against quiet-rest and
+    running windows as long as the events.
 
-    As :func:`brain_state_values`, on the gamma pass's ``slow_gamma_z`` and
-    ``fast_gamma_z``, joined on ``event_id``, and its epochs' running and
-    quiet-rest levels on the same scale.
+    On the gamma pass's ``slow_gamma_z`` and ``fast_gamma_z``, joined on
+    ``event_id``. An event's value is the mean over its bins, and band power is
+    skewed, so it is compared with the level of windows of the same length
+    (``gamma_power.matched_level``), each class with its own: not with the
+    median of single bins, which a window's mean exceeds when nothing differs.
     """
     make = value_factory(gamma_z_values, source, TAGS["gamma_z"])
-    return _signal_values({"slow_gamma": make, "fast_gamma": make}, events, reference)
+    words = ["slow_gamma", "fast_gamma"]
+    levels = event_statistics.matched_reference_medians(reference, words)
+    statistics = event_statistics.event_signal_statistics(
+        events,
+        reference,
+        {word: _SIGNAL_EVENT_COLUMNS[word] for word in words},
+        matched=True,
+    )
+    values: list[Value] = []
+    for word in words:
+        label = _SIGNAL_LABELS[word]
+        for group, is_swr in (("non_swr", False), ("swr", True)):
+            stats = statistics.loc[(word, is_swr)]
+            name = "non-SWR" if group == "non_swr" else "SWR-overlapping"
+            animal_value = (
+                f"animals whose median {name} event {label} (the median over their "
+                "epochs of each epoch's median)"
+            )
+            values.append(
+                make(
+                    f"{word}_median_{group}",
+                    stats["median"],
+                    "quantity",
+                    "dec2",
+                    f"median z-scored {label} of immobile {name} non-local events (event mean)",
+                    "z",
+                )
+            )
+            for regime, words_of_regime in (
+                ("rest", "quiet-rest"),
+                ("running", "running"),
+            ):
+                values.append(
+                    make(
+                        f"{word}_{regime}_matched_reference_{group}",
+                        levels.loc[(word, is_swr), regime],
+                        "quantity",
+                        "dec2",
+                        f"median over epochs of the epoch's z-scored {label} in "
+                        f"{words_of_regime} windows as long as its {name} events (the "
+                        "median over the events of one window's mean each, averaged "
+                        "over the draws)",
+                        "z",
+                    )
+                )
+            values += [
+                make(
+                    f"{word}_animals_below_running_{group}",
+                    stats["n_animals_below_running"],
+                    "count",
+                    "count",
+                    f"{animal_value} is below the median over the same epochs of the "
+                    "epoch's level in running windows as long as those events",
+                ),
+                make(
+                    f"{word}_animals_above_rest_{group}",
+                    stats["n_animals_above_rest"],
+                    "count",
+                    "count",
+                    f"{animal_value} is above the median over the same epochs of the "
+                    "epoch's level in quiet-rest windows as long as those events",
+                ),
+            ]
+    return values
 
 
 def _signal_values(

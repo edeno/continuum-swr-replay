@@ -238,6 +238,68 @@ def test_animal_signal_levels_are_the_values_the_statistics_compare():
     assert len(levels) == 4
 
 
+def _matched_reference() -> pd.DataFrame:
+    """The epochs of ``_signal_tables`` with, for each class, the level of rest
+    and of running windows as long as the class's events: the SWR events are the
+    longer ones, so their windows' levels are the higher ones."""
+    _, reference = _signal_tables()
+    return reference.assign(
+        theta_rest_matched_non_swr=[-0.9, 0.1, -0.4],
+        theta_rest_matched_swr=[-0.7, -0.9, 0.2],
+        theta_running_matched_non_swr=[1.2, 2.2, 1.2],
+        theta_running_matched_swr=[1.4, 2.4, 1.4],
+    )
+
+
+def test_matched_levels_are_each_class_s_own_windows():
+    events, _ = _signal_tables()
+    levels = stats.animal_signal_levels(
+        events, _matched_reference(), "theta", "theta_z", matched=True
+    )
+    # a, no SWR: the medians over its two epochs of the no-SWR windows' levels
+    assert levels.loc[(False, "a")].to_dict() == pytest.approx(
+        {"event": 1.15, "running": 1.7, "rest": -0.4}
+    )
+    # a, SWR: the SWR windows' levels, not the no-SWR ones
+    assert levels.loc[(True, "a")].to_dict() == pytest.approx(
+        {"event": -0.825, "running": 1.9, "rest": -0.8}
+    )
+    assert levels.loc[(True, "b")].to_dict() == pytest.approx(
+        {"event": 0.0, "running": 1.4, "rest": 0.2}
+    )
+
+
+def test_matched_statistics_count_animals_against_their_class_s_windows():
+    events, _ = _signal_tables()
+    result = stats.event_signal_statistics(
+        events, _matched_reference(), {"theta": "theta_z"}, matched=True
+    )
+    # SWR, a: -0.825 is below its windows' rest level -0.8; b: 0.0 is below 0.2.
+    # Against the epochs' rest medians (-0.5, -0.5), b would be above.
+    assert result.loc[("theta", True), "n_animals_above_rest"] == 0
+    # no SWR, a: 1.15 above -0.4; b: 1.0 above -0.4
+    assert result.loc[("theta", False), "n_animals_above_rest"] == 2
+    # no SWR, a: 1.15 below 1.7; b: 1.0 below 1.2 (it equals the running median)
+    assert result.loc[("theta", False), "n_animals_below_running"] == 2
+    levels = stats.matched_reference_medians(_matched_reference(), ["theta"])
+    assert levels.loc[("theta", False)].to_dict() == pytest.approx(
+        {"running": 1.2, "rest": -0.4}
+    )
+    assert levels.loc[("theta", True)].to_dict() == pytest.approx(
+        {"running": 1.4, "rest": -0.7}
+    )
+
+
+def test_matched_statistics_refuse_an_epoch_without_its_class_s_windows():
+    events, _ = _signal_tables()
+    broken = _matched_reference()
+    broken.loc[0, "theta_rest_matched_swr"] = np.nan
+    with pytest.raises(ValueError, match="theta"):
+        stats.event_signal_statistics(
+            events, broken, {"theta": "theta_z"}, matched=True
+        )
+
+
 def test_event_signal_statistics_weigh_an_animal_s_epochs_not_its_events():
     # Both epochs of a have running level 0 and rest level -1. e1 has one
     # event, at -2; e2 three, at 0.5.

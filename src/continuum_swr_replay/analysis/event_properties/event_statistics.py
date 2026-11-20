@@ -346,8 +346,48 @@ def reference_medians(reference: pd.DataFrame, signals: list[str]) -> pd.DataFra
     )
 
 
+_CLASS_WORDS = {False: "non_swr", True: "swr"}
+"""Each class's word in a column name."""
+
+
+def matched_reference_medians(
+    reference: pd.DataFrame, signals: list[str]
+) -> pd.DataFrame:
+    """The typical level of each signal in running and quiet-rest windows as long
+    as each class's events.
+
+    Parameters
+    ----------
+    reference : pd.DataFrame, shape (n_epochs, n_columns)
+        For each signal, class (``swr``, ``non_swr``) and regime, each epoch's
+        ``<signal>_<regime>_matched_<class>`` (``gamma_power.matched_level``).
+    signals : list of str
+
+    Returns
+    -------
+    medians : pd.DataFrame, shape (2 * n_signals, 2)
+        ``running`` and ``rest``, indexed by signal and ``is_swr``: the median
+        over the epochs that have the level (an epoch with no event of the class
+        has none).
+    """
+    return pd.DataFrame.from_dict(
+        {
+            (signal, is_swr): {
+                regime: reference[f"{signal}_{regime}_matched_{word}"].median()
+                for regime in ("running", "rest")
+            }
+            for signal in signals
+            for is_swr, word in _CLASS_WORDS.items()
+        },
+        orient="index",
+    ).rename_axis(["signal", "is_swr"])
+
+
 def event_signal_statistics(
-    events: pd.DataFrame, reference: pd.DataFrame, signals: Mapping[str, str]
+    events: pd.DataFrame,
+    reference: pd.DataFrame,
+    signals: Mapping[str, str],
+    matched: bool = False,
 ) -> pd.DataFrame:
     """Each signal during events, against the same epochs' running and rest levels.
 
@@ -357,6 +397,13 @@ def event_signal_statistics(
     epoch's median event value. It is compared with the median over the same
     epochs of each epoch's running (quiet-rest) level, so every epoch counts
     once, and an epoch with no event of the class does not count.
+
+    An epoch's level is the median of its single running (quiet-rest) bins, or,
+    with ``matched``, the level of running (quiet-rest) windows as long as the
+    class's events (``<signal>_<regime>_matched_<class>``). A mean over an
+    event's bins of a skewed signal sits above the median of single bins when
+    nothing differs, so only the matched level is the same statistic as the
+    events' value.
 
     Parameters
     ----------
@@ -368,6 +415,8 @@ def event_signal_statistics(
         The brain-state reference (:func:`reference_medians`), one row per epoch.
     signals : mapping of str to str
         Each signal's column in ``events``, by signal.
+    matched : bool
+        Compare with the levels of windows as long as the class's events.
 
     Returns
     -------
@@ -392,8 +441,8 @@ def event_signal_statistics(
     """
     rows = {}
     for signal, column in signals.items():
-        joined = _with_signal_levels(events, reference, signal, column)
-        levels = _animal_levels(joined, signal, column)
+        joined = _with_signal_levels(events, reference, signal, column, matched)
+        levels = _animal_levels(joined, column)
         for is_swr in (False, True):
             group = joined[joined["is_swr"] == is_swr]
             per_animal = levels.loc[is_swr]
@@ -406,7 +455,7 @@ def event_signal_statistics(
                     per_animal["event"] > per_animal["rest"]
                 ).sum(),
                 "reaches_running_fraction": (
-                    group[column] >= group[f"{signal}_running_median"]
+                    group[column] >= group["running_level"]
                 ).mean(),
             }
     return pd.DataFrame.from_dict(rows, orient="index").rename_axis(
@@ -415,7 +464,11 @@ def event_signal_statistics(
 
 
 def animal_signal_levels(
-    events: pd.DataFrame, reference: pd.DataFrame, signal: str, column: str
+    events: pd.DataFrame,
+    reference: pd.DataFrame,
+    signal: str,
+    column: str,
+    matched: bool = False,
 ) -> pd.DataFrame:
     """Each animal's event value of a signal and its running and quiet-rest levels.
 
@@ -430,11 +483,15 @@ def animal_signal_levels(
         One row per event, with ``is_swr``, the session columns and ``column``.
     reference : pd.DataFrame, shape (n_epochs, n_columns)
         The brain-state reference, one row per epoch, with
-        ``<signal>_running_median`` and ``<signal>_rest_median``.
+        ``<signal>_running_median`` and ``<signal>_rest_median``, or, with
+        ``matched``, ``<signal>_<regime>_matched_<class>``.
     signal : str
         The signal's name in the reference (``"theta"``).
     column : str
         The signal's column in ``events`` (``"theta_z"``).
+    matched : bool
+        Take each class's levels from windows as long as its events
+        (:func:`event_signal_statistics`).
 
     Returns
     -------
@@ -449,21 +506,48 @@ def animal_signal_levels(
         quiet-rest level of it.
     """
     return _animal_levels(
-        _with_signal_levels(events, reference, signal, column), signal, column
+        _with_signal_levels(events, reference, signal, column, matched), column
     )
 
 
 def _with_signal_levels(
-    events: pd.DataFrame, reference: pd.DataFrame, signal: str, column: str
+    events: pd.DataFrame,
+    reference: pd.DataFrame,
+    signal: str,
+    column: str,
+    matched: bool = False,
 ) -> pd.DataFrame:
-    """``events`` joined to their epoch's levels; raise if a value or level is missing."""
+    """``events`` joined to their epoch's levels, each event's as ``running_level``
+    and ``rest_level``; raise if a value or level is missing.
+
+    The levels are the epoch's medians of single bins, or, with ``matched``, the
+    levels of windows as long as the event's class's events.
+    """
     joined = events.merge(
         reference, on=list(SESSION_COLUMNS), how="left", validate="m:1"
     )
+    is_swr = joined["is_swr"].to_numpy(dtype=bool)
+    for regime in ("running", "rest"):
+        if matched:
+            joined[f"{regime}_level"] = np.where(
+                is_swr,
+                joined[f"{signal}_{regime}_matched_{_CLASS_WORDS[True]}"],
+                joined[f"{signal}_{regime}_matched_{_CLASS_WORDS[False]}"],
+            )
+        else:
+            joined[f"{regime}_level"] = joined[f"{signal}_{regime}_median"]
+    # Counted under the reference's own column names, which the error names.
+    source = "matched" if matched else "median"
     missing = (
-        joined[[column, f"{signal}_running_median", f"{signal}_rest_median"]]
+        joined[[column, "running_level", "rest_level"]]
         .isna()
         .sum()
+        .rename(
+            {
+                f"{regime}_level": f"{signal}_{regime}_{source}"
+                for regime in ("running", "rest")
+            }
+        )
     )
     if missing.any():
         raise ValueError(
@@ -473,7 +557,7 @@ def _with_signal_levels(
     return joined
 
 
-def _animal_levels(joined: pd.DataFrame, signal: str, column: str) -> pd.DataFrame:
+def _animal_levels(joined: pd.DataFrame, column: str) -> pd.DataFrame:
     """Per class and animal: the event value and the running and rest levels."""
     frames = {}
     for is_swr, group in joined.groupby("is_swr"):
@@ -484,8 +568,8 @@ def _animal_levels(joined: pd.DataFrame, signal: str, column: str) -> pd.DataFra
                 )
                 for name, source in (
                     ("event", column),
-                    ("running", f"{signal}_running_median"),
-                    ("rest", f"{signal}_rest_median"),
+                    ("running", "running_level"),
+                    ("rest", "rest_level"),
                 )
             }
         )

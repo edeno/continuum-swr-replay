@@ -276,7 +276,10 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
     """One animal, one epoch, two non-SWR and two SWR events. Signal number k
     (theta 0, ripple 1, MUA 2, slow gamma 3, fast gamma 4) has non-SWR values
     10k + 1 and 10k + 2, SWR values 10k + 3 and 10k + 7, a running level of
-    10k + 4 and a quiet-rest level of 10k + 1.8."""
+    10k + 4 and a quiet-rest level of 10k + 1.8. In windows as long as each
+    class's events the levels are higher, the more so for the longer SWR
+    events: rest 10k + 1.2 (non-SWR) and 10k + 5.5 (SWR), running 10k + 4.5 and
+    10k + 4.8."""
     events = pd.DataFrame(
         {
             "animal": "a",
@@ -290,6 +293,10 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
         events[column] = 10.0 * k + np.array([1.0, 2.0, 3.0, 7.0])
         reference[f"{signal}_running_median"] = 10.0 * k + 4.0
         reference[f"{signal}_rest_median"] = 10.0 * k + 1.8
+        reference[f"{signal}_rest_matched_non_swr"] = 10.0 * k + 1.2
+        reference[f"{signal}_rest_matched_swr"] = 10.0 * k + 5.5
+        reference[f"{signal}_running_matched_non_swr"] = 10.0 * k + 4.5
+        reference[f"{signal}_running_matched_swr"] = 10.0 * k + 4.8
     return events, reference
 
 
@@ -320,6 +327,23 @@ def test_brain_state_values_name_each_signal_class_and_reference():
         if signal == "theta":
             # of the SWR events, 7 reaches the running level and 3 does not
             expected |= {"like_fraction_non_swr": 0.0, "like_fraction_swr": 0.5}
+        if signal.endswith("gamma"):
+            # Gamma is compared with windows as long as each class's events.
+            expected = {
+                "median_non_swr": 10 * k + 1.5,
+                "median_swr": 10 * k + 5.0,
+                "rest_matched_reference_non_swr": 10 * k + 1.2,
+                "rest_matched_reference_swr": 10 * k + 5.5,
+                "running_matched_reference_non_swr": 10 * k + 4.5,
+                "running_matched_reference_swr": 10 * k + 4.8,
+                # non-SWR: 1.5 is above its windows' rest (1.2), below running (4.5)
+                "animals_above_rest_non_swr": 1,
+                "animals_below_running_non_swr": 1,
+                # SWR: 5 is not above its windows' rest (5.5), though it is above
+                # the median of single rest bins (1.8); nor below running (4.8)
+                "animals_above_rest_swr": 0,
+                "animals_below_running_swr": 0,
+            }
         assert own == pytest.approx(expected), signal
     assert values["ripple_median_swr"].figures == ("2i",)
     assert values["mua_median_swr"].figures == ("2i",)
@@ -700,7 +724,7 @@ def test_the_values_read_from_another_output_have_a_builder_of_their_own():
     gamma pass's are ``gamma_z_values``', the start-distance output's
     ``start_distance_values``'; the event table's are in neither."""
     gamma = _by_key(builder.gamma_z_values(*_signal_tables(), "s"))
-    assert len(gamma) == 16
+    assert len(gamma) == 20
     assert {key.split("_")[0] for key in gamma} == {"slow", "fast"}
     assert {v.function for v in gamma.values()} == {"gamma_z_values"}
     brain_state = _by_key(builder.brain_state_values(*_signal_tables(), "s"))
