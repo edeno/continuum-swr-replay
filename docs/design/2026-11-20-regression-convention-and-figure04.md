@@ -71,13 +71,13 @@ What holds in the current code:
 
 ### 2.1 Rate
 
-- A counted event must end before its stop ends (no event in the event table ends later). So event starts
-  are missing just before a stop ends, and the per-bin model counts that time as fully at risk. In stops of
-  2.5 s or more, SWR event starts in the last 100 to 200 ms run at about a quarter of their rate one second
-  earlier, and are still reduced 300 to 500 ms before the end, in 5 of 5 animals; No SWR starts are reduced
-  only in the last 50 ms.
-- Stops after an omitted reward are short, so most of their time is this end-of-stop time. On simulated
-  events laid over the real stops, with no true reward effect, the production rung M7r returned a reward
+- Event starts are fewer before a stop ends. In stops of 2.5 s or more, SWR event starts in the last 100 to
+  200 ms run at about a quarter of their rate one second earlier and are reduced from about 0.8 s before the
+  end, in 5 of 5 animals; counted No SWR starts are reduced only in the last 50 ms. Section 2.7 shows what
+  makes this: for SWR events it is in the data, not the counting rule.
+- Stops after an omitted reward are short, so most of their time is this end-of-stop time, and a model
+  without a clock for it reads the difference as a reward effect. On simulated events laid over the real
+  stops, with no true reward effect and only the counting rule, the production rung M7r returned a reward
   rate ratio of about 1.10 and called it significant in 18 of 20 simulated data sets; a model with a second
   clock (time until the stop ends) returned about 1.02.
 - On the real data the SWR lag-1 reward kernel falls from the reported value to about 1.19 when each stop's
@@ -149,6 +149,38 @@ least nine convergence tests and six rules for a term that cannot be estimated; 
 content and choice families, a cross-validated one in one history model and a fixed one in the mPFC models;
 six fold designs; six ways of scaling a covariate; uncentered interactions everywhere; and seven kinds of
 test with six different multiple-comparison families.
+
+### 2.7 Stop ends and small movements at the well (exploration of all 242 epochs)
+
+The lead asked whether the end-of-stop drop is a problem in the data, and worried about "cases where the
+animal moves a little bit and the animal is still at the well". The decode frames of all 242 epochs were
+read with the project's own event functions; the rebuild reproduces every row of the event table and of the
+stop table. All numbers are diagnostics.
+
+- **The counting rule is not what makes the SWR drop.** Without the rule that the animal is immobile for the
+  whole event, 233 more SWR candidates start in a stop and cross its end (0.6 % of counted SWR events).
+  Adding them leaves 94 to 99 % of the drop. SWR starts fall from about 0.8 s before the stop ends; head speed
+  begins to rise about 0.4 s before. One limit: the SWR detector itself needs low speed at an SWR's first and
+  last sample, so an SWR across a stop end cannot be in the inventory; treating crossing candidates with
+  high ripple power as SWR fills only the last 100 ms.
+- **For No SWR events the rule makes the last-50-ms drop, and hides a rise.** 6,541 No SWR candidates start
+  in a stop and continue into movement (12 % of the counted No SWR events; median duration 0.42 s). With them
+  the start rate rises two to three times in the last 100 ms. The paper's definition leaves these out.
+- **Most stop ends are small movements, not the animal leaving.** 58 % of well-anchored stop ends are
+  followed by another stop at the same well. The movement between is small: median 0.22 s, peak speed
+  5.7 cm/s, net head displacement 1.6 cm, the head within about 4 cm of the well. Position and speed alone
+  identify them in every epoch (98 to 99.8 % of stops that are not the last of a visit).
+- **The stop clock mixes arrivals with re-stops.** Counted from the start of a stop, the SWR start rate at
+  0.5 to 1 s is about 0.18 per second; counted from the animal's arrival at the well it is about 0.03.
+  Counted from arrival, the current-arm share falls to about 0.08 at 0.5 to 1 s and rises to 0.3 to 0.4 by 5
+  to 8 s; an earlier first look on the stop clock had shown no change.
+- **Before the animal leaves** the current-arm share reaches about 0.5 in the last 0.25 s in both kinds;
+  before a small movement it is about 0.31 to 0.35. The SWR drop appears before every movement, small or
+  large.
+- **Three ways to set the unit** (each stop alone; stops with their ends marked "stays" or "leaves"; the
+  well visit, with stops joined across small movements) give nearly the same curves against time until the
+  animal leaves. They differ in the clock since arrival and in the units at risk: 93,126 stops against
+  45,005 visits, with nearly the same events.
 
 ## 3. The questions
 
