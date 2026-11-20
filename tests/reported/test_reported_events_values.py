@@ -639,14 +639,14 @@ def test_rest_theta_values_name_each_class():
 
 
 def test_figure_3_values_are_tagged_to_the_panel_that_shows_them():
-    """Spatial extent is panel b and the arm count panel d. The content's place
-    shares (own and remote, at a well and elsewhere) are read off panel f and
-    the at-well share is quoted on panel h."""
+    """Spatial extent is panel c. The arm count answers the same question and is
+    in no panel. The content's place shares (own and remote, at a well and
+    elsewhere) are read off panel e and the at-well share is quoted on panel g."""
     values = _by_key(builder.property_values(_property_events(), "s"))
-    assert values["extent_median_swr"].figures == ("3b",)
-    assert values["arms_median_swr"].figures == ("3d",)
+    assert values["extent_median_swr"].figures == ("3c",)
+    assert values["arms_median_swr"].figures == ()
     assert values["arms_median_swr"].questions == values["extent_median_swr"].questions
-    assert builder.TAGS["content_occupancy"].figures == ("3f", "3h")
+    assert builder.TAGS["content_occupancy"].figures == ("3e", "3g")
 
 
 def test_content_occupancy_values_name_each_group_and_place():
@@ -805,7 +805,7 @@ def test_state_composition_values_name_each_group_and_state():
     values = _by_key(builder.state_composition_values(events, "s"))
     assert values["non_swr_continuous_share"].value == pytest.approx(0.8)
     assert values["swr_fragmented_share"].value == pytest.approx(0.2)
-    assert values["swr_fragmented_share"].figures == ("3e",)
+    assert values["swr_fragmented_share"].figures == ("3b",)
     assert len(values) == 4
 
 

@@ -155,7 +155,7 @@ TAGS = {
     "ripple": Tags(("2d.8", "2b.5"), ("2i",)),
     "mua": Tags(("2d.8",), ("2i",)),
     "theta": Tags(("2d.8",), ("2i",)),
-    "gamma_z": Tags(("2d.8",), ("3i",)),
+    "gamma_z": Tags(("2d.8",), ("3h",)),
     "brain_state": Tags(("2d.8",)),
     "class_distribution": Tags(("2b.5",)),
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
@@ -163,18 +163,18 @@ TAGS = {
     "nonlocal_power": Tags(("2b.5",), ("2j",)),
     "participation": Tags(("2d.9",), ("2g",)),
     "spike_rate": Tags(("2d.9",)),
-    "state_composition": Tags(("2d.10",), ("3e",)),
+    "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
     "tetrode_holdout": Tags(("2c.3",), ("2h",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
     "spike_gpi": Tags(("2c.4",)),
-    "content_occupancy": Tags(("2d.1",), ("3f", "3h")),
+    "content_occupancy": Tags(("2d.1",), ("3e", "3g")),
     "duration": Tags(("2d.6",), ("3a",)),
-    "extent": Tags(("2d.3",), ("3b",)),
-    "arms": Tags(("2d.3",), ("3d",)),
-    "speed": Tags(("2d.2",), ("3c",)),
+    "extent": Tags(("2d.3",), ("3c",)),
+    "arms": Tags(("2d.3",)),
+    "speed": Tags(("2d.2",), ("3d",)),
     "certainty": Tags(("2d.5",)),
     "stillness": Tags(("2d.4",)),
     "location": Tags(("2d.1",)),
@@ -1205,7 +1205,7 @@ _RUN_GROUPS = {"non_swr": SWR_LABELS[False], "swr": SWR_LABELS[True]}
 
 def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.10: the mean share of an SWR or no-SWR event in Continuous and in
-    Fragmented (Figure 3e)."""
+    Fragmented (Figure 3b)."""
     make = value_factory(state_composition_values, source, TAGS["state_composition"])
     statistics = event_statistics.state_composition_statistics(events)
     values = []

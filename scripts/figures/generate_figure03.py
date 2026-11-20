@@ -6,37 +6,40 @@ they overlap an SWR (Kay's detector, the SWR source). Each row asks one thing:
 
     Size and movement
         a — Duration.
-        b — Spatial extent of the decoded content.
-        c — Replay speed (each event's median).
-        d — Arms the decoded position visits (of the track's nine).
-        e — The mean share of an event in Non-Local Continuous and in Non-Local
+        b — The mean share of an event in Non-Local Continuous and in Non-Local
             Fragmented (each event's mean state probability, each event weighted
             alike); bars the animals' mean, dots the animals
             (``event_statistics.state_composition_statistics``).
-    Where the content is
-        f — Content time by track distance from the animal, at a well (within
+        c — Spatial extent of the decoded content.
+        d — Replay speed (each event's median).
+    Where the content is, and the brain state
+        e — Content time by track distance from the animal, at a well (within
             ``AT_WELL_CM`` of one) and elsewhere: content at a well far from
             the animal is at another well, near it at the animal's own.
-        g — Where on the track each kind's content is denser: the ratio of no-SWR
+        f — Where on the track each kind's content is denser: the ratio of no-SWR
             to SWR content time per cm along every arm.
-        h — Content time per cm from the center out to the junctions (trunk
+        g — Content time per cm from the center out to the junctions (trunk
             arms) and from the junctions out to the wells (leaf arms).
-    Brain state
-        i — Slow and fast gamma during the events, against the same epochs'
+        h — Slow and fast gamma during the events, against the same epochs'
             quiet rest and running. (Ripple power, MUA, theta and head speed
             around the events are Figure 2's.)
 
-Panels a–c mark each class's median (``event_statistics.class_medians``),
+b comes before c and d because the far mode of c and the fast mode of d are the
+events with Fragmented time. The number of arms the decoded position touches is
+not drawn: it restates c in arms, and an arm counts when one time bin's position
+is on it. Its values stay in the events summary.
+
+Panels a, c and d mark each class's median (``event_statistics.class_medians``),
 the events summary's ``<property>_median_*`` values
 (``paper/reported/events.json``). Panels
-f–h place every event time bin's MAP position on its arm
-(``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``): f
-draws ``content_along_arms.distance_from_animal_shares``, g and h
-``content_along_arms.content_density_along_arms``, each the animals' mean; h
+e–g place every event time bin's MAP position on its arm
+(``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``): e
+draws ``content_along_arms.distance_from_animal_shares``, f and g
+``content_along_arms.content_density_along_arms``, each the animals' mean; g
 quotes the share of content time within ``AT_WELL_CM`` of a well, the summary's
 ``*_content_at_well_fraction`` (``content_along_arms.content_place_shares``,
 ``place_share_statistics``). Every one of them weighs each epoch of an animal the
-same and each animal the same. Panel i's animal values are
+same and each animal the same. Panel h's animal values are
 ``event_statistics.animal_signal_levels``: the values the summary's
 ``<signal>_animals_*`` counts compare.
 
@@ -78,7 +81,6 @@ from continuum_swr_replay.analysis.event_properties.event_statistics import (
     class_medians,
     state_composition_statistics,
 )
-from continuum_swr_replay.data_loaders.constants import ALL_ARMS
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.paths import (
@@ -92,7 +94,6 @@ from continuum_swr_replay.reported.events import (
 from continuum_swr_replay.visualization.figure_utilities import save_figure
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.simulated_run_panels import (
-    LABEL_SIZE,
     SMALL_SIZE,
     check_journal_limits,
     drawn_extent,
@@ -109,30 +110,28 @@ warnings.filterwarnings("ignore")
 
 # Inches: saved with 0.1 in margins, about 17.3 cm (Cell Press full width).
 WIDTH = 6.5
-HEIGHT = 6.3
+HEIGHT = 4.6
 
 C_NO_SWR = COLORS["No SWR"]
 C_SWR = COLORS["SWR"]
-# Panel i's rest and running levels: neutral, not decoder-state colors.
+# Panel h's rest and running levels: neutral, not decoder-state colors.
 C_REST = "white"
 C_RUN = "black"
 KINDS = ((False, "no SWR", C_NO_SWR), (True, "SWR", C_SWR))
 
-# The track drawn in panel g: one epoch's track graph (every epoch's arms run the
+# The track drawn in panel f: one epoch's track graph (every epoch's arms run the
 # same way, ``content_along_arms.check_arm_orientation``).
 TRACK_EPOCH = "wilbur20210329_02_r1_HPC"
-# Half the width of an arm drawn in panel g, track units (cm).
+# Half the width of an arm drawn in panel f, track units (cm).
 ARM_HALF_WIDTH_CM = 9.0
-# Panels g and h: segments per arm, about 4 cm (two 2-cm place bins) each.
+# Panels f and g: segments per arm, about 4 cm (two 2-cm place bins) each.
 N_SEGMENTS = 13
-# Panel g: the color scale's limit, log2 of the no-SWR to SWR density ratio.
+# Panel f: the color scale's limit, log2 of the no-SWR to SWR density ratio.
 RATIO_LIMIT_LOG2 = 2
-# Panel f: distance from the animal, cm (the track's longest is under 240).
+# Panel e: distance from the animal, cm (the track's longest is under 240).
 DISTANCE_EDGES_CM = np.arange(0, 241, 8)
-# Panel d: the track's arms.
-N_ARMS = len(ALL_ARMS)
 
-# Panels a-c: (column, x label, scale, bin edges, log x, x ticks). A tick at an
+# Panels a, c, d: (column, x label, scale, bin edges, log x, x ticks). A tick at an
 # end of the axis that starts with ≤ or ≥ says its bin also holds the events
 # beyond the axis; an end without one holds none (``draw_histogram`` checks).
 HISTOGRAMS = {
@@ -150,7 +149,7 @@ HISTOGRAMS = {
     ),
 }  # fmt: skip
 
-# Panel i: (signal, event column, label). Theta is Figure 2's.
+# Panel h: (signal, event column, label). Theta is Figure 2's.
 SIGNALS = (
     ("slow_gamma", "slow_gamma_z", "Slow γ"),
     ("fast_gamma", "fast_gamma_z", "Fast γ"),
@@ -263,19 +262,6 @@ def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
     ax.set_xticks(list(ticks), list(ticks.values()))
 
 
-def draw_arm_counts(ax, events: pd.DataFrame) -> None:
-    """The share of each kind's events visiting each number of the nine arms."""
-    values = np.arange(1, N_ARMS + 1)
-    for k, (is_swr, _, color) in enumerate(KINDS):
-        counts = events.loc[events["is_swr"] == is_swr, "n_unique_arms"]
-        if not counts.between(1, N_ARMS).all():
-            raise ValueError(f"an event visits no arm or more than {N_ARMS}")
-        share = counts.value_counts(normalize=True).reindex(values, fill_value=0)
-        ax.bar(values + (k - 0.5) * 0.4, 100 * share, width=0.4, color=color, lw=0)
-    ax.set_xticks(values)
-    ax.set_xlim(0.4, N_ARMS + 0.6)
-
-
 def draw_distance_from_animal(axes, shares: pd.DataFrame) -> None:
     """Each kind's content time by distance from the animal (``axes``: no SWR,
     then SWR), stacked: at a well (dark) and elsewhere (light)."""
@@ -340,13 +326,15 @@ def draw_ratio_track(ax, track_graph, edge_order, ratio: pd.Series) -> None:
     ax.set_aspect("equal")
     ax.axis("off")
     steps = np.arange(-RATIO_LIMIT_LOG2, RATIO_LIMIT_LOG2 + 1)
+    # Under the track: beside it, the labels run into the next panel.
     bar = plt.colorbar(
-        bands, ax=ax, shrink=0.7, aspect=12, pad=0.02, ticks=steps
+        bands, ax=ax, orientation="horizontal", shrink=0.75, aspect=18, pad=0.03,
+        ticks=steps,
     )  # fmt: skip
-    labels = [f"{2 ** abs(k):g}×" if k else "equal" for k in steps]
-    labels[0] += " SWR"
-    labels[-1] += " no SWR"
-    bar.ax.set_yticklabels(labels)
+    # The ends and the middle are labeled; the ticks between are 2×.
+    limit = f"{2**RATIO_LIMIT_LOG2:g}×"
+    labels = {steps[0]: f"{limit} SWR", 0: "equal", steps[-1]: f"{limit} no SWR"}
+    bar.ax.set_xticklabels([labels.get(k, "") for k in steps])
     bar.ax.tick_params(length=2)
     bar.outline.set_linewidth(0.5)
     ax.set_title("Content time per cm,\nno SWR : SWR", fontsize=SMALL_SIZE, pad=2)
@@ -384,7 +372,7 @@ def draw_profiles(ax, profiles: pd.DataFrame, shares: pd.DataFrame) -> None:
 
 
 def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
-    """Panel e: the mean share of an event in Continuous and in Fragmented.
+    """Panel b: the mean share of an event in Continuous and in Fragmented.
 
     Bars are the animals' mean, dots the animals
     (``event_statistics.state_composition_statistics``).
@@ -407,7 +395,8 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
 
 
 def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
-    """Each animal's rest, no-SWR, SWR and running level of each signal."""
+    """Each animal's rest, no-SWR, SWR and running level of each signal
+    (``axes``: one per signal, stacked, sharing the x axis)."""
     colors = (C_REST, C_NO_SWR, C_SWR, C_RUN)
     for ax, (signal, column, label) in zip(axes, SIGNALS, strict=True):
         values = animal_signal_values(events, reference, signal, column)
@@ -420,10 +409,11 @@ def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> Non
                 edgecolors="black", linewidths=0.5, zorder=2,
             )  # fmt: skip
         ax.axhline(0, color="0.85", lw=0.5, zorder=0)
-        ax.set_title(label, fontsize=LABEL_SIZE, pad=2)
+        ax.set_title(label, fontsize=SMALL_SIZE, pad=2)
         ax.set_xticks(x, values.columns, rotation=45, ha="right")
         ax.set_xlim(-0.5, 3.5)
-    axes[0].set_ylabel("Power (z)")
+    axes[0].tick_params(labelbottom=False)
+    axes[0].set_ylabel("Power (z)", y=-0.2)
 
 
 # ---------------------------------------------------------------------------
@@ -436,44 +426,43 @@ def generate_figure(inputs: dict):
     events = inputs["events"]
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     outer = GridSpec(
-        3, 1, figure=fig, height_ratios=[1.0, 1.05, 1.0], hspace=0.75,
-        left=0.08, right=0.99, top=0.94, bottom=0.08,
+        2, 1, figure=fig, height_ratios=[1.0, 1.25], hspace=0.7,
+        left=0.08, right=0.99, top=0.91, bottom=0.13,
     )  # fmt: skip
 
-    row1 = outer[0].subgridspec(1, 5, width_ratios=[1, 1, 1, 1.3, 0.9], wspace=0.55)
-    ax_a, ax_b, ax_c, ax_d, ax_e = (fig.add_subplot(row1[i]) for i in range(5))
-    draw_state_composition(ax_e, state_composition_statistics(events))
-    for ax, key in ((ax_a, "duration"), (ax_b, "extent"), (ax_c, "speed")):
+    row1 = outer[0].subgridspec(1, 4, width_ratios=[1, 0.7, 1, 1], wspace=0.55)
+    ax_a, ax_b, ax_c, ax_d = (fig.add_subplot(row1[i]) for i in range(4))
+    draw_state_composition(ax_b, state_composition_statistics(events))
+    for ax, key in ((ax_a, "duration"), (ax_c, "extent"), (ax_d, "speed")):
         draw_histogram(ax, events, key)
-    ax_a.set_ylabel("% events")
-    draw_arm_counts(ax_d, events)
-    ax_d.set_xlabel("Arms visited")
-    ax_d.set_ylabel("% events")
+    for ax in (ax_a, ax_c):
+        ax.set_ylabel("% events")
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for _, _, c in KINDS]
     fig.legend(
         handles, [n for _, n, _ in KINDS], frameon=False, loc="upper center",
         bbox_to_anchor=(0.5, 1.0), ncol=2, handlelength=0.8, columnspacing=1.5,
     )  # fmt: skip
 
-    row2 = outer[1].subgridspec(1, 3, width_ratios=[1.0, 1.6, 1.3], wspace=0.6)
-    f_grid = row2[0].subgridspec(2, 1, hspace=0.15)
-    ax_f = [fig.add_subplot(f_grid[0])]
-    ax_f.append(fig.add_subplot(f_grid[1], sharex=ax_f[0]))
-    draw_distance_from_animal(ax_f, inputs["distance_shares"])
-    ax_g = fig.add_subplot(row2[1])
-    draw_ratio_track(ax_g, inputs["track_graph"], inputs["edge_order"], inputs["ratio"])
-    ax_h = fig.add_subplot(row2[2])
-    draw_profiles(ax_h, inputs["profiles"], inputs["place_shares"])
-
-    row3 = outer[2].subgridspec(1, 4, width_ratios=[1, 1, 1, 1.3], wspace=0.5)
-    ax_i = [fig.add_subplot(row3[i]) for i in range(len(SIGNALS))]
-    draw_brain_state(ax_i, events, inputs["reference"])
+    row2 = outer[1].subgridspec(
+        1, 4, width_ratios=[1.0, 1.5, 1.15, 0.7], wspace=0.6
+    )  # fmt: skip
+    e_grid = row2[0].subgridspec(2, 1, hspace=0.15)
+    ax_e = [fig.add_subplot(e_grid[0])]
+    ax_e.append(fig.add_subplot(e_grid[1], sharex=ax_e[0]))
+    draw_distance_from_animal(ax_e, inputs["distance_shares"])
+    ax_f = fig.add_subplot(row2[1])
+    draw_ratio_track(ax_f, inputs["track_graph"], inputs["edge_order"], inputs["ratio"])
+    ax_g = fig.add_subplot(row2[2])
+    draw_profiles(ax_g, inputs["profiles"], inputs["place_shares"])
+    h_grid = row2[3].subgridspec(2, 1, hspace=0.4)
+    ax_h = [fig.add_subplot(h_grid[0])]
+    ax_h.append(fig.add_subplot(h_grid[1], sharex=ax_h[0]))
+    draw_brain_state(ax_h, events, inputs["reference"])
 
     fig.draw_without_rendering()
     rows = (
-        ((ax_a, "a"), (ax_b, "b"), (ax_c, "c"), (ax_d, "d"), (ax_e, "e")),
-        ((ax_f[0], "f"), (ax_g, "g"), (ax_h, "h")),
-        ((ax_i[0], "i"),),
+        ((ax_a, "a"), (ax_b, "b"), (ax_c, "c"), (ax_d, "d")),
+        ((ax_e[0], "e"), (ax_f, "f"), (ax_g, "g"), (ax_h[0], "h")),
     )
     for row in rows:
         top = min(drawn_extent(fig, [ax for ax, _ in row]).y1 + 0.02, 0.985)
