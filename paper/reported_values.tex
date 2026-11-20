@@ -2,7 +2,7 @@
 % Every value is read from a summary file, paper/reported/<summary>.json;
 % each macro's comment names its key and what it is.
 
-% --- survey (commit 099b9dbb32c0)
+% --- survey (commit 59f114b4acbc)
 \newcommand{\SurveyBandHighMax}{300}  % survey.band_high_max: Largest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
 \newcommand{\SurveyBandHighMin}{200}  % survey.band_high_min: Smallest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
 \newcommand{\SurveyBandHighMode}{250}  % survey.band_high_mode: Most common upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
@@ -36,7 +36,7 @@
 \newcommand{\SurveyTimeBinMin}{2}  % survey.time_bin_min: Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)
 \newcommand{\SurveyTimeBinMode}{20}  % survey.time_bin_mode: Most common decoding time bin, over the 46 numeric cells of Time bin (ms)
 
-% --- detection (commit 099b9dbb32c0)
+% --- detection (commit 59f114b4acbc)
 \newcommand{\DetectionControlsContinuingOursOnePerPartLongestFraction}{96}  % detection.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingOursSpanningShortestFraction}{96}  % detection.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
 \newcommand{\DetectionControlsContinuingSlidingOnePerPartLongestFraction}{50}  % detection.controls_continuing_sliding_one_per_part_longest_fraction: continuing chains at the longest gap: share of trials the sliding window reports as one event per part
@@ -210,7 +210,7 @@
 \newcommand{\DetectionSweepTimingStateSpaceOnsetMinMs}{\ensuremath{-}20}  % detection.sweep_timing_state_space_onset_min_ms: smallest onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 \newcommand{\DetectionSweepTimingStateSpaceOnsetUpperQuartileMs}{\ensuremath{-}2}  % detection.sweep_timing_state_space_onset_upper_quartile_ms: upper quartile of the onset error of the state-space detector against the replay's first spike, over the replays both detectors report
 
-% --- events (commit e9b777f04c38)
+% --- events (commit 59f114b4acbc)
 \newcommand{\EventsAnimals}{5}  % events.animals: animals in the event table
 \newcommand{\EventsAnimalsNonSwrMajority}{4}  % events.animals_non_swr_majority: animals whose share of non-SWR events (the mean over their epochs) is above one half
 \newcommand{\EventsAnimalsNonSwrMoreAtWell}{5}  % events.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content, each share the mean over the animal's epochs
@@ -228,16 +228,16 @@
 \newcommand{\EventsBaselineScored}{25{,}167}  % events.baseline_scored: matched quiet windows scored
 \newcommand{\EventsBaselineSpikesMedian}{11}  % events.baseline_spikes_median: median spike count of matched quiet windows
 \newcommand{\EventsBaselineTetrodesMedian}{6}  % events.baseline_tetrodes_median: median number of tetrodes with a spike in matched quiet windows
-\newcommand{\EventsCalibrationErrorBinEight}{5.0}  % events.calibration_error_bin_eight: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.75 (bin 8 of 10), outside excluded time, sessions pooled
-\newcommand{\EventsCalibrationErrorBinFive}{6.8}  % events.calibration_error_bin_five: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.45 (bin 5 of 10), outside excluded time, sessions pooled
-\newcommand{\EventsCalibrationErrorBinFour}{7.2}  % events.calibration_error_bin_four: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.35 (bin 4 of 10), outside excluded time, sessions pooled
-\newcommand{\EventsCalibrationErrorBinNine}{4.9}  % events.calibration_error_bin_nine: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.85 (bin 9 of 10), outside excluded time, sessions pooled
-\newcommand{\EventsCalibrationErrorBinOne}{14}  % events.calibration_error_bin_one: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.05 (bin 1 of 10), outside excluded time, sessions pooled
-\newcommand{\EventsCalibrationErrorBinSeven}{5.8}  % events.calibration_error_bin_seven: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.65 (bin 7 of 10), outside excluded time, sessions pooled
-\newcommand{\EventsCalibrationErrorBinSix}{6.2}  % events.calibration_error_bin_six: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.55 (bin 6 of 10), outside excluded time, sessions pooled
-\newcommand{\EventsCalibrationErrorBinTen}{3.0}  % events.calibration_error_bin_ten: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.95 (bin 10 of 10), outside excluded time, sessions pooled
-\newcommand{\EventsCalibrationErrorBinThree}{7.5}  % events.calibration_error_bin_three: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.25 (bin 3 of 10), outside excluded time, sessions pooled
-\newcommand{\EventsCalibrationErrorBinTwo}{8.8}  % events.calibration_error_bin_two: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centred on 0.15 (bin 2 of 10), outside excluded time, sessions pooled
+\newcommand{\EventsCalibrationErrorBinEight}{5.0}  % events.calibration_error_bin_eight: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.75 (bin 8 of 10), outside excluded time, sessions pooled
+\newcommand{\EventsCalibrationErrorBinFive}{6.8}  % events.calibration_error_bin_five: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.45 (bin 5 of 10), outside excluded time, sessions pooled
+\newcommand{\EventsCalibrationErrorBinFour}{7.2}  % events.calibration_error_bin_four: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.35 (bin 4 of 10), outside excluded time, sessions pooled
+\newcommand{\EventsCalibrationErrorBinNine}{4.9}  % events.calibration_error_bin_nine: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.85 (bin 9 of 10), outside excluded time, sessions pooled
+\newcommand{\EventsCalibrationErrorBinOne}{14}  % events.calibration_error_bin_one: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.05 (bin 1 of 10), outside excluded time, sessions pooled
+\newcommand{\EventsCalibrationErrorBinSeven}{5.8}  % events.calibration_error_bin_seven: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.65 (bin 7 of 10), outside excluded time, sessions pooled
+\newcommand{\EventsCalibrationErrorBinSix}{6.2}  % events.calibration_error_bin_six: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.55 (bin 6 of 10), outside excluded time, sessions pooled
+\newcommand{\EventsCalibrationErrorBinTen}{3.0}  % events.calibration_error_bin_ten: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.95 (bin 10 of 10), outside excluded time, sessions pooled
+\newcommand{\EventsCalibrationErrorBinThree}{7.5}  % events.calibration_error_bin_three: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.25 (bin 3 of 10), outside excluded time, sessions pooled
+\newcommand{\EventsCalibrationErrorBinTwo}{8.8}  % events.calibration_error_bin_two: median over sessions of each session's median decoding error at time bins whose Local probability is in the 0.1-wide bin centered on 0.15 (bin 2 of 10), outside excluded time, sessions pooled
 \newcommand{\EventsCareyEvents}{24{,}084}  % events.carey_events: carey events compared with the non-local detector
 \newcommand{\EventsCareyMostlyLocalFraction}{16}  % events.carey_mostly_local_fraction: share of carey events that overlap no non-local event and have Local above 0.8 in more than half their rows
 \newcommand{\EventsCareyNoNonlocalFraction}{20}  % events.carey_no_nonlocal_fraction: share of carey events that overlap no non-local event
@@ -420,13 +420,13 @@
 \newcommand{\EventsNonlocalEventsNonSwr}{42{,}974}  % events.nonlocal_events_non_swr: of those, events overlapping no SWR (overlap_class non_swr)
 \newcommand{\EventsNonlocalEventsOutsideKay}{42{,}962}  % events.nonlocal_events_outside_kay: non-local events no Kay SWR overlaps (detector comparison memberships)
 \newcommand{\EventsNonlocalEventsOutsideKayFraction}{57}  % events.nonlocal_events_outside_kay_fraction: share of the non-local events with a known membership that no Kay SWR overlaps
-\newcommand{\EventsNonlocalEventsOutsideKayPerHour}{1100}  % events.nonlocal_events_outside_kay_per_hour: non-local events no Kay SWR overlaps, per hour of analysed immobility
+\newcommand{\EventsNonlocalEventsOutsideKayPerHour}{1100}  % events.nonlocal_events_outside_kay_per_hour: non-local events no Kay SWR overlaps, per hour of analyzed immobility
 \newcommand{\EventsNonlocalEventsOutsideTrigger}{19{,}221}  % events.nonlocal_events_outside_trigger: non-local events no SWR definition and no MUA event overlaps (cell sequence_matched_by_no_trigger)
 \newcommand{\EventsNonlocalEventsOutsideTriggerFraction}{25}  % events.nonlocal_events_outside_trigger_fraction: share of the non-local events with a known membership that no SWR definition and no MUA event overlaps
-\newcommand{\EventsNonlocalEventsOutsideTriggerPerHour}{480}  % events.nonlocal_events_outside_trigger_per_hour: non-local events no SWR definition and no MUA event overlaps, per hour of analysed immobility
+\newcommand{\EventsNonlocalEventsOutsideTriggerPerHour}{480}  % events.nonlocal_events_outside_trigger_per_hour: non-local events no SWR definition and no MUA event overlaps, per hour of analyzed immobility
 \newcommand{\EventsNonlocalEventsOutsideWidloski}{70{,}924}  % events.nonlocal_events_outside_widloski: non-local events no Widloski event overlaps (detector comparison memberships)
 \newcommand{\EventsNonlocalEventsOutsideWidloskiFraction}{94}  % events.nonlocal_events_outside_widloski_fraction: share of the non-local events with a known membership that no Widloski event overlaps
-\newcommand{\EventsNonlocalEventsOutsideWidloskiPerHour}{1800}  % events.nonlocal_events_outside_widloski_per_hour: non-local events no Widloski event overlaps, per hour of analysed immobility
+\newcommand{\EventsNonlocalEventsOutsideWidloskiPerHour}{1800}  % events.nonlocal_events_outside_widloski_per_hour: non-local events no Widloski event overlaps, per hour of analyzed immobility
 \newcommand{\EventsNonlocalEventsSwrContained}{16{,}037}  % events.nonlocal_events_swr_contained: events lying inside an SWR (overlap_class swr_contained)
 \newcommand{\EventsNonlocalEventsSwrPartial}{16{,}664}  % events.nonlocal_events_swr_partial: events partly overlapping an SWR (overlap_class swr_partial)
 \newcommand{\EventsNonlocalTimeOutsideKayFraction}{53}  % events.nonlocal_time_outside_kay_fraction: share of non-local event time that Kay's SWRs do not cover
@@ -456,7 +456,7 @@
 \newcommand{\EventsPeakMatchedDifferenceLow}{\ensuremath{-}0.17}  % events.peak_matched_difference_low: lower bound of its 95 % interval (nested bootstrap, small-sample t correction over the 5 animals); 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate
 \newcommand{\EventsPeakMedianNonSwr}{0.90}  % events.peak_median_non_swr: median posterior peak (mean over the event) of immobile non-SWR non-local events
 \newcommand{\EventsPeakMedianSwr}{0.82}  % events.peak_median_swr: median posterior peak (mean over the event) of immobile SWR-overlapping non-local events
-\newcommand{\EventsRestHours}{40}  % events.rest_hours: hours of analysed immobility the non-local detector observed (exposure), summed over epochs
+\newcommand{\EventsRestHours}{40}  % events.rest_hours: hours of analyzed immobility the non-local detector observed (exposure), summed over epochs
 \newcommand{\EventsReversalsAnimalsInDirection}{5}  % events.reversals_animals_in_direction: animals whose non-SWR median number of direction reversals is lower than their SWR median, each the median over the animal's epochs of the epoch's median
 \newcommand{\EventsReversalsDifferenceHigh}{+4.5}  % events.reversals_difference_high: upper bound of that interval
 \newcommand{\EventsReversalsDifferenceLow}{+1.5}  % events.reversals_difference_low: lower bound of the 95 % interval (nested bootstrap, small-sample t correction over the 5 animals) of the SWR minus non-SWR difference of median number of direction reversals
@@ -626,7 +626,7 @@
 \newcommand{\EventsZugaroOverlapNonlocalShareMedian}{100}  % events.zugaro_overlap_nonlocal_share_median: median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\EventsZugaroOverlapUncertainShareMedian}{0}  % events.zugaro_overlap_uncertain_share_median: median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8
 
-% --- behavior (commit 9cb45dbdebfa)
+% --- behavior (commit 59f114b4acbc)
 \newcommand{\BehaviorArmrewardAll}{\ensuremath{-}0.082}  % behavior.armreward_all: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient
 \newcommand{\BehaviorArmrewardAllAnimalsPositive}{2}  % behavior.armreward_all_animals_positive: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median
 \newcommand{\BehaviorArmrewardAllQ}{0.34}  % behavior.armreward_all_q: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
@@ -926,15 +926,15 @@
 \newcommand{\BehaviorHorseraceValueSwr}{\ensuremath{-}0.0018}  % behavior.horserace_value_swr: SWR events: within-arm coefficient of reward-belief mean (value), the four predictors entered together; median over sessions
 \newcommand{\BehaviorHorseraceValueSwrAnimals}{5}  % behavior.horserace_value_swr_animals: SWR events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median
 \newcommand{\BehaviorLeafStepBoth}{+1.5}  % behavior.leaf_step_both: leaf ladder Mu to Mvu: median per-session AIC(child) - AIC(parent); negative = child better
-\newcommand{\BehaviorLeafStepBothAnimals}{0}  % behavior.leaf_step_both_animals: leaf ladder Mu to Mvu: animals whose median step is negative (favours the child)
+\newcommand{\BehaviorLeafStepBothAnimals}{0}  % behavior.leaf_step_both_animals: leaf ladder Mu to Mvu: animals whose median step is negative (favors the child)
 \newcommand{\BehaviorLeafStepBothClear}{12}  % behavior.leaf_step_both_clear: leaf ladder Mu to Mvu: sessions in which the child's AIC is lower by more than 2
 \newcommand{\BehaviorLeafStepBothSessions}{242}  % behavior.leaf_step_both_sessions: leaf ladder Mu to Mvu: sessions compared
 \newcommand{\BehaviorLeafStepUncertainty}{\ensuremath{-}1.3}  % behavior.leaf_step_uncertainty: leaf ladder M4 to Mu: median per-session AIC(child) - AIC(parent); negative = child better
-\newcommand{\BehaviorLeafStepUncertaintyAnimals}{5}  % behavior.leaf_step_uncertainty_animals: leaf ladder M4 to Mu: animals whose median step is negative (favours the child)
+\newcommand{\BehaviorLeafStepUncertaintyAnimals}{5}  % behavior.leaf_step_uncertainty_animals: leaf ladder M4 to Mu: animals whose median step is negative (favors the child)
 \newcommand{\BehaviorLeafStepUncertaintyClear}{112}  % behavior.leaf_step_uncertainty_clear: leaf ladder M4 to Mu: sessions in which the child's AIC is lower by more than 2
 \newcommand{\BehaviorLeafStepUncertaintySessions}{242}  % behavior.leaf_step_uncertainty_sessions: leaf ladder M4 to Mu: sessions compared
 \newcommand{\BehaviorLeafStepValue}{+2.4}  % behavior.leaf_step_value: leaf ladder M4 to Mv: median per-session AIC(child) - AIC(parent); negative = child better
-\newcommand{\BehaviorLeafStepValueAnimals}{0}  % behavior.leaf_step_value_animals: leaf ladder M4 to Mv: animals whose median step is negative (favours the child)
+\newcommand{\BehaviorLeafStepValueAnimals}{0}  % behavior.leaf_step_value_animals: leaf ladder M4 to Mv: animals whose median step is negative (favors the child)
 \newcommand{\BehaviorLeafStepValueClear}{22}  % behavior.leaf_step_value_clear: leaf ladder M4 to Mv: sessions in which the child's AIC is lower by more than 2
 \newcommand{\BehaviorLeafStepValueSessions}{242}  % behavior.leaf_step_value_sessions: leaf ladder M4 to Mv: sessions compared
 \newcommand{\BehaviorLeafUncertainty}{+0.31}  % behavior.leaf_uncertainty: leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: session median coefficient
@@ -959,10 +959,10 @@
 \newcommand{\BehaviorPerStopAnimalsChildBetterNonLocalSwr}{4}  % behavior.per_stop_animals_child_better_non_local_swr: non-local with SWR: animals whose median step is negative
 \newcommand{\BehaviorPerStopAnimalsChildBetterSwr}{4}  % behavior.per_stop_animals_child_better_swr: detected SWR: animals whose median step is negative
 \newcommand{\BehaviorPerStopAuditStopsCommonDrop}{0}  % behavior.per_stop_audit_stops_common_drop: all_models_cohort_audit.csv: stops dropped by the common-cohort freeze (another rung's covariate, here the arrival clock)
-\newcommand{\BehaviorPerStopAuditStopsFull}{93{,}215}  % behavior.per_stop_audit_stops_full: all_models_cohort_audit.csv: stops modelled on R1
+\newcommand{\BehaviorPerStopAuditStopsFull}{93{,}215}  % behavior.per_stop_audit_stops_full: all_models_cohort_audit.csv: stops modeled on R1
 \newcommand{\BehaviorPerStopAuditStopsFullSessionExcluded}{340}  % behavior.per_stop_audit_stops_full_session_excluded: all_models_cohort_audit.csv: stops in sessions R1 gates out
 \newcommand{\BehaviorPerStopAuditStopsIn}{93{,}560}  % behavior.per_stop_audit_stops_in: all_models_cohort_audit.csv: stops entering the cohort
-\newcommand{\BehaviorPerStopAuditStopsModeled}{93{,}555}  % behavior.per_stop_audit_stops_modeled: all_models_cohort_audit.csv: stops modelled on R0
+\newcommand{\BehaviorPerStopAuditStopsModeled}{93{,}555}  % behavior.per_stop_audit_stops_modeled: all_models_cohort_audit.csv: stops modeled on R0
 \newcommand{\BehaviorPerStopAuditStopsModeledSessionExcluded}{0}  % behavior.per_stop_audit_stops_modeled_session_excluded: all_models_cohort_audit.csv: stops in sessions R0 gates out
 \newcommand{\BehaviorPerStopAuditStopsOwnDrop}{5}  % behavior.per_stop_audit_stops_own_drop: all_models_cohort_audit.csv: stops dropped for a missing own predictor
 \newcommand{\BehaviorPerStopChildBetterFractionNonLocal}{74}  % behavior.per_stop_child_better_fraction_non_local: non-local (all): share of sessions in which R1 has the lower AIC
@@ -1113,7 +1113,7 @@
 \newcommand{\BehaviorRateArrivalTimeSessionsSwr}{235}  % behavior.rate_arrival_time_sessions_swr: detected SWR: M5a_time_arrival fits with a finite AIC
 \newcommand{\BehaviorRateAuditStopsCommonDrop}{575}  % behavior.rate_audit_stops_common_drop: per_bin_rate_cohort_audit.csv: stops dropped by the common-cohort freeze (another rung's covariate, here the arrival clock)
 \newcommand{\BehaviorRateAuditStopsIn}{93{,}560}  % behavior.rate_audit_stops_in: per_bin_rate_cohort_audit.csv: stops entering the cohort
-\newcommand{\BehaviorRateAuditStopsModeled}{92{,}942}  % behavior.rate_audit_stops_modeled: per_bin_rate_cohort_audit.csv: stops modelled on M0_const
+\newcommand{\BehaviorRateAuditStopsModeled}{92{,}942}  % behavior.rate_audit_stops_modeled: per_bin_rate_cohort_audit.csv: stops modeled on M0_const
 \newcommand{\BehaviorRateAuditStopsModeledSessionExcluded}{38}  % behavior.rate_audit_stops_modeled_session_excluded: per_bin_rate_cohort_audit.csv: stops in sessions M0_const gates out
 \newcommand{\BehaviorRateAuditStopsOwnDrop}{5}  % behavior.rate_audit_stops_own_drop: per_bin_rate_cohort_audit.csv: stops dropped for a missing own predictor
 \newcommand{\BehaviorRateBaselineLowerQuartileNonLocal}{0.33}  % behavior.rate_baseline_lower_quartile_non_local: non-local (all): 25th percentile over sessions of the M0_const rate
@@ -1426,11 +1426,11 @@
 \newcommand{\BehaviorStayMinQGee}{0.52}  % behavior.stay_min_q_gee: smallest FDR-adjusted pooled-GEE p over roles and strata (role best, stratum all)
 \newcommand{\BehaviorStayMinQSignrank}{0.60}  % behavior.stay_min_q_signrank: smallest FDR-adjusted per-session Wilcoxon p over roles and strata (role best, stratum non_swr)
 \newcommand{\BehaviorStopDurationMeanRatio}{3.6}  % behavior.stop_duration_mean_ratio: ratio of those means
-\newcommand{\BehaviorStopDurationMeanRewarded}{2.2}  % behavior.stop_duration_mean_rewarded: well-anchored stops with a rewarded outcome: mean analysed immobility (the stop's span less the excluded time inside it)
-\newcommand{\BehaviorStopDurationMeanUnrewarded}{0.60}  % behavior.stop_duration_mean_unrewarded: well-anchored stops with an omitted outcome: mean analysed immobility (the stop's span less the excluded time inside it)
+\newcommand{\BehaviorStopDurationMeanRewarded}{2.2}  % behavior.stop_duration_mean_rewarded: well-anchored stops with a rewarded outcome: mean analyzed immobility (the stop's span less the excluded time inside it)
+\newcommand{\BehaviorStopDurationMeanUnrewarded}{0.60}  % behavior.stop_duration_mean_unrewarded: well-anchored stops with an omitted outcome: mean analyzed immobility (the stop's span less the excluded time inside it)
 \newcommand{\BehaviorStopDurationMedianRatio}{3.6}  % behavior.stop_duration_median_ratio: ratio of those medians
-\newcommand{\BehaviorStopDurationMedianRewarded}{1.0}  % behavior.stop_duration_median_rewarded: well-anchored stops with a rewarded outcome: median analysed immobility (the stop's span less the excluded time inside it)
-\newcommand{\BehaviorStopDurationMedianUnrewarded}{0.28}  % behavior.stop_duration_median_unrewarded: well-anchored stops with an omitted outcome: median analysed immobility (the stop's span less the excluded time inside it)
+\newcommand{\BehaviorStopDurationMedianRewarded}{1.0}  % behavior.stop_duration_median_rewarded: well-anchored stops with a rewarded outcome: median analyzed immobility (the stop's span less the excluded time inside it)
+\newcommand{\BehaviorStopDurationMedianUnrewarded}{0.28}  % behavior.stop_duration_median_unrewarded: well-anchored stops with an omitted outcome: median analyzed immobility (the stop's span less the excluded time inside it)
 \newcommand{\BehaviorStopSurvivalFourS}{14}  % behavior.stop_survival_four_s: share of well-anchored stops still immobile 4 s after they began (stop_end - stop_start at least 4 s; excluded time inside the stop is not taken out)
 \newcommand{\BehaviorStopSurvivalTwoS}{25}  % behavior.stop_survival_two_s: share of well-anchored stops still immobile 2 s after they began (stop_end - stop_start at least 2 s; excluded time inside the stop is not taken out)
 \newcommand{\BehaviorStopsAtWellWithStay}{75{,}785}  % behavior.stops_at_well_with_stay: at_well stops carrying an is_stay (Stage 6's population)
@@ -1550,8 +1550,8 @@
 \newcommand{\BehaviorUpdateCurrentSwrQ}{\ensuremath{1.3\times10^{-19}}}  % behavior.update_current_swr_q: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
 \newcommand{\BehaviorUpdateCurrentSwrSessions}{241}  % behavior.update_current_swr_sessions: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps
 
-% --- mpfc (commit 099b9dbb32c0)
-\newcommand{\MpfcAnalysedEpochs}{242}  % mpfc.analysed_epochs: analysed epochs the PFC cohort is drawn from
+% --- mpfc (commit 59f114b4acbc)
+\newcommand{\MpfcAnalyzedEpochs}{242}  % mpfc.analyzed_epochs: analyzed epochs the PFC cohort is drawn from
 \newcommand{\MpfcAnimals}{5}  % mpfc.animals: animals in the mPFC population
 \newcommand{\MpfcBestModelConstantFraction}{52}  % mpfc.best_model_constant_fraction: share of units whose best model by held-out deviance is constant
 \newcommand{\MpfcBestModelJointFraction}{6}  % mpfc.best_model_joint_fraction: share of units whose best model by held-out deviance is SWR + non_local_no_SWR
@@ -1711,7 +1711,7 @@
 \newcommand{\MpfcPriorMultiplierSustainedLow}{0.17}  % mpfc.prior_multiplier_sustained_low: lower end of the rate multiplier that sustained sd allows at 95 %
 \newcommand{\MpfcPriorSdPerLag}{2.07}  % mpfc.prior_sd_per_lag: the prior's implied standard deviation of a curve at one lag
 \newcommand{\MpfcPriorSdSustained}{0.90}  % mpfc.prior_sd_sustained: the prior's implied standard deviation of a curve sustained over the reported window
-\newcommand{\MpfcSessions}{75}  % mpfc.sessions: epochs with an mPFC unit bundle (the PFC cohort: analysed epochs with curated cortical spike sorting)
+\newcommand{\MpfcSessions}{75}  % mpfc.sessions: epochs with an mPFC unit bundle (the PFC cohort: analyzed epochs with curated cortical spike sorting)
 \newcommand{\MpfcSplitBestModelFraction}{10}  % mpfc.split_best_model_fraction: share of units whose best model by held-out deviance (among constant, non_local, and the split) is the split by SWR status
 \newcommand{\MpfcSplitImprovesFraction}{21}  % mpfc.split_improves_fraction: share of units whose held-out deviance improves when the non-local response is split by SWR status (non_local_SWR + non_local_no_SWR vs. non_local)
 \newcommand{\MpfcSplitSwrLargerFractionCalled}{63}  % mpfc.split_swr_larger_fraction_called: of units called for either, the share whose absolute peak modulation is larger for SWR-coupled replay than for non-SWR replay
@@ -1794,7 +1794,7 @@
 \newcommand{\MpfcSwrNoReplayEvents}{2{,}290}  % mpfc.swr_no_replay_events: Kay SWRs (kept, in the stop cohort) that overlap no non-local event, summed over sessions
 \newcommand{\MpfcSwrNoReplayEventsFraction}{20}  % mpfc.swr_no_replay_events_fraction: share of the kept, cohort Kay SWRs that overlap no non-local event
 \newcommand{\MpfcSwrNoReplayEventsSessionMedian}{29}  % mpfc.swr_no_replay_events_session_median: median per session of those SWRs
-\newcommand{\MpfcSwrNoReplayEventsUnknown}{0}  % mpfc.swr_no_replay_events_unknown: kept SWRs left out of the class because they overlap a window the analysed-time rule dropped
+\newcommand{\MpfcSwrNoReplayEventsUnknown}{0}  % mpfc.swr_no_replay_events_unknown: kept SWRs left out of the class because they overlap a window the analyzed-time rule dropped
 \newcommand{\MpfcSwrNoReplayOverlapBothAll}{438}  % mpfc.swr_no_replay_overlap_both_all: of those, units called for both (every session)
 \newcommand{\MpfcSwrNoReplayOverlapBothMinEvents}{362}  % mpfc.swr_no_replay_overlap_both_min_events: of those, units called for both (sessions with at least 10 SWRs without replay)
 \newcommand{\MpfcSwrNoReplayOverlapExpectedAll}{359}  % mpfc.swr_no_replay_overlap_expected_all: units called for both expected if the two calls were independent (every session)
