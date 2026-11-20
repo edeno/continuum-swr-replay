@@ -3,7 +3,8 @@ an epoch's decode inputs, the GPU worker pool, and the epoch loop that writes
 each epoch's record and gathers the run's manifest (``runs.epoch_records``).
 
 Used by ``measure_event_participation.py``, ``score_event_likelihood_advantage.py``,
-``score_tetrode_holdout.py`` and ``score_nonlocal_restriction.py``.
+``score_tetrode_holdout.py``, ``score_nonlocal_restriction.py`` and
+``sum_nonlocal_restriction_windows.py``.
 """
 
 from __future__ import annotations

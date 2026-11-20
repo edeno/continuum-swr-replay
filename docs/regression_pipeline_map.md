@@ -172,6 +172,12 @@ Tetrode participation and spike rate of non-local events, against Local rest.
 
 `local_rest_mask`, `control_windows`, `window_stops`, `tetrode_spike_counts`, `participation_and_rate`, `participation_statistics`, `participation_differences`
 
+### `src/continuum_swr_replay/analysis/event_evidence/restriction_windows.py`
+
+The non-local restriction models over the windows of Figure 2's panel h.
+
+`restriction_window_sums`, `window_spike_counts`, `contrast_column`, `window_contrasts`, `restriction_window_statistics`
+
 ### `src/continuum_swr_replay/analysis/event_evidence/spike_evidence.py`
 
 Spike evidence of non-local events: does the prior-excluded spike likelihood favor the decoded location over the animal's?
@@ -896,13 +902,19 @@ Per-bin scores of the three non-local restriction models on every analyzed epoch
 
 Held-out tetrode score of every canonical non-local event and its Local-rest control.
 
-`epoch_windows`, `run_epoch`, `main`
+`run_epoch`, `main`
 
 ### `scripts/event_evidence/split_state_evidence_by_swr.py`
 
 Held-out spike evidence of Non-Local bouts, split by SWR coupling.
 
 `label_epoch`, `main`
+
+### `scripts/event_evidence/sum_nonlocal_restriction_windows.py`
+
+The non-local restriction scores summed over the windows of Figure 2's panel h.
+
+`decode_time`, `run_epoch`, `run_input`, `check_holdout_inputs`, `main`
 
 ### `scripts/event_properties/bootstrap_event_properties.py`
 
@@ -1064,7 +1076,7 @@ Per-tetrode likelihood terms, and the encodings and decode files they come from.
 
 Speed regimes and the windows scored: bouts, matched windows, calibration windows.
 
-`keyed_rng`, `regimes`, `analyzed_regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `event_bins`, `tetrode_halves`, `null_partners`, `window_folds`
+`keyed_rng`, `regimes`, `analyzed_regimes`, `state_bouts`, `matched_windows`, `calibration_windows`, `build_windows`, `event_bins`, `epoch_windows`, `tetrode_halves`, `null_partners`, `window_folds`
 
 ### `src/continuum_swr_replay/analysis/replay_models/content/fit_outputs.py`
 

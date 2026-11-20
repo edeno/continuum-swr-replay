@@ -183,6 +183,11 @@ EVENT_NONLOCAL_RESTRICTION_DIR = "event_nonlocal_restriction"
 """The per-bin scores of the three non-local restriction models (``none``,
 ``swr``, ``full``) on every analyzed epoch, under the processed-data root
 (``scripts/event_evidence/score_nonlocal_restriction.py``)."""
+EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR = "event_nonlocal_restriction_windows"
+"""The non-local restriction models' per-bin scores summed over each canonical
+non-local event and its Local-rest control (the windows of the held-out tetrode
+score), under the processed-data root
+(``scripts/event_evidence/sum_nonlocal_restriction_windows.py``)."""
 EVENT_PARTICIPATION_DIR = "event_participation"
 """The tetrode participation and spike rate of the canonical non-local events
 and of Local-rest control windows, under the processed-data root
