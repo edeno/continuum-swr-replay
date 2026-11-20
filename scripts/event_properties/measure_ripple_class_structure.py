@@ -354,7 +354,7 @@ def plot_distributions(
                 [x[~frame.is_swr], x[frame.is_swr]],
                 bins=bins,
                 stacked=True,
-                color=[COLORS["Non-Local"], COLORS["SWR"]],
+                color=[COLORS["No SWR"], COLORS["SWR"]],
                 label=["non-SWR", "SWR"],
             )
             ax.axvline(cc.KAY_ZSCORE_THRESHOLD, color="k", lw=1, ls="--")

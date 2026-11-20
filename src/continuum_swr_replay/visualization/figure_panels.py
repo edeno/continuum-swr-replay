@@ -83,7 +83,7 @@ def plot_event_duration_distribution(
         duration = get_event_durations_ms(event_times)
 
         color = (
-            COLORS["Non-Local"]
+            COLORS["No SWR"]
             if event_type == "non_local_event_immobile_no_overlap_SWR_event"
             else COLORS["All Events"]
         )
@@ -195,7 +195,7 @@ def plot_triggered_averages(
             time,
             no_overlap_mean - no_overlap_sem,
             no_overlap_mean + no_overlap_sem,
-            color=COLORS["Non-Local"],
+            color=COLORS["No SWR"],
             alpha=0.3,
         )
         ax.fill_between(
@@ -210,7 +210,7 @@ def plot_triggered_averages(
             time,
             no_overlap_mean,
             label="non-SWR non-local",
-            color=COLORS["Non-Local"],
+            color=COLORS["No SWR"],
         )
         ax.plot(
             time,
@@ -324,7 +324,7 @@ def plot_swr_zscore_by_state(
 #: The two classes of immobile non-local events, as the event table's ``is_swr``,
 #: with the color and legend label each per-event panel gives them.
 _EVENT_CLASSES = (
-    (False, "non_swr", COLORS["Non-Local"], "non-SWR"),
+    (False, "non_swr", COLORS["No SWR"], "non-SWR"),
     (True, "swr", COLORS["SWR"], "SWR"),
 )
 
@@ -457,7 +457,7 @@ def plot_replay_speed_by_swr(
         bins=bins,
         density=True,
         alpha=0.7,
-        color=COLORS["Non-Local"],
+        color=COLORS["No SWR"],
         label="non-SWR non-local",
     )
 
@@ -592,7 +592,7 @@ def plot_replay_position_by_swr(
         bins=n_position_bins,
         density=True,
         alpha=0.7,
-        color=COLORS["Non-Local"],
+        color=COLORS["No SWR"],
         label="non-SWR non-local",
     )
 

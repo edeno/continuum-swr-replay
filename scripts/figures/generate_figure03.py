@@ -111,12 +111,12 @@ warnings.filterwarnings("ignore")
 WIDTH = 6.5
 HEIGHT = 6.3
 
-C_NL = COLORS["Non-Local"]
+C_NO_SWR = COLORS["No SWR"]
 C_SWR = COLORS["SWR"]
 # Panel i's rest and running levels: neutral, not decoder-state colors.
 C_REST = "white"
 C_RUN = "black"
-KINDS = ((False, "no SWR", C_NL), (True, "SWR", C_SWR))
+KINDS = ((False, "no SWR", C_NO_SWR), (True, "SWR", C_SWR))
 
 # The track drawn in panel g: one epoch's track graph (every epoch's arms run the
 # same way, ``content_along_arms.check_arm_orientation``).
@@ -317,7 +317,7 @@ def draw_ratio_track(ax, track_graph, edge_order, ratio: pd.Series) -> None:
     bands = PolyCollection(
         polygons,
         array=np.asarray(values),
-        cmap=LinearSegmentedColormap.from_list("kinds", [C_SWR, "#f7f7f7", C_NL]),
+        cmap=LinearSegmentedColormap.from_list("kinds", [C_SWR, "#f7f7f7", C_NO_SWR]),
         norm=TwoSlopeNorm(0.0, -RATIO_LIMIT_LOG2, RATIO_LIMIT_LOG2),
         linewidths=0,
     )
@@ -393,7 +393,7 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
 
 def draw_brain_state(axes, events: pd.DataFrame, reference: pd.DataFrame) -> None:
     """Each animal's rest, no-SWR, SWR and running level of each signal."""
-    colors = (C_REST, C_NL, C_SWR, C_RUN)
+    colors = (C_REST, C_NO_SWR, C_SWR, C_RUN)
     for ax, (signal, column, label) in zip(axes, SIGNALS, strict=True):
         values = animal_signal_values(events, reference, signal, column)
         x = np.arange(4)

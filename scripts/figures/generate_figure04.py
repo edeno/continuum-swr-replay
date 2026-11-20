@@ -367,7 +367,7 @@ def plot_population_average(modulations, pop_df, lag_time, ax):
 
     for name, color, label in [
         ("swr", COLORS["SWR"], "SWR"),
-        ("no_swr", COLORS["Non-Local"], "Non-SWR replay"),
+        ("no_swr", COLORS["No SWR"], "Non-SWR replay"),
     ]:
         arr = modulations[name] - modulations[name][:1]
         mean, sem = population_statistics.animal_balanced_unit_curve(
@@ -400,7 +400,7 @@ def plot_population_average(modulations, pop_df, lag_time, ax):
 SIGNIFICANCE_BARS = (
     ("SWR", "SWR", "SWR"),
     ("Replay", "non_local", "Non-Local"),
-    ("no-SWR", "non_local_no_SWR", "Non-Local"),
+    ("no-SWR", "non_local_no_SWR", "No SWR"),
     ("Beyond\ncontrol", "engagement", "Combined"),
 )
 
@@ -717,7 +717,7 @@ def assemble_figure(
         {
             "curve": "no_SWR",
             "label": "non-SWR replay",
-            "color": COLORS["Non-Local"],
+            "color": COLORS["No SWR"],
             "event_key": "non_local_no_SWR",
         },
     ]
