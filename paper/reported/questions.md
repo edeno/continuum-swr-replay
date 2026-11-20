@@ -17,7 +17,7 @@ it calls.
 |---|---|---|---|---|
 | `survey.json` | `cfa31d371dd9` | yes | 32 | 0 |
 | `detection.json` | `cfa31d371dd9` | yes | 172 | 0 |
-| `events.json` | `26238b32b7d7` | yes | 417 | 0 |
+| `events.json` | `330bad489f20` | yes | 421 | 0 |
 | `behavior.json` | `cfa31d371dd9` | yes | 922 | 0 |
 | `mpfc.json` | `cfa31d371dd9` | yes | 604 | 0 |
 
@@ -881,7 +881,7 @@ Sources:
 
 ### 2d.8. How do theta z-score and speed compare across SWR events, non-SWR events and running?
 
-Status: computed. Figures: 2i, 3h, decoder_validation. Values: 54.
+Status: computed. Figures: 2i, 3h, decoder_validation. Values: 58.
 
 *Note:* Was question 2c.1: the state the events occur in, not evidence that their content is real.
 
@@ -893,18 +893,20 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` | 3h |
-| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` | 3h |
-| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` | 3h |
-| `\EventsFastGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` | 3h |
+| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events | `events.gamma_z_values` | 3h |
+| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events | `events.gamma_z_values` | 3h |
+| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events | `events.gamma_z_values` | 3h |
+| `\EventsFastGammaAnimalsBelowRunningSwr` | 2 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events | `events.gamma_z_values` | 3h |
 | `\EventsFastGammaDbAnimalsAboveRestNonSwr` | 5 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsFastGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsFastGammaDbMedianNonSwr` | +0.52 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
 | `\EventsFastGammaDbMedianSwr` | +1.1 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
 | `\EventsFastGammaMedianNonSwr` | −0.21 | z | median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean) | `events.gamma_z_values` | 3h |
 | `\EventsFastGammaMedianSwr` | 0.11 | z | median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.gamma_z_values` | 3h |
-| `\EventsFastGammaRestReference` | −0.43 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest | `events.gamma_z_values` | 3h |
-| `\EventsFastGammaRunningReference` | −0.14 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running | `events.gamma_z_values` | 3h |
+| `\EventsFastGammaRestMatchedReferenceNonSwr` | −0.36 | z | median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in quiet-rest windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws) | `events.gamma_z_values` | 3h |
+| `\EventsFastGammaRestMatchedReferenceSwr` | −0.33 | z | median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in quiet-rest windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws) | `events.gamma_z_values` | 3h |
+| `\EventsFastGammaRunningMatchedReferenceNonSwr` | −0.03 | z | median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in running windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws) | `events.gamma_z_values` | 3h |
+| `\EventsFastGammaRunningMatchedReferenceSwr` | 0.01 | z | median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in running windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws) | `events.gamma_z_values` | 3h |
 | `\EventsMuaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 2i |
 | `\EventsMuaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event MUA rate (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 2i |
 | `\EventsMuaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event MUA rate (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` | 2i |
@@ -921,18 +923,20 @@ Sources:
 | `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 2i |
 | `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 2i |
 | `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 2i |
-| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` | 3h |
-| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.gamma_z_values` | 3h |
-| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` | 3h |
-| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.gamma_z_values` | 3h |
+| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 3 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events | `events.gamma_z_values` | 3h |
+| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events | `events.gamma_z_values` | 3h |
+| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 2 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events | `events.gamma_z_values` | 3h |
+| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events | `events.gamma_z_values` | 3h |
 | `\EventsSlowGammaDbAnimalsAboveRestNonSwr` | 3 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsSlowGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsSlowGammaDbMedianNonSwr` | +0.36 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
 | `\EventsSlowGammaDbMedianSwr` | +1.6 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
 | `\EventsSlowGammaMedianNonSwr` | −0.10 | z | median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean) | `events.gamma_z_values` | 3h |
 | `\EventsSlowGammaMedianSwr` | 0.36 | z | median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.gamma_z_values` | 3h |
-| `\EventsSlowGammaRestReference` | −0.28 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest | `events.gamma_z_values` | 3h |
-| `\EventsSlowGammaRunningReference` | −0.30 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running | `events.gamma_z_values` | 3h |
+| `\EventsSlowGammaRestMatchedReferenceNonSwr` | −0.20 | z | median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in quiet-rest windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws) | `events.gamma_z_values` | 3h |
+| `\EventsSlowGammaRestMatchedReferenceSwr` | −0.16 | z | median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in quiet-rest windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws) | `events.gamma_z_values` | 3h |
+| `\EventsSlowGammaRunningMatchedReferenceNonSwr` | −0.21 | z | median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in running windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws) | `events.gamma_z_values` | 3h |
+| `\EventsSlowGammaRunningMatchedReferenceSwr` | −0.16 | z | median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in running windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws) | `events.gamma_z_values` | 3h |
 | `\EventsThetaAnimalsAboveRestNonSwr` | 1 |  | animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 2i |
 | `\EventsThetaAnimalsAboveRestSwr` | 1 |  | animals whose median SWR-overlapping event theta power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 2i |
 | `\EventsThetaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event theta power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` | 2i |
@@ -2902,7 +2906,7 @@ Panel e: `\EventsAnimalsNonSwrMoreAtWell`, `\EventsNonSwrContentAtWellFraction`,
 
 Panel g: `\EventsAnimalsNonSwrMoreAtWell`, `\EventsNonSwrContentAtWellFraction`, `\EventsNonSwrContentNearOffFraction`, `\EventsNonSwrContentOwnWellFraction`, `\EventsNonSwrContentRemotePathFraction`, `\EventsNonSwrContentRemoteWellFraction`, `\EventsOccupancyEpochs`, `\EventsSwrContentAtWellFraction`, `\EventsSwrContentNearOffFraction`, `\EventsSwrContentOwnWellFraction`, `\EventsSwrContentRemotePathFraction`, `\EventsSwrContentRemoteWellFraction`
 
-Panel h: `\EventsFastGammaAnimalsAboveRestNonSwr`, `\EventsFastGammaAnimalsAboveRestSwr`, `\EventsFastGammaAnimalsBelowRunningNonSwr`, `\EventsFastGammaAnimalsBelowRunningSwr`, `\EventsFastGammaMedianNonSwr`, `\EventsFastGammaMedianSwr`, `\EventsFastGammaRestReference`, `\EventsFastGammaRunningReference`, `\EventsSlowGammaAnimalsAboveRestNonSwr`, `\EventsSlowGammaAnimalsAboveRestSwr`, `\EventsSlowGammaAnimalsBelowRunningNonSwr`, `\EventsSlowGammaAnimalsBelowRunningSwr`, `\EventsSlowGammaMedianNonSwr`, `\EventsSlowGammaMedianSwr`, `\EventsSlowGammaRestReference`, `\EventsSlowGammaRunningReference`
+Panel h: `\EventsFastGammaAnimalsAboveRestNonSwr`, `\EventsFastGammaAnimalsAboveRestSwr`, `\EventsFastGammaAnimalsBelowRunningNonSwr`, `\EventsFastGammaAnimalsBelowRunningSwr`, `\EventsFastGammaMedianNonSwr`, `\EventsFastGammaMedianSwr`, `\EventsFastGammaRestMatchedReferenceNonSwr`, `\EventsFastGammaRestMatchedReferenceSwr`, `\EventsFastGammaRunningMatchedReferenceNonSwr`, `\EventsFastGammaRunningMatchedReferenceSwr`, `\EventsSlowGammaAnimalsAboveRestNonSwr`, `\EventsSlowGammaAnimalsAboveRestSwr`, `\EventsSlowGammaAnimalsBelowRunningNonSwr`, `\EventsSlowGammaAnimalsBelowRunningSwr`, `\EventsSlowGammaMedianNonSwr`, `\EventsSlowGammaMedianSwr`, `\EventsSlowGammaRestMatchedReferenceNonSwr`, `\EventsSlowGammaRestMatchedReferenceSwr`, `\EventsSlowGammaRunningMatchedReferenceNonSwr`, `\EventsSlowGammaRunningMatchedReferenceSwr`
 
 ### Figure 4: mPFC responses to SWR and non-SWR events
 
@@ -2968,7 +2972,7 @@ without being called, is not listed.
 | `events.decoding_error_values` | `reported/events.py` | `analysis.decode_quality.quality_metrics.local_decoding_error_statistics` |  |
 | `events.event_cohort_values` | `reported/events.py` | `analysis.event_properties.event_statistics.overlap_class_statistics` |  |
 | `events.gamma_db_values` | `reported/events.py` | `analysis.event_properties.event_statistics.power_change_statistics` |  |
-| `events.gamma_z_values` | `reported/events.py` | `analysis.event_properties.event_statistics.event_signal_statistics`, `analysis.event_properties.event_statistics.reference_medians` |  |
+| `events.gamma_z_values` | `reported/events.py` | `analysis.event_properties.event_statistics.event_signal_statistics`, `analysis.event_properties.event_statistics.matched_reference_medians` |  |
 | `events.heldout_by_swr_values` | `reported/events.py` | none |  |
 | `events.left_out_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.left_out_statistics` |  |
 | `events.likelihood_advantage_values` | `reported/events.py` | `analysis.event_evidence.likelihood_advantage.likelihood_advantage_statistics` |  |

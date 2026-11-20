@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "26238b32b7d7",
+ "commit": "330bad489f20",
  "code": {
-  "head": "26238b32b7d792d3c10ba200f82a5b45d2b66be3",
+  "head": "330bad489f200cdec1d37bc7d150f6faa030888e",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -259,8 +259,8 @@
     "code_sha256": "c3490bca0d57002a36f5f68eb6147854d9e5c34485917eb10ba173490d1082e3"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
-    "sha256": "51485f4aaa98134dc21e48daef94c4de26bc8a7673001d0eeba648104e814216",
-    "code_sha256": "60e11a8c89499f3729f53a0ad34732c9455439cb6d0759cb47bd06b483db61bc"
+    "sha256": "0183fd53615a3c1653e40dd3039a3112c745556f4e1099bf4f7322826cfeb012",
+    "code_sha256": "9df0187fc8ed5c1ebef652478c4746a7de53d3c038f4ed38d9bd34ff32f624b5"
    },
    "src/continuum_swr_replay/analysis/event_properties/property_contrast.py": {
     "sha256": "4989d4b201bbbbdd1551bb4ebd9c749e87f0bab6781cbfd6565296f28b4c8d1b",
@@ -339,8 +339,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "cfda1510a6ee5d2529f93b33519435f60fa78e0b11bfe963006e75d6f41dab28",
-    "code_sha256": "948bc1c5af02696158f7438e53df37f7d5d8fa1e228a8d718ad56218ff5e6b55"
+    "sha256": "260a1b1db4edc01d30a4a75311191d24fe65784ad3c937581c0ced7d3a2f0d06",
+    "code_sha256": "78a88a5c906f17b3366a1309bb44ed8f9a7cb8dd6d617e685c25813ca0d867af"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -424,11 +424,11 @@
   },
   {
    "path": "Processed-Data/event_gamma/manifest.json",
-   "sha256": "1b3bc6f40e5c4a53969d83fd8113ac4cd3969a21909f40967fd6ff44f865c7d8"
+   "sha256": "b92d8d13255cce63d0382bee11ee0e548ed95145727026365b8dc748920fd713"
   },
   {
    "path": "Processed-Data/event_gamma/reference.parquet",
-   "sha256": "253abe749df602af0f91aad47c93778765cd0188ec5c0c7a77810e883eb6fd29"
+   "sha256": "4d1977830095622635a87e3f2a9ce5af19451711080fe7f52dd0250f4c234cae"
   },
   {
    "path": "Processed-Data/event_gamma/*_events.parquet",
@@ -1487,7 +1487,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
+   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events",
    "questions": [
     "2d.8"
    ],
@@ -1503,7 +1503,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
+   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events",
    "questions": [
     "2d.8"
    ],
@@ -1519,7 +1519,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
+   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events",
    "questions": [
     "2d.8"
    ],
@@ -1531,11 +1531,11 @@
    "pending": null
   },
   "fast_gamma_animals_below_running_swr": {
-   "value": 0,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
+   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events",
    "questions": [
     "2d.8"
    ],
@@ -1634,12 +1634,12 @@
    "function": "gamma_z_values",
    "pending": null
   },
-  "fast_gamma_rest_reference": {
-   "value": -0.4298946911128849,
+  "fast_gamma_rest_matched_reference_non_swr": {
+   "value": -0.3578498632427578,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
-   "description": "median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest",
+   "description": "median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in quiet-rest windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)",
    "questions": [
     "2d.8"
    ],
@@ -1650,12 +1650,44 @@
    "function": "gamma_z_values",
    "pending": null
   },
-  "fast_gamma_running_reference": {
-   "value": -0.1391173532811394,
+  "fast_gamma_rest_matched_reference_swr": {
+   "value": -0.32998792184410974,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
-   "description": "median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running",
+   "description": "median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in quiet-rest windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)",
+   "questions": [
+    "2d.8"
+   ],
+   "figures": [
+    "3h"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "function": "gamma_z_values",
+   "pending": null
+  },
+  "fast_gamma_running_matched_reference_non_swr": {
+   "value": -0.02553020949985636,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in running windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)",
+   "questions": [
+    "2d.8"
+   ],
+   "figures": [
+    "3h"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "function": "gamma_z_values",
+   "pending": null
+  },
+  "fast_gamma_running_matched_reference_swr": {
+   "value": 0.012617123558419908,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's z-scored fast-gamma power (65-100 Hz) in running windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)",
    "questions": [
     "2d.8"
    ],
@@ -4585,11 +4617,11 @@
    "pending": null
   },
   "slow_gamma_animals_above_rest_non_swr": {
-   "value": 5,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
+   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events",
    "questions": [
     "2d.8"
    ],
@@ -4605,7 +4637,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level",
+   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's level in quiet-rest windows as long as those events",
    "questions": [
     "2d.8"
    ],
@@ -4617,11 +4649,11 @@
    "pending": null
   },
   "slow_gamma_animals_below_running_non_swr": {
-   "value": 1,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
+   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events",
    "questions": [
     "2d.8"
    ],
@@ -4637,7 +4669,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level",
+   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's level in running windows as long as those events",
    "questions": [
     "2d.8"
    ],
@@ -4736,12 +4768,12 @@
    "function": "gamma_z_values",
    "pending": null
   },
-  "slow_gamma_rest_reference": {
-   "value": -0.28267979831698997,
+  "slow_gamma_rest_matched_reference_non_swr": {
+   "value": -0.20447373937328403,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
-   "description": "median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest",
+   "description": "median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in quiet-rest windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)",
    "questions": [
     "2d.8"
    ],
@@ -4752,12 +4784,44 @@
    "function": "gamma_z_values",
    "pending": null
   },
-  "slow_gamma_running_reference": {
-   "value": -0.29710325399289655,
+  "slow_gamma_rest_matched_reference_swr": {
+   "value": -0.161448482474487,
    "kind": "quantity",
    "style": "dec2",
    "unit": "z",
-   "description": "median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running",
+   "description": "median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in quiet-rest windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)",
+   "questions": [
+    "2d.8"
+   ],
+   "figures": [
+    "3h"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "function": "gamma_z_values",
+   "pending": null
+  },
+  "slow_gamma_running_matched_reference_non_swr": {
+   "value": -0.20737094298122488,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in running windows as long as its non-SWR events (the median over the events of one window's mean each, averaged over the draws)",
+   "questions": [
+    "2d.8"
+   ],
+   "figures": [
+    "3h"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)",
+   "function": "gamma_z_values",
+   "pending": null
+  },
+  "slow_gamma_running_matched_reference_swr": {
+   "value": -0.16171946524648395,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's z-scored slow-gamma power (25-55 Hz) in running windows as long as its SWR-overlapping events (the median over the events of one window's mean each, averaged over the draws)",
    "questions": [
     "2d.8"
    ],
