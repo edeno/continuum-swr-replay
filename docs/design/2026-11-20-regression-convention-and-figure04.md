@@ -397,6 +397,26 @@ answer are 1 to 5; 6 was open before.
    through the order among the other arms. Stage 1 runs this comparison on the real data first; the lead
    decides how recency is centered from its result.
 
+### Decisions recorded (lead, 2026-11-20, after reading this section)
+
+- **1, candidate set:** all nine arms, "so that we can better describe the activity". The trunk arms are
+  their own role and every event stays in the cohort.
+- **3, reward effect:** "whatever is the most fair". Read here as: report both, each named (**call**): the
+  total effect per second of stop, and the direct effect at the same time before the animal leaves.
+- **4, other families:** "move it to the convention and fix if needed". Two are still with the lead: the
+  within-arm comparison and the older all-bins history model, each proposed for removal because the content
+  model's Q5 and the two newer history models answer their questions.
+- **5, mPFC:** the mPFC models go onto the convention in this work. The second definition of uncertainty is
+  still with the lead.
+- **6, recency:** absolute time since the last visit. The stage 1 comparison stays as a check.
+- **2, what "leaves" means:** still with the lead. Measured on the five sessions with cached photogate data
+  (one per animal, 981 well visits; a diagnostic): the last stop of a visit ends within 0.25 s of the final
+  nose-poke out in 90 % of visits and within 0.5 s in 96 %, but a visit holds a median of two stops and 63 %
+  of stop ends are not the animal leaving (it moves at the well and stops again). Proposed: keep the
+  immobility stop as the unit, mark each stop end as "leaves" or "stays", and take the final nose-poke out
+  as the time the animal leaves. The poke times are cached for five sessions only; the other sessions need a
+  read of the lab database and two added columns in the stop table.
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
