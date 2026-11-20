@@ -104,7 +104,7 @@ FIGURES: dict[str, Figure] = {
     "3": Figure(
         "What SWR and no-SWR events are like",
         "scripts/figures/generate_figure03.py",
-        "abcdefg",
+        "abcdef",
     ),
     "4": Figure(
         "mPFC responses to SWR and non-SWR events",
@@ -275,7 +275,7 @@ QUESTIONS: tuple[Question, ...] = (
         "Where does content sit relative to the animal and to the reward wells, SWR against non-SWR?",
         status="partly computed",
         reason="the own-well share waits for the wider-Local-kernel re-decode (question 2c.6)",
-        figures=("3e", "3f", "3g"),
+        figures=("3e", "3f"),
     ),
     Question(
         "2d.2",

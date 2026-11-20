@@ -17,19 +17,22 @@ Each row asks one thing:
         d — Replay speed (each event's median over its time bins), twice on
             one axis: the distribution, and under it the share of events at
             or below each speed.
-    Where the content is
-        e — Content time by track distance from the animal, at a well (within
-            ``AT_WELL_CM`` of one) and elsewhere.
-        f — Where on the track each kind's content is denser: the ratio of no-SWR
-            to SWR content time per cm along every arm.
-        g — Content time per cm from the center out to the junctions (trunk
+    Where on the track the content is
+        e — Where each kind's content is denser: the ratio of no-SWR to SWR
+            content time per cm along every arm.
+        f — Content time per cm from the center out to the junctions (trunk
             arms) and from the junctions out to the wells (leaf arms), against
             what content spread evenly over the track would give (the dashed
             line; ``content_along_arms.even_content``).
 
-The state the events occur in is not drawn here: ripple power, MUA, theta and
-head speed around the events are Figure 2's, and slow and fast gamma during them
-are a supplementary figure (``generate_supp_event_gamma.py``).
+The figure describes the content from the decode and the track alone. What needs
+the animal's behavior to say is left to the behavior figure: content by distance
+from the animal and by which well it is at
+(``content_along_arms.distance_from_animal_shares``, once a panel here), by the
+animal's choices and rewards, and when the events happen. The state the events
+occur in is not drawn here either: ripple power, MUA, theta and head speed
+around the events are Figure 2's, and slow and fast gamma during them are a
+supplementary figure (``generate_supp_event_gamma.py``).
 
 b comes before c and d because the far mode of c and the fastest events of d
 (its end bin) are the events with Fragmented time. d's axis is linear: a decoded
@@ -45,14 +48,13 @@ Panels a, c and d mark each class's median (triangle;
 ``<property>_median_*`` values (``paper/reported/events.json``), and under it
 each animal's median (ticks; ``event_statistics.animal_class_medians``), the
 medians the summary's ``<property>_animals_in_direction`` counts compare. Panels
-e–g place every event time bin's MAP position on its arm
-(``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``): e
-draws ``content_along_arms.distance_from_animal_shares``, f and g
-``content_along_arms.content_density_along_arms``, each the animals' mean; g
+e and f place every event time bin's MAP position on its arm
+(``measure_content_along_arms.py``; ``Processed-Data/content_along_arms``) and
+draw ``content_along_arms.content_density_along_arms``, the animals' mean; f
 quotes the share of content time within ``AT_WELL_CM`` of a well, the summary's
 ``*_content_at_well_fraction`` (``content_along_arms.content_place_shares``,
-``place_share_statistics``). Every one of them weighs each epoch of an animal the
-same and each animal the same.
+``place_share_statistics``). Each weighs each epoch of an animal the same and
+each animal the same.
 
 Usage
 -----
@@ -81,7 +83,6 @@ from continuum_swr_replay.analysis.event_definition.analyzed_time import (
 from continuum_swr_replay.analysis.event_properties.content_along_arms import (
     content_density_along_arms,
     content_place_shares,
-    distance_from_animal_shares,
     even_content,
     leaf_and_trunk_profiles,
     log2_density_ratio,
@@ -121,24 +122,22 @@ warnings.filterwarnings("ignore")
 
 # Inches: saved with 0.1 in margins, about 17.3 cm (Cell Press full width).
 WIDTH = 6.5
-HEIGHT = 4.6
+HEIGHT = 4.3
 
 C_NO_SWR = COLORS["No SWR"]
 C_SWR = COLORS["SWR"]
 # The two kinds of event, named as in Figure 2.
 KINDS = ((False, "No SWR", C_NO_SWR), (True, "SWR", C_SWR))
 
-# The track drawn in panel f: one epoch's track graph (every epoch's arms run the
+# The track drawn in panel e: one epoch's track graph (every epoch's arms run the
 # same way, ``content_along_arms.check_arm_orientation``).
 TRACK_EPOCH = "wilbur20210329_02_r1_HPC"
-# Half the width of an arm drawn in panel f, track units (cm).
+# Half the width of an arm drawn in panel e, track units (cm).
 ARM_HALF_WIDTH_CM = 9.0
-# Panels f and g: segments per arm, about 4 cm (two 2-cm place bins) each.
+# Panels e and f: segments per arm, about 4 cm (two 2-cm place bins) each.
 N_SEGMENTS = 13
-# Panel f: the color scale's limit, log2 of the no-SWR to SWR density ratio.
+# Panel e: the color scale's limit, log2 of the no-SWR to SWR density ratio.
 RATIO_LIMIT_LOG2 = 2
-# Panel e: distance from the animal, cm (the track's longest is under 240).
-DISTANCE_EDGES_CM = np.arange(0, 241, 8)
 
 # Panels a, c, d: (column, x label, scale, bin edges, x ticks). A tick at an
 # end of the axis that starts with ≤ or ≥ says its bin also holds the events
@@ -190,9 +189,6 @@ def read_inputs() -> dict:
         "events": events,
         "place_shares": place_share_statistics(content_place_shares(along))["means"],
         "ratio": log2_density_ratio(density),
-        "distance_shares": distance_from_animal_shares(
-            along, DISTANCE_EDGES_CM, AT_WELL_CM
-        ),
         "profiles": leaf_and_trunk_profiles(density),
         "even": even_content(along, AT_WELL_CM),
         "track_graph": env.track_graph,
@@ -273,43 +269,6 @@ def draw_cumulative(ax, events: pd.DataFrame, key: str) -> None:
     ax.set_xticks(list(ticks), list(ticks.values()))
 
 
-def draw_distance_from_animal(axes, shares: pd.DataFrame) -> None:
-    """Each kind's content time by distance from the animal (``axes``: no SWR,
-    then SWR), stacked: at a well (dark) and elsewhere (light)."""
-    width = np.diff(DISTANCE_EDGES_CM)
-    top = 100 * shares.sum(axis=1).max()
-    for ax, (is_swr, name, color) in zip(axes, KINDS, strict=True):
-        kind = shares.loc[is_swr]
-        left = kind.index.to_numpy()
-        well = 100 * kind["at_well"].to_numpy()
-        ax.bar(left, well, width, align="edge", color=color, lw=0)
-        ax.bar(
-            left, 100 * kind["elsewhere"].to_numpy(), width, bottom=well,
-            align="edge", color=color, alpha=0.3, lw=0,
-        )  # fmt: skip
-        ax.set_xlim(DISTANCE_EDGES_CM[0], DISTANCE_EDGES_CM[-1])
-        ax.set_ylim(0, top * 1.05)
-        ax.text(
-            0.55, 0.95, name, transform=ax.transAxes, ha="center", va="top",
-            color=color, fontsize=SMALL_SIZE,
-        )  # fmt: skip
-    axes[0].tick_params(labelbottom=False)
-    axes[1].set_xlabel("Content distance\nfrom animal (cm)")
-    axes[0].set_ylabel("% content time", y=0.0)
-    handles = [
-        plt.Rectangle((0, 0), 1, 1, color="0.3", alpha=alpha, lw=0)
-        for alpha in (1.0, 0.3)
-    ]
-    # Above the panel: inside it, the key covers the bars. One entry per line:
-    # side by side they reach under the next panel's letter.
-    axes[0].legend(
-        handles, [f"at a well (<{AT_WELL_CM:.0f} cm)", "elsewhere"],
-        frameon=False, loc="lower left", bbox_to_anchor=(0.0, 1.04), ncol=1,
-        fontsize=SMALL_SIZE, handlelength=0.8, labelspacing=0.2,
-        handletextpad=0.4, borderaxespad=0,
-    )  # fmt: skip
-
-
 def draw_ratio_track(ax, track_graph, edge_order, ratio: pd.Series) -> None:
     """Each segment of the track colored by log2 of its no-SWR to SWR content
     density (``content_along_arms.log2_density_ratio``), on a scale between the
@@ -338,9 +297,9 @@ def draw_ratio_track(ax, track_graph, edge_order, ratio: pd.Series) -> None:
     ax.set_aspect("equal")
     ax.axis("off")
     steps = np.arange(-RATIO_LIMIT_LOG2, RATIO_LIMIT_LOG2 + 1)
-    # Under the track: beside it, the labels run into the next panel.
+    # Under the track and about as wide as it (the panel is two columns wide).
     bar = plt.colorbar(
-        bands, ax=ax, orientation="horizontal", shrink=0.75, aspect=18, pad=0.03,
+        bands, ax=ax, orientation="horizontal", shrink=0.45, aspect=18, pad=0.03,
         ticks=steps,
     )  # fmt: skip
     # The ends and the middle are labeled; the ticks between are 2×.
@@ -426,8 +385,8 @@ def draw_state_composition(ax, statistics: pd.DataFrame) -> None:
 
 # The panel letters as they sit in the figure: the letters of a row share a
 # height, the letters of a column a left edge.
-LETTER_ROWS = ("abcd", "efg")
-LETTER_COLUMNS = ("ae", "bf", "cg", "d")
+LETTER_ROWS = ("abcd", "ef")
+LETTER_COLUMNS = ("ae", "b", "cf", "d")
 
 
 def letter_positions(fig, panels: dict[str, list]) -> dict[str, tuple[float, float]]:
@@ -464,7 +423,7 @@ def generate_figure(inputs: dict):
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     # One grid for both rows, so the panels of a column share a left edge.
     grid = GridSpec(
-        2, 4, figure=fig, height_ratios=[1.0, 1.25], hspace=0.7,
+        2, 4, figure=fig, height_ratios=[1.0, 1.1], hspace=0.7,
         width_ratios=[1.0, 1.15, 1.05, 0.95], wspace=0.58,
         left=0.08, right=0.99, top=0.91, bottom=0.13,
     )  # fmt: skip
@@ -488,19 +447,16 @@ def generate_figure(inputs: dict):
         bbox_to_anchor=(0.5, 1.0), ncol=2, handlelength=0.8, columnspacing=1.5,
     )  # fmt: skip
 
-    e_grid = grid[1, 0].subgridspec(2, 1, hspace=0.15)
-    ax_e = [fig.add_subplot(e_grid[0])]
-    ax_e.append(fig.add_subplot(e_grid[1], sharex=ax_e[0]))
-    draw_distance_from_animal(ax_e, inputs["distance_shares"])
-    ax_f = fig.add_subplot(grid[1, 1])
-    draw_ratio_track(ax_f, inputs["track_graph"], inputs["edge_order"], inputs["ratio"])
-    ax_g = fig.add_subplot(grid[1, 2:])  # the last two columns
-    draw_profiles(ax_g, inputs["profiles"], inputs["place_shares"], inputs["even"])
+    # The lower row's two panels are each two columns wide.
+    ax_e = fig.add_subplot(grid[1, :2])
+    draw_ratio_track(ax_e, inputs["track_graph"], inputs["edge_order"], inputs["ratio"])
+    ax_f = fig.add_subplot(grid[1, 2:])
+    draw_profiles(ax_f, inputs["profiles"], inputs["place_shares"], inputs["even"])
 
     fig.draw_without_rendering()
     panels_by_letter = {
         "a": [ax_a], "b": [ax_b], "c": [ax_c], "d": [ax_d, ax_d_cumulative],
-        "e": ax_e, "f": [ax_f], "g": [ax_g],
+        "e": [ax_e], "f": [ax_f],
     }  # fmt: skip
     for letter, (left, top) in letter_positions(fig, panels_by_letter).items():
         letter_panel(fig, letter, left, top)

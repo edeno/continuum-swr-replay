@@ -1409,54 +1409,6 @@ def test_figure03_legend_counts_every_event_of_each_kind(offline):
     plt.close(fig)
 
 
-def test_figure03_distance_panel_names_no_well(offline):
-    """Panel e writes each kind's name in its axis and nothing else: the dark
-    bars are at a well by the key, and no label says which well."""
-    import matplotlib.pyplot as plt
-
-    figure03 = offline("scripts.figures.generate_figure03")
-    left = figure03.DISTANCE_EDGES_CM[:-1]
-    index = pd.MultiIndex.from_product([[False, True], left])
-    shares = pd.DataFrame(
-        {"at_well": 0.5 / len(left), "elsewhere": 0.5 / len(left)}, index=index
-    )
-    fig, axes = plt.subplots(2, 1, sharex=True)
-    figure03.draw_distance_from_animal(axes, shares)
-    names = [name for _, name, _ in figure03.KINDS]
-    assert [[t.get_text() for t in ax.texts] for ax in axes] == [[n] for n in names]
-    plt.close(fig)
-
-
-def test_figure03_distance_key_is_off_the_bars(offline):
-    """Panel e's key (at a well, elsewhere) is drawn outside both axes, so it
-    cannot cover a bar, and no wider than them, so it does not reach under the
-    next panel's letter."""
-    import matplotlib.pyplot as plt
-
-    figure03 = offline("scripts.figures.generate_figure03")
-    left = figure03.DISTANCE_EDGES_CM[:-1]
-    index = pd.MultiIndex.from_product([[False, True], left])
-    shares = pd.DataFrame(
-        {"at_well": 0.5 / len(left), "elsewhere": 0.5 / len(left)}, index=index
-    )
-    fig, axes = plt.subplots(2, 1, figsize=(1.2, 1.6), sharex=True)
-    figure03.draw_distance_from_animal(axes, shares)
-    fig.draw_without_rendering()
-    (key,) = [ax.get_legend() for ax in axes if ax.get_legend() is not None]
-    key_box = key.get_window_extent()
-    for ax in axes:
-        assert not key_box.overlaps(ax.get_window_extent())
-    plt.close(fig)
-
-    fig = plt.figure(figsize=(figure03.WIDTH, figure03.HEIGHT))
-    # panel e's two axes, at their size in the figure
-    axes = [fig.add_axes([0.08, y, 0.153, 0.149]) for y in (0.30, 0.13)]
-    figure03.draw_distance_from_animal(axes, shares)
-    fig.draw_without_rendering()
-    assert axes[0].get_legend().get_window_extent().x1 <= axes[0].get_window_extent().x1
-    plt.close(fig)
-
-
 def test_figure03_profiles_carry_the_even_content_line(offline):
     """Panel g draws what content spread evenly over the track would give: one
     density across both halves, labeled, and its share at a well beside the two
@@ -1481,15 +1433,17 @@ def test_figure03_profiles_carry_the_even_content_line(offline):
     plt.close(fig)
 
 
-def test_figure03_draws_seven_panels_and_no_gamma(offline):
-    """Figure 3 is a to g: gamma during the events is the supplementary
-    figure's, and the script's letters are the question list's."""
+def test_figure03_draws_six_panels_from_the_decode_and_the_track(offline):
+    """Figure 3 is a to f, and the script's letters are the question list's.
+    Gamma during the events is the supplementary figure's, and content against
+    the animal is the behavior figure's: neither is drawn here."""
     from continuum_swr_replay.reported.questions import FIGURES
 
     figure03 = offline("scripts.figures.generate_figure03")
-    assert "".join(figure03.LETTER_ROWS) == FIGURES["3"].panels == "abcdefg"
-    assert sorted("".join(figure03.LETTER_COLUMNS)) == list("abcdefg")
+    assert "".join(figure03.LETTER_ROWS) == FIGURES["3"].panels == "abcdef"
+    assert sorted("".join(figure03.LETTER_COLUMNS)) == list("abcdef")
     assert not hasattr(figure03, "draw_brain_state")
+    assert not hasattr(figure03, "draw_distance_from_animal")
 
 
 def test_the_gamma_figure_draws_each_animal_between_its_rest_and_running_levels(
@@ -1558,26 +1512,34 @@ def test_figure03_letters_share_a_height_by_row_and_a_left_edge_by_column(offlin
     from continuum_swr_replay.visualization.simulated_run_panels import drawn_extent
 
     figure03 = offline("scripts.figures.generate_figure03")
-    fig, grid = plt.subplots(2, 4, figsize=(figure03.WIDTH, figure03.HEIGHT))
+    rows, columns = figure03.LETTER_ROWS, figure03.LETTER_COLUMNS
+    fig, grid = plt.subplots(
+        len(rows), len(columns), figsize=(figure03.WIDTH, figure03.HEIGHT)
+    )
     panels = {
         letter: [grid[r, c]]
-        for r, row in enumerate(figure03.LETTER_ROWS)
-        for c, letter in enumerate(row)
+        for r, row in enumerate(rows)
+        for c, column in enumerate(columns)
+        for letter in row
+        if letter in column
     }
-    panels["b"][0].set_ylabel("a label\nof two lines")  # wider than f's
-    panels["g"][0].set_title("a title")  # higher than its row's other panels
+    assert sorted(panels) == sorted("".join(rows))
+    shared = next(column for column in columns if len(column) > 1 and "a" not in column)
+    upper, lower = shared
+    panels[upper][0].set_ylabel("a label\nof two lines")  # wider than the lower's
+    panels[rows[1][0]][0].set_title("a title")  # higher than its row's other panels
     fig.draw_without_rendering()
     positions = figure03.letter_positions(fig, panels)
 
-    for row in figure03.LETTER_ROWS:
+    for row in rows:
         tops = {positions[letter][1] for letter in row}
         assert len(tops) == 1
         assert tops.pop() > max(drawn_extent(fig, panels[letter]).y1 for letter in row)
-    for column in figure03.LETTER_COLUMNS:
+    for column in columns:
         lefts = {positions[letter][0] for letter in column}
         assert len(lefts) == 1
         assert lefts.pop() < min(
             drawn_extent(fig, panels[letter]).x0 for letter in column
         )
-    assert positions["f"][0] < drawn_extent(fig, panels["f"]).x0 - 0.01
+    assert positions[lower][0] < drawn_extent(fig, panels[lower]).x0 - 0.01
     plt.close(fig)

@@ -170,7 +170,8 @@ TAGS = {
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
     "spike_gpi": Tags(("2c.4",)),
-    "content_occupancy": Tags(("2d.1",), ("3e", "3g")),
+    "content_occupancy": Tags(("2d.1",), ("3f",)),
+    "content_by_animal": Tags(("2d.1",)),
     "duration": Tags(("2d.6",), ("3a",)),
     "extent": Tags(("2d.3",), ("3c",)),
     "arms": Tags(("2d.3",)),
@@ -2014,6 +2015,11 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
     (``content_along_arms.even_content``), which those shares are read against.
     """
     make = value_factory(content_occupancy_values, source, TAGS["content_occupancy"])
+    # The places that depend on where the animal is are in no panel: content
+    # against the animal is the behavior figure's.
+    make_by_animal = value_factory(
+        content_occupancy_values, source, TAGS["content_by_animal"]
+    )
     statistics = content_along_arms.place_share_statistics(
         content_along_arms.content_place_shares(bins)
     )
@@ -2029,7 +2035,7 @@ def content_occupancy_values(bins: pd.DataFrame, source: str) -> list[Value]:
     for word, is_swr, name in (("non_swr", False, "non-SWR"), ("swr", True, "SWR")):
         for column in event_statistics.OCCUPANCY_PLACES:
             values.append(
-                make(
+                (make if column == "at_well" else make_by_animal)(
                     f"{word}_content_{column}_fraction",
                     statistics["means"].loc[is_swr, column],
                     "fraction",

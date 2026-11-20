@@ -664,13 +664,19 @@ def test_rest_theta_values_name_each_class():
 
 def test_figure_3_values_are_tagged_to_the_panel_that_shows_them():
     """Spatial extent is panel c. The arm count answers the same question and is
-    in no panel. The content's place shares (own and remote, at a well and
-    elsewhere) are read off panel e and the at-well share is quoted on panel g."""
+    in no panel. The share of content at a well is quoted on panel f; the
+    shares that depend on where the animal is (own and remote wells, remote
+    paths, near the animal) are in no panel."""
     values = _by_key(builder.property_values(_property_events(), "s"))
     assert values["extent_median_swr"].figures == ("3c",)
     assert values["arms_median_swr"].figures == ()
     assert values["arms_median_swr"].questions == values["extent_median_swr"].questions
-    assert builder.TAGS["content_occupancy"].figures == ("3e", "3g")
+    assert builder.TAGS["content_occupancy"].figures == ("3f",)
+    assert builder.TAGS["content_by_animal"].figures == ()
+    assert (
+        builder.TAGS["content_by_animal"].questions
+        == builder.TAGS["content_occupancy"].questions
+    )
 
 
 def test_content_occupancy_values_name_each_group_and_place():
@@ -705,7 +711,16 @@ def test_content_occupancy_values_name_each_group_and_place():
         ],
         ignore_index=True,
     )
-    assert _numbers(builder.content_occupancy_values(bins, "s")) == {
+    values = builder.content_occupancy_values(bins, "s")
+    shown = {value.key for value in values if value.figures}
+    assert shown == {
+        "occupancy_epochs",
+        "non_swr_content_at_well_fraction",
+        "swr_content_at_well_fraction",
+        "animals_non_swr_more_at_well",
+        "even_content_at_well_fraction",
+    }
+    assert _numbers(values) == {
         "occupancy_epochs": 3,
         # no SWR: a (0.5, 0.25, 0.25, 0), b (1, 0, 0, 0); the animals' mean
         "non_swr_content_remote_well_fraction": pytest.approx(0.75),
