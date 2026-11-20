@@ -1265,8 +1265,8 @@ def test_no_swr_events_have_one_color_in_every_figure(offline):
 
 def _figure03_events(n: int = 400) -> pd.DataFrame:
     """Events of both kinds, of two animals with two epochs each, whose
-    durations pass the duration axis and whose speeds fall below the speed
-    axis, as the real ones do."""
+    durations pass the duration axis and whose speeds pass the speed axis, as
+    the real ones do."""
     rng = np.random.default_rng(0)
     return pd.DataFrame(
         {
@@ -1322,11 +1322,8 @@ def test_figure03_histogram_labels_the_ends_that_hold_clipped_events(offline):
     figure03.draw_histogram(ax_duration, events, "duration")
     assert _tick_labels(fig, ax_duration)[-1].get_text() == "≥400"
     figure03.draw_histogram(ax_speed, events, "speed")
-    assert _tick_labels(fig, ax_speed)[0].get_text() == "≤1"
+    assert _tick_labels(fig, ax_speed)[-1].get_text() == "≥1500"
 
-    too_fast = events.assign(replay_speed_median_cm_s=2e5)
-    with pytest.raises(ValueError, match="beyond the axis, unmarked"):
-        figure03.draw_histogram(ax_speed, too_fast, "speed")
     too_wide = events.assign(spatial_extent_cm=300.0)
     with pytest.raises(ValueError, match="beyond the axis, unmarked"):
         figure03.draw_histogram(ax_extent, too_wide, "extent")
@@ -1357,6 +1354,38 @@ def test_figure03_histogram_marks_each_animal_s_median(offline):
         x = [segment[0, 0] for segment in drawn.get_segments()]
         np.testing.assert_allclose(x, expected[word])
         np.testing.assert_allclose(drawn.get_colors()[0], to_rgba(color))
+    plt.close(fig)
+
+
+def test_figure03_cumulative_is_the_share_of_events_at_or_below(offline):
+    """Panel d's lower axis: each kind's curve is the share of its events at or
+    below each speed, so it crosses 50 % at the kind's median and ends short of
+    100 % by the share of events beyond the axis; an event without a value
+    raises, as in the histogram above it."""
+    import matplotlib.pyplot as plt
+
+    figure03 = offline("scripts.figures.generate_figure03")
+    events = _figure03_events(n=2400)
+    column, _, _, edges, _ = figure03.HISTOGRAMS["speed"]
+    fig, ax = plt.subplots()
+    figure03.draw_cumulative(ax, events, "speed")
+    curves = [line for line in ax.lines if len(line.get_xdata()) > 2]
+    assert len(curves) == 2
+    for (is_swr, _, _), curve in zip(figure03.KINDS, curves, strict=True):
+        speed, share = curve.get_xdata(), curve.get_ydata()
+        values = events.loc[events["is_swr"] == is_swr, column].to_numpy()
+        assert (np.diff(share) >= 0).all()
+        assert share[-1] == pytest.approx(100 * (values <= edges[-1]).mean())
+        assert share[-1] < 100  # some events lie beyond the axis
+        median = np.median(values)
+        assert share[speed <= median][-1] <= 50 <= share[speed >= median][0]
+    assert ax.get_xlim() == (edges[0], edges[-1])
+
+    missing = events.assign(
+        replay_speed_median_cm_s=events[column].where(events.index > 0)
+    )
+    with pytest.raises(ValueError, match="an event has no value"):
+        figure03.draw_cumulative(ax, missing, "speed")
     plt.close(fig)
 
 

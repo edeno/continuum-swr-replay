@@ -14,7 +14,9 @@ Each row asks one thing:
             alike); bars the animals' mean, dots the animals
             (``event_statistics.state_composition_statistics``).
         c — Spatial extent of the decoded content.
-        d — Replay speed (each event's median).
+        d — Replay speed (each event's median over its time bins), twice on
+            one axis: the distribution, and under it the share of events at
+            or below each speed.
     Where the content is, and the brain state
         e — Content time by track distance from the animal, at a well (within
             ``AT_WELL_CM`` of one) and elsewhere: content at a well far from
@@ -30,8 +32,12 @@ Each row asks one thing:
             kind's events. (Ripple power, MUA, theta and head speed around the
             events are Figure 2's.)
 
-b comes before c and d because the far mode of c and the fast mode of d are the
-events with Fragmented time. The number of arms the decoded position touches is
+b comes before c and d because the far mode of c and the fastest events of d
+(its end bin) are the events with Fragmented time. d's axis is linear: a decoded
+position that moves one place bin in one time bin has a speed of 1,000 cm/s,
+which the smoothing spreads over the bins around it, so the values an event's
+median takes below about 100 cm/s are the smoother's, and a log axis would give
+them two fifths of its length. The number of arms the decoded position touches is
 not drawn: it restates c in arms, and an arm counts when one time bin's position
 is on it. Its values stay in the events summary.
 
@@ -144,21 +150,22 @@ RATIO_LIMIT_LOG2 = 2
 # Panel e: distance from the animal, cm (the track's longest is under 240).
 DISTANCE_EDGES_CM = np.arange(0, 241, 8)
 
-# Panels a, c, d: (column, x label, scale, bin edges, log x, x ticks). A tick at an
+# Panels a, c, d: (column, x label, scale, bin edges, x ticks). A tick at an
 # end of the axis that starts with ≤ or ≥ says its bin also holds the events
 # beyond the axis; an end without one holds none (``draw_histogram`` checks).
 HISTOGRAMS = {
     "duration": (
         "event_duration_s", "Duration (ms)", 1e3,
-        np.arange(0, 401, 8), False, {0: "0", 200: "200", 400: "≥400"},
+        np.arange(0, 401, 8), {0: "0", 200: "200", 400: "≥400"},
     ),
     "extent": (
         "spatial_extent_cm", "Spatial extent (cm)", 1.0,
-        np.linspace(0, 240, 41), False, {0: "0", 100: "100", 200: "200"},
+        np.linspace(0, 240, 41), {0: "0", 100: "100", 200: "200"},
     ),
     "speed": (
         "replay_speed_median_cm_s", "Replay speed (cm/s)", 1.0,
-        np.geomspace(1, 1e5, 41), True, {1: "≤1", 1e2: "$10^2$", 1e4: "$10^4$"},
+        np.arange(0, 1501, 100),
+        {0: "0", 500: "500", 1000: "1000", 1500: "≥1500"},
     ),
 }  # fmt: skip
 
@@ -231,7 +238,7 @@ def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
     then says so (≤ or ≥). An event beyond an end that is not marked raises, and
     so does an event without a value: the legend's n is every event.
     """
-    column, label, scale, edges, log_x, ticks = HISTOGRAMS[key]
+    column, label, scale, edges, ticks = HISTOGRAMS[key]
     if events[column].isna().any():
         raise ValueError(f"{label}: an event has no value")
     medians = class_medians(events, column)
@@ -256,10 +263,29 @@ def draw_histogram(ax, events: pd.DataFrame, key: str) -> None:
             color=color, lw=0,
         )  # fmt: skip
         ax.vlines(scale * animals[word], top * 1.04, top * 1.12, color=color, lw=0.6)
-    if log_x:
-        ax.set_xscale("log")
     ax.set_xlim(edges[0], edges[-1])
     ax.set_ylim(0, top * 1.26)
+    ax.set_xlabel(label)
+    ax.set_xticks(list(ticks), list(ticks.values()))
+
+
+def draw_cumulative(ax, events: pd.DataFrame, key: str) -> None:
+    """The share of each kind's events at or below each value, on the
+    histogram's axis. A curve crosses the 50 % line at the kind's median, and
+    what it lacks of 100 % at the end of the axis is the share of events beyond
+    it (the histogram's end bin)."""
+    column, label, scale, edges, ticks = HISTOGRAMS[key]
+    if events[column].isna().any():
+        raise ValueError(f"{label}: an event has no value")
+    grid = np.linspace(edges[0], edges[-1], 301)
+    ax.axhline(50, color="0.8", lw=0.5)
+    for is_swr, _, color in KINDS:
+        values = scale * events.loc[events["is_swr"] == is_swr, column].to_numpy()
+        at_or_below = np.searchsorted(np.sort(values), grid, side="right")
+        ax.plot(grid, 100 * at_or_below / len(values), color=color, lw=0.8)
+    ax.set_xlim(edges[0], edges[-1])
+    ax.set_ylim(0, 100)
+    ax.set_yticks([0, 50, 100])
     ax.set_xlabel(label)
     ax.set_xticks(list(ticks), list(ticks.values()))
 
@@ -459,12 +485,19 @@ def generate_figure(inputs: dict):
     )  # fmt: skip
 
     row1 = outer[0].subgridspec(1, 4, width_ratios=[1, 0.7, 1, 1], wspace=0.55)
-    ax_a, ax_b, ax_c, ax_d = (fig.add_subplot(row1[i]) for i in range(4))
+    ax_a, ax_b, ax_c = (fig.add_subplot(row1[i]) for i in range(3))
+    d_grid = row1[3].subgridspec(2, 1, hspace=0.25)
+    ax_d = fig.add_subplot(d_grid[0])
+    ax_d_cumulative = fig.add_subplot(d_grid[1], sharex=ax_d)
     draw_state_composition(ax_b, state_composition_statistics(events))
     for ax, key in ((ax_a, "duration"), (ax_c, "extent"), (ax_d, "speed")):
         draw_histogram(ax, events, key)
-    for ax in (ax_a, ax_c):
+    draw_cumulative(ax_d_cumulative, events, "speed")
+    ax_d.set_xlabel("")
+    ax_d.tick_params(labelbottom=False)
+    for ax in (ax_a, ax_c, ax_d):
         ax.set_ylabel("% events")
+    ax_d_cumulative.set_ylabel("% events\nat or below")
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for _, _, c in KINDS]
     fig.legend(
         handles, kind_labels(events), frameon=False, loc="upper center",
