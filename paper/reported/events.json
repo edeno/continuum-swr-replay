@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "f1ede00e3c8a",
+ "commit": "5c81683c9381",
  "code": {
-  "head": "f1ede00e3c8ad5ec92fcba780edb2865eca36912",
+  "head": "5c81683c9381b05ccf058036760e7ce023f62577",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -339,8 +339,8 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "7847988a256ac5cee2154bf2ce45ccf9d0ef4f6c3ba0487c7c4d0ee26216e25b",
-    "code_sha256": "367c6cc8707d850be6b8ebd16912d8d38b07d58f9d2af1daeb522d39a420fd8c"
+    "sha256": "de9c90213e3818411fa6b46666663ff5302d1dc4c9f0a62e8d1f9e2b2d070723",
+    "code_sha256": "5baaa8afc8f33c654225b1353f61d79db04c23638c8914eacdc38d6b0d88f94d"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -598,8 +598,7 @@
     "2d.1"
    ],
    "figures": [
-    "3e",
-    "3g"
+    "3f"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -1334,8 +1333,7 @@
     "2d.1"
    ],
    "figures": [
-    "3e",
-    "3g"
+    "3f"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -3092,8 +3090,7 @@
     "2d.1"
    ],
    "figures": [
-    "3e",
-    "3g"
+    "3f"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -3108,10 +3105,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e",
-    "3g"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -3125,10 +3119,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e",
-    "3g"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -3142,10 +3133,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e",
-    "3g"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -3159,10 +3147,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e",
-    "3g"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -4082,8 +4067,7 @@
     "2d.1"
    ],
    "figures": [
-    "3e",
-    "3g"
+    "3f"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -5351,8 +5335,7 @@
     "2d.1"
    ],
    "figures": [
-    "3e",
-    "3g"
+    "3f"
    ],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
@@ -5367,10 +5350,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e",
-    "3g"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -5384,10 +5364,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e",
-    "3g"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -5401,10 +5378,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e",
-    "3g"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
@@ -5418,10 +5392,7 @@
    "questions": [
     "2d.1"
    ],
-   "figures": [
-    "3e",
-    "3g"
-   ],
+   "figures": [],
    "source": "Processed-Data/content_along_arms (scripts/event_properties/measure_content_along_arms.py)",
    "function": "content_occupancy_values",
    "pending": null
