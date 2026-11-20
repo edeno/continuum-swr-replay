@@ -176,6 +176,10 @@ EVENT_TETRODE_HOLDOUT_DIR = "event_tetrode_holdout"
 """The held-out tetrode score of the canonical non-local events and their
 Local-rest controls, under the processed-data root
 (``scripts/event_evidence/score_tetrode_holdout.py``)."""
+EVENT_NONLOCAL_RESTRICTION_DIR = "event_nonlocal_restriction"
+"""The per-bin scores of the three non-local restriction models (``none``,
+``swr_only``, ``full``) on every analyzed epoch, under the processed-data root
+(``scripts/event_evidence/score_nonlocal_restriction.py``)."""
 EVENT_PARTICIPATION_DIR = "event_participation"
 """The tetrode participation and spike rate of the canonical non-local events
 and of Local-rest control windows, under the processed-data root

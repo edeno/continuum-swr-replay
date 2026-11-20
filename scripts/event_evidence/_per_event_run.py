@@ -2,14 +2,15 @@
 and the epoch loop that writes each epoch's record and gathers the run's
 manifest (``runs.epoch_records``).
 
-Used by ``measure_event_participation.py``, ``score_event_likelihood_advantage.py``
-and ``score_tetrode_holdout.py``.
+Used by ``measure_event_participation.py``, ``score_event_likelihood_advantage.py``,
+``score_tetrode_holdout.py`` and ``score_nonlocal_restriction.py``.
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import multiprocessing
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -71,6 +72,31 @@ def select_epochs(
         for i, epoch_id in enumerate(sorted(epochs))
         if shards is None or i % n_shards in shards
     ]
+
+
+def use_gpu(queue: multiprocessing.Queue, mem_fraction: float) -> None:
+    """Worker initializer: run JAX on the next card from ``queue``.
+
+    Cards are assigned, several workers to a card, so the card is set here
+    rather than claimed (``configure_jax_gpu`` allows one process per card).
+    """
+    import os
+
+    from continuum_swr_replay.runs.device import query_gpus, verify_jax_device
+
+    index = queue.get()
+    card = {c.index: c for c in query_gpus()}[index]
+    os.environ["CUDA_VISIBLE_DEVICES"] = card.uuid
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(mem_fraction)
+    verify_jax_device(
+        {
+            "jax_backend": "gpu",
+            "gpu_index": card.index,
+            "gpu_uuid": card.uuid,
+            "gpu_name": card.name,
+        }
+    )
 
 
 def run(

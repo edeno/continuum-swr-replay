@@ -90,6 +90,7 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
     event_table_path,
     run,
     select_epochs,
+    use_gpu,
 )
 
 PRODUCED_BY = produced_by(__file__)
@@ -192,31 +193,6 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
     }
 
 
-def _use_gpu(queue: multiprocessing.Queue, mem_fraction: float) -> None:
-    """Worker initializer: run JAX on the next card from ``queue``.
-
-    Cards are assigned, several workers to a card, so the card is set here
-    rather than claimed (``configure_jax_gpu`` allows one process per card).
-    """
-    import os
-
-    from continuum_swr_replay.runs.device import query_gpus, verify_jax_device
-
-    index = queue.get()
-    card = {c.index: c for c in query_gpus()}[index]
-    os.environ["CUDA_VISIBLE_DEVICES"] = card.uuid
-    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(mem_fraction)
-    verify_jax_device(
-        {
-            "jax_backend": "gpu",
-            "gpu_index": card.index,
-            "gpu_uuid": card.uuid,
-            "gpu_name": card.name,
-        }
-    )
-
-
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -266,7 +242,7 @@ def main(argv: list[str] | None = None) -> None:
         max_workers=len(args.gpus) * args.workers_per_gpu,
         pool_options={
             "mp_context": context,
-            "initializer": _use_gpu,
+            "initializer": use_gpu,
             "initargs": (queue, round(0.9 / args.workers_per_gpu, 3)),
         },
     )

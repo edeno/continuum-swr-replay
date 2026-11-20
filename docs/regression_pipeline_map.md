@@ -160,6 +160,12 @@ Spike likelihood at decoded and actual positions, over each whole non-local even
 
 `advantage_from_bins`, `per_bin_advantage`, `event_scores`, `likelihood_advantage_statistics`
 
+### `src/continuum_swr_replay/analysis/event_evidence/nonlocal_restriction.py`
+
+Does allowing non-local states outside sharp-wave ripples predict the spikes better? Three decoders that differ only in when the non-local states may be entered, scored by how well each predicts each bin's spikes.
+
+`allowed_states`, `restricted_discrete_transitions`, `continuous_block_deviation`, `predictive_log_scores`, `heldout_log_likelihood`, `restriction_scores`, `score_columns`, `restriction_sums`, `restriction_contrasts`
+
 ### `src/continuum_swr_replay/analysis/event_evidence/participation.py`
 
 Tetrode participation and spike rate of non-local events, against Local rest.
@@ -854,7 +860,7 @@ Does each detector's content reproduce in cells it never saw?
 
 What the per-event runners share: their arguments, the canonical event table, and the epoch loop that writes each epoch's record and gathers the run's manifest (``runs.epoch_records``).
 
-`event_table_path`, `event_table_input`, `add_run_arguments`, `select_epochs`, `run`
+`event_table_path`, `event_table_input`, `add_run_arguments`, `select_epochs`, `use_gpu`, `run`
 
 ### `scripts/event_evidence/analyze_event_spike_evidence.py`
 
@@ -879,6 +885,12 @@ Held-out spike evidence for each decoder state, on every canonical HPC decode.
 Spike likelihood at decoded and actual positions, for every canonical non-local event.
 
 `epoch_events`, `epoch_scores`, `run_epoch`, `main`
+
+### `scripts/event_evidence/score_nonlocal_restriction.py`
+
+Per-bin scores of the three non-local restriction models on every analyzed epoch.
+
+`bin_categories`, `check_failures`, `run_epoch`, `main`
 
 ### `scripts/event_evidence/score_tetrode_holdout.py`
 
