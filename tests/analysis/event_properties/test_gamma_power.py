@@ -10,6 +10,7 @@ from continuum_swr_replay.analysis.event_properties.gamma_power import (
     epoch_gamma,
     event_means,
     power_change_db,
+    recorded_mask,
     samples_in_intervals,
     stretch_band_power,
     zscore_on,
@@ -74,6 +75,22 @@ def test_event_means_survive_missing_samples_elsewhere():
     assert means[0] == pytest.approx(3.0)
     assert np.isnan(means[1])
     assert means[2] == pytest.approx(8.5)
+
+
+def test_a_grid_bin_just_past_the_recording_still_reads_it():
+    """A 2 ms grid that starts or ends a bin beyond the recording's samples
+    keeps a value there (one grid step may be 3 ms long without a gap); farther
+    out there is none, and none between two stretches a pause apart."""
+    lfp_time = np.r_[np.arange(1000), np.arange(2000, 3000)] / FS  # 0-0.999, 2-2.999 s
+    power = np.ones(lfp_time.size)
+    grid = np.round(np.arange(-0.01, 3.011, 0.002), 6)
+    recorded = recorded_mask(grid, lfp_time, power)
+    expected = ((grid >= -0.003) & (grid <= 0.999 + 0.003)) | (
+        (grid >= 2.0 - 0.003) & (grid <= 2.999 + 0.003)
+    )
+    np.testing.assert_array_equal(recorded, expected)
+    assert recorded[np.isclose(grid, 3.002)].all()  # 3 ms past the last sample
+    assert not recorded[np.isclose(grid, 3.004)].any()
 
 
 def test_band_power_is_filtered_within_each_gap_free_stretch():
@@ -243,7 +260,9 @@ def test_epoch_gamma_is_unknown_where_the_lfp_was_not_recorded():
     dot = dot.copy()
     for start, end in zip(edges["start_time"], edges["end_time"], strict=True):
         dot.loc[(grid >= start) & (grid <= end), "in_excluded_time"] = True
-    paused = (grid > 1.0) & (grid < 2.0)
+    # (the grid reads the sample on each side of the pause as far as one of
+    # its own steps may reach, 3 ms)
+    paused = (grid > 1.0 + 0.003) & (grid < 2.0 - 0.003)
 
     columns, reference, on_grid = epoch_gamma(
         lfp[recorded], time[recorded], FS, dot, grid, excluded, events, 5,
@@ -252,7 +271,7 @@ def test_epoch_gamma_is_unknown_where_the_lfp_was_not_recorded():
 
     for band in on_grid.values():
         assert np.isnan(band[paused]).all()
-        assert np.isfinite(band[~paused]).all()
+        assert np.isfinite(band[(grid <= 1.0) | (grid >= 2.0)]).all()
     # the events and the rest level are what they are without the pause
     np.testing.assert_allclose(columns["slow_gamma_power"], [1.0, 0.04], rtol=0.1)
     # (within a quarter: the loud edges still leak a little past excluded time;

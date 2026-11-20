@@ -46,7 +46,7 @@ from continuum_swr_replay.analysis.event_properties.brain_state_reference import
     matched_window_means,
     regime_masks,
 )
-from continuum_swr_replay.intervals import interval_mask
+from continuum_swr_replay.intervals import interval_mask, max_step_s, sample_step
 
 GAMMA_BANDS: dict[str, tuple[float, float]] = {
     "slow_gamma": (25.0, 55.0),
@@ -146,16 +146,18 @@ def recorded_mask(
     Returns
     -------
     recorded : NDArray of bool, shape (n_grid,)
-        True from one sample step before a stretch's first sample to one after
-        its last. Between two stretches, and before the first or after the
-        last, the recording gives no value.
+        True from a stretch's first sample to its last, and as far beyond each
+        as two grid times may be apart without a gap between them
+        (``intervals.max_step_s`` of the grid's step): a grid that runs a bin
+        past the recording's last sample still reads that sample. Farther from
+        every stretch, the recording gives no value.
     """
     stretches = gap_free_stretches(lfp_time, power)
     if len(stretches) == 0:
         return np.zeros(grid_time.size, dtype=bool)
-    step = float(np.median(np.diff(lfp_time)))
-    first = lfp_time[stretches[:, 0]] - step
-    last = lfp_time[stretches[:, 1] - 1] + step
+    reach = max_step_s(sample_step(grid_time))
+    first = lfp_time[stretches[:, 0]] - reach
+    last = lfp_time[stretches[:, 1] - 1] + reach
     index = np.searchsorted(first, grid_time, side="right") - 1
     recorded: NDArray[np.bool_] = (index >= 0) & (
         grid_time <= last[np.maximum(index, 0)]
