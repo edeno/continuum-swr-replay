@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "59f114b4acbc",
+ "commit": "cfa31d371dd9",
  "code": {
-  "head": "59f114b4acbcf3f5b0353b3e4477fedab36431ac",
+  "head": "cfa31d371dd9cacc88b02b11100e0fedb3ca1d7e",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -250,13 +250,17 @@
     "sha256": "933f33706b5999a73702c0b687a36d8b0ca295a29f84600df0ec994258fec27a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
+   "src/continuum_swr_replay/analysis/event_properties/class_or_continuum.py": {
+    "sha256": "53a49744324d45f2fc8cd6cc25c1a2c7d2c5ac9723c61a73a9eafa46b14fd3ab",
+    "code_sha256": "ef936210972a70fd67d41f6d6730bf18f39dff3427aa6c8595c0ce398b8b1bbf"
+   },
    "src/continuum_swr_replay/analysis/event_properties/content_along_arms.py": {
     "sha256": "bd01826046e02e2eb1c1eab7b4948f95fa9c5bd44d8088806e0a9ac24c1c612b",
     "code_sha256": "7bfb24e78bcbd59c324c0db854de4890c5a7faa6785a21dedc9b817fb656162e"
    },
    "src/continuum_swr_replay/analysis/event_properties/event_statistics.py": {
-    "sha256": "ac3626abe56ef579be40971053789093f4f91e66b134c670592d9b8846c578b4",
-    "code_sha256": "ec4ab6b6773fcfe0024f607301a141069c5b99aa3bef328114b3eaff7803026c"
+    "sha256": "51485f4aaa98134dc21e48daef94c4de26bc8a7673001d0eeba648104e814216",
+    "code_sha256": "60e11a8c89499f3729f53a0ad34732c9455439cb6d0759cb47bd06b483db61bc"
    },
    "src/continuum_swr_replay/analysis/event_properties/property_contrast.py": {
     "sha256": "4989d4b201bbbbdd1551bb4ebd9c749e87f0bab6781cbfd6565296f28b4c8d1b",
@@ -327,16 +331,16 @@
     "code_sha256": "2584aa9d7dfde860a81be90095a3476b4fd93a22093cc370edcf8227f99eafc2"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "ba6450c8ffa28ebf8719bf19abaa465681ead2eef84b6dfea0794621ac1cb506",
-    "code_sha256": "381a575815636a39364563c2d455f618bafe6434880a2f03c1266ab6914913e9"
+    "sha256": "e47174c87512da6a3ea19e7eda09682265041cd2468c305531aa8584b6756db5",
+    "code_sha256": "e7f0b6faf0bce1487c45fabd50b5c119ba1c8f213299f14e73276d3bcb50058a"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "99e885a71ddf34db756864522c20fff5bf2fc717c40c34308e7989fcb3f77cfe",
-    "code_sha256": "e5d5cfcc4dfa6972033abdf0ede9b4c3d238202a3468df0bf206e2abefc80c5d"
+    "sha256": "41e18917c3b5e850752213a0ba2a00ed7a159653dd5ff2c176efbd7f2d013b25",
+    "code_sha256": "4268bf0c071e6e31e61d62acd6978db20e64ea184dd44b5988173d443a5525db"
    },
    "src/continuum_swr_replay/reported/formatting.py": {
     "sha256": "f8dd086632914e99b726c318139f1998f2c984a71975b5a0504316848e6300c2",
@@ -541,6 +545,14 @@
   {
    "path": "Processed-Data/ripple_class_structure/manifest.json",
    "sha256": "8756ababb8d26e05261876a13939d0275cf4dedcfea3b95e1cc1a4c90bf34824"
+  },
+  {
+   "path": "Processed-Data/nonlocal_by_ripple_power/counts.parquet",
+   "sha256": "1978408f70175c045c70218731046a25a9e84ff4269009165a5ad5d742aa532d"
+  },
+  {
+   "path": "Processed-Data/nonlocal_by_ripple_power/manifest.json",
+   "sha256": "edd765c1943ad494284b8b35e30ac0ba7baa338ef79f69bdd07e04b2824562e8"
   }
  ],
  "values": {
@@ -3173,9 +3185,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -3205,9 +3215,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -3672,9 +3680,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -3867,6 +3873,54 @@
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "function": "event_cohort_values",
+   "pending": null
+  },
+  "nonlocal_time_below_swr_threshold_fraction": {
+   "value": 0.7563727161109578,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the immobile time bins decoded non-local (non-local probability above 0.8) whose ripple power is below the Kay SWR threshold (2 z): mean over animals of each animal's share of its bins",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "2j"
+   ],
+   "source": "Processed-Data/nonlocal_by_ripple_power (scripts/event_properties/measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+   "function": "nonlocal_power_values",
+   "pending": null
+  },
+  "nonlocal_time_below_swr_threshold_fraction_animal_max": {
+   "value": 0.7903529357094728,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "2j"
+   ],
+   "source": "Processed-Data/nonlocal_by_ripple_power (scripts/event_properties/measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+   "function": "nonlocal_power_values",
+   "pending": null
+  },
+  "nonlocal_time_below_swr_threshold_fraction_animal_min": {
+   "value": 0.7265089666170936,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "lowest per-animal share of non-local time bins below the Kay threshold",
+   "questions": [
+    "2b.5"
+   ],
+   "figures": [
+    "2j"
+   ],
+   "source": "Processed-Data/nonlocal_by_ripple_power (scripts/event_properties/measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)",
+   "function": "nonlocal_power_values",
    "pending": null
   },
   "nonlocal_time_outside_kay_fraction": {
@@ -5352,9 +5406,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -5384,9 +5436,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null
@@ -5835,9 +5885,7 @@
    "questions": [
     "2d.9"
    ],
-   "figures": [
-    "2g"
-   ],
+   "figures": [],
    "source": "Processed-Data/event_participation (scripts/event_evidence/measure_event_participation.py)",
    "function": "participation_values",
    "pending": null

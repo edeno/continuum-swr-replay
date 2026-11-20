@@ -15,11 +15,11 @@ it calls.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `59f114b4acbc` | yes | 32 | 0 |
-| `detection.json` | `59f114b4acbc` | yes | 172 | 0 |
-| `events.json` | `59f114b4acbc` | yes | 414 | 0 |
-| `behavior.json` | `59f114b4acbc` | yes | 922 | 0 |
-| `mpfc.json` | `59f114b4acbc` | yes | 604 | 0 |
+| `survey.json` | `cfa31d371dd9` | yes | 32 | 0 |
+| `detection.json` | `cfa31d371dd9` | yes | 172 | 0 |
+| `events.json` | `cfa31d371dd9` | yes | 417 | 0 |
+| `behavior.json` | `cfa31d371dd9` | yes | 922 | 0 |
+| `mpfc.json` | `cfa31d371dd9` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -550,15 +550,19 @@ Sources:
 
 ### 2b.5. How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?
 
-Status: computed. Figures: 2i, 2j. Values: 15.
+Status: computed. Figures: 2i, 2j. Values: 18.
 
 Sources:
 
+- Processed-Data/nonlocal_by_ripple_power (scripts/event_properties/measure_nonlocal_by_ripple_power.py: each analyzed epoch's decode)
 - Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/event_properties/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/event_properties/measure_event_gamma.py)
 - Processed-Data/ripple_class_structure (scripts/event_properties/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
+| `\EventsNonlocalTimeBelowSwrThresholdFraction` | 76 % |  | share of the immobile time bins decoded non-local (non-local probability above 0.8) whose ripple power is below the Kay SWR threshold (2 z): mean over animals of each animal's share of its bins | `events.nonlocal_power_values` | 2j |
+| `\EventsNonlocalTimeBelowSwrThresholdFractionAnimalMax` | 79 % |  | highest per-animal share | `events.nonlocal_power_values` | 2j |
+| `\EventsNonlocalTimeBelowSwrThresholdFractionAnimalMin` | 73 % |  | lowest per-animal share of non-local time bins below the Kay threshold | `events.nonlocal_power_values` | 2j |
 | `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 2i |
 | `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power (the median over their epochs of each epoch's median) is above the median over the same epochs of the epoch's median quiet-rest level | `events.brain_state_values` | 2i |
 | `\EventsRippleAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event ripple power (the median over their epochs of each epoch's median) is below the median over the same epochs of the epoch's median running level | `events.brain_state_values` | 2i |
@@ -966,26 +970,26 @@ Sources:
 | `\EventsNonSwrCloseSpikesMedian` | 44 | spikes | median spike count of nonSWR-close events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrCloseTetrodesMedian` | 12 | tetrodes | median number of tetrodes with a spike in nonSWR-close events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrControlParticipation` | 35 % |  | share of tetrodes with a spike of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
-| `\EventsNonSwrControlSpikeRateHz` | 283 | spikes per s | spike rate summed over tetrodes of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsNonSwrControlSpikeRateHz` | 283 | spikes per s | spike rate summed over tetrodes of no SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` |  |
 | `\EventsNonSwrEventParticipation` | 52 % |  | share of tetrodes with a spike of no SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
-| `\EventsNonSwrEventSpikeRateHz` | 749 | spikes per s | spike rate summed over tetrodes of no SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsNonSwrEventSpikeRateHz` | 749 | spikes per s | spike rate summed over tetrodes of no SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` |  |
 | `\EventsNonSwrParticipationAnimals` | 5 |  | animals with no SWR events and Local-rest windows | `events.participation_values` | 2g |
 | `\EventsNonSwrParticipationAnimalsAboveRest` | 5 |  | animals whose no SWR events' share of tetrodes with a spike is above their Local-rest windows' | `events.participation_values` | 2g |
 | `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` |  |
 | `\EventsNonSwrRemoteSpikesMedian` | 36 | spikes | median spike count of nonSWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteTetrodesMedian` | 11 | tetrodes | median number of tetrodes with a spike in nonSWR-remote events | `events.spike_evidence_values` | 2 |
-| `\EventsNonSwrSpikeRateHzAnimalsAboveRest` | 5 |  | animals whose no SWR events' spike rate summed over tetrodes is above their Local-rest windows' | `events.participation_values` | 2g |
+| `\EventsNonSwrSpikeRateHzAnimalsAboveRest` | 5 |  | animals whose no SWR events' spike rate summed over tetrodes is above their Local-rest windows' | `events.participation_values` |  |
 | `\EventsParticipationEventsWithoutControl` | 8 |  | events longer than any Local-rest stretch of their epoch (no control) | `events.participation_values` | 2g |
 | `\EventsSwrControlParticipation` | 43 % |  | share of tetrodes with a spike of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
-| `\EventsSwrControlSpikeRateHz` | 283 | spikes per s | spike rate summed over tetrodes of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsSwrControlSpikeRateHz` | 283 | spikes per s | spike rate summed over tetrodes of SWR Local-rest windows: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` |  |
 | `\EventsSwrEventParticipation` | 72 % |  | share of tetrodes with a spike of SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
-| `\EventsSwrEventSpikeRateHz` | 1101 | spikes per s | spike rate summed over tetrodes of SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` | 2g |
+| `\EventsSwrEventSpikeRateHz` | 1101 | spikes per s | spike rate summed over tetrodes of SWR events: mean over animals of each animal's median over epochs of each epoch's median | `events.participation_values` |  |
 | `\EventsSwrParticipationAnimals` | 5 |  | animals with SWR events and Local-rest windows | `events.participation_values` | 2g |
 | `\EventsSwrParticipationAnimalsAboveRest` | 5 |  | animals whose SWR events' share of tetrodes with a spike is above their Local-rest windows' | `events.participation_values` | 2g |
 | `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` |  |
 | `\EventsSwrRemoteSpikesMedian` | 118 | spikes | median spike count of SWR-remote events | `events.spike_evidence_values` | 2 |
 | `\EventsSwrRemoteTetrodesMedian` | 15 | tetrodes | median number of tetrodes with a spike in SWR-remote events | `events.spike_evidence_values` | 2 |
-| `\EventsSwrSpikeRateHzAnimalsAboveRest` | 5 |  | animals whose SWR events' spike rate summed over tetrodes is above their Local-rest windows' | `events.participation_values` | 2g |
+| `\EventsSwrSpikeRateHzAnimalsAboveRest` | 5 |  | animals whose SWR events' spike rate summed over tetrodes is above their Local-rest windows' | `events.participation_values` |  |
 
 ### 2d.10. On average, how much of an SWR or non-SWR event is Continuous, and how much Fragmented?
 
@@ -2874,11 +2878,13 @@ Panel d: `\EventsAnimalsNonSwrMajority`, `\EventsAnimalsNonSwrPlurality`, `\Even
 
 Panel f: `\EventsEndOffsetBeyondFiftyMsFraction`, `\EventsEndOffsetBeyondTwentyFiveMsFraction`, `\EventsEndOffsetMedianMs`, `\EventsStartOffsetBeyondFiftyMsFraction`, `\EventsStartOffsetBeyondTwentyFiveMsFraction`, `\EventsStartOffsetMedianMs`, `\EventsSwrOverlappingEvents`
 
-Panel g: `\EventsNonSwrControlParticipation`, `\EventsNonSwrControlSpikeRateHz`, `\EventsNonSwrEventParticipation`, `\EventsNonSwrEventSpikeRateHz`, `\EventsNonSwrParticipationAnimalsAboveRest`, `\EventsNonSwrParticipationAnimals`, `\EventsNonSwrSpikeRateHzAnimalsAboveRest`, `\EventsParticipationEventsWithoutControl`, `\EventsSwrControlParticipation`, `\EventsSwrControlSpikeRateHz`, `\EventsSwrEventParticipation`, `\EventsSwrEventSpikeRateHz`, `\EventsSwrParticipationAnimalsAboveRest`, `\EventsSwrParticipationAnimals`, `\EventsSwrSpikeRateHzAnimalsAboveRest`
+Panel g: `\EventsNonSwrControlParticipation`, `\EventsNonSwrEventParticipation`, `\EventsNonSwrParticipationAnimalsAboveRest`, `\EventsNonSwrParticipationAnimals`, `\EventsParticipationEventsWithoutControl`, `\EventsSwrControlParticipation`, `\EventsSwrEventParticipation`, `\EventsSwrParticipationAnimalsAboveRest`, `\EventsSwrParticipationAnimals`
 
 Panel h: `\EventsNonSwrHeldoutControlGainPerSpikeCiHigh`, `\EventsNonSwrHeldoutControlGainPerSpikeCiLow`, `\EventsNonSwrHeldoutControlGainPerSpike`, `\EventsNonSwrHeldoutEventsScored`, `\EventsNonSwrHeldoutGainPerSpikeCiHigh`, `\EventsNonSwrHeldoutGainPerSpikeCiLow`, `\EventsNonSwrHeldoutGainPerSpike`, `\EventsNonSwrHeldoutSpikingGainPerSpikeCiHigh`, `\EventsNonSwrHeldoutSpikingGainPerSpikeCiLow`, `\EventsNonSwrHeldoutSpikingGainPerSpike`, `\EventsSwrHeldoutControlGainPerSpikeCiHigh`, `\EventsSwrHeldoutControlGainPerSpikeCiLow`, `\EventsSwrHeldoutControlGainPerSpike`, `\EventsSwrHeldoutEventsScored`, `\EventsSwrHeldoutGainPerSpikeCiHigh`, `\EventsSwrHeldoutGainPerSpikeCiLow`, `\EventsSwrHeldoutGainPerSpike`, `\EventsSwrHeldoutSpikingGainPerSpikeCiHigh`, `\EventsSwrHeldoutSpikingGainPerSpikeCiLow`, `\EventsSwrHeldoutSpikingGainPerSpike`
 
 Panel i: `\EventsMuaAnimalsAboveRestNonSwr`, `\EventsMuaAnimalsAboveRestSwr`, `\EventsMuaAnimalsBelowRunningNonSwr`, `\EventsMuaAnimalsBelowRunningSwr`, `\EventsMuaMedianNonSwr`, `\EventsMuaMedianSwr`, `\EventsMuaRestReference`, `\EventsMuaRunningReference`, `\EventsRippleAnimalsAboveRestNonSwr`, `\EventsRippleAnimalsAboveRestSwr`, `\EventsRippleAnimalsBelowRunningNonSwr`, `\EventsRippleAnimalsBelowRunningSwr`, `\EventsRippleMedianNonSwr`, `\EventsRippleMedianSwr`, `\EventsRippleRestReference`, `\EventsRippleRunningReference`, `\EventsThetaAnimalsAboveRestNonSwr`, `\EventsThetaAnimalsAboveRestSwr`, `\EventsThetaAnimalsBelowRunningNonSwr`, `\EventsThetaAnimalsBelowRunningSwr`, `\EventsThetaLikeFractionNonSwr`, `\EventsThetaLikeFractionSwr`, `\EventsThetaMedianNonSwr`, `\EventsThetaMedianSwr`, `\EventsThetaRestReference`, `\EventsThetaRunningReference`
+
+Panel j: `\EventsNonlocalTimeBelowSwrThresholdFractionAnimalMax`, `\EventsNonlocalTimeBelowSwrThresholdFractionAnimalMin`, `\EventsNonlocalTimeBelowSwrThresholdFraction`
 
 ### Figure 3: What SWR and no-SWR events are like
 
@@ -2966,6 +2972,7 @@ without being called, is not listed.
 | `events.heldout_by_swr_values` | `reported/events.py` | none |  |
 | `events.left_out_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.left_out_statistics` |  |
 | `events.likelihood_advantage_values` | `reported/events.py` | `analysis.event_evidence.likelihood_advantage.likelihood_advantage_statistics` |  |
+| `events.nonlocal_power_values` | `reported/events.py` | `analysis.event_properties.event_statistics.animal_power_counts`, `analysis.event_properties.event_statistics.nonlocal_below_threshold_statistics` |  |
 | `events.other_detector_values` | `reported/events.py` | `analysis.detector_comparison.nonlocal_comparison.other_detector_statistics` |  |
 | `events.participation_values` | `reported/events.py` | `analysis.event_evidence.participation.participation_differences`, `analysis.event_evidence.participation.participation_statistics` |  |
 | `events.property_interval_values` | `reported/events.py` | none |  |
