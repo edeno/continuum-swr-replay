@@ -11,6 +11,7 @@ from continuum_swr_replay.analysis.event_properties.gamma_power import (
     event_means,
     power_change_db,
     samples_in_intervals,
+    stretch_band_power,
     zscore_on,
 )
 
@@ -60,6 +61,44 @@ def test_event_means_include_both_bounds_and_mark_empty_events():
     means = event_means(grid, values, np.array([2.0, 4.5]), np.array([4.0, 4.6]))
     assert means[0] == pytest.approx(3.0)
     assert np.isnan(means[1])
+
+
+def test_event_means_survive_missing_samples_elsewhere():
+    """A missing sample makes the events that hold it unknown, and no other."""
+    grid = np.arange(10.0)
+    values = np.arange(10.0)
+    values[7] = np.nan
+    means = event_means(
+        grid, values, np.array([2.0, 6.0, 8.0]), np.array([4.0, 8.0, 9.0])
+    )
+    assert means[0] == pytest.approx(3.0)
+    assert np.isnan(means[1])
+    assert means[2] == pytest.approx(8.5)
+
+
+def test_band_power_is_filtered_within_each_gap_free_stretch():
+    """Where the recording paused, the samples before and after are not joined:
+    each stretch is filtered by itself, so a step across the pause leaves no
+    ringing, and a stretch too short to filter has no power."""
+    band = GAMMA_BANDS["slow_gamma"]
+    time = np.arange(4000) / FS
+    lfp = sines(40.0, seconds=4.0)
+    lfp[time >= 2.5] += 50.0  # the signal comes back at another level
+    kept = (time < 1.5) | (time >= 2.5)
+
+    power = stretch_band_power(lfp[kept], time[kept], FS, band)
+
+    expected = np.r_[
+        band_power(lfp[time < 1.5], FS, band), band_power(lfp[time >= 2.5], FS, band)
+    ]
+    np.testing.assert_allclose(power, expected)
+    # joined, the step rings through the band
+    assert band_power(lfp[kept], FS, band)[1500] > 100 * power[1500]
+
+    short = (time < 1.5) | ((time >= 2.0) & (time < 2.01)) | (time >= 2.5)
+    power = stretch_band_power(lfp[short], time[short], FS, band)
+    assert np.isnan(power[1500:1510]).all()
+    assert np.isfinite(np.delete(power, np.arange(1500, 1510))).all()
 
 
 @pytest.mark.parametrize("band, freq_hz", [("slow_gamma", 40.0), ("fast_gamma", 80.0)])
@@ -184,6 +223,52 @@ def test_epoch_gamma_measures_events_and_references_on_analyzed_time():
         "fast_gamma_db_swr",
         "fast_gamma_db_non_swr",
     ]
+
+
+def test_epoch_gamma_is_unknown_where_the_lfp_was_not_recorded():
+    """The recording pauses over 1.0-2.0 s, and the 0.1 s on each side of the
+    pause are 30 times larger; excluded time covers those edges with the
+    artifact rule's 0.3 s reach, not the middle of the pause. The gamma of the
+    pause is unknown: no value on the grid, no rest bin, no part in a
+    reference."""
+    lfp, time, dot, grid, excluded, events = _epoch()
+    _, whole, _ = epoch_gamma(
+        lfp, time, FS, dot, grid, excluded, events, 5, np.random.default_rng(0)
+    )
+    lfp = lfp.copy()
+    lfp[((time >= 0.9) & (time < 1.0)) | ((time >= 2.0) & (time < 2.1))] *= 30.0
+    recorded = (time < 1.0) | (time >= 2.0)
+    edges = pd.DataFrame({"start_time": [0.6, 1.7], "end_time": [1.3, 2.4]})
+    excluded = pd.concat([edges, excluded], ignore_index=True)
+    dot = dot.copy()
+    for start, end in zip(edges["start_time"], edges["end_time"], strict=True):
+        dot.loc[(grid >= start) & (grid <= end), "in_excluded_time"] = True
+    paused = (grid > 1.0) & (grid < 2.0)
+
+    columns, reference, on_grid = epoch_gamma(
+        lfp[recorded], time[recorded], FS, dot, grid, excluded, events, 5,
+        np.random.default_rng(0),
+    )  # fmt: skip
+
+    for band in on_grid.values():
+        assert np.isnan(band[paused]).all()
+        assert np.isfinite(band[~paused]).all()
+    # the events and the rest level are what they are without the pause
+    np.testing.assert_allclose(columns["slow_gamma_power"], [1.0, 0.04], rtol=0.1)
+    # (within a quarter: the loud edges still leak a little past excluded time;
+    # read across the pause, the mean would be many times larger)
+    assert reference["slow_gamma_power_rest_mean"] == pytest.approx(
+        whole["slow_gamma_power_rest_mean"], rel=0.25
+    )
+    assert reference["slow_gamma_power_rest_median"] == pytest.approx(0.04, rel=0.05)
+    assert reference["slow_gamma_rest_matched_non_swr"] < 0
+    rest = (
+        (dot["head_speed"] < 4)
+        & ~dot["in_excluded_time"]
+        & (dot["non_local_event"] == 0)
+        & ~paused
+    )
+    assert reference["n_rest_bins"] == int(rest.sum())
 
 
 def _rest_only_epoch(n_events: int = 1500, event_s: float = 0.05):

@@ -218,7 +218,7 @@ Summary statistics of the immobile non-local events.
 
 Slow- and fast-gamma power of CA1 on the decode grid: z-scored per epoch, and its change against quiet rest in dB (``power_change_db``).
 
-`band_power`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`, `matched_level`, `epoch_gamma`
+`band_power`, `stretch_band_power`, `recorded_mask`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`, `matched_level`, `epoch_gamma`
 
 ### `src/continuum_swr_replay/analysis/event_properties/property_contrast.py`
 
