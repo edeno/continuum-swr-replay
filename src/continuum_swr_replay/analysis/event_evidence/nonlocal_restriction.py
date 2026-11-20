@@ -474,6 +474,14 @@ def predictive_log_scores(
         )
     else:
         masked = log_likelihood
+    # The first bin's predicted mass is the restricted initial distribution, so
+    # a state bin it gives no mass is not part of the model there either: its
+    # likelihood is set to -inf for the same reason. Otherwise, when the animal
+    # starts where the Local likelihood is far below a non-local one that has
+    # no initial mass, the pinned library's 1e-15 leaves that bin's filtered
+    # mass far below 1 and its scores off by its log (16 nats at the first bin
+    # of chimi20200223_04_r2_HPC).
+    masked = masked.at[0].set(jnp.where(jnp.asarray(first > 0), masked[0], -jnp.inf))
 
     started = clock.time()
     (smoothed, _, marginal, _, _, _, causal, predicted) = (

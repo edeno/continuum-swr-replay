@@ -183,6 +183,32 @@ def test_a_forbidden_state_holds_no_mass():
     )
 
 
+def test_the_first_bins_likelihood_counts_only_where_the_initial_mass_is():
+    """All the initial mass on state 0, and the first bin's likelihood 70 nats
+    higher on every other state bin: the library's filter subtracts the
+    largest likelihood of the bin before exponentiating and adds 1e-15 to the
+    normalizer (non_local_detector 2d730c3a), so without leaving out the state
+    bins with no initial mass the first bin's filtered mass collapses to about
+    1e-15 and its scores are off by its log."""
+    _, continuous, discrete, log_likelihood = _toy_model(4)
+    initial = np.zeros(STATE_IND.size)
+    initial[0] = 1.0
+    log_likelihood[0] = [-70.0, 0.0, 0.0, 0.0, 0.0]
+    allowed = ALLOWED["everything"]
+    filter_score, two_sided, record = _scores(
+        log_likelihood, initial, continuous, discrete, allowed
+    )
+    prefix, expected_two_sided = _brute_force(
+        initial, continuous, discrete, log_likelihood, allowed
+    )
+    assert record["predicted_mass_deviation"] < 1e-5
+    assert record["causal_mass_deviation"] < 1e-5
+    assert record["filter_identity_deviation"] < 1e-5
+    np.testing.assert_allclose(filter_score[0], -70.0, atol=1e-5)
+    np.testing.assert_allclose(np.cumsum(filter_score), prefix, rtol=0, atol=1e-4)
+    np.testing.assert_allclose(two_sided, expected_two_sided, rtol=0, atol=1e-4)
+
+
 def test_a_missing_bin_scores_zero():
     initial, continuous, discrete, log_likelihood = _toy_model(3)
     log_likelihood[[0, 3, 5]] = 0.0
