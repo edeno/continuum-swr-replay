@@ -720,6 +720,23 @@ Put to the lead as a table; all four accepted:
   straight line when a session has about 140 events, and that the belief-variance test is then wrong
   (61 % and 68 % false positives); a recency curve with almost no penalty restores the test.
 
+### Fourteenth round (lead, 2026-11-21, 04:40): one curve for each session stays
+
+A third simulation round showed that one recency curve shared by the sessions of an animal recovers the
+planted curve and keeps the belief-variance test correct with high power. I recommended it for the smooth
+terms. The lead: "I don't want one curve for each animal. This is a whole new design and implementation."
+
+- **The design stays: one fit for each session**, summarized by session, recording day and animal.
+- What is known inside this design (simulation): a penalty chosen from the data makes each session's
+  curve a line (a session has about 140 events of a kind) and the belief-variance test wrong; a small
+  fixed penalty, or a small basis with no penalty, keeps that test correct (false positives 0 to 7 %) with
+  low power (23 to 50 % at an effect of the size of the recency effect's linear part).
+- (**call**, being checked by simulation) For smooth terms the per-session curve is fitted with a fixed
+  weak penalty, and the reported curve is the average of the per-session curves. The check: does that
+  average recover the planted shape, and at which strength.
+- The shared fitter is corrected for the failures that the content design showed (sessions with no finite
+  maximum, fits at very strong penalties, a flat score); its merge waits for that.
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
