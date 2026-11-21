@@ -500,7 +500,6 @@ def test_every_rate_fit_drops_the_excluded_bins():
         package / "replay_models" / "rate" / "per_bin_rate_ladder.py",
         package / "replay_models" / "rate" / "swr_contrast_rate.py",
         package / "replay_models" / "rate" / "uncertainty_rate.py",
-        package / "replay_models" / "rate" / "cross_history.py",
     ]
     for path in sorted(runners):
         tree = ast.parse(path.read_text())
@@ -726,7 +725,6 @@ def test_every_per_bin_runner_checks_its_tables_source():
         "fit_per_bin_rate_models.py",
         "fit_swr_contrast_rate.py",
         "fit_uncertainty_rate.py",
-        "fit_cross_history_rate.py",
         "plot_model_checking.py",
     ]
     for name in runners:

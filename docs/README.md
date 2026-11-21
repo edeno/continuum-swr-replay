@@ -183,7 +183,7 @@ Three tiers:
 
    | dir | producer | holds |
    |---|---|---|
-   | `models_per_bin_rate/` | `scripts/replay_models/rate/fit_per_bin_rate_models.py`, `fit_swr_contrast_rate.py`, `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` | the per-bin rate fits: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`, `cross_history_models.pkl`; plus three exploratory one-offs nothing supported reads (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) |
+   | `models_per_bin_rate/` | `scripts/replay_models/rate/fit_per_bin_rate_models.py`, `fit_swr_contrast_rate.py`, `fit_uncertainty_rate.py` | the per-bin rate fits: `all_models.pkl` (Family-B ladder), `swr_contrast_rate.pkl`, `uncertainty_rate.pkl`; plus three exploratory one-offs nothing supported reads (`contingency_table.pkl`, `contingency_csv_alpha.json`, `covariate_ranking.pkl`) |
    | `models_per_event_swr_power/` | `scripts/replay_models/coupling/fit_swr_power_model.py` | the per-event ripple-power model `swr_power_model.pkl`, its `.z_reference_by_session.json` and its two audits |
    | `models_per_stop_rate/` | `scripts/replay_models/rate/fit_per_stop_rate_models.py` | Family-A per-stop ladder |
    | `models/`, `models_patch/` | `scripts/replay_models/content/fit_replay_content_models.py` (arm / patch) | the default content ladders — arm `M0`, `M0a`, `M1`–`M6`; patch `P0`–`P3` — on the at-well events, plus the opt-in value/uncertainty rungs (`Mv`, `Mu`, `Mvu`, `Pv`) when named with `--models` |

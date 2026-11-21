@@ -1166,12 +1166,6 @@ Per-event SWR-coupling strength (ripple power) vs behavioral covariates.
 
 `build_parser`, `main`
 
-### `scripts/replay_models/rate/fit_cross_history_rate.py`
-
-Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
-
-`main`
-
 ### `scripts/replay_models/rate/fit_cross_history_ridge_cv.py`
 
 Ridge cross-validated comparison of self vs self+cross history, per animal.
@@ -1279,12 +1273,6 @@ The per-event SWR-power model: an event's ripple power against the behavioral co
 Which sessions of a rung pair can be compared by an information criterion.
 
 `why_not_comparable`, `pair_rung_fits`
-
-### `src/continuum_swr_replay/analysis/replay_models/rate/cross_history.py`
-
-Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
-
-`fit_direction`, `fit_cross_history`
 
 ### `src/continuum_swr_replay/analysis/replay_models/rate/history_kernel_statistics.py`
 

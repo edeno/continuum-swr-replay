@@ -169,8 +169,6 @@ RUNS: tuple[Run, ...] = (
     _run("rate.swr_contrast.all_stops", f"{_RC} --stop-cohort all_stops --workers 16", 16, _RTB),
     _run("rate.uncertainty.at_well", "scripts/replay_models/rate/fit_uncertainty_rate.py --stop-cohort at_well", 1, _RTB),
     _run("coupling.ripple_power", "scripts/replay_models/coupling/fit_swr_power_model.py", 1, _RT),
-    # No worker flag: its parallelism is BLAS threads.
-    _run("rate.cross_history", "scripts/replay_models/rate/fit_cross_history_rate.py --write", 8, _RTB, threads=8),
     # The self- and cross-history on the at-risk design (bins inside an event dropped,
     # history from event onsets and ends): per session, then pooled within animal.
     _run("rate.duration_aware_history.at_well", f"{_DA} --mode session --workers 16", 16, _RTB),

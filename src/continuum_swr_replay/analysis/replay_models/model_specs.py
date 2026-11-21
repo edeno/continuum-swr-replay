@@ -1105,8 +1105,10 @@ MODEL_UNCERTAINTY_RATE: dict[str, PerBinRateModelSpec] = {
 }
 
 
-# Cross-history coupling (``scripts/replay_models/rate/fit_cross_history_rate.py``): does one
-# non-local stream's recent history drive the other's rate? ``Mself`` is the
+# Cross-history coupling, onset-only: does one non-local stream's recent
+# history drive the other's rate? The duration-aware runner
+# (``scripts/replay_models/rate/fit_duration_aware_history_rate.py``) fits these
+# rungs beside its own as the comparison. ``Mself`` is the
 # time spline + reward kernel + self-history; ``Mselfcross`` adds the other
 # stream's raised-cosine cross-history. Reward enters via the kernel only (no
 # reward_rate stop covariate), so the design needs no regenerated stop

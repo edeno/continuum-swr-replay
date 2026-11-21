@@ -82,7 +82,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 ## `replay_models/rate/` — event-rate models and their plots
 - `fit_per_bin_rate_models.py`, `fit_per_stop_rate_models.py` — Family B / A rate ladders ([../docs/rate_models.md](../docs/rate_models.md)).
 - `fit_swr_contrast_rate.py` — the `is_swr`-contrast per-bin ladder (G0–G8 / S0–S10).
-- `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` — MU / cross-history rate models.
+- `fit_uncertainty_rate.py` — the MU rate models.
 - `fit_cross_history_ridge_cv.py` — ridge cross-validated comparison of self vs self+cross history, per animal.
 - `fit_duration_aware_history_rate.py` — self- and cross-history refit on the at-risk design, per session or pooled per animal.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures; each docstring names the panels that are reported values.
