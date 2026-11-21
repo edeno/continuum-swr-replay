@@ -537,7 +537,7 @@ poke-out counts up to it.
   the visit starts before its final poke-out), `"small_movement"` for the
   visit's other stops, `"outside_visit"` for a stop with no visit. No position
   or speed threshold is used: the visit ends at the final poke-out. How a stop
-  ends is known only afterwards, so it is future-referencing.
+  ends is known only afterward, so it is future-referencing.
 
 **Event table** (non-local and ContFrag, carried to the event × arm and event ×
 patch tables; `event_tables/visit_context.py:event_visit_columns`), for the
