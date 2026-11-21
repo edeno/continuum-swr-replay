@@ -164,16 +164,10 @@ def _heldout_likelihood(recording, detector) -> np.ndarray:
 
 
 @pytest.fixture(scope="module")
-def recording_and_detector():
-    recording = sim.simulate_recording(seed=0)
-    return recording, sim.fit_detector(recording)
-
-
-@pytest.fixture(scope="module")
-def simulated(recording_and_detector):
+def simulated(simulated_recording):
     """The recording, its detector and the held-out likelihood (contiguous
     time blocks)."""
-    recording, detector = recording_and_detector
+    recording, detector = simulated_recording
     return recording, detector, _heldout_likelihood(recording, detector)
 
 
@@ -198,11 +192,8 @@ def scenarios(simulated):
 
 
 @pytest.fixture(scope="module")
-def chance():
-    recording = sim.simulate_recording(
-        kinds=sim.CHANCE_KINDS, boundary_event=False, seed=1
-    )
-    detector = sim.fit_detector(recording)
+def chance(chance_recording):
+    recording, detector = chance_recording
     no_swr = np.zeros(recording.time.size, dtype=bool)
     scores, record = nr.model_scores(
         detector, _heldout_likelihood(recording, detector), no_swr, log=sim.quiet
@@ -390,8 +381,10 @@ def _fold_spikes_replaced(recording, mine, seed=0):
 def fold_fit():
     """A shorter recording, its decoder, the fold-fit scores with trial folds,
     each fold's fit as ``fold_fit_scores`` asked for it (its training and
-    missing bins, the fitted detector), the decode's masks, and each fold's
-    likelihood as ``fold_fit_scores`` computed it (``fold_log_likelihood``).
+    missing bins, the fitted detector), the decode's masks, each fold's
+    likelihood as ``fold_fit_scores`` computed it (``fold_log_likelihood``),
+    and each fold's pass as ``fold_fit_scores`` made it: the arguments of its
+    ``fold_log_likelihood`` and ``model_scores`` calls and the scores.
 
     The decode has missing bins, as 85 of the analyzed epochs do: the first
     150 bins of the epoch, and 150 bins inside a stretch of fold 0 and of fold
@@ -418,6 +411,7 @@ def fold_fit():
     fits = []
 
     likelihoods = []
+    passes = []
 
     def recording_fit(*args, **kwargs):
         detector, record = nr.fit_fold_detector(*args, **kwargs)
@@ -427,10 +421,20 @@ def fold_fit():
     def recording_likelihood(*args, **kwargs):
         likelihood = fold_log_likelihood(*args, **kwargs)
         likelihoods.append(np.asarray(likelihood))
+        passes.append({"likelihood_args": (args, kwargs), "likelihood": likelihood})
         return likelihood
 
+    def recording_scores(*args, **kwargs):
+        scores, part = model_scores(*args, **kwargs)
+        passes[-1].update(scores_args=(args, kwargs), scores=scores)
+        return scores, part
+
     fold_log_likelihood = nr.fold_log_likelihood
-    with mock.patch.object(nr, "fold_log_likelihood", recording_likelihood):
+    model_scores = nr.model_scores
+    with (
+        mock.patch.object(nr, "fold_log_likelihood", recording_likelihood),
+        mock.patch.object(nr, "model_scores", recording_scores),
+    ):
         table, record = nr.fold_fit_scores(
             canonical,
             recording.time,
@@ -458,6 +462,7 @@ def fold_fit():
         is_training,
         is_missing,
         likelihoods,
+        passes,
     )
 
 
@@ -466,7 +471,7 @@ def test_each_fold_is_fit_without_its_bins(fold_fit):
     encoding (none in the fold or its margin, none missing) and fold k's bins
     and the decode's missing bins as missing; every fold's pass passes the
     model checks."""
-    _, _, folds, margin, _, table, record, fits, is_training, is_missing, _ = fold_fit
+    _, _, folds, margin, _, table, record, fits, is_training, is_missing, *_ = fold_fit
     masks = fold_training_masks(is_training, folds, nr.N_FOLDS, margin)
     assert len(fits) == nr.N_FOLDS
     for k, (training, missing, detector) in enumerate(fits):
@@ -491,7 +496,7 @@ def test_the_fold_fit_table_has_its_columns_and_place_sampling(fold_fit):
     """The table's columns, in order, and each bin's seconds of training data
     at the animal's place under its own fold's encoding (the trial folds and
     their margin)."""
-    recording, canonical, folds, margin, _, table, _, _, is_training, _, _ = fold_fit
+    recording, canonical, folds, margin, _, table, _, _, is_training, *_ = fold_fit
     assert list(table.columns) == [
         "time",
         "none",
@@ -520,35 +525,48 @@ def test_the_fold_fit_table_has_its_columns_and_place_sampling(fold_fit):
 
 def test_each_bin_is_scored_by_its_own_folds_fit(fold_fit):
     """The table's rows of fold k are fold k's pass: its fitted detector's
-    likelihood of every bin, then the three models. Fold 1's pass scores fold
-    0's bins differently, so the test fails if the folds are stitched wrong."""
-    recording, _, folds, _, in_swr, table, _, fits, _, is_missing, _ = fold_fit
+    likelihood of every bin (only the decode's missing bins missing), then the
+    three models on that likelihood. Each pass is read from the calls
+    ``fold_fit_scores`` made, which ``fold_fit`` records, rather than computed
+    again. Fold 1's pass scores fold 0's bins differently, so the test fails if
+    the folds are stitched wrong."""
+    recording, _, folds, _, in_swr, table, _, fits, _, is_missing, _, passes = fold_fit
     columns = [
         *nr.SCORE_COLUMNS,
         *nr.STATE_PROBABILITY_COLUMNS.values(),
         nr.NONLOCAL_PLACE_BIN_COLUMN,
     ]
-    passes = {}
-    for k in (0, 1):
+    expected_likelihood_args = (
+        recording.time,
+        recording.position[:, None],
+        recording.spike_times,
+        recording.marks,
+        is_missing,
+    )
+    assert len(passes) == nr.N_FOLDS
+    for k, made in enumerate(passes):
         detector = fits[k][2]
-        likelihood = nr.fold_log_likelihood(
-            detector,
-            recording.time,
-            recording.position[:, None],
-            recording.spike_times,
-            recording.marks,
-            is_missing,
-        )
-        passes[k], _ = nr.model_scores(
-            detector, likelihood, in_swr, summary_bins=folds == k, log=sim.quiet
-        )
+        args, kwargs = made["likelihood_args"]
+        assert args[0] is detector and not kwargs
+        for given, expected in zip(args[1:], expected_likelihood_args, strict=True):
+            if isinstance(expected, list):
+                for a, b in zip(given, expected, strict=True):
+                    np.testing.assert_array_equal(a, b)
+            else:
+                np.testing.assert_array_equal(given, expected)
+        args, kwargs = made["scores_args"]
+        assert args[0] is detector and args[1] is made["likelihood"]
+        np.testing.assert_array_equal(args[2], in_swr)
+        assert kwargs.get("models", nr.MODELS) == nr.MODELS
         mine = folds == k
+        np.testing.assert_array_equal(kwargs["summary_bins"], mine)
         for column in columns:
             np.testing.assert_array_equal(
-                table[column].to_numpy()[mine], passes[k][column][mine]
+                table[column].to_numpy()[mine], made["scores"][column][mine]
             )
     zero = folds == 0
-    assert np.abs(passes[1]["full"][zero] - table["full"].to_numpy()[zero]).max() > 1e-3
+    full_1 = passes[1]["scores"]["full"]
+    assert np.abs(full_1[zero] - table["full"].to_numpy()[zero]).max() > 1e-3
 
 
 def test_a_folds_spikes_reach_none_of_its_fit(fold_fit):
@@ -573,6 +591,7 @@ def test_a_folds_spikes_reach_none_of_its_fit(fold_fit):
         is_training,
         is_missing,
         likelihoods,
+        _,
     ) = fold_fit
     zero = folds == 0
     masks = fold_training_masks(is_training, folds, nr.N_FOLDS, margin)
@@ -639,7 +658,7 @@ def test_the_decodes_missing_bins_score_zero_in_every_fold(fold_fit):
     held-out folds 0 and 3, have a likelihood of 0 under every fold's fit and
     score 0 in every column (to float32 rounding of the posterior's mass); the
     held-out folds' other bins score as usual."""
-    recording, _, folds, _, _, table, _, fits, _, is_missing, likelihoods = fold_fit
+    recording, _, folds, _, _, table, _, fits, _, is_missing, likelihoods, _ = fold_fit
     assert is_missing[0] and (is_missing & (folds == 0)).sum() >= 150
     assert (is_missing & (folds == 3)).sum() >= 150
     assert len(likelihoods) == len(fits) == nr.N_FOLDS

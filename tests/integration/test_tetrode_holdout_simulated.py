@@ -95,9 +95,8 @@ def _per_window(scores: pd.DataFrame) -> pd.DataFrame:
 
 
 @pytest.fixture(scope="module")
-def recording():
-    recording = sim.simulate_recording(seed=0)
-    return recording, sim.fit_detector(recording)
+def recording(simulated_recording):
+    return simulated_recording
 
 
 def _inserted_windows(recording: sim.Recording):
@@ -145,11 +144,8 @@ def detected(recording):
 
 
 @pytest.fixture(scope="module")
-def chance():
-    recording = sim.simulate_recording(
-        kinds=sim.CHANCE_KINDS, boundary_event=False, seed=1
-    )
-    detector = sim.fit_detector(recording)
+def chance(chance_recording):
+    recording, detector = chance_recording
     events = sim.detected_events(detector, recording)
     return events, _per_window(_score(detector, recording, events))
 
