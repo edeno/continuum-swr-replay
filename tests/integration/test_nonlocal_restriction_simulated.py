@@ -49,7 +49,7 @@ from tests.support import tetrode_holdout_simulation as sim
 from tests.support._restriction_tables import restriction_contrasts
 from tests.support._time_blocks import TIME_BLOCK_MARGIN_BINS, time_blocks
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.slow, pytest.mark.integration]
 
 BIN_S = 0.002
 NOT_REMOTE = ("local_burst", "silent")
