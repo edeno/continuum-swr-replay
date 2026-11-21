@@ -703,6 +703,23 @@ Decisions:
   the fits: a null result is "no evidence beyond recency, and the design cannot detect an effect of this
   size".
 
+### Thirteenth round (lead, 2026-11-21, 03:07): "Okay to decisions"
+
+Put to the lead as a table; all four accepted:
+
+- **The visit unit goes to master and into the tables.** `visit-clocks` was merged (master d14ff888) and
+  the 13 canonical tables were published with the visit columns. Existing columns changed only on the rows
+  that cross the final poke-out: the 189 crossing events and the 15,803 crossing stops take the visit's
+  well as their current arm (**call**, for stops: the same rule as for events).
+- **The control windows of tetrode participation and of the held-out tetrode score are drawn inside well
+  visits**, and both runs are done again (the held-out one with trial folds), then the other session's
+  window sums.
+- **The shared fitter's merge waits** for a check of its penalty search on the content design.
+- **One curve shared across sessions, or one for each session:** waits for the same simulation round. Its
+  second round showed that a curve for each session, with one penalty chosen from the data, becomes a
+  straight line when a session has about 140 events, and that the belief-variance test is then wrong
+  (61 % and 68 % false positives); a recency curve with almost no penalty restores the test.
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
