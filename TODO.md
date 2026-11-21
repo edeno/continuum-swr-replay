@@ -189,3 +189,12 @@ reviewer's, on a synthetic session of 40,000 rows and 56 columns, 4 threads.
   fits; score a halving candidate before computing its derivatives; cache `X'X` and
   `X'y` for the Gaussian.
   *When:* with the trace terms above.
+- [ ] **The Gaussian in the Newton loop.** The Gaussian goes through the loop and is
+  exempted from its step rules at three places. One exact step does not replace the
+  loop: the loop's second step refines the first. A reviewer measured, on a design with
+  two nearly equal columns, a largest coefficient error of 3.9e-8 with one step and
+  2.9e-11 with the loop, each against a stable least-squares solution; one step also
+  returned "converged" for an objective that was not finite. A direct solve needs a
+  refinement step and that check. Outside the penalty search, a Gaussian fit stops by an
+  absolute tolerance, so an outcome with a very large spread ends at the step limit.
+  *When:* with the step cap above.

@@ -55,6 +55,7 @@ from .constants import (
     LOG_PENALTY_BOUNDS,
     MAX_FAILING_SHARE,
     MAX_STEP_HALVINGS,
+    NAMED_SHARE,
     NULL_SPACE_EDF_TOL,
     PENALTY_ROUNDING_TOL,
     REFIT_MAX_ROUNDS,
@@ -732,7 +733,7 @@ def reml_and_derivatives(
         fit = replace(fit, step=step, running_away=running_away_columns(X, step))
     unidentified: tuple[FreeDirection, ...] = ()
     if fit.unidentified is not None:
-        named = np.flatnonzero(np.any(np.abs(fit.unidentified) > 0.1, axis=1))
+        named = _named_coordinates(fit.unidentified)
         unidentified = tuple(
             sorted(
                 _directions(rotated, named),
@@ -1447,17 +1448,32 @@ def _screen(
     return kept, set_aside
 
 
+def _named_coordinates(combinations: np.ndarray) -> np.ndarray:
+    """The coordinates that take part in ``combinations``, shape ``(p, k)``
+    with orthonormal columns: those with more than ``NAMED_SHARE`` of their
+    length in the space the columns span. The length of a coordinate in that
+    space is the norm of its row, whichever basis of the space is given."""
+    return np.flatnonzero(np.linalg.norm(combinations, axis=1) > NAMED_SHARE)
+
+
 def _unidentified_text(session: RemlScore) -> str:
-    """What a design does not identify, in words: columns the likelihood cannot
-    see (each combination one column), else the coordinates collinear to it."""
+    """What a design does not identify, in words: the coordinates the
+    likelihood cannot see, else the coordinates collinear to it.
+
+    ``k`` combinations name ``k`` coordinates only when each is one coordinate
+    that the likelihood cannot see: ``k`` collinear combinations of columns
+    that are not zero take part in more than ``k`` coordinates.
+    """
     directions = session.unidentified_directions
-    one_each = np.sum(np.abs(np.nan_to_num(session.fit.unidentified)) > 0.1, axis=0)
-    if np.all(one_each == 1) and all(d.block is None for d in directions):
+    if len(directions) != session.fit.unidentified.shape[1]:
+        return "collinear to the likelihood: " + ", ".join(str(d) for d in directions)
+    why = "(zero on every row; for the grouped softmax, constant within every group)"
+    if all(d.block is None for d in directions):
         return (
-            "columns the likelihood cannot see (zero on every row; for the grouped "
-            f"softmax, constant within every group): {[d.index for d in directions]}"
+            f"columns the likelihood cannot see {why}: {[d.index for d in directions]}"
         )
-    return "collinear to the likelihood: " + ", ".join(str(d) for d in directions)
+    names = ", ".join(str(d) for d in directions)
+    return f"coordinates the likelihood cannot see {why}: {names}"
 
 
 def _refit(

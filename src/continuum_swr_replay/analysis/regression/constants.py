@@ -41,6 +41,10 @@ NO_MAXIMUM_CAPPED_STEPS = 10
 # IDENTIFIABILITY_TOL (1 - R^2 of a column on the others is at least that): an
 # exactly collinear design gives rounding, about 1e-16.
 IDENTIFIABILITY_TOL = 1e-12
+# An error names the coordinates that take part in what the design does not
+# identify: those with more than NAMED_SHARE of their unit length in the space
+# of the combinations it does not identify.
+NAMED_SHARE = 0.1
 
 # A penalty matrix is symmetric positive semidefinite to rounding when its
 # asymmetry and its most negative eigenvalue are at most PENALTY_ROUNDING_TOL

@@ -599,6 +599,34 @@ def test_an_unconverged_search_raises(monkeypatch: pytest.MonkeyPatch) -> None:
         refine_penalties(lik, [data], blocks, [-5.0, 15.0])
 
 
+def test_the_coordinates_named_do_not_depend_on_the_basis() -> None:
+    """Two bases of one space of combinations name the same coordinates: those
+    with more than a tenth of their length in the space."""
+    first = np.zeros((8, 2))
+    first[[0, 1], 0] = 1.0
+    first[[2, 3], 1] = 1.0
+    first[4], first[5] = [0.13, 0.13], [0.13, -0.13]  # below a tenth in each vector
+    first[6], first[7] = [0.04, 0.04], [0.04, -0.04]  # below a tenth in the space
+    first /= np.linalg.norm(first, axis=0)
+    turn = np.array([[1.0, -1.0], [1.0, 1.0]]) / np.sqrt(2)
+    second = first @ turn  # coordinates 4 and 5 are now each in one vector
+    for basis in (first, second):
+        np.testing.assert_allclose(basis.T @ basis, np.eye(2), atol=1e-12)
+    assert np.abs(first[[4, 5]]).max() < 0.1 < np.linalg.norm(first[4])
+    np.testing.assert_array_equal(reml._named_coordinates(first), np.arange(6))
+    np.testing.assert_array_equal(reml._named_coordinates(second), np.arange(6))
+
+
+def test_a_smooth_with_no_values_is_named_as_not_seen() -> None:
+    """A session whose smooth columns are zero on every row: the likelihood
+    cannot see the smooth's unpenalized direction, and the error says so."""
+    lik, data, blocks = _session("poisson", 1, seed=4)
+    X = data.X.copy()
+    X[:, blocks[0].columns] = 0.0
+    with pytest.raises(ValueError, match=r"cannot see .*block 0's null space"):
+        select_penalties(lik, [data, replace(data, X=X)], blocks)
+
+
 def _with_zero_column(data: SessionData, name: str | None = None) -> SessionData:
     """``data`` with an unpenalized column that is zero on every row, last."""
     X = np.column_stack([data.X, np.zeros(data.X.shape[0])])

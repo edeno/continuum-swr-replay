@@ -232,9 +232,12 @@ start).
   point makes that point's score infinite.
 - A session whose fit has no finite maximum there is set aside (`PenaltySearch.set_aside`).
 - A session whose design is not identified is an error that names the session and the
-  columns the likelihood cannot see, with the remedy: mark the columns the session
+  coordinates that take part (columns the likelihood cannot see, or the columns and
+  penalty directions that are collinear), with the remedy: mark the columns the session
   cannot estimate inactive (`SessionData.active`). It is the caller's design, not the
-  data's lack of a maximum.
+  data's lack of a maximum. A coordinate is named when more than a tenth of its unit
+  length (`NAMED_SHARE`) lies in the space of the combinations that are not identified;
+  that set does not depend on the basis in which the space is computed.
 - A session whose fit fails otherwise ("step halving failed", "step limit reached",
   "information not positive definite") is an error naming it: a numerical failure is not
   a property of the data to be reported around.

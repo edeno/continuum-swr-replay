@@ -132,7 +132,11 @@ class NewtonFit:
         predictor most first; empty for every other status.
     unidentified : np.ndarray or None, shape (p, k)
         For a design that is not identified, the combinations of coefficients
-        it does not identify; None for every other status.
+        it does not identify, with orthonormal columns; None for every other
+        status. A combination weights each free coordinate after its column of
+        the design is scaled to unit length, so the weights say which
+        coordinates take part whatever their units, and ``X @ unidentified``
+        is zero only when those columns have one length.
     """
 
     beta: np.ndarray
