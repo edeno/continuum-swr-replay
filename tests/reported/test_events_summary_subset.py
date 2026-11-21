@@ -120,3 +120,39 @@ def test_an_output_not_made_over_the_subset_is_pending():
     assert builder.subset_staleness({"subset": ANALYZED_SUBSET}, "out") is None
     assert "rerun it" in builder.subset_staleness({}, "out")
     assert "rerun it" in builder.subset_staleness({"subset": "every event"}, "out")
+
+
+def test_the_spike_evidence_left_out_are_counted_per_group():
+    metrics = pd.DataFrame(
+        {"group": ["baseline", "baseline", "SWR-remote", "nonSWR-close", "SWR-remote"]}
+    )
+    kept = np.array([True, False, False, True, True])
+    values = _by_key(builder.spike_evidence_visit_values(metrics, kept, "s"))
+    assert values["baseline_left_out"].value == 1
+    assert values["swr_remote_left_out"].value == 1
+    assert values["non_swr_close_left_out"].value == 0
+    assert values["non_swr_remote_left_out"].value == 0
+    assert "quiet windows" in values["baseline_left_out"].description
+
+
+def test_the_held_out_bouts_read_and_left_out_are_the_split_s_counts():
+    bouts = pd.DataFrame(
+        {
+            "state": [
+                "Non-Local Continuous | SWR",
+                "Non-Local Continuous | no SWR",
+                "Non-Local Continuous | no SWR",
+            ],
+            "regime": ["immobile", "immobile", "running"],
+            "n_bouts": [10, 20, 99],
+            "n_kept": [9, 15, 1],
+            "n_left_out": [1, 5, 98],
+            "n_kept_matched_outside_visit": [2, 3, 0],
+        }
+    )
+    values = _by_key(builder.heldout_bout_values(bouts, "s"))
+    assert values["heldout_swr_bouts_in_subset"].value == 9
+    assert values["heldout_swr_bouts_left_out"].value == 1
+    assert values["heldout_non_swr_bouts_in_subset"].value == 15
+    assert values["heldout_non_swr_bouts_left_out"].value == 5
+    assert values["heldout_non_swr_bouts_matched_outside_visit"].value == 3

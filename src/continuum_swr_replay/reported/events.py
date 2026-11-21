@@ -16,10 +16,14 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   (``*_state_shares.parquet``, from ``scripts/detector_comparison/add_state_shares.py``);
 - the spike-evidence run that scores every event
   (``Processed-Data/event_spike_evidence``, one folder per epoch, from
-  ``scripts/event_evidence/run_event_spike_evidence.sh``);
+  ``scripts/event_evidence/run_event_spike_evidence.sh``), read over the
+  selected events (each scored event matched to its ``event_id``,
+  ``spike_evidence.with_event_ids``) and the quiet windows that start inside a
+  well visit (``spike_evidence.in_analyzed_subset``);
 - the held-out tetrode test split by SWR (``nl_bouts_by_swr_stats.csv`` beside
   the state-evidence run the detection summary reads, from
-  ``scripts/event_evidence/split_state_evidence_by_swr.py``);
+  ``scripts/event_evidence/split_state_evidence_by_swr.py``), over the bouts
+  that start inside a well visit, which its provenance records;
 - each event time bin's content placed on the track, with its track distance to
   the animal and to the nearest well (``Processed-Data/content_along_arms``, from
   ``scripts/event_properties/measure_content_along_arms.py``);
@@ -69,10 +73,12 @@ medians, a mean of its epochs' means).
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.decode_quality import quality_metrics
@@ -95,7 +101,10 @@ from continuum_swr_replay.analysis.event_evidence import (
     tetrode_holdout,
 )
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
+    BASELINE_GROUP,
     SPIKE_EVIDENCE_METRICS,
+    in_analyzed_subset,
+    with_event_ids,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
@@ -239,6 +248,18 @@ DETECTOR_SUBSET = (
     "against the non-local events that start inside one"
 )
 """What the values of the detector comparison are over."""
+
+SPIKE_EVIDENCE_SUBSET = (
+    f"{EVENTS_SUBSET}, against the matched quiet windows whose first sample is "
+    "inside a well visit"
+)
+"""What the values of the spike-evidence run are over."""
+
+BOUT_SUBSET = (
+    "the decoder's Non-Local Continuous bouts whose first sample is inside a well "
+    "visit (from the first poke-in at a well to the final poke-out)"
+)
+"""What the values of the held-out test split by SWR are over."""
 
 
 @dataclass(frozen=True)
@@ -1324,6 +1345,33 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
+def spike_evidence_visit_values(
+    metrics: pd.DataFrame, kept: np.ndarray, source: str
+) -> list[Value]:
+    """Questions 2c.3 and 2d.9: the scored events and quiet windows of each group
+    left out because they start outside every well visit
+    (``spike_evidence.in_analyzed_subset``)."""
+    make = value_factory(spike_evidence_visit_values, source, TAGS["spike"])
+    left_out = metrics.loc[~kept, "group"].value_counts()
+    groups = {"baseline": BASELINE_GROUP, **_SPIKE_EVIDENCE_GROUPS}
+    return [
+        make(
+            f"{word}_left_out",
+            int(left_out.get(group, 0)),
+            "count",
+            "count",
+            (
+                "matched quiet windows scored whose first sample is outside every "
+                "well visit, left out"
+                if word == "baseline"
+                else f"{group} events scored that start outside every well visit, "
+                "left out"
+            ),
+        )
+        for word, group in groups.items()
+    ]
+
+
 def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode test of immobile Non-Local Continuous bouts,
     split by SWR, per held-out spike against the animal's position."""
@@ -1380,6 +1428,50 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 "animals in that test",
+            ),
+        ]
+    return values
+
+
+def heldout_bout_values(bouts: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2c.3: the immobile Non-Local Continuous bouts of the held-out test
+    split by SWR that start inside a well visit and are read, those left out, and
+    the read ones whose matched window starts outside every visit (the matched
+    windows were drawn from all immobile time). ``bouts`` is the split's count
+    table (``state_evidence.bout_visit_counts``, recorded in its provenance)."""
+    make = value_factory(heldout_bout_values, source, TAGS["spike_evidence"])
+    rows = bouts[bouts["regime"] == "immobile"].set_index("state")
+    values = []
+    for word, state in (
+        ("swr", "Non-Local Continuous | SWR"),
+        ("non_swr", "Non-Local Continuous | no SWR"),
+    ):
+        row = rows.loc[state]
+        label = "with an SWR" if word == "swr" else "without an SWR"
+        values += [
+            make(
+                f"heldout_{word}_bouts_in_subset",
+                row["n_kept"],
+                "count",
+                "count",
+                f"immobile Non-Local Continuous bouts {label} whose first sample is "
+                "inside a well visit, read",
+            ),
+            make(
+                f"heldout_{word}_bouts_left_out",
+                row["n_left_out"],
+                "count",
+                "count",
+                f"immobile Non-Local Continuous bouts {label} whose first sample is "
+                "outside every well visit, left out",
+            ),
+            make(
+                f"heldout_{word}_bouts_matched_outside_visit",
+                row["n_kept_matched_outside_visit"],
+                "count",
+                "count",
+                f"of the read bouts {label}, those whose matched window starts "
+                "outside every well visit",
             ),
         ]
     return values
@@ -2485,14 +2577,24 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         file_record(directional_path, ROOT_DIR),
     ]
 
-    metrics = spike_evidence_metrics(inputs.spike_evidence_dir, n_epochs)
+    # the run scores every event: each scored event takes its event_id, and the
+    # events the selection keeps and the quiet windows in a visit are read
+    metrics = with_event_ids(
+        spike_evidence_metrics(inputs.spike_evidence_dir, n_epochs), table
+    )
+    in_subset = in_analyzed_subset(metrics, events["event_id"], visits)
+    evidence_source = (
+        f"{rel(inputs.spike_evidence_dir)}/*/{SPIKE_EVIDENCE_METRICS} (every event, "
+        "no cap), each scored event matched to the event table by epoch and start, "
+        "with each epoch's well visits"
+    )
     summary.add(
-        *spike_evidence_values(
-            metrics,
-            f"{rel(inputs.spike_evidence_dir)}/*/{SPIKE_EVIDENCE_METRICS} "
-            "(every event, no cap)",
+        *over(
+            spike_evidence_values(metrics[in_subset], evidence_source),
+            SPIKE_EVIDENCE_SUBSET,
         )
     )
+    summary.add(*spike_evidence_visit_values(metrics, in_subset, evidence_source))
     spike_evidence_record = files_record(
         SPIKE_EVIDENCE_METRICS,
         inputs.spike_evidence_dir.glob(f"*/{SPIKE_EVIDENCE_METRICS}"),
@@ -2501,13 +2603,31 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary.inputs.append(spike_evidence_record)
 
     stats = pd.read_csv(inputs.heldout_by_swr)
-    summary.add(*heldout_by_swr_values(stats, rel(inputs.heldout_by_swr)))
+    heldout_provenance_path = inputs.heldout_by_swr.with_name(
+        f"{NL_BOUTS_BY_SWR_STEM}.provenance.json"
+    )
+    heldout_provenance = json.loads(heldout_provenance_path.read_text())
+    heldout_off_subset = subset_staleness(
+        heldout_provenance, rel(heldout_provenance_path)
+    )
+    summary.add(
+        *over(
+            pend(
+                heldout_by_swr_values(stats, rel(inputs.heldout_by_swr)),
+                heldout_off_subset,
+            ),
+            BOUT_SUBSET,
+        )
+    )
+    if heldout_off_subset is None:
+        summary.add(
+            *heldout_bout_values(
+                pd.DataFrame(heldout_provenance["bouts"]), rel(heldout_provenance_path)
+            )
+        )
     summary.inputs += [
         file_record(inputs.heldout_by_swr, ROOT_DIR),
-        file_record(
-            inputs.heldout_by_swr.with_name(f"{NL_BOUTS_BY_SWR_STEM}.provenance.json"),
-            ROOT_DIR,
-        ),
+        file_record(heldout_provenance_path, ROOT_DIR),
     ]
 
     along_bins, along_paths = content_along_arms_bins(

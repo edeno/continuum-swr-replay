@@ -51,6 +51,20 @@ wherever it is). Each producer re-run over the subset records
 that does not, and the events summary marks the values read from one pending.
 The summary counts the events of every well-visit label, kept and left out
 (`events.json`, `events_label_*`, `*events_in_subset`, `*events_left_out`).
+The spike-evidence run (`event_spike_evidence/`) scores every event and every
+matched quiet window; each scored event is one of the event table's, matched to
+its `event_id` by epoch and start time
+(`analysis/event_evidence/spike_evidence.py:with_event_ids`, an event without a
+match is an error), and the summary reads the selected events and the quiet
+windows whose first sample is inside a visit (`in_analyzed_subset`;
+`*_left_out` counts the others). The held-out test split by SWR
+(`scripts/event_evidence/split_state_evidence_by_swr.py`) reads the decoder's
+Non-Local bouts whose first sample is inside a visit, each with its matched
+window (`state_evidence.mark_bouts_in_well_visits`); the matched windows were
+drawn from all of the epoch's time in the bout's regime, so some of the kept
+bouts' windows start outside every visit, which its provenance counts
+(`bouts`, with the bouts kept and left out per state, SWR label and regime;
+`events.json`, `heldout_*_bouts_*`).
 
 Figure 1 needs no data. Figures 2–4 need the lab's Spyglass database and the
 processed-data root ([reproduce.md](reproduce.md#requirements)).
