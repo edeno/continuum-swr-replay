@@ -52,7 +52,9 @@ def _rest_windows(recording: sim.Recording, n: int, length: int) -> pd.DataFrame
     return pd.DataFrame({"kind": "rest", "s": chosen, "e": chosen + length - 1})
 
 
-def _score(detector, recording, windows, is_missing=None) -> pd.DataFrame:
+def _score(detector, recording, windows, is_missing=None, **folds) -> pd.DataFrame:
+    """The held-out scores of ``windows``; ``folds`` passes ``folds`` and
+    ``margin_bins`` to ``holdout_scores`` (by default its time blocks)."""
     windows = windows.reset_index(drop=True).rename_axis("window_id").reset_index()
     missing = (
         np.zeros(recording.time.size, dtype=bool) if is_missing is None else is_missing
@@ -68,6 +70,7 @@ def _score(detector, recording, windows, is_missing=None) -> pd.DataFrame:
         missing,
         windows,
         log=_quiet,
+        **folds,
     )
     return scores.join(windows.set_index("window_id")["kind"], on="window_id")
 
@@ -92,9 +95,9 @@ def recording():
     return recording, sim.fit_detector(recording)
 
 
-@pytest.fixture(scope="module")
-def inserted(recording):
-    recording, detector = recording
+def _inserted_windows(recording: sim.Recording):
+    """The inserted events and 12 rest windows, and the decode's missing bins:
+    ``N_MISSING`` bins inside the first stationary event (its window id)."""
     length = int(sim.EVENT_S * 500)
     windows = pd.concat(
         [recording.events, _rest_windows(recording, 12, length)], ignore_index=True
@@ -102,8 +105,31 @@ def inserted(recording):
     is_missing = np.zeros(recording.time.size, dtype=bool)
     first = recording.events[recording.events.kind == "stationary"].iloc[0]
     is_missing[first.s + 10 : first.s + 10 + N_MISSING] = True
+    return windows, is_missing, int(first.name)
+
+
+@pytest.fixture(scope="module")
+def inserted(recording):
+    recording, detector = recording
+    windows, is_missing, first = _inserted_windows(recording)
     scores = _score(detector, recording, windows, is_missing)
-    return scores, _per_window(scores), int(first.name)
+    return scores, _per_window(scores), first
+
+
+@pytest.fixture(scope="module")
+def inserted_trials(recording):
+    """As :func:`inserted`, with the runner's trial folds: each lap and the
+    rest after it, balanced by the end it runs to and cut by the 30 s cap into
+    12 groups, and the 1 s margin."""
+    recording, detector = recording
+    windows, is_missing, first = _inserted_windows(recording)
+    starts, classes = sim.trials(recording)
+    folds = th.trial_folds(recording.time, starts, classes, th.N_FOLDS)
+    margin = th.margin_in_bins(th.TRIAL_MARGIN_S, recording.time)
+    scores = _score(
+        detector, recording, windows, is_missing, folds=folds, margin_bins=margin
+    )
+    return scores, _per_window(scores), first, folds
 
 
 @pytest.fixture(scope="module")
@@ -345,3 +371,37 @@ def test_no_scored_spike_trained_the_encoding_that_scores_it(recording, monkeypa
         assert not trained[bins].any()
         n_scored += bins.size
     assert n_scored == sum(s.size for s in recording.spike_times)
+
+
+def test_trial_folds_change_only_the_encodings(inserted, inserted_trials):
+    """With trial folds (interleaved, a 1 s margin) the run completes on the
+    same windows. What does not depend on the encodings (each window and
+    tetrode's bins, scored bins and spikes) is unchanged. The scores move a
+    little, as other training bins fit the encodings: by at most 0.15 nats per
+    spike for every window with spikes (agreement: every window but rest,
+    whose few spikes make it large), and the contrasts keep their signs:
+    remote content gains and agrees, the gain grows with distance, and local
+    content and rest gain under 0.2 nats (0.17 at most here, 0.11 with
+    contiguous blocks), a local burst under 0.02 nats per spike."""
+    scores, contiguous, _ = inserted
+    trial_scores, per_window, _, folds = inserted_trials
+    assert (np.diff(folds) != 0).sum() > th.N_FOLDS - 1  # interleaved, not blocks
+    key = ["window_id", "tetrode", "n_bins", "n_scored_bins", "n_spikes"]
+    pd.testing.assert_frame_equal(scores[key], trial_scores[key])
+    assert not np.allclose(scores["gain"], trial_scores["gain"])
+    pd.testing.assert_series_equal(per_window["kind"], contiguous["kind"])
+    change = (per_window["gain_per_spike"] - contiguous["gain_per_spike"]).abs()
+    assert (change.dropna() < 0.15).all()
+    agreement = per_window["agreement_per_spike"] - contiguous["agreement_per_spike"]
+    assert (agreement[per_window["kind"] != "rest"].dropna().abs() < 0.15).all()
+
+    remote = per_window[per_window["kind"].isin(REMOTE)]
+    assert (remote["gain_per_spike"] > 0.3).all()
+    assert (remote["agreement_per_spike"] > 0.5).all()
+    mean = per_window.groupby("kind")["gain_per_spike"].mean()
+    assert mean["close_20"] < mean["close_40"] < mean["close_80"]
+    local = per_window[per_window["kind"].isin(["local_burst", "rest", "silent"])]
+    assert len(local) == 24
+    assert (local["gain"].abs() < 0.2).all()
+    bursts = per_window[per_window["kind"] == "local_burst"]
+    assert (bursts["gain_per_spike"].abs() < 0.02).all()
