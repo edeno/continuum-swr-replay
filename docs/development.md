@@ -304,7 +304,8 @@ and the two 10 cm radii are in `analysis/constants.py`): `in_visit` exactly when
 `occupancy_state == "at_well"`, and otherwise where the window lies (across a visit
 boundary, still next to the well just left, on the track, before the first visit).
 The event, event × arm, event × patch and stop tables carry it, with the visit's id
-and the times since the last poke-out and until the next poke-in. No row is dropped
+and the times since the last poke-out and until the next poke-in; the ContFrag tables
+(SWR and MUA events) do not. No row is dropped
 for its label: an analysis that reads only the events inside a well visit calls
 `analysis/event_definition/cohort_selection.py:select_visit_context` (default
 `in_visit`), and `count_visit_context` gives the rows kept and dropped per label.

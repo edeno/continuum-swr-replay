@@ -97,10 +97,11 @@ def _require_stable_event_context(frame: pd.DataFrame, columns: Iterable[str]) -
 def require_visit_context_labels(frame: pd.DataFrame, table_name: str) -> None:
     """Check ``visit_context`` against its vocabulary and ``occupancy_state``.
 
-    A table without ``visit_context`` (built before the label existed) is not
-    checked. Where it is present every value is one of
-    ``analysis.constants.VISIT_CONTEXTS``, and a row is ``in_visit`` exactly
-    when its ``occupancy_state`` is ``at_well``.
+    The non-local event tables carry the label (their build columns name it,
+    ``_common.py``); the ContFrag tables, which share these validators, do not,
+    and a table without ``visit_context`` is not checked. Where it is present
+    every value is one of ``analysis.constants.VISIT_CONTEXTS``, and a row is
+    ``in_visit`` exactly when its ``occupancy_state`` is ``at_well``.
 
     Raises
     ------
