@@ -10,10 +10,11 @@ from __future__ import annotations
 # is below NEWTON_DECREMENT_TOL; the value is the content fitter's
 # (``analysis/replay_models/fitting.py``). A step is first shortened so that no
 # coefficient moves more than MAX_STEP_LENGTH (from a start whose
-# probabilities saturate the information is tiny and the raw step enormous;
-# a quadratic likelihood, the Gaussian, is not capped: its full step is the
-# optimum), then halved at most MAX_STEP_HALVINGS times until the objective does not
+# probabilities saturate the information is tiny and the raw step enormous),
+# then halved at most MAX_STEP_HALVINGS times until the objective does not
 # rise: 2**-30 of a step is below the objective's floating-point resolution.
+# None of these rules applies to a quadratic likelihood, the Gaussian: it takes
+# one full step, its exact optimum.
 NEWTON_DECREMENT_TOL = 1e-8
 NEWTON_MAX_STEPS = 100
 MAX_STEP_HALVINGS = 30
@@ -24,9 +25,7 @@ MAX_STEP_LENGTH = 10.0
 # (``max |X @ step|``, on the link scale, whatever the columns' units). Where
 # the likelihood has no finite maximum along a direction (a 0/1 column whose
 # rows all have y = 1, a Poisson cell with no events), the decrement goes to
-# zero while each step still moves eta by about one. Not applied to a quadratic
-# likelihood (the Gaussian), whose maximum is finite when A is positive definite
-# and whose eta is on the outcome's scale.
+# zero while each step still moves eta by about one.
 NO_MAXIMUM_ETA_STEP = 0.1
 # A fit that reaches NEWTON_MAX_STEPS has no finite maximum, too, when each of
 # its last NO_MAXIMUM_CAPPED_STEPS steps was cut to MAX_STEP_LENGTH and lowered
