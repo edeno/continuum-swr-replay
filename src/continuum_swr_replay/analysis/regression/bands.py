@@ -1,8 +1,8 @@
 """Simultaneous bands for a curve on a fixed grid.
 
 A band of this module is built for the whole curve, not each point alone, at a
-nominal level of 95 %. Whether it reaches that level depends on the curve (see
-below and ``docs/design/regression_fitter.md``, "Bands"). Two forms:
+nominal level of 95 %. Whether it reaches that level depends on the curve. Two
+forms:
 
 - one fit's curve (:func:`simultaneous_band`): the curve is ``f = C beta`` on
   the grid, ``C`` the rows of the coefficient vector that give the curve at
@@ -26,17 +26,8 @@ below and ``docs/design/regression_fitter.md``, "Bands"). Two forms:
   is ``|t|`` with ``A - 1`` degrees of freedom, so the band is the scalar
   interval.
 
-What the across-session band does, in simulation on the cohort's shape
-(``scripts/checks/simulate_interval_coverage.py --band-out``, table
-``tests/scripts/checks/data/band_coverage_full.csv``): with 20 grid points,
-smooth curves and session noise of SD 0.3 or 1 it held the whole curve in
-0.953 to 0.997 of the data sets; when the animals carried almost all the
-variance and the curve was rough for a 100-point grid it held it in only 0.91
-to 0.94, below 95 %, because five animals show at most four independent
-directions of difference between curves and the pivot's grid correlation is
-estimated from them; with three animals it held it always but was very wide
-(critical value about 40). At a single grid point it is conservative. Its
-level for the curves of the models is checked when those curves exist.
+What the across-session band reaches in simulation, and where it falls below
+95 %, is measured in ``docs/design/regression_fitter.md``, "Bands".
 
 Neither form depends on the basis that made the curve or on how its freedom
 was set: the first takes ``C``, the coefficients and their covariance, the

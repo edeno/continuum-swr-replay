@@ -591,16 +591,16 @@ atomically, the structured fields as JSON strings, and `read_records` reads it b
 ## Contrasts
 
 Every scalar estimand of a fit is a linear functional `c' beta` of its coefficients, so
-its variance in a session is exact: `c' V c`, with `V` the Bayesian covariance
-(`contrasts.py`). A curve contrast is the mean of a curve over one range of its variable
-minus its mean over another, each mean taken over an equally spaced grid (step
-`GRID_STEP = 0.01`). A range whose two ends are equal is one point. Both ranges must lie
-inside the term's range, which the contrast is given (`term_range`): beyond it a clamped
-smooth is flat, so a mean there would silently be the curve at the end. A coefficient
-difference is a sum of named coefficients less another sum. A curve enters only through
-the function that maps values of its variable to rows of the coefficient vector, so the
-basis and its freedom do not matter. A coefficient left out of a session makes NaN every
-contrast that uses it, and no other.
+its variance in a session is exact: `c' V c`, with `V` the Bayesian covariance. There are
+two kinds. A curve contrast is the mean of a curve over one range of its variable less
+its mean over another, each mean over a grid of step `GRID_STEP = 0.01`; a range whose
+two ends are equal is one point. A coefficient difference is a sum of named coefficients
+less another sum. A curve enters only through the function that maps values of its
+variable to rows of the coefficient vector, so the basis and its freedom do not matter.
+The rules (a range must lie inside the term's range; a coefficient left out of a session
+makes NaN only the contrasts that use it) are stated in `analysis/regression/contrasts.py`.
+The declared family of estimands built from these contrasts is
+`analysis/replay_models/declared_tests.py`.
 
 ## Folds
 
@@ -627,80 +627,67 @@ merges, its code calls this one.
 ## Bands
 
 A band of `bands.py` is built for the whole curve, not each point alone, at a nominal level
-of 95 %. Whether it reaches that level depends on the curve; what was measured is below.
+of 95 %. There are two forms, stated in the module's docstring:
 
-- One fit's curve: `f = C beta` on a grid, with pointwise standard error
-  `se = sqrt(diag(C V C'))`. From `BAND_DRAWS = 10,000` draws `z ~ N(0, V)` with a stored
-  seed, the critical value `c` is the 0.95 quantile of `max |C z| / se`, and the band is
-  `f ± c se`. A slow test simulates 500 Poisson fits of a P-spline curve and requires that
-  the band holds the whole true curve in 93 to 97 % of them
+- one fit's curve `f = C beta`: the critical value is the 0.95 quantile of the largest
+  standardized deviation `max |C z| / se` over draws `z ~ N(0, V)`, and the band is
+  `f ± c se`;
+- the animal-balanced curve across sessions (session to day to animal, with the nested
+  bootstrap draws of the next section): the band is `estimate ± c sd sqrt(A / (A - 1))`,
+  `sd` the draws' standard deviation over the `A` animals, with `c` from a pivot simulated
+  at the level of the animals. At one grid point the pivot is `|t|` with `A - 1` degrees
+  of freedom, so the band is `estimand_summary`'s interval.
+
+Each band records its form, the draws behind it, the pivot's draws and the seed (`Band`).
+Whether a band reaches its level depends on the curve. What was measured:
+
+- One fit's band: a slow test simulates 500 Poisson fits of a P-spline curve and
+  requires that the band holds the whole true curve in 93 to 97 % of them
   (`tests/analysis/regression/test_bands.py`).
-- The animal-balanced curve across sessions: the per-session curves on one grid are
-  taken session to recording day to animal as a mean of means, with nested bootstrap
-  draws of that curve (animals, then their sessions). With `sd` the draws' standard
-  deviation and `A` the animals with a finite curve, the band is
-  `estimate ± c sd sqrt(A / (A - 1))`, the scale of the scalar interval with `c` in place
-  of `t(0.975, A - 1)`. `c` is the 0.95 quantile of a pivot simulated at the level of the
-  animals: `A` independent Gaussian curves with the grid correlation of the draws, and
-  `max |their mean| / (their sample SD / sqrt(A))`, drawn `PIVOT_DRAWS = 10,000` times
-  from the stored seed. At one grid point the pivot is `|t|` with `A - 1` degrees of
-  freedom, so the band is `estimand_summary`'s interval.
+- The across-session band, in simulation on the cohort's shape
+  (`scripts/checks/simulate_interval_coverage.py --band-out`; 300 data sets per setting,
+  table `tests/scripts/checks/data/band_coverage_full.csv`):
+  - With 20 grid points, smooth animal and day curves (correlation length 0.2 of the
+    range) and session noise of SD 0.3 or 1, it held the whole curve in 0.953 to 0.997 of
+    the data sets.
+  - When the animals carried almost all the variance (session noise SD 0.02) and the
+    curve was rough for its 100-point grid (correlation length 0.05 or 0.02, or white
+    noise), it held the whole curve in only 0.91 to 0.94 of them (standard error about
+    0.015), below 95 %. The pivot's grid correlation is estimated from the draws, and five
+    animals show at most four independent directions of difference between curves: a
+    curve with more independent directions than that has a larger maximum than the
+    simulated pivot.
+  - With three animals it held the whole curve in every data set but was very wide (mean
+    critical value about 40).
+  - At a single grid point it is conservative: it covered in 0.997 to 1.0 of the data
+    sets.
 
-What the across-session band does, in simulation on the cohort's shape
-(`scripts/checks/simulate_interval_coverage.py --band-out`; 300 data sets per setting,
-table `tests/scripts/checks/data/band_coverage_full.csv`):
-
-- With 20 grid points, smooth animal and day curves (correlation length 0.2 of the range)
-  and session noise of SD 0.3 or 1, it held the whole curve in 0.953 to 0.997 of the data
-  sets.
-- When the animals carried almost all the variance (session noise SD 0.02) and the curve
-  was rough for its 100-point grid (correlation length 0.05 or 0.02, or white noise), it
-  held the whole curve in only 0.91 to 0.94 of them (standard error about 0.015), below
-  95 %. The pivot's grid correlation is estimated from the draws, and five animals show at
-  most four independent directions of difference between curves: a curve with more
-  independent directions than that has a larger maximum than the simulated pivot.
-- With three animals it held the whole curve in every data set but was very wide (mean
-  critical value about 40).
-- At a single grid point it is conservative: it covered in 0.997 to 1.0 of the data sets.
-- The earlier band, a quantile of the draws' own maximum, held the whole curve in only
-  0.80 to 0.90 of the data sets of the first three settings.
-
-Its level for the curves of the models, low-dimensional spline curves, is checked when
-those curves exist.
-
-A band records its form (`form`), the draws behind it (`n_draws`: one fit's coefficient
-draws, or the across-session bootstrap draws) and, across sessions, the pivot's draws
-(`n_pivot_draws`) and its seed. The across-session band refuses a curve whose draws do not
-vary at a grid point: a curve expressed relative to a reference point is zero there in
-every session, and the caller leaves that point off the grid.
-
-Neither form depends on the basis that made the curve.
+Its level for the curves of the models, low-dimensional spline curves, is not yet
+measured: it is checked when those curves exist.
 
 ## From session to day to animal
 
 The 242 epochs are not independent, so each per-session estimate is reduced session to
-recording day to animal (`analysis/shared_statistics.py`).
-`animal_balanced_bootstrap` takes a per-session number or curve as a mean over animals
-of each animal's mean over its days of each day's mean over its sessions. A session whose
-value is not finite is left out of that reduction. Its draws are the project's nested
-bootstrap, animals and then each drawn animal's sessions (`nested_bootstrap_draws`); the
-days are not resampled but stay in the estimate: in each draw a day's mean is over its
-drawn sessions, and a day with no session drawn is absent. A simulation
-(`scripts/checks/simulate_interval_coverage.py`; 5 animals, 45 days, 244 sessions, 2,000
-data sets per setting; table `tests/scripts/checks/data/interval_coverage_full.csv`) found the t-corrected interval of this rule at or above 95 %
-coverage in every setting of animal, day and session variance, missing sessions and a
-paired kind difference included; resampling days as a third level gave intervals up to 41 %
-wider that over-covered (up to 100 %) when the animals varied little.
-`animal_day_session_values` gives each animal's value session -> day -> animal (median
-or mean). `day_level_test` is the signed-rank p over recording days of the day means
-(NaN below six non-zero differences).
+recording day to animal (`analysis/shared_statistics.py`): the mean over animals of each
+animal's mean over its days of each day's mean over its sessions. Its draws are the
+project's nested bootstrap, animals and then each drawn animal's sessions; the days are
+not resampled but stay in the estimate. The rule is stated once, in
+`animal_balanced_bootstrap`. A simulation (`scripts/checks/simulate_interval_coverage.py`;
+5 animals, 45 days, 244 sessions, 2,000 data sets per setting; table
+`tests/scripts/checks/data/interval_coverage_full.csv`) found the t-corrected interval of
+this rule at or above 95 % coverage in every setting of animal, day and session variance,
+missing sessions and a paired kind difference included; resampling days as a third level
+gave intervals up to 41 % wider that over-covered (up to 100 %) when the animals varied
+little.
 
 `estimand_summary` summarizes a scalar estimand: the animal-balanced estimate, its 95 %
-interval (`bootstrap_interval` over the nested draws, with the t correction over animals),
-the number of animals whose own value has the estimate's sign, and the day-level p. A kind
-difference is the difference of the two kinds' session estimates, reduced the same way.
-With five animals a sign test cannot go below p = 0.0625, so no claim rests on a p over
-animals alone.
+interval (`bootstrap_interval` over the nested draws), the number of animals whose own
+value has the estimate's sign, and the signed-rank p over recording days. The day and
+animal values behind the last two are the same means as the estimate's, and
+`animal_day_session_values` and `day_level_test` give them alone. A kind difference is
+the difference of the two kinds' session estimates, reduced the same way. With five
+animals a sign test cannot go below p = 0.0625, so no claim rests on a p over animals
+alone.
 
 ## Cost
 
