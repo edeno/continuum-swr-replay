@@ -454,6 +454,36 @@ The raised-cosine history basis and the projection of a lag matrix onto it.
 
 `raised_cosine_history_basis`, `reward_basis_from_lags`
 
+### `src/continuum_swr_replay/analysis/regression/constants.py`
+
+The shared fitter's numerical rules, in one place.
+
+_No module-level public symbols._
+
+### `src/continuum_swr_replay/analysis/regression/likelihoods.py`
+
+Log-likelihoods of the shared fitter and their derivatives on the eta scale.
+
+`Likelihood`, `Poisson`, `Bernoulli`, `Gaussian`, `group_starts`, `GroupedSoftmax`
+
+### `src/continuum_swr_replay/analysis/regression/newton.py`
+
+Penalized Newton fit at fixed penalty strengths, in float64.
+
+`NewtonFit`, `penalized_newton`
+
+### `src/continuum_swr_replay/analysis/regression/pspline.py`
+
+Cubic P-splines: a B-spline basis on fixed, equally spaced knots.
+
+`PSplineBasis`, `difference_penalty`, `sum_to_zero_constraint`, `penalty_rank`
+
+### `src/continuum_swr_replay/analysis/regression/reml.py`
+
+Penalty strengths by restricted maximum likelihood (REML), with exact derivatives.
+
+`PenaltyBlock`, `SessionData`, `RemlScore`, `PooledScore`, `SessionFit`, `PenaltySearch`, `PooledFit`, `assemble_penalty`, `reml_and_derivatives`, `pooled_reml`, `refine_penalties`, `select_penalties`, `fit_at_penalties`
+
 ### `src/continuum_swr_replay/analysis/replay_models/_fit_diagnostics.py`
 
 Shared fit-diagnostics helpers: convergence, separation, warning capture, flag counts.
