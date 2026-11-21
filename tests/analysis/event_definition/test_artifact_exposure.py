@@ -5,8 +5,8 @@ Excluded time is not analyzed, so it is no one's exposure:
 - a stop's immobility exposure (Family A's offset, the ContFrag stop table's
   too) falls by exactly the excluded seconds inside the stop, and nothing else
   about the stop changes;
-- a per-bin row that touches excluded time is dropped (the dense stop-timebin
-  table, Family B's design, the PFC fit bins), and so is one whose history or
+- a per-bin row that touches excluded time is dropped (Family B's design, the
+  PFC fit bins), and so is one whose history or
   peri-event window reaches it, and a matched control never lands on a
   dropped event;
 - with no artifact run configured, every one of these is what it was.
@@ -29,9 +29,6 @@ import pytest
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
 from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 from continuum_swr_replay.analysis.event_tables.stop_table import build_stop_table
-from continuum_swr_replay.analysis.event_tables.timebin_tables import (
-    build_stop_timebin_table,
-)
 from continuum_swr_replay.analysis.pfc.event_sets import build_session_fit_mask
 from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_PER_BIN_RATE,
@@ -184,34 +181,6 @@ class TestStopExposure:
         np.testing.assert_array_equal(
             stops["immobility_duration_s"].to_numpy(),
             (stops["stop_end"] - stops["stop_start"]).to_numpy(),
-        )
-
-
-class TestTheDenseTimebinTable:
-    def test_a_bin_touching_the_mask_is_dropped(self, masked):
-        out = build_stop_timebin_table(_dot(), np.array([]), bin_s=0.5)
-
-        # bin k of the first stop is [0.5 k, 0.5 k + 0.5]: those touching
-        # [1.7, 5.3] (k = 3..10) are gone, and only those; of the second
-        # stop's bins [16 + 0.5 k, ...], the first touches [15.55, 16.35]
-        by_stop = out.groupby("stop_id", sort=False)["bin_in_stop"].apply(list)
-        assert by_stop.tolist() == [
-            [0, 1, 2, *range(11, 20)],
-            list(range(1, 8)),
-        ]
-
-    def test_with_no_artifact_run_it_is_unchanged(self, masked, monkeypatch):
-        masked_bins = build_stop_timebin_table(_dot(), np.array([]), bin_s=0.5)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
-
-        unmasked = build_stop_timebin_table(_dot(), np.array([]), bin_s=0.5)
-
-        assert len(unmasked) == 20 + 8
-        kept = unmasked.merge(
-            masked_bins[["stop_id", "bin_in_stop"]], on=["stop_id", "bin_in_stop"]
-        )
-        pd.testing.assert_frame_equal(
-            kept.reset_index(drop=True), masked_bins.reset_index(drop=True)
         )
 
 
@@ -611,7 +580,6 @@ class TestNoArtifactsChangeNothing:
             "events": build_classified_nonlocal_event_table(read),
             "stops": stops,
             "onsets": onsets,
-            "timebins": build_stop_timebin_table(read, np.array([1.0]), bin_s=0.5),
             "design": aggregate_to_timebins(
                 stops,
                 onsets[onsets.event_type == "non_local"].dropna(subset=["stop_id"]),

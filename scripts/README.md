@@ -64,7 +64,7 @@ them importable.
 ## `tables/` — the event, stop and time-bin tables
 - `prepare_replay_content_data.py` — build the canonical replay-content tables (event / event-arm / event-patch / event-sequence / stop).
 - `regenerate_stop_table.py` — rebuild the per-stop immobility table.
-- `build_timebin_tables.py` — build the per-(stop×bin) design tables.
+- `build_timebin_tables.py` — build the event-onset table.
 - `prepare_contfrag_replay_content_data.py` — assemble ContFrag content tables.
 - `assemble_replay_content_shards.py`, `assemble_contfrag_shards.py` — assemble per-animal table shards into one bundle.
 - `refresh_contfrag_behavioral_covariates.py` — rebuild the ContFrag tables, reusing a preserved bundle's posterior aggregates.

@@ -21,8 +21,8 @@ runs, in the order their code requires:
    ``qvals_table``. It is the stop table's canonical producer (the bootstrap's
    table plus the SWR split); ``regenerate_stop_table.py`` is not a run, as it
    assumes the stop bouts of an existing event table;
-4. ``tables.timebin``: ``build_timebin_tables.py``, the event-onset and
-   stop-timebin tables, from the decodes alone;
+4. ``tables.timebin``: ``build_timebin_tables.py``, the event-onset table,
+   from the decodes alone;
 5. ``tables.contfrag.swr`` and ``tables.contfrag.mua``:
    ``prepare_contfrag_replay_content_data.py``, which reads ``qvals_table``.
 

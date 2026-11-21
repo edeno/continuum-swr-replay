@@ -45,9 +45,8 @@ non-local SWR / no-SWR split — the pooled ``non_local`` is the one-population
 null tested against its split.
 
 How this family (B) differs from Family A on the same stop is in the
-``fit_per_stop_rate_models.py`` docstring. Family B never reads the dense
-``stop_timebin_table``: ``aggregate_to_timebins`` builds the 15 ms bins from
-``stop_table`` and ``event_onset_table``.
+``fit_per_stop_rate_models.py`` docstring. ``aggregate_to_timebins`` builds
+the 15 ms bins from ``stop_table`` and ``event_onset_table``.
 
 Outputs: ``models_per_bin_rate/all_models{sfx}.pkl`` (one row per (session,
 outcome, model)), its ``.provenance.json`` sidecar, and

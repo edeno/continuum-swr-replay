@@ -294,9 +294,9 @@ Scientific table contracts beyond the generic covariate schema stamp.
 
 ### `src/continuum_swr_replay/analysis/event_tables/timebin_tables.py`
 
-Within-stop time-binned tables (Part B).
+Within-stop event-onset table.
 
-`build_event_onset_table`, `build_stop_timebin_table`, `concat_session_timebin_tables`
+`build_event_onset_table`
 
 ### `src/continuum_swr_replay/tables/event_ids.py`
 
@@ -354,7 +354,7 @@ Diagnostic per-animal fitted-alpha leaky-Q learner.
 
 Reward-history covariates: rolling reward counts and recent reward rates over an arm's last visits, plus stop-level reward histories.
 
-`rolling_reward_count_all_events`, `recent_reward_rate_all_events`, `recent_trial_reward_rate`, `lagged_trial_rewards`, `reward_history_basis_features`
+`rolling_reward_count_all_events`, `log1p_known_visit_count_all_events`, `recent_reward_rate_all_events`, `recent_trial_reward_rate`, `lagged_trial_rewards`, `reward_history_basis_features`
 
 ### `src/continuum_swr_replay/analysis/behavior/covariates/history/value_block.py`
 
@@ -592,7 +592,7 @@ Assemble disjoint Replay table shards into one canonical candidate bundle.
 
 ### `scripts/tables/build_timebin_tables.py`
 
-Build the Part B within-stop time-binned tables over all sessions.
+Build the within-stop event-onset table over all sessions.
 
 `build_one`, `validate`, `main`
 
@@ -1242,7 +1242,7 @@ Plot replay rate vs uncertainty/value by population from the tidy fit output.
 
 Where an event or a stop lies relative to the well visits.
 
-`window_visit_context`, `visit_context_of_samples`
+`window_visit_context`, `visit_context_of_samples`, `stop_visit_columns`, `event_visit_columns`, `assign_visit_current_arm`
 
 ### `src/continuum_swr_replay/analysis/replay_models/coefficient_statistics.py`
 

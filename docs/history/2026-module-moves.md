@@ -765,3 +765,16 @@ module kept its place; one file was renamed. Paths are under `src/continuum_swr_
 
 The PFC cohort records keep their key `n_analysed`: the records on disk carry it, and
 `reported/mpfc/population.py` reads it.
+
+## The well visit in the tables, 2026-11-20
+
+The well visit (first nose-poke in to final poke-out) became the tables' unit: the stop,
+event and event × arm tables gained the visit columns (`docs/covariate_dictionary.md`,
+"The well visit and its clocks"). What that replaced was removed. Paths are under
+`src/continuum_swr_replay/` unless they start with `scripts/`.
+
+| Removed | Replaced by |
+|---|---|
+| the dense stop time-bin table `stop_timebin_table.parquet` (canonical name `stop_timebin`, its row key in `tables/covariate_registry.py`) (removed: replaced by the visit bins) | the rate models' visit bins, built per session from the stop and event-onset tables; the file in `Processed-Data/replay_content/` is kept, no longer read |
+| `analysis/event_tables/timebin_tables.build_stop_timebin_table`, `concat_session_timebin_tables`, `ONSETS_IN_EXCLUDED_BINS_ATTR` (removed: replaced by the visit bins) | `build_event_onset_table` stays; `scripts/tables/build_timebin_tables.py` writes only the event-onset table |
+| `scripts/exploratory/_timeresolved_psth.py` (removed: its table is gone) | none |

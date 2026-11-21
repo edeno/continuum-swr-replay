@@ -563,19 +563,15 @@ def test_the_stop_only_bootstrap_publishes_with_the_sources_stamp(
     assert stop.attrs["swr_source"] == swr_source.swr_source_name()
 
 
-def test_the_timebin_tables_are_published_with_the_sources_stamp(
+def test_the_onset_table_is_published_with_the_sources_stamp(
     source, monkeypatch, offline, tmp_path
 ):
     script = offline("scripts.tables.build_timebin_tables")
     key = {"animal": "j16", "session_date": 20210706, "epoch": EPOCH}
     session = {"nwb_file_name": NWB, "epoch_name": EPOCH}
     monkeypatch.setattr(script, "find_sessions", lambda max_per_animal: [session])
-    monkeypatch.setattr(
-        script,
-        "build_one",
-        lambda s: (pd.DataFrame([key]), pd.DataFrame([{**key, "n_swr_events": 0}])),
-    )
-    monkeypatch.setattr(script, "validate", lambda onset, dense, in_excluded: None)
+    monkeypatch.setattr(script, "build_one", lambda s: pd.DataFrame([key]))
+    monkeypatch.setattr(script, "validate", lambda onset: None)
     stamps: dict = {}
     monkeypatch.setattr(
         script,
@@ -588,7 +584,6 @@ def test_the_timebin_tables_are_published_with_the_sources_stamp(
 
     assert stamps == {
         "event_onset": swr_source.swr_source_name(),
-        "stop_timebin": swr_source.swr_source_name(),
     }
 
 

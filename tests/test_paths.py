@@ -201,7 +201,6 @@ def test_registry_is_the_one_parity_reads():
         "stop_table",
         "qvals_table",
         "event_onset_table",
-        "stop_timebin_table",
     )
 
 
@@ -217,7 +216,6 @@ def test_the_one_table_list_names_the_registry_row_keys_and_swr_tables():
         "event_sequence",
         "stop",
         "event_onset",
-        "stop_timebin",
     }
 
 

@@ -345,7 +345,6 @@ CANONICAL_TABLES: tuple[str, ...] = (
     "stop",
     "qvals",
     "event_onset",
-    "stop_timebin",
 )
 """The canonical tables, by covariate-registry key, in the order every
 freeze, manifest and parity sweep iterates them. The one list: the registry's

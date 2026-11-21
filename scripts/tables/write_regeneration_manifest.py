@@ -558,7 +558,7 @@ def write_manifest(
             "replay": "full 218-session v4-cache rebuild; five disjoint animal shards; pooled standardization",
             "qvals": "live 218-session model/timing rebuild against candidate stop table",
             "contfrag": "all non-posterior quantities rebuilt; immutable posterior aggregates transferred by exact source-event/candidate keys",
-            "carried_forward": "event_onset_table and stop_timebin_table after exact stop/session key checks",
+            "carried_forward": "event_onset_table after exact stop/session key checks",
             "baseline_parity": (
                 "event/event_arm/stop diffed against the accepted baseline on "
                 "their primary key; structural drift or undeclared column drift "
