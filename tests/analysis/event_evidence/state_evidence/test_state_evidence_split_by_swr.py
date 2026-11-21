@@ -163,3 +163,28 @@ def test_windows_on_another_time_grid_refuse():
     labeled["start_time"] += 0.001
     with pytest.raises(ValueError, match="not the decode time at s"):
         mark_bouts_in_well_visits(labeled, TIME, [TIME[8]], [TIME[22]])
+
+
+def test_a_running_bout_is_read_wherever_it_happens():
+    """Running is counted wherever it happens (the animal does not run inside a
+    visit): only the immobile bouts are restricted to the visits."""
+    labeled = _labeled()
+    running = labeled.assign(regime="running")
+    out = mark_bouts_in_well_visits(
+        pd.concat([labeled, running], ignore_index=True), TIME, [TIME[8]], [TIME[22]]
+    )
+    bouts = out[out["kind"] == "bout"]
+    immobile = bouts[bouts["regime"] == "immobile"].set_index("bout_s")
+    moving = bouts[bouts["regime"] == "running"].set_index("bout_s")
+    assert immobile["in_analyzed_subset"].to_dict() == {2: False, 10: True}
+    assert moving["in_analyzed_subset"].to_dict() == {2: True, 10: True}
+    # the matched window of a read bout is read with it
+    assert out.groupby(["regime", "in_analyzed_subset"]).size().to_dict() == {
+        ("immobile", False): 2,
+        ("immobile", True): 2,
+        ("running", True): 4,
+    }
+    counts = bout_visit_counts(out).set_index(["state", "regime"])
+    assert counts.loc[("Non-Local Continuous | SWR", "running"), "n_kept"] == 1
+    assert counts.loc[("Non-Local Continuous | SWR", "running"), "n_left_out"] == 0
+    assert counts.loc[("Non-Local Continuous | SWR", "immobile"), "n_kept"] == 0

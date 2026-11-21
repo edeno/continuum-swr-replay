@@ -7,8 +7,10 @@ coincide with an SWR. This runner labels each Non-Local bout of a finished run,
 and its matched window, by its full span
 (:func:`~continuum_swr_replay.analysis.event_evidence.state_evidence.split_non_local_by_swr`):
 "SWR" when some bin of the bout is in an SWR of the decode frame read through
-the SWR source (``read_dot_with_swr_source``), else "no SWR". A bout counts when
-its first sample is inside a well visit, and its matched window goes with it
+the SWR source (``read_dot_with_swr_source``), else "no SWR". An immobile bout
+counts when its first sample is inside a well visit, a running bout wherever it
+happens (running is counted wherever it happens: the animal does not run inside
+a visit), and its matched window goes with it
 (:func:`~continuum_swr_replay.analysis.event_evidence.state_evidence.mark_bouts_in_well_visits`,
 each epoch's visits from ``event_tables.prepare_data.well_visit_times``).
 ``bout_statistics`` then runs on each subset of those bouts as on any state
@@ -21,9 +23,11 @@ visit; the provenance counts them.
 Reads every epoch the run's ``manifest.json`` marks ``ok``. Writes, beside the run:
 
 - ``nl_bouts_by_swr.parquet``: the labeled windows, every bout and its matched
-  window, with ``starts_in_well_visit`` and ``matched_starts_in_well_visit``;
-- ``nl_bouts_by_swr_stats.csv``: the statistics over the bouts that start inside
-  a well visit (the events summary reads it, question 2c.3);
+  window, with ``starts_in_well_visit``, ``matched_starts_in_well_visit`` and
+  ``in_analyzed_subset``;
+- ``nl_bouts_by_swr_stats.csv``: the statistics over the immobile bouts that
+  start inside a well visit and every running bout (the events summary reads
+  it, question 2c.3);
 - ``nl_bouts_by_swr.provenance.json``: the commit, the SWR source, the epochs,
   the subset (``cohort_selection.ANALYZED_SUBSET``), the session-cache entries
   the visits were read from (``prepare_data.session_cache_record``) and the
@@ -110,7 +114,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     windows = pd.concat(
         [label_epoch(run_dir, e, decode_dir) for e in epochs], ignore_index=True
     )
-    kept = windows[windows["starts_in_well_visit"]]
+    kept = windows[windows["in_analyzed_subset"]]
     states = sorted(windows["state"].unique())
     stats = bout_statistics(kept, metrics=dict.fromkeys(states, METRICS))
     counts = bout_visit_counts(windows)

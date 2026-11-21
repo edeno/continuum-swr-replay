@@ -2,9 +2,11 @@
 
 One epoch with three immobile Non-Local Continuous bouts and their matched
 windows: one bout touches an SWR, one does not, and a planted one with a huge
-score starts before the epoch's only well visit. The decode frame and the well
-visits are stand-ins; the run folder, its manifest and the outputs are real
-files, so the run writes its statistics and its provenance as on real data.
+score starts before the epoch's only well visit; and one running bout after the
+visit, which is read (running is counted wherever it happens). The decode frame
+and the well visits are stand-ins; the run folder, its manifest, the session
+cache's entry and the outputs are real files, so the run writes its statistics
+and its provenance as on real data.
 """
 
 from __future__ import annotations
@@ -49,8 +51,16 @@ def _windows() -> pd.DataFrame:
         rows,
         columns=["kind", "state", "s", "bout_s", "bout_e", "matched_bout_s", "score"],
     )
-    windows["start_time"] = TIME[windows["s"]]
     windows["regime"] = "immobile"
+    running = pd.DataFrame(
+        [
+            ("bout", "Non-Local Continuous", 52, 52, 56, np.nan, 5.0),
+            ("baseline", "Non-Local Continuous", 57, np.nan, np.nan, 52, 0.0),
+        ],
+        columns=["kind", "state", "s", "bout_s", "bout_e", "matched_bout_s", "score"],
+    ).assign(regime="running")
+    windows = pd.concat([windows, running], ignore_index=True)
+    windows["start_time"] = TIME[windows["s"]]
     windows["epoch_id"] = EPOCH
     windows["animal"] = "chimi"
     windows["n_found"] = 3
@@ -98,6 +108,14 @@ def test_the_run_writes_its_statistics_over_the_bouts_in_visits_and_its_provenan
     ].iloc[0]
     assert swr_row["n"] == 1
     assert swr_row["mean"] == 1.0
+    # the running bout, outside the visit, is read
+    running = stats[
+        (stats["state"] == "Non-Local Continuous | no SWR")
+        & (stats["regime"] == "running")
+        & (stats["metric"] == "runcv_nl_anim_mark_ps")
+    ].iloc[0]
+    assert running["n"] == 1
+    assert running["mean"] == 5.0
 
     provenance = json.loads(
         (run_dir / f"{NL_BOUTS_BY_SWR_STEM}.provenance.json").read_text()
@@ -105,7 +123,9 @@ def test_the_run_writes_its_statistics_over_the_bouts_in_visits_and_its_provenan
     assert provenance["subset"] == ANALYZED_SUBSET
     assert provenance["epochs"] == [EPOCH]
     assert provenance["session_cache"]["sha256"] == files_sha256([entry])
-    counts = {row["state"]: row for row in provenance["bouts"]}
+    counts = {
+        row["state"]: row for row in provenance["bouts"] if row["regime"] == "immobile"
+    }
     assert counts["Non-Local Continuous | no SWR"] == {
         "state": "Non-Local Continuous | no SWR",
         "regime": "immobile",
@@ -118,5 +138,6 @@ def test_the_run_writes_its_statistics_over_the_bouts_in_visits_and_its_provenan
 
     # every bout and matched window is kept in the labeled table, marked
     labeled = read_table(run_dir / f"{NL_BOUTS_BY_SWR_STEM}.parquet")
-    assert len(labeled) == 6
+    assert len(labeled) == 8
     assert labeled["starts_in_well_visit"].sum() == 4
+    assert labeled["in_analyzed_subset"].sum() == 6

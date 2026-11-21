@@ -1432,13 +1432,15 @@ def mark_bouts_in_well_visits(
 ) -> pd.DataFrame:
     """One epoch's Non-Local bouts and matched windows, marked by the well visits.
 
-    A bout counts when its first sample (``time[bout_s]``) is inside a well
-    visit (``event_definition.well_visits.in_well_visit``), and its matched
-    window goes with it: both rows of the pair carry the bout's
-    ``starts_in_well_visit``. The matched windows were drawn from all of the
-    epoch's time in the bout's regime, so each pair also carries
-    ``matched_starts_in_well_visit``, whether the matched window's first sample
-    (``time[s]``) is inside a visit, to be counted
+    An immobile bout counts when its first sample (``time[bout_s]``) is inside
+    a well visit (``event_definition.well_visits.in_well_visit``); a running
+    bout counts wherever it happens, as running time does (the animal does not
+    run inside a visit). The matched window goes with its bout: both rows of
+    the pair carry the bout's ``starts_in_well_visit`` and
+    ``in_analyzed_subset`` (whether the pair is read). The matched windows were
+    drawn from all of the epoch's time in the bout's regime, so each pair also
+    carries ``matched_starts_in_well_visit``, whether the matched window's
+    first sample (``time[s]``) is inside a visit, to be counted
     (:func:`bout_visit_counts`), not to select by.
 
     Parameters
@@ -1456,8 +1458,8 @@ def mark_bouts_in_well_visits(
     Returns
     -------
     pd.DataFrame
-        A copy of ``windows`` with ``starts_in_well_visit`` and
-        ``matched_starts_in_well_visit``.
+        A copy of ``windows`` with ``starts_in_well_visit``,
+        ``matched_starts_in_well_visit`` and ``in_analyzed_subset``.
 
     Raises
     ------
@@ -1487,9 +1489,13 @@ def mark_bouts_in_well_visits(
         raise ValueError("a matched window has no bout")
     if out["matched_starts_in_well_visit"].isna().any():
         raise ValueError("a bout has no matched window")
-    return out.astype(
+    out = out.astype(
         {"starts_in_well_visit": bool, "matched_starts_in_well_visit": bool}
     )
+    out["in_analyzed_subset"] = out["starts_in_well_visit"] | (
+        out["regime"] == "running"
+    )
+    return out
 
 
 def bout_visit_counts(windows: pd.DataFrame) -> pd.DataFrame:
@@ -1504,12 +1510,13 @@ def bout_visit_counts(windows: pd.DataFrame) -> pd.DataFrame:
     -------
     pd.DataFrame
         One row per ``state`` (with its SWR label) and ``regime``:
-        ``n_bouts``; ``n_kept``, the bouts whose first sample is inside a well
-        visit; ``n_left_out``, the others; and ``n_kept_matched_outside_visit``,
+        ``n_bouts``; ``n_kept``, the bouts read (``in_analyzed_subset``: an
+        immobile bout whose first sample is inside a well visit, every running
+        bout); ``n_left_out``, the others; and ``n_kept_matched_outside_visit``,
         the kept bouts whose matched window starts outside every visit.
     """
     bouts = windows[windows["kind"] == "bout"]
-    kept = bouts["starts_in_well_visit"]
+    kept = bouts["in_analyzed_subset"]
     return (
         bouts.assign(
             kept=kept,

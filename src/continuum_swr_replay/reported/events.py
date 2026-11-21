@@ -259,8 +259,10 @@ SPIKE_EVIDENCE_SUBSET = (
 """What the values of the spike-evidence run are over."""
 
 BOUT_SUBSET = (
-    "the decoder's Non-Local Continuous bouts whose first sample is inside a well "
-    "visit (from the first poke-in at a well to the final poke-out)"
+    "the decoder's immobile Non-Local Continuous bouts whose first sample is inside "
+    "a well visit (from the first poke-in at a well to the final poke-out); the "
+    "bouts' matched windows are drawn from all of the epoch's time in the regime, "
+    "and the values reported here do not use them"
 )
 """What the values of the held-out test split by SWR are over."""
 
