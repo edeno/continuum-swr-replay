@@ -552,3 +552,242 @@ def test_place_sampling_uses_the_folds_and_margin_it_is_given(monkeypatch):
         place, is_training, th.time_blocks(time), 5, th.MARGIN_BINS, 0.002
     )
     assert not np.array_equal(expected, contiguous)
+
+
+def test_smoothed_summary_by_hand():
+    """States 0 (one bin) and 1, 2 (two place bins each): each state's mass,
+    and the place bin with the most mass of states 1 and 2 together."""
+    smoothed = np.array(
+        [
+            [0.1, 0.5, 0.0, 0.1, 0.3],  # place 0: 0.6, place 1: 0.3
+            [0.2, 0.1, 0.2, 0.0, 0.5],  # place 0: 0.1, place 1: 0.7
+            [1.0, 0.0, 0.0, 0.0, 0.0],
+        ],
+        dtype=np.float32,
+    )
+    probability, place = nr.smoothed_summary(
+        smoothed, STATE_IND, [1, 2], np.array([0, 1]), chunk_bins=1
+    )
+    np.testing.assert_allclose(probability, [[0.1, 0.5, 0.4], [0.2, 0.3, 0.5]])
+    np.testing.assert_array_equal(place, [0, 1])
+    assert probability.dtype == np.float32 and place.dtype == np.int32
+    with pytest.raises(ValueError, match="place bins"):
+        nr.smoothed_summary(smoothed, np.array([0, 1, 1, 1, 2]), [1, 2], [0])
+
+
+def test_the_summary_changes_no_score_and_is_the_smoothed_posterior():
+    """With ``summary_rows`` the scores are the same to the bit, and the state
+    probabilities are the library smoother's, summed by state."""
+    from non_local_detector.core import chunked_filter_smoother_covariate_dependent
+
+    initial, continuous, discrete, log_likelihood = _toy_model(3)
+    allowed = ALLOWED["time-varying"]
+    plain = _scores(log_likelihood, initial, continuous, discrete, allowed)
+    rows = np.array([0, 2, 5])
+    summarized = nr.predictive_log_scores(
+        log_likelihood,
+        initial,
+        continuous,
+        discrete,
+        STATE_IND,
+        allowed,
+        summary_rows=rows,
+        summed_states=[1, 2],
+    )
+    np.testing.assert_array_equal(plain[0], summarized[0])
+    np.testing.assert_array_equal(plain[1], summarized[1])
+    patterns, pattern = np.unique(allowed, axis=0, return_inverse=True)
+    pattern = pattern.ravel()
+    restricted = nr.restricted_discrete_transitions(discrete, patterns)
+    first = initial * patterns[pattern[0]][STATE_IND]
+    masked = np.where(patterns[pattern][:, STATE_IND], log_likelihood, -np.inf)
+    smoothed = np.asarray(
+        chunked_filter_smoother_covariate_dependent(
+            time=np.arange(N_TIME),
+            state_ind=STATE_IND,
+            initial_distribution=first / first.sum(),
+            discrete_transition_matrix=restricted[np.r_[pattern[1:], pattern[-1]]],
+            continuous_transition_matrix=continuous,
+            log_likelihood_func=None,
+            log_likelihood_args=(),
+            log_likelihoods=masked,
+        )[0]
+    )
+    expected = np.stack([smoothed[:, STATE_IND == s].sum(axis=1) for s in range(3)], 1)
+    np.testing.assert_allclose(
+        summarized[2]["state_probability"], expected[rows], atol=1e-6
+    )
+    nonlocal_mass = smoothed[:, STATE_IND == 1] + smoothed[:, STATE_IND == 2]
+    np.testing.assert_array_equal(
+        summarized[2]["place_bin"], nonlocal_mass[rows].argmax(axis=1)
+    )
+
+
+def test_em_record_reads_the_librarys_loop():
+    """The trace holds each iteration's E-step marginal, then the final one;
+    the loop stops when the last two iterations' change is below the
+    tolerance relative to their mean."""
+    record = nr.em_record(np.array([-200.0, -100.0, -99.999, -99.99]), 20, 1e-4)
+    assert record == {
+        "em_iterations": 3,
+        "converged": True,
+        "marginal_log_likelihoods": [-200.0, -100.0, -99.999, -99.99],
+    }
+    # stopped by max_iter, still changing
+    record = nr.em_record(np.array([-200.0, -100.0, -90.0]), 2, 1e-4)
+    assert record["em_iterations"] == 2 and record["converged"] is False
+    with pytest.raises(ValueError, match="without converging"):
+        nr.em_record(np.array([-200.0, -100.0, -90.0]), 20, 1e-4)
+
+
+def test_em_settings_are_the_librarys_defaults():
+    from non_local_detector import NonLocalClusterlessDetector
+
+    settings = nr.em_settings(False)
+    assert settings["estimate_encoding_model"] is False
+    assert settings["max_iter"] == 20 and settings["tolerance"] == 1e-4
+    import inspect
+
+    defaults = inspect.signature(NonLocalClusterlessDetector.estimate_parameters)
+    assert defaults.parameters["estimate_encoding_model"].default is True
+    assert set(settings) == {*nr.EM_SETTING_NAMES, "estimate_encoding_model"}
+
+
+def _configured_detector(**changes):
+    from non_local_detector import NonLocalClusterlessDetector
+    from non_local_detector.environment import Environment
+
+    from continuum_swr_replay.decoding.config import NonLocalDecodingConfig
+    from continuum_swr_replay.decoding.fit import algorithm_params
+    from continuum_swr_replay.decoding.transitions import nonlocal_detector_kwargs
+    from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
+
+    config = NonLocalDecodingConfig()
+    return NonLocalClusterlessDetector(
+        environments=Environment(place_bin_size=PLACE_BIN_SIZE_1D),
+        **{
+            **algorithm_params(config, "clusterless"),
+            **nonlocal_detector_kwargs(config),
+            **changes,
+        },
+    )
+
+
+def test_a_fresh_detector_never_starts_from_the_fitted_initial_distribution():
+    """The library's EM writes its fitted initial distribution into the
+    detector's ``discrete_initial_conditions`` setting; a fresh detector has
+    the configured one."""
+    configured = _configured_detector()
+    canonical = _configured_detector()
+    canonical.discrete_initial_conditions = np.array([0.9, 0.05, 0.05, 0.0])
+    fresh = nr.fresh_detector(canonical)
+    assert fresh is not canonical
+    np.testing.assert_array_equal(
+        fresh.discrete_initial_conditions, configured.discrete_initial_conditions
+    )
+    assert fresh.environments[0] is not canonical.environments[0]
+
+
+def test_a_changed_configuration_raises():
+    with pytest.raises(ValueError, match="local_position_std"):
+        nr.fresh_detector(_configured_detector(local_position_std=4.0))
+    with pytest.raises(ValueError, match="discrete_transition_concentration"):
+        nr.fresh_detector(_configured_detector(discrete_transition_concentration=2.0))
+
+
+def test_each_fold_failure_is_named_by_its_fold():
+    record = {
+        "folds": [
+            {"fold": 0, **_record()},
+            {"fold": 1, **_record(causal_mass_deviation_swr=2e-3)},
+        ]
+    }
+    failures = nr.fold_check_failures(record)
+    assert len(failures) == 1 and failures[0].startswith("fold 1: swr: filtered")
+    assert nr.fold_check_failures({"folds": [{"fold": 0, **_record()}]}) == []
+
+
+def test_fold_fit_scores_fits_each_fold_without_its_bins_and_stitches(monkeypatch):
+    """Each fold's fit is given its encoding's training bins (the decode's,
+    outside the fold and its margin) and the fold's bins as missing; each bin's
+    columns come from its own fold's pass. The fit, likelihood and models are
+    stubbed: pass k scores every bin k (state probabilities k / 10, place bin
+    k)."""
+    from types import SimpleNamespace
+
+    from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
+
+    n = 3000
+    time = np.arange(n) * 0.002
+    rng = np.random.default_rng(2)
+    folds = np.repeat(rng.permutation(np.arange(30) % 5), n // 30)
+    is_training = rng.random(n) < 0.8
+    is_missing = np.zeros(n, dtype=bool)
+    is_missing[100:110] = True
+    margin = 7
+    canonical = SimpleNamespace(
+        discrete_state_transitions_=np.eye(4),
+        discrete_initial_conditions=np.array([1.0, 0, 0, 0]),
+    )
+    fits = []
+
+    def fit(c, t, position, spikes, marks, training, missing, estimate_encoding_model):
+        assert c is canonical and estimate_encoding_model is False
+        fits.append((training.copy(), missing.copy()))
+        k = len(fits) - 1
+        return SimpleNamespace(k=k), {
+            "discrete_transition": np.eye(4) * (1 - k / 10),
+            "initial_discrete": np.array([1.0, 0, 0, 0]),
+            "em_iterations": 3,
+            "converged": True,
+            "fit_s": 1.0,
+        }
+
+    def likelihood(detector, t, position, spikes, marks, missing):
+        np.testing.assert_array_equal(missing, is_missing)
+        return detector.k
+
+    def scores(detector, k, in_swr, summary_bins, log):
+        assert detector.k == k
+        np.testing.assert_array_equal(summary_bins, folds == k)
+        out = {c: np.full(n, k, dtype=np.float32) for c in nr.SCORE_COLUMNS}
+        out |= {
+            c: np.full(n, k / 10, dtype=np.float32)
+            for c in nr.STATE_PROBABILITY_COLUMNS.values()
+        }
+        out[nr.NONLOCAL_PLACE_BIN_COLUMN] = np.full(n, k, dtype=np.int32)
+        return out, {"continuous_block_deviation": 0.0}
+
+    monkeypatch.setattr(nr, "fold_log_likelihood", likelihood)
+    monkeypatch.setattr(nr, "model_scores", scores)
+    table, record = nr.fold_fit_scores(
+        canonical,
+        time,
+        np.zeros((n, 2)),
+        [],
+        [],
+        is_training,
+        is_missing,
+        np.zeros(n, dtype=bool),
+        folds=folds,
+        margin_bins=margin,
+        estimate_encoding_model=False,
+        fit=fit,
+        log=lambda message: None,
+    )
+    masks = th.fold_training_masks(is_training, folds, 5, margin)
+    assert len(fits) == 5
+    for k, (training, missing) in enumerate(fits):
+        np.testing.assert_array_equal(training, masks[k])
+        np.testing.assert_array_equal(missing, is_missing | (folds == k))
+    for column in nr.SCORE_COLUMNS:
+        np.testing.assert_array_equal(table[column], folds)
+        assert table[column].dtype == np.float32
+    np.testing.assert_array_equal(table["block"], folds)
+    np.testing.assert_allclose(table["full_prob_local"], folds / 10)
+    np.testing.assert_array_equal(table[nr.NONLOCAL_PLACE_BIN_COLUMN], folds)
+    assert table[nr.NONLOCAL_PLACE_BIN_COLUMN].dtype == np.int32
+    assert [f["fold"] for f in record["folds"]] == list(range(5))
+    assert [f["n_bins"] for f in record["folds"]] == np.bincount(folds).tolist()
+    assert record["folds"][2]["discrete_transition_difference"] == pytest.approx(0.2)
+    assert record["n_missing"] == 10 and record["fit_s"] == 5.0
