@@ -772,6 +772,12 @@ Run the port and the reference's own arithmetic on one input, and compare.
 
 `window_counts`, `overlap`, `shuffle_permutations`, `p_values`, `passes`, `compare`, `reference_row`, `fields_and_thresholds`, `compare_variants`, `decode_sweep_cell`, `sweep_totals`, `main`
 
+### `scripts/checks/compare_regression_to_current_fitters.py`
+
+Compare the shared fitter without a penalty with the current fitters on real sessions.
+
+`per_bin_coefficients`, `content_coefficients`, `largest_relative_difference`, `main`
+
 ### `scripts/checks/compare_regression_to_mgcv.py`
 
 Compare the shared regression fitter with mgcv on small synthetic data sets.
