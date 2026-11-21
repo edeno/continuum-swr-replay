@@ -11,29 +11,88 @@ finite is rejected the same way. A quadratic likelihood (the Gaussian) takes
 its full step, uncapped: it is the exact optimum, whatever the scale of the
 outcome. ``eta`` is never clipped.
 
+Before the first step the design is checked: the coefficients the penalty
+leaves free (the unpenalized columns and the penalties' null spaces) must be
+identified by ``X``. A small decrement is not enough to stop: when the step it
+belongs to still moves the linear predictor by more than
+``NO_MAXIMUM_ETA_STEP`` on some row, the likelihood has no finite maximum
+along that step (a 0/1 column whose rows all have the same outcome, a Poisson
+cell with no events): the decrement shrinks to zero while a coefficient runs
+to infinity. Near a finite maximum the step shrinks with the decrement.
+
 Once the decrement is below the tolerance the fit still takes that last full
 step, and reports ``A`` and the decrement where it lands. Stopping before it
 would leave a coefficient off by up to about ``sqrt(2 tol / lambda_min)``
 (``lambda_min`` the smallest eigenvalue of ``A``): 4e-5 on a content fit of 80
 events. After it the error is of the order of the square of that.
+
+Every fit ends with one of the statuses below; only ``CONVERGED`` is a fit.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import scipy.linalg
 
 from .constants import (
+    IDENTIFIABILITY_TOL,
     MAX_STEP_HALVINGS,
     MAX_STEP_LENGTH,
     NEWTON_DECREMENT_TOL,
     NEWTON_MAX_STEPS,
+    NO_MAXIMUM_ETA_STEP,
 )
 from .likelihoods import Likelihood
 
-__all__ = ["NewtonFit", "penalized_newton"]
+__all__ = [
+    "CONVERGED",
+    "FIT_STATUSES",
+    "HALVING_FAILED",
+    "NOT_IDENTIFIED",
+    "NOT_POSITIVE_DEFINITE",
+    "NO_FINITE_MAXIMUM",
+    "STEP_LIMIT",
+    "FitStatus",
+    "NewtonFit",
+    "penalized_newton",
+]
+
+FitStatus = Literal[
+    "converged",
+    "design not identified",
+    "information not positive definite",
+    "step halving failed",
+    "step limit reached",
+    "no finite maximum",
+]
+#: The decrement is below the tolerance at a finite maximum.
+CONVERGED: FitStatus = "converged"
+#: The design cannot identify a coefficient the penalty leaves free (a
+#: duplicated column, a column zero on every row, a linear term beside a smooth
+#: whose penalty's null space holds it); no step is taken.
+NOT_IDENTIFIED: FitStatus = "design not identified"
+#: ``A`` is not positive definite or not finite (a start whose predictions
+#: overflow).
+NOT_POSITIVE_DEFINITE: FitStatus = "information not positive definite"
+#: No halving of a step lowered ``F``.
+HALVING_FAILED: FitStatus = "step halving failed"
+#: ``max_iter`` steps without the decrement falling below the tolerance.
+STEP_LIMIT: FitStatus = "step limit reached"
+#: The decrement is below the tolerance but the step still moves the linear
+#: predictor by more than ``NO_MAXIMUM_ETA_STEP``: a coefficient runs to
+#: infinity.
+NO_FINITE_MAXIMUM: FitStatus = "no finite maximum"
+FIT_STATUSES: tuple[FitStatus, ...] = (
+    CONVERGED,
+    NOT_IDENTIFIED,
+    NOT_POSITIVE_DEFINITE,
+    HALVING_FAILED,
+    STEP_LIMIT,
+    NO_FINITE_MAXIMUM,
+)
 
 
 @dataclass(frozen=True)
@@ -45,11 +104,13 @@ class NewtonFit:
     beta : np.ndarray, shape (p,)
         The coefficients.
     A : np.ndarray, shape (p, p)
-        ``H + S`` at ``beta``; its inverse is the Bayesian covariance.
-    converged : bool
-        True when the decrement at ``beta`` is below the tolerance.
+        ``H + S`` at ``beta``; its inverse is the Bayesian covariance. NaN when
+        the design is not identified (no step is taken).
+    status : FitStatus
+        How the fit ended; ``CONVERGED`` is the only fit.
     newton_decrement : float
-        ``g' A^-1 g / 2`` at ``beta``; NaN when ``A`` is not positive definite.
+        ``g' A^-1 g / 2`` at ``beta``; NaN when ``A`` is not positive definite
+        or the design is not identified.
     n_iter : int
         Newton steps taken.
     loglik : float
@@ -58,10 +119,43 @@ class NewtonFit:
 
     beta: np.ndarray
     A: np.ndarray
-    converged: bool
+    status: FitStatus
     newton_decrement: float
     n_iter: int
     loglik: float
+
+    @property
+    def converged(self) -> bool:
+        """True when ``status`` is ``CONVERGED``."""
+        return self.status == CONVERGED
+
+
+def _free_columns(S: np.ndarray) -> np.ndarray:
+    """The unit vectors of the columns ``S`` leaves unpenalized, shape ``(p, k)``."""
+    unpenalized = ~(S != 0).any(axis=0)
+    return np.eye(S.shape[0])[:, unpenalized]
+
+
+def _identified(X: np.ndarray, free_basis: np.ndarray) -> bool:
+    """Whether ``X`` identifies the coefficients spanned by ``free_basis``.
+
+    The columns of ``X @ free_basis`` are scaled to unit length (so a column's
+    units do not matter) and their Gram matrix's smallest eigenvalue must
+    exceed ``IDENTIFIABILITY_TOL``; a column that is zero on every row fails.
+    """
+    if free_basis.shape[1] == 0:
+        return True
+    free = X @ free_basis
+    norms = np.linalg.norm(free, axis=0)
+    if not np.all(norms > 0):
+        return False
+    unit = free / norms
+    return bool(np.linalg.eigvalsh(unit.T @ unit)[0] > IDENTIFIABILITY_TOL)
+
+
+def _eta_step(X: np.ndarray, step: np.ndarray) -> float:
+    """``max |X @ step|``: the most a step moves the linear predictor on a row."""
+    return float(np.max(np.abs(X @ step)))
 
 
 def penalized_newton(
@@ -72,6 +166,7 @@ def penalized_newton(
     S: np.ndarray,
     beta0: np.ndarray,
     *,
+    free_basis: np.ndarray | None = None,
     tol: float = NEWTON_DECREMENT_TOL,
     max_iter: int = NEWTON_MAX_STEPS,
     max_halvings: int = MAX_STEP_HALVINGS,
@@ -93,6 +188,12 @@ def penalized_newton(
         The summed penalty at the chosen strengths; zeros for none.
     beta0 : np.ndarray, shape (p,)
         Start.
+    free_basis : np.ndarray or None, shape (p, k)
+        A basis of the coefficients the penalty leaves free, whose
+        identification by ``X`` is checked before the fit: the unpenalized
+        columns and the null spaces of the penalty blocks
+        (:func:`.reml.reml_and_derivatives` passes it). None: the columns
+        where ``S`` is zero, which misses a penalty's null space.
     tol : float
         Stop when the Newton decrement is below this.
     max_iter : int
@@ -106,10 +207,8 @@ def penalized_newton(
     Returns
     -------
     NewtonFit
-        Not converged, without raising, when ``A`` is not positive definite
-        (an unpenalized design the data cannot identify) or not finite (a
-        start whose predictions overflow), when no halving of a step lowers
-        ``F``, or after ``max_iter`` steps.
+        With ``status`` saying how it ended (:data:`FIT_STATUSES`); a fit that
+        is not ``CONVERGED`` is returned without raising.
     """
     beta = np.array(beta0, dtype=float)
     cap = np.inf if lik.quadratic else max_step
@@ -119,6 +218,9 @@ def penalized_newton(
         return -loglik + 0.5 * b @ S @ b, loglik
 
     F, loglik = objective(beta)
+    if not _identified(X, _free_columns(S) if free_basis is None else free_basis):
+        nan = np.full((beta.size, beta.size), np.nan)
+        return NewtonFit(beta, nan, NOT_IDENTIFIED, np.nan, 0, loglik)
     for n_iter in range(max_iter + 1):
         eta = X @ beta
         g = X.T @ lik.score_eta(eta, y, aux) - S @ beta
@@ -126,17 +228,19 @@ def penalized_newton(
         try:
             factor = scipy.linalg.cho_factor(A, lower=True)
         except (np.linalg.LinAlgError, ValueError):  # not PD, or not finite
-            return NewtonFit(beta, A, False, np.nan, n_iter, loglik)
+            return NewtonFit(beta, A, NOT_POSITIVE_DEFINITE, np.nan, n_iter, loglik)
         step = scipy.linalg.cho_solve(factor, g)
         decrement = 0.5 * float(g @ step)
         if decrement < tol:
+            if _eta_step(X, step) > NO_MAXIMUM_ETA_STEP:
+                return NewtonFit(beta, A, NO_FINITE_MAXIMUM, decrement, n_iter, loglik)
             return _last_step(
                 lik,
                 X,
                 y,
                 aux,
                 S,
-                NewtonFit(beta, A, True, decrement, n_iter, loglik),
+                NewtonFit(beta, A, CONVERGED, decrement, n_iter, loglik),
                 step,
             )
         if n_iter == max_iter:
@@ -149,9 +253,9 @@ def penalized_newton(
                 break
             scale *= 0.5
         else:
-            return NewtonFit(beta, A, False, decrement, n_iter, loglik)
+            return NewtonFit(beta, A, HALVING_FAILED, decrement, n_iter, loglik)
         beta, F, loglik = candidate, F_new, loglik_new
-    return NewtonFit(beta, A, False, decrement, n_iter, loglik)
+    return NewtonFit(beta, A, STEP_LIMIT, decrement, n_iter, loglik)
 
 
 def _last_step(
@@ -189,4 +293,4 @@ def _last_step(
     decrement = 0.5 * float(g @ scipy.linalg.cho_solve(factor, g))
     if not (F_new <= F_old or decrement < fit.newton_decrement):
         return fit
-    return NewtonFit(beta, A, True, decrement, fit.n_iter + 1, loglik)
+    return NewtonFit(beta, A, CONVERGED, decrement, fit.n_iter + 1, loglik)

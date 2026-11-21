@@ -18,7 +18,10 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     GroupedSoftmax,
     Poisson,
 )
-from continuum_swr_replay.analysis.regression.newton import penalized_newton
+from continuum_swr_replay.analysis.regression.newton import (
+    NOT_IDENTIFIED,
+    penalized_newton,
+)
 from continuum_swr_replay.analysis.regression.pspline import (
     PSplineBasis,
     sum_to_zero_constraint,
@@ -512,3 +515,19 @@ def test_gaussian_is_invariant_to_the_outcome_scale() -> None:
             reference.sessions[0].fit.beta,
             rtol=1e-6,
         )
+
+
+@pytest.mark.parametrize("rho", [-10.0, 0.0, 10.0, 20.0])
+def test_a_linear_term_beside_its_smooth_is_not_identified(rho: float) -> None:
+    """A linear column of ``x`` beside a P-spline of ``x``: the spline's
+    penalty leaves the straight line free, so the design cannot tell the two
+    apart, at every penalty strength."""
+    rng = np.random.default_rng(0)
+    x = rng.uniform(size=500)
+    design, penalty = _smooth(x, n_basis=10)
+    X = np.column_stack([np.ones(500), x, design])
+    y = rng.poisson(np.exp(0.5 + np.sin(3.0 * x))).astype(float)
+    blocks = [PenaltyBlock(np.arange(2, 11), penalty)]
+    score = reml_and_derivatives(Poisson(), X, y, np.zeros(500), blocks, [rho])
+    assert score.score == np.inf
+    assert score.fit.status == NOT_IDENTIFIED

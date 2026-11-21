@@ -64,6 +64,7 @@ __all__ = [
     "SessionFit",
     "assemble_penalty",
     "fit_at_penalties",
+    "free_basis",
     "pooled_reml",
     "refine_penalties",
     "reml_and_derivatives",
@@ -88,12 +89,16 @@ class PenaltyBlock:
     log_pdet : float
         ``log|S|_+``, the sum of the logs of its ``rank`` largest
         eigenvalues, set on construction.
+    null_space : np.ndarray, shape (k, k - rank)
+        An orthonormal basis of the null space of ``S`` (for a P-spline, the
+        straight lines), set on construction.
     """
 
     columns: np.ndarray
     S: np.ndarray
     rank: int = field(init=False)
     log_pdet: float = field(init=False)
+    null_space: np.ndarray = field(init=False)
 
     def __post_init__(self) -> None:
         columns = np.asarray(self.columns, dtype=int)
@@ -101,7 +106,7 @@ class PenaltyBlock:
         if S.shape != (columns.size, columns.size):
             raise ValueError(f"penalty of shape {S.shape} for {columns.size} columns")
         rank = penalty_rank(S)
-        eigenvalues = np.linalg.eigvalsh(S)
+        eigenvalues, vectors = np.linalg.eigh(S)
         object.__setattr__(self, "columns", columns)
         object.__setattr__(self, "S", S)
         object.__setattr__(self, "rank", rank)
@@ -110,6 +115,7 @@ class PenaltyBlock:
             "log_pdet",
             float(np.log(eigenvalues[eigenvalues.size - rank :]).sum()),
         )
+        object.__setattr__(self, "null_space", vectors[:, : eigenvalues.size - rank])
 
 
 @dataclass(frozen=True)
@@ -313,6 +319,23 @@ def assemble_penalty(
     return out
 
 
+def free_basis(blocks: Sequence[PenaltyBlock], n_columns: int) -> np.ndarray:
+    """The coefficients no penalty touches: the unpenalized columns and each
+    block's null space, embedded, shape ``(n_columns, k)``.
+
+    The design must identify them (:func:`.newton.penalized_newton` checks);
+    a penalty identifies the rest.
+    """
+    penalized = np.zeros(n_columns, dtype=bool)
+    parts = []
+    for block in blocks:
+        penalized[block.columns] = True
+        embedded = np.zeros((n_columns, block.null_space.shape[1]))
+        embedded[block.columns] = block.null_space
+        parts.append(embedded)
+    return np.hstack([np.eye(n_columns)[:, ~penalized], *parts])
+
+
 def _log_pdet(blocks: Sequence[PenaltyBlock], rho: np.ndarray) -> float:
     """``log|S|_+`` of the disjoint blocks at ``rho``."""
     return float(sum(b.rank * r + b.log_pdet for b, r in zip(blocks, rho, strict=True)))
@@ -369,7 +392,9 @@ def reml_and_derivatives(
             raise ValueError("the Gaussian scale is profiled; pass aux=None")
         return _gaussian_profiled(X, y, blocks, rho, S, start, derivatives)
 
-    fit = penalized_newton(lik, X, y, aux, S, start)
+    fit = penalized_newton(
+        lik, X, y, aux, S, start, free_basis=free_basis(blocks, n_columns)
+    )
     if not fit.converged:
         return RemlScore(np.inf, None, None, fit, 1.0)
     b, A = fit.beta, fit.A
@@ -446,7 +471,15 @@ def _gaussian_profiled(
     """
     n_rows, n_columns = X.shape
     working = float(np.var(y))
-    pls = penalized_newton(Gaussian(), X, y, working, S / working, beta0)
+    pls = penalized_newton(
+        Gaussian(),
+        X,
+        y,
+        working,
+        S / working,
+        beta0,
+        free_basis=free_basis(blocks, n_columns),
+    )
     if not pls.converged:
         return RemlScore(np.inf, None, None, pls, np.nan)
     b = pls.beta

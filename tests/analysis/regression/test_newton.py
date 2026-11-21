@@ -13,7 +13,16 @@ from continuum_swr_replay.analysis.regression.likelihoods import (
     GroupedSoftmax,
     Poisson,
 )
-from continuum_swr_replay.analysis.regression.newton import NewtonFit, penalized_newton
+from continuum_swr_replay.analysis.regression.newton import (
+    CONVERGED,
+    HALVING_FAILED,
+    NO_FINITE_MAXIMUM,
+    NOT_IDENTIFIED,
+    NOT_POSITIVE_DEFINITE,
+    STEP_LIMIT,
+    NewtonFit,
+    penalized_newton,
+)
 from continuum_swr_replay.analysis.replay_models.fitting import fit_conditional_poisson
 
 
@@ -224,3 +233,87 @@ def test_last_step_below_the_objective_rounding_is_taken() -> None:
     assert fit.converged
     assert np.max(np.abs(delta)) > 1e-9
     np.testing.assert_allclose(fit.beta, optimum, rtol=0, atol=1e-12)
+
+
+def _separated_cases() -> dict[str, tuple]:
+    """Fits whose likelihood has no finite maximum along one direction.
+
+    - a logistic 0/1 column whose rows are all y = 1;
+    - a Poisson 0/1 cell with no events;
+    - a logistic continuous column that quasi-separates the outcome (y = 1
+      above zero, y = 0 below, both at zero), its other values at least 0.5
+      from zero.
+    """
+    rng = np.random.default_rng(1)
+    x = rng.normal(size=300)
+    high = (x > 1.5).astype(float)
+    y = (rng.uniform(size=300) < 0.3).astype(float)
+    y[high == 1] = 1.0
+    logistic = (Bernoulli(), np.column_stack([np.ones(300), x, high]), y, None)
+    counts = rng.poisson(1.0, size=300).astype(float)
+    counts[high == 1] = 0.0
+    poisson = (Poisson(), np.column_stack([np.ones(300), high]), counts, np.zeros(300))
+    away = rng.choice([-1.0, 1.0], size=200) * rng.uniform(0.5, 2.0, size=200)
+    z = np.r_[away, np.zeros(10)]
+    quasi_y = np.r_[(z[:200] > 0).astype(float), np.tile([0.0, 1.0], 5)]
+    quasi = (Bernoulli(), np.column_stack([np.ones(210), z]), quasi_y, None)
+    return {"logistic_cell": logistic, "poisson_cell": poisson, "quasi": quasi}
+
+
+@pytest.mark.parametrize("name", ["logistic_cell", "poisson_cell", "quasi"])
+def test_separation_has_no_finite_maximum(name: str) -> None:
+    """The decrement goes to zero while a coefficient runs to infinity: the fit
+    is not converged, and says why."""
+    lik, X, y, aux = _separated_cases()[name]
+    p = X.shape[1]
+    fit = penalized_newton(lik, X, y, aux, np.zeros((p, p)), np.zeros(p))
+    assert not fit.converged
+    assert fit.status == NO_FINITE_MAXIMUM
+
+
+def test_each_status() -> None:
+    """Every way the fit ends has its own status."""
+    X, y = _logistic_data()
+    S = np.zeros((2, 2))
+    fit = penalized_newton(Bernoulli(), X, y, None, S, np.zeros(2))
+    assert fit.converged and fit.status == CONVERGED
+
+    short = penalized_newton(
+        Bernoulli(), X, y, None, S, np.array([25.0, -30.0]), max_iter=2
+    )
+    assert short.status == STEP_LIMIT and not short.converged
+
+    with np.errstate(over="ignore", invalid="ignore"):
+        overflow = penalized_newton(
+            Poisson(),
+            np.array([[1.0], [2.0]]),
+            np.array([1.0, 2.0]),
+            np.zeros(2),
+            np.zeros((1, 1)),
+            np.array([800.0]),
+        )
+    assert overflow.status == NOT_POSITIVE_DEFINITE
+
+    class _Uphill(Bernoulli):
+        """The Bernoulli with the score's sign flipped: no step lowers F."""
+
+        def score_eta(self, eta, y, aux):
+            return -super().score_eta(eta, y, aux)
+
+    uphill = penalized_newton(_Uphill(), X, y, None, S, np.array([0.3, 1.0]))
+    assert uphill.status == HALVING_FAILED and not uphill.converged
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_a_collinear_design_is_not_fitted(seed: int) -> None:
+    """A duplicated column (up to its scale) is refused before any step,
+    whatever the rounding of the information's Cholesky factor (on these 20
+    seeds it succeeds at the start on 11)."""
+    rng = np.random.default_rng(seed)
+    x = rng.uniform(size=300)
+    X = np.column_stack([np.ones(300), x, 3.0 * x])
+    y = rng.poisson(np.exp(0.5 + np.sin(3.0 * x))).astype(float)
+    fit = penalized_newton(
+        Poisson(), X, y, np.zeros(300), np.zeros((3, 3)), np.zeros(3)
+    )
+    assert fit.status == NOT_IDENTIFIED and not fit.converged

@@ -19,6 +19,21 @@ NEWTON_MAX_STEPS = 100
 MAX_STEP_HALVINGS = 30
 MAX_STEP_LENGTH = 10.0
 
+# A decrement below the tolerance is a finite maximum only if its Newton step
+# moves the linear predictor by at most NO_MAXIMUM_ETA_STEP on every row
+# (``max |X @ step|``, on the link scale, whatever the columns' units). Where
+# the likelihood has no finite maximum along a direction (a 0/1 column whose
+# rows all have y = 1, a Poisson cell with no events), the decrement goes to
+# zero while each step still moves eta by about one.
+NO_MAXIMUM_ETA_STEP = 0.1
+
+# The design identifies the coefficients the penalty leaves free (unpenalized
+# columns, penalties' null spaces) when the Gram matrix of those columns of
+# ``X``, each scaled to unit length, has its smallest eigenvalue above
+# IDENTIFIABILITY_TOL (1 - R^2 of a column on the others is at least that): an
+# exactly collinear design gives rounding, about 1e-16.
+IDENTIFIABILITY_TOL = 1e-12
+
 # Bounds of every log penalty strength in the REML search.
 LOG_PENALTY_BOUNDS = (-10.0, 20.0)
 

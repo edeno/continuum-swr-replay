@@ -123,7 +123,9 @@ def per_bin_coefficients(
         start,
     )
     if not ours.converged:
-        raise ValueError(f"{spec.name}: the shared fitter did not converge")
+        raise ValueError(
+            f"{spec.name}: the shared fitter did not converge ({ours.status})"
+        )
     return (
         pd.Series(ours.beta, index=X.columns),
         current[X.columns],
@@ -178,7 +180,7 @@ def content_coefficients(
         np.zeros(len(predictors)),
     )
     if not ours.converged:
-        raise ValueError("the shared grouped softmax did not converge")
+        raise ValueError(f"the shared grouped softmax did not converge ({ours.status})")
     current = pd.Series({name: fit[f"coef_{name}"] for name in predictors})
     return pd.Series(ours.beta, index=predictors), current
 
