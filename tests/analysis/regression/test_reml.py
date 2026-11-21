@@ -1315,3 +1315,26 @@ def test_gradient_and_hessian_at_strong_penalties(rho: float) -> None:
     numeric_hessian = (4 * hessian(0.025) - hessian(0.05)) / 3
     np.testing.assert_allclose(at.gradient, numeric_gradient, rtol=1e-4, atol=1e-11)
     np.testing.assert_allclose(at.hessian, numeric_hessian, rtol=1e-3, atol=1e-10)
+
+
+def test_a_softmax_design_collinear_within_events_is_named() -> None:
+    """A content session with a column that equals its first role column plus
+    a constant per event: the softmax cannot tell the two apart. The search
+    raises as "design not identified", naming the two columns."""
+    sessions = []
+    for seed in range(5):
+        data, blocks = _content_session(seed)
+        rng = np.random.default_rng(seed)
+        if seed == 2:
+            level = np.repeat(rng.normal(size=data.X.shape[0] // 6), 6)
+            extra = data.X[:, 9] + level
+        else:
+            extra = rng.normal(size=data.X.shape[0])
+        X = np.column_stack([data.X, extra])
+        sessions.append(SessionData(X, data.y, data.aux, name=f"s{seed}"))
+    message = (
+        r"session 2 \(s2\): design not identified .*collinear to the likelihood: "
+        r"column 9, column 11\)"
+    )
+    with pytest.raises(ValueError, match=message):
+        select_penalties(GroupedSoftmax(), sessions, blocks)

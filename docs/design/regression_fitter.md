@@ -284,6 +284,18 @@ the direction of a session without a finite maximum lies in the coordinates the
 penalty leaves free, whatever its strength. It is kept as a check, and on the
 reproductions it never succeeded; the sessions fitted were fitted with columns left out.
 
+On the simulated content model (242 sessions per model and kind; 2026-11-21) the M0 and
+M1 models without SWR set aside 4 sessions each, all "no finite maximum"; each was
+fitted at the chosen log strength (2.57 and 2.95) with 5 or 6 arm and role columns
+inactive, in one round, so no session is without a fit and 238 sessions chose the
+penalty. The models with SWR set aside none and end at the bound, every session a
+line. With two smooths (M3) the search raises at the reference point: one session's
+design is not identified for the grouped softmax (columns 21 to 24 and 28 are
+collinear within events, which the study's per-column support rule did not see); it
+was set aside before, and earlier still its fit failed as "information not positive
+definite". With that session and the separated ones left out by the study's own
+screen, M3 returns `[5.30, 19.38]` without SWR and `[19.70, 20]` with it.
+
 There is no fallback: if no grid point gives a finite score over the sessions kept,
 `select_penalties` raises, naming the sessions that failed and why, and the model is not
 fitted. A search that does not converge (50 steps, or a step no halving accepts) raises

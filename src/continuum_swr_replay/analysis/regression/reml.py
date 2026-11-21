@@ -56,6 +56,7 @@ import scipy.linalg
 
 from .constants import (
     AT_BOUNDARY_MARGIN,
+    IDENTIFIABILITY_TOL,
     LOG_PENALTY_BOUNDS,
     MAX_FAILING_SHARE,
     MAX_STEP_HALVINGS,
@@ -1403,7 +1404,30 @@ def _zero_columns(
             "columns the likelihood cannot see (zero on every row; for the grouped "
             f"softmax, constant within every group): {zero.tolist()}"
         )
-    return "no column the likelihood cannot see alone; some columns are collinear"
+    # The free coordinates (unpenalized columns, blocks' null spaces) the
+    # likelihood sees, each scaled to unit length; the right singular vectors
+    # of the smallest singular values name the combinations it cannot tell
+    # apart.
+    names, parts = [], []
+    for column in np.flatnonzero(free):
+        names.append(FreeDirection(None, int(column), True))
+        parts.append(seen[:, column])
+    for b, block in enumerate(blocks):
+        null = seen[:, block.columns] @ block.null_space
+        for q in range(null.shape[1]):
+            names.append(FreeDirection(b, q, True))
+            parts.append(null[:, q])
+    coordinates = np.column_stack(parts)
+    coordinates = coordinates / np.linalg.norm(coordinates, axis=0)
+    _, singular, vectors = np.linalg.svd(coordinates, full_matrices=False)
+    collinear = sorted(
+        {
+            j
+            for k in np.flatnonzero(singular**2 <= IDENTIFIABILITY_TOL)
+            for j in np.flatnonzero(np.abs(vectors[k]) > 0.1)
+        }
+    )
+    return "collinear to the likelihood: " + ", ".join(str(names[j]) for j in collinear)
 
 
 def _refit(
