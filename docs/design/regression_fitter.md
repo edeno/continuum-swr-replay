@@ -604,25 +604,30 @@ The declared family of estimands built from these contrasts is
 
 ## Folds
 
-There is one fold rule (`folds.py`). Inside an epoch each row (a time bin, or an event
-placed by its start) belongs to a trial segment: from a departure from a well to the
-next departure, so the run to a well and the whole stay there are one segment. Its class
-is the destination well. A segment longer than `MAX_SEGMENT_S = 30` s is cut into equal
-pieces, so that a long stay is spread over the folds; the pieces of one segment can fall
-in different folds, so one long stay can span two folds. The cap is a number of rows: 30 s
-at the median spacing of the rows. A piece of evenly spaced bins is therefore at most 30 s,
-and a piece of events, which are not evenly spaced, can span more or less time. The rows'
-times must be strictly increasing, one row per bin or per event: a model with several rows
-per event (one per candidate arm) makes the folds on the events and gives each event's
-rows its fold. The folds are scikit-learn's `StratifiedGroupKFold` with `N_FOLDS = 5` and no
-shuffling, the class a row's segment's and the group its piece. Every row of a piece is
-in one fold, and each class is spread over the folds as evenly as whole pieces allow.
-The folds do not depend on a seed.
+There is one fold rule in the project, in `analysis/regression/folds.py`; its rules are
+stated there. Inside an epoch each row (a time bin, or an event placed by its start)
+belongs to a trial segment: from a departure from a well to the next departure, so the
+run to a well and the whole stay there are one segment, its class the destination well.
+A segment longer than `MAX_SEGMENT_S = 30` s (a number of rows at the median row
+spacing) is cut into equal pieces, so a long stay is spread over the folds and can span
+two of them. The folds are scikit-learn's `StratifiedGroupKFold` with `N_FOLDS = 5` and
+no shuffling, the class a row's segment's and the group its piece: every row of a piece
+is in one fold, each class is spread over the folds as evenly as whole pieces allow, and
+the folds do not depend on a seed. The rows' times must be strictly increasing; a model
+with several rows per event (one per candidate arm) makes the folds on the events and
+gives each event's rows its fold.
+
+The held-out scores of the event evidence use the same rule:
+`analysis/event_evidence/tetrode_holdout.py`'s `epoch_folds` gives each epoch's decode
+bins their folds (`trial_folds_and_groups`, which also returns the segments and groups the
+counts are recorded from) for the held-out tetrode score and the non-local restriction
+run. On the 242 analyzed epochs the folds it makes from the session cache's trials equal
+the folds the restriction run stored, and their counts of segments and groups equal its
+records (`.claude/research/nonlocal_restriction_cohort_checks/folds_from_cache_check.py`,
+2026-11-21); the held-out tetrode run records the same counts, trial shares and margins.
 
 Folds compare designs and check over-fitting. They do not choose penalties, and they are
 not the test that an effect exists. A held-out claim is made on the sum over sessions.
-The rule is copied from `trial_folds` on the branch `swr-trial-folds`; when that branch
-merges, its code calls this one.
 
 ## Bands
 

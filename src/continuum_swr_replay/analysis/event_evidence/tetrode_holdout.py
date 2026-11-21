@@ -5,11 +5,12 @@ coding does?
 The events are fixed by the all-tetrode decode (the canonical event table). For
 each epoch:
 
-1. **Time folds.** The epoch's bins are split into the :data:`N_FOLDS` folds
-   the caller gives with their margin; the runner
-   (``scripts/event_evidence/score_tetrode_holdout.py``) gives whole trials
-   balanced by destination well (:func:`trial_folds`, with a margin of
-   :data:`TRIAL_MARGIN_S`). The folds are whole trials because the animal
+1. **Time folds.** The epoch's bins are split into the folds the caller gives
+   with their margin; the runner
+   (``scripts/event_evidence/score_tetrode_holdout.py``) gives the project's
+   fold rule (:func:`epoch_folds`: ``analysis/regression/folds.py``'s
+   ``N_FOLDS`` folds of whole trials balanced by destination well, with a
+   margin of :data:`TRIAL_MARGIN_S`). The folds are whole trials because the animal
    stays in one patch for long stretches: a place visited in only one stretch
    of time would have no data in that stretch's held-out encoding.
    Every tetrode's encoding is refit, once per fold, on the decode's own
@@ -82,14 +83,19 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
     spikes_in_bins,
     training_spike_bins,
 )
+from continuum_swr_replay.analysis.regression.folds import (
+    MAX_SEGMENT_S,
+    MIN_TRIAL_BIN_SHARE,
+    N_FOLDS,
+    task_segment_starts,
+    trial_bin_share,
+    trial_folds_and_groups,
+)
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.intervals import sample_step
 
-N_FOLDS = 5
-"""Folds per epoch; each fold's encodings are fit on the others."""
-
 TRIAL_MARGIN_S = 1.0
-"""The margin of :func:`trial_folds`' folds, s: training bins this close to any
+"""The margin of :func:`epoch_folds`' folds, s: training bins this close to any
 bin of a fold are left out of its encodings' fit. A trial fold is many separate
 segments, so its scored bins neighbor other folds' training bins many times an
 epoch. The margin guarantees that no bin is scored under an encoding fit on its
@@ -98,25 +104,6 @@ not keep every event within one fold: an event that spans a change of fold has
 its parts scored under different folds' encodings, and a part that lies farther
 than the margin from the change may be among the training bins of the encoding
 that scores the other part."""
-
-MAX_SEGMENT_S = 30.0
-"""The longest piece of a segment :func:`trial_folds` keeps whole, s: a longer
-segment is cut into equal pieces, each its own group, so a long stay is spread
-over the folds."""
-
-BEFORE_FIRST_TRIAL = -1
-"""The class of the segment before an epoch's first trial."""
-
-AFTER_LAST_TRIAL = -2
-"""The class of the segment after an epoch's last trial."""
-
-MIN_TRIAL_BIN_SHARE = 0.8
-"""The smallest share of an epoch's bins that its trials must cover
-(:func:`task_segment_starts`). Over the 242 analyzed epochs the trials cover
-93 % to 99.97 % (median 98.7 %; the time before the first trial is at most 65 s
-and after the last at most 120 s), so a smaller share means the trials are not
-on the decode's clock, where every bin would fall outside them and the cap would
-cut the epoch into blocks of one class."""
 
 NO_SPIKE = "No-Spike"
 LOCAL = "Local"
@@ -131,7 +118,7 @@ def fold_blocks(time: NDArray, n_folds: int, folds: NDArray) -> NDArray[np.int64
         The decode's time axis, s, increasing.
     n_folds : int
     folds : ndarray of int, shape (n_time,)
-        Each bin's fold, 0 .. n_folds - 1 (for example :func:`trial_folds`).
+        Each bin's fold, 0 .. n_folds - 1 (for example :func:`epoch_folds`).
 
     Returns
     -------
@@ -155,268 +142,9 @@ def fold_blocks(time: NDArray, n_folds: int, folds: NDArray) -> NDArray[np.int64
     return blocks
 
 
-def trial_segments(time: NDArray, segment_starts: NDArray) -> NDArray[np.int64]:
-    """Each bin's segment: segment i runs from ``segment_starts[i]`` up to the
-    next start. Bins before the first start belong to segment 0, bins after the
-    last start to the last segment.
-
-    Parameters
-    ----------
-    time : ndarray, shape (n_time,)
-        The decode's time axis, s, increasing.
-    segment_starts : ndarray, shape (n_segments,)
-        Each segment's first time, s, strictly increasing.
-
-    Returns
-    -------
-    ndarray of int, shape (n_time,)
-        0 .. n_segments - 1.
-
-    Raises
-    ------
-    ValueError
-        When there is no start, or the starts are not finite and strictly
-        increasing.
-    """
-    starts = np.asarray(segment_starts, dtype=float)
-    if starts.size == 0:
-        raise ValueError("no segment starts")
-    if not np.isfinite(starts).all() or (np.diff(starts) <= 0).any():
-        raise ValueError("segment starts must be finite and strictly increasing")
-    segment = np.searchsorted(starts, np.asarray(time, dtype=float), side="right") - 1
-    return np.maximum(segment, 0).astype(np.int64)
-
-
-def trial_bin_share(time: NDArray, departures: NDArray, last_trial_end: float) -> float:
-    """The share of the bins from the first departure to the last trial's end.
-
-    Parameters
-    ----------
-    time : ndarray, shape (n_time,)
-    departures : ndarray, shape (n_trials,)
-        s, increasing.
-    last_trial_end : float
-        s.
-    """
-    time = np.asarray(time, dtype=float)
-    first = float(np.asarray(departures, dtype=float)[0])
-    return float(np.mean((time >= first) & (time < last_trial_end)))
-
-
-def task_segment_starts(
-    time: NDArray,
-    departures: NDArray,
-    destinations: NDArray,
-    last_trial_end: float,
-) -> tuple[NDArray[np.float64], NDArray[np.int64]]:
-    """The segments of an epoch of the bandit task and their classes.
-
-    One segment per trial, from its departure from a well (``movement_start_time``,
-    the final poke-out at its origin) to the next departure, so the run to a well
-    and the whole stay there are one segment, its class the destination well
-    (``to_well``). The time before the first departure is a segment of class
-    :data:`BEFORE_FIRST_TRIAL` and the time from the last trial's end (its final
-    poke-out at its destination, ``end_time``) a segment of class
-    :data:`AFTER_LAST_TRIAL`, when the epoch has bins there.
-
-    Parameters
-    ----------
-    time : ndarray, shape (n_time,)
-        The decode's time axis, s, increasing.
-    departures : ndarray, shape (n_trials,)
-        Each trial's departure, s, strictly increasing.
-    destinations : ndarray of int, shape (n_trials,)
-        Each trial's destination well.
-    last_trial_end : float
-        The last trial's end, s, after its departure.
-
-    Returns
-    -------
-    starts : ndarray, shape (n_segments,)
-        Each segment's first time, s (:func:`trial_segments`).
-    classes : ndarray of int, shape (n_segments,)
-
-    Raises
-    ------
-    ValueError
-        When there is no trial, a destination is missing, the departures and
-        destinations differ in length, the last trial ends before it departs, a
-        departure lies outside the time axis, or the trials cover less than
-        :data:`MIN_TRIAL_BIN_SHARE` of the bins (:func:`trial_bin_share`): the
-        trials are then not on the decode's clock.
-    """
-    time = np.asarray(time, dtype=float)
-    departures = np.asarray(departures, dtype=float)
-    destinations = np.asarray(destinations)
-    if departures.size == 0:
-        raise ValueError("no trials")
-    if destinations.shape != departures.shape:
-        raise ValueError(
-            f"{destinations.size} destinations for {departures.size} departures"
-        )
-    if destinations.dtype.kind == "f" and not np.isfinite(destinations).all():
-        raise ValueError("every trial needs a destination well")
-    if not last_trial_end > departures[-1]:
-        raise ValueError("the last trial ends before its departure")
-    if departures[0] < time[0] or departures[-1] > time[-1]:
-        raise ValueError(
-            f"departures from {departures[0]} to {departures[-1]} s lie outside "
-            f"the time axis ({time[0]} to {time[-1]} s): are the trials on the "
-            "decode's clock?"
-        )
-    share = trial_bin_share(time, departures, last_trial_end)
-    if share < MIN_TRIAL_BIN_SHARE:
-        raise ValueError(
-            f"the trials cover {share:.1%} of the bins, less than "
-            f"{MIN_TRIAL_BIN_SHARE:.0%}: are the trials on the decode's clock?"
-        )
-    starts = [departures]
-    classes = [destinations.astype(np.int64)]
-    if departures[0] > time[0]:
-        starts.insert(0, time[:1])
-        classes.insert(0, np.array([BEFORE_FIRST_TRIAL]))
-    if last_trial_end <= time[-1]:
-        starts.append(np.array([last_trial_end]))
-        classes.append(np.array([AFTER_LAST_TRIAL]))
-    return np.concatenate(starts), np.concatenate(classes)
-
-
-def capped_groups(
-    time: NDArray, segment: NDArray, max_segment_s: float | None = MAX_SEGMENT_S
-) -> NDArray[np.int64]:
-    """Each bin's group: its segment, cut into equal pieces where the segment
-    is longer than ``max_segment_s``.
-
-    A segment of ``n`` bins longer than the cap (``m`` bins, the cap over the
-    median bin width, rounded down) is cut into ``ceil(n / m)`` pieces of
-    consecutive bins whose lengths differ by at most one bin, each at most
-    ``m`` bins; a segment of at most ``m`` bins is one group.
-
-    Parameters
-    ----------
-    time : ndarray, shape (n_time,)
-    segment : ndarray of int, shape (n_time,)
-        Each bin's segment (:func:`trial_segments`), nondecreasing.
-    max_segment_s : float or None
-        The cap, s; None leaves every segment whole.
-
-    Returns
-    -------
-    ndarray of int, shape (n_time,)
-        0 .. n_groups - 1, nondecreasing.
-    """
-    segment = np.asarray(segment, dtype=np.int64)
-    if (np.diff(segment) < 0).any():
-        raise ValueError("segments must be runs of consecutive bins")
-    first = np.r_[0, np.flatnonzero(np.diff(segment)) + 1]
-    lengths = np.diff(np.r_[first, segment.size])
-    if max_segment_s is None:
-        pieces = np.ones(lengths.size, dtype=np.int64)
-    else:
-        bin_s = sample_step(np.asarray(time, dtype=float))
-        cap_bins = max(int(np.floor(max_segment_s / bin_s + 1e-6)), 1)
-        pieces = -(-lengths // cap_bins)  # ceil
-    run = np.repeat(np.arange(lengths.size), lengths)
-    rank = np.arange(segment.size) - first[run]
-    piece = rank * pieces[run] // lengths[run]
-    offset = np.r_[0, np.cumsum(pieces)[:-1]]
-    return (offset[run] + piece).astype(np.int64)
-
-
-def trial_folds(
-    time: NDArray,
-    segment_starts: NDArray,
-    segment_classes: NDArray,
-    n_folds: int = N_FOLDS,
-    max_segment_s: float | None = MAX_SEGMENT_S,
-) -> NDArray[np.int64]:
-    """Each bin's fold: whole groups of bins, the folds balanced by class.
-
-    scikit-learn's ``StratifiedGroupKFold(n_splits=n_folds, shuffle=False)``
-    with one sample per bin, its class the class of the bin's segment
-    (:func:`trial_segments`) and its group the bin's piece of that segment
-    (:func:`capped_groups`: a segment longer than ``max_segment_s`` is cut into
-    equal pieces, so a long stay is spread over the folds). Every bin of a group
-    is in one fold, and each class's time is spread over the folds as evenly as
-    whole groups allow. Deterministic: without shuffling the splitter places the
-    groups in a fixed order (the most bins first).
-
-    With the segments of :func:`task_segment_starts` the folds sample every well
-    with at least ``n_folds`` groups in every fold, where folds of time would
-    leave a patch the animal visits in one stretch of the epoch to a single
-    fold. A well with fewer groups is not: its stays are
-    scored with encodings that may have no other stay there, which the per-bin
-    ``place_sampling_s`` (:func:`place_sampling`) and the runner's
-    ``immobile_share_place_sampling_0s`` show.
-
-    Parameters
-    ----------
-    time : ndarray, shape (n_time,)
-        The decode's time axis, s, increasing.
-    segment_starts : ndarray, shape (n_segments,)
-        Each segment's first time, s, strictly increasing.
-    segment_classes : ndarray of int, shape (n_segments,)
-        Each segment's class.
-    n_folds : int
-    max_segment_s : float or None
-        The longest group, s; None leaves every segment whole.
-
-    Returns
-    -------
-    ndarray of int, shape (n_time,)
-        0 .. n_folds - 1; every fold has bins.
-
-    Raises
-    ------
-    ValueError
-        When the classes are not one per start or not all finite, when fewer
-        groups than ``n_folds`` hold a bin, or when a fold is left empty.
-    """
-    return _trial_folds_and_groups(
-        time, segment_starts, segment_classes, n_folds, max_segment_s
-    )[0]
-
-
-def _trial_folds_and_groups(
-    time: NDArray,
-    segment_starts: NDArray,
-    segment_classes: NDArray,
-    n_folds: int,
-    max_segment_s: float | None,
-) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
-    """:func:`trial_folds`' folds, with each bin's segment
-    (:func:`trial_segments`) and group (:func:`capped_groups`)."""
-    from sklearn.model_selection import StratifiedGroupKFold
-
-    classes = np.asarray(segment_classes)
-    if classes.shape != np.shape(segment_starts):
-        raise ValueError(
-            f"{classes.size} segment classes for {np.size(segment_starts)} starts"
-        )
-    if classes.dtype.kind == "f" and not np.isfinite(classes).all():
-        raise ValueError("every segment needs a class (a destination well)")
-    segment = trial_segments(time, segment_starts)
-    group = capped_groups(time, segment, max_segment_s)
-    n_groups = int(group[-1]) + 1
-    if n_groups < n_folds:
-        raise ValueError(
-            f"{n_groups} segments (trials) hold bins, fewer than the {n_folds} folds"
-        )
-    folds = np.full(segment.size, -1, dtype=np.int64)
-    splitter = StratifiedGroupKFold(n_splits=n_folds, shuffle=False)
-    for fold, (_, scored) in enumerate(
-        splitter.split(np.zeros(segment.size), classes[segment], group)
-    ):
-        folds[scored] = fold
-    empty = np.setdiff1d(np.arange(n_folds), folds)
-    if empty.size:
-        raise ValueError(f"folds {empty.tolist()} hold no segment")
-    return folds, segment, group
-
-
 TRIAL_DESIGN = "trials"
 """The fold design of whole trials balanced by destination well
-(:func:`trial_folds`, with a margin of :data:`TRIAL_MARGIN_S`)."""
+(:func:`epoch_folds`, with a margin of :data:`TRIAL_MARGIN_S`)."""
 
 
 def fold_settings() -> dict:
@@ -444,8 +172,16 @@ def epoch_folds(
     The segments are :func:`task_segment_starts`' (each trial from its
     ``movement_start_time`` to the next, of class ``to_well``; the time before
     the first trial and after the last trial's ``end_time``, each its own
-    class), cut into pieces of at most :data:`MAX_SEGMENT_S`
-    (:func:`trial_folds`); the margin is :data:`TRIAL_MARGIN_S`.
+    class), cut into pieces of at most ``MAX_SEGMENT_S`` and dealt into
+    ``N_FOLDS`` folds balanced by class (``analysis/regression/folds.py``,
+    ``trial_folds_and_groups``, whose segments and groups give the counts);
+    the margin is :data:`TRIAL_MARGIN_S`.
+
+    Every well with at least ``N_FOLDS`` groups is then sampled in every fold.
+    A well with fewer groups is not: its stays are scored with encodings that
+    may have no other stay there, which the per-bin ``place_sampling_s``
+    (:func:`place_sampling`) and the runner's
+    ``immobile_share_place_sampling_0s`` show.
 
     Parameters
     ----------
@@ -472,7 +208,7 @@ def epoch_folds(
     starts, classes = task_segment_starts(
         time, departures, trials["to_well"].to_numpy(), last_end
     )
-    folds, segment, group = _trial_folds_and_groups(
+    folds, segment, group = trial_folds_and_groups(
         time, starts, classes, N_FOLDS, MAX_SEGMENT_S
     )
     counts = {
@@ -507,7 +243,7 @@ def fold_training_masks(
     """The training bins of each fold's encodings: the decode's, outside the
     fold and more than ``margin_bins`` from every bin of it.
 
-    A fold may be many separate segments (:func:`trial_folds`): a training bin
+    A fold may be many separate segments (:func:`epoch_folds`): a training bin
     is left out when any bin of the fold lies within ``margin_bins`` of it.
 
     Parameters
@@ -891,7 +627,7 @@ def heldout_terms(
         The decode's training bins.
     n_folds : int
     folds : ndarray of int, shape (n_time,)
-        Each bin's fold, 0 .. n_folds - 1 (for example :func:`trial_folds`).
+        Each bin's fold, 0 .. n_folds - 1 (for example :func:`epoch_folds`).
     margin_bins : int
         Training bins within this many bins of a fold are left out of its
         encodings' fit (:func:`fold_training_masks`).
@@ -993,7 +729,7 @@ def holdout_scores(
         ``window_id``, ``s`` and ``e`` (first and last bin, inclusive).
     n_folds : int
     folds : ndarray of int, shape (n_time,)
-        Each bin's fold, 0 .. n_folds - 1 (for example :func:`trial_folds`).
+        Each bin's fold, 0 .. n_folds - 1 (for example :func:`epoch_folds`).
     margin_bins : int
         Training bins within this many bins of a fold are left out of its
         encodings' fit (:func:`fold_training_masks`).

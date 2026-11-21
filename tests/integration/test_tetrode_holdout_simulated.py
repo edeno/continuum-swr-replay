@@ -30,6 +30,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
     refit_encoding,
     training_spike_bins,
 )
+from continuum_swr_replay.analysis.regression import folds as fo
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from tests.support import tetrode_holdout_simulation as sim
 from tests.support._time_blocks import TIME_BLOCK_MARGIN_BINS, time_blocks
@@ -129,7 +130,7 @@ def inserted_trials(recording):
     recording, detector = recording
     windows, is_missing, first = _inserted_windows(recording)
     starts, classes = sim.trials(recording)
-    folds = th.trial_folds(recording.time, starts, classes, th.N_FOLDS)
+    folds = fo.trial_folds(recording.time, starts, classes, fo.N_FOLDS)
     margin = th.margin_in_bins(th.TRIAL_MARGIN_S, recording.time)
     scores = _score(
         detector, recording, windows, is_missing, folds=folds, margin_bins=margin
@@ -370,7 +371,7 @@ def test_no_scored_spike_trained_the_encoding_that_scores_it(recording, monkeypa
         refit=refit,
         log=sim.quiet,
     )
-    assert len(masks) == th.N_FOLDS and len(scored) == th.N_FOLDS
+    assert len(masks) == fo.N_FOLDS and len(scored) == fo.N_FOLDS
     n_scored = 0
     for encoding_id, spike_times in scored:
         trained = training_spike_bins(recording.time, position, masks[encoding_id])
@@ -392,7 +393,7 @@ def test_trial_folds_change_only_the_encodings(inserted, inserted_trials):
     contiguous blocks), a local burst under 0.02 nats per spike."""
     scores, contiguous, _ = inserted
     trial_scores, per_window, _, folds = inserted_trials
-    assert (np.diff(folds) != 0).sum() > th.N_FOLDS - 1  # interleaved, not blocks
+    assert (np.diff(folds) != 0).sum() > fo.N_FOLDS - 1  # interleaved, not blocks
     key = ["window_id", "tetrode", "n_bins", "n_scored_bins", "n_spikes"]
     pd.testing.assert_frame_equal(scores[key], trial_scores[key])
     assert not np.allclose(scores["gain"], trial_scores["gain"])

@@ -10,7 +10,7 @@ canonical event rule (``heldout_events.labeled_frame`` and
 non-local probabilities. Each fold's bins were scored under the decoder fit on
 the other folds, so these events are chosen without the decoder having seen
 their bins. A trial segment (the run to a well and the whole stay there) longer
-than ``tetrode_holdout.MAX_SEGMENT_S`` (30 s) is cut into pieces of at most
+than ``regression.folds.MAX_SEGMENT_S`` (30 s) is cut into pieces of at most
 30 s that can fall in different folds, so a small share of the events span two
 folds: their probability trace and per-bin scores come from two fits, each bin
 still scored under a fit that did not see it. Then sum the restriction scores over each event

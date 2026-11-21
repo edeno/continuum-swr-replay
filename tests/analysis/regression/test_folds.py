@@ -46,6 +46,9 @@ def test_trial_folds_rules() -> None:
     assert set(np.unique(folds)) == set(range(fo.N_FOLDS))
     for g in np.unique(group):
         assert np.unique(folds[group == g]).size == 1
+    # No trial is longer than the cap here, so every trial is in one fold.
+    for s in np.unique(segment):
+        assert np.unique(folds[segment == s]).size == 1
     np.testing.assert_array_equal(folds, fo.trial_folds(time, starts, classes))
 
     # Classes balanced: each fold holds a fifth of each class's time.
@@ -72,6 +75,7 @@ def test_capped_groups_cut_a_long_segment_into_equal_pieces_within_the_cap() -> 
     sizes = np.bincount(group)
     # 95 s -> 4 pieces of 23.7-23.8 s; 30 s whole; 10 s whole; 65 s -> 3 pieces
     np.testing.assert_array_equal(sizes, [238, 237, 238, 237, 300, 100, 217, 217, 216])
+    assert sizes.max() * 0.1 <= 30.0
     for g in np.unique(group):
         assert np.unique(segment[group == g]).size == 1
     np.testing.assert_array_equal(fo.capped_groups(time, segment, None), segment)
@@ -133,8 +137,11 @@ def test_trials_off_the_rows_clock_raise() -> None:
     wells = np.tile([2, 3], 25)[:49]
     fo.task_segment_starts(time, departures, wells, 1595.0)
     assert fo.trial_bin_share(time, departures, 1595.0) == pytest.approx(0.975)
+    # in milliseconds, or offset past the epoch: the departures leave the axis
     with pytest.raises(ValueError, match="outside the time axis"):
         fo.task_segment_starts(time, departures * 1000.0, wells, 1595.0 * 1000.0)
+    with pytest.raises(ValueError, match="outside the time axis"):
+        fo.task_segment_starts(time, departures + 600.0, wells, 2195.0)
     with pytest.raises(ValueError, match="cover 19.8% of the bins"):
         fo.task_segment_starts(time, departures[:12], wells[:12], 1129.0)
 
@@ -167,6 +174,15 @@ def test_row_times_must_be_strictly_increasing() -> None:
             fo.trial_folds(rows, starts, classes)
         with pytest.raises(ValueError, match="one row per event or per bin"):
             fo.capped_groups(rows, fo.trial_segments(rows, starts))
+
+
+def test_trial_folds_and_groups_return_the_segments_and_groups_of_the_folds() -> None:
+    rng = np.random.default_rng(4)
+    time, starts, classes = _trials(rng.uniform(5, 60, 30), rng.integers(0, 6, 30))
+    folds, segment, group = fo.trial_folds_and_groups(time, starts, classes)
+    np.testing.assert_array_equal(folds, fo.trial_folds(time, starts, classes))
+    np.testing.assert_array_equal(segment, fo.trial_segments(time, starts))
+    np.testing.assert_array_equal(group, fo.capped_groups(time, segment))
 
 
 def test_the_cap_is_a_number_of_rows_at_the_median_spacing() -> None:

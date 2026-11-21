@@ -69,13 +69,14 @@ exp(ll[t])``:
   likelihood.
 
 **Holding out the whole decoder** (:func:`fold_fit_scores`). The epoch's bins
-are split into the :data:`~.tetrode_holdout.N_FOLDS` folds the caller gives;
-the runner's folds are whole trials balanced by destination well
-(:func:`.tetrode_holdout.trial_folds`), with a margin of
-:data:`~.tetrode_holdout.TRIAL_MARGIN_S`. The time before the first trial and after the last
-are segments of their own two classes, and a segment longer than
-:data:`~.tetrode_holdout.MAX_SEGMENT_S` is cut into equal pieces, so a long stay
-is spread over the folds. For each fold k, a detector configured as the
+are split into the folds the caller gives; the runner's folds are the
+project's fold rule (``analysis/regression/folds.py``, through
+:func:`.tetrode_holdout.epoch_folds`): ``N_FOLDS`` folds of whole trials
+balanced by destination well, with a margin of
+:data:`~.tetrode_holdout.TRIAL_MARGIN_S`. The time before the first trial and
+after the last are segments of their own two classes, and a segment longer
+than ``MAX_SEGMENT_S`` is cut into equal pieces, so a long stay is spread over
+the folds. For each fold k, a detector configured as the
 canonical one (:func:`fresh_detector`, never a copy of the fitted one) is fit
 by the library's own EM with the canonical decode's call and EM settings
 (:func:`fit_fold_detector`), its encoding trained on the decode's training bins
@@ -142,7 +143,6 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
 )
 from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     LOCAL,
-    N_FOLDS,
     NO_SPIKE,
     animal_place_bins,
     check_no_fold_leakage,
@@ -150,6 +150,7 @@ from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
     fold_training_masks,
     place_sampling,
 )
+from continuum_swr_replay.analysis.regression.folds import N_FOLDS
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
@@ -1251,7 +1252,7 @@ def fold_fit_scores(
     in_swr : ndarray of bool, shape (n_time,)
     n_folds : int
     folds : ndarray of int, shape (n_time,)
-        Each bin's fold (``tetrode_holdout.trial_folds``).
+        Each bin's fold (``tetrode_holdout.epoch_folds``).
     margin_bins : int
         Training bins within this many bins of a fold are left out of its
         encoding's fit (``tetrode_holdout.fold_training_masks``).

@@ -10,9 +10,9 @@ events are found from the held-out probabilities instead, by the canonical rule,
 on the canonical decode frame.
 
 A fold is whole trial segments (the run to a well and the whole stay there),
-but a segment longer than ``tetrode_holdout.MAX_SEGMENT_S`` (30 s) is cut into
+but a segment longer than ``regression.folds.MAX_SEGMENT_S`` (30 s) is cut into
 pieces of at most 30 s that can fall in different folds
-(``tetrode_holdout.trial_folds``). So a held-out event can span two folds (a
+(``regression.folds.trial_folds``). So a held-out event can span two folds (a
 small share do); its probability trace and its per-bin scores then come from
 two fits, each bin still scored under a fit that did not see it.
 
