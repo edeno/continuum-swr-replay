@@ -562,8 +562,8 @@ def _grid(m: int) -> list[np.ndarray]:
     return [np.array(point) for point in itertools.product(REML_GRID_POINTS, repeat=m)]
 
 
-def _grid_start(evaluate: _Evaluator, m: int) -> tuple[np.ndarray, float, int]:
-    """The best grid point, its score and the points evaluated.
+def _grid_start(evaluate: _Evaluator, m: int) -> tuple[np.ndarray, int]:
+    """The best grid point and the number of points evaluated.
 
     Raises
     ------
@@ -596,7 +596,7 @@ def _grid_start(evaluate: _Evaluator, m: int) -> tuple[np.ndarray, float, int]:
             f"no finite REML score on the grid over {LOG_PENALTY_BOUNDS}: no penalty "
             "gives a converged inner fit in every session"
         )
-    return best_rho, float(best_score), n_points
+    return best_rho, n_points
 
 
 def _free(rho: np.ndarray, gradient: np.ndarray) -> np.ndarray:
@@ -640,7 +640,7 @@ def _try_step(
 
 
 def _search(
-    evaluate: _Evaluator, start: np.ndarray, start_score: float, n_grid_points: int
+    evaluate: _Evaluator, start: np.ndarray, n_grid_points: int
 ) -> tuple[np.ndarray, PooledScore, PenaltySearch]:
     """Newton on the log penalties from ``start``.
 
@@ -654,6 +654,7 @@ def _search(
     current = evaluate(rho, derivatives=True)
     if not np.isfinite(current.score):
         raise ValueError(f"no finite REML score at the start {rho}")
+    start_score = current.score
     converged, n_steps = False, 0
     while True:
         free = _free(rho, current.gradient)
@@ -674,7 +675,7 @@ def _search(
     at_boundary = (rho - lo <= AT_BOUNDARY_MARGIN) | (hi - rho <= AT_BOUNDARY_MARGIN)
     search = PenaltySearch(
         np.array(start, dtype=float),
-        float(start_score),
+        start_score,
         n_grid_points,
         converged,
         n_steps,
@@ -729,8 +730,7 @@ def refine_penalties(
     """
     evaluate = _Evaluator(lik, sessions, blocks)
     rho0 = np.asarray(rho0, dtype=float)
-    first = evaluate(rho0, derivatives=False)
-    rho, pooled, search = _search(evaluate, rho0, first.score, 0)
+    rho, pooled, search = _search(evaluate, rho0, 0)
     return _pooled_fit(rho, pooled, blocks, search)
 
 
@@ -765,8 +765,8 @@ def select_penalties(
     if not blocks:
         raise ValueError("no penalty to select; use fit_at_penalties")
     evaluate = _Evaluator(lik, sessions, blocks)
-    start, start_score, n_points = _grid_start(evaluate, len(blocks))
-    rho, pooled, search = _search(evaluate, start, start_score, n_points)
+    start, n_points = _grid_start(evaluate, len(blocks))
+    rho, pooled, search = _search(evaluate, start, n_points)
     return _pooled_fit(rho, pooled, blocks, search)
 
 

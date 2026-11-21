@@ -262,6 +262,19 @@ def test_pooled_invariant_to_duplication() -> None:
     assert once.search.converged and twice.search.converged
     np.testing.assert_allclose(twice.rho, once.rho, rtol=0, atol=1e-6)
     assert twice.score == pytest.approx(2 * once.score, rel=1e-10)
+    assert once.search.n_grid_points == 25  # the product of five points per term
+
+
+def test_more_than_three_terms_use_one_term_grids() -> None:
+    """Four terms: two passes of one-term integer grids (2 x 4 x 31 points),
+    then Newton to a stationary point."""
+    lik, data, blocks = _session("poisson", 4, seed=10, n_rows=400)
+    result = select_penalties(lik, [data], blocks)
+    assert result.search.n_grid_points == 2 * 4 * 31
+    assert result.search.converged
+    free = ~result.search.at_boundary
+    assert np.max(np.abs(result.gradient[free])) < 1e-6 * max(1.0, abs(result.score))
+    assert result.score <= result.search.start_score
 
 
 def test_gaussian_scale_matches_closed_form() -> None:
