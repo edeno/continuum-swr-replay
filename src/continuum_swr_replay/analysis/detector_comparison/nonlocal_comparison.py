@@ -32,20 +32,24 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from continuum_swr_replay import intervals
+from continuum_swr_replay.analysis.detector_comparison.availability import (
+    still_intervals,
+    stored_coverage,
+)
 from continuum_swr_replay.analysis.detector_comparison.features import (
     STATE_SHARE_COLUMNS,
 )
 from continuum_swr_replay.analysis.detector_comparison.inventory_run import (
+    MAX_GAP_S,
     SWR_DEFINITIONS,
     TABLE_DTYPES,
     TRIGGERED,
 )
 from continuum_swr_replay.analysis.detector_comparison.pooling import (
-    cells_by_animal,
-    counts_by_animal,
-    session_tables,
+    detector_availability,
 )
 from continuum_swr_replay.analysis.detector_comparison.schema import (
     MEMORYLESS,
@@ -55,6 +59,7 @@ from continuum_swr_replay.analysis.detector_comparison.schema import (
 )
 from continuum_swr_replay.analysis.event_definition.well_visits import in_well_visit
 from continuum_swr_replay.analysis.shared_statistics import animal_session_values
+from continuum_swr_replay.parameters import DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 from continuum_swr_replay.paths import inventory_comparison_root
 from continuum_swr_replay.runs.io import ok_epochs, ok_table_paths, read_manifest
 from continuum_swr_replay.tables.io import read_table
@@ -71,8 +76,8 @@ Widloski detector's events."""
 
 _KNOWN = ["matched", "unmatched"]
 
-INVENTORY_TABLES = ("observations", "counts", "cells")
-"""The inventory run's tables :func:`left_out_statistics` pools by animal."""
+INVENTORY_TABLES = ("observations", "cells")
+"""The inventory run's tables :func:`left_out_statistics` reads."""
 
 
 def _epoch_paths(run_dir: Path, name: str) -> list[Path]:
@@ -510,106 +515,213 @@ def _intervals(table: pd.DataFrame, detectors: tuple[str, ...]) -> np.ndarray:
     return rows[["event_start_s", "event_end_s"]].to_numpy(dtype=np.float64)
 
 
-def left_out_seconds(run_dir: Path) -> dict[str, float]:
-    """Seconds of non-local event time outside each other inventory, summed over
-    the run's ``ok`` epochs.
+EXPOSURE_IN_VISITS_DIR = "nonlocal_exposure_in_well_visits"
+"""The folder, under the data root, of each epoch's non-local detector exposure
+inside the well visits (``scripts/detector_comparison/measure_exposure_in_well_visits.py``)."""
+
+
+def exposure_in_well_visits(
+    observations: pd.DataFrame,
+    set_aside: pd.DataFrame,
+    time: NDArray,
+    speed: NDArray,
+    arrival_times: NDArray,
+    departure_times: NDArray,
+) -> tuple[float, float]:
+    """One epoch's non-local detector exposure, and its part inside the well visits.
+
+    The exposure is the inventory comparison's: the time the detector observed,
+    less excluded time and the spans of the events set aside, inside the
+    epoch's still intervals (``availability.stored_coverage``, rebuilt from the
+    tables the comparison stored and the decode frame's speed trace). The
+    part inside the visits is its intersection with ``[arrival, departure)``.
+
+    Parameters
+    ----------
+    observations, set_aside : pd.DataFrame
+        The inventory run's stored ``observations`` and ``set_aside`` tables of
+        the epoch.
+    time, speed : NDArray, shape (n_time,)
+        The decode frame's grid (s) and head speed (cm/s)
+        (``inventory_run.speed_trace``).
+    arrival_times, departure_times : NDArray, shape (n_visits,)
+        The epoch's well visits (``event_tables.prepare_data.well_visit_times``).
+
+    Returns
+    -------
+    exposure_s, exposure_in_visit_s : float
+        Seconds.
+    """
+    session = tuple(observations[["animal", "day", "epoch"]].iloc[0])
+    session = (str(session[0]), int(session[1]), str(session[2]))
+    still = {
+        session: still_intervals(
+            time, speed, DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, MAX_GAP_S
+        )
+    }
+    coverage = stored_coverage(observations, set_aside, still)
+    exposure = coverage[(*session, STATE_SPACE)].exposure
+    visits = np.column_stack(
+        [
+            np.asarray(arrival_times, dtype=np.float64),
+            np.asarray(departure_times, dtype=np.float64),
+        ]
+    ).reshape(-1, 2)
+    return (
+        intervals.total_duration(exposure),
+        intervals.total_duration(intervals.intersect(exposure, visits)),
+    )
+
+
+def _selected(table: pd.DataFrame, event_ids: Iterable[object]) -> np.ndarray:
+    """Which rows of a table of the run's (or the inventory run's) non-local
+    events are among ``event_ids``: a non-local event's native key is its
+    ``event_id``."""
+    return (
+        native_event_keys(table["event_key"])
+        .isin({str(event_id) for event_id in event_ids})
+        .to_numpy()
+    )
+
+
+def left_out_seconds(
+    run_dir: Path, event_ids: Iterable[object], visits: Mapping[str, Visits]
+) -> dict[str, float]:
+    """Seconds of the selected non-local events' time outside each other
+    inventory, summed over the run's ``ok`` epochs.
 
     Each epoch's compared events (``*_features.parquet``: every inventory's
-    whole-event-immobile events): the non-local detector's event time
-    (``nonlocal``), the time Kay's SWRs span (``kay``), and, for each of
-    :data:`COVERINGS`, the part of the non-local event time that no event of
-    those inventories covers (``outside_<covering>``).
+    whole-event-immobile events): the time of the non-local events in
+    ``event_ids`` (``nonlocal``), the time the Kay SWRs whose first sample is
+    inside a well visit span (``kay``), and, for each of :data:`COVERINGS`,
+    the part of that non-local time that no event of those inventories covers,
+    wherever the covering event starts (``outside_<covering>``).
+
+    Parameters
+    ----------
+    run_dir : Path
+        The event features run.
+    event_ids : iterable
+        The selected non-local events' ``event_id``.
+    visits : Mapping
+        Each ok epoch's id to its visits' ``(arrival_times, departure_times)``.
 
     Raises
     ------
     ValueError
-        If the run has no readable manifest, or it marks no epoch ``ok``.
+        If the run has no readable manifest, it marks no epoch ``ok``, or an
+        ok epoch has no visits in ``visits``.
     """
+    event_ids = list(event_ids)
     totals = dict.fromkeys(
         ("nonlocal", "kay", *(f"outside_{name}" for name in COVERINGS)), 0.0
     )
-    for path in _epoch_paths(run_dir, "features"):
-        table = pd.read_parquet(
-            path, columns=["detector", "event_start_s", "event_end_s"]
+    identifiers = ok_epochs(read_manifest(run_dir))
+    if missing := sorted(set(identifiers) - set(visits)):
+        raise ValueError(
+            f"no well visits for {len(missing)} epochs, e.g. {missing[:3]}"
         )
-        nonlocal_ = _intervals(table, (STATE_SPACE,))
+    for identifier, path in zip(
+        identifiers, _epoch_paths(run_dir, "features"), strict=True
+    ):
+        table = pd.read_parquet(
+            path, columns=["detector", "event_key", "event_start_s", "event_end_s"]
+        )
+        is_nonlocal = (table["detector"] == STATE_SPACE).to_numpy()
+        selected = np.zeros(len(table), dtype=bool)
+        selected[is_nonlocal] = _selected(table[is_nonlocal], event_ids)
+        nonlocal_ = _intervals(table[selected], (STATE_SPACE,))
+        kay = table[table["detector"] == "kay"]
+        kay = kay[
+            in_well_visit(
+                kay["event_start_s"].to_numpy(dtype=np.float64), *visits[identifier]
+            )
+        ]
         totals["nonlocal"] += intervals.total_duration(nonlocal_)
-        totals["kay"] += intervals.total_duration(_intervals(table, ("kay",)))
+        totals["kay"] += intervals.total_duration(_intervals(kay, ("kay",)))
         for name, detectors in COVERINGS.items():
             outside = intervals.subtract(nonlocal_, _intervals(table, detectors))
             totals[f"outside_{name}"] += intervals.total_duration(outside)
     return totals
 
 
-def inventory_animal_tables(inventory_dir: Path) -> dict[str, pd.DataFrame]:
-    """The inventory run's counts and cells pooled by animal, from its tables.
-
-    The run's ``observations``, ``counts`` and ``cells`` tables of the epochs its
-    manifest marks ``ok`` (:data:`INVENTORY_TABLES`), pooled as the comparison's
-    report pools them (``pooling.session_tables``, ``pooling.counts_by_animal``,
-    ``pooling.cells_by_animal``).
-
-    Returns
-    -------
-    dict of str to DataFrame
-        ``counts_by_animal`` and ``cells_by_animal``.
-
-    Raises
-    ------
-    ValueError
-        If the run has no readable manifest, or it marks no epoch ``ok``.
-    """
-    manifest = read_manifest(inventory_dir)
-    tables = {
-        name: typed_table(
-            map(read_table, _epoch_paths(inventory_dir, name)), TABLE_DTYPES[name]
-        )
-        for name in INVENTORY_TABLES
-    }
-    by_session = session_tables(manifest, tables)
-    return {
-        "counts_by_animal": counts_by_animal(by_session["counts"]),
-        "cells_by_animal": cells_by_animal(by_session["cells"]),
-    }
-
-
-def left_out_statistics(run_dir: Path, inventory_dir: Path) -> dict[str, float]:
+def left_out_statistics(
+    run_dir: Path,
+    inventory_dir: Path,
+    event_ids: Iterable[object],
+    visits: Mapping[str, Visits],
+    exposure: pd.DataFrame,
+) -> dict[str, float]:
     """What an analysis that starts from another inventory leaves out of the
-    non-local events, in events, in event time and per hour of rest.
+    selected non-local events, in events, in event time and per hour of rest
+    inside the well visits.
 
     Parameters
     ----------
     run_dir : Path
         The event features run.
     inventory_dir : Path
-        The inventory comparison run the event features run read; its
-        exposures and cells are pooled from its tables
-        (:func:`inventory_animal_tables`).
+        The inventory comparison run the event features run read: its
+        observations (which sessions the non-local detector observed) and its
+        cells (each event's membership against the triggered inventories) of
+        the epochs its manifest marks ``ok``.
+    event_ids : iterable
+        The selected non-local events' ``event_id``
+        (``cohort_selection.select_visit_context``).
+    visits : Mapping
+        Each ok epoch's id to its visits' ``(arrival_times, departure_times)``.
+    exposure : pd.DataFrame
+        One row per ok epoch (``animal``, ``day``, ``epoch``,
+        ``exposure_in_visit_s``): the non-local detector's exposure inside the
+        well visits (:func:`exposure_in_well_visits`).
 
     Returns
     -------
     statistics : dict
-        - ``rest_hours``: hours of analyzed immobility the non-local detector
-          observed (its exposure), summed over epochs.
-        - ``nonlocal_time_s``, ``kay_time_s``: seconds the non-local events, and
-          Kay's SWRs, span (:func:`left_out_seconds`).
+        - ``rest_hours``: hours of the non-local detector's exposure inside a
+          well visit, summed over the sessions it observed.
+        - ``nonlocal_time_s``, ``kay_time_s``: seconds the selected non-local
+          events, and the Kay SWRs that start inside a visit, span
+          (:func:`left_out_seconds`).
         - For each of :data:`COVERINGS`, ``nonlocal_time_outside_<covering>_s``
-          and ``..._fraction``: the non-local event time it does not cover, in
-          seconds and as a share.
+          and ``..._fraction``: the selected non-local event time it does not
+          cover, in seconds and as a share.
         - For ``kay`` and ``widloski``, and for ``trigger`` (no SWR definition
           and no MUA event; the comparison's cell
           ``sequence_matched_by_no_trigger``): ``nonlocal_events_outside_<name>``,
-          the non-local events none of its events overlaps; ``..._fraction``,
-          their share of the non-local events with a known membership; and
-          ``..._per_hour``, per hour of ``rest_hours``.
+          the selected non-local events none of its events overlaps (wherever
+          that event starts); ``..._fraction``, their share of the selected
+          events with a known membership; and ``..._per_hour``, per hour of
+          ``rest_hours``.
+
+    Raises
+    ------
+    ValueError
+        If either run has no readable manifest or marks no epoch ``ok``, an ok
+        epoch has no visits, or ``exposure`` lacks a session the non-local
+        detector observed.
     """
-    pooled = inventory_animal_tables(inventory_dir)
-    counts = pooled["counts_by_animal"]
-    exposure_s = float(
-        counts.loc[counts["detector"] == STATE_SPACE, "exposure_s"].sum()
+    event_ids = list(event_ids)
+    session = ["animal", "day", "epoch"]
+    availability = detector_availability(
+        typed_table(
+            map(read_table, _epoch_paths(inventory_dir, "observations")),
+            TABLE_DTYPES["observations"],
+        )
     )
-    hours = exposure_s / 3600.0
-    seconds = left_out_seconds(run_dir)
+    observed = availability.loc[
+        (availability["detector"] == STATE_SPACE) & availability["available"], session
+    ]
+    exposed = observed.merge(
+        exposure[[*session, "exposure_in_visit_s"]],
+        on=session,
+        how="left",
+        validate="1:1",
+    )
+    if exposed["exposure_in_visit_s"].isna().any():
+        raise ValueError("the exposure lacks a session the non-local detector observed")
+    hours = float(exposed["exposure_in_visit_s"].sum()) / 3600.0
+    seconds = left_out_seconds(run_dir, event_ids, visits)
     statistics = {
         "rest_hours": hours,
         "nonlocal_time_s": seconds["nonlocal"],
@@ -625,17 +737,22 @@ def left_out_statistics(run_dir: Path, inventory_dir: Path) -> dict[str, float]:
     membership = _read_epochs(
         run_dir, "pair_membership", filters=[("detector", "==", STATE_SPACE)]
     )
-    known = membership[membership["membership"].isin(_KNOWN)]
+    known = membership[
+        membership["membership"].isin(_KNOWN) & _selected(membership, event_ids)
+    ]
     alone = (
         known.assign(alone=known["membership"] == "unmatched")
         .groupby("other_detector")["alone"]
         .agg(["sum", "size"])
     )
-    cells = pooled["cells_by_animal"]
-    no_trigger = cells[
+    cells = typed_table(
+        map(read_table, _epoch_paths(inventory_dir, "cells")), TABLE_DTYPES["cells"]
+    )
+    cells = cells[
         (cells["cell"] == "sequence_matched_by_no_trigger")
         & (cells["detector"] == STATE_SPACE)
-    ][["n_events", "n_unmatched", "n_unknown"]].sum()
+    ].merge(observed, on=session, how="inner")
+    no_trigger = cells.loc[_selected(cells, event_ids), "membership"]
     outside_events = {
         "kay": (int(alone.loc["kay", "sum"]), int(alone.loc["kay", "size"])),
         "widloski": (
@@ -643,8 +760,8 @@ def left_out_statistics(run_dir: Path, inventory_dir: Path) -> dict[str, float]:
             int(alone.loc[MEMORYLESS, "size"]),
         ),
         "trigger": (
-            int(no_trigger["n_unmatched"]),
-            int(no_trigger["n_events"] - no_trigger["n_unknown"]),
+            int((no_trigger == "unmatched").sum()),
+            int(no_trigger.isin(_KNOWN).sum()),
         ),
     }
     for name, (n, n_known) in outside_events.items():

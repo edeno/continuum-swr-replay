@@ -46,6 +46,7 @@ them importable.
 - `report_inventory_comparison.py` — the counts of one comparison run, per session and per animal, with figures.
 - `run_event_features.py` — the features of every compared event of the nine inventories.
 - `add_state_shares.py` — adds each compared event's decoder-state shares to an event features run.
+- `measure_exposure_in_well_visits.py` — each epoch's non-local detector exposure, rebuilt from an inventory comparison run's tables, and its part inside the well visits (the events summary's left-out rates).
 - `report_event_features.py` — the features of one event features run, per session and per animal, with figures.
 - `sweep_memoryless_heldout.py` — held-out content of both detectors on simulated data; writes `detection_heldout_summary.csv` beside the sweep summaries.
 

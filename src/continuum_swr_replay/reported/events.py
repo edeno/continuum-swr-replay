@@ -74,7 +74,7 @@ medians, a mean of its epochs' means).
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -121,9 +121,9 @@ from continuum_swr_replay.analysis.event_properties.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
+    behavioral_context_cache_path,
     session_cache_staleness,
     time_mask_staleness,
-    behavioral_context_cache_path,
     well_visit_times,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (
@@ -260,6 +260,13 @@ DETECTOR_SUBSET = (
 )
 """What the values of the detector comparison are over."""
 
+LEFT_OUT_SUBSET = (
+    f"{EVENTS_SUBSET}, and the non-local detector's exposure inside a well visit; "
+    "an event is left out when no event of the other inventory overlaps it, "
+    "wherever that event starts"
+)
+"""What the values of what another inventory leaves out are over."""
+
 SPIKE_EVIDENCE_SUBSET = (
     f"{EVENTS_SUBSET}, against the matched quiet windows whose first sample is "
     "inside a well visit"
@@ -294,6 +301,7 @@ class EventsInputs:
     event_participation: Path
     likelihood_advantage: Path
     tetrode_holdout: Path
+    exposure_in_visits: Path
 
 
 def default_inputs() -> EventsInputs:
@@ -318,6 +326,8 @@ def default_inputs() -> EventsInputs:
         event_participation=processed_data_dir() / EVENT_PARTICIPATION_DIR,
         likelihood_advantage=processed_data_dir() / EVENT_LIKELIHOOD_ADVANTAGE_DIR,
         tetrode_holdout=processed_data_dir() / EVENT_TETRODE_HOLDOUT_DIR,
+        exposure_in_visits=processed_data_dir()
+        / nonlocal_comparison.EXPOSURE_IN_VISITS_DIR,
     )
 
 
@@ -832,21 +842,31 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
 # --- what an analysis without the non-local detector leaves out -----------------
 
 
-def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Value]:
-    """Question 2b.2: how many non-local events, and how much of their time, an
-    analysis that starts from SWRs (or from any LFP- or rate-based trigger, or
-    from the Widloski detector) does not include, in total and per hour of rest.
-    """
+def left_out_values(
+    run_dir: Path,
+    inventory_dir: Path,
+    event_ids: Iterable[object],
+    visits: Mapping[str, tuple[np.ndarray, np.ndarray]],
+    exposure: pd.DataFrame,
+    source: str,
+) -> list[Value]:
+    """Question 2b.2: how many of the selected non-local events, and how much of
+    their time, an analysis that starts from SWRs (or from any LFP- or
+    rate-based trigger, or from the Widloski detector) does not include, in
+    total and per hour of rest inside the well visits
+    (``nonlocal_comparison.left_out_statistics``)."""
     make = value_factory(left_out_values, source, TAGS["left_out"])
-    stats = nonlocal_comparison.left_out_statistics(run_dir, inventory_dir)
+    stats = nonlocal_comparison.left_out_statistics(
+        run_dir, inventory_dir, event_ids, visits, exposure
+    )
     values = [
         make(
             "rest_hours",
             stats["rest_hours"],
             "quantity",
             "sig2",
-            "hours of analyzed immobility the non-local detector observed (exposure), "
-            "summed over epochs",
+            "hours of analyzed immobility inside a well visit the non-local detector "
+            "observed (its exposure inside the visits), summed over epochs",
             "h",
         ),
         make(
@@ -862,8 +882,8 @@ def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Val
             stats["kay_time_s"],
             "quantity",
             "int",
-            "seconds Kay's SWRs span (compared events): what an SWR-triggered analysis "
-            "examines",
+            "seconds the Kay SWRs whose first sample is inside a well visit span "
+            "(compared events): what an SWR-triggered analysis examines",
             "s",
         ),
     ]
@@ -914,7 +934,8 @@ def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Val
                 stats[f"nonlocal_events_outside_{word}_per_hour"],
                 "quantity",
                 "sig2",
-                f"non-local events {label}, per hour of analyzed immobility",
+                f"non-local events {label}, per hour of analyzed immobility inside a "
+                "well visit",
                 "per h",
             ),
         ]
@@ -941,7 +962,7 @@ def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Val
             "quantity",
             "sig2",
             "non-local events no SWR definition and no MUA event overlaps, per hour of "
-            "analyzed immobility",
+            "analyzed immobility inside a well visit",
             "per h",
         ),
     ]
@@ -2560,15 +2581,33 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             "each epoch's well visits",
         )
     )
+    folder = inputs.exposure_in_visits
+    exposure = pd.read_parquet(folder / "exposure.parquet")
     summary.add(
-        *left_out_values(
-            run,
-            inventory_dir,
-            f"event features run {run.name} (every inventory's compared events) and "
-            f"inventory comparison run {inventory_dir.name} (its observations, counts "
-            "and cells, pooled by animal)",
+        *over(
+            pend(
+                left_out_values(
+                    run,
+                    inventory_dir,
+                    events["event_id"],
+                    visits,
+                    exposure,
+                    f"event features run {run.name} (every inventory's compared "
+                    f"events), inventory comparison run {inventory_dir.name} (its "
+                    f"observations and cells) and {rel(folder)} (scripts/"
+                    "detector_comparison/measure_exposure_in_well_visits.py: the "
+                    "non-local detector's exposure inside the well visits)",
+                ),
+                off_subset(folder),
+                off_visits(folder, exposure["epoch_id"]),
+            ),
+            LEFT_OUT_SUBSET,
         )
     )
+    summary.inputs += [
+        file_record(folder / name, ROOT_DIR)
+        for name in ("exposure.parquet", "manifest.json")
+    ]
 
     # the run's tables are read, and so recorded, for the epochs its manifest marks ok
     def run_tables(name: str) -> dict[str, object]:
