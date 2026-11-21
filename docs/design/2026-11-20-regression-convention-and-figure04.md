@@ -630,6 +630,16 @@ Diagnostics; the scripts, tables and plots are scratch in the main checkout unde
   windows refuses to run until the held-out tetrode run and the participation run record the new event
   table.
 
+### Ninth round (lead, 2026-11-20): legacy code and the ContFrag tables
+
+- "Let's make sure to cleanup any legacy code." Each phase of the plan removes the code it replaces, with
+  no compatibility code left for older tables or fits, and the last phase is a sweep that proves nothing
+  is left (`.claude/docs/plans/regression-convention/`). A value the manuscript cites is still removed
+  only with the lead's yes, and an analysis the plan does not replace is a question for the lead.
+- The ContFrag tables (the SWR-event and MUA-event content tables) get the same well-visit label as the
+  non-local tables ("Label them now"), so that every table with `occupancy_state` carries `visit_context`
+  and the table contract requires it.
+
 ## 10. Left to the builder
 
 File and function names inside `analysis/regression/`; the tolerance values; the number of basis functions
