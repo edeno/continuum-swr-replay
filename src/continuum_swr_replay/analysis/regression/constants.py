@@ -74,11 +74,8 @@ REML_MAX_STEPS = 50
 AT_BOUNDARY_MARGIN = 0.5
 NULL_SPACE_EDF_TOL = 0.01
 
-# A session whose fit has no finite maximum at the search's reference point is
-# set aside; after the search it is fitted at the chosen penalties, and while
-# that fit runs away along unpenalized columns only, again with those columns
-# inactive, at most REFIT_MAX_ROUNDS times (a direction spread over
-# near-collinear columns names only part of them at a time).
+# The most rounds of columns made inactive in the refit of a session set aside
+# by the penalty search (the rule is in ``reml.select_penalties``).
 REFIT_MAX_ROUNDS = 5
 
 # A penalty search raises when more than MAX_FAILING_SHARE of the sessions end

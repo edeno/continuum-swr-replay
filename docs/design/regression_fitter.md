@@ -50,8 +50,7 @@ At fixed strengths `lam_j` the fit minimizes `-l(beta) + beta' S beta / 2`, with
 (`A = H + S`); a step is first shortened so that no coefficient moves more than 10, then
 halved (at most 30 times) until the objective does not rise. The Gaussian, whose
 log-likelihood is quadratic in the linear predictor, takes its full step without the
-cap: that step is the exact optimum whatever the outcome's scale (capped, an outcome of
-spread 1,000 did not converge in 100 steps). The linear predictor is never clipped; a
+cap: that step is the exact optimum whatever the outcome's scale. The linear predictor is never clipped; a
 step whose objective is not finite is rejected like one that rises.
 
 Before the first step the design is checked: the coefficients the penalty leaves free
@@ -70,8 +69,7 @@ Where the likelihood has no finite maximum along a direction (a logistic 0/1 col
 whose rows are all y = 1, a Poisson 0/1 cell with no events, a continuous column that
 separates the outcome) the decrement goes to zero while the coefficient runs to
 infinity and each step still moves the linear predictor by about one: such a fit is not
-converged (status "no finite maximum"), where before it was reported converged with a
-coefficient near 23 and a standard error near 1e4. The threshold is on the link scale
+converged (status "no finite maximum"). The threshold is on the link scale
 and does not depend on a column's units. The largest `max |X step|` at the stop of a
 regular fit was 1.7e-3 over the regression tests and the mgcv fixtures (1,384 stops),
 2.4e-5 over 30 synthetic sessions of 40,000 bins (1,020 stops) and 1.8e-3 over the
@@ -129,9 +127,7 @@ reached" at 40 steps and converges at 400).
 sees (`Likelihood.identifying_design`): `X` for the Poisson, Bernoulli and Gaussian;
 for the grouped softmax, `X` less each group's mean, since a combination of columns
 constant within every group (a session's role columns that together mark every
-candidate) cancels in each group. Checked on `X` itself, such a design passed and its fit
-ended as "information not positive definite" (one of 242 simulated content sessions);
-it is now "design not identified".
+candidate) cancels in each group.
 
 ## How the penalties are chosen
 
@@ -158,20 +154,15 @@ derivatives and the edf as they are, and in which the penalty is
 `diag(PenaltyBlock.eigenvalues)`, exactly zero on the `k - rank` null-space directions
 that `rank` defines. The coefficients, `A` and the covariance (computed in that basis)
 are rotated back. With `S` as given, two rounding errors grow with `exp(rho)`: `b' S b`
-is a difference of terms of size `|S| |b|^2` (at log penalty 16 on a content session it
-came out -8.4e-8 where it is 2.1e-7, an error ten times the last Newton step's predicted
-gain of 3.4e-8, and the fit stopped as "step halving failed"), and the stored `S_j` has
-rounding of about `1e-16` of its largest eigenvalue on its null space, which `exp(rho)`
-turns into a penalty on the straight lines (on 242 content sessions the pooled score was
-3.4e-6 too high at log penalty 10, 1.1e-4 at 14, and rose from 14 to 16 where it should
-fall). In the eigenbasis `b' S b` is a sum of positive terms and the fit at a very
+is a difference of terms of size `|S| |b|^2`, which can exceed the gain of the last
+Newton steps, and the stored `S_j` has rounding of about `1e-16` of its largest
+eigenvalue on its null space, which `exp(rho)` turns into a penalty on the straight
+lines. In the eigenbasis `b' S b` is a sum of positive terms and the fit at a very
 strong penalty is the fit in the penalty's null space: at log penalty 20 the linear
 predictor equals that fit's to 1e-6 (`test_inner_fits_converge_at_strong_penalties`).
-On a simulated content model (242 sessions of each of two kinds, log penalties 14 to
-20, 3,388 fits) 47 fits stopped as "step halving failed" at ef98019d; in the eigenbasis
-41 of them converge and 6 stop as "no finite maximum", in the sessions whose unpenalized
-columns separate (below); none fails otherwise. The bounds `[-10, 20]` are kept: the
-fit at 20 is obtainable, and the score there is within its last few `1e-8` of the limit.
+The fit at the upper bound, 20, is obtainable, and the score there is within its last
+few `1e-8` of the limit. The measurements behind this, and the rules it replaced, are in
+[the fitter's history](../../.claude/docs/reviews/2026-11-21-regression-fitter-history.md).
 
 A session may lack support for an unpenalized term (a 0/1 term none of its rows has):
 `SessionData.active`, a boolean mask over the columns, marks the columns the session
@@ -186,8 +177,7 @@ separated per-session column gives the whole animal no finite maximum, the anima
 aside (below) with that session's columns named as running away and refitted with them
 inactive, and marking them inactive gives the fit, score, derivatives, covariance and
 edf of the stack built without them (`test_a_stack_with_inactive_columns_is_the_stack_without_them`, five animals of
-three sessions). The mask already did this at ef98019d; what was missing was the names of
-the columns, and the whole five-animal search raised.
+three sessions).
 
 The search (`select_penalties`):
 
@@ -201,30 +191,20 @@ The search (`select_penalties`):
    `D^-1 H D^-1` with `D_jj = sqrt(max(1, |H_jj|))`, and its eigenvalues are made positive
    and floored at `1e-6 * max(1, max|eigenvalue|)` there: a term of curvature at most
    one keeps the absolute floor of `1e-6`, and a stiff term does not set the floor of a
-   weak one. Floored over the unscaled Hessian, a term of curvature 1,000 floored one
-   of curvature 2e-5 or 2e-6 at 1e-3: the weak term crawled for 50 steps and the search
-   raised, and one of 2e-7 was reported converged eight units short of its optimum
-   (now: one step to the optimum, and for 2e-7 the stop of the term alone). A log
-   strength at a bound whose gradient points outward is held there;
+   weak one. A log strength at a bound whose gradient points outward is held there;
 3. it stops only where the unfloored Hessian on the free terms is positive
    semidefinite to rounding (the same floor, on the scaled Hessian); where the
-   decrement is small but the curvature negative (started 1e-5 from a maximum of the
-   score, it was reported converged at the maximum) it takes a step of one scaled unit
+   decrement is small but the curvature negative (near a maximum or a saddle of the
+   score) it takes a step of one scaled unit
    along the direction of most negative curvature, downhill first, and goes on. It
    stops when the Newton decrement in the log strengths, `g' H^-1 g / 2` on the free
    terms with the floored Hessian (the gain in the score the next step predicts, in
    log-likelihood units), is below `1e-8`, then takes one last Newton step if the score
-   does not rise by more than its rounding (`8 eps max(1, |score|)`). The rule does not
-   depend on units: the gradient rule it replaces, largest free gradient component
-   below `1e-6 * max(1, |score|)`, moved with the score's size, which depends on the
-   units of the exposure (the Poisson) or of the outcome (the Gaussian's profiled
-   scale). On 30 synthetic sessions of 40,000 bins (score 63,852) the old rule stopped
-   4.6e-6 from the optimum in one log strength; the new one ends within 1e-11 of it.
-   On the four mgcv fixtures the selected log strengths are the same to the last bit,
-   and over the 17 searches of the REML tests they move by at most 3e-9. A decrement
-   below the rounding of the score also ends the search: no halving can show a gain
-   that small, and the point is the optimum to rounding (with the tolerance set to zero
-   the search ends there instead of on a step too small to move `rho`).
+   does not rise by more than its rounding (`8 eps max(1, |score|)`). The rule is in
+   log-likelihood units and does not depend on the size of the score, which moves with
+   the units of the exposure (the Poisson) or of the outcome (the Gaussian's profiled
+   scale). A decrement below the rounding of the score also ends the search: no halving
+   can show a gain that small, and the point is the optimum to rounding.
 
 **A flat score.** When the data do not support curvature the score falls toward its
 limit in the penalty's null space as `c exp(-rho)`: the gradient is `-c exp(-rho)`,
@@ -234,15 +214,12 @@ eigenvalue floor of `1e-6`. The search then stops where the gain left is below
 usually is (the bound is its lowest grid point) and where a gradient pointing out holds
 the term. Either point is converged: the term's edf is its null space's dimension
 (`in_null_space`; `at_boundary` only at the bound) and the score is within about
-`1.4e-7` of its limit. On 242 simulated content sessions with a flat score from log
-penalty 5 on, the search raised at ef98019d (the score's rounding at strong penalties,
-above, made it rise where it falls, by 3e-4 from 14 to 16, and inner fits failed from
-17); it now ends at the bound, the edf 1.000 in every session.
+`1.4e-7` of its limit.
 
 **Sessions without a finite maximum are set aside before the search.** A session whose
 unpenalized columns, or a smooth's unpenalized line, separate the outcome has no finite
 maximum at any penalty (the penalty does not touch those coordinates), and one such
-session made every pooled score infinite, so the whole model raised. Before the grid,
+session would make every pooled score infinite. Before the grid,
 `select_penalties` fits every session at one reference point, every log strength at the
 grid's center (6: a fixed point, the same for every model and data set, where the
 penalty identifies the smooth without dominating it; `refine_penalties` uses its
@@ -283,18 +260,7 @@ In exact arithmetic the first refit, before any column is left out, cannot succe
 the direction of a session without a finite maximum lies in the coordinates the
 penalty leaves free, whatever its strength. It is kept as a check, and on the
 reproductions it never succeeded; the sessions fitted were fitted with columns left out.
-
-On the simulated content model (242 sessions per model and kind; 2026-11-21) the M0 and
-M1 models without SWR set aside 4 sessions each, all "no finite maximum"; each was
-fitted at the chosen log strength (2.57 and 2.95) with 5 or 6 arm and role columns
-inactive, in one round, so no session is without a fit and 238 sessions chose the
-penalty. The models with SWR set aside none and end at the bound, every session a
-line. With two smooths (M3) the search raises at the reference point: one session's
-design is not identified for the grouped softmax (columns 21 to 24 and 28 are
-collinear within events, which the study's per-column support rule did not see); it
-was set aside before, and earlier still its fit failed as "information not positive
-definite". With that session and the separated ones left out by the study's own
-screen, M3 returns `[5.30, 19.38]` without SWR and `[19.70, 20]` with it.
+How the simulated content model's searches ended on 2026-11-21 is in the fitter's history.
 
 There is no fallback: if no grid point gives a finite score over the sessions kept,
 `select_penalties` raises, naming the sessions that failed and why, and the model is not
@@ -328,11 +294,8 @@ eq. 4) at that scale. The Newton fit behind it runs at the working scale `var(y)
 the penalty divided by it, the same minimizer), so its decrement does not depend on the
 outcome's units: for an outcome scaled by 1, 1e3 and 1e6 the curve is the same up to
 the scale and the selected log strength the same to 3e-15 (and at 1e9 too), with every
-grid point finite (before, at 1e6, the inner fit at the four largest strengths stopped at 100
-steps on a decrement of rounding, 5e-8 to 9e-5 in squared units of the outcome). A
-constant outcome (`var(y) = 0`) has no scale to profile and is refused as such ("the
-Gaussian outcome is constant"), where before it failed as a working scale that is not
-positive.
+grid point finite. A constant outcome (`var(y) = 0`) has no scale to profile and is
+refused as such ("the Gaussian outcome is constant").
 
 ## Agreement with mgcv, neurospatial and the current fitters
 

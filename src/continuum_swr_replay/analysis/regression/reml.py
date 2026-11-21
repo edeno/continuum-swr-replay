@@ -32,15 +32,10 @@ sessions, and one session whose inner fit fails makes the pooled score
 infinite; the score records which session and the fit's status, and every
 error names them. A session may leave out unpenalized columns it cannot
 estimate (``SessionData.active``): its fit is that of its design without them.
-:func:`select_penalties` first sets aside the sessions whose fit has no
-finite maximum at a reference point (the grid's center), naming the columns
-running away (any other failure there raises); it then starts from the best
-point of a grid over the others (the score can have two optima), refines it by
-Newton on ``rho`` with the exact Hessian, and fits the set-aside sessions at
-the chosen penalties, leaving out their unpenalized running-away columns; more
-than ``MAX_FAILING_SHARE`` of the sessions without a fit raises.
-:func:`fit_at_penalties` fits at given strengths without a search. A search
-that does not converge raises.
+:func:`select_penalties` chooses the strengths: it sets aside the sessions
+without a finite maximum, searches from a grid by Newton on ``rho`` with the
+exact Hessian, and refits the sessions set aside (its docstring states the
+rules). :func:`fit_at_penalties` fits at given strengths without a search.
 """
 
 from __future__ import annotations
@@ -395,13 +390,8 @@ class SessionFit:
 
 @dataclass(frozen=True)
 class SetAsideSession:
-    """A session left out of the penalty choice: its fit had no finite maximum
-    at the search's reference point (:func:`select_penalties`).
-
-    After the search it is fitted again at the chosen log penalties; while
-    that fit has no finite maximum along unpenalized design columns only,
-    those columns are made inactive and it is fitted again, at most
-    ``REFIT_MAX_ROUNDS`` times.
+    """A session left out of the penalty choice and refitted after the search,
+    by the rules of :func:`select_penalties`.
 
     Attributes
     ----------
@@ -1512,15 +1502,8 @@ def _refit(
     rho: np.ndarray,
     reference: RemlScore,
 ) -> SetAsideSession:
-    """A set-aside session fitted at the chosen ``rho``.
-
-    Fitted as given first; then, while its fit has no finite maximum along
-    unpenalized design columns only, with those columns made inactive, at most
-    ``REFIT_MAX_ROUNDS`` times (a direction spread over near-collinear columns
-    can name only part of them at a time). A direction through a penalty
-    block (a smooth's own line, or its penalized coordinates) cannot be left
-    out, and the session stays without a fit.
-    """
+    """A set-aside session fitted at the chosen ``rho``, by the refit rule of
+    :func:`select_penalties`."""
     active = (
         np.ones(data.X.shape[1], dtype=bool)
         if data.active is None
@@ -1731,16 +1714,21 @@ def select_penalties(
     that its objective does not change as it goes (``PenaltySearch.in_choice``);
     a session kept that fails at another point makes that point's score
     infinite. After the search each set-aside session is fitted at the chosen
-    log penalties (its penalty does not depend on its own data), with the
-    columns running away made inactive while they are all unpenalized design
-    columns, at most ``REFIT_MAX_ROUNDS`` times (``PenaltySearch.set_aside``
-    records every step). More than ``MAX_FAILING_SHARE`` of the sessions
-    without a fit at the end is an error.
+    log penalties (its penalty does not depend on its own data); while that
+    fit has no finite maximum along unpenalized design columns only, those
+    columns are made inactive and it is fitted again, at most
+    ``REFIT_MAX_ROUNDS`` times (a direction spread over near-collinear columns
+    can name only part of them at a time). A direction through a penalty block
+    (a smooth's own line, or its penalized coordinates) cannot be left out, and
+    the session stays without a fit. ``PenaltySearch.set_aside`` records every
+    step. More than ``MAX_FAILING_SHARE`` of the sessions without a fit at the
+    end is an error.
 
-    The grid start (one term: every integer of the bounds; two or three: the
-    product of ``REML_GRID_POINTS``; more: one-term integer grids, two passes
-    from all terms at ``REML_GRID_CENTER``), then Newton on the log penalties
-    with the exact Hessian, eigenvalue floor, step halving and the bounds.
+    The search starts from the best point of a grid over the log penalties
+    (the score can have two optima; the grid is described beside
+    ``REML_GRID_POINTS`` in :mod:`.constants`), then takes Newton steps on the
+    log penalties with the exact Hessian, an eigenvalue floor, step halving and
+    the bounds, to the stopping rule of :func:`_search`.
 
     Parameters
     ----------
