@@ -84,7 +84,9 @@ frames (cached), whose event counts by SWR overlap must equal the canonical
 table's.
 
 Every event panel is over the events that start inside a well visit (the first
-poke-in at a well to the final poke-out): the canonical table is checked
+poke-in at a well to the final poke-out); panel g's second axis uses the events
+detected from the held-out decode that start inside one, every other event
+panel the canonical events. The canonical table is checked
 against the frames whole and then selected once
 (``cohort_selection.select_visit_context``), the stored per-event tables are read
 over the selected events (``cohort_selection.select_events_in``), and i's
@@ -1130,6 +1132,15 @@ PANEL_G_RERUN = "scripts/event_evidence/detect_heldout_events.py"
 BIN_FACTS_RERUN = "scripts/event_evidence/measure_bin_facts.py"
 """The runners to make again when panel g refuses its inputs."""
 
+
+def panel_g_refusal(reason: str, rerun: str) -> str:
+    """Why panel g is not drawn: what is not current (the events summary's
+    ``reason``, without its closing advice to rerun before citing) and the
+    runners to make again (``rerun``)."""
+    cause = reason.removesuffix("; rerun it before citing")
+    return f"panel g is not drawn: {cause}. Rerun {rerun}."
+
+
 ROW4_GRID = {"width_ratios": (1.05, 0.85, 1.0, 1.0), "wspace": 0.85}
 """Row 4's grid of four cells: j keeps the last, so its left edge, which also
 places f's letter (they share a column), is where it was before g held two
@@ -1644,7 +1655,7 @@ def generate_figure(
         (heldout.session_cache, f"{BIN_FACTS_RERUN}, then {PANEL_G_RERUN}"),
     ):
         if reason is not None:
-            raise ValueError(f"panel g is not drawn: {reason} (with {rerun})")
+            raise ValueError(panel_g_refusal(reason, rerun))
     restriction_decoders, restriction_parts = restriction_figure_statistics(
         heldout.events, heldout.time_sums, heldout.bin_s
     )

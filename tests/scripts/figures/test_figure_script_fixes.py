@@ -2358,8 +2358,12 @@ def test_figure02_refuses_bin_facts_made_from_other_visits(
     with pytest.raises(ValueError, match=f"{EVENT_BIN_FACTS_DIR}.*{note}") as refused:
         figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
     message = str(refused.value)
-    assert "scripts/event_evidence/measure_bin_facts.py" in message
-    assert "detect_heldout_events.py" in message
+    # what is not current, then the runners to make again, in that order
+    assert "before citing" not in message
+    assert message.endswith(
+        ". Rerun scripts/event_evidence/measure_bin_facts.py, then "
+        "scripts/event_evidence/detect_heldout_events.py."
+    )
 
 
 def test_figure02_refuses_a_heldout_event_run_not_made_from_the_current_bin_facts(

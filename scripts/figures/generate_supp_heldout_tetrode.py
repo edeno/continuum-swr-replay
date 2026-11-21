@@ -36,6 +36,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 import continuum_swr_replay.visualization.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
@@ -106,14 +108,14 @@ def read_inputs() -> pd.DataFrame:
     return holdout_statistics(window_scores(selected), "event")
 
 
-def draw_heldout_tetrode(ax, statistics: pd.DataFrame) -> None:
+def draw_heldout_tetrode(ax: Axes, statistics: pd.DataFrame) -> None:
     """The held-out tetrode gain over local coding per spike, by group
     (``statistics``: :func:`read_inputs`)."""
     draw_group_gain(ax, statistics, TITLE)
     label_gain_axis(ax, YLABEL)
 
 
-def generate_figure(statistics: pd.DataFrame):
+def generate_figure(statistics: pd.DataFrame) -> Figure:
     """Build the figure from :func:`read_inputs`."""
     fig, ax = plt.subplots(figsize=(WIDTH, HEIGHT))
     fig.subplots_adjust(left=0.36, right=0.97, top=0.88, bottom=0.2)

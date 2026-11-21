@@ -5,7 +5,8 @@ manifest (``runs.epoch_records``).
 
 Used by ``measure_event_participation.py``, ``score_event_likelihood_advantage.py``,
 ``score_tetrode_holdout.py``, ``score_nonlocal_restriction.py``,
-``sum_nonlocal_restriction_windows.py`` and ``detect_heldout_events.py``.
+``measure_bin_facts.py``, ``sum_nonlocal_restriction_windows.py`` and
+``detect_heldout_events.py``.
 """
 
 from __future__ import annotations
