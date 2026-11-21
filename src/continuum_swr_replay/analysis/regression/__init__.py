@@ -13,6 +13,8 @@ package may import it.
   term and shared by the sessions (pooled), from a grid start.
 - ``pspline``: the cubic B-spline basis on fixed, equally spaced knots, its
   second-order difference penalty and the sum-to-zero constraint.
+- ``contrasts``: linear functionals of a fit (range-mean curve contrasts and
+  coefficient differences) with their exact variance.
 
 Submodules are imported by name; nothing is re-exported here.
 """
