@@ -48,6 +48,7 @@ from .constants import (
     LOG_PENALTY_BOUNDS,
     MAX_STEP_HALVINGS,
     NULL_SPACE_EDF_TOL,
+    PENALTY_ROUNDING_TOL,
     REML_EIGEN_FLOOR,
     REML_GRADIENT_TOL,
     REML_GRID_CENTER,
@@ -110,8 +111,18 @@ class PenaltyBlock:
         S = np.asarray(self.S, dtype=float)
         if S.shape != (columns.size, columns.size):
             raise ValueError(f"penalty of shape {S.shape} for {columns.size} columns")
+        scale = float(np.max(np.abs(S))) if S.size else 0.0
+        if np.max(np.abs(S - S.T), initial=0.0) > PENALTY_ROUNDING_TOL * scale:
+            raise ValueError("penalty matrix is not symmetric")
         rank = penalty_rank(S)
         eigenvalues, vectors = np.linalg.eigh(S)
+        if eigenvalues.size and eigenvalues[0] < -PENALTY_ROUNDING_TOL * max(
+            abs(eigenvalues[0]), abs(eigenvalues[-1])
+        ):
+            raise ValueError(
+                f"penalty matrix is not positive semidefinite (eigenvalue "
+                f"{eigenvalues[0]:.3g})"
+            )
         object.__setattr__(self, "columns", columns)
         object.__setattr__(self, "S", S)
         object.__setattr__(self, "rank", rank)
@@ -662,7 +673,8 @@ def pooled_reml(
     Raises
     ------
     ValueError
-        If a session marks a column of a penalty block inactive.
+        If a session marks a column of a penalty block inactive or its inputs
+        cannot be fitted; the message names the session.
     """
     for index, data in enumerate(sessions):
         _check_active(data, index, blocks)
@@ -670,7 +682,10 @@ def pooled_reml(
         starts = [data.beta0 for data in sessions]
     scores = []
     for index, (data, start) in enumerate(zip(sessions, starts, strict=True)):
-        session = _session_score(lik, data, blocks, rho, start, derivatives)
+        try:
+            session = _session_score(lik, data, blocks, rho, start, derivatives)
+        except ValueError as error:
+            raise ValueError(f"{_label(data, index)}: {error}") from error
         if not np.isfinite(session.score):
             status = session.fit.status
             failure = f"{_label(data, index)}: {status}"

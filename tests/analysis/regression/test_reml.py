@@ -647,3 +647,26 @@ def test_an_inactive_penalized_column_is_refused() -> None:
     active[blocks[0].columns[2]] = False
     with pytest.raises(ValueError, match=r"session 0.*column 3.*penalty"):
         pooled_reml(lik, [replace(data, active=active)], blocks, [0.0])
+
+
+def test_a_penalty_that_is_not_symmetric_positive_semidefinite_is_refused() -> None:
+    _, _, blocks = _session("poisson", 1, seed=1)
+    S = blocks[0].S.copy()
+    asymmetric = S.copy()
+    asymmetric[0, 1] += 1e-3
+    with pytest.raises(ValueError, match="not symmetric"):
+        PenaltyBlock(blocks[0].columns, asymmetric)
+    with pytest.raises(ValueError, match="not positive semidefinite"):
+        PenaltyBlock(blocks[0].columns, S - 0.01 * np.eye(S.shape[0]))
+    # Rounding is not refused.
+    PenaltyBlock(blocks[0].columns, S + 1e-15 * np.triu(np.ones_like(S), 1))
+
+
+def test_an_input_error_names_the_session() -> None:
+    lik, first, blocks = _session("poisson", 1, seed=4)
+    _, second, _ = _session("poisson", 1, seed=5)
+    offset = second.aux.copy()
+    offset[7] = -np.inf
+    bad = SessionData(second.X, second.y, offset, name="peanut_02")
+    with pytest.raises(ValueError, match=r"session 1 \(peanut_02\).*zero exposure"):
+        select_penalties(lik, [first, bad], blocks)

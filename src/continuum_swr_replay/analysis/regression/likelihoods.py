@@ -5,6 +5,9 @@ the linear predictor ``X @ beta``, shape ``(n_rows,)``; ``aux`` is the family's
 extra data (below), passed to every method so that one object serves every
 session and, for the Gaussian, every scale.
 
+- ``check(y, aux)``: raise ``ValueError``, naming the problem, when the
+  response or ``aux`` is outside what the family takes (the fit calls it once,
+  at its entry, after checking that ``y`` is finite).
 - ``loglik(eta, y, aux)``: the log-likelihood, a float.
 - ``score_eta(eta, y, aux)``: ``dl/deta``, shape ``(n_rows,)``; the coefficient
   gradient is ``X.T @ score_eta``.
@@ -59,6 +62,8 @@ class Likelihood(Protocol):
 
     name: str
     quadratic: bool
+
+    def check(self, y: np.ndarray, aux: object) -> None: ...
 
     def loglik(self, eta: np.ndarray, y: np.ndarray, aux: object) -> float: ...
 
@@ -128,6 +133,24 @@ class Poisson(_DiagonalFamily):
     name = "poisson"
     quadratic = False
 
+    def check(self, y: np.ndarray, aux: np.ndarray) -> None:
+        """Counts at least zero; an offset per row, finite (a row of zero
+        exposure, offset minus infinity, carries no likelihood: drop it)."""
+        if np.any(y < 0):
+            raise ValueError(f"Poisson response below zero on {np.sum(y < 0)} rows")
+        offset = np.asarray(aux, dtype=float)
+        if offset.shape != y.shape:
+            raise ValueError(f"offset of shape {offset.shape} for {y.size} rows")
+        if np.any(offset == -np.inf):
+            raise ValueError(
+                f"zero exposure (offset -inf) on {np.sum(offset == -np.inf)} rows: "
+                "drop those rows, which carry no likelihood"
+            )
+        if not np.all(np.isfinite(offset)):
+            raise ValueError(
+                f"offset not finite on {np.sum(~np.isfinite(offset))} rows"
+            )
+
     def loglik(self, eta: np.ndarray, y: np.ndarray, aux: np.ndarray) -> float:
         log_mu = eta + aux
         return float(y @ log_mu - np.exp(log_mu).sum())
@@ -151,6 +174,15 @@ class Bernoulli(_DiagonalFamily):
     name = "bernoulli"
     quadratic = False
 
+    def check(self, y: np.ndarray, aux: object) -> None:
+        """0/1 outcomes only; the family does not take proportions."""
+        outside = (y != 0) & (y != 1)
+        if np.any(outside):
+            raise ValueError(
+                f"Bernoulli response outside {{0, 1}} on {np.sum(outside)} rows "
+                "(it takes 0/1 outcomes, not proportions)"
+            )
+
     def loglik(self, eta: np.ndarray, y: np.ndarray, aux: object) -> float:
         return float(y @ eta - np.logaddexp(0.0, eta).sum())
 
@@ -173,6 +205,13 @@ class Gaussian(_DiagonalFamily):
 
     name = "gaussian"
     quadratic = True
+
+    def check(self, y: np.ndarray, aux: float) -> None:
+        """A finite, positive scale."""
+        if not (np.ndim(aux) == 0 and np.isfinite(aux) and aux > 0):
+            raise ValueError(
+                f"the Gaussian scale must be finite and positive, not {aux}"
+            )
 
     def loglik(self, eta: np.ndarray, y: np.ndarray, aux: float) -> float:
         residual = y - eta
@@ -230,6 +269,25 @@ class GroupedSoftmax:
 
     name = "grouped_softmax"
     quadratic = False
+
+    def check(self, y: np.ndarray, aux: np.ndarray) -> None:
+        """Finite, sorted group ids, one per row; shares (or counts) at least
+        zero; every group with a positive total."""
+        groups = np.asarray(aux)
+        if groups.shape != y.shape:
+            raise ValueError(f"group ids of shape {groups.shape} for {y.size} rows")
+        if groups.dtype.kind == "f" and not np.all(np.isfinite(groups)):
+            raise ValueError(
+                f"group ids not finite on {np.sum(~np.isfinite(groups))} rows"
+            )
+        if np.any(y < 0):
+            raise ValueError(f"softmax shares negative on {np.sum(y < 0)} rows")
+        empty = np.add.reduceat(y, group_starts(groups)) <= 0
+        if np.any(empty):
+            raise ValueError(
+                f"{np.sum(empty)} group(s) whose responses sum to zero: drop them, "
+                "they carry no likelihood"
+            )
 
     @staticmethod
     def _parts(

@@ -34,6 +34,11 @@ NO_MAXIMUM_ETA_STEP = 0.1
 # exactly collinear design gives rounding, about 1e-16.
 IDENTIFIABILITY_TOL = 1e-12
 
+# A penalty matrix is symmetric positive semidefinite to rounding when its
+# asymmetry and its most negative eigenvalue are at most PENALTY_ROUNDING_TOL
+# times its largest absolute entry and eigenvalue.
+PENALTY_ROUNDING_TOL = 1e-10
+
 # Bounds of every log penalty strength in the REML search.
 LOG_PENALTY_BOUNDS = (-10.0, 20.0)
 

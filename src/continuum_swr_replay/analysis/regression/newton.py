@@ -11,7 +11,8 @@ finite is rejected the same way. A quadratic likelihood (the Gaussian) takes
 its full step, uncapped: it is the exact optimum, whatever the scale of the
 outcome. ``eta`` is never clipped.
 
-Before the first step the design is checked: the coefficients the penalty
+Before the first step the inputs are checked (finite, of matching shapes, and
+what the family takes) and so is the design: the coefficients the penalty
 leaves free (the unpenalized columns and the penalties' null spaces) must be
 identified by ``X``. A small decrement is not enough to stop: when the step it
 belongs to still moves the linear predictor by more than
@@ -156,6 +157,32 @@ def _identified(X: np.ndarray, free_basis: np.ndarray) -> bool:
     return bool(np.linalg.eigvalsh(unit.T @ unit)[0] > IDENTIFIABILITY_TOL)
 
 
+def _check_inputs(
+    lik: Likelihood,
+    X: np.ndarray,
+    y: np.ndarray,
+    aux: object,
+    S: np.ndarray,
+    beta0: np.ndarray,
+) -> None:
+    """Raise ``ValueError``, naming the problem, for inputs the fit cannot take."""
+    if X.ndim != 2 or y.shape != (X.shape[0],):
+        raise ValueError(f"design of shape {X.shape} for a response of shape {y.shape}")
+    p = X.shape[1]
+    if S.shape != (p, p) or np.shape(beta0) != (p,):
+        raise ValueError(
+            f"penalty of shape {S.shape} and start of shape {np.shape(beta0)} for "
+            f"{p} columns"
+        )
+    if not np.all(np.isfinite(X)):
+        raise ValueError(f"design not finite in {np.sum(~np.isfinite(X))} entries")
+    if not np.all(np.isfinite(y)):
+        raise ValueError(f"response not finite on {np.sum(~np.isfinite(y))} rows")
+    if not (np.all(np.isfinite(S)) and np.all(np.isfinite(beta0))):
+        raise ValueError("penalty or start not finite")
+    lik.check(y, aux)
+
+
 def _eta_step(X: np.ndarray, step: np.ndarray) -> float:
     """``max |X @ step|``: the most a step moves the linear predictor on a row."""
     return float(np.max(np.abs(X @ step)))
@@ -212,7 +239,15 @@ def penalized_newton(
     NewtonFit
         With ``status`` saying how it ended (:data:`FIT_STATUSES`); a fit that
         is not ``CONVERGED`` is returned without raising.
+
+    Raises
+    ------
+    ValueError
+        If the inputs cannot be fitted: shapes that do not match, a design,
+        response, penalty or start that is not finite, or a response or
+        ``aux`` the family does not take (``Likelihood.check``).
     """
+    _check_inputs(lik, X, y, aux, S, beta0)
     beta = np.array(beta0, dtype=float)
     cap = np.inf if lik.quadratic else max_step
 

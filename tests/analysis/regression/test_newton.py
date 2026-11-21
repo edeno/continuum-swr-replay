@@ -11,6 +11,7 @@ from continuum_swr_replay.analysis.regression import newton
 from continuum_swr_replay.analysis.regression.constants import NEWTON_DECREMENT_TOL
 from continuum_swr_replay.analysis.regression.likelihoods import (
     Bernoulli,
+    Gaussian,
     GroupedSoftmax,
     Poisson,
 )
@@ -340,3 +341,65 @@ def test_last_step_never_raises_f_nor_lands_unconverged(to: float) -> None:
     )
 
     assert moved is fit
+
+
+def _inputs(family: str) -> tuple:
+    """A small valid fit's likelihood, design, response and aux."""
+    X = np.column_stack([np.ones(6), np.arange(6.0)])
+    if family == "poisson":
+        return Poisson(), X, np.array([0.0, 1, 2, 1, 3, 2]), np.zeros(6)
+    if family == "bernoulli":
+        return Bernoulli(), X, np.array([0.0, 1, 0, 1, 1, 0]), None
+    if family == "gaussian":
+        return Gaussian(), X, np.array([0.1, 0.5, 0.3, 0.9, 1.2, 1.0]), 1.0
+    shares = np.array([0.2, 0.3, 0.5, 0.6, 0.4, 0.0])
+    return GroupedSoftmax(), X[:, 1:], shares, np.array([0, 0, 0, 1, 1, 1])
+
+
+def _changed(family: str, part: str, index: int, value: float) -> tuple:
+    lik, X, y, aux = _inputs(family)
+    X, y = X.copy(), y.copy()
+    aux = None if aux is None else np.array(aux, dtype=float)
+    if part == "X":
+        X[index, 0] = value
+    elif part == "y":
+        y[index] = value
+    elif part == "aux" and family == "gaussian":
+        aux = value
+    else:
+        aux[index] = value
+    return lik, X, y, aux
+
+
+@pytest.mark.parametrize(
+    ("family", "part", "index", "value", "message"),
+    [
+        ("poisson", "X", 2, np.nan, "design.*not finite"),
+        ("bernoulli", "X", 0, np.inf, "design.*not finite"),
+        ("poisson", "y", 1, np.nan, "response.*not finite"),
+        ("gaussian", "y", 4, np.inf, "response.*not finite"),
+        ("poisson", "y", 3, -1.0, "Poisson.*below zero"),
+        ("bernoulli", "y", 2, 0.5, r"Bernoulli.*\{0, 1\}"),
+        ("poisson", "aux", 1, np.nan, "offset.*not finite"),
+        ("poisson", "aux", 4, -np.inf, "zero exposure.*drop"),
+        ("gaussian", "aux", 0, 0.0, "scale.*positive"),
+        ("grouped_softmax", "y", 1, -0.3, "shares.*negative"),
+        ("grouped_softmax", "aux", 2, np.nan, "group ids.*not finite"),
+    ],
+)
+def test_inputs_are_checked(
+    family: str, part: str, index: int, value: float, message: str
+) -> None:
+    """A fit refuses inputs it cannot fit, and says what is wrong."""
+    lik, X, y, aux = _changed(family, part, index, value)
+    p = X.shape[1]
+    with pytest.raises(ValueError, match=message):
+        penalized_newton(lik, X, y, aux, np.zeros((p, p)), np.zeros(p))
+
+
+def test_a_group_whose_shares_sum_to_zero_is_refused() -> None:
+    lik, X, y, groups = _inputs("grouped_softmax")
+    y = y.copy()
+    y[3:] = 0.0
+    with pytest.raises(ValueError, match="group.*sum to zero"):
+        penalized_newton(lik, X, y, groups, np.zeros((1, 1)), np.zeros(1))
