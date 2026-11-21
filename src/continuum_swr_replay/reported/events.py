@@ -1810,6 +1810,11 @@ _RESTRICTION_KINDS = {
 #: after the final poke-out of their visit: of the window values, only these
 #: read the well visits (through the per-bin facts).
 RESTRICTION_AFTER_VISIT = "_outside_swr_after_visit"
+#: The part of the keys of the outside-SWR values over the time no event holds:
+#: the window run marks that time from the windows of every event of the table,
+#: so these values are over the time inside a well visit, not over the selected
+#: events.
+RESTRICTION_OUTSIDE_EVENTS = "_outside_events_"
 #: Figure 2g, the decoders compared, in one score family (its values carry the
 #: panel's tag; the other family's do not).
 RESTRICTION_FIGURE_FAMILY = "filter"
@@ -2113,17 +2118,17 @@ def restriction_outside_swr_values(
             row = statistics.loc[(family, f"outside_events_gain_{unit}")]
             values += _per_spike_interval(
                 make,
-                f"{key}_outside_events_{unit}",
+                f"{key}{RESTRICTION_OUTSIDE_EVENTS}{unit}",
                 row,
                 f"{scored}, {full_minus_swr}, summed over the epoch's immobile bins "
-                f"outside SWRs that no non-local event holds and divided by "
-                f"{divided}: {reduction}",
+                f"outside SWRs that no non-local event of any well-visit label "
+                f"holds and divided by {divided}: {reduction}",
                 style="sig2",
                 unit=words,
             )
             values.append(
                 make(
-                    f"{key}_outside_events_{unit}_animals_positive",
+                    f"{key}{RESTRICTION_OUTSIDE_EVENTS}{unit}_animals_positive",
                     row["n_animals_positive"],
                     "count",
                     "count",
@@ -3478,19 +3483,27 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             for value in window_values
         )
     )
+    outside_swr_values = pend(
+        restriction_outside_swr_values(
+            restriction_time_sums,
+            restriction_bin_s,
+            restriction_windows_table,
+            f"{restriction_source} (its windows and time sums)",
+        ),
+        *restriction_stale,
+        facts_off_visits,
+    )
+    # the time no event holds is outside every event of the table, selected or
+    # not: those values are over the time alone
     summary.add(
-        *over(
-            pend(
-                restriction_outside_swr_values(
-                    restriction_time_sums,
-                    restriction_bin_s,
-                    restriction_windows_table,
-                    f"{restriction_source} (its windows and time sums)",
-                ),
-                *restriction_stale,
-                facts_off_visits,
-            ),
-            f"{TIME_SUBSET}, and {EVENTS_SUBSET}",
+        *(
+            over(
+                [value],
+                TIME_SUBSET
+                if RESTRICTION_OUTSIDE_EVENTS in value.key
+                else f"{TIME_SUBSET}, and {EVENTS_SUBSET}",
+            )[0]
+            for value in outside_swr_values
         )
     )
     # over immobile time only: no event table or held-out tetrode run enters

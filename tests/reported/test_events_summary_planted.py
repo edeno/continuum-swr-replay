@@ -84,6 +84,7 @@ RESTRICTION_BUILDERS = {
 }
 #: The window values' key that reads the well visits (through the bin facts).
 AFTER_VISIT = f"restriction_window{builder.RESTRICTION_AFTER_VISIT}"
+OUTSIDE_EVENTS = f"restriction_outside_swr{builder.RESTRICTION_OUTSIDE_EVENTS}per_spike"
 BIN_S = 0.002
 OTHER_BUILDERS = (
     "visit_context_values",
@@ -287,6 +288,12 @@ class _Run:
             "restriction_window_values",
             self._spy("restriction_window_values", AFTER_VISIT),
         )
+        # the outside-SWR values hold the time that no event holds
+        monkeypatch.setattr(
+            builder,
+            "restriction_outside_swr_values",
+            self._spy("restriction_outside_swr_values", OUTSIDE_EVENTS),
+        )
 
         def class_steps(manifest, sha256, class_stale, steps, source, what):
             seen["class_step_values_with_staleness"] = (class_stale,)
@@ -418,9 +425,9 @@ def test_no_step_after_the_selection_reads_the_planted_rows(
     assert values["restriction_outside_swr"].description.endswith(
         f"; over {builder.TIME_SUBSET}, and {builder.EVENTS_SUBSET}"
     )
-    assert values["restriction_immobile"].description.endswith(
-        f"; over {builder.TIME_SUBSET}"
-    )
+    # the time no event holds is outside every event, selected or not
+    for key in ("restriction_immobile", OUTSIDE_EVENTS):
+        assert values[key].description.endswith(f"; over {builder.TIME_SUBSET}")
 
 
 def _same_visits(visits) -> bool:
@@ -441,6 +448,7 @@ RESTRICTION_VALUES = {
     "restriction_window",
     AFTER_VISIT,
     "restriction_outside_swr",
+    OUTSIDE_EVENTS,
     "restriction_immobile",
 }
 RESTRICTION_EVENT_VALUES = RESTRICTION_VALUES - {"restriction_immobile"}
