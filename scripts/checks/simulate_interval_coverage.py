@@ -35,13 +35,17 @@ one core; ``--quick`` runs 40 data sets of 200 draws.
 
 With ``--band-out`` a second part measures the across-session band
 (``regression.bands.across_session_band``) on the same cohort: each session's
-curve on 20 grid points over [0, 1] is ``animal curve + day curve + session
-noise``, the animal and day curves smooth Gaussian processes (squared
-exponential, length 0.2) and the noise independent at each point, at the SDs of
-:data:`BAND_SETTINGS`, truth 0. One row per setting: ``whole_curve_coverage``
-(the band holds the whole true curve), ``point_coverage`` (at the first grid
-point), ``mean_width``, ``coverage_se``, ``n_sets`` and ``n_draws``; 300 data
-sets of 1,000 draws per setting (``--quick``: 20 of 200), about 1 min.
+curve on a grid over [0, 1] is ``animal curve + day curve + session noise``,
+the animal and day curves Gaussian processes (squared exponential) and the
+noise independent at each point, truth 0. :data:`BAND_SETTINGS` (20 points,
+length 0.2) are those in which the band is checked to hold the whole curve;
+:data:`BAND_HARD_SETTINGS` record where it is weak (100 points, the animals
+carrying almost all the variance on a rough curve, or three animals). One row
+per setting: ``whole_curve_coverage`` (the band holds the whole true curve),
+``point_coverage`` (at the first grid point), ``mean_width``,
+``mean_critical``, ``coverage_se``, ``n_sets``, ``n_draws``, ``n_points``,
+``n_animals`` and ``checked``; 300 data sets of 1,000 draws per setting
+(``--quick``: 20 of 200).
 
 The committed tables ``tests/scripts/checks/data/interval_coverage_full.csv``
 and ``tests/scripts/checks/data/band_coverage_full.csv`` were made by::
@@ -233,36 +237,89 @@ def simulate(setting: Setting, n_sets: int, n_draws: int) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+@dataclass(frozen=True)
+class BandSetting:
+    """One simulated band setting.
+
+    Attributes
+    ----------
+    sds : tuple of float
+        The SDs of the animal curve, the day curve and the session noise.
+    seed : int
+    n_points : int
+        Grid points over [0, 1].
+    length : float
+        The correlation length of the animal and day curves (squared
+        exponential); 0 for white noise, independent at every point.
+    n_animals : int
+        The cohort's first ``n_animals`` animals.
+    """
+
+    sds: tuple[float, float, float]
+    seed: int
+    n_points: int = 20
+    length: float = 0.2
+    n_animals: int = 5
+
+    @property
+    def name(self) -> str:
+        label = "sd {:g}/{:g}/{:g}".format(*self.sds)
+        if self.n_points != 20:
+            label += f", {self.n_points} points"
+        if self.length == 0:
+            label += ", white noise"
+        elif self.length != 0.2:
+            label += f", length {self.length:g}"
+        if self.n_animals != 5:
+            label += f", {self.n_animals} animals"
+        return label
+
+
 BAND_SETTINGS = (
-    Setting((1.0, 0.5, 1.0), 301),
-    Setting((0.3, 1.0, 1.0), 302),
-    Setting((1.0, 0.0, 0.3), 303),
+    BandSetting((1.0, 0.5, 1.0), 301),
+    BandSetting((0.3, 1.0, 1.0), 302),
+    BandSetting((1.0, 0.0, 0.3), 303),
 )
-BAND_POINTS = 20
-BAND_LENGTH = 0.2
+"""Settings in which the band is checked to hold the whole curve."""
+
+BAND_HARD_SETTINGS = (
+    BandSetting((1.0, 0.0, 0.02), 304, n_points=100, length=0.05),
+    BandSetting((1.0, 0.0, 0.02), 305, n_points=100, length=0.02),
+    BandSetting((1.0, 0.0, 0.02), 306, n_points=100, length=0.0),
+    BandSetting((1.0, 0.5, 1.0), 307, n_points=100, length=0.1, n_animals=3),
+)
+"""Settings that record where the band is weak: the animals carry almost all
+the variance and the curve is rough for its grid, or there are three animals."""
 
 
-def simulate_band(setting: Setting, n_sets: int, n_draws: int) -> pd.DataFrame:
+def simulate_band(setting: BandSetting, n_sets: int, n_draws: int) -> pd.DataFrame:
     """Whole-curve and one-point coverage of the across-session band."""
     animal, day = cohort()
+    keep = animal < setting.n_animals
+    animal, day = animal[keep], day[keep]
     n_animals, n_days = animal.max() + 1, day.max() + 1
-    x = np.linspace(0.0, 1.0, BAND_POINTS)
-    kernel = np.exp(-((x[:, None] - x[None]) ** 2) / (2 * BAND_LENGTH**2))
-    root = np.linalg.cholesky(kernel + 1e-8 * np.eye(BAND_POINTS))
+    n_points = setting.n_points
+    if setting.length == 0:
+        root = np.eye(n_points)
+    else:
+        x = np.linspace(0.0, 1.0, n_points)
+        kernel = np.exp(-((x[:, None] - x[None]) ** 2) / (2 * setting.length**2))
+        root = np.linalg.cholesky(kernel + 1e-8 * np.eye(n_points))
     sd_animal, sd_day, sd_session = setting.sds
     rng = np.random.default_rng(setting.seed)
-    whole, point, width = [], [], []
+    whole, point, width, critical = [], [], [], []
     for i in range(n_sets):
         curves = (
-            (rng.standard_normal((n_animals, BAND_POINTS)) @ root.T)[animal] * sd_animal
-            + (rng.standard_normal((n_days, BAND_POINTS)) @ root.T)[day] * sd_day
-            + rng.normal(0.0, sd_session, (animal.size, BAND_POINTS))
+            (rng.standard_normal((n_animals, n_points)) @ root.T)[animal] * sd_animal
+            + (rng.standard_normal((n_days, n_points)) @ root.T)[day] * sd_day
+            + rng.normal(0.0, sd_session, (animal.size, n_points))
         )
         band = across_session_band(curves, animal, day, n_draws=n_draws, seed=i)
         inside = (band.low <= 0.0) & (band.high >= 0.0)
         whole.append(inside.all())
         point.append(inside[0])
         width.append(np.mean(band.high - band.low))
+        critical.append(band.critical)
     coverage = float(np.mean(whole))
     return pd.DataFrame(
         [
@@ -271,9 +328,13 @@ def simulate_band(setting: Setting, n_sets: int, n_draws: int) -> pd.DataFrame:
                 "whole_curve_coverage": coverage,
                 "point_coverage": float(np.mean(point)),
                 "mean_width": float(np.mean(width)),
+                "mean_critical": float(np.mean(critical)),
                 "coverage_se": float(np.sqrt(coverage * (1 - coverage) / n_sets)),
                 "n_sets": n_sets,
                 "n_draws": n_draws,
+                "n_points": n_points,
+                "n_animals": int(n_animals),
+                "checked": setting in BAND_SETTINGS,
             }
         ]
     )
@@ -299,7 +360,10 @@ def main(argv: list[str] | None = None) -> None:
     if args.band_out is not None:
         n_sets, n_draws = (20, 200) if args.quick else (300, 1000)
         bands = pd.concat(
-            [simulate_band(setting, n_sets, n_draws) for setting in BAND_SETTINGS],
+            [
+                simulate_band(setting, n_sets, n_draws)
+                for setting in (*BAND_SETTINGS, *BAND_HARD_SETTINGS)
+            ],
             ignore_index=True,
         )
         args.band_out.parent.mkdir(parents=True, exist_ok=True)

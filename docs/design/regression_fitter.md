@@ -611,12 +611,14 @@ merges, its code calls this one.
 
 ## Bands
 
-A band of `bands.py` holds the whole curve with 95 % probability, not each point alone.
+A band of `bands.py` is built for the whole curve, not each point alone, at a nominal level
+of 95 %. Whether it reaches that level depends on the curve; what was measured is below.
 
 - One fit's curve: `f = C beta` on a grid, with pointwise standard error
   `se = sqrt(diag(C V C'))`. From `BAND_DRAWS = 10,000` draws `z ~ N(0, V)` with a stored
   seed, the critical value `c` is the 0.95 quantile of `max |C z| / se`, and the band is
-  `f ± c se`.
+  `f ± c se`. Over 500 simulated Poisson fits of a P-spline curve it held the whole true
+  curve in 94.6 % of them (`tests/analysis/regression/test_bands.py`).
 - The animal-balanced curve across sessions: the per-session curves on one grid are
   taken session to recording day to animal as a mean of means, with nested bootstrap
   draws of that curve (animals, then their sessions). With `sd` the draws' standard
@@ -626,13 +628,29 @@ A band of `bands.py` holds the whole curve with 95 % probability, not each point
   animals: `A` independent Gaussian curves with the grid correlation of the draws, and
   `max |their mean| / (their sample SD / sqrt(A))`, drawn `PIVOT_DRAWS = 10,000` times
   from the stored seed. At one grid point the pivot is `|t|` with `A - 1` degrees of
-  freedom, so the band is `estimand_summary`'s interval. A simulation
-  (`scripts/checks/simulate_interval_coverage.py --band-out`; table
-  `tests/scripts/checks/data/band_coverage_full.csv`) measured the whole-curve coverage
-  on the cohort's shape: the earlier band, a quantile of the draws' own maximum, held the
-  whole curve in 0.80 to 0.90 of the data sets, because with five animals the draws do
-  not carry the tail the t correction supplies; this one holds it in at least 0.95 of them
-  in each setting, and is wider.
+  freedom, so the band is `estimand_summary`'s interval.
+
+What the across-session band does, in simulation on the cohort's shape
+(`scripts/checks/simulate_interval_coverage.py --band-out`; 300 data sets per setting,
+table `tests/scripts/checks/data/band_coverage_full.csv`):
+
+- With 20 grid points, smooth animal and day curves (correlation length 0.2 of the range)
+  and session noise of SD 0.3 or 1, it held the whole curve in 0.953 to 0.997 of the data
+  sets.
+- When the animals carried almost all the variance (session noise SD 0.02) and the curve
+  was rough for its 100-point grid (correlation length 0.05 or 0.02, or white noise), it
+  held the whole curve in only 0.91 to 0.94 of them (standard error about 0.015), below
+  95 %. The pivot's grid correlation is estimated from the draws, and five animals show at
+  most four independent directions of difference between curves: a curve with more
+  independent directions than that has a larger maximum than the simulated pivot.
+- With three animals it held the whole curve in every data set but was very wide (mean
+  critical value about 40).
+- At a single grid point it is conservative: it covered in 0.997 to 1.0 of the data sets.
+- The earlier band, a quantile of the draws' own maximum, held the whole curve in only
+  0.80 to 0.90 of the data sets of the first three settings.
+
+Its level for the curves of the models, low-dimensional spline curves, is checked when
+those curves exist.
 
 A band records its form (`form`), the draws behind it (`n_draws`: one fit's coefficient
 draws, or the across-session bootstrap draws) and, across sessions, the pivot's draws

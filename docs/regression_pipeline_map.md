@@ -486,7 +486,7 @@ The raised-cosine history basis and the projection of a lag matrix onto it.
 
 ### `src/continuum_swr_replay/analysis/regression/bands.py`
 
-Simultaneous 95 % bands for a curve on a fixed grid.
+Simultaneous bands for a curve on a fixed grid.
 
 `Band`, `simultaneous_band`, `across_session_band`
 
@@ -896,7 +896,7 @@ Compute decoding quality metrics across all sessions.
 
 Coverage of the animal-balanced interval under three ways to resample.
 
-`Setting`, `cohort`, `intervals`, `simulate`, `simulate_band`, `main`
+`Setting`, `cohort`, `intervals`, `simulate`, `BandSetting`, `simulate_band`, `main`
 
 ### `scripts/checks/summarize_cohort_audits.py`
 

@@ -48,16 +48,24 @@ def test_quick_run_writes_the_table(tmp_path: Path) -> None:
         "whole_curve_coverage",
         "point_coverage",
         "mean_width",
+        "mean_critical",
         "coverage_se",
         "n_sets",
         "n_draws",
+        "n_points",
+        "n_animals",
+        "checked",
     ]
-    assert len(band_table) == len(coverage.BAND_SETTINGS)
+    assert len(band_table) == len(coverage.BAND_SETTINGS) + len(
+        coverage.BAND_HARD_SETTINGS
+    )
 
 
 @pytest.mark.slow
-def test_the_band_holds_the_whole_curve() -> None:
-    """300 data sets of each band setting: whole-curve coverage at least 0.93."""
+def test_the_band_holds_the_whole_curve_in_the_checked_settings() -> None:
+    """300 data sets of each checked band setting: whole-curve coverage at
+    least 0.93. The hard settings are a record of where the band is weak; their
+    level is not asserted (the committed table holds them)."""
     for setting in coverage.BAND_SETTINGS:
         row = coverage.simulate_band(setting, 300, 1000).iloc[0]
         assert row.whole_curve_coverage >= 0.93, (setting.name, row)
@@ -67,9 +75,12 @@ _DATA = Path(__file__).resolve().parent / "data"
 
 
 def test_the_committed_tables_say_what_the_fitter_doc_says() -> None:
-    """docs/design/regression_fitter.md quotes these tables: the two-level
-    rule covers at least 95 % in every setting, the third level is up to 41 %
-    wider, and the band holds the whole curve in at least 95 %."""
+    """docs/design/regression_fitter.md and bands.py quote these tables: the
+    two-level rule covers at least 95 % in every setting and the third level is
+    up to 41 % wider; the band holds the whole curve in 0.953 to 0.997 of the
+    data sets in the checked settings, in only 0.91 to 0.94 in the hard
+    five-animal ones, always with three animals at a critical value about 40,
+    and covers 0.997 to 1.0 at a single point."""
     table = pd.read_csv(_DATA / "interval_coverage_full.csv")
     two_level = table[table.scheme == "animals_sessions"].set_index("setting")
     three_level = table[table.scheme == "animals_days_sessions"].set_index("setting")
@@ -77,6 +88,20 @@ def test_the_committed_tables_say_what_the_fitter_doc_says() -> None:
     ratio = three_level.mean_width / two_level.mean_width
     assert round(ratio.max() - 1, 2) == 0.41
     assert three_level.coverage.max() == 1.0
-    bands = pd.read_csv(_DATA / "band_coverage_full.csv")
-    assert len(bands) == len(coverage.BAND_SETTINGS)
-    assert (bands.whole_curve_coverage >= 0.95).all()
+    bands = pd.read_csv(_DATA / "band_coverage_full.csv").set_index("setting")
+    names = [s.name for s in (*coverage.BAND_SETTINGS, *coverage.BAND_HARD_SETTINGS)]
+    assert list(bands.index) == names
+    checked = bands[bands.checked]
+    assert list(checked.index) == [s.name for s in coverage.BAND_SETTINGS]
+    assert round(checked.whole_curve_coverage.min(), 3) == 0.953
+    assert round(checked.whole_curve_coverage.max(), 3) == 0.997
+    hard = bands[~bands.checked & (bands.n_animals == 5)]
+    assert len(hard) == 3
+    assert (hard.whole_curve_coverage < 0.95).all()
+    assert round(hard.whole_curve_coverage.min(), 2) == 0.91
+    assert round(hard.whole_curve_coverage.max(), 2) == 0.94
+    assert round(hard.coverage_se.mean(), 3) == 0.015
+    three = bands[bands.n_animals == 3]
+    assert len(three) == 1 and three.whole_curve_coverage.iloc[0] == 1.0
+    assert round(three.mean_critical.iloc[0], -1) == 40
+    assert round(bands.point_coverage.min(), 3) == 0.997
