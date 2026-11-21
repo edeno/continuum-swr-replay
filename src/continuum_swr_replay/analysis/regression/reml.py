@@ -35,7 +35,8 @@ estimate (``SessionData.active``): its fit is that of its design without them.
 :func:`select_penalties` chooses the strengths: it sets aside the sessions
 without a finite maximum, searches from a grid by Newton on ``rho`` with the
 exact Hessian, and refits the sessions set aside (its docstring states the
-rules). :func:`fit_at_penalties` fits at given strengths without a search.
+rules) by :func:`refit_session`, which a per-session fit at given penalties
+calls too. :func:`fit_at_penalties` fits at given strengths without a search.
 """
 
 from __future__ import annotations
@@ -84,6 +85,7 @@ __all__ = [
     "PooledScore",
     "RemlScore",
     "SessionData",
+    "SessionRefit",
     "SetAsideSession",
     "FreeDirection",
     "assemble_penalty",
@@ -92,6 +94,7 @@ __all__ = [
     "in_null_space",
     "pooled_reml",
     "refine_penalties",
+    "refit_session",
     "reml_and_derivatives",
     "select_penalties",
 ]
@@ -1476,22 +1479,86 @@ def _unidentified_text(session: RemlScore) -> str:
     return f"coordinates the likelihood cannot see {why}: {names}"
 
 
-def _refit(
+@dataclass(frozen=True)
+class SessionRefit:
+    """One session's fit at given log penalties with the columns running away
+    made inactive (:func:`refit_session`).
+
+    Attributes
+    ----------
+    refits : tuple of RemlScore
+        Its fits, in order: as given, then after each round of columns made
+        inactive.
+    left_out : np.ndarray of int, shape (k,)
+        The columns made inactive, in the order they were.
+    rounds : np.ndarray of int, shape (k,)
+        The refit in which each of ``left_out`` was made inactive (1 for the
+        first).
+    reason : str
+        How it ended, in words.
+    """
+
+    refits: tuple[RemlScore, ...]
+    left_out: np.ndarray
+    rounds: np.ndarray
+    reason: str
+
+    @property
+    def fitted(self) -> bool:
+        """True when its last fit converged."""
+        return self.refits[-1].fit.converged
+
+
+def refit_session(
     lik: Likelihood,
     data: SessionData,
-    index: int,
     blocks: Sequence[PenaltyBlock],
-    rho: np.ndarray,
-    reference: RemlScore,
-) -> SetAsideSession:
-    """A set-aside session fitted at the chosen ``rho``, by the refit rule of
-    :func:`select_penalties`."""
+    rho: Sequence[float],
+    *,
+    index: int = 0,
+) -> SessionRefit:
+    """A session's fit at ``rho``, its columns running away made inactive.
+
+    The rule (the penalty search's for a session it sets aside, and a
+    per-session fit's at given penalties): the session is fitted at ``rho``;
+    while that fit has no finite maximum along unpenalized design columns only
+    (no direction through a penalty block), the columns running away are made
+    inactive and it is fitted again, at most ``REFIT_MAX_ROUNDS`` times (a
+    direction spread over near-collinear columns can name only part of them
+    at a time). A direction through a penalty block (a smooth's own line, or
+    its penalized coordinates) cannot be left out, and the session stays
+    without a fit; so does a fit that ends with any other status. Neither is
+    an error here: the caller decides (the search raises at its reference
+    point for a design not identified or a numerical failure, before any
+    refit).
+
+    Parameters
+    ----------
+    lik : Likelihood
+    data : SessionData
+    blocks : sequence of PenaltyBlock
+    rho : sequence of float
+    index : int
+        The session's place among the caller's, for messages.
+
+    Returns
+    -------
+    SessionRefit
+
+    Raises
+    ------
+    ValueError
+        If a column of a penalty block is inactive, or the inputs cannot be
+        fitted; the message names the session.
+    """
+    _check_active(data, index, blocks)
     active = (
         np.ones(data.X.shape[1], dtype=bool)
         if data.active is None
         else data.active.copy()
     )
     left_out: list[int] = []
+    rounds: list[int] = []
     refits = [_labeled_score(lik, data, index, blocks, rho, None, False)]
     reason = ""
     while not refits[-1].fit.converged:
@@ -1516,6 +1583,7 @@ def _refit(
         new = [int(c) for c in last.fit.running_away if active[c]]
         active[new] = False
         left_out.extend(new)
+        rounds.extend([len(refits)] * len(new))
         refits.append(
             _labeled_score(
                 lik,
@@ -1531,13 +1599,26 @@ def _refit(
         reason = "converged at the chosen log penalties" + (
             f" with columns {left_out} inactive" if left_out else ""
         )
-    return SetAsideSession(
-        index,
-        data.name,
-        reference,
+    return SessionRefit(
         tuple(refits),
         np.array(left_out, dtype=int),
+        np.array(rounds, dtype=int),
         reason,
+    )
+
+
+def _refit(
+    lik: Likelihood,
+    data: SessionData,
+    index: int,
+    blocks: Sequence[PenaltyBlock],
+    rho: np.ndarray,
+    reference: RemlScore,
+) -> SetAsideSession:
+    """A set-aside session fitted at the chosen ``rho`` (:func:`refit_session`)."""
+    refit = refit_session(lik, data, blocks, rho, index=index)
+    return SetAsideSession(
+        index, data.name, reference, refit.refits, refit.left_out, refit.reason
     )
 
 

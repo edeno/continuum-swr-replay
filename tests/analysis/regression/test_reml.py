@@ -38,6 +38,7 @@ from continuum_swr_replay.analysis.regression.reml import (
     in_null_space,
     pooled_reml,
     refine_penalties,
+    refit_session,
     reml_and_derivatives,
     select_penalties,
 )
@@ -1039,6 +1040,54 @@ def test_separated_sessions_are_set_aside_before_the_search() -> None:
     np.testing.assert_array_equal(refitted.fit.beta, direct.fit.beta)
     np.testing.assert_array_equal(refitted.edf, direct.edf)
     assert np.all(np.isnan(refitted.fit.beta[[arm, role]]))
+
+
+def test_the_search_refits_a_set_aside_session_by_refit_session() -> None:
+    """The search's refit of a set-aside session is :func:`refit_session` at
+    the chosen penalties: the same fits, columns left out, rounds and reason;
+    the columns are left out in round 1."""
+    sessions = []
+    for seed in range(10):
+        data, blocks = _content_session(seed)
+        sessions.append(_with_arm_columns(data, seed, separated=seed == 4))
+    result = select_penalties(GroupedSoftmax(), sessions, blocks)
+    (set_aside,) = result.search.set_aside
+    refit = refit_session(GroupedSoftmax(), sessions[4], blocks, result.rho, index=4)
+    assert refit.fitted and refit.reason == set_aside.reason
+    np.testing.assert_array_equal(refit.left_out, set_aside.left_out)
+    np.testing.assert_array_equal(refit.rounds, [1, 1])
+    assert len(refit.refits) == len(set_aside.refits)
+    for one, two in zip(refit.refits, set_aside.refits, strict=True):
+        np.testing.assert_array_equal(one.fit.beta, two.fit.beta)
+        assert one.fit.status == two.fit.status
+
+
+def test_refit_session_counts_its_rounds_and_reports_a_block() -> None:
+    """Rounds: a direction spread over near-copies of a 0/1 column is left out
+    over several rounds, each column with the round that left it out. A
+    separation by a smooth's own line ends without a fit, with the reason, and
+    is not an error."""
+    rng = np.random.default_rng(0)
+    basis = PSplineBasis(0.0, 4.0, 10)
+    x = rng.uniform(0.0, 4.0, 600)
+    design, penalty, _ = basis.constrained(x)
+    indicator = (rng.uniform(size=600) < 0.2).astype(float)
+    copies = [indicator * (1.0 + 0.05 * rng.normal(size=600)) for _ in range(10)]
+    X = np.column_stack([np.ones(600), design, *copies])
+    y = (rng.uniform(size=600) < 1 / (1 + np.exp(-np.sin(x)))).astype(float)
+    y[indicator == 1] = 1.0
+    blocks = [PenaltyBlock(np.arange(1, 10), penalty)]
+    with np.errstate(over="ignore"):
+        refit = refit_session(Bernoulli(), SessionData(X, y), blocks, [6.0])
+    assert refit.fitted and len(refit.refits) > 2
+    assert refit.rounds.size == refit.left_out.size
+    assert refit.rounds[0] == 1 and refit.rounds[-1] == len(refit.refits) - 1
+    assert np.all(np.diff(refit.rounds) >= 0)
+
+    data, blocks = _content_session(6, by_the_clock=True)
+    line = refit_session(GroupedSoftmax(), data, blocks, [6.0])
+    assert not line.fitted and line.left_out.size == 0
+    assert "block 0's null space" in line.reason
 
 
 def test_a_separation_by_a_smooths_line_stays_without_a_fit() -> None:

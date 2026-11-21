@@ -169,24 +169,17 @@ reviewer's, on a synthetic session of 40,000 rows and 56 columns, 4 threads.
   columns. Measured: the rotation takes 28 ms and the two checks 10.5 ms of a 109 ms
   score-only evaluation.
   *When:* before the fitter runs the real models' searches.
-- [ ] **The step cap depends on column scaling.** The cap is in coefficient units. A
-  prototype (2026-11-21, simulated designs of 600 rows) showed the effect: with one
-  N(0,1) column multiplied by 1e-4 or less, the Poisson, Bernoulli and softmax fits end
-  at the step limit, and a Poisson fit from a far start ends "no finite maximum" although
-  its maximum is finite; multiplied by 1e-2 or by any factor above 1, every fit
-  converges to the same optimum. Two replacements were tried and both failed the saved
-  failure cases, so the cap stays. A cap of 10 on the change of the linear predictor
-  cannot find a separation along a smooth's line and runs out of steps from a saturated
-  start. No cap, with halving alone, overshoots until the information underflows: a
-  separated session ends "information not positive definite", not "no finite maximum".
-  Until a better rule exists, a design must not hold a column whose values are all very
-  small: the convention's design check refuses one (planned with the collinearity and
-  support checks). A rule not tried: no cap, except where a step would saturate a row.
-  *When:* the design check with the convention tools; a new rule only if needed.
-- [ ] **Who refits the set-aside sessions.** Refitting a set-aside session with columns
-  left out is model policy. Decide whether it belongs to the caller, which owns the
-  support rule, with the search returning the set-aside sessions and their directions.
-  *When:* when the first model's caller is written.
+- [ ] **The step cap depends on column scaling.** The cap is in coefficient units, so a
+  column whose values are all very small ends a fit at the step limit (a prototype,
+  2026-11-21: one N(0,1) column multiplied by 1e-4 on simulated designs of 600 rows;
+  a Poisson fit from a far start then ends "no finite maximum" although its maximum is
+  finite). The design check (`analysis/regression/terms.py:check_column_sizes`) refuses such a
+  column before any fit. Two replacement rules failed the saved failure cases: a cap of
+  10 on the change of the linear predictor cannot find a separation along a smooth's line
+  and runs out of steps from a saturated start; no cap, with halving alone, overshoots
+  until the information underflows. A rule not tried: no cap, except where a step would
+  saturate a row.
+  *When:* only if a design that passes the check still ends at the step limit.
 - [ ] **The Hessian's trace terms by leverages.** For the diagonal families the trace
   terms can use leverages (`sum_i lev_i * (...)`) instead of two Gram products and a
   solve per pair of penalties. Measured: 22.0 ms to 6.6 ms per pair, with a relative
