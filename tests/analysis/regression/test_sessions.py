@@ -603,3 +603,38 @@ def test_a_fit_along_a_penalty_direction_keeps_the_fit_tried() -> None:
     assert record.no_fit == NoFit.ALONG_A_PENALTY
     assert (record.n_rows, record.n_units, record.n_events) == (600, 150, 150.0)
     assert np.isnan(record.coef).all() and record.edf == {}
+
+
+def test_an_unpenalized_term_leaves_whole() -> None:
+    """An unpenalized smooth whose rows in one session hold no share above a
+    clock of 17 s: the refit leaves out only part of its columns. The whole
+    term leaves the session (no finite maximum, the round of its first
+    columns), and the session is fitted again without it: the fit is that
+    of the session with every column of the smooth inactive."""
+    from .conftest import content_rows
+
+    frames = [content_rows(seed) for seed in range(4)]
+    gap = frames[2]
+    gap.loc[gap["clock_s"] > 17.0, "share"] = 0.0
+    sessions = by_session(frames)
+    design = build_design(
+        [ROLE, Smooth("clock_s", 0.0, 20.0, 14, "none")],
+        pd.concat(sessions.values(), ignore_index=True),
+        intercept=False,
+    )
+    record = _fit(
+        design, sessions, GroupedSoftmax(), response="share", unit="event_id"
+    )[2]
+    smooth = [c for c in design.coef_names if c.startswith("s(clock_s).")]
+    assert record.status == "converged"
+    assert record.left_out == dict.fromkeys(smooth, Removed.NO_FINITE_MAXIMUM)
+    assert record.left_out_round == dict.fromkeys(smooth, 1)
+    assert record.edf["s(clock_s)"] == 0.0
+
+    X, _ = design.session(gap)
+    active = ~np.isin(design.coef_names, smooth)
+    data = SessionData(
+        X, gap["share"].to_numpy(), gap["event_id"].to_numpy(), active=active
+    )
+    alone = fit_at_penalties(GroupedSoftmax(), [data], [], [])
+    np.testing.assert_array_equal(record.coef, alone.sessions[0].fit.beta)

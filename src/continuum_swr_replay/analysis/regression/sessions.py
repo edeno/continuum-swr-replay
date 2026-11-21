@@ -27,7 +27,10 @@ slice. For each session, in order:
    session's first fit a design not identified, or a numerical failure, is an
    error that names the session. When a level is left out there, it is
    removed as in step 2 and the steps run again from step 2 on the rows then
-   kept.
+   kept. A term leaves whole: when the refit leaves out part of the columns
+   of a term of several unpenalized columns (a smooth without a penalty, a
+   lag functional), the whole term is removed and the session is fitted
+   again without it.
 
 A session with no rows, or no events, left is not fitted (``NOT_FITTED``: no
 fit was tried); its record says why and the loop goes on. A fit that was tried
@@ -327,15 +330,18 @@ class _Session:
         return refit
 
     def apply(self, refit: SessionRefit) -> bool:
-        """Remove the columns the refit left out (a level as in step 2).
+        """Remove what the refit left out: a level as in step 2; a term of
+        several unpenalized columns (a smooth without a penalty, a lag
+        functional) whole, when the refit left out part of its columns.
 
         Returns
         -------
         bool
-            True when the refit converged with a level left out: the steps
-            run again on the rows then kept.
+            True when the session is fitted again: the refit converged with a
+            level left out (the steps run again on the rows then kept), or a
+            term left whole.
         """
-        level_left = False
+        level_left = whole = False
         for column, round_ in zip(refit.left_out, refit.rounds, strict=True):
             term = self.design.column_terms[column]
             at = self.rounds + int(round_)
@@ -353,10 +359,16 @@ class _Session:
                 )
                 removal.columns.append(int(column))
                 removal.rounds.append(at)
+        for name, removal in self.removed.items():
+            columns = self.design.by_name[name].columns
+            if len(removal.columns) < columns.size:  # the refit left out part
+                rest = [int(j) for j in columns if j not in removal.columns]
+                removal.columns += rest
+                removal.rounds += [min(removal.rounds)] * len(rest)
+                whole = True
         self.rounds += len(refit.refits) - 1
-        if not refit.fitted:
-            self.no_fit = NoFit(refit.ended.value)
-        return refit.fitted and level_left
+        self.no_fit = "" if refit.fitted else NoFit(refit.ended.value)
+        return (refit.fitted and level_left) or whole
 
 
 def _holds_event(lik: Likelihood, y: np.ndarray) -> np.ndarray:
