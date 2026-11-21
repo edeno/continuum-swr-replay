@@ -547,7 +547,9 @@ Every scalar estimand of a fit is a linear functional `c' beta` of its coefficie
 its variance in a session is exact: `c' V c`, with `V` the Bayesian covariance
 (`contrasts.py`). A curve contrast is the mean of a curve over one range of its variable
 minus its mean over another, each mean taken over an equally spaced grid (step
-`GRID_STEP = 0.01`). A range whose two ends are equal is one point. A coefficient
+`GRID_STEP = 0.01`). A range whose two ends are equal is one point. Both ranges must lie
+inside the term's range, which the contrast is given (`term_range`): beyond it a clamped
+smooth is flat, so a mean there would silently be the curve at the end. A coefficient
 difference is a sum of named coefficients less another sum. A curve enters only through
 the function that maps values of its variable to rows of the coefficient vector, so the
 basis and its freedom do not matter. A coefficient left out of a session makes NaN every

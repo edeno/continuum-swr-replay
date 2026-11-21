@@ -84,5 +84,17 @@ def test_the_sd_change_is_the_curve_half_an_sd_each_side_of_the_mean() -> None:
     def line(x: np.ndarray) -> np.ndarray:
         return np.column_stack([np.ones_like(x), x])
 
-    c = range_mean_contrast(line, curve.first, curve.second)
+    c = range_mean_contrast(line, curve.first, curve.second, term_range=(0.0, 1.0))
     assert c @ np.array([1.0, 3.0]) == pytest.approx(3.0 * 0.2)
+
+
+def test_an_sd_change_past_the_terms_range_is_refused() -> None:
+    """A pooled mean near the end of the reward fraction's range puts
+    m + sd / 2 beyond it: the contrast is refused, not read at the clamp."""
+    curve = dt.estimand("Q4a").contrast.at(mean=0.9, sd=0.4)
+
+    def line(x: np.ndarray) -> np.ndarray:
+        return np.column_stack([np.ones_like(x), x])
+
+    with pytest.raises(ValueError, match="outside the term's range"):
+        range_mean_contrast(line, curve.first, curve.second, term_range=(0.0, 1.0))

@@ -16,6 +16,7 @@ from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 BASIS = PSplineBasis(0.0, 5.0, 8)
 Z = BASIS.constrained(np.linspace(0.0, 5.0, 300)).constraint
 N_COEF = 1 + Z.shape[1] + 1  # intercept, the smooth, one slope
+TERM_RANGE = (BASIS.lo, BASIS.hi)
 
 
 def curve_rows(x: np.ndarray) -> np.ndarray:
@@ -44,7 +45,7 @@ def test_range_grid_includes_both_ends_and_a_point_is_one_value() -> None:
 
 def test_range_mean_contrast_is_the_difference_of_grid_means() -> None:
     beta, _ = a_fit(0)
-    c = range_mean_contrast(curve_rows, (2.0, 4.0), (0.0, 1.0))
+    c = range_mean_contrast(curve_rows, (2.0, 4.0), (0.0, 1.0), term_range=TERM_RANGE)
     curve = lambda x: curve_rows(x) @ beta  # noqa: E731
     expected = np.mean([curve(np.array([x]))[0] for x in np.linspace(2, 4, 201)])
     expected -= np.mean([curve(np.array([x]))[0] for x in np.linspace(0, 1, 101)])
@@ -57,7 +58,7 @@ def test_curve_contrast_variance() -> None:
     """The exact variance of a range-mean contrast is the variance of the
     contrast over draws of the coefficients from N(beta, V)."""
     beta, V = a_fit(1)
-    c = range_mean_contrast(curve_rows, (0.0, 0.25), (1.0, 2.0))
+    c = range_mean_contrast(curve_rows, (0.0, 0.25), (1.0, 2.0), term_range=TERM_RANGE)
     result = evaluate_contrast(c, beta, V)
     draws = np.random.default_rng(2).multivariate_normal(beta, V, size=100_000)
     values = draws @ c
@@ -86,7 +87,7 @@ def test_a_left_out_coefficient_spoils_only_the_contrasts_that_use_it() -> None:
     beta, V = a_fit(3)
     beta[-1] = np.nan
     V[-1, :] = V[:, -1] = np.nan
-    c = range_mean_contrast(curve_rows, (2.0, 4.0), (0.0, 1.0))
+    c = range_mean_contrast(curve_rows, (2.0, 4.0), (0.0, 1.0), term_range=TERM_RANGE)
     result = evaluate_contrast(c, beta, V)
     assert np.isfinite(result.estimate) and np.isfinite(result.variance)
     slope = np.zeros(N_COEF)
@@ -99,3 +100,15 @@ def test_a_contrast_must_match_the_coefficients() -> None:
     beta, V = a_fit(4)
     with pytest.raises(ValueError, match="coefficients"):
         evaluate_contrast(np.ones(N_COEF + 1), beta, V)
+
+
+def test_a_range_outside_the_terms_range_is_refused() -> None:
+    """Beyond its range a clamped smooth is flat: a mean over (5, 6) of a term
+    on [0, 5] would silently be the curve at 5."""
+    for first in ((5.0, 6.0), (-0.5, 1.0), (5.01, 5.01)):
+        with pytest.raises(ValueError, match="outside the term's range"):
+            range_mean_contrast(curve_rows, first, (0.0, 1.0), term_range=TERM_RANGE)
+    with pytest.raises(ValueError, match="outside the term's range"):
+        range_mean_contrast(curve_rows, (0.0, 1.0), (4.0, 6.0), term_range=TERM_RANGE)
+    # Both ends of the term's range are inside it.
+    range_mean_contrast(curve_rows, (0.0, 0.0), (5.0, 5.0), term_range=TERM_RANGE)

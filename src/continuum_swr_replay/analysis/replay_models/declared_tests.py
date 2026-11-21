@@ -112,7 +112,11 @@ class SDChangeContrast:
     role: str
 
     def at(self, mean: float, sd: float) -> CurveContrast:
-        """The contrast at a pooled mean and SD, as two one-point ranges."""
+        """The contrast at a pooled mean and SD, as two one-point ranges.
+
+        Like every curve contrast, its points must lie inside the term's
+        range: ``contrasts.range_mean_contrast`` refuses them otherwise.
+        """
         high, low = mean + sd / 2, mean - sd / 2
         return CurveContrast(self.term, (high, high), (low, low))
 
