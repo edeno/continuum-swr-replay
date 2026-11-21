@@ -119,6 +119,7 @@ def _trials() -> pd.DataFrame:
         {
             "movement_start_time": [11.0],
             "end_time": [15.0],
+            "destination_first_poke_in_time": [15.0],
             "from_well": [1],
             "to_well": [0],
             "is_reward": [True],
