@@ -336,3 +336,9 @@ penalty selection (25 grid points and 4 Newton steps) 6.3 min, with about 5 core
 average and 4.5 GB resident, almost all of it the design matrices. 82 % of an
 evaluation's time is the information `X' W X`; the session loop is independent across
 sessions and can be spread over processes if a model needs it.
+
+These were measured before the fits were moved to the penalties' eigenbasis. The copy
+of the design in that basis, and the covariance computed at each evaluation, add to one
+session's evaluation (40,000 rows, 53 columns, two smooths, one thread, warm start,
+median of 5; 2026-11-21) 18 ms to the score alone (54 to 72 ms) and 26 ms with the
+gradient and Hessian (165 to 191 ms).
