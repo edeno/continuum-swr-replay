@@ -896,8 +896,9 @@ def _restriction_windows() -> pd.DataFrame:
     Outside SWRs, over half a second and 2 spikes (inside a well visit too):
     ``full - swr`` per second 4k in no-SWR events and k in SWR events (0 in
     controls), so per spike k and k / 4; the two-sided scores twice those. Each
-    window is its own event's (a control's event id is its event's), and every
-    event starts inside a well visit (:func:`_restriction_events`)."""
+    window is its own event's (a control's event id is its event's); the
+    summary selects the windows of the events that start inside a well visit
+    before the builders see them (``tests/reported/test_events_summary_planted.py``)."""
     sums = {
         ("event", "no SWR"): (0.0, 4.0),
         ("event", "SWR"): (6.0, 5.0),
@@ -948,34 +949,9 @@ def _restriction_windows() -> pd.DataFrame:
     )
 
 
-def _restriction_events(windows: pd.DataFrame) -> pd.DataFrame:
-    """The event table of ``windows``: every event starts inside a well visit."""
-    return pd.DataFrame(
-        {"event_id": windows["event_id"].unique(), "visit_context": "in_visit"}
-    )
-
-
-def _with_unselected_event(windows: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """``windows`` with one more no-SWR event (and its control) whose event
-    starts outside a well visit, with gains far from the rest."""
-    extra = windows[windows["event_id"] == "ano SWR"].assign(event_id="away")
-    numbers = [c for c in extra.columns if c.startswith(("full", "swr"))]
-    extra[numbers] = 1000.0
-    events = pd.concat(
-        [
-            _restriction_events(windows),
-            pd.DataFrame({"event_id": ["away"], "visit_context": ["track_center"]}),
-        ],
-        ignore_index=True,
-    )
-    return pd.concat([windows, extra], ignore_index=True), events
-
-
 def test_restriction_window_values_name_each_window_contrast_and_score():
     windows = _restriction_windows()
-    values = _by_key(
-        builder.restriction_window_values(windows, _restriction_events(windows), "s")
-    )
+    values = _by_key(builder.restriction_window_values(windows, "s"))
     numbers = {key: value.value for key, value in values.items()}
     assert numbers["restriction_non_swr_events_full_minus_swr_per_spike"] == (
         pytest.approx(4.0)
@@ -1057,35 +1033,21 @@ def test_restriction_window_values_name_each_window_contrast_and_score():
     )
     assert {k for k, v in values.items() if v.figures == ("2g",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
-    assert all("start inside a well visit" in values[k].description for k in drawn
-               if not k.endswith(("_ci_low", "_ci_high", "_animals_positive")))  # fmt: skip
-
-
-def test_restriction_window_values_read_only_the_events_that_start_in_a_visit():
-    """An event that starts outside a well visit, and its control, leave every
-    value as it was."""
-    windows = _restriction_windows()
-    expected = _numbers(
-        builder.restriction_window_values(windows, _restriction_events(windows), "s")
+    # the summary says what they are over (``over``), once
+    assert not any(
+        "start inside a well visit" in v.description for v in values.values()
     )
-    more, events = _with_unselected_event(windows)
-    assert _numbers(builder.restriction_window_values(more, events, "s")) == expected
-    with pytest.raises(ValueError, match="visit_context"):
-        builder.restriction_window_values(
-            windows, events.drop(columns="visit_context"), "s"
-        )
 
 
 def test_restriction_window_values_refuse_a_window_run_without_outside_sums():
     windows = _restriction_windows()
-    events = _restriction_events(windows)
     with pytest.raises(ValueError, match="Rerun scripts/event_evidence"):
         builder.restriction_window_values(
-            windows.drop(columns=["n_bins_outside_swr"]), events, "s"
+            windows.drop(columns=["n_bins_outside_swr"]), "s"
         )
     with pytest.raises(ValueError, match="per-bin facts"):
         builder.restriction_window_values(
-            windows.drop(columns=["n_spikes_outside_swr"]), events, "s"
+            windows.drop(columns=["n_spikes_outside_swr"]), "s"
         )
 
 
@@ -1115,8 +1077,9 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     spikes in event windows, with a third of the gain. Of that, the selected
     no-SWR events hold 10, 16, 30, 32, 25 and 28 inside the visit (more outside
     it, which never counts), and the selected SWR events a fifth of the gain in
-    their time outside the SWR. Time outside a visit, SWR bins and an event
-    that starts outside a visit never count."""
+    their time outside the SWR. Time outside a visit and SWR bins never count;
+    the summary selects the windows (an event that starts outside a visit,
+    planted here, is not handed to the builder)."""
     rows, windows = [], []
     for epoch, gain, in_events in (
         ("a1", 20.0, 10.0),
@@ -1152,19 +1115,10 @@ def test_restriction_outside_swr_values_are_the_gain_and_its_share_in_a_visit():
     for suffix, scale in (("", 1.0), ("_two_sided", 2.0)):
         windows[f"full{suffix}_outside_swr"] = scale * windows["outside"]
         windows[f"full{suffix}_outside_swr_in_visit"] = scale * windows["in_visit"]
-    events = pd.DataFrame(
-        {
-            "event_id": windows["event_id"],
-            "visit_context": np.where(
-                windows["event_id"].str.endswith("away"), "track_center", "in_visit"
-            ),
-        }
-    )
+    selected = windows[~windows["event_id"].str.endswith("away")]
     bin_s = pd.Series(1.0, index=["a1", "a2", "b1", "b2", "c1", "c2"])
     values = _by_key(
-        builder.restriction_outside_swr_values(
-            _time_sums(rows), bin_s, windows, events, "s"
-        )
+        builder.restriction_outside_swr_values(_time_sums(rows), bin_s, selected, "s")
     )
     numbers = {key: value.value for key, value in values.items()}
     key = "restriction_outside_swr_full_minus_swr"
@@ -1273,26 +1227,22 @@ def test_restriction_immobile_values_are_each_decoders_gain_and_the_share():
     assert {k for k, v in values.items() if v.figures == ("2g",)} == drawn
     assert {v.figures for k, v in values.items() if k not in drawn} == {()}
     assert {v.questions for v in values.values()} == {("2c.3",)}
-    assert "inside a well visit" in (
-        values["restriction_immobile_full_minus_swr_per_spike"].description
-    )
+    # the summary says what they are over (``over``), once
+    assert not any("inside a well visit" in v.description for v in values.values())
 
 
 def test_restriction_figure_statistics_are_the_tagged_values():
     """Figure 2g's two axes are the rows the drawn values are made from."""
     windows = _restriction_windows()
-    events = _restriction_events(windows)
     time_sums = _immobile_time_sums()
     bin_s = pd.Series(1.0, index=["a1", "b1", "c1"])
-    decoders, parts = builder.restriction_figure_statistics(
-        windows, time_sums, bin_s, events
-    )
+    decoders, parts = builder.restriction_figure_statistics(windows, time_sums, bin_s)
     numbers = _numbers(builder.restriction_immobile_values(time_sums, bin_s, "s"))
     for measure in builder.RESTRICTION_FIGURE_DECODERS:
         assert decoders.loc[("filter", measure), "estimate"] == pytest.approx(
             numbers[f"restriction_immobile_{measure}"]
         )
-    numbers = _numbers(builder.restriction_window_values(windows, events, "s"))
+    numbers = _numbers(builder.restriction_window_values(windows, "s"))
     for word, group in (("non_swr", "no SWR"), ("swr", "SWR")):
         assert parts.loc[group, "estimate"] == pytest.approx(
             numbers[f"restriction_{word}_events_outside_swr_full_minus_swr_per_spike"]

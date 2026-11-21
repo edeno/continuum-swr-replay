@@ -2030,8 +2030,9 @@ class _Figure02Read(Exception):
 
 def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     """The figure module with its eight events in a visit and a ninth on the
-    track, every reader before the held-out tetrode run's stubbed, and a
-    participation run over the subset and the current session cache."""
+    track, every reader before the held-out tetrode run's stubbed, a
+    participation run over the subset and the current session cache, and a
+    per-bin facts run made from the current session cache."""
     import joblib
 
     from continuum_swr_replay.analysis.event_definition.cohort_selection import (
@@ -2040,6 +2041,7 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     from continuum_swr_replay.analysis.event_tables import prepare_data
     from continuum_swr_replay.paths import (
         BRAIN_STATE_REFERENCE_DIR,
+        EVENT_BIN_FACTS_DIR,
         EVENT_PARTICIPATION_DIR,
         NONLOCAL_BY_RIPPLE_POWER_DIR,
         processed_data_dir,
@@ -2076,6 +2078,15 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
             {
                 "settings": {"subset": ANALYZED_SUBSET},
                 "inputs": {"session_cache": prepare_data.session_cache_record(["e"])},
+            }
+        )
+    )
+    (tmp_path / EVENT_BIN_FACTS_DIR).mkdir()
+    (tmp_path / EVENT_BIN_FACTS_DIR / "manifest.json").write_text(
+        json.dumps(
+            {
+                "inputs": {"session_cache": prepare_data.session_cache_record(["e"])},
+                "epochs": {"e": {"status": "ok"}},
             }
         )
     )
@@ -2155,6 +2166,67 @@ def test_figure02_refuses_a_participation_run_off_the_subset_or_the_visits(
 
 def _refuse_drawing(table):
     raise AssertionError("the participation run was read without its check")
+
+
+def test_figure02_reads_the_restriction_windows_over_the_selected_events(
+    offline, tmp_path, monkeypatch
+):
+    from continuum_swr_replay.paths import EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR
+
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    folder = tmp_path / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR
+    folder.mkdir()
+    (folder / "manifest.json").write_text(
+        json.dumps({"epochs": {"e": {"status": "ok", "bin_s": 0.002}}})
+    )
+    seen = []
+
+    def stop(windows, time_sums, bin_s):
+        seen.append((windows, time_sums, bin_s))
+        raise _Figure02Read
+
+    monkeypatch.setattr(figure02, "restriction_figure_statistics", stop)
+    with pytest.raises(_Figure02Read):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    windows, time_sums, bin_s = seen[0]
+    assert sorted(windows["event_id"]) == list(range(8))
+    assert len(time_sums) == 9  # the time sums are read whole
+    assert bin_s.to_dict() == {"e": 0.002}
+
+
+@pytest.mark.parametrize("problem", ["no session cache", "another session cache"])
+def test_figure02_refuses_bin_facts_made_from_other_visits(
+    offline, tmp_path, monkeypatch, problem
+):
+    """Panel g's time inside a well visit is the per-bin facts' flag: a facts
+    run that records no session cache (made before it did) or another than the
+    current one is refused, naming the runs to make again."""
+    from continuum_swr_replay.paths import EVENT_BIN_FACTS_DIR
+
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    # the facts' own record changes; the cache, which participation read too,
+    # does not
+    path = tmp_path / EVENT_BIN_FACTS_DIR / "manifest.json"
+    manifest = json.loads(path.read_text())
+    if problem == "no session cache":
+        manifest["inputs"].pop("session_cache")
+    else:
+        manifest["inputs"]["session_cache"] = {"sha256": "0" * 64}
+    path.write_text(json.dumps(manifest))
+    note = {
+        "no session cache": "records no session-cache SHA-256",
+        "another session cache": "other well visits than the current",
+    }[problem]
+
+    def refuse(*args):
+        raise AssertionError("panel g was drawn from the facts without their check")
+
+    monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
+    with pytest.raises(ValueError, match=f"per-bin facts run .*{note}") as refused:
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    message = str(refused.value)
+    assert "scripts/event_evidence/measure_bin_facts.py" in message
+    assert "sum_nonlocal_restriction_windows.py" in message
 
 
 def test_figure02_checks_every_event_s_label_against_the_visits(

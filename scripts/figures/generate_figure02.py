@@ -68,8 +68,11 @@ the stored counts by the functions the events summary uses
 (``event_statistics.animal_power_counts``,
 ``nonlocal_below_threshold_statistics``); g from the restriction window run's
 windows and time sums by the events summary's own function
-(``reported.events.restriction_figure_statistics``: the events that start
-inside a well visit and the time inside a well visit). Panel i is a
+(``reported.events.restriction_figure_statistics``: the windows of the events
+that start inside a well visit, ``cohort_selection.select_events_in``, and the
+time inside a well visit), refused when the per-bin facts run that gave the
+time its well-visit flag records no session cache or another than the current
+one (``prepare_data.session_cache_staleness``). Panel i is a
 per-time-bin signal no stored output holds, computed from the aggregated decode
 frames (cached), whose event counts by SWR overlap must equal the canonical
 table's.
@@ -165,6 +168,7 @@ from continuum_swr_replay.analysis.event_properties.triggered_analysis import (
 )
 from continuum_swr_replay.analysis.event_tables.prepare_data import (
     behavioral_context_cache_path,
+    session_cache_staleness,
     time_mask_staleness,
     well_visit_times,
 )
@@ -187,6 +191,7 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
+    EVENT_BIN_FACTS_DIR,
     EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
     EVENT_PARTICIPATION_DIR,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
@@ -1584,6 +1589,20 @@ def generate_figure(
             events["event_id"],
         )
     )
+    # the time sums' well-visit flag is the per-bin facts': refuse facts made
+    # from other visits than the current session cache's
+    facts_dir = data_dir / EVENT_BIN_FACTS_DIR
+    manifest = read_output_manifest(facts_dir)
+    note = session_cache_staleness(
+        manifest,
+        ok_epochs(manifest),
+        f"the per-bin facts run ({facts_dir}, "
+        "scripts/event_evidence/measure_bin_facts.py)",
+    )
+    if note is not None:
+        raise ValueError(
+            f"{note}, then scripts/event_evidence/sum_nonlocal_restriction_windows.py"
+        )
     # the events summary's restriction values: the same runs, cohorts, time
     # steps, subset and function
     windows_dir = data_dir / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR
@@ -1594,10 +1613,14 @@ def generate_figure(
         }
     )
     restriction_decoders, restriction_parts = restriction_figure_statistics(
-        read_complete_run(windows_dir, "nonlocal_restriction_windows", event_epochs),
+        select_events_in(
+            read_complete_run(
+                windows_dir, "nonlocal_restriction_windows", event_epochs
+            ),
+            events["event_id"],
+        ),
         read_complete_run(windows_dir, "nonlocal_restriction_time_sums", event_epochs),
         restriction_bin_s,
-        events,
     )
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))

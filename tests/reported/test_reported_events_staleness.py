@@ -24,7 +24,6 @@ from continuum_swr_replay.reported.events import (
 )
 from continuum_swr_replay.reported.values import Value, pend
 from tests.reported.test_reported_events_values import (
-    _restriction_events,
     _restriction_windows,
     step_fits,
 )
@@ -281,9 +280,7 @@ def test_window_values_are_pending_when_the_window_run_carries_a_note():
     assert "cccccccccccc" in reason and "dddddddddddd" in reason
     assert "held-out tetrode run" in reason and "rerun" in reason
     values = pend(
-        restriction_window_values(
-            _restriction_windows(), _restriction_events(_restriction_windows()), "s"
-        ),
+        restriction_window_values(_restriction_windows(), "s"),
         reason,
     )
     assert values and all(v.pending == reason for v in values)
@@ -292,9 +289,7 @@ def test_window_values_are_pending_when_the_window_run_carries_a_note():
 def test_window_values_are_not_pending_without_the_note():
     assert window_run_note_staleness(_window_manifest(None), "w") is None
     values = pend(
-        restriction_window_values(
-            _restriction_windows(), _restriction_events(_restriction_windows()), "s"
-        ),
+        restriction_window_values(_restriction_windows(), "s"),
         window_run_note_staleness(_window_manifest(None), "w"),
     )
     assert all(v.pending is None for v in values)
