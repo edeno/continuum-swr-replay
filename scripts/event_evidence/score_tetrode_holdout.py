@@ -90,9 +90,7 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.epoch_records import gather_manifest
 from continuum_swr_replay.runs.io import (
-    files_sha256,
     ok_epochs,
-    ok_table_paths,
     output_path,
     read_manifest,
 )
@@ -103,12 +101,14 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
+    add_fold_design_argument,
     add_gpu_arguments,
     add_run_arguments,
     epoch_inputs,
-    event_table_input,
     event_table_path,
+    file_input,
     gpu_pool,
+    participation_input,
     run,
     select_epochs,
 )
@@ -171,13 +171,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     add_run_arguments(parser)
     add_gpu_arguments(parser)
-    parser.add_argument(
-        "--fold-design",
-        choices=th.FOLD_DESIGNS,
-        default=th.TRIAL_DESIGN,
-        help="whole trials balanced by destination well (default), or the "
-        "earlier contiguous time blocks",
-    )
+    add_fold_design_argument(parser)
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
@@ -189,13 +183,8 @@ def main(argv: list[str] | None = None) -> None:
         "provenance": provenance_record(ROOT_DIR),
         "settings": {"n_folds": th.N_FOLDS, **th.fold_settings(args.fold_design)},
         "inputs": {
-            "event_table": event_table_input(event_table),
-            "event_participation": {
-                "sha256": files_sha256(
-                    ok_table_paths(participation_dir, PARTICIPATION_NAME)
-                ),
-                "path": str(participation_dir),
-            },
+            "event_table": file_input(event_table),
+            "event_participation": participation_input(data_dir),
         },
     }
     if args.gather:

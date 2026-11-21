@@ -190,8 +190,8 @@ def header(processed_data_root, monkeypatch):
     """A function that returns the header ``main`` gathers under, for the
     given arguments."""
     monkeypatch.setattr(runner, "provenance_record", lambda root: {})
-    monkeypatch.setattr(runner, "event_table_input", lambda path: {"sha256": "e"})
-    monkeypatch.setattr(runner, "ok_table_paths", lambda folder, name: [])
+    monkeypatch.setattr(runner, "file_input", lambda path: {"sha256": "e"})
+    monkeypatch.setattr(runner, "participation_input", lambda data_dir: {"sha256": "p"})
     headers = []
     monkeypatch.setattr(
         runner, "gather_manifest", lambda output, name, header: headers.append(header)

@@ -1,8 +1,10 @@
 """The per-event runners' shared epoch loop (records, the gathered manifest,
-re-runs and failures)."""
+re-runs and failures) and the epoch inputs."""
 
 import json
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from scripts.event_evidence import _per_event_run as per_event
@@ -63,3 +65,43 @@ def test_shards_split_the_sorted_epochs():
     assert per_event.select_epochs(epochs, [0], 2) == ["e1", "e3"]
     assert per_event.select_epochs(epochs, [1], 2) == ["e2", "e4"]
     assert per_event.select_epochs(epochs, None, 1) == ["e1", "e2", "e3", "e4"]
+
+
+def _epoch_inputs(tmp_path, monkeypatch, loader_time):
+    """``epoch_inputs`` with the decode frame, the loader and the detector
+    replaced at their boundaries; the frame's time is 0, 0.002, 0.004 s."""
+    import sys
+    import types
+
+    from continuum_swr_replay.analysis.event_definition import analyzed_time
+
+    frame = pd.DataFrame({"x": [1.0, 2.0, 3.0]}, index=[0.0, 0.002, 0.004])
+    monkeypatch.setattr(analyzed_time, "read_dot_with_swr_source", lambda path: frame)
+    monkeypatch.setattr(
+        per_event,
+        "decode_paths",
+        lambda epoch_id, data_dir: types.SimpleNamespace(data_over_time="d"),
+    )
+    terms = types.ModuleType("terms")
+    terms.load_marks_and_training_mask = lambda epoch_id, trials: {"time": loader_time}
+    terms.load_detector = lambda epoch_id, data_dir: "detector"
+    monkeypatch.setitem(
+        sys.modules,
+        "continuum_swr_replay.analysis.event_evidence.state_evidence.terms",
+        terms,
+    )
+    return frame
+
+
+def test_epoch_inputs_read_the_detector_only_when_asked(tmp_path, monkeypatch):
+    frame = _epoch_inputs(tmp_path, monkeypatch, np.array([0.0, 0.002, 0.004]))
+    epoch = per_event.epoch_inputs("e", tmp_path)
+    assert epoch.detector == "detector" and epoch.frame is frame
+    np.testing.assert_array_equal(epoch.time, [0.0, 0.002, 0.004])
+    assert per_event.epoch_inputs("e", tmp_path, detector=False).detector is None
+
+
+def test_epoch_inputs_refuse_a_loader_on_another_time_axis(tmp_path, monkeypatch):
+    _epoch_inputs(tmp_path, monkeypatch, np.array([0.0, 0.002, 0.005]))
+    with pytest.raises(ValueError, match="the loader's time axis is not the decode's"):
+        per_event.epoch_inputs("e", tmp_path, detector=False)

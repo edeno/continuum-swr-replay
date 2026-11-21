@@ -234,10 +234,11 @@ def _main_header(
     }
     monkeypatch.setattr(runner, "event_table_path", lambda data_dir: tmp_path / "e")
     monkeypatch.setattr(
-        runner, "event_table_input", lambda path: {"sha256": event_table, "path": "e"}
+        runner, "file_input", lambda path: {"sha256": event_table, "path": "e"}
     )
-    monkeypatch.setattr(runner, "files_sha256", lambda paths: "b")
-    monkeypatch.setattr(runner, "ok_table_paths", lambda folder, name: [])
+    monkeypatch.setattr(
+        runner, "participation_input", lambda data_dir: {"sha256": "b", "path": "p"}
+    )
     monkeypatch.setattr(runner, "run_input", lambda run_dir: {"sha256": run_dir.name})
     monkeypatch.setattr(runner, "provenance_record", lambda root: {})
     monkeypatch.setattr(runner, "read_manifest", lambda folder: manifests[folder.name])

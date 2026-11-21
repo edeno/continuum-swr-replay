@@ -72,7 +72,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import multiprocessing
 import sys
 import time as clock
 from pathlib import Path
@@ -121,7 +120,6 @@ from continuum_swr_replay.runs.io import (
     ok_epochs,
     output_path,
     read_manifest,
-    sha256_file,
 )
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.io import write_table
@@ -130,9 +128,13 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
+    add_cpu_arguments,
+    add_restriction_dir_argument,
     add_run_arguments,
-    event_table_input,
+    cpu_pool,
     event_table_path,
+    file_input,
+    restriction_run_dir,
     run,
     run_input,
     select_epochs,
@@ -318,12 +320,9 @@ def run_epoch(
             ),
             "bin_s": sample_step(time),
             "epoch_inputs": {
-                name: {"sha256": sha256_file(path), "path": str(path)}
-                for name, path in {
-                    "bins": bins_path,
-                    "bin_facts": facts_path,
-                    "data_over_time": Path(decode_path),
-                }.items()
+                "bins": file_input(bins_path),
+                "bin_facts": file_input(facts_path),
+                "data_over_time": file_input(Path(decode_path)),
             },
             "seconds": round(clock.time() - started, 1),
         }
@@ -335,19 +334,14 @@ def main(argv: list[str] | None = None) -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     add_run_arguments(parser)
-    parser.add_argument("--workers", type=int, default=8)
-    parser.add_argument(
-        "--restriction-dir",
-        type=Path,
-        default=None,
-        help="the restriction run to read; default the canonical one under --data-dir",
-    )
+    add_cpu_arguments(parser, workers=8)
+    add_restriction_dir_argument(parser)
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
     output = args.output_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR
     event_table = event_table_path(data_dir)
-    restriction_dir = args.restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
+    restriction = restriction_run_dir(args, data_dir)
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
@@ -356,28 +350,29 @@ def main(argv: list[str] | None = None) -> None:
             "nonlocal_threshold": DEFAULT_NON_LOCAL_THRESHOLD,
         },
         "inputs": {
-            "event_table": event_table_input(event_table),
-            "nonlocal_restriction": run_input(restriction_dir),
+            "event_table": file_input(event_table),
+            "nonlocal_restriction": run_input(restriction),
             "bin_facts": run_input(data_dir / EVENT_BIN_FACTS_DIR),
         },
     }
     if args.gather:
         gather_manifest(output, HELDOUT_EVENTS_NAME, header)
         return
+    max_workers, pool_options = cpu_pool(args)
     run(
         epochs=select_epochs(
-            args.epochs or ok_epochs(read_manifest(restriction_dir)),
+            args.epochs or ok_epochs(read_manifest(restriction)),
             args.shards,
             args.n_shards,
         ),
         task=run_epoch,
-        task_args=(event_table, data_dir, output, restriction_dir),
+        task_args=(event_table, data_dir, output, restriction),
         output=output,
         name=HELDOUT_EVENTS_NAME,
         header=header,
         overwrite=args.overwrite,
-        max_workers=args.workers,
-        pool_options={"mp_context": multiprocessing.get_context("spawn")},
+        max_workers=max_workers,
+        pool_options=pool_options,
     )
 
 

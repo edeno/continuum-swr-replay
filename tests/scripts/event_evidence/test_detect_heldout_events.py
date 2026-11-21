@@ -263,9 +263,7 @@ def test_main_runs_the_restriction_runs_ok_epochs_and_records_its_inputs(
     ran = {}
     manifest = {"epochs": {EPOCH: {"status": "ok"}, "x": {"status": "failed"}}}
     monkeypatch.setattr(runner, "event_table_path", lambda data_dir: tmp_path / "e")
-    monkeypatch.setattr(
-        runner, "event_table_input", lambda path: {"sha256": "a", "path": "e"}
-    )
+    monkeypatch.setattr(runner, "file_input", lambda path: {"sha256": "a", "path": "e"})
     monkeypatch.setattr(runner, "run_input", lambda run_dir: {"sha256": run_dir.name})
     monkeypatch.setattr(runner, "provenance_record", lambda root: {})
     monkeypatch.setattr(runner, "read_manifest", lambda folder: manifest)

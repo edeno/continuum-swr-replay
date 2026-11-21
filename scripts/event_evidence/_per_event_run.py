@@ -1,5 +1,6 @@
 """What the per-event runners share: their arguments, the canonical event table,
-an epoch's decode inputs, the GPU worker pool, and the epoch loop that writes each epoch's record and gathers the run's
+their input records, an epoch's decode inputs, the CPU and GPU worker pools,
+and the epoch loop that writes each epoch's record and gathers the run's
 manifest (``runs.epoch_records``).
 
 Used by ``measure_event_participation.py``, ``score_event_likelihood_advantage.py``,
@@ -21,19 +22,24 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.decoding.files import DecodePaths, decode_paths
 from continuum_swr_replay.paths import (
+    EVENT_NONLOCAL_RESTRICTION_DIR,
+    EVENT_PARTICIPATION_DIR,
+    PARTICIPATION_NAME,
     processed_data_dir,
     replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.runs.batch import lost_epoch_record
 from continuum_swr_replay.runs.epoch_records import (
+    MANIFEST,
     epochs_to_run,
     gather_manifest,
     write_record,
 )
-from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.io import files_sha256, ok_table_paths, sha256_file
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
@@ -45,14 +51,35 @@ def event_table_path(data_dir: Path) -> Path:
     )
 
 
-def event_table_input(path: Path) -> dict[str, str]:
-    """The event table as a run's input: its digest and where it was read."""
+def file_input(path: Path) -> dict[str, str]:
+    """A file as a run's input: its digest and where it was read."""
     return {"sha256": sha256_file(path), "path": str(path)}
 
 
 def run_input(run_dir: Path) -> dict[str, str]:
     """A run folder as an input: its manifest's digest and where it is."""
-    return {"sha256": sha256_file(run_dir / "manifest.json"), "path": str(run_dir)}
+    return {"sha256": sha256_file(run_dir / MANIFEST), "path": str(run_dir)}
+
+
+def participation_input(data_dir: Path) -> dict[str, str]:
+    """The participation tables under ``data_dir`` as a run's input: the
+    digest of the tables of the participation run's ``ok`` records, and their
+    folder."""
+    participation_dir = data_dir / EVENT_PARTICIPATION_DIR
+    return {
+        "sha256": files_sha256(ok_table_paths(participation_dir, PARTICIPATION_NAME)),
+        "path": str(participation_dir),
+    }
+
+
+def decode_time(epoch_id: str, data_dir: Path) -> np.ndarray:
+    """The epoch's decode frame's time axis, s, shape (n_time,)."""
+    from continuum_swr_replay.analysis.event_definition.analyzed_time import (
+        read_dot_with_swr_source,
+    )
+
+    frame = read_dot_with_swr_source(decode_paths(epoch_id, data_dir).data_over_time)
+    return frame.index.to_numpy(dtype=float)
 
 
 def add_run_arguments(parser: argparse.ArgumentParser) -> None:
@@ -83,6 +110,45 @@ def select_epochs(
         for i, epoch_id in enumerate(sorted(epochs))
         if shards is None or i % n_shards in shards
     ]
+
+
+def add_cpu_arguments(parser: argparse.ArgumentParser, workers: int) -> None:
+    """``--workers`` (default ``workers``), the argument of :func:`cpu_pool`."""
+    parser.add_argument("--workers", type=int, default=workers)
+
+
+def cpu_pool(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
+    """:func:`run`'s ``max_workers`` and ``pool_options`` for ``args.workers``
+    worker processes, started by spawning."""
+    return args.workers, {"mp_context": multiprocessing.get_context("spawn")}
+
+
+def add_restriction_dir_argument(parser: argparse.ArgumentParser) -> None:
+    """``--restriction-dir``, the restriction run a runner reads
+    (:func:`restriction_run_dir`)."""
+    parser.add_argument(
+        "--restriction-dir",
+        type=Path,
+        default=None,
+        help="the restriction run to read; default the canonical one under --data-dir",
+    )
+
+
+def restriction_run_dir(args: argparse.Namespace, data_dir: Path) -> Path:
+    """``--restriction-dir``, or by default the canonical restriction run under
+    ``data_dir``."""
+    return args.restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
+
+
+def add_fold_design_argument(parser: argparse.ArgumentParser) -> None:
+    """``--fold-design``, one of ``tetrode_holdout.FOLD_DESIGNS``."""
+    parser.add_argument(
+        "--fold-design",
+        choices=th.FOLD_DESIGNS,
+        default=th.TRIAL_DESIGN,
+        help="whole trials balanced by destination well (default), or the "
+        "earlier contiguous time blocks",
+    )
 
 
 def use_gpu(queue: multiprocessing.Queue, mem_fraction: float) -> None:
@@ -148,11 +214,15 @@ class EpochInputs:
     loaded: dict
     """``load_marks_and_training_mask``'s spikes, marks and masks."""
     detector: Any
+    """The epoch's saved decoder, or None when it was not asked for."""
 
 
-def epoch_inputs(epoch_id: str, data_dir: Path, *, trials: bool = False) -> EpochInputs:
+def epoch_inputs(
+    epoch_id: str, data_dir: Path, *, trials: bool = False, detector: bool = True
+) -> EpochInputs:
     """Read an epoch's decode frame, spikes, masks and detector; with
-    ``trials``, also its trials (``loaded["trials"]``), in the same load.
+    ``trials``, also its trials (``loaded["trials"]``), in the same load;
+    without ``detector``, no detector.
 
     Raises
     ------
@@ -173,7 +243,13 @@ def epoch_inputs(epoch_id: str, data_dir: Path, *, trials: bool = False) -> Epoc
     loaded = load_marks_and_training_mask(epoch_id, trials=trials)
     if not np.array_equal(loaded["time"], time):
         raise ValueError("the loader's time axis is not the decode's")
-    return EpochInputs(paths, frame, time, loaded, load_detector(epoch_id, data_dir))
+    return EpochInputs(
+        paths,
+        frame,
+        time,
+        loaded,
+        load_detector(epoch_id, data_dir) if detector else None,
+    )
 
 
 def run(

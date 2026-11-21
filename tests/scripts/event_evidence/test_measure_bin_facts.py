@@ -1,10 +1,10 @@
-"""The bin-facts runner's wiring: what ``run_epoch`` reads, checks and writes.
-The decode frame's time, the spike loader and the well visits are replaced at
-their boundaries; the restriction run's record (a fold fit's, which counts no
-spikes) is made by hand."""
+"""The bin-facts runner's wiring: what ``run_epoch`` reads and writes. The
+epoch's decode inputs (``_per_event_run.epoch_inputs``, which checks the
+loader's time against the decode's) and the well visits are replaced at their
+boundaries; the restriction run's record (a fold fit's, which counts no spikes)
+is made by hand."""
 
 import json
-import sys
 import types
 
 import numpy as np
@@ -21,6 +21,7 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.io import output_path
 from scripts.event_evidence import measure_bin_facts as runner
+from scripts.event_evidence._per_event_run import EpochInputs
 from tests.support._session_cache_fixtures import write_session_cache_entries
 
 EPOCH = "wilbur20210329_02_r1_HPC"
@@ -35,24 +36,20 @@ def folders(tmp_path, monkeypatch):
     restriction.mkdir()
     output = tmp_path / "out"
     output.mkdir()
-    monkeypatch.setattr(runner, "decode_time", lambda epoch_id, data_dir: TIME)
     monkeypatch.setattr(runner, "well_visit_times", lambda epoch_id: VISITS)
     (tmp_path / "cache.pkl").write_bytes(b"x")
-    terms = types.ModuleType("terms")
-    terms.load_marks_and_training_mask = lambda epoch_id: {
-        "time": TIME,
-        "spike_times": SPIKES,
-    }
-    monkeypatch.setitem(
-        sys.modules,
-        "continuum_swr_replay.analysis.event_evidence.state_evidence.terms",
-        terms,
-    )
-    monkeypatch.setattr(
-        runner, "decode_paths", lambda epoch_id, data_dir: types.SimpleNamespace(
-            data_over_time=tmp_path / "cache.pkl"
+
+    def epoch_inputs(epoch_id, data_dir, *, detector):
+        assert detector is False
+        return EpochInputs(
+            types.SimpleNamespace(data_over_time=tmp_path / "cache.pkl"),
+            None,
+            TIME,
+            {"time": TIME, "spike_times": SPIKES},
+            None,
         )
-    )  # fmt: skip
+
+    monkeypatch.setattr(runner, "epoch_inputs", epoch_inputs)
     return tmp_path, restriction, output
 
 
@@ -91,14 +88,6 @@ def test_run_epoch_writes_each_bins_spikes_and_visit_flag(folders):
     ]
     assert list(record["epoch_inputs"]) == ["data_over_time", "restriction_record"]
     json.dumps(record, allow_nan=False)
-
-
-def test_a_time_grid_that_is_not_the_decodes_raises(folders, monkeypatch):
-    data_dir, restriction, output = folders
-    _record(restriction)
-    monkeypatch.setattr(runner, "decode_time", lambda epoch_id, data_dir: TIME + 1e-3)
-    with pytest.raises(ValueError, match="decode frame"):
-        runner.run_epoch(EPOCH, data_dir, restriction, output)
 
 
 def test_the_header_records_the_session_cache_of_every_epoch_of_the_restriction_run(

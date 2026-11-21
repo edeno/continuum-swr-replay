@@ -90,14 +90,13 @@ from continuum_swr_replay.tables.io import write_table
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
     add_run_arguments,
-    event_table_input,
     event_table_path,
+    file_input,
     run,
     select_epochs,
 )
 
 PRODUCED_BY = produced_by(__file__)
-"""Each epoch's table is ``{epoch_id}_participation.parquet``."""
 SEED = 20261118
 """The control windows' seed, with the epoch id."""
 
@@ -232,7 +231,7 @@ def main(argv: list[str] | None = None) -> None:
             "control_rule": pt.CONTROL_RULE,
         },
         "inputs": {
-            "event_table": event_table_input(event_table),
+            "event_table": file_input(event_table),
             "session_cache": session_cache_record(every_epoch),
         },
     }

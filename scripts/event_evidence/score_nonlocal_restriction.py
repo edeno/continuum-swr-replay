@@ -126,7 +126,7 @@ from continuum_swr_replay.paths import (
     processed_data_dir,
 )
 from continuum_swr_replay.runs.epoch_records import gather_manifest
-from continuum_swr_replay.runs.io import json_ready, output_path, sha256_file
+from continuum_swr_replay.runs.io import json_ready, output_path
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.io import write_table
 
@@ -134,9 +134,11 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
+    add_fold_design_argument,
     add_gpu_arguments,
     add_run_arguments,
     epoch_inputs,
+    file_input,
     gpu_pool,
     run,
     select_epochs,
@@ -243,14 +245,8 @@ def run_epoch(
             "n_immobile_in_swr_label": int((immobile & in_label).sum()),
             "bins_table_bytes": bins_path.stat().st_size,
             "epoch_inputs": {
-                "data_over_time": {
-                    "sha256": sha256_file(epoch.paths.data_over_time),
-                    "path": str(epoch.paths.data_over_time),
-                },
-                "detector": {
-                    "sha256": sha256_file(epoch.paths.detector),
-                    "path": str(epoch.paths.detector),
-                },
+                "data_over_time": file_input(epoch.paths.data_over_time),
+                "detector": file_input(epoch.paths.detector),
                 **{
                     f"swr_{name}": entry
                     for name, entry in swr_source.swr_source_files(epoch_id).items()
@@ -267,13 +263,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     add_run_arguments(parser)
     add_gpu_arguments(parser)
-    parser.add_argument(
-        "--fold-design",
-        choices=th.FOLD_DESIGNS,
-        default=th.TRIAL_DESIGN,
-        help="whole trials balanced by destination well (default), or the "
-        "earlier contiguous time blocks",
-    )
+    add_fold_design_argument(parser)
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()

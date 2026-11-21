@@ -74,7 +74,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import multiprocessing
 import sys
 import time as clock
 from pathlib import Path
@@ -83,14 +82,12 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
-    read_dot_with_swr_source,
     read_swr_table,
 )
 from continuum_swr_replay.analysis.event_evidence import restriction_windows as rw
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     epoch_windows,
 )
-from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.parameters import ROOT_DIR
@@ -109,24 +106,28 @@ from continuum_swr_replay.paths import (
 )
 from continuum_swr_replay.runs.epoch_records import gather_manifest
 from continuum_swr_replay.runs.io import (
-    files_sha256,
     json_ready,
     ok_epochs,
-    ok_table_paths,
     output_path,
     read_manifest,
-    sha256_file,
 )
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
+from continuum_swr_replay.runs.staleness import recorded_sha256
 from continuum_swr_replay.tables.io import write_table
 
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
+    add_cpu_arguments,
+    add_restriction_dir_argument,
     add_run_arguments,
-    event_table_input,
+    cpu_pool,
+    decode_time,
     event_table_path,
+    file_input,
+    participation_input,
+    restriction_run_dir,
     run,
     run_input,
     select_epochs,
@@ -134,12 +135,6 @@ from scripts.event_evidence._per_event_run import (  # noqa: E402
 
 PRODUCED_BY = produced_by(__file__)
 HOLDOUT_COLUMNS = [*rw.WINDOW_KEYS, "tetrode", "n_bins", "n_spikes"]
-
-
-def decode_time(epoch_id: str, data_dir: Path) -> np.ndarray:
-    """The epoch's decode frame's time axis, s, shape (n_time,)."""
-    frame = read_dot_with_swr_source(decode_paths(epoch_id, data_dir).data_over_time)
-    return frame.index.to_numpy(dtype=float)
 
 
 def run_epoch(
@@ -229,13 +224,10 @@ def run_epoch(
             "n_spikes": int(facts["n_spikes"].sum()),
             "bin_s": sample_step(time),
             "epoch_inputs": {
-                name: {"sha256": sha256_file(path), "path": str(path)}
-                for name, path in {
-                    "bins": bins_path,
-                    "bin_facts": facts_path,
-                    "tetrode_holdout": holdout_path,
-                    "participation": participation_path,
-                }.items()
+                "bins": file_input(bins_path),
+                "bin_facts": file_input(facts_path),
+                "tetrode_holdout": file_input(holdout_path),
+                "participation": file_input(participation_path),
             },
             "seconds": round(clock.time() - started, 1),
         }
@@ -252,9 +244,7 @@ def check_holdout_inputs(header_inputs: dict, holdout_manifest: dict) -> None:
         If the participation tables' digest differs.
     """
     name = "event_participation"
-    if header_inputs[name]["sha256"] != holdout_manifest["inputs"].get(name, {}).get(
-        "sha256"
-    ):
+    if header_inputs[name]["sha256"] != recorded_sha256(holdout_manifest, name):
         raise ValueError(
             f"not the held-out tetrode run's inputs: ['{name}']; its windows would "
             "not be these"
@@ -273,7 +263,7 @@ def event_table_note(header_inputs: dict, holdout_manifest: dict) -> dict | None
         when its manifest records none), with a sentence saying what differs.
     """
     ours = header_inputs["event_table"]["sha256"]
-    theirs = holdout_manifest["inputs"].get("event_table", {}).get("sha256")
+    theirs = recorded_sha256(holdout_manifest, "event_table")
     if ours == theirs:
         return None
     return {
@@ -291,20 +281,14 @@ def main(argv: list[str] | None = None) -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     add_run_arguments(parser)
-    parser.add_argument("--workers", type=int, default=8)
-    parser.add_argument(
-        "--restriction-dir",
-        type=Path,
-        default=None,
-        help="the restriction run to read; default the canonical one under --data-dir",
-    )
+    add_cpu_arguments(parser, workers=8)
+    add_restriction_dir_argument(parser)
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir or processed_data_dir()
     output = args.output_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR
     event_table = event_table_path(data_dir)
-    participation_dir = data_dir / EVENT_PARTICIPATION_DIR
-    restriction_dir = args.restriction_dir or data_dir / EVENT_NONLOCAL_RESTRICTION_DIR
+    restriction = restriction_run_dir(args, data_dir)
     holdout_dir = data_dir / EVENT_TETRODE_HOLDOUT_DIR
     facts_dir = data_dir / EVENT_BIN_FACTS_DIR
     header = {
@@ -314,14 +298,9 @@ def main(argv: list[str] | None = None) -> None:
             "contrasts": {k: list(v) for k, v in rw.CONTRASTS.items()},
         },
         "inputs": {
-            "event_table": event_table_input(event_table),
-            "event_participation": {
-                "sha256": files_sha256(
-                    ok_table_paths(participation_dir, PARTICIPATION_NAME)
-                ),
-                "path": str(participation_dir),
-            },
-            "nonlocal_restriction": run_input(restriction_dir),
+            "event_table": file_input(event_table),
+            "event_participation": participation_input(data_dir),
+            "nonlocal_restriction": run_input(restriction),
             "tetrode_holdout": run_input(holdout_dir),
             "bin_facts": run_input(facts_dir),
         },
@@ -341,7 +320,7 @@ def main(argv: list[str] | None = None) -> None:
         gather_manifest(output, NONLOCAL_RESTRICTION_WINDOWS_NAME, header)
         return
     check_holdout_inputs(header["inputs"], holdout_manifest)
-    restriction_ok = set(ok_epochs(read_manifest(restriction_dir)))
+    restriction_ok = set(ok_epochs(read_manifest(restriction)))
     holdout_ok = set(ok_epochs(holdout_manifest))
     in_one_run = sorted(restriction_ok ^ holdout_ok)
     if in_one_run:
@@ -351,16 +330,17 @@ def main(argv: list[str] | None = None) -> None:
             in_one_run,
         )
     every_epoch = sorted(restriction_ok & holdout_ok)
+    max_workers, pool_options = cpu_pool(args)
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
         task=run_epoch,
-        task_args=(event_table, data_dir, output, restriction_dir),
+        task_args=(event_table, data_dir, output, restriction),
         output=output,
         name=NONLOCAL_RESTRICTION_WINDOWS_NAME,
         header=header,
         overwrite=args.overwrite,
-        max_workers=args.workers,
-        pool_options={"mp_context": multiprocessing.get_context("spawn")},
+        max_workers=max_workers,
+        pool_options=pool_options,
     )
 
 
