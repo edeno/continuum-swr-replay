@@ -685,3 +685,32 @@ def test_estimand_summary():
         stats.estimand_summary(
             twice.value, twice.animal, twice.day, twice.session, n_draws=10, seed=0
         )
+
+
+def test_a_session_without_a_finite_value_is_left_out_of_everything():
+    """An infinite session value is left out as a missing one is: of the
+    estimate, the counts, the animals' signs and its day's value."""
+    d = _days_table()
+    infinite, missing = d.copy(), d.copy()
+    infinite.loc[0, "value"] = np.inf
+    missing.loc[0, "value"] = np.nan
+    a = stats.estimand_summary(
+        infinite.value,
+        infinite.animal,
+        infinite.day,
+        infinite.session,
+        n_draws=50,
+        seed=0,
+    )
+    b = stats.estimand_summary(
+        missing.value, missing.animal, missing.day, missing.session, n_draws=50, seed=0
+    )
+    assert a == b
+    assert a["n_sessions"] == len(d) - 1 and a["n_days"] == 8
+    assert stats.day_level_test(
+        infinite.value, infinite.animal, infinite.day
+    ) == stats.day_level_test(missing.value, missing.animal, missing.day)
+    values = stats.animal_day_session_values(
+        infinite.value, infinite.animal, infinite.day, infinite.session, "mean"
+    )
+    assert np.isfinite(values).all()
