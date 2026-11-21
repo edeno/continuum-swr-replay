@@ -183,3 +183,22 @@ def test_separable() -> None:
         "d": {"observed": 0.1, "worst": 0.9, "estimate": MAX_EXPLAINED},
     }
     assert separable(record) == {"a": True, "b": False, "c": True, "d": False}
+
+
+def test_a_column_zero_in_the_session_does_not_change_the_measures() -> None:
+    """A smooth's column that is zero on every row of a session (a basis
+    function beyond the session's values, identified by the penalty) adds a
+    direction the data do not see: the measures equal those without it."""
+    X, y, offset, beta, terms = _poisson_design()
+    padded = np.column_stack([X[:, :8], np.zeros(len(y)), X[:, 8:]])
+    padded_beta = np.r_[beta[:8], 0.0, beta[8:]]
+    padded_terms = {"s(t)": np.arange(1, 9), "z": np.array([9])}
+    weighted = weighted_design(Poisson(), X, y, offset, X @ beta)
+    padded_weighted = weighted_design(
+        Poisson(), padded, y, offset, padded @ padded_beta
+    )
+    one = concurvity(weighted, terms, beta, intercept=0)
+    two = concurvity(padded_weighted, padded_terms, padded_beta, intercept=0)
+    for name in terms:
+        for key in ("observed", "worst", "estimate"):
+            assert two[name][key] == pytest.approx(one[name][key], rel=1e-9)

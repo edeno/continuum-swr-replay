@@ -7,7 +7,8 @@ Two kinds of rows, each built from a fixed seed:
   lagged outcomes and one continuous covariate;
 - content rows: one row per candidate arm of each event (four candidates: the
   current arm, the previous arm, another leaf arm and a trunk arm), with the
-  event's share on each, a clock and a reward fraction (missing on the trunk).
+  event's share on each, a clock of each candidate and a reward fraction
+  (missing on the trunk).
 """
 
 from __future__ import annotations
@@ -80,7 +81,7 @@ def content_rows(seed: int, n_events: int = 150) -> pd.DataFrame:
     -------
     pd.DataFrame, shape (4 * n_events, 8)
         ``animal``, ``session_date``, ``epoch``, ``event_id``, ``role``,
-        ``share``, ``clock_s`` (the event's time since arrival) and
+        ``share``, ``clock_s`` (the candidate's, s) and
         ``reward_fraction`` (NaN on the trunk row).
     """
     rng = np.random.default_rng(10_000 + seed)
@@ -88,7 +89,7 @@ def content_rows(seed: int, n_events: int = 150) -> pd.DataFrame:
     role = np.tile(np.array(ROLES, dtype=object), n_events)
     fraction = rng.uniform(0.0, 1.0, size=event.size)
     fraction[role == "trunk"] = np.nan
-    clock = np.repeat(rng.uniform(0.0, 20.0, size=n_events), len(ROLES))
+    clock = rng.uniform(0.0, 20.0, size=event.size)
     eta = np.select(
         [role == "current", role == "previous", role == "other"],
         [1.0, 0.3, 0.0],

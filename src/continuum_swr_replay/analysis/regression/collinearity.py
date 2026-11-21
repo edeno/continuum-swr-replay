@@ -21,7 +21,10 @@ other terms' columns ``X0``, QR of ``[X0, Xi]`` gives
     worst    = largest mu of  R0i' R0i v = mu (R0i' R0i + Rii' Rii) v
     estimate = ||R0i||_F^2 / (||R0i||_F^2 + ||Rii||_F^2)
 
-For a term of one column the three are the R^2 of that column on the others,
+``R0i`` is computed in an orthonormal basis of the other columns' range (a
+column zero in a session, such as a smooth's basis function beyond the
+session's values, adds no direction). For a term of one column the three are
+the R^2 of that column on the others,
 and ``VIF = 1 / (1 - R^2)``. A term is separable when the others explain less
 than ``MAX_EXPLAINED`` of it: ``r2`` for a term of one column, ``estimate``
 for a term of several (:func:`separable`).
@@ -37,12 +40,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import numpy as np
-import scipy.linalg
 
 from .likelihoods import Gaussian, GroupedSoftmax, Likelihood
 
 __all__ = [
     "MAX_EXPLAINED",
+    "RANK_TOL",
     "concurvity",
     "separable",
     "term_collinearity",
@@ -52,6 +55,10 @@ __all__ = [
 #: A term is separable from the others when they explain less than this share
 #: of it: R^2 0.8, a variance inflation factor of 5.
 MAX_EXPLAINED = 0.8
+
+#: A direction of a term's columns is seen by the data when its eigenvalue in
+#: their Gram matrix is above RANK_TOL times the largest.
+RANK_TOL = 1e-12
 
 
 def weighted_design(
@@ -125,26 +132,52 @@ def concurvity(
     if intercept is not None:
         q = X[:, intercept] / np.linalg.norm(X[:, intercept])
         X = X - np.outer(q, q @ X)
-    R = np.linalg.qr(X[:, used], mode="r")  # every term's columns, once
+    R = np.linalg.qr(X[:, used], mode="r")  # R'R = X'X over the terms' columns
     position = {int(c): k for k, c in enumerate(used)}
     out = {}
     for name, own in zip(terms, columns, strict=True):
         mine = [position[int(c)] for c in own]
-        rest = [k for k in range(used.size) if k not in set(mine)]
-        R_term = np.linalg.qr(R[:, rest + mine], mode="r")[:, len(rest) :]
-        R0i, Rii = R_term[: len(rest)], R_term[len(rest) :]
+        rest = np.setdiff1d(np.arange(used.size), mine)
+        A = R[:, mine]
+        explained = _range(R[:, rest]).T @ A  # R0i, in a basis of X0's range
         b = beta[own]
-        explained, left = R0i @ b, Rii @ b
-        cross = R0i.T @ R0i
-        whole = cross + Rii.T @ Rii
+        seen, total = explained @ b, A @ b
+        cross, whole = explained.T @ explained, A.T @ A
         out[name] = {
-            "worst": float(scipy.linalg.eigh(cross, whole, eigvals_only=True)[-1]),
-            "observed": float(
-                explained @ explained / (explained @ explained + left @ left)
-            ),
-            "estimate": float(np.sum(R0i**2) / (np.sum(R0i**2) + np.sum(Rii**2))),
+            "worst": _largest_ratio(cross, whole),
+            "observed": _share(seen @ seen, total @ total),
+            "estimate": _share(np.trace(cross), np.trace(whole)),
         }
     return out
+
+
+def _range(M: np.ndarray) -> np.ndarray:
+    """An orthonormal basis of the range of ``M``, its singular values above
+    ``RANK_TOL`` times the largest: the other terms of a session can hold
+    columns that are zero there (a smooth's basis functions beyond the
+    session's values), which add no direction."""
+    if M.shape[1] == 0:
+        return M[:, :0]
+    U, singular, _ = np.linalg.svd(M, full_matrices=False)
+    return U[:, singular > np.sqrt(RANK_TOL) * max(singular[0], 0.0)]
+
+
+def _share(part: float, whole: float) -> float:
+    """``part / whole``; 0 when the whole is 0."""
+    return float(part / whole) if whole > 0 else 0.0
+
+
+def _largest_ratio(cross: np.ndarray, whole: np.ndarray) -> float:
+    """The largest ``mu`` of ``cross v = mu whole v`` over the range of
+    ``whole``: a term's columns that are zero in a session (a smooth's basis
+    functions outside the session's values, which the penalty identifies)
+    add directions the data do not see, and are left out."""
+    values, vectors = np.linalg.eigh(whole)
+    seen = values > RANK_TOL * max(values[-1], 0.0)
+    if not seen.any():
+        return 0.0
+    W = vectors[:, seen] / np.sqrt(values[seen])
+    return float(np.linalg.eigvalsh(W.T @ cross @ W)[-1])
 
 
 def term_collinearity(
