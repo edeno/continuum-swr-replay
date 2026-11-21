@@ -176,7 +176,7 @@ def _last_step(
     A = lik.information(X, eta, y, aux) + S
     try:
         factor = scipy.linalg.cho_factor(A, lower=True)
-    except np.linalg.LinAlgError:
+    except (np.linalg.LinAlgError, ValueError):  # not PD, or not finite
         return fit
     decrement = 0.5 * float(g @ scipy.linalg.cho_solve(factor, g))
     return NewtonFit(beta, A, True, decrement, fit.n_iter + 1, loglik)
