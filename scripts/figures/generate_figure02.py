@@ -87,6 +87,7 @@ import logging
 import warnings
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 import joblib
 import matplotlib.pyplot as plt
@@ -850,6 +851,31 @@ def label_reward_well(ax: Axes, track_graph) -> None:
     )  # fmt: skip
 
 
+def shift_to_left_ink(
+    fig: Figure, renderer: Any, reference: Axes, first: Axes, second: Axes
+) -> None:
+    """Move panel g left until its drawn extent starts where panel c's does.
+
+    Row 4's grid starts at the axes' left edge, as row 3's does, but panel c's
+    bar labels reach further left than g's y-label, so g looked indented under
+    c. ``first`` (g's decoder axis) moves left by the difference and keeps its
+    width; ``second`` (g's event-time axis) moves its left edge by the same
+    amount and keeps its right edge, so it gains the width and h, i and j stay
+    where they are. Nothing moves when g already starts at or left of c.
+    """
+
+    def left_ink(ax: Axes) -> float:
+        return ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted()).x0
+
+    shift = left_ink(first) - left_ink(reference)
+    if shift <= 0:
+        return
+    box = first.get_position()
+    first.set_position((box.x0 - shift, box.y0, box.width, box.height))
+    box = second.get_position()
+    second.set_position((box.x0 - shift, box.y0, box.width + shift, box.height))
+
+
 def fit_track_to_height(fig: Figure, ax_track: Axes, left: float) -> None:
     """Size the track's equal-aspect axes to fill its row's height, at ``left``."""
     box = ax_track.get_position(original=True)
@@ -1566,6 +1592,7 @@ def generate_figure(
         )
         - 0.004
     )
+    shift_to_left_ink(fig, renderer, ax_c, ax_g, ax_g2)
     fit_track_to_height(fig, ax_a, x_left)
     fig.canvas.draw()
     positions = place_letters(
