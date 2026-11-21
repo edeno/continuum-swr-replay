@@ -558,12 +558,18 @@ def test_place_sampling_uses_the_folds_and_margin_it_is_given(monkeypatch):
         fit=fit,
         log=lambda message: None,
     )
-    expected = th.place_sampling(place, is_training, folds, 5, margin, 0.002)
+    expected = th.place_sampling(
+        place, th.fold_training_masks(is_training, folds, 5, margin), folds, 0.002
+    )
     np.testing.assert_array_equal(table["place_sampling_s"], expected)
     np.testing.assert_array_equal(table["block"], folds)
     # the contiguous defaults would give something else
+    blocks = th.time_blocks(time)
     contiguous = th.place_sampling(
-        place, is_training, th.time_blocks(time), 5, th.MARGIN_BINS, 0.002
+        place,
+        th.fold_training_masks(is_training, blocks, 5, th.MARGIN_BINS),
+        blocks,
+        0.002,
     )
     assert not np.array_equal(expected, contiguous)
 

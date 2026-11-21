@@ -101,14 +101,11 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
-    FOLD_DESIGNS,
     add_gpu_arguments,
     add_run_arguments,
-    epoch_folds,
     epoch_inputs,
     event_table_input,
     event_table_path,
-    fold_settings,
     gpu_pool,
     run,
     select_epochs,
@@ -124,13 +121,13 @@ def run_epoch(
     event_table: Path,
     data_dir: Path,
     output: Path,
-    fold_design: str = "trials",
+    fold_design: str = th.TRIAL_DESIGN,
 ) -> dict:
     """Score one epoch and write its table; return its status record."""
     started = clock.time()
     log = logging.getLogger(epoch_id).info
-    epoch = epoch_inputs(epoch_id, data_dir, trials=fold_design == "trials")
-    folds, margin_bins, fold_counts = epoch_folds(
+    epoch = epoch_inputs(epoch_id, data_dir, trials=fold_design == th.TRIAL_DESIGN)
+    folds, margin_bins, fold_counts = th.epoch_folds(
         epoch.time, epoch.loaded.get("trials"), fold_design
     )
     participation = pd.read_parquet(
@@ -176,8 +173,8 @@ def main(argv: list[str] | None = None) -> None:
     add_gpu_arguments(parser)
     parser.add_argument(
         "--fold-design",
-        choices=FOLD_DESIGNS,
-        default="trials",
+        choices=th.FOLD_DESIGNS,
+        default=th.TRIAL_DESIGN,
         help="whole trials balanced by destination well (default), or the "
         "earlier contiguous time blocks",
     )
@@ -190,7 +187,7 @@ def main(argv: list[str] | None = None) -> None:
     header = {
         "produced_by": PRODUCED_BY,
         "provenance": provenance_record(ROOT_DIR),
-        "settings": {"n_folds": th.N_FOLDS, **fold_settings(args.fold_design)},
+        "settings": {"n_folds": th.N_FOLDS, **th.fold_settings(args.fold_design)},
         "inputs": {
             "event_table": event_table_input(event_table),
             "event_participation": {

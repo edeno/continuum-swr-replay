@@ -14,7 +14,6 @@ from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.decoding.files import DecodePaths
 from continuum_swr_replay.paths import EVENT_PARTICIPATION_DIR
 from continuum_swr_replay.runs.io import output_path
-from scripts.event_evidence import _per_event_run as per_event
 from scripts.event_evidence import score_tetrode_holdout as runner
 from scripts.event_evidence._per_event_run import EpochInputs
 
@@ -204,7 +203,7 @@ def header(processed_data_root, monkeypatch):
 def test_the_header_names_the_fold_design_and_its_margin(header):
     assert header()["settings"] == {
         "n_folds": th.N_FOLDS,
-        **per_event.fold_settings("trials"),
+        **th.fold_settings("trials"),
     }
     assert header("--fold-design", "trials")["settings"]["fold_design"] == "trials"
     # the earlier design, with its name and its margin in seconds besides the

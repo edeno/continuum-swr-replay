@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+import sklearn
 
 from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 
@@ -209,14 +210,18 @@ def test_place_sampling_counts_the_folds_training_seconds_at_the_place():
     place = np.array([0, 1, 1, 1, 2, -1])
     blocks = np.array([0, 0, 0, 1, 1, 1])
     is_training = np.array([True, True, True, True, True, False])
-    sampling = th.place_sampling(place, is_training, blocks, 2, 0, 0.5)
+    sampling = th.place_sampling(
+        place, th.fold_training_masks(is_training, blocks, 2, 0), blocks, 0.5
+    )
     assert sampling.dtype == np.float32
     # fold 0 is fit on bins 3-4 (places 1, 2); fold 1 on bins 0-2 (0, 1, 1)
     np.testing.assert_array_equal(sampling[:5], [0.0, 0.5, 0.5, 1.0, 0.0])
     assert np.isnan(sampling[5])
     # a margin of one bin drops bin 3 from fold 0's fit and bin 2 from fold 1's
     np.testing.assert_array_equal(
-        th.place_sampling(place, is_training, blocks, 2, 1, 0.5)[:5],
+        th.place_sampling(
+            place, th.fold_training_masks(is_training, blocks, 2, 1), blocks, 0.5
+        )[:5],
         [0.0, 0.0, 0.0, 0.5, 0.0],
     )
 
@@ -240,12 +245,16 @@ def test_trial_folds_sample_a_patch_that_contiguous_blocks_leave_unsampled():
     first_patch = place < 10
 
     blocks = th.time_blocks(time, 5)
-    contiguous = th.place_sampling(place, is_training, blocks, 5, 2, bin_s)
+    contiguous = th.place_sampling(
+        place, th.fold_training_masks(is_training, blocks, 5, 2), blocks, bin_s
+    )
     assert (contiguous[first_patch] == 0).all()
 
     folds = th.trial_folds(time, starts, classes, 5)
     margin = th.margin_in_bins(th.TRIAL_MARGIN_S, time)
-    trial = th.place_sampling(place, is_training, folds, 5, margin, bin_s)
+    trial = th.place_sampling(
+        place, th.fold_training_masks(is_training, folds, 5, margin), folds, bin_s
+    )
     assert (trial > 0).all()
     # eight first-patch trials outside each fold, about 1 s at each place
     assert trial[first_patch].min() >= 5.0
@@ -504,3 +513,58 @@ def test_the_leakage_check_raises_where_the_library_would_reach_a_fold():
     with pytest.raises(ValueError, match="fold 1's encoding would train on 10"):
         th.check_no_fold_leakage(time, gap, masks, blocks)
     th.check_no_fold_leakage(time, position, masks, blocks)
+
+
+def test_the_header_names_the_fold_design_and_its_margin():
+    assert th.fold_settings("trials") == {
+        "fold_design": "trials",
+        "fold_classes": "to_well",
+        "margin_s": 1.0,
+        "max_segment_s": th.MAX_SEGMENT_S,
+        "min_trial_bin_share": th.MIN_TRIAL_BIN_SHARE,
+        "sklearn_version": sklearn.__version__,
+    }
+    assert th.fold_settings("contiguous") == {
+        "fold_design": "contiguous",
+        "margin_s": 0.004,
+        "margin_bins": 2,
+    }
+    with pytest.raises(ValueError, match="unknown fold design"):
+        th.fold_settings("chunks")
+
+
+def test_epoch_folds_deal_the_trials_and_the_time_after_them_into_folds():
+    """Six trials of 1.5 s, to wells 2 and 3 in turn, from 0.5 s into a 10 s
+    epoch, the last ending at 9.5 s: eight segments (the time before the first
+    trial, the six trials, the time after the last), none longer than the cap."""
+    time = np.arange(0.0, 10.0, 0.002)
+    trials = pd.DataFrame(
+        {
+            # out of order: the folds sort the trials by departure
+            "movement_start_time": [2.0, 0.5, 3.5, 5.0, 6.5, 8.0],
+            "end_time": [3.5, 2.0, 5.0, 6.5, 8.0, 9.5],
+            "to_well": [3, 2, 2, 3, 2, 3],
+        }
+    )
+    folds, margin_bins, counts = th.epoch_folds(time, trials, "trials")
+    starts = np.array([0.0, 0.5, 2.0, 3.5, 5.0, 6.5, 8.0, 9.5])
+    classes = np.r_[th.BEFORE_FIRST_TRIAL, 2, 3, 2, 3, 2, 3, th.AFTER_LAST_TRIAL]
+    np.testing.assert_array_equal(
+        folds, th.trial_folds(time, starts, classes, th.N_FOLDS)
+    )
+    assert margin_bins == 500
+    assert counts == {
+        "n_segments": 8,
+        "n_groups": 8,
+        "trial_bin_share": pytest.approx(0.9),
+    }
+
+
+def test_epoch_folds_of_the_contiguous_design_are_the_default_blocks():
+    assert th.epoch_folds(np.arange(10.0), None, "contiguous") == (
+        None,
+        th.MARGIN_BINS,
+        {"n_segments": None, "n_groups": None, "trial_bin_share": None},
+    )
+    with pytest.raises(ValueError, match="unknown fold design"):
+        th.epoch_folds(np.arange(10.0), None, "chunks")

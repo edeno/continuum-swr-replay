@@ -73,6 +73,7 @@ from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
 )
 from continuum_swr_replay.decoding.results import ENCODING_KEY
 from continuum_swr_replay.intervals import sample_step
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 N_FOLDS = 5
 """Folds per epoch (contiguous time blocks or trial folds); each fold's
@@ -390,6 +391,20 @@ def trial_folds(
         When the classes are not one per start or not all finite, when fewer
         groups than ``n_folds`` hold a bin, or when a fold is left empty.
     """
+    return _trial_folds_and_groups(
+        time, segment_starts, segment_classes, n_folds, max_segment_s
+    )[0]
+
+
+def _trial_folds_and_groups(
+    time: NDArray,
+    segment_starts: NDArray,
+    segment_classes: NDArray,
+    n_folds: int,
+    max_segment_s: float | None,
+) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
+    """:func:`trial_folds`' folds, with each bin's segment
+    (:func:`trial_segments`) and group (:func:`capped_groups`)."""
     from sklearn.model_selection import StratifiedGroupKFold
 
     classes = np.asarray(segment_classes)
@@ -415,7 +430,113 @@ def trial_folds(
     empty = np.setdiff1d(np.arange(n_folds), folds)
     if empty.size:
         raise ValueError(f"folds {empty.tolist()} hold no segment")
-    return folds
+    return folds, segment, group
+
+
+TRIAL_DESIGN = "trials"
+"""The fold design of whole trials balanced by destination well
+(:func:`trial_folds`, with a margin of :data:`TRIAL_MARGIN_S`)."""
+
+CONTIGUOUS_DESIGN = "contiguous"
+"""The fold design of :data:`N_FOLDS` contiguous time blocks
+(:func:`time_blocks`, with a margin of :data:`MARGIN_BINS` bins)."""
+
+FOLD_DESIGNS = (TRIAL_DESIGN, CONTIGUOUS_DESIGN)
+"""The fold designs a held-out run can use (:func:`epoch_folds`)."""
+
+
+def fold_settings(fold_design: str) -> dict:
+    """The header's record of a fold design: its name and margin in seconds;
+    for :data:`TRIAL_DESIGN` also the segment cap and the scikit-learn version,
+    whose ``StratifiedGroupKFold`` heuristic assigns the folds.
+
+    Raises
+    ------
+    ValueError
+        If ``fold_design`` is not one of :data:`FOLD_DESIGNS`.
+    """
+    if fold_design == TRIAL_DESIGN:
+        import sklearn
+
+        return {
+            "fold_design": TRIAL_DESIGN,
+            "fold_classes": "to_well",
+            "margin_s": TRIAL_MARGIN_S,
+            "max_segment_s": MAX_SEGMENT_S,
+            "min_trial_bin_share": MIN_TRIAL_BIN_SHARE,
+            "sklearn_version": sklearn.__version__,
+        }
+    if fold_design == CONTIGUOUS_DESIGN:
+        return {
+            "fold_design": CONTIGUOUS_DESIGN,
+            "margin_s": MARGIN_BINS / SAMPLING_FREQUENCY,
+            "margin_bins": MARGIN_BINS,
+        }
+    raise ValueError(f"unknown fold design {fold_design!r}, not one of {FOLD_DESIGNS}")
+
+
+def epoch_folds(
+    time: NDArray, trials: pd.DataFrame | None, fold_design: str
+) -> tuple[NDArray[np.int64] | None, int, dict]:
+    """Each bin's fold, the margin in bins and the folds' counts under
+    ``fold_design``.
+
+    For :data:`TRIAL_DESIGN`, the segments are :func:`task_segment_starts`'
+    (each trial from its ``movement_start_time`` to the next, of class
+    ``to_well``; the time before the first trial and after the last trial's
+    ``end_time``, each its own class), cut into pieces of at most
+    :data:`MAX_SEGMENT_S` (:func:`trial_folds`); :data:`CONTIGUOUS_DESIGN`
+    returns no folds (:func:`fold_blocks`' default time blocks) and
+    :data:`MARGIN_BINS`.
+
+    Parameters
+    ----------
+    time : ndarray, shape (n_time,)
+        The decode's time axis, s.
+    trials : pd.DataFrame or None
+        The epoch's trials (``movement_start_time``, ``end_time``,
+        ``to_well``); not read for :data:`CONTIGUOUS_DESIGN`.
+    fold_design : str
+        One of :data:`FOLD_DESIGNS`.
+
+    Returns
+    -------
+    folds : ndarray of int, shape (n_time,), or None
+    margin_bins : int
+    counts : dict
+        ``n_segments`` (the segments holding a bin), ``n_groups`` (their
+        pieces after the cap) and ``trial_bin_share`` (the share of the bins
+        from the first departure to the last trial's end), None for
+        :data:`CONTIGUOUS_DESIGN`.
+
+    Raises
+    ------
+    ValueError
+        If ``fold_design`` is not one of :data:`FOLD_DESIGNS`.
+    """
+    if fold_design == CONTIGUOUS_DESIGN:
+        return (
+            None,
+            MARGIN_BINS,
+            {"n_segments": None, "n_groups": None, "trial_bin_share": None},
+        )
+    if fold_design != TRIAL_DESIGN:
+        raise ValueError(f"unknown fold design {fold_design!r}")
+    trials = trials.sort_values("movement_start_time")
+    departures = trials["movement_start_time"].to_numpy(dtype=float)
+    last_end = float(trials["end_time"].iloc[-1])
+    starts, classes = task_segment_starts(
+        time, departures, trials["to_well"].to_numpy(), last_end
+    )
+    folds, segment, group = _trial_folds_and_groups(
+        time, starts, classes, N_FOLDS, MAX_SEGMENT_S
+    )
+    counts = {
+        "n_segments": int(np.unique(segment).size),
+        "n_groups": int(group[-1]) + 1,
+        "trial_bin_share": trial_bin_share(time, departures, last_end),
+    }
+    return folds, margin_in_bins(TRIAL_MARGIN_S, time), counts
 
 
 def margin_in_bins(margin_s: float, time: NDArray) -> int:
@@ -538,31 +659,29 @@ def animal_place_bins(environment: Any, linear_position: NDArray) -> NDArray[np.
 
 def place_sampling(
     place_bin: NDArray,
-    is_training: NDArray,
+    masks: Sequence[NDArray],
     blocks: NDArray,
-    n_folds: int,
-    margin_bins: int,
     bin_s: float,
 ) -> NDArray[np.float32]:
     """At each bin, the seconds its fold's encodings were fit on at the
     animal's place.
 
-    The training bins of a fold's encodings are :func:`fold_training_masks`'
-    (the decode's training bins outside the fold and its margin). A bin's value
-    is ``bin_s`` times the number of them whose place bin is the bin's own: 0
-    where the encoding saw no data at the animal's place. Computed from the
-    positions and folds alone, not from any score.
+    The training bins of a fold's encodings are ``masks``
+    (:func:`fold_training_masks`: the decode's training bins outside the fold
+    and its margin). A bin's value is ``bin_s`` times the number of them whose
+    place bin is the bin's own: 0 where the encoding saw no data at the
+    animal's place. Computed from the positions and folds alone, not from any
+    score.
 
     Parameters
     ----------
     place_bin : ndarray of int, shape (n_time,)
         The animal's place bin at each bin (:func:`animal_place_bins`), -1
         where unknown.
-    is_training : ndarray of bool, shape (n_time,)
+    masks : sequence of ndarray of bool, one per fold, each shape (n_time,)
+        Each fold's training bins (:func:`fold_training_masks`).
     blocks : ndarray of int, shape (n_time,)
         Each bin's fold.
-    n_folds, margin_bins : int
-        As :func:`fold_training_masks`.
     bin_s : float
         The bin width, s.
 
@@ -578,7 +697,7 @@ def place_sampling(
     occupancy = np.stack(
         [
             np.bincount(place_bin[mask & known], minlength=n_places)
-            for mask in fold_training_masks(is_training, blocks, n_folds, margin_bins)
+            for mask in masks
         ]
     )  # (n_folds, n_places), training bins
     out = np.full(place_bin.size, np.nan, dtype=np.float32)

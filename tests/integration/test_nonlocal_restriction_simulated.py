@@ -499,10 +499,8 @@ def test_the_fold_fit_table_has_its_columns_and_place_sampling(fold_fit):
         table["place_sampling_s"],
         th.place_sampling(
             th.animal_place_bins(environment, recording.position),
-            is_training,
+            th.fold_training_masks(is_training, folds, nr.N_FOLDS, margin),
             folds,
-            nr.N_FOLDS,
-            margin,
             float(np.median(np.diff(recording.time))),
         ),
     )

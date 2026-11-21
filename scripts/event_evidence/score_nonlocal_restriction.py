@@ -111,6 +111,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.event_definition import swr_source
 from continuum_swr_replay.analysis.event_evidence import nonlocal_restriction as nr
+from continuum_swr_replay.analysis.event_evidence import tetrode_holdout as th
 from continuum_swr_replay.data_loaders.epoch_register import analyzed_epoch_ids
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.intervals import interval_mask
@@ -131,12 +132,9 @@ from continuum_swr_replay.tables.io import write_table
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
-    FOLD_DESIGNS,
     add_gpu_arguments,
     add_run_arguments,
-    epoch_folds,
     epoch_inputs,
-    fold_settings,
     gpu_pool,
     run,
     select_epochs,
@@ -151,17 +149,11 @@ SPARSE_SAMPLING_S = 10.0
 at most this many seconds of training data at the animal's place."""
 
 
-FIT = "folds"
-"""The fit the header's settings and each record name (``"fit"``): the whole
-decoder fit on each fold's training folds. A run of the earlier design, which
-held out only the encodings, records none."""
-
-
 def fit_settings() -> dict:
     """The header's settings of the fit: its name and the EM settings of every
     fold's fit (``nonlocal_restriction.em_settings``)."""
     return {
-        "fit": FIT,
+        "fit": nr.FIT,
         "em": nr.em_settings(),
     }
 
@@ -170,14 +162,14 @@ def run_epoch(
     epoch_id: str,
     data_dir: Path,
     output: Path,
-    fold_design: str = "trials",
+    fold_design: str = th.TRIAL_DESIGN,
 ) -> dict:
     """Score one epoch, write its two tables and return its record."""
     started = clock.time()
     log = logging.getLogger(epoch_id).info
-    epoch = epoch_inputs(epoch_id, data_dir, trials=fold_design == "trials")
+    epoch = epoch_inputs(epoch_id, data_dir, trials=fold_design == th.TRIAL_DESIGN)
     frame = epoch.frame
-    folds, margin_bins, fold_counts = epoch_folds(
+    folds, margin_bins, fold_counts = th.epoch_folds(
         epoch.time, epoch.loaded.get("trials"), fold_design
     )
     source_events = swr_source.epoch_source(epoch_id).events
@@ -227,7 +219,7 @@ def run_epoch(
             **({"error": "; ".join(failures)} if failures else {}),
             **record,
             **share,
-            "fit": FIT,
+            "fit": nr.FIT,
             "fold_design": fold_design,
             "margin_bins": margin_bins,
             **fold_counts,
@@ -276,8 +268,8 @@ def main(argv: list[str] | None = None) -> None:
     add_gpu_arguments(parser)
     parser.add_argument(
         "--fold-design",
-        choices=FOLD_DESIGNS,
-        default="trials",
+        choices=th.FOLD_DESIGNS,
+        default=th.TRIAL_DESIGN,
         help="whole trials balanced by destination well (default), or the "
         "earlier contiguous time blocks",
     )
@@ -291,7 +283,7 @@ def main(argv: list[str] | None = None) -> None:
         "settings": {
             "n_folds": nr.N_FOLDS,
             **fit_settings(),
-            **fold_settings(args.fold_design),
+            **th.fold_settings(args.fold_design),
             "sparse_sampling_s": SPARSE_SAMPLING_S,
             "immobility_threshold_cm_per_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
             "swr_source": swr_source.swr_source_name(),

@@ -913,6 +913,12 @@ conditions are identical, the marginal traces identical, and the discrete
 transitions differ by at most 2.9e-7 (GPU run-to-run level); the fit took 305 s
 and 249 s."""
 
+FIT = "folds"
+"""The fit a restriction run's header settings and each record name
+(``"fit"``): the whole decoder fit on each fold's training folds
+(:func:`fold_fit_scores`). A run of the earlier design, which held out only the
+encodings, records none."""
+
 
 def em_settings() -> dict[str, Any]:
     """The EM settings of a fold fit: the library's defaults of
@@ -1377,10 +1383,8 @@ def fold_fit_scores(
         environment = canonical.encoding_model_[ENCODING_KEY]["environment"]
         table["place_sampling_s"] = place_sampling(
             animal_place_bins(environment, linear_position),
-            is_training,
+            masks,
             blocks,
-            n_folds,
-            margin_bins,
             sample_step(time),
         )
     for column in (*STATE_PROBABILITY_COLUMNS.values(), NONLOCAL_PLACE_BIN_COLUMN):
