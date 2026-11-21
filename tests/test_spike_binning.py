@@ -1,4 +1,4 @@
-"""Tests for spike count binning (get_spikecount_per_time_bin).
+"""Tests for spike binning (get_spikecount_per_time_bin, decoder_time_bin).
 
 This function uses np.digitize + np.bincount, which is prone to off-by-one
 errors at bin boundaries. These tests verify correctness against hand-computed
@@ -8,8 +8,9 @@ expected values.
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
-from continuum_swr_replay.intervals import get_spikecount_per_time_bin
+from continuum_swr_replay.intervals import decoder_time_bin, get_spikecount_per_time_bin
 
 
 class TestGetSpikecountPerTimeBin:
@@ -121,3 +122,61 @@ class TestGetSpikecountPerTimeBin:
         counts = get_spikecount_per_time_bin(spike_times, time)
 
         assert counts.sum() == 1
+
+
+class TestDecoderTimeBin:
+    """The decoder's rule, ``np.digitize(spike_times, time[1:-1])``."""
+
+    def test_hand_checked_bins(self):
+        time = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+        spikes = np.array([-1.0, 0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 3.5, 4.0, 5.0])
+
+        # before time[0] -> 0; on a bin time -> the bin that starts there;
+        # from time[-2] on, and past time[-1], -> n - 2; bin n - 1 never.
+        assert decoder_time_bin(spikes, time).tolist() == [
+            0, 0, 0, 1, 1, 2, 3, 3, 3, 3,
+        ]  # fmt: skip
+
+    def test_a_nan_spike_goes_to_the_last_reachable_bin(self):
+        time = np.array([0.0, 1.0, 2.0])
+        assert decoder_time_bin(np.array([np.nan]), time).tolist() == [1]
+
+    def test_two_samples_put_every_spike_in_bin_0(self):
+        bins = decoder_time_bin(np.array([-1.0, 0.5, 2.0]), np.array([0.0, 1.0]))
+        assert bins.tolist() == [0, 0, 0]
+
+    def test_no_spikes(self):
+        bins = decoder_time_bin(np.array([]), np.array([0.0, 1.0, 2.0]))
+        assert bins.shape == (0,)
+
+    @pytest.mark.parametrize("seed", range(20))
+    def test_it_is_the_expression_it_replaces(self, seed):
+        # The call sites it replaced wrote np.digitize(x, time[1:-1]) inline,
+        # some on a float64 copy of time; spikes on, between, before and after
+        # bin times, at epoch-sized clock values.
+        rng = np.random.default_rng(seed)
+        n_time = int(rng.integers(2, 40))
+        time = 1.6e9 + np.cumsum(rng.uniform(0.001, 0.003, n_time))
+        spikes = np.concatenate(
+            [
+                rng.uniform(time[0] - 0.01, time[-1] + 0.01, 200),
+                time,
+                np.nextafter(time, -np.inf),
+                np.nextafter(time, np.inf),
+                [np.nan, -np.inf, np.inf],
+            ]
+        )
+        expected = np.digitize(spikes, time[1:-1])
+        got = decoder_time_bin(spikes, time)
+        assert got.dtype == expected.dtype
+        np.testing.assert_array_equal(got, expected)
+        # the decoder's own count is the bincount of the kept spikes' bins
+        from non_local_detector.likelihoods.common import (
+            get_spikecount_per_time_bin as library_count,
+        )
+
+        kept = spikes[(spikes >= time[0]) & (spikes <= time[-1])]
+        np.testing.assert_array_equal(
+            np.bincount(decoder_time_bin(kept, time), minlength=n_time),
+            library_count(kept, time),
+        )

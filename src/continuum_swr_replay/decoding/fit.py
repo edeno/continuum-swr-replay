@@ -11,7 +11,8 @@ epoch's spikes and position. What an epoch's decode does around the fit
 ``scripts/decoding/_decode_runner.py:run_decode``.
 
 ``non_local_detector`` and ``decoding.transitions`` are imported inside
-:func:`perform_decoding`, so importing this module loads no JAX.
+:func:`perform_decoding` and :func:`linear_environment`, so importing this
+module loads no JAX.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ __all__ = [
     "DecodeRunner",
     "algorithm_params",
     "create_detector",
+    "linear_environment",
     "perform_decoding",
 ]
 
@@ -90,27 +92,45 @@ def algorithm_params(config: DecodingConfig, param_type: str) -> dict[str, Any]:
 
 
 def create_detector(
-    runner: DecodeRunner,
+    detector_classes: Mapping[str, tuple[type, str]],
+    detector_kwargs: Callable[[DecodingConfig], dict[str, Any]],
     brain_area: str,
     env: Environment,
     config: DecodingConfig,
 ) -> Any:
-    """Build `runner`'s detector for `brain_area`.
+    """Build the detector for `brain_area`, unfitted.
 
-    Its discrete transitions come from ``runner.detector_kwargs``, never from
-    the library's defaults.
+    `detector_classes` and `detector_kwargs` are a :class:`DecodeRunner`'s
+    (``runner.detector_classes``, ``runner.detector_kwargs``). Its discrete
+    transitions come from `detector_kwargs`, never from the library's defaults.
     """
-    if brain_area not in runner.detector_classes:
-        valid_areas = list(runner.detector_classes.keys())
+    if brain_area not in detector_classes:
+        valid_areas = list(detector_classes.keys())
         raise ValueError(
             f"Invalid brain_area '{brain_area}'. Must be one of {valid_areas}"
         )
 
-    detector_class, param_type = runner.detector_classes[brain_area]
+    detector_class, param_type = detector_classes[brain_area]
     return detector_class(
         environments=env,
         **algorithm_params(config, param_type),
-        **runner.detector_kwargs(config),
+        **detector_kwargs(config),
+    )
+
+
+def linear_environment(
+    track_graph: nx.Graph, edge_order: list, edge_spacing: list
+) -> Environment:
+    """The unfitted environment of a 1-D decode: ``PLACE_BIN_SIZE_1D`` bins on
+    `track_graph`, linearized in `edge_order` with `edge_spacing`."""
+    # loads JAX, which importing this module must not
+    from non_local_detector.environment import Environment
+
+    return Environment(
+        place_bin_size=PLACE_BIN_SIZE_1D,
+        track_graph=track_graph,
+        edge_order=edge_order,
+        edge_spacing=edge_spacing,
     )
 
 
@@ -150,12 +170,7 @@ def perform_decoding(
         raise ValueError(NON_STATIONARY_REFUSAL)
 
     if is_1d:
-        env = Environment(
-            place_bin_size=PLACE_BIN_SIZE_1D,
-            track_graph=track_graph,
-            edge_order=linear_edge_order,
-            edge_spacing=linear_edge_spacing,
-        )
+        env = linear_environment(track_graph, linear_edge_order, linear_edge_spacing)
     else:
         env = Environment(
             place_bin_size=PLACE_BIN_SIZE_2D,
@@ -165,7 +180,9 @@ def perform_decoding(
 
     logger.info(f"{runner.decoding_label} {brain_area}...")
 
-    detector = create_detector(runner, brain_area, env, config)
+    detector = create_detector(
+        runner.detector_classes, runner.detector_kwargs, brain_area, env, config
+    )
 
     estimate_params = {
         "position_time": position_info.index.to_numpy(),

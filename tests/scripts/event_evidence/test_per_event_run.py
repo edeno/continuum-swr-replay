@@ -2,6 +2,8 @@
 re-runs and failures) and the epoch inputs."""
 
 import json
+import os
+import queue
 
 import numpy as np
 import pandas as pd
@@ -138,3 +140,38 @@ def test_the_trials_digest_follows_the_fold_columns():
     ]
     for trials in changed:
         assert per_event.trials_input(trials)["sha256"] != digest["sha256"]
+
+
+def test_a_gpu_worker_is_set_on_its_card_without_claiming_it(monkeypatch, tmp_path):
+    from continuum_swr_replay.runs import device
+
+    cards = device.parse_gpu_query(
+        "0, 100, 81920, 0, GPU-aaa, A100\n1, 100, 81920, 0, GPU-bbb, A100\n"
+    )
+    checked = []
+    monkeypatch.setattr(device, "query_gpus", lambda: cards)
+    monkeypatch.setattr(device, "verify_jax_device", checked.append)
+    monkeypatch.setattr(device, "CLAIM_DIRECTORY", tmp_path / "claims")
+    for name in (
+        "CUDA_VISIBLE_DEVICES",
+        "XLA_PYTHON_CLIENT_PREALLOCATE",
+        "XLA_PYTHON_CLIENT_MEM_FRACTION",
+    ):
+        monkeypatch.setenv(name, "")
+    cards_left = queue.Queue()
+    cards_left.put(1)
+
+    per_event.use_gpu(cards_left, 0.3)
+
+    assert os.environ["CUDA_VISIBLE_DEVICES"] == "GPU-bbb"
+    assert os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] == "false"
+    assert os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] == "0.3"
+    assert checked == [
+        {
+            "jax_backend": "gpu",
+            "gpu_index": 1,
+            "gpu_uuid": "GPU-bbb",
+            "gpu_name": "A100",
+        }
+    ]
+    assert not (tmp_path / "claims").exists()
