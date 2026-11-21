@@ -587,10 +587,20 @@ A band of `bands.py` holds the whole curve with 95 % probability, not each point
   `f ± c se`.
 - The animal-balanced curve across sessions: the per-session curves on one grid are
   taken session to recording day to animal as a mean of means, with nested bootstrap
-  draws of that curve. With `sd` the draws' standard deviation, `c` is the 0.95 quantile
-  of `max |draw - mean| / sd`, and the band is `estimate ± c sd k`, with
-  `k = t(0.975, A - 1) sqrt(A / (A - 1)) / z(0.975)` the small-sample correction over the
-  `A` animals.
+  draws of that curve (animals, then their sessions). With `sd` the draws' standard
+  deviation and `A` the animals with a finite curve, the band is
+  `estimate ± c sd sqrt(A / (A - 1))`, the scale of the scalar interval with `c` in place
+  of `t(0.975, A - 1)`. `c` is the 0.95 quantile of a pivot simulated at the level of the
+  animals: `A` independent Gaussian curves with the grid correlation of the draws, and
+  `max |their mean| / (their sample SD / sqrt(A))`, drawn `PIVOT_DRAWS = 10,000` times
+  from the stored seed. At one grid point the pivot is `|t|` with `A - 1` degrees of
+  freedom, so the band is `estimand_summary`'s interval. A simulation
+  (`scripts/checks/simulate_interval_coverage.py --band-out`; table
+  `tests/scripts/checks/data/band_coverage_full.csv`) measured the whole-curve coverage
+  on the cohort's shape: the earlier band, a quantile of the draws' own maximum, held the
+  whole curve in 0.80 to 0.90 of the data sets, because with five animals the draws do
+  not carry the tail the t correction supplies; this one holds it in at least 0.95 of them
+  in each setting, and is wider.
 
 Neither form depends on the basis that made the curve.
 
@@ -605,7 +615,7 @@ bootstrap, animals and then each drawn animal's sessions (`nested_bootstrap_draw
 days are not resampled but stay in the estimate: in each draw a day's mean is over its
 drawn sessions, and a day with no session drawn is absent. A simulation
 (`scripts/checks/simulate_interval_coverage.py`; 5 animals, 45 days, 244 sessions, 2,000
-data sets per setting) found the t-corrected interval of this rule at or above 95 %
+data sets per setting; table `tests/scripts/checks/data/interval_coverage_full.csv`) found the t-corrected interval of this rule at or above 95 %
 coverage in every setting of animal, day and session variance, missing sessions and a
 paired kind difference included; resampling days as a third level gave intervals up to 41 %
 wider that over-covered (up to 100 %) when the animals varied little.
