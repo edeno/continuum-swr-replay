@@ -702,18 +702,24 @@ def spikes_in_bins(
     return kept_times, kept_marks
 
 
-def load_marks_and_training_mask(epoch_id: str) -> dict:
+def load_marks_and_training_mask(epoch_id: str, *, trials: bool = False) -> dict:
     """Marks, the position axis and the decode's masks, from ``load_data``.
 
     The masks are ``decode_masks.hpc_decode_masks``' for a ``no_ripple``
     decode, from the configured SWR source, as the decoder built them.
+
+    Parameters
+    ----------
+    epoch_id : str
+    trials : bool
+        Also return the epoch's trials, read in the same ``load_data`` call.
 
     Returns
     -------
     dict
         ``time`` (the loader's position axis, s), ``spike_times`` and
         ``marks`` (per tetrode), ``is_training`` and ``is_missing`` (bool per
-        time bin).
+        time bin); with ``trials``, ``trials`` (``load_data``'s).
     """
     from continuum_swr_replay.data_loaders import load_data
     from continuum_swr_replay.data_types import SessionDataKeys as K
@@ -727,7 +733,10 @@ def load_marks_and_training_mask(epoch_id: str) -> dict:
     data = load_data(
         nwb_file_name,
         epoch_name,
-        include=frozenset({K.SPIKE_TIMES, K.SPIKE_WAVEFORM_FEATURES}),
+        include=frozenset(
+            {K.SPIKE_TIMES, K.SPIKE_WAVEFORM_FEATURES}
+            | ({K.TRIALS} if trials else set())
+        ),
     )
     masks = hpc_decode_masks(
         nwb_file_name,
@@ -742,6 +751,7 @@ def load_marks_and_training_mask(epoch_id: str) -> dict:
         "marks": [np.asarray(x) for x in data["spike_waveform_features"][brain_area]],
         "is_training": masks.is_training,
         "is_missing": masks.is_missing,
+        **({"trials": data["trials"]} if trials else {}),
     }
 
 

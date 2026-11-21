@@ -77,6 +77,7 @@ from continuum_swr_replay.intervals import sample_step
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import (
     EVENT_PARTICIPATION_DIR,
+    PARTICIPATION_NAME,
     processed_data_dir,
 )
 from continuum_swr_replay.runs.epoch_records import gather_manifest
@@ -89,15 +90,13 @@ from continuum_swr_replay.tables.io import write_table
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.event_evidence._per_event_run import (  # noqa: E402
     add_run_arguments,
-    event_table_input,
     event_table_path,
+    file_input,
     run,
     select_epochs,
 )
 
 PRODUCED_BY = produced_by(__file__)
-OUTPUT_NAME = "participation"
-"""Each epoch's table is ``{epoch_id}_participation.parquet``."""
 SEED = 20261118
 """The control windows' seed, with the epoch id."""
 
@@ -200,7 +199,7 @@ def run_epoch(epoch_id: str, event_table: Path, data_dir: Path, output: Path) ->
     started = clock.time()
     events = epoch_events(read_swr_table(event_table), epoch_id)
     table, without_control = epoch_table(epoch_id, events, data_dir)
-    write_table(table, output_path(epoch_id, output, OUTPUT_NAME))
+    write_table(table, output_path(epoch_id, output, PARTICIPATION_NAME))
     return {
         "status": "ok",
         "n_events": len(events),
@@ -232,19 +231,19 @@ def main(argv: list[str] | None = None) -> None:
             "control_rule": pt.CONTROL_RULE,
         },
         "inputs": {
-            "event_table": event_table_input(event_table),
+            "event_table": file_input(event_table),
             "session_cache": session_cache_record(every_epoch),
         },
     }
     if args.gather:
-        gather_manifest(output, OUTPUT_NAME, header)
+        gather_manifest(output, PARTICIPATION_NAME, header)
         return
     run(
         epochs=select_epochs(args.epochs or every_epoch, args.shards, args.n_shards),
         task=run_epoch,
         task_args=(event_table, data_dir, output),
         output=output,
-        name=OUTPUT_NAME,
+        name=PARTICIPATION_NAME,
         header=header,
         overwrite=args.overwrite,
         max_workers=args.n_workers,

@@ -27,12 +27,14 @@
 
 % A figure file is drawn if it exists; otherwise a framed box names the file
 % and the script that makes it, so the PDF builds before every figure exists.
-\newcommand{\paperfigure}[2]{%
-  \IfFileExists{#1}%
-    {\includegraphics[width=\textwidth]{#1}}%
+% The optional argument is the graphics options: the text width by default,
+% empty ([]) for a small figure drawn at the size its script made it.
+\newcommand{\paperfigure}[3][width=\textwidth]{%
+  \IfFileExists{#2}%
+    {\includegraphics[#1]{#2}}%
     {\fbox{\parbox[c][0.3\textheight][c]{0.9\textwidth}{\centering
-      Figure not yet generated: \texttt{\detokenize{#1}}\\[0.5em]
-      Run \texttt{\detokenize{#2}}}}}%
+      Figure not yet generated: \texttt{\detokenize{#2}}\\[0.5em]
+      Run \texttt{\detokenize{#3}}}}}%
 }
 
 \title{Non-local hippocampal events outside sharp-wave ripples\\
@@ -180,6 +182,13 @@ The code for every analysis and figure is at
   \paperfigure{figures/supp_memoryless_comparison/supp_memoryless_comparison.pdf}{scripts/figures/generate_supp_memoryless_comparison.py}
   \caption{To be written.}
   \label{fig:supp_memoryless_comparison}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \paperfigure[]{figures/supp_heldout_tetrode/supp_heldout_tetrode.pdf}{scripts/figures/generate_supp_heldout_tetrode.py}
+  \caption{To be written.}
+  \label{fig:supp_heldout_tetrode}
 \end{figure}
 
 \begin{figure}[p]

@@ -731,6 +731,12 @@ DECODE_FRAME_READERS = {
         "reads it through with_swr_source, and keeps the decoder's own non-local "
         "labels so every decoded event stays out of the running-only encodings"
     ),
+    "scripts/event_evidence/detect_heldout_events.py": (
+        "reads it through with_swr_source, twice: as saved (the canonical events "
+        "its rule must reproduce) and with the held-out labels and non-local "
+        "probabilities put in, so the analyzed-time rule and the source's SWRs "
+        "apply to the held-out events"
+    ),
     "scripts/checks/diagnose_trial_detection.py": "position and trials",
     "scripts/pfc/compare_pfc_cohorts.py": "PFC bundles; names data_over_time_sha256",
     "scripts/figures/generate_supp_pipeline_data_flow.py": (

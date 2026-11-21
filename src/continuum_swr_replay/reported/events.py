@@ -46,7 +46,27 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
 - the decoder quality of each analyzed epoch (``Processed-Data/decoder_quality``,
   from ``scripts/decoding/measure_decoder_quality.py``): the Local-state
   decoding error, the state fractions moving and immobile, and the calibration
-  curve, summarized by ``analysis.decode_quality.quality_metrics``.
+  curve, summarized by ``analysis.decode_quality.quality_metrics``;
+- the non-local restriction run (``Processed-Data/event_nonlocal_restriction``,
+  from ``scripts/event_evidence/score_nonlocal_restriction.py``): each epoch's
+  per-bin scores of the local-only, SWR-only and full decoders, each fold's bins
+  under the whole decoder fit on the other folds (a run of the earlier design,
+  which held out only the encodings, is refused, :func:`require_fold_fit`),
+  summed over the windows of the canonical events and their Local-rest
+  controls (``Processed-Data/event_nonlocal_restriction_windows``, from
+  ``scripts/event_evidence/sum_nonlocal_restriction_windows.py``), and over the
+  events detected by the canonical rule from the run's held-out state
+  probabilities, with which held-out and canonical events share a bin and the
+  bins summed by category, well visit and held-out event window
+  (``Processed-Data/event_nonlocal_restriction_heldout_events``, from
+  ``scripts/event_evidence/detect_heldout_events.py``, which Figure 2g draws);
+  each bin's spikes and well-visit flag from ``Processed-Data/event_bin_facts``
+  (``scripts/event_evidence/measure_bin_facts.py``); summarized by
+  ``analysis.event_evidence.restriction_windows``,
+  ``analysis.event_evidence.restriction_totals`` and
+  ``analysis.event_evidence.heldout_events`` on the canonical events that start
+  inside a well visit, the held-out events that start inside one
+  (:data:`HELDOUT_EVENTS_SUBSET`) and the time inside a well visit.
 
 Every value is over the analyses' one subset: the events that start inside a
 well visit (``cohort_selection.select_visit_context``, applied once, where the
@@ -63,7 +83,25 @@ epoch's decode, not over events.
 Each derived output above that reads the canonical event table records the
 table's SHA-256 in its manifest; an output made from another table than the
 current one, or recording none, makes the values read from it pending
-(:func:`event_table_staleness`).
+(:func:`event_table_staleness`). The restriction window values are also pending
+when the window run read another event table than the held-out tetrode run whose
+spike counts it adds (:func:`window_run_note_staleness`); the values of the
+held-out event run when it read another restriction run, per-bin facts run or
+event table than the current ones (:func:`read_heldout_restriction`); and those
+that read the well visits through the per-bin facts (the time sums inside a
+visit, the held-out events' start, the window counts after a visit) when the
+facts run was not made from the current session cache (``prepare_data.session_cache_staleness``).
+Every restriction value, over the canonical windows or the held-out events and
+time, is also pending when the restriction run's recorded decode frames or SWR
+source are not the current ones (:func:`restriction_input_staleness`: the
+source by name, the decode frames against the event features run's record of
+them). The held-out tetrode values and
+the restriction window values are against Local-rest controls inside one well
+visit (:data:`CONTROL_SUBSET`): their runs must have read the current
+participation tables, and they are pending, as the participation values are,
+when the participation run records no subset or another, or other visits than
+the current session cache's (the participation run records the subset only
+since its controls lie inside one visit).
 
 Pooled values sum events over sessions and animals; "animals in direction"
 counts the animals whose own value points the way the claim states, an
@@ -77,6 +115,7 @@ import json
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -97,9 +136,23 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     subset_staleness,
 )
 from continuum_swr_replay.analysis.event_evidence import (
+    heldout_events,
     likelihood_advantage,
     participation,
+    restriction_totals,
+    restriction_windows,
     tetrode_holdout,
+)
+from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
+    FAMILY_SUFFIX,
+    FIT,
+)
+from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
+    RESTRICTION_FIGURE,
+    RESTRICTION_FIGURE_DECODERS,
+    RESTRICTION_FIGURE_DIFFERENCE,
+    RESTRICTION_FIGURE_FAMILY,
+    RESTRICTION_FIGURE_GROUPS,
 )
 from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
     BASELINE_GROUP,
@@ -110,6 +163,7 @@ from continuum_swr_replay.analysis.event_evidence.spike_evidence import (
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
 )
+from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import TRIAL_DESIGN
 from continuum_swr_replay.analysis.event_properties import (
     content_along_arms,
     event_statistics,
@@ -133,20 +187,31 @@ from continuum_swr_replay.data_loaders.epoch_register import (
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
+    CANONICAL_EVENTS_FOUND_NAME,
     CONTENT_ALONG_ARMS_DIR,
     DECODER_QUALITY_DIR,
+    EVENT_BIN_FACTS_DIR,
     EVENT_GAMMA_DIR,
     EVENT_LIKELIHOOD_ADVANTAGE_DIR,
+    EVENT_NONLOCAL_RESTRICTION_DIR,
+    EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+    EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
     EVENT_PARTICIPATION_DIR,
     EVENT_PROPERTY_BOOTSTRAP_DIR,
     EVENT_START_REST_THETA_DIR,
     EVENT_TETRODE_HOLDOUT_DIR,
+    EXPOSURE_IN_VISITS_DIR,
+    HELDOUT_EVENTS_NAME,
+    HELDOUT_TIME_SUMS_NAME,
     NL_BOUTS_BY_SWR_STEM,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
+    NONLOCAL_RESTRICTION_WINDOWS_NAME,
+    PARTICIPATION_NAME,
     RIPPLE_CLASS_STRUCTURE_DIR,
     ROOT_DIR,
     STATE_EVIDENCE_DIR,
     STATE_EVIDENCE_RUN,
+    TETRODE_HOLDOUT_NAME,
     event_features_root,
     event_spike_evidence_dir,
     processed_data_dir,
@@ -169,6 +234,7 @@ from continuum_swr_replay.reported.values import (
     rel,
     value_factory,
 )
+from continuum_swr_replay.runs.epoch_records import MANIFEST
 from continuum_swr_replay.runs.io import (
     files_sha256,
     ok_epochs,
@@ -199,11 +265,13 @@ TAGS = {
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5",)),
     "nonlocal_power": Tags(("2b.5",), ("2j",)),
-    "participation": Tags(("2d.9",), ("2g",)),
+    "participation": Tags(("2d.9",), ("2h",)),
     "spike_rate": Tags(("2d.9",)),
     "state_composition": Tags(("2d.10",), ("3b",)),
     "likelihood_advantage": Tags(("2c.3",)),
-    "tetrode_holdout": Tags(("2c.3",), ("2h",)),
+    "tetrode_holdout": Tags(("2c.3",), ("heldout_tetrode",)),
+    "nonlocal_restriction": Tags(("2c.3",)),
+    "nonlocal_restriction_figure": Tags(("2c.3",), ("2g",)),
     "spike": Tags(("2d.9", "2c.3")),
     "spike_count": Tags(("2d.9",), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
@@ -241,6 +309,16 @@ EVENTS_SUBSET = (
 )
 """What the values of the events are over, as their descriptions say."""
 
+HELDOUT_EVENTS_SUBSET = (
+    "the immobile non-local events detected from the held-out decode (each fold's "
+    "bins under the decoder fit on the other folds, by the canonical event rule; "
+    "a small share span two folds, each bin still under a fit that did not see "
+    "it) "
+    "that start inside a well visit (their first bin is inside one, from the first "
+    "poke-in at a well to the final poke-out)"
+)
+"""What the values of the events detected from the held-out decode are over."""
+
 CONTROL_SUBSET = (
     f"{EVENTS_SUBSET}, against Local-rest control windows of each event's length "
     "lying wholly inside one well visit"
@@ -248,12 +326,13 @@ CONTROL_SUBSET = (
 """What the participation values are over: their controls are Local rest inside
 one well visit (``event_evidence.participation.CONTROL_RULE``)."""
 
-HOLDOUT_CONTROL_SUBSET = (
-    f"{EVENTS_SUBSET}, against Local-rest control windows of each event's length "
-    "drawn from the whole epoch (not only inside a well visit)"
+CANONICAL_WINDOWS_SUBSET = (
+    "the canonical events, chosen from the decode fit on the whole epoch (the "
+    "scores are held out; the choice of events is not; Figure 2g's values use "
+    f"the events detected from the held-out decode instead): {CONTROL_SUBSET}"
 )
-"""What the held-out tetrode values are over: their run took its controls from
-participation tables whose controls were Local rest anywhere in the epoch."""
+"""What the restriction values over the canonical windows are over
+(:func:`restriction_window_values`)."""
 
 TIME_SUBSET = (
     "time inside a well visit (from the first poke-in at a well to the final poke-out)"
@@ -309,6 +388,10 @@ class EventsInputs:
     event_participation: Path
     likelihood_advantage: Path
     tetrode_holdout: Path
+    nonlocal_restriction: Path
+    nonlocal_restriction_windows: Path
+    nonlocal_restriction_heldout_events: Path
+    bin_facts: Path
     exposure_in_visits: Path
 
 
@@ -334,8 +417,13 @@ def default_inputs() -> EventsInputs:
         event_participation=processed_data_dir() / EVENT_PARTICIPATION_DIR,
         likelihood_advantage=processed_data_dir() / EVENT_LIKELIHOOD_ADVANTAGE_DIR,
         tetrode_holdout=processed_data_dir() / EVENT_TETRODE_HOLDOUT_DIR,
-        exposure_in_visits=processed_data_dir()
-        / nonlocal_comparison.EXPOSURE_IN_VISITS_DIR,
+        nonlocal_restriction=processed_data_dir() / EVENT_NONLOCAL_RESTRICTION_DIR,
+        nonlocal_restriction_windows=processed_data_dir()
+        / EVENT_NONLOCAL_RESTRICTION_WINDOWS_DIR,
+        nonlocal_restriction_heldout_events=processed_data_dir()
+        / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+        bin_facts=processed_data_dir() / EVENT_BIN_FACTS_DIR,
+        exposure_in_visits=processed_data_dir() / EXPOSURE_IN_VISITS_DIR,
     )
 
 
@@ -364,6 +452,98 @@ def event_table_staleness(manifest: dict, current_sha256: str, what: str) -> str
     """Why an output made from the canonical event table is stale, or None."""
     return _input_staleness(
         manifest, "event_table", current_sha256, what, "event-table", "event table"
+    )
+
+
+def window_run_note_staleness(manifest: dict, what: str) -> str | None:
+    """Why the restriction window run's values are pending for its note, or None.
+
+    The window run records a note (``restriction_windows.EVENT_TABLE_NOTE``, in
+    its settings) when the event table it read is not the one the held-out
+    tetrode run read, whose spike counts it adds; its windows still matched that
+    run's window by window, but the two runs are not on one table.
+    """
+    note = manifest.get("settings", {}).get(restriction_windows.EVENT_TABLE_NOTE)
+    if note is None:
+        return None
+    theirs = note["tetrode_holdout_event_table_sha256"]
+    return (
+        f"{what} read another event table (sha256 "
+        f"{note['event_table_sha256'][:12]}) than the held-out tetrode run whose "
+        f"spike counts it adds (sha256 {'none' if theirs is None else theirs[:12]}); "
+        "rerun the held-out tetrode run and then the window run before citing"
+    )
+
+
+def require_trial_folds(manifest: dict, what: str, rerun: str) -> None:
+    """Refuse a held-out run whose folds are not whole trials.
+
+    A held-out run records its fold design in its settings (``fold_design``).
+    A run of an older design (contiguous blocks of time, or no design recorded)
+    cannot give values that describe folds of whole trials.
+
+    Raises
+    ------
+    ValueError
+        If ``manifest``'s settings do not record ``"fold_design": "trials"``;
+        the message ends with ``rerun``, what to run instead.
+    """
+    design = manifest.get("settings", {}).get("fold_design")
+    if design != TRIAL_DESIGN:
+        raise ValueError(
+            f"{what} is not held out in folds of whole trials (its settings "
+            f"record fold_design {design!r}, not {TRIAL_DESIGN!r}). {rerun}"
+        )
+
+
+def require_fold_fit(manifest: dict, what: str) -> None:
+    """Refuse a restriction run that is not the fold fit on folds of whole trials.
+
+    The values describe scores under a decoder fit on the other folds, five
+    folds of whole trials balanced by destination well; the fold-fit run's
+    settings record ``"fit": "folds"`` and ``"fold_design": "trials"``. A run of
+    the earlier design, which held out only the encodings and ran the models
+    with the transitions fit on the whole epoch, records no ``fit``; a run of
+    another fold design is refused by :func:`require_trial_folds`. Neither can
+    give these values.
+
+    Raises
+    ------
+    ValueError
+        If ``manifest``'s settings do not record ``"fit": "folds"`` and
+        ``"fold_design": "trials"``.
+    """
+    fit = manifest.get("settings", {}).get("fit")
+    rerun = (
+        "Put the fold-fit run (scripts/event_evidence/score_nonlocal_restriction.py) "
+        "in this folder, then rerun scripts/event_evidence/measure_bin_facts.py, "
+        "scripts/event_evidence/detect_heldout_events.py and "
+        "scripts/event_evidence/sum_nonlocal_restriction_windows.py on it."
+    )
+    if fit != FIT:
+        raise ValueError(
+            f"{what} is not the fold fit (its settings record fit {fit!r}, not "
+            f"{FIT!r}): it is the earlier design, which held out only the "
+            f"encodings. {rerun}"
+        )
+    require_trial_folds(manifest, what, rerun)
+
+
+def require_tetrode_holdout_folds(manifest: dict, what: str) -> None:
+    """Refuse a held-out tetrode run whose folds are not whole trials
+    (:func:`require_trial_folds`).
+
+    Raises
+    ------
+    ValueError
+        If ``manifest``'s settings do not record ``"fold_design": "trials"``.
+    """
+    require_trial_folds(
+        manifest,
+        what,
+        "Put the held-out tetrode run on folds of whole trials "
+        "(scripts/event_evidence/score_tetrode_holdout.py) in this folder, then "
+        "rerun scripts/event_evidence/sum_nonlocal_restriction_windows.py on it.",
     )
 
 
@@ -1538,7 +1718,7 @@ def state_composition_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
     """Question 2d.9: tetrode participation and spike rate of the events against
-    Local-rest windows of their length (Figure 2g shows the participation)."""
+    Local-rest windows of their length (Figure 2h shows the participation)."""
     makers = {
         "participation": value_factory(
             participation_values, source, TAGS["participation"]
@@ -1605,18 +1785,23 @@ def participation_values(table: pd.DataFrame, source: str) -> list[Value]:
 
 
 def _per_spike_interval(
-    make: Callable[..., Value], key: str, row: pd.Series, description: str
+    make: Callable[..., Value],
+    key: str,
+    row: pd.Series,
+    description: str,
+    style: str = "dec2",
+    unit: str = "nats per spike",
 ) -> list[Value]:
-    """A per-animal per-spike estimate and the bounds of its 95 % interval
-    (``likelihood_advantage_statistics``' ``estimate``, ``ci_low``, ``ci_high``)."""
-    unit = "nats per spike"
+    """A per-animal estimate, per spike unless ``unit`` says otherwise, and the
+    bounds of its 95 % interval (``likelihood_advantage_statistics``'
+    ``estimate``, ``ci_low``, ``ci_high``)."""
     return [
-        make(key, row["estimate"], "quantity", "dec2", description, unit),
+        make(key, row["estimate"], "quantity", style, description, unit),
         make(
             f"{key}_ci_low",
             row["ci_low"],
             "quantity",
-            "dec2",
+            style,
             "lower bound of its 95 % interval (nested bootstrap of the animals "
             "and their epochs, small-sample t correction over the "
             f"{row['n_animals']} animals)",
@@ -1626,7 +1811,7 @@ def _per_spike_interval(
             f"{key}_ci_high",
             row["ci_high"],
             "quantity",
-            "dec2",
+            style,
             "upper bound of that interval",
             unit,
         ),
@@ -1635,8 +1820,8 @@ def _per_spike_interval(
 
 def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the spike likelihood at the decoded positions minus at the
-    animal's, per spike, over each whole event (in sample; Figure 2h shows the
-    held-out score)."""
+    animal's, per spike, over each whole event (in sample; the held-out tetrode
+    supplementary figure shows the held-out score)."""
     make = value_factory(
         likelihood_advantage_values, source, TAGS["likelihood_advantage"]
     )
@@ -1672,9 +1857,24 @@ def likelihood_advantage_values(table: pd.DataFrame, source: str) -> list[Value]
     return values
 
 
+_TETRODE_HELD_OUT = (
+    "each tetrode is left out of the decoder in turn; at a scored bin, that "
+    "tetrode's and the other tetrodes' place-field encodings are fit on the other "
+    f"folds ({tetrode_holdout.N_FOLDS} folds of whole trials balanced by "
+    f"destination well, a segment longer than {tetrode_holdout.MAX_SEGMENT_S:g} s "
+    "cut into pieces, training bins within "
+    f"{tetrode_holdout.TRIAL_MARGIN_S:g} s of the fold left out); the state "
+    "transitions and initial conditions are the canonical decoder's, fit on the "
+    "whole epoch with every tetrode; the posterior is smoothed over the whole epoch"
+)
+"""How the held-out tetrode score is held out, in words
+(``tetrode_holdout.holdout_scores``)."""
+
+
 def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode gain over local coding, per spike, of
-    the events and their Local-rest controls (Figure 2h)."""
+    the events and their Local-rest controls (the held-out tetrode
+    supplementary figure)."""
     make = value_factory(tetrode_holdout_values, source, TAGS["tetrode_holdout"])
     values = []
     estimates = (
@@ -1700,8 +1900,10 @@ def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
                 "log predictive score under the other tetrodes' position "
                 "distribution minus under local coding around the animal"
                 f"{spiking}, summed over tetrodes and bins and divided by the "
-                "window's spikes; mean over animals of each animal's median "
-                "over epochs of each epoch's median",
+                f"window's spikes; {_TETRODE_HELD_OUT}; mean over animals of "
+                "each animal's median over epochs of each epoch's median",
+                # the controls' values are near zero: two significant digits
+                style="sig2" if kind == "control" else "dec2",
             )
             if name == "gain":
                 values.append(
@@ -1713,6 +1915,732 @@ def tetrode_holdout_values(windows: pd.DataFrame, source: str) -> list[Value]:
                         f"{group} events with a held-out score per spike",
                     )
                 )
+    return values
+
+
+#: The three decoders of the restriction run (``nonlocal_restriction.MODELS``),
+#: in words.
+_RESTRICTION_MODELS = {
+    "none": "the local-only decoder (Local and No-Spike states at every bin)",
+    "swr": "the SWR-only decoder (only the non-local states in SWR bins, only the "
+    "local states elsewhere)",
+    "full": "the full decoder (every state at every bin)",
+}
+#: The two score families (``nonlocal_restriction.FAMILY_SUFFIX``), in words.
+_RESTRICTION_SCORES = {
+    "filter": "one-step-ahead (filter) predictive log score of each 2 ms bin's spikes",
+    "two_sided": "two-sided predictive log score of each 2 ms bin's spikes (from "
+    "every other bin; summed, two-sided scores are not a log likelihood)",
+}
+_RESTRICTION_HELD_OUT = (
+    "with each of five folds of whole trials (balanced by destination well; a "
+    "trial's run to a well with its whole stay there, when longer than "
+    f"{tetrode_holdout.MAX_SEGMENT_S:g} s, is cut into pieces of at most "
+    f"{tetrode_holdout.MAX_SEGMENT_S:g} s that can fall in different folds) "
+    "scored under a decoder whose place-field encodings were fit on the decode's "
+    "training bins (outside every SWR and artifact) of the other folds, more than "
+    "1 s from the fold, and whose state transitions and initial conditions were "
+    "fit by EM with the fold's bins missing"
+)
+#: The window comparisons reported: kind of window, group, contrast.
+_RESTRICTION_WINDOWS = (
+    ("event", SWR_LABELS[False], "full_minus_swr"),
+    ("event", SWR_LABELS[True], "swr_minus_none"),
+    ("event", SWR_LABELS[True], "full_minus_none"),
+    ("event", SWR_LABELS[True], "full_minus_swr"),
+    ("control", SWR_LABELS[False], "full_minus_swr"),
+    ("control", SWR_LABELS[True], "full_minus_swr"),
+)
+_RESTRICTION_KINDS = {
+    "event": ("events", "events"),
+    "control": ("controls", "matched Local-rest controls"),
+}
+#: Each unit of a restriction value: its word in a key, what the sum is divided
+#: by, and the value's unit.
+_RESTRICTION_UNITS = (
+    ("per_spike", "their spikes", "nats per spike"),
+    ("per_s", "their duration", "nats per s"),
+)
+#: Each group's bins outside SWRs, in words.
+_OUTSIDE_SWR_WHERE = {
+    SWR_LABELS[False]: "over each of the events with no SWR (its bins outside "
+    "SWRs: all but a few inside an SWR the SWR-only decoder used)",
+    SWR_LABELS[True]: "over the bins outside the SWR of each of the events that "
+    "overlap an SWR",
+}
+#: How a value over time is reduced over epochs and animals, in words.
+_EPOCH_REDUCTION = (
+    "mean over animals of each animal's median over its epochs; 95 % interval "
+    "from the nested bootstrap of the animals and their epochs, small-sample t "
+    "correction over the animals"
+)
+#: Each SWR group's word in a key (the inverse of ``_RUN_GROUPS``).
+_GROUP_WORDS = {group: word for word, group in _RUN_GROUPS.items()}
+
+
+def _interval_and_animals_positive(
+    make: Callable[..., Value],
+    key: str,
+    row: pd.Series,
+    description: str,
+    unit: str = "nats per spike",
+) -> list[Value]:
+    """:func:`_per_spike_interval` to two significant digits, and the animals
+    whose value is above zero (``n_animals_positive``)."""
+    return [
+        *_per_spike_interval(make, key, row, description, style="sig2", unit=unit),
+        make(
+            f"{key}_animals_positive",
+            row["n_animals_positive"],
+            "count",
+            "count",
+            "animals whose value is above zero",
+        ),
+    ]
+
+
+def _share_interval(
+    make: Callable[..., Value], key: str, row: pd.Series, description: str
+) -> list[Value]:
+    """A share and the bounds of its 95 % interval (``estimate``, ``ci_low``,
+    ``ci_high``)."""
+    return [
+        make(key, row["estimate"], "fraction", "pct", description),
+        make(
+            f"{key}_ci_low",
+            row["ci_low"],
+            "fraction",
+            "pct",
+            "lower bound of its 95 % interval",
+        ),
+        make(
+            f"{key}_ci_high",
+            row["ci_high"],
+            "fraction",
+            "pct",
+            "upper bound of that interval",
+        ),
+    ]
+
+
+def run_staleness(manifest: dict, folder: Path, name: str, run_dir: Path) -> str | None:
+    """Why the output in ``folder`` (its ``manifest``) is stale for the run
+    ``name`` in ``run_dir`` that it read, or None: it records no digest of that
+    run's manifest, or another than the current one."""
+    return _input_staleness(
+        manifest,
+        name,
+        file_record(run_dir / MANIFEST, ROOT_DIR)["sha256"],
+        rel(folder),
+        f"{name} run",
+        f"{name} run",
+    )
+
+
+@dataclass(frozen=True)
+class HeldoutRestriction:
+    """The held-out event run's inputs to the restriction values and Figure 2g
+    (:func:`read_heldout_restriction`), and why a value read from them is
+    pending (each None when it is not)."""
+
+    events: pd.DataFrame
+    """The events detected from the held-out decode that start inside a well
+    visit (``starts_in_well_visit``)."""
+    time_sums: pd.DataFrame
+    """The time sums of every epoch (``restriction_totals.restriction_time_sums``)."""
+    bin_s: pd.Series
+    """Each epoch's decode time step (s), indexed by ``epoch_id``, as the run read
+    it from the decode frame's time (checked there against the per-bin table's)."""
+    restriction_run: str | None
+    """The run was not made from the current restriction run."""
+    bin_facts_run: str | None
+    """The run was not made from the current per-bin facts run."""
+    session_cache: str | None
+    """The per-bin facts, which give the time sums, the events' start and the
+    windows' bins their well-visit flag, were not made from the current
+    session cache."""
+    event_table: str | None
+    """The run was not made from the current event table."""
+
+
+def restriction_input_staleness(
+    manifest: dict,
+    decode_sha256: Mapping[str, str],
+    epoch_ids: Iterable[str],
+    what: str,
+) -> str | None:
+    """Why the restriction run was not made from the current decode frames and
+    SWR source, or None.
+
+    The run's settings record the SWR source by name (``swr_source``, which
+    names the SWR inventory run and the artifact run) and each epoch's record
+    the SHA-256 of the decode frame it read (``epoch_inputs.data_over_time``).
+    The current source is ``swr_source.swr_source_name()``. The current decode
+    frames are the ones the event features run records (``decode_sha256``),
+    which the figures also take as the decodes (``generate_figure02.py``'s
+    ``checked_reference``); no decode frame is hashed here, so a decode remade
+    without a new event features run is not seen.
+
+    Parameters
+    ----------
+    manifest : dict
+        The restriction run's manifest.
+    decode_sha256 : Mapping of str to str
+        Each epoch's decode frame's SHA-256, as the event features run records it.
+    epoch_ids : iterable of str
+        The epochs read; one the run has no record of, or the features run no
+        digest of, counts as another decode.
+    what : str
+        The restriction run, for the note.
+    """
+    notes = []
+    recorded = manifest.get("settings", {}).get("swr_source")
+    current = swr_source.swr_source_name()
+    if recorded != current:
+        notes.append(
+            f"its settings record the SWR source {recorded!r}, not the current "
+            f"{current!r}"
+        )
+    records = manifest.get("epochs", {})
+
+    def recorded_decode(epoch_id: str) -> str | None:
+        inputs = records.get(epoch_id, {}).get("epoch_inputs", {})
+        return inputs.get("data_over_time", {}).get("sha256")
+
+    differ = sorted(
+        epoch_id
+        for epoch_id in epoch_ids
+        if recorded_decode(epoch_id) is None
+        or recorded_decode(epoch_id) != decode_sha256.get(epoch_id)
+    )
+    if differ:
+        notes.append(
+            f"{len(differ)} of its epochs record another decode frame than the "
+            f"one event features run {EVENT_FEATURES_RUN} records (e.g. "
+            f"{differ[:3]})"
+        )
+    if not notes:
+        return None
+    return (
+        f"{what} was not made from the current decodes and SWR source "
+        f"({'; '.join(notes)}); rerun scripts/event_evidence/"
+        "score_nonlocal_restriction.py and the runs made from it before citing"
+    )
+
+
+def read_heldout_restriction(
+    heldout_dir: Path,
+    restriction_dir: Path,
+    bin_facts_dir: Path,
+    epoch_ids: Iterable[str],
+    event_table_sha256: str,
+) -> HeldoutRestriction:
+    """The held-out event run's events, time sums and time steps, with the
+    reasons a value read from them is pending.
+
+    Parameters
+    ----------
+    heldout_dir, restriction_dir, bin_facts_dir : Path
+        The held-out event run, the restriction run and the per-bin facts run.
+    epoch_ids : iterable of str
+        The epochs read (every analyzed epoch with an event).
+    event_table_sha256 : str
+        The current event table's SHA-256.
+
+    Raises
+    ------
+    ValueError
+        If the restriction run is not the fold fit on folds of whole trials
+        (:func:`require_fold_fit`).
+    """
+    require_fold_fit(read_output_manifest(restriction_dir), rel(restriction_dir))
+    epoch_ids = list(epoch_ids)
+    manifest = read_output_manifest(heldout_dir)
+    events = read_complete_run(heldout_dir, HELDOUT_EVENTS_NAME, epoch_ids)
+    facts_manifest = read_output_manifest(bin_facts_dir)
+    return HeldoutRestriction(
+        events=events[events["starts_in_well_visit"].astype(bool)],
+        time_sums=read_complete_run(heldout_dir, HELDOUT_TIME_SUMS_NAME, epoch_ids),
+        bin_s=pd.Series(
+            {
+                epoch_id: record["bin_s"]
+                for epoch_id, record in manifest["epochs"].items()
+            }
+        ),
+        restriction_run=run_staleness(
+            manifest, heldout_dir, "nonlocal_restriction", restriction_dir
+        ),
+        bin_facts_run=run_staleness(manifest, heldout_dir, "bin_facts", bin_facts_dir),
+        session_cache=session_cache_staleness(
+            facts_manifest, ok_epochs(facts_manifest), rel(bin_facts_dir)
+        ),
+        event_table=event_table_staleness(
+            manifest, event_table_sha256, rel(heldout_dir)
+        ),
+    )
+
+
+class WindowValues(NamedTuple):
+    """The restriction window values, by what they read."""
+
+    windows: list[Value]
+    """The values that read the window run only."""
+    after_visit: list[Value]
+    """The counts of events by their bins after the final poke-out of their
+    visit: of the window values, only these read the well visits (through the
+    per-bin facts)."""
+
+
+def restriction_window_values(windows: pd.DataFrame, source: str) -> WindowValues:
+    """Question 2c.3: the three restriction decoders compared per spike over the
+    canonical events of ``windows`` (those that start inside a well visit,
+    ``cohort_selection.select_events_in``) and their Local-rest controls, in
+    both score families, and the full decoder against the SWR-only decoder per
+    spike and per second over the events' bins outside SWRs. Figure 2g draws
+    the latter over the events detected from the held-out decode instead
+    (:func:`restriction_heldout_event_values`), so none of these carries its
+    tag. Every key starts ``restriction_canonical_``, and the summary adds
+    :data:`CANONICAL_WINDOWS_SUBSET` to every description."""
+    make = value_factory(
+        restriction_window_values, source, TAGS["nonlocal_restriction"]
+    )
+    # only the per-spike rows are read; each row's bootstrap is seeded on its
+    # own, so the rows do not depend on which others are computed
+    statistics = restriction_windows.restriction_window_statistics(
+        windows, units=["per_spike"]
+    ).set_index(["family", "contrast", "unit", "kind", "group"])
+    values, after_visit = [], []
+    for family, suffix in FAMILY_SUFFIX.items():
+        for kind, group, contrast in _RESTRICTION_WINDOWS:
+            row = statistics.loc[(family, contrast, "per_spike", kind, group)]
+            kind_word, label = _RESTRICTION_KINDS[kind]
+            a, b = restriction_windows.CONTRASTS[contrast]
+            values += _interval_and_animals_positive(
+                make,
+                f"restriction_canonical_{_GROUP_WORDS[group]}_{kind_word}_{contrast}"
+                f"{suffix}_per_spike",
+                row,
+                f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, under "
+                f"{_RESTRICTION_MODELS[a]} minus under {_RESTRICTION_MODELS[b]}, "
+                f"summed over each of the {group} {label} and divided by its "
+                "spikes: mean over animals of each animal's "
+                "median over epochs of each epoch's median",
+            )
+    # full - swr per spike and per second over the events' bins outside SWRs
+    outside = restriction_windows.restriction_window_statistics(
+        windows,
+        **{
+            **RESTRICTION_FIGURE,
+            "families": list(FAMILY_SUFFIX),
+            "units": ["per_spike", "per_s"],
+        },
+    ).set_index(["family", "unit", "group"])
+    counts = restriction_windows.outside_swr_window_counts(windows)
+    a, b = restriction_windows.CONTRASTS["full_minus_swr"]
+    for family, suffix in FAMILY_SUFFIX.items():
+        for unit, divided, words in _RESTRICTION_UNITS:
+            for group in RESTRICTION_FIGURE_GROUPS:
+                row = outside.loc[(family, unit, group)]
+                word = _GROUP_WORDS[group]
+                values += _interval_and_animals_positive(
+                    make,
+                    f"restriction_canonical_{word}_events_outside_swr_full_minus_swr"
+                    f"{suffix}_{unit}",
+                    row,
+                    f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, under "
+                    f"{_RESTRICTION_MODELS[a]} minus under {_RESTRICTION_MODELS[b]}, "
+                    f"summed {_OUTSIDE_SWR_WHERE[group]} and divided by {divided}: "
+                    "mean over animals of each animal's median over epochs of each "
+                    "epoch's median",
+                    unit=words,
+                )
+                if family == RESTRICTION_FIGURE_FAMILY:
+                    values.append(
+                        make(
+                            f"restriction_canonical_{word}_events_outside_swr_scored"
+                            f"_{unit}",
+                            row["n_scored"],
+                            "count",
+                            "count",
+                            f"{group} events with a value "
+                            + (
+                                "per spike outside SWRs (immobile bins there and a "
+                                "spike in them)"
+                                if unit == "per_spike"
+                                else "per second outside SWRs (immobile bins there)"
+                            ),
+                        )
+                    )
+    for group in RESTRICTION_FIGURE_GROUPS:
+        row = counts.loc[("event", group)]
+        word = _GROUP_WORDS[group]
+        values.append(
+            make(
+                f"restriction_canonical_{word}_events_outside_swr_without_spikes",
+                row["n_without_spikes_outside_swr"],
+                "count",
+                "count",
+                f"{group} events with immobile bins outside SWRs but no spike in "
+                "them: no value per spike there",
+            )
+        )
+        after_visit.append(
+            make(
+                f"restriction_canonical_{word}_events_outside_swr_after_visit",
+                row["n_with_bins_outside_swr_outside_visit"],
+                "count",
+                "count",
+                f"{group} events with immobile bins outside SWRs after the final "
+                "poke-out of their visit (left out of "
+                "the shares of immobile time inside a well visit)",
+            )
+        )
+    # the windows and those with spikes are the same for every contrast and family
+    for kind, (kind_word, label) in _RESTRICTION_KINDS.items():
+        for word, group in _RUN_GROUPS.items():
+            row = statistics.loc[("filter", "full_minus_swr", "per_spike", kind, group)]
+            values += [
+                make(
+                    f"restriction_canonical_{word}_{kind_word}",
+                    row["n_events"],
+                    "count",
+                    "count",
+                    f"{group} {label} summed",
+                ),
+                make(
+                    f"restriction_canonical_{word}_{kind_word}_scored",
+                    row["n_scored"],
+                    "count",
+                    "count",
+                    f"{group} {label} with a per-spike value (at least one spike)",
+                ),
+            ]
+    values.append(
+        make(
+            "restriction_canonical_animals",
+            row["n_animals"],
+            "count",
+            "count",
+            "animals in the restriction comparison",
+        )
+    )
+    return WindowValues(values, after_visit)
+
+
+def restriction_heldout_event_values(windows: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2c.3 and Figure 2g's second axis: the full decoder minus the
+    SWR-only decoder per spike over the bins outside SWRs of the events
+    detected from the held-out decode (``windows``, those that start inside a
+    well visit), events with no SWR and events that overlap one, in
+    :data:`RESTRICTION_FIGURE_FAMILY` (:data:`RESTRICTION_FIGURE`); with the
+    events of each group, those with a value and those with bins outside SWRs
+    but no spike in them. Every value carries that panel's tag."""
+    make = value_factory(
+        restriction_heldout_event_values,
+        source,
+        TAGS["nonlocal_restriction_figure"],
+    )
+    statistics = restriction_windows.restriction_window_statistics(
+        windows, **RESTRICTION_FIGURE
+    ).set_index("group")
+    counts = restriction_windows.outside_swr_window_counts(windows)
+    a, b = restriction_windows.CONTRASTS["full_minus_swr"]
+    values = []
+    for group in RESTRICTION_FIGURE_GROUPS:
+        row = statistics.loc[group]
+        word = _GROUP_WORDS[group]
+        values += _interval_and_animals_positive(
+            make,
+            f"restriction_heldout_{word}_events_outside_swr_full_minus_swr_per_spike",
+            row,
+            f"{_RESTRICTION_SCORES[RESTRICTION_FIGURE_FAMILY]}, "
+            f"{_RESTRICTION_HELD_OUT}, under {_RESTRICTION_MODELS[a]} minus under "
+            f"{_RESTRICTION_MODELS[b]}, summed {_OUTSIDE_SWR_WHERE[group]} and "
+            "divided by their spikes: mean over animals of each animal's median "
+            "over epochs of each epoch's median",
+        )
+        values += [
+            make(
+                f"restriction_heldout_{word}_events",
+                row["n_events"],
+                "count",
+                "count",
+                f"{group} events detected from the held-out decode",
+            ),
+            make(
+                f"restriction_heldout_{word}_events_outside_swr_scored_per_spike",
+                row["n_scored"],
+                "count",
+                "count",
+                f"{group} events with a value per spike outside SWRs (immobile "
+                "bins there and a spike in them)",
+            ),
+            make(
+                f"restriction_heldout_{word}_events_outside_swr_without_spikes",
+                counts.loc[("event", group), "n_without_spikes_outside_swr"],
+                "count",
+                "count",
+                f"{group} events with immobile bins outside SWRs but no spike in "
+                "them: no value per spike there",
+            ),
+        ]
+    return values
+
+
+def restriction_agreement_values(
+    heldout: pd.DataFrame, canonical: pd.DataFrame, source: str
+) -> list[Value]:
+    """Question 2c.3: how the events detected from the held-out decode and the
+    canonical events agree. Of the canonical events of ``canonical``, the share
+    a held-out event shares a bin with; of the held-out events of ``heldout``,
+    the share a canonical event shares a bin with; each over every event and
+    by SWR group, pooled and the lowest and highest animal
+    (``heldout_events.found_again_statistics``); and the held-out events."""
+    make = value_factory(
+        restriction_agreement_values, source, TAGS["nonlocal_restriction"]
+    )
+    words = {"all": "", SWR_LABELS[False]: "_non_swr", SWR_LABELS[True]: "_swr"}
+    values = []
+    for events, found, stem, what, partner in (
+        (
+            canonical,
+            "shares_bin_with_heldout",
+            "restriction_canonical{}_events_found_again",
+            "canonical events (found from the decode fit on all the data)",
+            "an event detected from the held-out decode",
+        ),
+        (
+            heldout,
+            "shares_bin_with_canonical",
+            "restriction_heldout{}_events_with_canonical",
+            "events detected from the held-out decode",
+            "a canonical event",
+        ),
+    ):
+        statistics = heldout_events.found_again_statistics(events, found)
+        for group, word in words.items():
+            row = statistics.loc[group]
+            key = stem.format(word)
+            which = what if group == "all" else f"{group} {what}"
+            values += [
+                make(
+                    key,
+                    row["share"],
+                    "fraction",
+                    "pct",
+                    f"share of the {which} that share at least one bin with "
+                    f"{partner} (of any well-visit start), pooled over the events "
+                    "of every epoch and animal",
+                ),
+                make(
+                    f"{key}_animal_min",
+                    row["share_animal_min"],
+                    "fraction",
+                    "pctnum",
+                    "lowest of the animals' shares, each animal's share the mean "
+                    "over its epochs of the epoch's share (the pooled share, over "
+                    "events, can lie outside the animals' range)",
+                ),
+                make(
+                    f"{key}_animal_max",
+                    row["share_animal_max"],
+                    "fraction",
+                    "pct",
+                    "highest of the animals' shares, each animal's share the mean "
+                    "over its epochs of the epoch's share (the pooled share, over "
+                    "events, can lie outside the animals' range)",
+                ),
+            ]
+    row = heldout_events.found_again_statistics(
+        heldout, "shares_bin_with_canonical"
+    ).loc["all"]
+    values.append(
+        make(
+            "restriction_heldout_events",
+            row["n_events"],
+            "count",
+            "count",
+            "events detected from the held-out decode",
+        )
+    )
+    return values
+
+
+class OutsideSwrValues(NamedTuple):
+    """The outside-SWR values, by what they are over."""
+
+    with_events: list[Value]
+    """The values over the time and the selected held-out events."""
+    outside_events: list[Value]
+    """The values over the time no held-out event holds: the held-out event run
+    marks that time from every event detected from the held-out decode,
+    wherever it starts, so these are over the time inside a well visit alone."""
+
+
+def restriction_outside_swr_values(
+    time_sums: pd.DataFrame, bin_s: pd.Series, windows: pd.DataFrame, source: str
+) -> OutsideSwrValues:
+    """Question 2c.3: the full decoder against the SWR-only decoder over the
+    immobile time outside SWRs inside a well visit (time chosen by speed, ripple
+    detection and the well visits, not by the decoder), per spike and per
+    second, the share of it in the events of ``windows`` (the events detected
+    from the held-out decode that start inside a well visit), and the rest
+    outside every held-out event (``time_sums``' ``in_event_window``, which
+    marks every held-out event, wherever it starts)."""
+    make = value_factory(
+        restriction_outside_swr_values, source, TAGS["nonlocal_restriction"]
+    )
+    statistics = restriction_totals.outside_swr_gain_statistics(
+        restriction_totals.epoch_outside_swr_gains(time_sums, bin_s, windows)
+    ).set_index(["family", "measure"])
+    full_minus_swr = (
+        f"under {_RESTRICTION_MODELS['full']} minus under {_RESTRICTION_MODELS['swr']}"
+    )
+    time = "every immobile bin outside SWRs of the epoch"
+    values, outside_events = [], []
+    for family, suffix in FAMILY_SUFFIX.items():
+        key = f"restriction_outside_swr_full_minus_swr{suffix}"
+        scored = f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}"
+        for unit, divided, words in _RESTRICTION_UNITS:
+            row = statistics.loc[(family, f"gain_{unit}")]
+            values += _interval_and_animals_positive(
+                make,
+                f"{key}_{unit}",
+                row,
+                f"{scored}, {full_minus_swr}, summed over {time} and divided by "
+                f"{divided}: {_EPOCH_REDUCTION}",
+                unit=words,
+            )
+            if unit == "per_s":
+                values += [
+                    make(
+                        f"{key}_epochs_positive",
+                        row["n_epochs_positive"],
+                        "count",
+                        "count",
+                        "epochs whose gain per second is above zero",
+                    ),
+                    make(
+                        f"{key}_epochs",
+                        row["n_epochs"],
+                        "count",
+                        "count",
+                        "epochs with immobile bins outside SWRs",
+                    ),
+                ]
+            row = statistics.loc[(family, f"outside_events_gain_{unit}")]
+            outside_events += _interval_and_animals_positive(
+                make,
+                f"{key}_outside_heldout_events_{unit}",
+                row,
+                f"{scored}, {full_minus_swr}, summed over the epoch's immobile bins "
+                "outside SWRs that no event detected from the held-out decode "
+                f"holds (wherever it starts) and divided by {divided}: "
+                f"{_EPOCH_REDUCTION}",
+                unit=words,
+            )
+        for measure, name, part in (
+            (
+                "share_in_swr_events_outside_swr",
+                "share_in_heldout_swr_events_outside_swr",
+                "the time outside the SWR of the events detected from the held-out "
+                "decode that overlap an SWR",
+            ),
+            (
+                "share_in_no_swr_events",
+                "share_in_heldout_non_swr_events",
+                "the events detected from the held-out decode with no SWR",
+            ),
+        ):
+            values += _share_interval(
+                make,
+                f"{key}_{name}",
+                statistics.loc[(family, measure)],
+                f"{scored}; the gain is the score {full_minus_swr}. Per epoch, "
+                f"the gain summed over {part} (their immobile bins outside SWRs "
+                "inside a well visit; an event that runs past the final poke-out "
+                "adds its bins before it only), divided by the gain summed over "
+                "every immobile bin "
+                "outside SWRs inside a well visit of the epoch (no value when "
+                "that sum is not positive). Both are signed sums, so a share can "
+                "be above 1 or below 0 and the two shares need not add to 1. "
+                f"Over the cohort: {_EPOCH_REDUCTION}",
+            )
+    return OutsideSwrValues(values, outside_events)
+
+
+def restriction_immobile_values(
+    time_sums: pd.DataFrame, bin_s: pd.Series, source: str
+) -> list[Value]:
+    """Question 2c.3: the SWR-only and full decoders against the local-only
+    decoder over all immobile time inside a well visit (time chosen by speed and
+    the well visits, not by the decoder or the SWRs), per spike and per second,
+    their difference, and the share of the full decoder's gain the SWR-only
+    decoder captures. The gains per spike and their difference in
+    :data:`RESTRICTION_FIGURE_FAMILY` are drawn on Figure 2g's first axis and
+    carry that panel's tag."""
+    make_text = value_factory(
+        restriction_immobile_values, source, TAGS["nonlocal_restriction"]
+    )
+    make_figure = value_factory(
+        restriction_immobile_values, source, TAGS["nonlocal_restriction_figure"]
+    )
+    statistics = restriction_totals.immobile_gain_statistics(
+        restriction_totals.epoch_immobile_gains(time_sums, bin_s)
+    ).set_index(["family", "measure"])
+    drawn = (*RESTRICTION_FIGURE_DECODERS, RESTRICTION_FIGURE_DIFFERENCE)
+    values = []
+    for family, suffix in FAMILY_SUFFIX.items():
+        scored = (
+            f"{_RESTRICTION_SCORES[family]}, {_RESTRICTION_HELD_OUT}, summed over "
+            "every immobile bin of the epoch (inside and outside SWRs)"
+        )
+        for unit, divided, words in _RESTRICTION_UNITS:
+            for contrast in ("swr_minus_none", "full_minus_none", "full_minus_swr"):
+                measure = f"{contrast}_{unit}"
+                figure = family == RESTRICTION_FIGURE_FAMILY and measure in drawn
+                a, b = restriction_windows.CONTRASTS[contrast]
+                values += _interval_and_animals_positive(
+                    make_figure if figure else make_text,
+                    f"restriction_immobile_{contrast}{suffix}_{unit}",
+                    statistics.loc[(family, measure)],
+                    f"{scored}, under {_RESTRICTION_MODELS[a]} minus under "
+                    f"{_RESTRICTION_MODELS[b]}, divided by {divided}: "
+                    f"{_EPOCH_REDUCTION}",
+                    unit=words,
+                )
+        row = statistics.loc[(family, RESTRICTION_FIGURE_DIFFERENCE)]
+        make = make_figure if family == RESTRICTION_FIGURE_FAMILY else make_text
+        values.append(
+            make(
+                f"restriction_immobile_epochs_full_above_swr_only{suffix}",
+                row["n_epochs_full_above_swr_only"],
+                "count",
+                "count",
+                f"epochs whose summed score ({family}) over their immobile bins "
+                "is higher under "
+                f"{_RESTRICTION_MODELS['full']} than under "
+                f"{_RESTRICTION_MODELS['swr']}",
+            )
+        )
+        values += _share_interval(
+            make_text,
+            f"restriction_immobile_share_captured_by_swr_only{suffix}",
+            statistics.loc[(family, "share_captured_by_swr_only")],
+            f"{scored}: the gain of {_RESTRICTION_MODELS['swr']} over "
+            f"{_RESTRICTION_MODELS['none']} as a share of the gain of "
+            f"{_RESTRICTION_MODELS['full']} over it: {_EPOCH_REDUCTION}",
+        )
+    row = statistics.loc[(RESTRICTION_FIGURE_FAMILY, RESTRICTION_FIGURE_DIFFERENCE)]
+    values.append(
+        make_figure(
+            "restriction_immobile_epochs",
+            row["n_epochs"],
+            "count",
+            "count",
+            "epochs with immobile bins in the restriction comparison",
+        )
+    )
     return values
 
 
@@ -2421,7 +3349,8 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     events = select_visit_context(table)
     # the time masks read the visits themselves: they and the labels must agree
     run = inputs.event_features_run
-    run_epochs = ok_epochs(read_manifest(run))
+    features_manifest = read_manifest(run)
+    run_epochs = ok_epochs(features_manifest)
     visits = {identifier: well_visit_times(identifier) for identifier in run_epochs}
     check_visit_context_starts(table, visits)
     event_table_record = file_record(inputs.event_table, ROOT_DIR)
@@ -2725,7 +3654,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     analyzed = swr_source.event_table_epochs(table, analyzed_epoch_ids())
     selected = events["event_id"]
     participation_table = select_events_in(
-        read_complete_run(inputs.event_participation, "participation", analyzed),
+        read_complete_run(inputs.event_participation, PARTICIPATION_NAME, analyzed),
         selected,
     )
     advantage_table = select_events_in(
@@ -2734,11 +3663,14 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         ),
         selected,
     )
+    require_tetrode_holdout_folds(
+        read_output_manifest(inputs.tetrode_holdout), rel(inputs.tetrode_holdout)
+    )
     holdout_table = select_events_in(
-        read_complete_run(inputs.tetrode_holdout, "tetrode_holdout", analyzed),
+        read_complete_run(inputs.tetrode_holdout, TETRODE_HOLDOUT_NAME, analyzed),
         selected,
     )
-    participation_paths = ok_table_paths(inputs.event_participation, "participation")
+    participation_paths = ok_table_paths(inputs.event_participation, PARTICIPATION_NAME)
     participation_sha256 = files_sha256(participation_paths)
 
     def participation_off_subset() -> str | None:
@@ -2802,18 +3734,19 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 ),
                 stale(inputs.tetrode_holdout),
                 participation_staleness(inputs.tetrode_holdout),
+                participation_off_subset(),
             ),
-            HOLDOUT_CONTROL_SUBSET,
+            CONTROL_SUBSET,
         )
     )
     summary.inputs += [
         files_record(
-            "*_tetrode_holdout.parquet",
-            ok_table_paths(inputs.tetrode_holdout, "tetrode_holdout"),
+            f"*_{TETRODE_HOLDOUT_NAME}.parquet",
+            ok_table_paths(inputs.tetrode_holdout, TETRODE_HOLDOUT_NAME),
             ROOT_DIR,
         ),
         file_record(inputs.tetrode_holdout / "manifest.json", ROOT_DIR),
-        files_record("*_participation.parquet", participation_paths, ROOT_DIR),
+        files_record(f"*_{PARTICIPATION_NAME}.parquet", participation_paths, ROOT_DIR),
         file_record(inputs.event_participation / "manifest.json", ROOT_DIR),
         files_record(
             "*_likelihood_advantage.parquet",
@@ -2821,6 +3754,187 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             ROOT_DIR,
         ),
         file_record(inputs.likelihood_advantage / "manifest.json", ROOT_DIR),
+    ]
+
+    # the restriction scores over the canonical events' windows and their
+    # controls: the window run sums the restriction run's bins and takes its
+    # spike counts from the held-out tetrode run, so it must be made from both
+    # runs as they are now, and on the held-out tetrode run's event table (the
+    # window run's note when it is not; the event-table check above covers the
+    # window run's own table)
+    restriction_dir = inputs.nonlocal_restriction
+    restriction_windows_dir = inputs.nonlocal_restriction_windows
+    heldout_dir = inputs.nonlocal_restriction_heldout_events
+    # the held-out event run (Figure 2g): its events that start inside a well
+    # visit, its time sums and time steps, and why a value read from them is
+    # pending; a restriction run of the earlier design is refused (the window
+    # and held-out event runs must have read this run, staleness below)
+    heldout = read_heldout_restriction(
+        heldout_dir, restriction_dir, inputs.bin_facts, analyzed, current_sha256
+    )
+    # every restriction value reads the restriction run: pending when it was not
+    # made from the current decode frames (as the event features run records
+    # them) and SWR source
+    restriction_inputs = restriction_input_staleness(
+        read_output_manifest(restriction_dir),
+        {
+            epoch_id: record.get("decode", {}).get("sha256")
+            for epoch_id, record in features_manifest["epochs"].items()
+        },
+        analyzed,
+        rel(restriction_dir),
+    )
+    # the run holds the windows of every event: those of the selected events
+    # (and their controls, under their event's id) are read
+    restriction_windows_table = select_events_in(
+        read_complete_run(
+            restriction_windows_dir, NONLOCAL_RESTRICTION_WINDOWS_NAME, analyzed
+        ),
+        selected,
+    )
+    windows_manifest = read_output_manifest(restriction_windows_dir)
+    restriction_stale = (
+        stale(restriction_windows_dir),
+        participation_staleness(restriction_windows_dir),
+        run_staleness(
+            windows_manifest,
+            restriction_windows_dir,
+            "tetrode_holdout",
+            inputs.tetrode_holdout,
+        ),
+        run_staleness(
+            windows_manifest,
+            restriction_windows_dir,
+            "nonlocal_restriction",
+            restriction_dir,
+        ),
+        run_staleness(
+            windows_manifest, restriction_windows_dir, "bin_facts", inputs.bin_facts
+        ),
+        window_run_note_staleness(windows_manifest, rel(restriction_windows_dir)),
+        restriction_inputs,
+    )
+    restriction_source = (
+        f"{rel(restriction_windows_dir)} "
+        "(scripts/event_evidence/sum_nonlocal_restriction_windows.py, from "
+        f"{rel(restriction_dir)}, scripts/event_evidence/score_nonlocal_restriction.py, "
+        f"and {rel(inputs.bin_facts)}, scripts/event_evidence/measure_bin_facts.py)"
+    )
+    # the windows' controls come from the participation tables the held-out
+    # tetrode run read (sum_nonlocal_restriction_windows.check_holdout_inputs):
+    # Local rest inside one well visit only when that run records the subset
+    window_values = restriction_window_values(
+        restriction_windows_table, restriction_source
+    )
+    window_stale = (*restriction_stale, participation_off_subset())
+    summary.add(
+        *over(pend(window_values.windows, *window_stale), CANONICAL_WINDOWS_SUBSET)
+    )
+    # of the window values, only the counts after the visit read the visits
+    # (through the per-bin facts)
+    summary.add(
+        *over(
+            pend(window_values.after_visit, *window_stale, heldout.session_cache),
+            CANONICAL_WINDOWS_SUBSET,
+        )
+    )
+
+    # the canonical events found again, over the selected events
+    found_table = select_events_in(
+        read_complete_run(heldout_dir, CANONICAL_EVENTS_FOUND_NAME, analyzed),
+        selected,
+    )
+    heldout_selected = heldout.events
+    restriction_time_sums = heldout.time_sums
+    restriction_bin_s = heldout.bin_s
+    heldout_runs_stale = (
+        heldout.restriction_run,
+        heldout.bin_facts_run,
+        restriction_inputs,
+    )
+    heldout_stale = (heldout.event_table, *heldout_runs_stale, heldout.session_cache)
+    heldout_source = (
+        f"{rel(heldout_dir)} (scripts/event_evidence/detect_heldout_events.py, from "
+        f"{rel(restriction_dir)}, scripts/event_evidence/score_nonlocal_restriction.py, "
+        f"and {rel(inputs.bin_facts)}, scripts/event_evidence/measure_bin_facts.py)"
+    )
+    summary.add(
+        *over(
+            pend(
+                restriction_heldout_event_values(heldout_selected, heldout_source),
+                *heldout_stale,
+            ),
+            HELDOUT_EVENTS_SUBSET,
+        )
+    )
+    summary.add(
+        *over(
+            pend(
+                restriction_agreement_values(
+                    heldout_selected,
+                    found_table,
+                    f"{heldout_source} (its held-out events and the canonical "
+                    "events found again)",
+                ),
+                *heldout_stale,
+            ),
+            f"{HELDOUT_EVENTS_SUBSET}, and {EVENTS_SUBSET}; whether an event "
+            "shares a bin with an event of the other set is read against all of "
+            "that set's events, so its partner may start outside a visit",
+        )
+    )
+    outside_swr_values = restriction_outside_swr_values(
+        restriction_time_sums,
+        restriction_bin_s,
+        heldout_selected,
+        f"{heldout_source} (its held-out events and time sums)",
+    )
+    summary.add(
+        *over(
+            pend(outside_swr_values.with_events, *heldout_stale),
+            f"{TIME_SUBSET}, and {HELDOUT_EVENTS_SUBSET}",
+        )
+    )
+    # the time no event holds is outside every held-out event, selected or not:
+    # those values are over the time alone
+    summary.add(
+        *over(pend(outside_swr_values.outside_events, *heldout_stale), TIME_SUBSET)
+    )
+    # over immobile time only: no event enters
+    summary.add(
+        *over(
+            pend(
+                restriction_immobile_values(
+                    restriction_time_sums,
+                    restriction_bin_s,
+                    f"{heldout_source} (its time sums)",
+                ),
+                *heldout_runs_stale,
+                heldout.session_cache,
+            ),
+            TIME_SUBSET,
+        )
+    )
+    summary.inputs += [
+        file_record(restriction_dir / MANIFEST, ROOT_DIR),
+        files_record(
+            f"*_{NONLOCAL_RESTRICTION_WINDOWS_NAME}.parquet",
+            ok_table_paths(restriction_windows_dir, NONLOCAL_RESTRICTION_WINDOWS_NAME),
+            ROOT_DIR,
+        ),
+        file_record(restriction_windows_dir / MANIFEST, ROOT_DIR),
+        *(
+            files_record(
+                f"*_{name}.parquet", ok_table_paths(heldout_dir, name), ROOT_DIR
+            )
+            for name in (
+                HELDOUT_EVENTS_NAME,
+                CANONICAL_EVENTS_FOUND_NAME,
+                HELDOUT_TIME_SUMS_NAME,
+            )
+        ),
+        file_record(heldout_dir / MANIFEST, ROOT_DIR),
+        file_record(inputs.bin_facts / MANIFEST, ROOT_DIR),
     ]
 
     folder = inputs.decoder_quality

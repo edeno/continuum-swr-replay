@@ -21,21 +21,36 @@ relate to sharp-wave ripples (SWRs, Kay's detector, the SWR source):
     f — Each SWR-overlapping event's start and end minus its SWR's: the percent
         of event-SWR pairs per 5 ms on a log axis, bars the animals' mean and
         outlines the animals.
-    g — Tetrode participation (the share of tetrodes with a spike) of each
+    g — Three decoders that differ only in when the non-local states may be
+        occupied, scored by every tetrode's one-step-ahead predictive score of
+        each bin, the whole decoder (place fields, state transitions, initial
+        conditions) fit on folds of whole trials and each fold scored under the
+        fit that did not see it: the local-only decoder
+        (Local and No-Spike states only), the SWR-only decoder (non-local states
+        only inside SWRs) and the full decoder. Left, "All immobile time": each
+        epoch's gain of the SWR-only and of the full decoder over the local-only
+        decoder, summed over every immobile bin inside a well visit and divided
+        by the spikes in them; a dot per animal (the median over its epochs), an
+        animal's two dots joined, and a dashed line at zero, the local-only
+        decoder (``restriction_totals.immobile_gain_statistics``). Right,
+        "Immobile time outside SWR bounds": the full decoder minus the SWR-only
+        decoder per spike over the immobile bins outside SWRs of each event with
+        no SWR, and of each event partly in an SWR (its time outside the SWR),
+        of the events detected from the held-out decode (the canonical event
+        rule on each fold's held-out state probabilities) that start inside a
+        well visit; a dot per animal, the animals' mean with its interval, and
+        a dashed line at zero
+        (``restriction_windows.restriction_window_statistics``). Both from
+        ``Processed-Data/event_nonlocal_restriction_heldout_events`` (its events
+        and time sums) by ``restriction_totals.restriction_figure_statistics``,
+        which the events summary's values share. The held-out
+        tetrode gain over local coding is a supplementary figure
+        (``generate_supp_heldout_tetrode.py``).
+    h — Tetrode participation (the share of tetrodes with a spike) of each
         non-local event against a Local-rest window of its length, one line
         per animal, for no-SWR and SWR events: the events are population
         events (``event_evidence.participation``;
         ``Processed-Data/event_participation``).
-    h — Held-out tetrode score: each tetrode left out of the decoder's smoother in
-        turn and scored at every bin of each event under the other tetrodes'
-        position distribution against local coding around the animal (time-fold
-        encodings); the gain summed over tetrodes and bins, per spike. A dot per
-        animal for no-SWR and SWR events, the animals' mean with its interval,
-        and a line at zero, where local coding predicts the held-out spikes as
-        well (the Local-rest controls sit there by construction, so they are
-        in the events summary and not drawn)
-        (``event_evidence.tetrode_holdout``;
-        ``Processed-Data/event_tetrode_holdout``).
     i — Around non-local event starts, SWR vs no-SWR: ripple power, MUA, theta
         power and head speed, each the median and interquartile range over
         events, with the epochs' level between events, theta's running level and
@@ -55,12 +70,23 @@ features run the summary reads; i's between-events and running lines from
 ``event_statistics.reference_medians`` of the brain-state reference; j from
 the stored counts by the functions the events summary uses
 (``event_statistics.animal_power_counts``,
-``nonlocal_below_threshold_statistics``). Panel i is a per-time-bin signal no
-stored output holds, computed from the aggregated decode frames (cached), whose
-event counts by SWR overlap must equal the canonical table's.
+``nonlocal_below_threshold_statistics``); g from the held-out event run's
+events and time sums as the events summary reads them
+(``reported.events.read_heldout_restriction``: the events detected from the
+held-out decode that start inside a well visit, and the time inside a well
+visit) and by ``restriction_totals.restriction_figure_statistics``, refused when
+the restriction run is not the fold fit on folds of whole trials, when the
+held-out event run was not made from the current restriction run or per-bin
+facts run, or when the per-bin facts, which give the time and the events' start
+their well-visit flag, were not made from the current session cache. Panel i is a
+per-time-bin signal no stored output holds, computed from the aggregated decode
+frames (cached), whose event counts by SWR overlap must equal the canonical
+table's.
 
 Every event panel is over the events that start inside a well visit (the first
-poke-in at a well to the final poke-out): the canonical table is checked
+poke-in at a well to the final poke-out); panel g's second axis uses the events
+detected from the held-out decode that start inside one, every other event
+panel the canonical events. The canonical table is checked
 against the frames whole and then selected once
 (``cohort_selection.select_visit_context``), the stored per-event tables are read
 over the selected events (``cohort_selection.select_events_in``), and i's
@@ -84,7 +110,9 @@ import hashlib
 import logging
 import warnings
 from collections.abc import Mapping, Sequence
+from numbers import Real
 from pathlib import Path
+from typing import Any
 
 import joblib
 import matplotlib.pyplot as plt
@@ -132,9 +160,14 @@ from continuum_swr_replay.analysis.event_definition.swr_source import (
 from continuum_swr_replay.analysis.event_evidence.participation import (
     participation_statistics,
 )
-from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import (
-    holdout_statistics,
-    window_scores,
+from continuum_swr_replay.analysis.event_evidence.restriction_totals import (
+    RESTRICTION_FIGURE_DECODERS,
+    RESTRICTION_FIGURE_FAMILY,
+    RESTRICTION_FIGURE_GROUPS,
+    restriction_figure_statistics,
+)
+from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
+    SWR_LABELS,
 )
 from continuum_swr_replay.analysis.event_properties.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
@@ -175,18 +208,33 @@ from continuum_swr_replay.parameters import (
 )
 from continuum_swr_replay.paths import (
     BRAIN_STATE_REFERENCE_DIR,
+    EVENT_BIN_FACTS_DIR,
+    EVENT_NONLOCAL_RESTRICTION_DIR,
+    EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
     EVENT_PARTICIPATION_DIR,
-    EVENT_TETRODE_HOLDOUT_DIR,
     NONLOCAL_BY_RIPPLE_POWER_DIR,
+    PARTICIPATION_NAME,
     event_features_root,
     processed_data_dir,
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.reported.events import read_heldout_restriction
 from continuum_swr_replay.reported.formatting import format_number
-from continuum_swr_replay.runs.io import ok_epochs, read_complete_run, read_manifest
+from continuum_swr_replay.runs.io import (
+    ok_epochs,
+    read_complete_run,
+    read_manifest,
+    sha256_file,
+)
 from continuum_swr_replay.runs.staleness import read_output_manifest
 from continuum_swr_replay.visualization.figure_utilities import save_figure
+from continuum_swr_replay.visualization.heldout_gain_panels import (
+    REFERENCE_COLOR,
+    animal_values,
+    draw_animal_gain,
+    label_gain_axis,
+)
 from continuum_swr_replay.visualization.inventory_examples import detector_color
 from continuum_swr_replay.visualization.palettes import COLORS, readable_text_color
 from continuum_swr_replay.visualization.plots import (
@@ -252,8 +300,8 @@ C_NOSPIKE = COLORS["No-Spike"]
 C_OTHER = "white"
 """Panel c's 'Other' SWRs: an outlined bar, no state's color (they are mostly
 mixed-state, not No-Spike)."""
-C_REFERENCE = "#777777"
-"""A reference level (panel h's zero, panel i's between-events level): a neutral
+C_REFERENCE = REFERENCE_COLOR
+"""A reference level (panel g's zeros, panel i's between-events level): a neutral
 gray, not the No-Spike state's."""
 C_NL = COLORS["Non-Local"]
 C_NO_SWR = COLORS["No SWR"]
@@ -261,11 +309,17 @@ C_NO_SWR = COLORS["No SWR"]
 which marks the state and every non-local event in a and b and the SWRs with
 non-local content in c."""
 C_SWR = COLORS["SWR"]
+C_SWR_PARTIAL = COLORS["SWR partial"]
+C_SWR_ONLY = "#444444"
+"""Panel g's SWR-only decoder: a dark gray, no state's or class's color; the
+full decoder is the Non-Local state's green."""
+C_PAIR = "#999999"
+"""A line joining one animal's two values (panels g and h)."""
 C_QUIET = COLORS["All Events"]
 CLASS_ORDER = ("swr_contained", "swr_partial", "non_swr")
 CLASS_COLORS = {
     "swr_contained": C_SWR,
-    "swr_partial": COLORS["SWR partial"],
+    "swr_partial": C_SWR_PARTIAL,
     "non_swr": C_NO_SWR,
 }
 CLASS_LABELS = {
@@ -880,6 +934,31 @@ def label_reward_well(ax: Axes, track_graph) -> None:
     )  # fmt: skip
 
 
+def shift_to_left_ink(
+    fig: Figure, renderer: Any, reference: Axes, first: Axes, second: Axes
+) -> None:
+    """Move panel g left until its drawn extent starts where panel c's does.
+
+    Row 4's grid starts at the axes' left edge, as row 3's does, but panel c's
+    bar labels reach further left than g's y-label, so g looked indented under
+    c. ``first`` (g's decoder axis) moves left by the difference and keeps its
+    width; ``second`` (g's event-time axis) moves its left edge by the same
+    amount and keeps its right edge, so it gains the width and h, i and j stay
+    where they are. Nothing moves when g already starts at or left of c.
+    """
+
+    def left_ink(ax: Axes) -> float:
+        return ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted()).x0
+
+    shift = left_ink(first) - left_ink(reference)
+    if shift <= 0:
+        return
+    box = first.get_position()
+    first.set_position((box.x0 - shift, box.y0, box.width, box.height))
+    box = second.get_position()
+    second.set_position((box.x0 - shift, box.y0, box.width + shift, box.height))
+
+
 def fit_track_to_height(fig: Figure, ax_track: Axes, left: float) -> None:
     """Size the track's equal-aspect axes to fill its row's height, at ``left``."""
     box = ax_track.get_position(original=True)
@@ -1024,15 +1103,59 @@ def draw_swr_bars(ax: Axes, kay: pd.Series, animals: pd.DataFrame) -> None:
 
 
 REST_EVENT_X = {"no SWR": (0.0, 1.0), "SWR": (2.4, 3.4)}
-"""Panel g: each group's Local-rest and event positions on the x axis."""
+"""Panel h: each group's Local-rest and event positions on the x axis."""
 
-HELDOUT_X = {"no SWR": 0.0, "SWR": 1.0}
-"""Panel h: each group's position on the x axis."""
+DECODER_X = dict(zip(RESTRICTION_FIGURE_DECODERS, (0.0, 1.0), strict=True))
+"""Panel g, left: each decoder's measure and its position on the x axis."""
+DECODER_LABELS = dict(
+    zip(RESTRICTION_FIGURE_DECODERS, ("SWR-only", "Full"), strict=True)
+)
+DECODER_COLORS = dict(zip(RESTRICTION_FIGURE_DECODERS, (C_SWR_ONLY, C_NL), strict=True))
+PANEL_G_DECODERS_TITLE = "All immobile time"
+PANEL_G_DECODERS_YLABEL = "Gain over local-only\ndecoder (nats/spike)"
+PANEL_G_REFERENCE = "local-only"
+PART_X = dict(zip(RESTRICTION_FIGURE_GROUPS, (0.0, 1.0), strict=True))
+"""Panel g, right: each kind of event time's position on the x axis."""
+PART_LABELS = {
+    SWR_LABELS[False]: "No-SWR\nevents",
+    SWR_LABELS[True]: "Events partly\nin an SWR:\ntime outside\nthe SWR",
+}
+PART_COLORS = {SWR_LABELS[False]: C_NO_SWR, SWR_LABELS[True]: C_SWR_PARTIAL}
+"""Panel d's colors of the no-SWR events and of the events partly in an SWR."""
+PANEL_G_PARTS_TITLE = "Immobile time outside\nSWR bounds"
+"""On two lines: on one it is wider than its axis and meets the left axis'
+title and h's tick labels."""
+PANEL_G_PARTS_YLABEL = "Full minus SWR-only\ndecoder (nats/spike)"
+GAIN_FLOOR = 0.13
+"""Panel g: each axis' floor below zero, as a share of its top."""
+PANEL_G_RERUN = "scripts/event_evidence/detect_heldout_events.py"
+BIN_FACTS_RERUN = "scripts/event_evidence/measure_bin_facts.py"
+"""The runners to make again when panel g refuses its inputs."""
 
 
-def animal_values(row: pd.Series, column: str, scale: float = 1.0) -> pd.Series:
-    """A statistics row's per-animal values, indexed by animal."""
-    return scale * pd.Series(row[column], index=row["animal_names"])
+def panel_g_refusal(reason: str, rerun: str) -> str:
+    """Why panel g is not drawn: what is not current (the events summary's
+    ``reason``, without its closing advice to rerun before citing) and the
+    runners to make again (``rerun``)."""
+    cause = reason.removesuffix("; rerun it before citing")
+    return f"panel g is not drawn: {cause}. Rerun {rerun}."
+
+
+ROW4_GRID = {"width_ratios": (1.05, 0.85, 1.0, 1.0), "wspace": 0.85}
+"""Row 4's grid of four cells: j keeps the last, so its left edge, which also
+places f's letter (they share a column), is where it was before g held two
+axes; g, h and i share the first three (:data:`ROW4_WIDTHS`)."""
+ROW4_WIDTHS = (2.55, 0.8, 1.2)
+"""The widths of g (its two axes), h and i within row 4's first three cells."""
+ROW4_WSPACE = 0.42
+PANEL_G_WIDTHS = (0.55, 1.0)
+"""Panel g's two axes' widths: the decoders, then the kinds of event time."""
+PANEL_G_WSPACE = 1.0
+LETTER_COLUMNS = ("abcg", "d", "e", "h", "i", "fj")
+"""The panel letters that share a left edge (convention 10). Row 4's g holds
+two axes, so h and i no longer sit under d and e (h starts between d's and e's
+letters, i right of e's): each is placed by itself. j keeps its cell
+(:data:`ROW4_GRID`) and shares f's column, as before."""
 
 
 def draw_rest_to_event(
@@ -1041,13 +1164,13 @@ def draw_rest_to_event(
     """One line per animal from its Local-rest value to its event value."""
     x = REST_EVENT_X[group]
     for animal in event.index.intersection(rest.index):  # paired by animal
-        ax.plot(x, (rest[animal], event[animal]), color="#999999", lw=0.5, zorder=1)
+        ax.plot(x, (rest[animal], event[animal]), color=C_PAIR, lw=0.5, zorder=1)
     ax.scatter(np.full(rest.size, x[0]), rest, s=6, color=C_LOCAL, lw=0, zorder=2)
     ax.scatter(np.full(event.size, x[1]), event, s=6, color=color, lw=0, zorder=2)
 
 
 def draw_participation(ax: Axes, statistics: pd.DataFrame) -> None:
-    """Panel g: tetrode participation, Local rest vs events.
+    """Panel h: tetrode participation, Local rest vs events.
 
     One line per animal from its length-matched Local-rest controls to its
     events, for no-SWR events and for SWR events (``participation_statistics``).
@@ -1070,37 +1193,88 @@ def draw_participation(ax: Axes, statistics: pd.DataFrame) -> None:
     )
 
 
-def draw_heldout_gain(ax: Axes, events: pd.DataFrame) -> None:
-    """Panel h: the held-out tetrode gain over local coding, per spike.
+def draw_decoder_gains(ax: Axes, statistics: pd.DataFrame) -> None:
+    """Panel g, left: the SWR-only and full decoders' gains over the local-only
+    decoder per spike of the immobile time inside a well visit.
 
-    A dot per animal and the animals' mean with its 95 % interval
-    (``tetrode_holdout.holdout_statistics``). The dashed line is zero, where
-    local coding around the animal predicts the held-out spikes as well as the
-    other tetrodes' position does. It is not a control: the groups' Local-rest
-    controls sit there by construction (in Local rest the decoded position is
-    the animal's own), so they are in the events summary and not drawn.
+    A dot per animal for each decoder (the median over its epochs; dark gray
+    for the SWR-only decoder, the Non-Local state's green for the full one),
+    the same animal's two dots joined by a thin gray line, and a dashed line at
+    zero, the local-only decoder (``restriction_totals.immobile_gain_statistics``,
+    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE_DECODERS`).
+
+    Parameters
+    ----------
+    ax : Axes
+    statistics : pd.DataFrame
+        ``immobile_gain_statistics``' rows, indexed by ``family`` and
+        ``measure``.
     """
-    for group, color in (("no SWR", C_NO_SWR), ("SWR", C_SWR)):
-        x = HELDOUT_X[group]
-        event = events.loc[group]
-        animals = animal_values(event, "animals")
-        ax.scatter(np.full(animals.size, x), animals, s=6, color=color, lw=0, zorder=2)
-        ax.errorbar(
-            x + 0.25, event["estimate"],
-            yerr=[[event["estimate"] - event["ci_low"]],
-                  [event["ci_high"] - event["estimate"]]],
-            fmt="_", color="black", ms=5, lw=0.8, capsize=0,
+    values = {
+        measure: animal_values(
+            statistics.loc[(RESTRICTION_FIGURE_FAMILY, measure)], "animals"
+        )
+        for measure in RESTRICTION_FIGURE_DECODERS
+    }
+    swr_only, full = values.values()
+    for animal in full.index.intersection(swr_only.index):  # paired by animal
+        ax.plot(
+            list(DECODER_X.values()), (swr_only[animal], full[animal]),
+            color=C_PAIR, lw=0.5, zorder=1,
+        )  # fmt: skip
+    for measure, animals in values.items():
+        ax.scatter(
+            np.full(animals.size, DECODER_X[measure]), animals, s=6,
+            color=DECODER_COLORS[measure], lw=0, zorder=2,
         )  # fmt: skip
     ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
-    ax.text(
-        0.04, -0.02, "no gain", transform=ax.get_yaxis_transform(), va="top",
-        fontsize=SMALL_SIZE, color=C_REFERENCE,
+    ax.set_xlim(-0.5, 1.5)
+    ax.set_xticks(
+        list(DECODER_X.values()), list(DECODER_LABELS.values()), rotation=45,
+        ha="right",
     )  # fmt: skip
-    ax.set_xlim(-0.6, 1.6)
-    ax.set_xticks(list(HELDOUT_X.values()), ["No SWR", "SWR"], rotation=45, ha="right")
-    ax.set_ylim(-0.12, None)
-    ax.set_ylabel("Held-out gain\nover local (nats/spike)")
-    ax.set_title("Held-out tetrode", fontsize=SMALL_SIZE, pad=3)
+    top = max(float(animals.max()) for animals in values.values()) * 1.08
+    label_gain_axis(
+        ax, PANEL_G_DECODERS_YLABEL, PANEL_G_REFERENCE, floor=-GAIN_FLOOR * top
+    )
+    ax.set_ylim(top=top)
+    ax.set_title(PANEL_G_DECODERS_TITLE, fontsize=SMALL_SIZE, pad=3)
+
+
+def draw_part_gains(ax: Axes, statistics: pd.DataFrame) -> None:
+    """Panel g, right: the full decoder minus the SWR-only decoder per spike,
+    over the immobile bins outside SWRs of the events with no SWR and of the
+    events partly in an SWR (their time outside the SWR), of the events
+    detected from the held-out decode that start inside a well visit.
+
+    For each, a dot per animal in panel d's color and, beside them, the animals'
+    mean with its 95 % interval in black (drawn by
+    ``heldout_gain_panels.draw_animal_gain``), with a dashed line at zero
+    (``restriction_windows.restriction_window_statistics`` with
+    :data:`~continuum_swr_replay.analysis.event_evidence.restriction_totals.RESTRICTION_FIGURE`).
+
+    Parameters
+    ----------
+    ax : Axes
+    statistics : pd.DataFrame
+        That statistic's rows, indexed by ``group`` (``"no SWR"``, ``"SWR"``).
+    """
+    for group in RESTRICTION_FIGURE_GROUPS:
+        draw_animal_gain(ax, PART_X[group], statistics.loc[group], PART_COLORS[group])
+    ax.axhline(0, color=C_REFERENCE, lw=0.6, ls="--", zorder=1)
+    ax.set_xlim(-0.35, 1.4)
+    ax.set_xticks(list(PART_X.values()), [PART_LABELS[g] for g in PART_X])
+    ax.tick_params(axis="x", labelsize=SMALL_SIZE)
+    top = (
+        max(
+            max(float(statistics.loc[g, "animals"].max()), statistics.loc[g, "ci_high"])
+            for g in PART_X
+        )
+        * 1.08
+    )
+    ax.set_ylim(-GAIN_FLOOR * top, top)
+    ax.set_ylabel(PANEL_G_PARTS_YLABEL)
+    ax.set_title(PANEL_G_PARTS_TITLE, fontsize=SMALL_SIZE, pad=3)
 
 
 def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> None:
@@ -1166,8 +1340,8 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
     labels.append("between events")
     ax_rip.legend(
         handles, labels, frameon=False, loc="lower center", ncol=2,
-        bbox_to_anchor=(0.5, 1.0), handlelength=0.8, columnspacing=0.8,
-        borderaxespad=0.1,
+        bbox_to_anchor=(0.5, 1.0), handlelength=0.8, handletextpad=0.4,
+        columnspacing=0.6, borderaxespad=0.1,
     )  # fmt: skip
     ax_speed.set_xlabel("Time from event start (ms)")
 
@@ -1335,6 +1509,7 @@ def place_letters(
     panels: Mapping[str, Sequence[Axes]],
     rows: Sequence[str],
     columns: Sequence[str],
+    heights: Mapping[str, Sequence[Axes] | float] | None = None,
 ) -> dict[str, tuple[float, float]]:
     """Each panel letter's figure position, aligned by row and by column.
 
@@ -1342,15 +1517,31 @@ def place_letters(
     height just above the highest of their panels' drawn tops; the letters of a
     column (each string of ``columns``, such as ``"dh"``) share the left edge of
     the leftmost of their panels' drawn extents.
+
+    ``heights`` names, by letter, which part of its panel sets its row's
+    height in place of the panel's whole drawn extent: the axes whose drawn
+    tops count (none: the panel does not count, as when a legend above it
+    would lift the row's letters away from the others), or the letter's own
+    height in figure coordinates.
     """
-    extents = {name: panel_extent(fig, renderer, axes) for name, axes in panels.items()}
-    y = {
-        name: min(max(extents[n].y1 for n in row) + 0.002, 0.985)
-        for row in rows
-        for name in row
-    }
+    heights = heights or {}
+    y = {}
+    for row in rows:
+        tops = [
+            panel_extent(fig, renderer, axes).y1
+            for axes in (heights.get(name, panels[name]) for name in row)
+            if not isinstance(axes, Real) and len(axes) > 0
+        ]
+        for name in row:
+            given = heights.get(name)
+            y[name] = (
+                given if isinstance(given, Real) else min(max(tops) + 0.002, 0.985)
+            )
     x = {
-        name: max(min(extents[n].x0 for n in column) - 0.004, 0.0)
+        name: max(
+            min(panel_extent(fig, renderer, panels[n]).x0 for n in column) - 0.004,
+            0.0,
+        )
         for column in columns
         for name in column
     }
@@ -1441,21 +1632,33 @@ def generate_figure(
         raise ValueError(note)
     participation = participation_statistics(
         select_events_in(
-            read_complete_run(participation_dir, "participation", event_epochs),
+            read_complete_run(participation_dir, PARTICIPATION_NAME, event_epochs),
             events["event_id"],
         )
     )
-    heldout = window_scores(
-        select_events_in(
-            read_complete_run(
-                data_dir / EVENT_TETRODE_HOLDOUT_DIR,
-                "tetrode_holdout",
-                analyzed_epoch_ids(),
-            ),
-            events["event_id"],
-        )
+    # the events summary's restriction inputs: the same runs, cohorts, time
+    # steps and subset; panel g draws the fold fit on whole trials, and only
+    # from a held-out event run made from the restriction run and the per-bin
+    # facts run as they are now, with facts made from the current session
+    # cache: content of another design, decoder run or visits is refused, not
+    # drawn (the event-table reason is the summary's alone)
+    heldout = read_heldout_restriction(
+        data_dir / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+        data_dir / EVENT_NONLOCAL_RESTRICTION_DIR,
+        data_dir / EVENT_BIN_FACTS_DIR,
+        event_epochs,
+        sha256_file(_event_table_path(data_dir)),
     )
-    heldout_events = holdout_statistics(heldout, "event")
+    for reason, rerun in (
+        (heldout.restriction_run, PANEL_G_RERUN),
+        (heldout.bin_facts_run, PANEL_G_RERUN),
+        (heldout.session_cache, f"{BIN_FACTS_RERUN}, then {PANEL_G_RERUN}"),
+    ):
+        if reason is not None:
+            raise ValueError(panel_g_refusal(reason, rerun))
+    restriction_decoders, restriction_parts = restriction_figure_statistics(
+        heldout.events, heldout.time_sums, heldout.bin_s
+    )
 
     fig = plt.figure(figsize=(WIDTH, HEIGHT))
     outer = GridSpec(
@@ -1485,12 +1688,20 @@ def generate_figure(
     ax_f1 = fig.add_subplot(offsets_grid[0])
     ax_f2 = fig.add_subplot(offsets_grid[1], sharex=ax_f1)
     draw_offsets(ax_f1, ax_f2, boundary_offsets(events), events["animal"])
-    row4 = outer[3].subgridspec(1, 4, width_ratios=[1.05, 0.85, 1.0, 1.0], wspace=0.85)
-    ax_g = fig.add_subplot(row4[0])
-    draw_participation(ax_g, participation)
-    ax_h = fig.add_subplot(row4[1])
-    draw_heldout_gain(ax_h, heldout_events)
-    triggered = row4[2].subgridspec(4, 1, hspace=0.2)
+    row4 = outer[3].subgridspec(1, 4, **ROW4_GRID)
+    row4_left = row4[0:3].subgridspec(
+        1, 3, width_ratios=ROW4_WIDTHS, wspace=ROW4_WSPACE
+    )
+    decoders = row4_left[0].subgridspec(
+        1, 2, width_ratios=PANEL_G_WIDTHS, wspace=PANEL_G_WSPACE
+    )
+    ax_g = fig.add_subplot(decoders[0])
+    draw_decoder_gains(ax_g, restriction_decoders)
+    ax_g2 = fig.add_subplot(decoders[1])
+    draw_part_gains(ax_g2, restriction_parts)
+    ax_h = fig.add_subplot(row4_left[1])
+    draw_participation(ax_h, participation)
+    triggered = row4_left[2].subgridspec(4, 1, hspace=0.2)
     ax_i = fig.add_subplot(triggered[0])
     triggered_axes = [
         ax_i,
@@ -1511,6 +1722,7 @@ def generate_figure(
         )
         - 0.004
     )
+    shift_to_left_ink(fig, renderer, ax_c, ax_g, ax_g2)
     fit_track_to_height(fig, ax_a, x_left)
     fig.canvas.draw()
     positions = place_letters(
@@ -1523,16 +1735,22 @@ def generate_figure(
             "d": [ax_d],
             "e": [ax_e, ax_e2],
             "f": [ax_f1, ax_f2],
-            "g": [ax_g],
+            "g": [ax_g, ax_g2],
             "h": [ax_h],
             "i": triggered_axes,
             "j": [ax_j, ax_j2],
         },
         rows=["a", "b", "cdef", "ghij"],
-        columns=["abcg", "dh", "ei", "fj"],
+        columns=LETTER_COLUMNS,
+        heights={
+            # panel a's letter sits at the top of its decode, not of the track
+            # drawing
+            "a": ax_a_top.get_position().y1 + 0.004,
+            # the legend drawn above panel i's axes would lift the last row's
+            # letters away from panels g, h and j
+            "i": [],
+        },
     )
-    # panel a's letter sits at the top of its decode, not of the track drawing
-    positions["a"] = (positions["a"][0], ax_a_top.get_position().y1 + 0.004)
     for name, (x, y) in positions.items():
         fig.text(
             x, y, name, fontsize=PANEL_LETTER_SIZE, fontweight="bold", ha="left",

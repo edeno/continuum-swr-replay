@@ -55,6 +55,13 @@ them importable.
 - `split_state_evidence_by_swr.py` — held-out spike evidence of Non-Local bouts, split by SWR coupling, over the bouts that start inside a well visit (it records `cohort_selection.ANALYZED_SUBSET` and the bouts kept and left out in its provenance).
 - `analyze_event_spike_evidence.py` — the spike-evidence test that non-SWR non-local events favor their decoded location.
 - `run_event_spike_evidence.sh [NJOBS]` — the run of it the events summary reads, one process per epoch (run it in tmux). It scores every event; the summary reads the events that start inside a well visit and the quiet windows whose first sample is inside one.
+- `score_nonlocal_restriction.py` — per-bin held-out scores of three decoders that allow the non-local states never, only inside SWRs, or always, on every analyzed epoch: for each fold the place-field encodings are fit on the decode's training bins of the other folds (more than 1 s from the fold), the transitions and initial conditions by EM with the fold's bins missing, and the fold's bins are scored under that fit (GPU; needs `--gpus`).
+- `measure_event_participation.py` — tetrode participation and spike rate of every canonical non-local event against one Local-rest control window of its length inside one well visit of the same epoch (CPU; the held-out tetrode and window runs read its controls).
+- `score_event_likelihood_advantage.py` — the decoder's stored spike likelihood at each canonical event's decoded positions against the animal's position, per spike of the participation run's count (CPU).
+- `score_tetrode_holdout.py` — the held-out tetrode score of every canonical non-local event and its Local-rest control: each tetrode left out of the decoder in turn and scored under the other tetrodes' position distribution against local coding, with encodings held out in folds of whole trials balanced by destination well (GPU; needs `--gpus`).
+- `measure_bin_facts.py` — each decode bin's spikes over every tetrode and whether it is inside a well visit (the visits from the session cache only, whose entries the run records), on every epoch of the restriction run (CPU; reads the lab's database, read only).
+- `sum_nonlocal_restriction_windows.py` — those per-bin scores summed over each canonical non-local event and its Local-rest control, with each window's spike count and its sums over the bins outside SWRs (CPU; `--restriction-dir` reads another restriction run).
+- `detect_heldout_events.py` — the non-local events detected by the canonical rule from the restriction run's held-out state probabilities (Figure 2g reads them), with the restriction scores summed over each, which held-out and canonical events share a bin, and each epoch's bins, spikes and scores by category, well visit and held-out event window; each epoch checks that the rule on the canonical decode's own probabilities gives its canonical labels (CPU; `--restriction-dir` reads another restriction run).
 
 ## `event_properties/` — what the events are like (Part 2)
 Each is over the events that start inside a well visit and the time inside one
@@ -114,6 +121,7 @@ The Part 3 model runners are under `replay_models/`, one folder per subpackage o
 - `generate_supp_*.py`, `generate_event_gallery.py`, `run_event_gallery.sh`.
 - `plot_swr_contrast_coefs.py` — per-animal coefficient forest plots for the `is_swr` rate and content contrast ladders.
 - `generate_supp_memoryless_comparison.py` — supplemental figure: the Widloski & Foster detector against the state-space detector in simulation.
+- `generate_supp_heldout_tetrode.py` — supplemental figure: the held-out tetrode gain over local coding of no-SWR and SWR events (was Figure 2h).
 - `generate_inventory_examples.py` — seeded example events from each cell of one inventory comparison run.
 - `generate_event_feature_examples.py` — seeded comparator-only and ours-only example events from one event features run.
 

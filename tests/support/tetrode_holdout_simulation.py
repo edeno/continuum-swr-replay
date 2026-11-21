@@ -36,11 +36,11 @@ from non_local_detector import NonLocalClusterlessDetector
 from non_local_detector.environment import Environment
 from non_local_detector.simulate.simulate import simulate_multiunit_with_place_fields
 
-from continuum_swr_replay.analysis.event_evidence.tetrode_holdout import time_blocks
 from continuum_swr_replay.decoding.config import NonLocalDecodingConfig
 from continuum_swr_replay.decoding.fit import algorithm_params
 from continuum_swr_replay.decoding.transitions import nonlocal_detector_kwargs
 from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D, SAMPLING_FREQUENCY
+from tests.support._time_blocks import time_blocks
 
 TRACK_CM = 175.0
 RUN_CM_PER_S = 25.0
@@ -202,6 +202,25 @@ def simulate_recording(
     )
 
 
+def trials(recording: Recording) -> tuple[np.ndarray, np.ndarray]:
+    """The recording's trials as ``tetrode_holdout.trial_folds`` takes them:
+    each lap is a trial, from its departure (the first running bin) through the
+    rest at the end it runs to.
+
+    Returns
+    -------
+    starts : ndarray, shape (n_laps,)
+        Each trial's departure, s.
+    classes : ndarray of int, shape (n_laps,)
+        Its destination: 0 for the track's start, 1 for its end.
+    """
+    running = recording.is_running.astype(np.int8)
+    first = np.flatnonzero(np.diff(np.r_[0, running]) == 1)
+    last = np.flatnonzero(np.diff(np.r_[running, 0]) == -1)
+    classes = (recording.position[last] > TRACK_CM / 2).astype(np.int64)
+    return recording.time[first], classes
+
+
 def fit_detector(recording: Recording) -> NonLocalClusterlessDetector:
     """The real decodes' detector, fit by EM on the running bins."""
     config = NonLocalDecodingConfig()
@@ -250,3 +269,7 @@ def detected_events(
         ]
         rows.append((overlap.kind.iloc[0] if len(overlap) else "none", s, e))
     return pd.DataFrame(rows, columns=["kind", "s", "e"])
+
+
+def quiet(message: str) -> None:
+    """A log that writes nothing, for the scorers' ``log`` argument."""

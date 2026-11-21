@@ -146,6 +146,79 @@ Work that is deferred on purpose. Each item says when it should be done.
 
   *When:* before the Results are drafted.
 
+## Event evidence
+
+The review of the restriction and held-out tetrode runs before the
+`swr-restricted-models` merge left these on purpose.
+
+- [ ] **Which trials make the folds.** Both GPU runners make their folds from the
+  trials `load_data` returns (the DIO parse); the session cache's trials
+  (`replay_content/_session_cache/<epoch>.pkl`) can differ from them and give other
+  folds. Each epoch's record now keeps the digest of the trials it used
+  (`epoch_inputs["trials"]`), but nothing compares it on a resume.
+  *When:* decide which trials are canonical before any rerun of either runner.
+- [ ] **A run made from a restriction run of another design is pending, not refused.**
+  The window run (`sum_nonlocal_restriction_windows.py`) and the held-out event run
+  (`detect_heldout_events.py`) record the restriction run's manifest digest but not its
+  design, so the summary can mark their values pending but cannot tell another design
+  from a rerun of the same one.
+  *When:* when either runner is next changed.
+- [ ] **The per-bin facts' spikes outside the canonical windows are checked against no
+  other run.** The window run checks the facts' spikes over each canonical window against
+  the held-out tetrode run's; the restriction run records no spike count, so the facts'
+  spikes elsewhere (the time sums, the held-out events) are not checked.
+  *When:* if the restriction run is changed to record its spike counts.
+- [ ] **Figure 2 draws panel g when the summary marks its values pending.** The figure
+  refuses panel g for another restriction run, per-bin facts run or session cache, but
+  not when only the event table changed (the held-out event run's canonical check), nor
+  for the restriction run's decodes or SWR source, while the events summary marks the
+  values pending in both cases.
+  *When:* when Figure 2's checks are next changed.
+- [ ] **The supplementary held-out tetrode figure checks no staleness.**
+  `scripts/figures/generate_supp_heldout_tetrode.py` refuses a run not on folds of whole
+  trials, but draws a run made from another event table or participation run.
+  *When:* before the figure is final.
+- [ ] **`n_folds` beside `folds`.** `tetrode_holdout.heldout_terms`, `holdout_scores` and
+  `nonlocal_restriction.fold_fit_scores` take `n_folds` beside the `folds` array, which
+  implies it.
+  *When:* at the next change to those functions.
+- [ ] **A branch only a test uses.** `tetrode_holdout.capped_groups`' `max_segment_s=None`
+  (every segment whole) is used only by a test.
+  *When:* at the next change to `capped_groups`.
+- [ ] **`--shards` values not below `--n-shards`.** `_per_event_run.select_epochs` selects
+  nothing, without a message, for a shard that is not below `--n-shards`.
+  *When:* at the next change to the shared runner arguments.
+- [ ] **The "block" names.** `tetrode_holdout.fold_blocks`, `FoldTerms.block` and the
+  restriction run's per-bin `block` column keep the name of the contiguous design; the
+  column is on disk.
+  *When:* at the next full rerun of the restriction run.
+- [ ] **Two long simulated integration tests.** The two simulated tests in
+  `tests/integration/` of the restriction and held-out tetrode runs take about 13 and 23
+  minutes.
+  *When:* when the suite's time matters (CI).
+
+## Run infrastructure
+
+- [ ] **A resumed run does not compare an epoch's own inputs.** `runs/epoch_records.same_run`
+  compares the run-wide header `inputs` only. A runner whose inputs are per epoch (a decode
+  frame, a saved detector) reuses an epoch's record after that epoch is re-decoded; only
+  `--overwrite` recomputes it. `scripts/event_evidence/score_nonlocal_restriction.py` records
+  each epoch's input digests (`epoch_inputs`), which only the events summary reads back (its
+  decode digests, `reported.events.restriction_input_staleness`), not the resume;
+  `score_tetrode_holdout.py` records only the trials' digest and
+  `score_event_likelihood_advantage.py` none. Let a task
+  give `epochs_to_run` a per-epoch input function and rerun an epoch whose digests differ.
+  A resume does not compare the code either: the commit is recorded (`provenance`) and not
+  read back, so an `ok` record made by older scoring code is reused unless the change shows
+  in `settings`.
+  *When:* before the next re-decode, or when one of these runners is resumed across one or
+  across a change to its scoring code.
+- [ ] **One GPU-per-worker setup.** `scripts/event_evidence/_per_event_run.use_gpu` repeats the
+  environment setup and device check of `runs/device.configure_jax_gpu`, which it cannot call
+  because that allows one process per card. Move the shared part into `runs/device` and have
+  both use it.
+  *When:* when a third runner needs several workers on a card.
+
 ## Checks
 
 - [ ] **Type checking.** `mypy src/` reports about 400 errors in 90 files.

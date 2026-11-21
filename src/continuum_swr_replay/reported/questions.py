@@ -122,6 +122,10 @@ FIGURES: dict[str, Figure] = {
         "Slow and fast gamma during SWR and no-SWR events",
         "scripts/figures/generate_supp_event_gamma.py",
     ),
+    "heldout_tetrode": Figure(
+        "The held-out tetrode gain over local coding",
+        "scripts/figures/generate_supp_heldout_tetrode.py",
+    ),
     "content_estimators": Figure(
         "Content models under three estimators",
         "scripts/replay_models/content/compare_content_estimators.py",
@@ -256,9 +260,9 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     Question(
         "2c.3",
-        "Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?",
-        figures=("2", "2h"),
-        note="The held-out test split by SWR (the heldout_* values) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
+        "Do an event's spikes favor its decoded location over the animal's position (against matched windows and on held-out tetrodes), and do held-out spikes favor a decoder that may be non-local outside SWRs over one that is non-local only in SWRs or never?",
+        figures=("2", "2g", "heldout_tetrode"),
+        note="Two lines of evidence. The spike evidence: the matched-window, likelihood-advantage and held-out tetrode values (the held-out tetrode score of the supplementary figure is the *_heldout_gain_*, *_heldout_spiking_gain_* and *_heldout_control_gain_* values). The decoder comparison: the restriction_* values compare the local-only, SWR-only and full decoders by held-out predictive score, over immobile time and over the events detected from the held-out decode (restriction_heldout_*, Figure 2g) or the canonical events (restriction_canonical_non_swr_* and restriction_canonical_swr_*); the *_found_again and *_with_canonical values say how those two sets of events agree. The held-out test split by SWR (the values whose keys start heldout_swr_ or heldout_non_swr_) was made by the tracked scripts/event_evidence/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.",
     ),
     Question(
         "2c.4",
@@ -309,7 +313,7 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2d.9",
         "How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?",
-        figures=("2", "2g"),
+        figures=("2", "2h"),
         note="Was question 2c.2: events are detected from spiking, so more spikes than a quiet window is not evidence of spatial content.",
     ),
     Question(

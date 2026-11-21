@@ -515,11 +515,6 @@ def _intervals(table: pd.DataFrame, detectors: tuple[str, ...]) -> np.ndarray:
     return rows[["event_start_s", "event_end_s"]].to_numpy(dtype=np.float64)
 
 
-EXPOSURE_IN_VISITS_DIR = "nonlocal_exposure_in_well_visits"
-"""The folder, under the data root, of each epoch's non-local detector exposure
-inside the well visits (``scripts/detector_comparison/measure_exposure_in_well_visits.py``)."""
-
-
 def exposure_in_well_visits(
     observations: pd.DataFrame,
     set_aside: pd.DataFrame,

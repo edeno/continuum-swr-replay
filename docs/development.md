@@ -507,7 +507,11 @@ Each builder's statistics:
   sets; the modes, ranges and shares are computed there);
 - events: `analysis/event_properties/event_statistics.py`, `analysis/event_properties/content_along_arms.py`
   (where content sits on the track), `analysis/decode_quality/quality_metrics.py` (the
-  decoder's accuracy, state fractions and calibration), `analysis/detector_comparison/nonlocal_comparison.py`;
+  decoder's accuracy, state fractions and calibration), `analysis/detector_comparison/nonlocal_comparison.py`,
+  and in `analysis/event_evidence/`: `restriction_totals.py` and `restriction_windows.py` (the three
+  restriction decoders over immobile time and over event windows), `heldout_events.py` (the events
+  detected from the held-out decode and how they agree with the canonical ones), `tetrode_holdout.py`
+  (the held-out tetrode score), `participation.py` and `likelihood_advantage.py`;
 - mpfc: `analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`, and
   `analysis/pfc/marked_family_statistics.py` (through the marked-family summary
   `scripts/pfc/summarize_pfc_marked_family.py` writes);
@@ -551,7 +555,7 @@ still compute a reported statistic themselves are listed in `TODO.md`.
 7. **Index/time alignment**: Use `.loc[start:end]` for time-based slicing, not `.iloc`
 8. **Data roots**: every root is read at call time from `$CSR_PROCESSED_DATA_DIR` through `paths`. In tests that variable is the one patch point (the `processed_data_root` fixture); the suite starts with a sentinel root that cannot be read or written
 9. **AIC and BIC differences**: the child rung's minus the parent rung's, within session; negative means the child is better (`analysis/replay_models/coefficient_statistics.aic_difference_statistics`, `analysis/replay_models/content/model_comparison.compare_nested_models`). Both compare a session only when its two fits can be compared (`analysis/replay_models/fit_comparability.why_not_comparable`: the same numbers of events, bins and stops, the same clock and stop cohort, likelihoods on the same constants). Likelihood-ratio statistics and held-out gains keep their own signs
-10. **Panel letters**: in a multi-panel figure, the letters of panels that share a row sit at one height (just above the highest of those panels' drawn tops), and the letters of panels that share a column sit at one left edge (the leftmost of those panels' drawn extents); a panel alone in its row or column is placed by itself. Figure 2's `place_letters` (`scripts/figures/generate_figure02.py`) does this from a row and column layout of the letters
+10. **Panel letters**: in a multi-panel figure, the letters of panels that share a row sit at one height (just above the highest of those panels' drawn tops), and the letters of panels that share a column sit at one left edge (the leftmost of those panels' drawn extents); a panel alone in its row or column is placed by itself; a figure may name which part of a panel sets its row's letter height (Figure 2 does for panel a's decode and for the legend above panel i). Figure 2's `place_letters` (`scripts/figures/generate_figure02.py`) does this from a row and column layout of the letters
 
 ## Notes on Data Quality
 

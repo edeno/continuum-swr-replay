@@ -1748,6 +1748,244 @@ def test_figure03_letters_share_a_height_by_row_and_a_left_edge_by_column(offlin
     plt.close(fig)
 
 
+def test_figure02_letters_share_a_row_height_from_the_named_parts(offline):
+    """A row's letters sit just above its panels' highest drawn top; a panel
+    named with no axes does not count (its title would lift the row), and a
+    letter given a height sits there; columns share the leftmost edge."""
+    import matplotlib.pyplot as plt
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    fig, grid = plt.subplots(2, 3)
+    panels = {
+        "a": [grid[0, 0]],
+        "b": [grid[0, 1]],
+        "c": [grid[0, 2]],
+        "d": [grid[1, 0]],
+        "e": [grid[1, 1]],
+        "f": [grid[1, 2]],
+    }
+    grid[0, 2].set_title("a title\nof two lines")
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    extent = {
+        name: figure02.panel_extent(fig, renderer, axes)
+        for name, axes in panels.items()
+    }
+    rows, columns = ["abc", "def"], ["ad", "be", "c", "f"]
+    plain = figure02.place_letters(fig, renderer, panels, rows, columns)
+    named = figure02.place_letters(
+        fig, renderer, panels, rows, columns, heights={"c": [], "d": 0.3}
+    )
+    # by default the title of c sets its row's height
+    assert {plain[n][1] for n in "abc"} == {extent["c"].y1 + 0.002}
+    # named: c does not count, so a and b set it; d sits where it is given
+    top = max(extent[n].y1 for n in "ab") + 0.002
+    assert top < extent["c"].y1
+    assert {named[n][1] for n in "abc"} == {top}
+    assert named["d"][1] == 0.3
+    assert {named[n][1] for n in "ef"} == {max(extent[n].y1 for n in "ef") + 0.002}
+    assert named["a"][0] == named["d"][0] == min(extent[n].x0 for n in "ad") - 0.004
+    plt.close(fig)
+
+
+def _gain_statistics(no_swr: list[float], swr: list[float]) -> pd.DataFrame:
+    """Statistics indexed by group, as ``likelihood_advantage_statistics``
+    gives them, with each group's mean as its estimate and an interval of
+    +/- 0.1."""
+    rows = {}
+    for group, animals in (("no SWR", no_swr), ("SWR", swr)):
+        estimate = float(np.mean(animals))
+        rows[group] = {
+            "animals": np.asarray(animals),
+            "animal_names": np.array(list("abcde"[: len(animals)])),
+            "estimate": estimate,
+            "ci_low": estimate - 0.1,
+            "ci_high": estimate + 0.1,
+        }
+    return pd.DataFrame.from_dict(rows, orient="index").rename_axis("group")
+
+
+def assert_draws_group_gain(ax, statistics: pd.DataFrame) -> None:
+    """``ax`` holds, for each group, its animals' dots in the group's color at
+    its x, the mean beside them and the dashed zero line."""
+    from continuum_swr_replay.visualization import heldout_gain_panels as panels
+
+    for group, color in panels.GROUP_COLORS.items():
+        x = panels.HELDOUT_X[group]
+        mine = [
+            c
+            for c in ax.collections
+            if isinstance(c, matplotlib.collections.PathCollection)
+            and np.allclose(c.get_offsets()[:, 0], x)
+        ]
+        assert len(mine) == 1
+        np.testing.assert_allclose(
+            mine[0].get_offsets()[:, 1], statistics.loc[group, "animals"]
+        )
+        np.testing.assert_allclose(
+            mine[0].get_facecolor()[0], matplotlib.colors.to_rgba(color)
+        )
+        # the mean, as an errorbar's marker beside the dots
+        means = [
+            line.get_ydata()
+            for line in ax.lines
+            if np.allclose(line.get_xdata(), x + 0.25)
+        ]
+        assert np.allclose(means, statistics.loc[group, "estimate"])
+    assert any(
+        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
+        for line in ax.lines
+    )
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["No SWR", "SWR"]
+    assert [t.get_text() for t in ax.texts] == ["no gain"]
+
+
+def _immobile_statistics(swr_only: list[float], full: list[float]) -> pd.DataFrame:
+    """``immobile_gain_statistics``' rows indexed by family and measure: the
+    filter family's two decoders' per-animal gains (the two-sided family's
+    twice them)."""
+    rows = {}
+    for family, scale in (("filter", 1.0), ("two_sided", 2.0)):
+        for measure, animals in (
+            ("swr_minus_none_per_spike", swr_only),
+            ("full_minus_none_per_spike", full),
+        ):
+            values = scale * np.asarray(animals)
+            rows[(family, measure)] = {
+                "animals": values,
+                "animal_names": np.array(list("abcde"[: len(values)])),
+                "estimate": float(values.mean()),
+            }
+    table = pd.DataFrame.from_dict(rows, orient="index")
+    table.index.names = ["family", "measure"]
+    return table
+
+
+def test_figure02_panel_g_left_draws_each_decoders_gain_joined_by_animal(offline):
+    """Panel g's first axis: a dot per animal for the SWR-only decoder (dark
+    gray) and the full decoder (green), each animal's two dots joined, a dashed
+    zero line labeled "local-only", and the filter family only."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    swr_only, full = (
+        [0.096, 0.089, 0.074, 0.128, 0.084],
+        [0.118, 0.112, 0.104, 0.17, 0.109],
+    )
+    fig, ax = plt.subplots()
+    figure02.draw_decoder_gains(ax, _immobile_statistics(swr_only, full))
+    fig.canvas.draw()
+    dots = ax.collections
+    assert len(dots) == 2
+    for drawn, x, values, color in (
+        (dots[0], 0.0, swr_only, figure02.C_SWR_ONLY),
+        (dots[1], 1.0, full, figure02.COLORS["Non-Local"]),
+    ):
+        np.testing.assert_allclose(drawn.get_offsets()[:, 0], x)
+        np.testing.assert_allclose(drawn.get_offsets()[:, 1], values)
+        np.testing.assert_allclose(drawn.get_facecolors()[0], to_rgba(color))
+    pairs = [line for line in ax.lines if line.get_linestyle() == "-"]
+    assert len(pairs) == 5
+    for line, a, b in zip(pairs, swr_only, full, strict=True):
+        np.testing.assert_allclose(line.get_ydata(), [a, b])
+    assert any(
+        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
+        for line in ax.lines
+    )
+    assert [t.get_text() for t in ax.get_xticklabels()] == ["SWR-only", "Full"]
+    assert [t.get_text() for t in ax.texts] == ["local-only"]
+    assert ax.get_title() == "All immobile time"
+    assert ax.get_ylabel() == "Gain over local-only\ndecoder (nats/spike)"
+    low, high = ax.get_ylim()
+    assert low < 0 < max(full) < high
+    plt.close(fig)
+
+
+def test_figure02_panel_g_right_draws_the_full_minus_swr_only_by_event_time(
+    offline,
+):
+    """Panel g's second axis: for the events with no SWR and the time outside
+    the SWR of the events partly in one, a dot per animal in panel d's colors,
+    the mean with its interval beside them, and a dashed zero line."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    statistics = _gain_statistics([318, 241, 253, 367, 244], [124, 106, 153, 219, 142])
+    fig, ax = plt.subplots()
+    figure02.draw_part_gains(ax, statistics)
+    fig.canvas.draw()
+    for group, x, color in (
+        ("no SWR", 0.0, figure02.COLORS["No SWR"]),
+        ("SWR", 1.0, figure02.COLORS["SWR partial"]),
+    ):
+        (dots,) = [
+            c
+            for c in ax.collections
+            if isinstance(c, matplotlib.collections.PathCollection)
+            and np.allclose(c.get_offsets()[:, 0], x)
+        ]
+        np.testing.assert_allclose(
+            dots.get_offsets()[:, 1], statistics.loc[group, "animals"]
+        )
+        np.testing.assert_allclose(dots.get_facecolors()[0], to_rgba(color))
+        means = [
+            line.get_ydata()
+            for line in ax.lines
+            if np.allclose(line.get_xdata(), x + 0.25)
+        ]
+        assert np.allclose(means, statistics.loc[group, "estimate"])
+    assert figure02.CLASS_COLORS["swr_partial"] == figure02.COLORS["SWR partial"]
+    assert any(
+        line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0)
+        for line in ax.lines
+    )
+    labels = [t.get_text() for t in ax.get_xticklabels()]
+    assert labels == [
+        "No-SWR\nevents",
+        "Events partly\nin an SWR:\ntime outside\nthe SWR",
+    ]
+    assert ax.get_title() == "Immobile time outside\nSWR bounds"
+    assert ax.get_ylabel() == "Full minus SWR-only\ndecoder (nats/spike)"
+    plt.close(fig)
+
+
+def test_figure02_panel_g_draws_the_values_the_events_summary_tags(offline):
+    """Panel g draws the restriction rows the events summary tags with it, by
+    the summary's own definitions; participation is panel h; the held-out
+    tetrode values are the supplementary figure's."""
+    from continuum_swr_replay.analysis.event_evidence import restriction_totals
+    from continuum_swr_replay.reported import events
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    # one definition of the drawn statistic and its choices, in the analysis
+    # layer, used by both
+    assert (
+        figure02.restriction_figure_statistics
+        is restriction_totals.restriction_figure_statistics
+    )
+    for name in (
+        "RESTRICTION_FIGURE_DECODERS",
+        "RESTRICTION_FIGURE_FAMILY",
+        "RESTRICTION_FIGURE_GROUPS",
+    ):
+        assert getattr(figure02, name) is getattr(restriction_totals, name), name
+    for name in (
+        "RESTRICTION_FIGURE",
+        "RESTRICTION_FIGURE_DECODERS",
+        "RESTRICTION_FIGURE_DIFFERENCE",
+        "RESTRICTION_FIGURE_FAMILY",
+        "RESTRICTION_FIGURE_GROUPS",
+    ):
+        assert getattr(events, name) is getattr(restriction_totals, name), name
+    assert list(figure02.DECODER_X) == list(events.RESTRICTION_FIGURE_DECODERS)
+    assert list(figure02.PART_X) == list(events.RESTRICTION_FIGURE_GROUPS)
+    assert events.TAGS["nonlocal_restriction_figure"].figures == ("2g",)
+    assert events.TAGS["participation"].figures == ("2h",)
+    assert events.TAGS["tetrode_holdout"].figures == ("heldout_tetrode",)
+
+
 @pytest.mark.parametrize(
     "module",
     ["scripts.figures.generate_figure03", "scripts.figures.generate_supp_event_gamma"],
@@ -1843,8 +2081,9 @@ class _Figure02Read(Exception):
 
 def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     """The figure module with its eight events in a visit and a ninth on the
-    track, every reader before the held-out tetrode run's stubbed, and a
-    participation run over the subset and the current session cache."""
+    track, every reader before the held-out tetrode run's stubbed, a
+    participation run over the subset and the current session cache, and a
+    per-bin facts run made from the current session cache."""
     import joblib
 
     from continuum_swr_replay.analysis.event_definition.cohort_selection import (
@@ -1853,12 +2092,14 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     from continuum_swr_replay.analysis.event_tables import prepare_data
     from continuum_swr_replay.paths import (
         BRAIN_STATE_REFERENCE_DIR,
+        EVENT_BIN_FACTS_DIR,
         EVENT_PARTICIPATION_DIR,
         NONLOCAL_BY_RIPPLE_POWER_DIR,
         processed_data_dir,
         replay_content_dir,
         table_path,
     )
+    from continuum_swr_replay.reported import events
 
     figure02 = offline("scripts.figures.generate_figure02")
     inside = _figure02_events().assign(event_id=range(8))
@@ -1892,8 +2133,21 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
             }
         )
     )
-    # each stored per-event table holds a row of every event, the ninth too
+    (tmp_path / EVENT_BIN_FACTS_DIR).mkdir()
+    (tmp_path / EVENT_BIN_FACTS_DIR / "manifest.json").write_text(
+        json.dumps(
+            {
+                "inputs": {"session_cache": prepare_data.session_cache_record(["e"])},
+                "epochs": {"e": {"status": "ok"}},
+            }
+        )
+    )
+    # each stored per-event table holds a row of every event, the ninth too;
+    # the held-out event run is read by the events summary's reader
     rows = pd.DataFrame({"event_id": [*range(8), 99]})
+    monkeypatch.setattr(
+        events, "read_complete_run", lambda *args: rows.assign(starts_in_well_visit=1)
+    )
     for name, value in {
         "parse_nwb_filename": lambda name: ("a", "d1"),
         "example_windows": lambda *args: {},
@@ -1908,22 +2162,6 @@ def _figure_with_one_event_outside(offline, tmp_path, monkeypatch):
     }.items():
         monkeypatch.setattr(figure02, name, value)
     return figure02
-
-
-def test_figure02_reads_the_held_out_tetrode_run_over_the_selected_events(
-    offline, tmp_path, monkeypatch
-):
-    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
-    seen = []
-
-    def stop(table):
-        seen.append(table)
-        raise _Figure02Read
-
-    monkeypatch.setattr(figure02, "window_scores", stop)
-    with pytest.raises(_Figure02Read):
-        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
-    assert sorted(seen[0]["event_id"]) == list(range(8))
 
 
 def test_figure02_reads_participation_over_the_selected_events(
@@ -1984,6 +2222,168 @@ def test_figure02_refuses_a_participation_run_off_the_subset_or_the_visits(
 
 def _refuse_drawing(table):
     raise AssertionError("the participation run was read without its check")
+
+
+def _heldout_events_run(
+    tmp_path, facts_sha256=None, restriction_sha256=None, restriction_settings=None
+) -> None:
+    """A restriction run's manifest (the fold fit on whole trials, or
+    ``restriction_settings``) and a held-out event run's manifest that records
+    the current per-bin facts and restriction runs' digests (or
+    ``facts_sha256``, ``restriction_sha256``)."""
+    from continuum_swr_replay.paths import (
+        EVENT_BIN_FACTS_DIR,
+        EVENT_NONLOCAL_RESTRICTION_DIR,
+        EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
+    )
+    from continuum_swr_replay.runs.io import sha256_file
+
+    restriction = tmp_path / EVENT_NONLOCAL_RESTRICTION_DIR
+    restriction.mkdir()
+    settings = restriction_settings or {"fit": "folds", "fold_design": "trials"}
+    (restriction / "manifest.json").write_text(json.dumps({"settings": settings}))
+    folder = tmp_path / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR
+    folder.mkdir()
+    facts = facts_sha256 or sha256_file(
+        tmp_path / EVENT_BIN_FACTS_DIR / "manifest.json"
+    )
+    restriction_digest = restriction_sha256 or sha256_file(
+        restriction / "manifest.json"
+    )
+    (folder / "manifest.json").write_text(
+        json.dumps(
+            {
+                "inputs": {
+                    "bin_facts": {"sha256": facts},
+                    "nonlocal_restriction": {"sha256": restriction_digest},
+                },
+                "epochs": {"e": {"status": "ok", "bin_s": 0.002}},
+            }
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (
+            {"restriction_sha256": "0" * 64},
+            "made from another nonlocal_restriction run than the current one",
+        ),
+        ({"restriction_settings": {"n_folds": 5}}, "is not the fold fit"),
+        (
+            {"restriction_settings": {"fit": "folds", "fold_design": "contiguous"}},
+            "not 'trials'",
+        ),
+    ],
+    ids=["another restriction run", "not the fold fit", "contiguous blocks"],
+)
+def test_figure02_refuses_a_heldout_event_run_not_from_the_current_fold_fit(
+    offline, tmp_path, monkeypatch, change, message
+):
+    """Panel g draws only the fold fit on whole trials, from a held-out event
+    run made from the restriction run as it is now."""
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    _heldout_events_run(tmp_path, **change)
+
+    def refuse(*args):
+        raise AssertionError("panel g was drawn from another restriction run")
+
+    monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
+    with pytest.raises(ValueError, match=message) as refused:
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    assert "detect_heldout_events.py" in str(refused.value)
+
+
+def test_figure02_reads_the_heldout_events_that_start_inside_a_visit(
+    offline, tmp_path, monkeypatch
+):
+    """Panel g reads the held-out event run: its events that start inside a
+    well visit (not the two planted outside one) and its time sums whole."""
+    from continuum_swr_replay.reported import events
+
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    _heldout_events_run(tmp_path)
+    heldout = pd.DataFrame(
+        {"heldout_event_id": range(5), "starts_in_well_visit": [1, 0, 1, 1, 0]}
+    ).astype({"starts_in_well_visit": bool})
+    read = {"heldout_events": heldout, "heldout_time_sums": pd.DataFrame(range(9))}
+    monkeypatch.setattr(
+        events, "read_complete_run", lambda folder, name, epochs: read[name]
+    )
+    seen = []
+
+    def stop(windows, time_sums, bin_s):
+        seen.append((windows, time_sums, bin_s))
+        raise _Figure02Read
+
+    monkeypatch.setattr(figure02, "restriction_figure_statistics", stop)
+    with pytest.raises(_Figure02Read):
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    windows, time_sums, bin_s = seen[0]
+    assert windows["heldout_event_id"].tolist() == [0, 2, 3]
+    assert len(time_sums) == 9  # the time sums are read whole
+    assert bin_s.to_dict() == {"e": 0.002}
+
+
+@pytest.mark.parametrize("problem", ["no session cache", "another session cache"])
+def test_figure02_refuses_bin_facts_made_from_other_visits(
+    offline, tmp_path, monkeypatch, problem
+):
+    """Panel g's time inside a well visit is the per-bin facts' flag: a facts
+    run that records no session cache (made before it did) or another than the
+    current one is refused, naming the runs to make again."""
+    from continuum_swr_replay.paths import EVENT_BIN_FACTS_DIR
+
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    # the facts' own record changes; the cache, which participation read too,
+    # does not; the held-out event run read these facts
+    path = tmp_path / EVENT_BIN_FACTS_DIR / "manifest.json"
+    manifest = json.loads(path.read_text())
+    if problem == "no session cache":
+        manifest["inputs"].pop("session_cache")
+    else:
+        manifest["inputs"]["session_cache"] = {"sha256": "0" * 64}
+    path.write_text(json.dumps(manifest))
+    _heldout_events_run(tmp_path)
+    note = {
+        "no session cache": "records no session-cache SHA-256",
+        "another session cache": "other well visits than the current",
+    }[problem]
+
+    def refuse(*args):
+        raise AssertionError("panel g was drawn from the facts without their check")
+
+    monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
+    with pytest.raises(ValueError, match=f"{EVENT_BIN_FACTS_DIR}.*{note}") as refused:
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    message = str(refused.value)
+    # what is not current, then the runners to make again, in that order
+    assert "before citing" not in message
+    assert message.endswith(
+        ". Rerun scripts/event_evidence/measure_bin_facts.py, then "
+        "scripts/event_evidence/detect_heldout_events.py."
+    )
+
+
+def test_figure02_refuses_a_heldout_event_run_not_made_from_the_current_bin_facts(
+    offline, tmp_path, monkeypatch
+):
+    """Panel g draws the held-out event run, whose events' start and time sums
+    take their well visits from the per-bin facts: a run that recorded another
+    facts run than the current one is refused, naming the run to make again."""
+    figure02 = _figure_with_one_event_outside(offline, tmp_path, monkeypatch)
+    _heldout_events_run(tmp_path, facts_sha256="0" * 64)
+
+    def refuse(*args):
+        raise AssertionError("panel g was drawn from another facts run's events")
+
+    monkeypatch.setattr(figure02, "restriction_figure_statistics", refuse)
+    with pytest.raises(
+        ValueError, match="made from another bin_facts run than the current one"
+    ) as refused:
+        figure02.generate_figure(epoch_name="e1", data_dir=tmp_path)
+    assert "detect_heldout_events.py" in str(refused.value)
 
 
 def test_figure02_checks_every_event_s_label_against_the_visits(

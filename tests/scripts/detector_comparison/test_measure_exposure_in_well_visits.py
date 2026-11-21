@@ -13,13 +13,16 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.detector_comparison.nonlocal_comparison import (
-    EXPOSURE_IN_VISITS_DIR,
     exposure_in_well_visits,
 )
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     ANALYZED_SUBSET,
 )
-from continuum_swr_replay.paths import event_features_root, inventory_comparison_root
+from continuum_swr_replay.paths import (
+    EXPOSURE_IN_VISITS_DIR,
+    event_features_root,
+    inventory_comparison_root,
+)
 from continuum_swr_replay.runs.io import files_sha256, output_path
 from scripts.detector_comparison import measure_exposure_in_well_visits as script
 from tests.support._session_cache_fixtures import write_session_cache_entries
