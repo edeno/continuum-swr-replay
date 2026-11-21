@@ -116,6 +116,8 @@ class PSplineBasis:
             Each row sums to one.
         """
         clamped = np.clip(np.asarray(x, dtype=float), self.lo, self.hi)
+        if clamped.size == 0:
+            return np.empty((0, self.n_basis))
         return BSpline.design_matrix(
             clamped, self.knots, self.degree, extrapolate=False
         ).toarray()

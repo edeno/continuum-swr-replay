@@ -105,3 +105,9 @@ def test_constrained_smooth_is_the_basis_times_the_constraint() -> None:
     assert design.shape == (200, 9) and penalty.shape == (9, 9)
     np.testing.assert_allclose(design.sum(axis=0), 0.0, atol=1e-10)
     assert penalty_rank(penalty) == 10 - 2
+
+
+def test_no_rows_give_an_empty_design() -> None:
+    """The basis at no rows is an empty design of the basis's width (scipy's
+    design matrix refuses an empty input)."""
+    assert PSplineBasis(0.0, 1.0, 8).design(np.empty(0)).shape == (0, 8)
