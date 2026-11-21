@@ -497,6 +497,90 @@ of them also contains an outcome boundary, while the 2,099 `mixed` stops that do
 contain a boundary begin a median 0.22 s *after* their own arrival and last
 ~0.7 s. A stop whose boundary lies outside it is untouched.
 
+### F.5 The well visit and its clocks
+
+The unit of the analyses is the **well visit**: one port experience, from the
+animal's first nose-poke in at a well (`arrival_time`) to its final poke-out
+there (`departure_time`). A time is inside a visit when
+`arrival_time <= t < departure_time`
+(`analysis/event_definition/well_visits.py:well_visit_index`, the one statement
+of the rule). The animal is immobile in one or more stops during a visit,
+separated by small movements at the well; the last stop of a visit ends with the
+animal leaving. An event belongs to the time when it starts: the analyses read
+the events that start inside a visit (`in_visit` and `spans_visit_end`,
+`analysis.constants.STARTS_IN_WELL_VISIT`), and a stop that crosses the final
+poke-out counts up to it.
+
+**Stop table** (non-local and ContFrag; `event_tables/visit_context.py:stop_visit_columns`):
+
+- `well_visit_id` — the visit that holds the stop's first analyzed sample, for
+  a stop that starts inside a visit (`in_visit`, `spans_visit_end`); missing
+  otherwise.
+- `overlapping_visit_id` — the visit the stop overlaps at all, so a
+  `spans_visit_start` stop (stopped at the well before the first poke-in) is
+  placed too; missing when the stop overlaps no visit. Equal to `well_visit_id`
+  wherever that is set. A stop overlaps at most one visit when the animal moves
+  between wells; a stop that overlaps two (one at the start of an epoch, across
+  the first visits at the two wells of a patch) is placed in the later one.
+- `visit_first_poke_in_s`, `visit_last_poke_out_s` — that visit's first poke-in
+  and final poke-out (absolute session seconds; differences only). Where both
+  exist, `last_well_arrival_time_s` equals `visit_first_poke_in_s`.
+- `in_visit_immobile_s` — seconds of the stop inside the well visits, less
+  excluded time (`analyzed_time.excluded_intervals`); 0.0 for a stop outside
+  every visit. A stop that crosses the final poke-out counts up to it; a stop
+  that starts before the first poke-in counts from it. Summed over a session's
+  stops it is the immobile in-visit time, the rate models' at-risk time before
+  the time inside ongoing events is removed.
+- `visit_stretch_index` — 0, 1, ... for the stops of one visit in time order;
+  missing without a visit.
+- `stop_end_kind` — `"leaves"` for the last stop of its visit (no later stop of
+  the visit starts before its final poke-out), `"small_movement"` for the
+  visit's other stops, `"outside_visit"` for a stop with no visit. No position
+  or speed threshold is used: the visit ends at the final poke-out. How a stop
+  ends is known only afterwards, so it is future-referencing.
+
+**Event table** (non-local and ContFrag, carried to the event × arm and event ×
+patch tables; `event_tables/visit_context.py:event_visit_columns`), for the
+events that start inside a visit and missing for the others:
+
+- `time_since_visit_start_s` — event start minus the visit's first poke-in.
+- `time_until_visit_end_s` — the visit's final poke-out minus the event start;
+  positive for both `in_visit` and `spans_visit_end` events.
+- `time_until_stretch_end_s` — the end of the stop that holds the event,
+  clipped at the final poke-out, minus the event start. It equals
+  `time_until_visit_end_s` only when the visit's last stop runs to the
+  poke-out; when the animal moves at the well and then pokes out, the last
+  stop ends first.
+
+The two times until are future-referencing (they embed when the animal will
+next move or leave): descriptive clocks for the rate and content designs, not
+predictive covariates (`covariate_timing.FUTURE_REFERENCING`).
+
+- `n_visits_arrived` — the port experiences whose first poke-in is at or before
+  the event start, the starting port included: the trial number in the epoch,
+  counted in visits (defined for every event). `completed_trial_id` counts
+  completed trials instead.
+
+**Current arm of an event that crosses the final poke-out.** Its whole-window
+location is `mixed`, so the window gives no current arm; it starts inside a
+visit, so `occupancy_well_arm`, `current_patch` and `is_stay` are those of the
+visit's well (`visit_context.assign_visit_current_arm`), and the event × arm and
+event × patch indicators (`is_current_arm`, `is_same_patch_as_current`,
+`is_current_patch`, the distance and rank, the recency spline and the products)
+follow. `occupancy_well_id` stays the whole-window location (missing). The
+content table contract defines the current arm exactly for the events that start
+inside a visit (`table_contracts.validate_canonical_table_contract`).
+
+**Event × arm table: the sample count** (`behavior/covariates/history/reward_history.py:log1p_known_visit_count_all_events`):
+
+- `log1p_n_known_visits_candidate_arm` — log of one plus the visits to the
+  candidate arm's well earlier in the epoch whose outcome was known at or before
+  the event start (the outcome clock of
+  `reward_fraction_candidate_arm_last10_visits`), the starting port included
+  when its outcome was observed; 0 before the arm's first known visit and on the
+  trunk arms, which are no reward site. It is a drift with the trial number
+  unless `n_visits_arrived` is in the model too.
+
 ## G. Base covariate reference
 
 Definitions for the base (non-interaction) covariates on the canonical tables.
@@ -519,8 +603,9 @@ mean/variance, RPE, relative value, entropy, and choice probability) are in
   with the column True). At the event grain the cohort is the column
   ([design/cohort_and_timing_rules.md](design/cohort_and_timing_rules.md)). `modal_observed_track_segment_id` is
   the modal observed track segment, including trunks.
-  `occupancy_well_arm` is NaN off-well; there is no
-  trunk-to-destination fallback.
+  `occupancy_well_arm` is NaN off-well, except for an event that starts inside a
+  visit and crosses its final poke-out (`spans_visit_end`), which takes the
+  visit's well (F.5); there is no trunk-to-destination fallback.
   9.10 % of events are off-well on the regenerated tables — see
   [`known_issues/current_arm_trunk_fallback.md`](known_issues/current_arm_trunk_fallback.md).
 - `visit_context` / `well_visit_id` / `last_completed_well_visit_id` /
@@ -540,8 +625,9 @@ mean/variance, RPE, relative value, entropy, and choice probability) are in
   order; else within `VISIT_JUNCTION_RADIUS_CM` (10 cm) of a patch junction
   (`track_patch_junction`) or the center (`track_center`); else
   `track_leaf_arm` / `track_trunk_arm` by the observed segment, or
-  `track_no_position`. `well_visit_id` is the `experience_id` of an `in_visit`
-  window's visit (numbered from 0 within the epoch, so it identifies a visit
+  `track_no_position`. `well_visit_id` is the `experience_id` of the visit that
+  holds the window start, for a window that starts inside a visit (`in_visit`,
+  `spans_visit_end`; numbered from 0 within the epoch, so it identifies a visit
   only with the session columns; missing otherwise); `last_completed_well_visit_id` the latest
   visit whose final poke-out is at or before the window start. The two times
   (window start less that poke-out; next poke-in after the window end less the
@@ -558,9 +644,9 @@ mean/variance, RPE, relative value, entropy, and choice probability) are in
   (the destination the animal will run to); used only where a spec includes it, and
   interpreted as forward representation, not a causal predictor.
   `is_current_arm` is **NaN** (not 0) wherever `occupancy_well_arm` is, so any spec
-  containing it is fit on the at-well cohort by complete-case selection. That
-  is the only cohort in which "the current arm" is defined — it is not an
-  optional sensitivity subset. `is_prev_arm` / `is_next_arm` /
+  containing it is fit on the events that start inside a well visit by
+  complete-case selection. That is the only set in which "the current arm" is
+  defined — it is not an optional sensitivity subset. `is_prev_arm` / `is_next_arm` /
   `is_last_rewarded_arm`
   instead encode an absent reference as 0, because "no previous trip" genuinely
   means no arm qualifies.

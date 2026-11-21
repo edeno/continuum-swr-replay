@@ -48,6 +48,17 @@ event ids, and the qvals table joins to them, so they are rebuilt together; a
 partial rebuild mis-joins silently
 ([development.md](development.md#canonical-per-event-classification-table)).
 
+The stop, event, event × arm and event × patch tables (non-local and ContFrag)
+carry the well-visit columns, built from the port experiences of the behavioral
+cache: the stop table's `well_visit_id`, `overlapping_visit_id`,
+`visit_first_poke_in_s`, `visit_last_poke_out_s`, `in_visit_immobile_s`,
+`visit_stretch_index` and `stop_end_kind`; the event table's
+`time_since_visit_start_s`, `time_until_visit_end_s`,
+`time_until_stretch_end_s` and `n_visits_arrived`, carried to the event × arm
+and event × patch tables; and the event × arm table's
+`log1p_n_known_visits_candidate_arm`
+([covariate_dictionary.md](covariate_dictionary.md), F.5).
+
 The canonical tables sit at the root of `replay_content/`, beside their
 standardization references (`standardization_reference.json`,
 `qvals_standardization_reference.json`). They are parquet: read and write them

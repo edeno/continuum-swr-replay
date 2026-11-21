@@ -418,11 +418,10 @@ def stop_visit_columns(
 
     Notes
     -----
-    A stop overlaps at most one visit when the animal moves between wells. One
-    stop of the 242 analyzed epochs overlaps two (a 17 s stop at the start of
-    an epoch, across the first two visits at the two wells of one patch): it is
-    placed in the later one, and its ``in_visit_immobile_s`` counts its seconds
-    in both.
+    A stop overlaps at most one visit when the animal moves between wells. A
+    stop that overlaps two (a stop at the start of an epoch, across the first
+    visits at the two wells of one patch) is placed in the later one, and its
+    ``in_visit_immobile_s`` counts its seconds in both.
     """
     start = np.asarray(stop_start, dtype=float)
     end = np.asarray(stop_end, dtype=float)
