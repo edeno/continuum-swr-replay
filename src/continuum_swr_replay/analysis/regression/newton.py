@@ -104,8 +104,9 @@ def penalized_newton(
     -------
     NewtonFit
         Not converged, without raising, when ``A`` is not positive definite
-        (an unpenalized design the data cannot identify), when no halving of a
-        step lowers ``F``, or after ``max_iter`` steps.
+        (an unpenalized design the data cannot identify) or not finite (a
+        start whose predictions overflow), when no halving of a step lowers
+        ``F``, or after ``max_iter`` steps.
     """
     beta = np.array(beta0, dtype=float)
 
@@ -120,7 +121,7 @@ def penalized_newton(
         A = lik.information(X, eta, y, aux) + S
         try:
             factor = scipy.linalg.cho_factor(A, lower=True)
-        except np.linalg.LinAlgError:
+        except (np.linalg.LinAlgError, ValueError):  # not PD, or not finite
             return NewtonFit(beta, A, False, np.nan, n_iter, loglik)
         step = scipy.linalg.cho_solve(factor, g)
         decrement = 0.5 * float(g @ step)

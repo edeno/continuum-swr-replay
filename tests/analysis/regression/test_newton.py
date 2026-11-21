@@ -178,3 +178,19 @@ def test_stops_unconverged_rather_than_raising() -> None:
     )
     assert not short.converged
     assert short.n_iter == 2
+
+
+def test_a_start_that_overflows_reports_not_converged() -> None:
+    """A start whose expected counts overflow gives an infinite A, not an error."""
+    X = np.array([[1.0], [2.0]])
+    with np.errstate(over="ignore", invalid="ignore"):
+        fit = penalized_newton(
+            Poisson(),
+            X,
+            np.array([1.0, 2.0]),
+            np.zeros(2),
+            np.zeros((1, 1)),
+            np.array([800.0]),
+        )
+    assert not fit.converged
+    assert fit.n_iter == 0
