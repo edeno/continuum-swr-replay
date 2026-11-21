@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from dataclasses import replace
 
 import numpy as np
@@ -1197,3 +1198,120 @@ def test_a_separation_by_a_smooths_line_is_named_as_its_null_space(rho: float) -
         reml.FreeDirection(0, 0, True),
         reml.FreeDirection(None, 0, True),
     }
+
+
+class _Quadratic:
+    """A pooled score given by a formula, for the search alone."""
+
+    labels: dict[int, str] = {}
+
+    def __init__(self, function) -> None:
+        self.function = function
+
+    def __call__(self, rho: np.ndarray, derivatives: bool) -> reml.PooledScore:
+        score, gradient, hessian = self.function(np.asarray(rho, dtype=float))
+        return reml.PooledScore(score, gradient, hessian, ())
+
+
+@pytest.mark.parametrize("weak", [1e-5, 1e-6, 1e-7])
+def test_a_stiff_term_does_not_set_the_floor_of_a_weak_one(weak: float) -> None:
+    """``V = 500 (r1 - 3)^2 + a (r2 - 12)^2`` from (3, 4): the weak term moves
+    as it would alone. With the eigenvalue floor taken over the whole Hessian
+    (1e-3 here), ``a`` of 1e-5 and 1e-6 crawled for 50 steps and raised, and
+    1e-7 stopped at once, eight units short. Curvature 2e-7 is below the
+    floor of 1e-6 that a term alone has too: that term stops where the gain
+    left is within the flat-score rule's reach."""
+
+    def score(r: np.ndarray):
+        value = 5e4 + 500 * (r[0] - 3) ** 2 + weak * (r[1] - 12) ** 2
+        gradient = np.array([1000 * (r[0] - 3), 2 * weak * (r[1] - 12)])
+        return value, gradient, np.diag([1000.0, 2 * weak])
+
+    def alone(r: np.ndarray):
+        value = 5e4 + weak * (r[0] - 12) ** 2
+        return value, np.array([2 * weak * (r[0] - 12)]), np.array([[2 * weak]])
+
+    rho, _, _ = reml._search(_Quadratic(score), np.array([3.0, 4.0]), 0, Counter())
+    single, _, _ = reml._search(_Quadratic(alone), np.array([4.0]), 0, Counter())
+    assert rho[0] == pytest.approx(3.0, abs=1e-9)
+    assert rho[1] == pytest.approx(single[0], abs=1e-6)
+    assert weak * (rho[1] - 12) ** 2 < 1e-7
+
+
+def test_the_search_does_not_stop_where_the_curvature_is_negative() -> None:
+    """``V = 100 - (r - 5)^2 + 0.01 (r - 5)^4`` has a maximum at 5 and minima at
+    ``5 +- sqrt(50)``. Started 1e-5 from the maximum, the decrement (with the
+    curvature made positive) is below the tolerance; the search steps along
+    the negative curvature instead and ends at a minimum."""
+
+    def score(r: np.ndarray):
+        d = r[0] - 5
+        value = 100 - d**2 + 0.01 * d**4
+        return value, np.array([-2 * d + 0.04 * d**3]), np.array([[-2 + 0.12 * d**2]])
+
+    rho, current, _ = reml._search(_Quadratic(score), np.array([5.00001]), 0, Counter())
+    assert abs(rho[0] - 5) == pytest.approx(np.sqrt(50), abs=1e-6)
+    assert current.hessian[0, 0] > 0
+
+
+def test_a_constant_gaussian_outcome_is_named() -> None:
+    """A Gaussian outcome with no variance has no scale to profile: the error
+    says the outcome is constant."""
+    _, data, blocks = _session("gaussian", 1, seed=9)
+    constant = replace(data, y=np.full(data.y.shape, 2.5), name="flat")
+    with pytest.raises(ValueError, match=r"session 0 \(flat\).*outcome is constant"):
+        pooled_reml(Gaussian(), [constant], blocks, [0.0])
+
+
+@pytest.mark.parametrize("rho", [15.0, 17.5, 20.0])
+def test_gradient_and_hessian_at_strong_penalties(rho: float) -> None:
+    """At log penalties 15 to 20 the analytic gradient and Hessian of the
+    two-smooth content score equal Richardson-extrapolated central
+    differences of the score (steps 0.05 and 0.025, warm-started at the
+    fit): the derivatives hold in the eigenbasis where the score is a
+    shallow ``c exp(-rho)``."""
+    data, blocks = _two_smooth_session(3)
+    point = np.array([rho, rho - 2.0])
+    at = _score(GroupedSoftmax(), data, blocks, point)
+    warm = at.fit.beta
+
+    def value(r: np.ndarray) -> float:
+        return reml_and_derivatives(
+            GroupedSoftmax(),
+            data.X,
+            data.y,
+            data.aux,
+            blocks,
+            r,
+            warm,
+            derivatives=False,
+        ).score
+
+    unit = np.eye(2)
+
+    def gradient(h: float) -> np.ndarray:
+        return np.array(
+            [(value(point + h * e) - value(point - h * e)) / (2 * h) for e in unit]
+        )
+
+    def hessian(h: float) -> np.ndarray:
+        return np.array(
+            [
+                [
+                    (
+                        value(point + h * (a + c))
+                        - value(point + h * (a - c))
+                        - value(point - h * (a - c))
+                        + value(point - h * (a + c))
+                    )
+                    / (4 * h * h)
+                    for c in unit
+                ]
+                for a in unit
+            ]
+        )
+
+    numeric_gradient = (4 * gradient(0.025) - gradient(0.05)) / 3
+    numeric_hessian = (4 * hessian(0.025) - hessian(0.05)) / 3
+    np.testing.assert_allclose(at.gradient, numeric_gradient, rtol=1e-4, atol=1e-11)
+    np.testing.assert_allclose(at.hessian, numeric_hessian, rtol=1e-3, atol=1e-10)

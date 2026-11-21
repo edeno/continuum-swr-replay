@@ -819,6 +819,11 @@ def _gaussian_profiled(
     """
     n_rows, n_columns = X.shape
     working = float(np.var(y))
+    if not working > 0:
+        raise ValueError(
+            "the Gaussian outcome is constant (variance zero): it has no scale to "
+            "profile"
+        )
     pls = penalized_newton(
         Gaussian(),
         X,
@@ -1142,12 +1147,29 @@ def _free(rho: np.ndarray, gradient: np.ndarray) -> np.ndarray:
     return ~(((rho <= lo) & (gradient > 0)) | ((rho >= hi) & (gradient < 0)))
 
 
+def _term_scale(hessian: np.ndarray) -> np.ndarray:
+    """Per term, ``sqrt(max(1, |H_jj|))``: the Hessian divided by it on both
+    sides has a diagonal of at most one."""
+    return np.sqrt(np.maximum(1.0, np.abs(np.diag(hessian))))
+
+
 def _newton_step(gradient: np.ndarray, hessian: np.ndarray) -> np.ndarray:
-    """``-H~^-1 g`` with ``H``'s eigenvalues made positive and floored."""
-    eigenvalues, vectors = np.linalg.eigh(hessian)
+    """``-H~^-1 g`` with ``H``'s eigenvalues made positive and floored, each
+    term scaled by its own curvature first.
+
+    With ``D = diag(_term_scale(H))``, the eigenvalues of ``D^-1 H D^-1`` are
+    made positive and floored at ``REML_EIGEN_FLOOR * max(1, max |eig|)``, so
+    that a term of curvature at most one keeps the absolute floor
+    ``REML_EIGEN_FLOOR`` and a stiff term does not set the floor of a weak
+    one (floored over the whole Hessian, a term of curvature 1000 floored a
+    term of curvature 2e-7 at 1e-3, and the search stopped eight units short
+    of that term's optimum).
+    """
+    scale = _term_scale(hessian)
+    eigenvalues, vectors = np.linalg.eigh(hessian / np.outer(scale, scale))
     floor = REML_EIGEN_FLOOR * max(1.0, float(np.max(np.abs(eigenvalues))))
     eigenvalues = np.maximum(np.abs(eigenvalues), floor)
-    return -vectors @ ((vectors.T @ gradient) / eigenvalues)
+    return -(vectors @ ((vectors.T @ (gradient / scale)) / eigenvalues)) / scale
 
 
 def _outer_step(rho: np.ndarray, current: PooledScore) -> np.ndarray:
@@ -1159,6 +1181,31 @@ def _outer_step(rho: np.ndarray, current: PooledScore) -> np.ndarray:
             current.gradient[free], current.hessian[np.ix_(free, free)]
         )
     return step
+
+
+def _downhill_probes(rho: np.ndarray, current: PooledScore) -> list[np.ndarray]:
+    """Steps along the direction of most negative curvature on the free terms,
+    when the Hessian there is not positive semidefinite to rounding; empty
+    otherwise.
+
+    Rounding is ``REML_EIGEN_FLOOR * max(1, max |eig|)`` of the Hessian scaled
+    by :func:`_term_scale`. The probes are one scaled unit along the
+    eigenvector, the downhill sign first.
+    """
+    free = _free(rho, current.gradient)
+    if not free.any():
+        return []
+    hessian = current.hessian[np.ix_(free, free)]
+    scale = _term_scale(hessian)
+    eigenvalues, vectors = np.linalg.eigh(hessian / np.outer(scale, scale))
+    floor = REML_EIGEN_FLOOR * max(1.0, float(np.max(np.abs(eigenvalues))))
+    if eigenvalues[0] >= -floor:
+        return []
+    direction = np.zeros_like(rho)
+    direction[free] = vectors[:, 0] / scale
+    if current.gradient @ direction > 0:
+        direction = -direction
+    return [direction, -direction]
 
 
 def _try_step(
@@ -1199,11 +1246,15 @@ def _search(
 
     Stops when the Newton decrement in the log penalties, ``g' H~^-1 g / 2``
     on the free terms with the floored Hessian ``H~`` (the gain in the score
-    the next step predicts), is below ``REML_DECREMENT_TOL`` or below the
-    rounding of the score, ``8 eps max(1, |V|)`` (a gain no halving can
-    show), then takes that last step when the score does not rise by more
-    than its rounding (as the inner fit does), so ``rho`` is the optimum to
-    rounding.
+    the next step predicts; :func:`_newton_step`), is below
+    ``REML_DECREMENT_TOL`` or below the rounding of the score,
+    ``8 eps max(1, |V|)`` (a gain no halving can show), and the Hessian on the
+    free terms is positive semidefinite to rounding, then takes that last
+    step when the score does not rise by more than its rounding (as the inner
+    fit does), so ``rho`` is the optimum to rounding. Where the decrement is
+    small but the curvature negative (near a maximum or a saddle of the
+    score) it steps along the direction of negative curvature instead
+    (:func:`_downhill_probes`).
 
     On a flat score (the data do not support curvature; the score falls
     toward its limit in the null space as ``c exp(-rho)``) the gradient is
@@ -1231,6 +1282,21 @@ def _search(
         step = _outer_step(rho, current)
         rounding = 8.0 * np.finfo(float).eps * max(1.0, abs(current.score))
         if -0.5 * float(current.gradient @ step) < max(REML_DECREMENT_TOL, rounding):
+            probes = _downhill_probes(rho, current)
+            if probes and n_steps < REML_MAX_STEPS:
+                for probe in probes:
+                    moved = _try_step(evaluate, rho, current, probe, MAX_STEP_HALVINGS)
+                    if not isinstance(moved, str) and moved[1].score < current.score:
+                        break
+                else:
+                    raise ValueError(
+                        "the penalty search did not converge: it stopped where the "
+                        "score's curvature is negative and no step along that "
+                        f"direction lowered it, after {n_steps} steps; log penalties "
+                        f"{rho}, gradient {current.gradient}"
+                    )
+                (rho, current), n_steps = moved, n_steps + 1
+                continue
             moved = _try_step(evaluate, rho, current, step, 1, rounding)
             if not isinstance(moved, str):
                 (rho, current), n_steps = moved, n_steps + 1

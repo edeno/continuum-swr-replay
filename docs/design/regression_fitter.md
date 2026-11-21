@@ -196,11 +196,22 @@ The search (`select_penalties`):
    for more, two passes of one-term integer grids from all terms at 6. The score can
    have two optima, a wiggly one and the straight line, and a search started at one
    point can end at the worse;
-2. Newton on the log strengths from the best grid point, with the Hessian's eigenvalues
-   made positive and floored at `1e-6 * max(1, max|eigenvalue|)`, step halving on the
-   pooled score and the bounds. A log strength at a bound whose gradient points outward
-   is held there;
-3. it stops when the Newton decrement in the log strengths, `g' H^-1 g / 2` on the free
+2. Newton on the log strengths from the best grid point, step halving on the pooled
+   score and the bounds. The Hessian is first scaled by each term's own curvature,
+   `D^-1 H D^-1` with `D_jj = sqrt(max(1, |H_jj|))`, and its eigenvalues are made positive
+   and floored at `1e-6 * max(1, max|eigenvalue|)` there: a term of curvature at most
+   one keeps the absolute floor of `1e-6`, and a stiff term does not set the floor of a
+   weak one. Floored over the unscaled Hessian, a term of curvature 1,000 floored one
+   of curvature 2e-5 or 2e-6 at 1e-3: the weak term crawled for 50 steps and the search
+   raised, and one of 2e-7 was reported converged eight units short of its optimum
+   (now: one step to the optimum, and for 2e-7 the stop of the term alone). A log
+   strength at a bound whose gradient points outward is held there;
+3. it stops only where the unfloored Hessian on the free terms is positive
+   semidefinite to rounding (the same floor, on the scaled Hessian); where the
+   decrement is small but the curvature negative (started 1e-5 from a maximum of the
+   score, it was reported converged at the maximum) it takes a step of one scaled unit
+   along the direction of most negative curvature, downhill first, and goes on. It
+   stops when the Newton decrement in the log strengths, `g' H^-1 g / 2` on the free
    terms with the floored Hessian (the gain in the score the next step predicts, in
    log-likelihood units), is below `1e-8`, then takes one last Newton step if the score
    does not rise by more than its rounding (`8 eps max(1, |score|)`). The rule does not
@@ -306,7 +317,10 @@ the penalty divided by it, the same minimizer), so its decrement does not depend
 outcome's units: for an outcome scaled by 1, 1e3 and 1e6 the curve is the same up to
 the scale and the selected log strength the same to 3e-15 (and at 1e9 too), with every
 grid point finite (before, at 1e6, the inner fit at the four largest strengths stopped at 100
-steps on a decrement of rounding, 5e-8 to 9e-5 in squared units of the outcome).
+steps on a decrement of rounding, 5e-8 to 9e-5 in squared units of the outcome). A
+constant outcome (`var(y) = 0`) has no scale to profile and is refused as such ("the
+Gaussian outcome is constant"), where before it failed as a working scale that is not
+positive.
 
 ## Agreement with mgcv, neurospatial and the current fitters
 
