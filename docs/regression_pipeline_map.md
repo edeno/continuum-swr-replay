@@ -176,7 +176,7 @@ Spike likelihood at decoded and actual positions, over each whole non-local even
 
 Is the non-local activity of rest the activity of sharp-wave ripples? Three decoders that differ only in when the non-local states may be occupied, scored by how well each predicts each bin's spikes.
 
-`bin_categories`, `allowed_states`, `restricted_discrete_transitions`, `continuous_block_deviation`, `filter_identity_deviation`, `smoothed_summary`, `predictive_log_scores`, `heldout_log_likelihood`, `model_scores`, `restriction_scores`, `check_failures`, `em_settings`, `fresh_detector`, `em_record`, `fit_fold_detector`, `fold_log_likelihood`, `check_place_grid`, `fold_fit_scores`, `fold_check_failures`, `restriction_sums`, `restriction_contrasts`, `share_outside_swr`
+`bin_categories`, `allowed_states`, `restricted_discrete_transitions`, `continuous_block_deviation`, `filter_identity_deviation`, `smoothed_summary`, `predictive_log_scores`, `model_scores`, `check_failures`, `em_settings`, `fresh_detector`, `em_record`, `fit_fold_detector`, `fold_log_likelihood`, `check_place_grid`, `fold_fit_scores`, `fold_check_failures`, `restriction_sums`, `restriction_contrasts`, `share_outside_swr`
 
 ### `src/continuum_swr_replay/analysis/event_evidence/participation.py`
 
