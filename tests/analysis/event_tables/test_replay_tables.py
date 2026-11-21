@@ -481,8 +481,10 @@ def test_value_block_predictors_resolve_and_populate(tiny_session):
     contingency join (build_event_arm_table(contingency=...)) producing values
     rather than silently staying NaN.
     """
-    from continuum_swr_replay.analysis.replay_models.model_specs import (
+    from continuum_swr_replay.analysis.behavior.design_constants import (
         ARM_FE_PREDICTORS,
+    )
+    from continuum_swr_replay.analysis.replay_models.model_specs import (
         MODEL_HIERARCHY,
         MODEL_PATCH,
     )
@@ -1577,7 +1579,7 @@ class TestMutationSurvivorGuards:
         from continuum_swr_replay.analysis.behavior.covariates import (
             reward_history_basis_features,
         )
-        from continuum_swr_replay.analysis.replay_models.model_specs import (
+        from continuum_swr_replay.analysis.behavior.design_constants import (
             REWARD_HISTORY_COLUMNS,
             REWARD_HISTORY_INCOMPLETE,
         )

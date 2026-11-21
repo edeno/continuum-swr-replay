@@ -59,6 +59,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_INCOMPLETE,
+)
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     require_swr_source,
 )
@@ -73,8 +77,6 @@ from continuum_swr_replay.analysis.replay_models.covariate_timing import (
 )
 from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_PER_STOP_RATE,
-    REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_INCOMPLETE,
 )
 from continuum_swr_replay.analysis.replay_models.rate.per_stop_rate_model import (
     PER_STOP_RATE_OUTCOMES,

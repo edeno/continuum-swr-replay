@@ -34,13 +34,15 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    ARM_FE_PREDICTORS,
+)
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS, WELL_ARMS
 
 from ...behavior.covariates import center_visit_recency_within_event
 from ...behavior.covariates.interactions import interaction_product
 from ...behavior.spatial_mapping import map_estimate_to_arm
 from ...event_tables.summaries import arm_count_hard as _arm_count_hard_fn
-from ..model_specs import ARM_FE_PREDICTORS
 
 DEFAULT_PREDICTORS: tuple[str, ...] = (
     "is_current_arm",

@@ -12,6 +12,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    RATE_BIN_S,
+    TMAX,
+)
 from continuum_swr_replay.analysis.event_definition.analyzed_time import (
     excluded_intervals_by_session,
 )
@@ -20,8 +24,6 @@ from continuum_swr_replay.analysis.event_definition.cohort_selection import (
 )
 from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_PER_BIN_RATE,
-    RATE_BIN_S,
-    TMAX,
     longest_history_window_s,
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import (

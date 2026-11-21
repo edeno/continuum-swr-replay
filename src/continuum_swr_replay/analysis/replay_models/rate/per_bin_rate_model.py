@@ -41,6 +41,11 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    ARRIVAL_CLOCK_COLUMN,
+    REWARD_HISTORY_COLUMNS,
+    TMAX_ARRIVAL,
+)
 from continuum_swr_replay.tables.columns import require_columns
 
 from .._fit_diagnostics import (
@@ -52,9 +57,6 @@ from .._fit_diagnostics import (
     fold_flag_counts,
 )
 from ..model_specs import (
-    ARRIVAL_CLOCK_COLUMN,
-    REWARD_HISTORY_COLUMNS,
-    TMAX_ARRIVAL,
     PerBinRateModelSpec,
 )
 

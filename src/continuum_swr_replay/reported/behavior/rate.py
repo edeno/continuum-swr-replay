@@ -15,6 +15,12 @@ from collections.abc import Callable, Mapping
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    RATE_BIN_S,
+    REWARD_HISTORY_COLUMNS,
+    REWARD_HISTORY_N_LAGS,
+    TMAX_ARRIVAL,
+)
 from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     aic_difference_statistics,
     audited_drop_statistics,
@@ -30,10 +36,6 @@ from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
 )
 from continuum_swr_replay.analysis.replay_models.model_specs import (
     PER_BIN_HISTORY_COLUMNS,
-    RATE_BIN_S,
-    REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_N_LAGS,
-    TMAX_ARRIVAL,
 )
 from continuum_swr_replay.analysis.replay_models.rate import (
     rate_fit_statistics,

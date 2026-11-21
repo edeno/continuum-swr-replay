@@ -25,10 +25,12 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    RATE_BIN_S,
+)
 from continuum_swr_replay.analysis.replay_models.coefficient_statistics import (
     group_range,
 )
-from continuum_swr_replay.analysis.replay_models.model_specs import RATE_BIN_S
 
 HISTORY_MIN_SUPPORT = 3.0
 """A kernel's lag is read when it has at least this many expected onsets ..."""

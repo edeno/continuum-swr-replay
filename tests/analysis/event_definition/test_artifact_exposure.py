@@ -26,14 +26,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    N_HISTORY_LAGS,
+    RATE_BIN_S,
+)
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
 from continuum_swr_replay.analysis.event_definition import analyzed_time, swr_source
 from continuum_swr_replay.analysis.event_tables.stop_table import build_stop_table
 from continuum_swr_replay.analysis.pfc.event_sets import build_session_fit_mask
 from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_PER_BIN_RATE,
-    N_HISTORY_LAGS,
-    RATE_BIN_S,
     SWR_CONTRAST_RATE_G_SPECS,
     SWR_CONTRAST_RATE_S_SPECS,
     longest_history_window_s,

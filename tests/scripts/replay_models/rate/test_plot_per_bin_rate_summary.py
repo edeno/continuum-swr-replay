@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.replay_models.model_specs import (
+from continuum_swr_replay.analysis.behavior.design_constants import (
     REWARD_HISTORY_COLUMNS,
 )
 from scripts.replay_models.rate import plot_per_bin_rate_summary as mod

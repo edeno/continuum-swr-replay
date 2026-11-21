@@ -16,10 +16,12 @@ import pandas as pd
 import pytest
 from threadpoolctl import threadpool_limits
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    TMAX_ARRIVAL,
+)
 from continuum_swr_replay.analysis.replay_models.model_specs import (
     MODEL_PER_BIN_RATE,
     PER_BIN_DESIGN,
-    TMAX_ARRIVAL,
 )
 from continuum_swr_replay.analysis.replay_models.per_bin_design import POPULATIONS
 from continuum_swr_replay.analysis.replay_models.rate import (

@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.behavior import design_constants
 from continuum_swr_replay.analysis.behavior.history_basis import (
     raised_cosine_history_basis,
 )
@@ -205,7 +206,7 @@ def test_duration_aware_rungs_add_the_offset_blocks():
     ladder = model_specs.MODEL_CROSS_HISTORY_DURATION_RATE
     dur_self, dur_cross = ladder["Mself_dur"], ladder["Mselfcross_dur"]
     m_self, m_cross = model_specs.MODEL_CROSS_HISTORY_RATE.values()
-    nb = model_specs.N_HISTORY_BASIS
+    nb = design_constants.N_HISTORY_BASIS
     on = [f"hist_rcos_{k}" for k in range(nb)]
     off = [f"offhist_rcos_{k}" for k in range(nb)]
     cross_on = [f"cross_hist_rcos_{k}" for k in range(nb)]
@@ -303,11 +304,11 @@ def _simulated_design(n_stops: int = 300) -> pd.DataFrame:
     return aggregate_to_timebins(
         stops,
         events[events["stream"] == "no_swr"],
-        bin_s=model_specs.RATE_BIN_S,
-        tmax=model_specs.TMAX,
+        bin_s=design_constants.RATE_BIN_S,
+        tmax=design_constants.TMAX,
         reward_basis=True,
-        self_history_lags=model_specs.N_HISTORY_LAGS,
-        self_history_basis=model_specs.N_HISTORY_BASIS,
+        self_history_lags=design_constants.N_HISTORY_LAGS,
+        self_history_basis=design_constants.N_HISTORY_BASIS,
         excluded_intervals=NO_EXCLUDED_TIME,
         arrival_clocks=False,
         outcome_shift=False,
@@ -370,7 +371,7 @@ def test_history_kernels_weight_the_bumps_by_each_block_coefficients():
         history_kernels,
     )
 
-    n_lags, n_basis = model_specs.N_HISTORY_LAGS, model_specs.N_HISTORY_BASIS
+    n_lags, n_basis = design_constants.N_HISTORY_LAGS, design_constants.N_HISTORY_BASIS
     basis = raised_cosine_history_basis(n_lags, n_basis)  # (n_basis, n_lags)
     fit = {f"coef_hist_rcos_{k}": float(k == 1) for k in range(n_basis)}
     fit |= {f"coef_offhist_rcos_{k}": 2.0 for k in range(n_basis)}
@@ -384,7 +385,7 @@ def test_history_kernels_weight_the_bumps_by_each_block_coefficients():
 
 def _lag_design() -> pd.DataFrame:
     """Four bins, two onsets in 0.06 s; onset-lag columns marked by hand."""
-    n_lags = model_specs.N_HISTORY_LAGS
+    n_lags = design_constants.N_HISTORY_LAGS
     design = pd.DataFrame(
         {"count": [1, 0, 1, 0], "exposure": [0.015, 0.015, 0.01, 0.02]}
     )
@@ -405,7 +406,7 @@ def test_lag_support_is_the_mean_rate_times_the_exposure_at_each_lag():
     support = lag_support(_lag_design())
     assert set(support) == {"self_onset", "self_offset"}
     rate = 2 / 0.06
-    expected = np.zeros(model_specs.N_HISTORY_LAGS)
+    expected = np.zeros(design_constants.N_HISTORY_LAGS)
     expected[0], expected[1] = rate * 0.035, rate * 0.01
     np.testing.assert_allclose(support["self_onset"], expected)
     assert support["self_offset"][2] == pytest.approx(2.0)  # rate x all exposure
@@ -418,7 +419,7 @@ def test_onset_offset_collinearity_is_one_for_shifted_copies_and_lower_otherwise
     )
 
     rng = np.random.default_rng(0)
-    n_basis = model_specs.N_HISTORY_BASIS
+    n_basis = design_constants.N_HISTORY_BASIS
     onset = rng.normal(size=(200, n_basis))
     onset[:20] = 0.0  # bins with no history in either block are left out
     same = pd.DataFrame(

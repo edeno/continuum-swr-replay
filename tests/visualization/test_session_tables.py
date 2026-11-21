@@ -1151,7 +1151,7 @@ class TestPatchPanels:
 class TestStopGrainPanels:
     @staticmethod
     def _stop_table(n_stops: int = 2) -> pd.DataFrame:
-        from continuum_swr_replay.analysis.replay_models.model_specs import (
+        from continuum_swr_replay.analysis.behavior.design_constants import (
             N_REWARD_LAGS,
         )
 

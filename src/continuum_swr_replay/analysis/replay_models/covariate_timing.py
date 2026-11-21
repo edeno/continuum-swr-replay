@@ -31,6 +31,10 @@ test asserts every ladder predictor resolves into :data:`KNOWN_ATOMS`.
 
 from __future__ import annotations
 
+from continuum_swr_replay.analysis.behavior.design_constants import (
+    N_REWARD_LAGS,
+)
+
 from ..behavior.covariates.definitions import (
     ABSOLUTE_SECONDS_UNITS,
     COVARIATE_DEFINITIONS,
@@ -42,7 +46,6 @@ from ..behavior.covariates.interactions import (
     UNFITTED_PRODUCTS,
     factor_source,
 )
-from .model_specs import N_REWARD_LAGS
 
 # Timing classification is derived from the scientific definition catalog so a
 # rename or new fitted atom cannot acquire a second, contradictory hand-written
