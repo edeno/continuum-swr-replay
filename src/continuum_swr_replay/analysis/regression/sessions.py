@@ -54,7 +54,7 @@ import numpy as np
 import pandas as pd
 
 from .collinearity import term_collinearity
-from .likelihoods import Bernoulli, Gaussian, GroupedSoftmax, Likelihood, Poisson
+from .likelihoods import Bernoulli, GroupedSoftmax, Likelihood, Poisson
 from .newton import CONVERGED, NO_FINITE_MAXIMUM, NOT_IDENTIFIED
 from .record import FitRecord
 from .reml import (
@@ -75,13 +75,6 @@ SessionKey = tuple[str, str, str]
 #: The status of a session left without a fit before any fit: no rows, or no
 #: events of the kind, are left.
 NOT_FITTED = "not fitted"
-
-_NAMES = {
-    Poisson: "poisson",
-    Bernoulli: "bernoulli",
-    Gaussian: "gaussian",
-    GroupedSoftmax: "grouped_softmax",
-}
 
 # Why a row of a session is not in its fit (0: it is).
 _KEPT, _MISSING, _LEVEL, _NO_RESPONSE, _EMPTIED = 0, 1, 2, 3, 4
@@ -366,6 +359,16 @@ def _holds_event(lik: Likelihood, y: np.ndarray) -> np.ndarray:
     return np.ones(y.size, dtype=bool)
 
 
+def _n_events(lik: Likelihood, y: np.ndarray, unit: np.ndarray) -> float:
+    """The events in the rows: the count total (Poisson, Bernoulli), the
+    units (grouped softmax), the rows (Gaussian)."""
+    if isinstance(lik, Poisson | Bernoulli):
+        return float(y.sum())
+    if isinstance(lik, GroupedSoftmax):
+        return float(np.unique(unit).size)
+    return float(y.size)
+
+
 def _edf(
     design: Design, fit: RemlScore, block_terms: list[str], active: np.ndarray
 ) -> dict[str, float]:
@@ -404,20 +407,47 @@ def _fit_session(
     while True:
         why = session.judge()
         if why:
-            return _not_fitted(session, identity, why)
+            return _record(session, identity, why)
         refit = session.fit(first)
         first = False
         if refit.reason == ALONG_THE_INTERCEPT:
-            return _not_fitted(session, identity, refit.reason)
+            return _record(session, identity, refit.reason)
         if not session.apply(refit):
-            return _record(session, identity, refit)
+            return _record(session, identity, session.fit_reason, refit)
 
 
-def _not_fitted(session: _Session, identity: _Identity, reason: str) -> FitRecord:
-    """The record of a session left without a fit before any fit."""
+def _record(
+    session: _Session,
+    identity: _Identity,
+    reason: str,
+    refit: SessionRefit | None = None,
+) -> FitRecord:
+    """The session's :class:`.record.FitRecord`: of its last fit, or, with no
+    ``refit``, of a session left without a fit before any fit."""
     design = session.design
-    p = len(design.coef_names)
     kept = session.kept
+    p = len(design.coef_names)
+    beta, vcov = np.full(p, np.nan), np.full((p, p), np.nan)
+    collinearity, edf = {}, {}
+    status, decrement, n_iter, n_events = NOT_FITTED, float("nan"), 0, 0.0
+    if refit is not None:
+        data, block_terms = session.fitted_with
+        last = refit.refits[-1]
+        status = str(last.fit.status)
+        decrement, n_iter = float(last.fit.newton_decrement), int(last.fit.n_iter)
+        n_events = _n_events(session.lik, data.y, session.unit[kept])
+        if refit.fitted:
+            beta, vcov = last.fit.beta, last.covariance
+            collinearity = term_collinearity(
+                session.lik,
+                data.X,
+                data.y,
+                data.aux,
+                beta,
+                design.term_columns,
+                intercept=design.intercept_column,
+            )
+            edf = _edf(design, last, block_terms, np.isfinite(beta))
     animal, session_date, epoch = identity.key
     return FitRecord(
         model=identity.model,
@@ -425,66 +455,9 @@ def _not_fitted(session: _Session, identity: _Identity, reason: str) -> FitRecor
         animal=animal,
         session_date=session_date,
         epoch=epoch,
-        likelihood=_NAMES[type(session.lik)],
+        likelihood=session.lik.name,
         n_rows=int(kept.sum()),
         n_units=int(np.unique(session.unit[kept]).size),
-        n_events=0.0,
-        cohort_counts=session.cohort_counts(),
-        coef_names=list(design.coef_names),
-        coef=[float("nan")] * p,
-        vcov=np.full((p, p), np.nan).tolist(),
-        log_penalty=design.log_penalty_record(),
-        edf={},
-        status=NOT_FITTED,
-        newton_decrement=float("nan"),
-        n_iter=0,
-        left_out=session.left_out(),
-        support={c: s._asdict() for c, s in session.recorded_support().items()},
-        collinearity={},
-        basis=design.basis_record(),
-        standardization=design.standardization_record(),
-        table_sha256=dict(identity.table_sha256),
-        fit_reason=reason,
-    )
-
-
-def _record(session: _Session, identity: _Identity, refit: SessionRefit) -> FitRecord:
-    """The session's :class:`.record.FitRecord`."""
-    design = session.design
-    data, block_terms = session.fitted_with
-    last, fitted = refit.refits[-1], refit.fitted
-    p = len(design.coef_names)
-    beta = last.fit.beta if fitted else np.full(p, np.nan)
-    vcov = last.covariance if fitted else np.full((p, p), np.nan)
-    active = np.isfinite(beta)
-    collinearity, edf = {}, {}
-    if fitted:
-        collinearity = term_collinearity(
-            session.lik,
-            data.X,
-            data.y,
-            data.aux,
-            beta,
-            design.term_columns,
-            intercept=design.intercept_column,
-        )
-        edf = _edf(design, last, block_terms, active)
-    if isinstance(session.lik, Poisson | Bernoulli):
-        n_events = float(data.y.sum())
-    elif isinstance(session.lik, GroupedSoftmax):
-        n_events = float(np.unique(session.unit[session.kept]).size)
-    else:
-        n_events = float(data.y.size)
-    animal, session_date, epoch = identity.key
-    return FitRecord(
-        model=identity.model,
-        kind=identity.kind,
-        animal=animal,
-        session_date=session_date,
-        epoch=epoch,
-        likelihood=_NAMES[type(session.lik)],
-        n_rows=int(data.y.size),
-        n_units=int(np.unique(session.unit[session.kept]).size),
         n_events=n_events,
         cohort_counts=session.cohort_counts(),
         coef_names=list(design.coef_names),
@@ -492,16 +465,16 @@ def _record(session: _Session, identity: _Identity, refit: SessionRefit) -> FitR
         vcov=vcov.tolist(),
         log_penalty=design.log_penalty_record(),
         edf=edf,
-        status=str(last.fit.status),
-        newton_decrement=float(last.fit.newton_decrement),
-        n_iter=int(last.fit.n_iter),
+        status=status,
+        newton_decrement=decrement,
+        n_iter=n_iter,
         left_out=session.left_out(),
         support={c: s._asdict() for c, s in session.recorded_support().items()},
         collinearity=collinearity,
         basis=design.basis_record(),
         standardization=design.standardization_record(),
         table_sha256=dict(identity.table_sha256),
-        fit_reason=session.fit_reason,
+        fit_reason=reason,
     )
 
 
