@@ -372,7 +372,7 @@ class SessionFit:
     in_penalty_choice : bool
         True when the session's score was part of the pooled score that chose
         the penalties; False for a session set aside before the search and
-        fitted afterwards at the chosen penalties (``PenaltySearch.set_aside``).
+        fitted afterward at the chosen penalties (``PenaltySearch.set_aside``).
     """
 
     fit: NewtonFit
@@ -514,7 +514,7 @@ class PooledFit:
         Its gradient there; None when the strengths were given.
     sessions : tuple of SessionFit
         One per session given, in order. A session set aside by the search
-        (``search.set_aside``) and fitted afterwards has its fit at ``rho``
+        (``search.set_aside``) and fitted afterward has its fit at ``rho``
         with ``in_penalty_choice`` False (NaN at the columns its refit left
         out); one not fitted has NaN coefficients, covariance, edf and score,
         and ``fit.status`` says how its last fit ended.
