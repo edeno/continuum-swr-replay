@@ -387,6 +387,9 @@ A model is a list of terms (`terms.py`) and, for the diagonal families, an inter
 - `LinearFunctional(lag_columns, lags, lo, hi, n_basis, penalty)`: a smooth curve over
   log lag; column `b` is `sum_l B_b(log l) r_l`. It has no sum-to-zero constraint.
 - `Category(column, levels, reference)`: one 0/1 column for each level but the reference.
+  The reference level must have rows in every session; a session without them is not
+  identified, and its first fit is an error that names the session and the coefficients
+  involved.
 - `Slope(column, by=None, levels=None)`: one column, or one for each level of a category.
 - `Offset(column)`: the Poisson offset, `log` of an exposure column.
 

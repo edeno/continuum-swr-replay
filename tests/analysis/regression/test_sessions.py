@@ -413,3 +413,30 @@ def test_a_column_too_small_in_one_session_fails_its_support(content_sessions) -
     assert last.left_out == {"reward_fraction:role=previous": "support"}
     entry = last.support["reward_fraction:role=previous"]
     assert not entry["passes"] and "SMALLEST_COLUMN_SIZE" in entry["reason"]
+
+
+def test_a_session_without_reference_rows_names_the_session_and_columns(
+    rate_sessions,
+) -> None:
+    """A session with no rows of a category's reference level: the intercept
+    and the levels' columns are collinear, and the error names the session and
+    those coefficients (the reference level must have rows in every
+    session)."""
+    frames = list(rate_sessions.values())
+    keys = list(rate_sessions)
+    level = {0: "a", 1: "b", 2: "c"}
+    sessions = {}
+    for key, rows in zip(keys[:3], frames[:3], strict=True):
+        visit = rows["well_visit_id"]
+        sessions[key] = rows.assign(grp=(visit % 3).map(level))
+    first = sessions[keys[0]]
+    sessions[keys[0]] = first.assign(grp=np.where(first["well_visit_id"] % 2, "b", "c"))
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    grp = Category("grp", ("a", "b", "c"), reference="a")
+    design = build_design([grp, Slope("x"), Offset("exposure")], pooled, intercept=True)
+    message = (
+        r"session sim/20260000/02_r1: at its first fit its design is not identified"
+        r".*\(Intercept\), grp\[b\], grp\[c\]"
+    )
+    with pytest.raises(ValueError, match=message):
+        _fit(design, sessions, Poisson(), response="count", unit="well_visit_id")

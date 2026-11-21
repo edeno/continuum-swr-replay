@@ -247,8 +247,9 @@ def fit_session(
         start = refit.refits[0].fit.status
         if first and start not in (CONVERGED, NO_FINITE_MAXIMUM):
             what = (
-                "its design is not identified (mark the columns it cannot estimate "
-                "inactive)"
+                "its design is not identified, in the coefficients "
+                + _named(design, blocks, block_terms, refit.refits[0])
+                + " (a category's reference level must have rows in every session)"
                 if start == NOT_IDENTIFIED
                 else f"its fit ended as {start}, a numerical failure"
             )
@@ -341,6 +342,23 @@ def _not_fitted(
         table_sha256=dict(table_sha256),
         fit_reason=reason,
     )
+
+
+def _named(
+    design: Design,
+    blocks: list[PenaltyBlock],
+    block_terms: list[str],
+    score: RemlScore,
+) -> str:
+    """The coefficients a design not identified involves, by name: a design
+    column by its coefficient, a smooth's coordinate by its term."""
+    names = []
+    for direction in score.unidentified_directions:
+        if direction.block is None:
+            names.append(design.coef_names[direction.index])
+        else:
+            names.append(f"{block_terms[direction.block]} ({direction})")
+    return ", ".join(dict.fromkeys(names))
 
 
 def _columns_of(design: Design, name: str) -> list[str]:

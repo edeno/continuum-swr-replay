@@ -12,7 +12,10 @@ A model is a list of terms and, for the diagonal families, an intercept:
   and the same required ``penalty``.
 - :class:`Category`: one 0/1 column for each level but the reference. A
   missing value (None or NaN) makes its row missing; any other value outside
-  the levels is an error.
+  the levels is an error. The reference level must have rows in every
+  session: without them the intercept (or, under the grouped softmax, the
+  other levels) and the levels' columns are collinear, and the session's
+  first fit is an error naming them.
 - :class:`Slope`: one column, or one for each level of a category.
 - :class:`Offset`: ``log`` of a column (an exposure), the Poisson offset.
 
