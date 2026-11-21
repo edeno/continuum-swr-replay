@@ -151,12 +151,18 @@ Work that is deferred on purpose. Each item says when it should be done.
 The review of the restriction and held-out tetrode runs before the
 `swr-restricted-models` merge left these on purpose.
 
-- [ ] **Which trials make the folds.** Both GPU runners make their folds from the
-  trials `load_data` returns (the DIO parse); the session cache's trials
-  (`replay_content/_session_cache/<epoch>.pkl`) can differ from them and give other
-  folds. Each epoch's record now keeps the digest of the trials it used
-  (`epoch_inputs["trials"]`), but nothing compares it on a resume.
-  *When:* decide which trials are canonical before any rerun of either runner.
+- [ ] **Old session-cache files hold other trials.** Both GPU runners make their
+  folds from the trials `load_data` returns (the DIO parse). The current session
+  cache (`replay_content/_session_cache/comrie_photogate_trials_v4/`) is a saved
+  copy of the same trials: folds made from it equal the stored folds of the
+  restriction run in every epoch (checked 2026-11-21). The files of older cache
+  contracts beside it (the `.pkl` files directly under `_session_cache/` and
+  `comrie_photogate_trials_v3/`) hold trials from before the photogate reparse; a
+  review read one of them and took it for the current cache. Each epoch's record now
+  keeps the digest of the trials it used (`epoch_inputs["trials"]`), but nothing
+  compares it on a resume.
+  *When:* delete the old cache files when the lead agrees; compare the digest on a
+  resume if the runners are rerun.
 - [ ] **The participation run's record names a staging folder.**
   `event_participation/manifest.json` records the paths of its event table and session
   cache under a staging root that held links to the real files (the run of 2026-11-21
@@ -175,11 +181,11 @@ The review of the restriction and held-out tetrode runs before the
   the held-out tetrode run's; the restriction run records no spike count, so the facts'
   spikes elsewhere (the time sums, the held-out events) are not checked.
   *When:* if the restriction run is changed to record its spike counts.
-- [ ] **Figure 2 draws panel g when the summary marks its values pending.** The figure
-  refuses panel g for another restriction run, per-bin facts run or session cache, but
-  not when only the event table changed (the held-out event run's canonical check), nor
-  for the restriction run's decodes or SWR source, while the events summary marks the
-  values pending in both cases.
+- [ ] **Figure 2 draws panel g when only the event table changed.** The figure
+  refuses panel g for another restriction run, per-bin facts run or session cache, and
+  for a restriction run made from other decode frames or another SWR source
+  (`restriction_inputs_note`), but not when only the event table changed (the held-out
+  event run's canonical check), while the events summary marks the values pending.
   *When:* when Figure 2's checks are next changed.
 - [ ] **The supplementary held-out tetrode figure checks no staleness.**
   `scripts/figures/generate_supp_heldout_tetrode.py` refuses a run not on folds of whole

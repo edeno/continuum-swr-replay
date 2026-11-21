@@ -219,7 +219,10 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.reported.events import read_heldout_restriction
+from continuum_swr_replay.reported.events import (
+    read_heldout_restriction,
+    restriction_input_staleness,
+)
 from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.runs.io import (
     ok_epochs,
@@ -1130,14 +1133,29 @@ GAIN_FLOOR = 0.13
 """Panel g: each axis' floor below zero, as a share of its top."""
 PANEL_G_RERUN = "scripts/event_evidence/detect_heldout_events.py"
 BIN_FACTS_RERUN = "scripts/event_evidence/measure_bin_facts.py"
+RESTRICTION_RERUN = "scripts/event_evidence/score_nonlocal_restriction.py"
 """The runners to make again when panel g refuses its inputs."""
+
+
+def restriction_inputs_note(restriction_dir: Path, epochs: Sequence[str]) -> str | None:
+    """Why the restriction run was not made from the current decode frames and
+    SWR source, or None: the events summary's check
+    (``reported.events.restriction_input_staleness``), with the decode frames
+    the event features run records, as :func:`checked_reference` takes them."""
+    features = read_manifest(event_features_root() / EVENT_FEATURES_RUN)["epochs"]
+    return restriction_input_staleness(
+        read_output_manifest(restriction_dir),
+        {e: record.get("decode", {}).get("sha256") for e, record in features.items()},
+        epochs,
+        f"the restriction run ({restriction_dir})",
+    )
 
 
 def panel_g_refusal(reason: str, rerun: str) -> str:
     """Why panel g is not drawn: what is not current (the events summary's
     ``reason``, without its closing advice to rerun before citing) and the
     runners to make again (``rerun``)."""
-    cause = reason.removesuffix("; rerun it before citing")
+    cause = reason.split("; rerun ")[0]
     return f"panel g is not drawn: {cause}. Rerun {rerun}."
 
 
@@ -1335,14 +1353,26 @@ def draw_triggered(axes: Sequence[Axes], curves: dict, rest: pd.DataFrame) -> No
         )  # fmt: skip
     for ax in axes[:-1]:
         ax.tick_params(labelbottom=False)
-    handles, labels = ax_rip.get_legend_handles_labels()
-    handles.append(plt.Line2D([], [], color=C_REFERENCE, ls="--", lw=0.6))
-    labels.append("between events")
-    ax_rip.legend(
-        handles, labels, frameon=False, loc="lower center", ncol=2,
-        bbox_to_anchor=(0.5, 1.0), handlelength=0.8, handletextpad=0.4,
-        columnspacing=0.6, borderaxespad=0.1,
+    # two centered rows, each narrower than the axes, so the legend stays clear
+    # of the row's panel letters: the dashed line just above the axes, the two
+    # event classes above it
+    style = {
+        "frameon": False, "loc": "lower center", "handlelength": 0.8,
+        "handletextpad": 0.4, "columnspacing": 0.8, "borderaxespad": 0.1,
+        "borderpad": 0.0,
+    }  # fmt: skip
+    reference = ax_rip.legend(
+        [plt.Line2D([], [], color=C_REFERENCE, ls="--", lw=0.6)],
+        ["between events"], bbox_to_anchor=(0.5, 1.0), **style,
     )  # fmt: skip
+    row = 1.3 * reference.get_texts()[0].get_fontsize() / 72  # one row, inches
+    axes_height = ax_rip.get_position().height * ax_rip.figure.get_figheight()
+    handles, labels = ax_rip.get_legend_handles_labels()
+    ax_rip.legend(
+        handles, labels, ncol=2, bbox_to_anchor=(0.5, 1.0 + row / axes_height),
+        **style,
+    )  # fmt: skip
+    ax_rip.add_artist(reference)
     ax_speed.set_xlabel("Time from event start (ms)")
 
 
@@ -1640,8 +1670,9 @@ def generate_figure(
     # steps and subset; panel g draws the fold fit on whole trials, and only
     # from a held-out event run made from the restriction run and the per-bin
     # facts run as they are now, with facts made from the current session
-    # cache: content of another design, decoder run or visits is refused, not
-    # drawn (the event-table reason is the summary's alone)
+    # cache, and from a restriction run made from the current decode frames
+    # and SWR source: content of another design, decoder run, decode or visits
+    # is refused, not drawn (the event-table reason is the summary's alone)
     heldout = read_heldout_restriction(
         data_dir / EVENT_NONLOCAL_RESTRICTION_HELDOUT_EVENTS_DIR,
         data_dir / EVENT_NONLOCAL_RESTRICTION_DIR,
@@ -1649,7 +1680,11 @@ def generate_figure(
         event_epochs,
         sha256_file(_event_table_path(data_dir)),
     )
+    restriction_inputs = restriction_inputs_note(
+        data_dir / EVENT_NONLOCAL_RESTRICTION_DIR, event_epochs
+    )
     for reason, rerun in (
+        (restriction_inputs, f"{RESTRICTION_RERUN} and the runs made from it"),
         (heldout.restriction_run, PANEL_G_RERUN),
         (heldout.bin_facts_run, PANEL_G_RERUN),
         (heldout.session_cache, f"{BIN_FACTS_RERUN}, then {PANEL_G_RERUN}"),
