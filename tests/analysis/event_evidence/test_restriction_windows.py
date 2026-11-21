@@ -200,12 +200,14 @@ def test_statistics_are_the_per_animal_median_of_epoch_medians_and_their_mean():
     assert row["estimate"] == pytest.approx(11.5)
     assert row["ci_low"] <= row["estimate"] <= row["ci_high"]
     assert row["n_events"] == 6 and row["n_scored"] == 6 and row["n_animals"] == 2
+    assert row["n_animals_positive"] == 2
     two_sided = key.loc[("two_sided", "full_minus_swr", "per_s", "event", "no SWR")]
     assert two_sided["estimate"] == pytest.approx(23.0)
     control = key.loc[("filter", "full_minus_swr", "per_spike", "control", "no SWR")]
     assert control["estimate"] == pytest.approx(1.0) and control["n_events"] == 3
     null = key.loc[("filter", "swr_minus_none", "per_s", "event", "SWR")]
     assert null["estimate"] == pytest.approx(0.0)
+    assert null["n_animals_positive"] == 0
 
 
 def test_statistics_leave_out_and_count_windows_with_excluded_bins():

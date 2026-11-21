@@ -273,7 +273,8 @@ def restriction_window_statistics(
         One row per family, contrast, unit, kind and group: those keys,
         ``estimate``, ``ci_low``, ``ci_high``, ``animals`` (the animals'
         values), ``animal_names``, ``n_events`` (windows), ``n_scored``
-        (windows with a value) and ``n_animals``.
+        (windows with a value), ``n_animals`` and ``n_animals_positive``
+        (animals whose value is above zero).
     """
     scored = window_contrasts(windows)
     parts = []
@@ -291,5 +292,6 @@ def restriction_window_statistics(
                         )
                     )
     table = pd.concat(parts, ignore_index=True)
+    table["n_animals_positive"] = [int((a > 0).sum()) for a in table["animals"]]
     keys = ["family", "contrast", "unit", "kind", "group"]
     return table[keys + [c for c in table.columns if c not in keys]]
