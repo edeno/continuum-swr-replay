@@ -1,6 +1,7 @@
 """The bin-facts runner's wiring: what ``run_epoch`` reads, checks and writes.
 The decode frame's time, the spike loader and the well visits are replaced at
-their boundaries; the restriction run's record is made by hand."""
+their boundaries; the restriction run's record (a fold fit's, which counts no
+spikes) is made by hand."""
 
 import json
 import sys
@@ -51,15 +52,16 @@ def folders(tmp_path, monkeypatch):
     return tmp_path, restriction, output
 
 
-def _record(restriction, n_spikes: int) -> None:
+def _record(restriction) -> None:
+    """A fold-fit record: it counts no spikes."""
     output_path(EPOCH, restriction, runner.RESTRICTION_NAME).with_suffix(
         ".json"
-    ).write_text(json.dumps({"n_spikes": n_spikes}))
+    ).write_text(json.dumps({"status": "ok", "fit": "folds", "n_bins": 6}))
 
 
 def test_run_epoch_writes_each_bins_spikes_and_visit_flag(folders):
     data_dir, restriction, output = folders
-    _record(restriction, 4)
+    _record(restriction)
     record = runner.run_epoch(EPOCH, data_dir, restriction, output)
     table = pd.read_parquet(output_path(EPOCH, output, runner.OUTPUT_NAME))
     # spikes at 50.0 -> 0, 50.0031 -> 1, 50.005 -> 2, 50.0099 -> 4 (the last
@@ -68,23 +70,28 @@ def test_run_epoch_writes_each_bins_spikes_and_visit_flag(folders):
     np.testing.assert_array_equal(
         table["in_well_visit"], [False, True, True, False, False, False]
     )
-    assert record["n_spikes"] == 4 and record["restriction_n_spikes"] == 4
+    assert record["n_spikes"] == 4
     assert record["n_bins_in_well_visit"] == 2
     assert record["n_spikes_in_well_visit"] == 2
     assert record["n_well_visits"] == 1
+    # the record the earlier runs wrote, less the restriction run's spike count
+    assert list(record) == [
+        "status",
+        "n_bins",
+        "n_spikes",
+        "n_well_visits",
+        "n_bins_in_well_visit",
+        "n_spikes_in_well_visit",
+        "epoch_inputs",
+        "seconds",
+    ]
+    assert list(record["epoch_inputs"]) == ["data_over_time", "restriction_record"]
     json.dumps(record, allow_nan=False)
-
-
-def test_a_spike_count_other_than_the_restriction_runs_raises(folders):
-    data_dir, restriction, output = folders
-    _record(restriction, 5)
-    with pytest.raises(ValueError, match="restriction run"):
-        runner.run_epoch(EPOCH, data_dir, restriction, output)
 
 
 def test_a_time_grid_that_is_not_the_decodes_raises(folders, monkeypatch):
     data_dir, restriction, output = folders
-    _record(restriction, 4)
+    _record(restriction)
     monkeypatch.setattr(runner, "decode_time", lambda epoch_id, data_dir: TIME + 1e-3)
     with pytest.raises(ValueError, match="decode frame"):
         runner.run_epoch(EPOCH, data_dir, restriction, output)
@@ -115,5 +122,10 @@ def test_the_header_records_the_session_cache_of_every_epoch_of_the_restriction_
     runner.main(["--gather"])
     runner.main(["--epochs", EPOCH])
     assert headers[0] == headers[1]
+    # the header the run finishing under the earlier code wrote, key for key
+    assert list(headers[0]) == ["produced_by", "provenance", "settings", "inputs"]
+    assert headers[0]["settings"] == {
+        "binning": "np.digitize(t, time[1:-1]), time[0] <= t <= time[-1]"
+    }
     assert headers[0]["inputs"] == {"session_cache": session_cache_record(epochs)}
     assert "subset" not in headers[0] and "subset" not in headers[0]["settings"]

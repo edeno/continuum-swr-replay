@@ -8,9 +8,12 @@ loader's time axis is the decode frame's, and read the epoch's well visits from
 the session cache of the table builders only (``event_tables.prepare_data.well_visit_times``;
 an epoch without a current cache entry fails instead of being fetched). Then
 write the per-bin facts (``event_evidence.bin_facts.bin_facts``: spikes binned
-as the decoder bins them, and ``in_well_visit``). The total spike count must
-equal the restriction run's record ``n_spikes`` for the epoch, or the epoch
-fails. No event table is read, and every bin is kept: the facts are not made
+as the decoder bins them, and ``in_well_visit``). The restriction run's record
+counts no spikes (the fold fit's likelihood is the library's, which returns no
+count), so nothing here ties the spikes to that run; the window run
+(``sum_nonlocal_restriction_windows.py``) ties them to the held-out tetrode
+run's, window by window, and their time to the restriction run's per-bin table.
+No event table is read, and every bin is kept: the facts are not made
 over a subset, so the run records none. CPU only.
 
 Writes, under ``processed_data_dir() / EVENT_BIN_FACTS_DIR``:
@@ -18,8 +21,8 @@ Writes, under ``processed_data_dir() / EVENT_BIN_FACTS_DIR``:
 - ``{epoch_id}_bin_facts.parquet``: one row per decode bin, ``time`` (s),
   ``n_spikes`` (int32) and ``in_well_visit`` (bool);
 - ``{epoch_id}_bin_facts.json``: the epoch's record (bins, spikes, well visits,
-  bins and spikes inside them, the restriction run's ``n_spikes``, the digests
-  of the decode frame and the restriction run's record; provenance);
+  bins and spikes inside them, the digests of the decode frame and the
+  restriction run's record; provenance);
 
 and ``manifest.json`` gathered from the records. The inputs record the
 session-cache entries the visits were read from
@@ -37,7 +40,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import json
 import multiprocessing
 import sys
 import time as clock
@@ -100,8 +102,7 @@ def run_epoch(
     Raises
     ------
     ValueError
-        If the loader's time axis is not the decode frame's, or the total spike
-        count is not the restriction run's.
+        If the loader's time axis is not the decode frame's.
     """
     from continuum_swr_replay.analysis.event_evidence.state_evidence.terms import (
         load_marks_and_training_mask,
@@ -118,12 +119,6 @@ def run_epoch(
     restriction_record = output_path(
         epoch_id, restriction_dir, RESTRICTION_NAME
     ).with_suffix(".json")
-    restriction_spikes = int(json.loads(restriction_record.read_text())["n_spikes"])
-    if n_spikes != restriction_spikes:
-        raise ValueError(
-            f"{n_spikes} spikes in the bins, but the restriction run's record "
-            f"counts {restriction_spikes}"
-        )
     write_table(table, output_path(epoch_id, output, OUTPUT_NAME))
     inside = table["in_well_visit"].to_numpy()
     return json_ready(
@@ -131,7 +126,6 @@ def run_epoch(
             "status": "ok",
             "n_bins": len(table),
             "n_spikes": n_spikes,
-            "restriction_n_spikes": restriction_spikes,
             "n_well_visits": len(visits[0]),
             "n_bins_in_well_visit": int(inside.sum()),
             "n_spikes_in_well_visit": int(table.loc[inside, "n_spikes"].sum()),
