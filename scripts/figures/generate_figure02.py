@@ -108,6 +108,7 @@ import hashlib
 import logging
 import warnings
 from collections.abc import Mapping, Sequence
+from numbers import Real
 from pathlib import Path
 from typing import Any
 
@@ -1493,6 +1494,7 @@ def place_letters(
     panels: Mapping[str, Sequence[Axes]],
     rows: Sequence[str],
     columns: Sequence[str],
+    heights: Mapping[str, Sequence[Axes] | float] | None = None,
 ) -> dict[str, tuple[float, float]]:
     """Each panel letter's figure position, aligned by row and by column.
 
@@ -1500,15 +1502,31 @@ def place_letters(
     height just above the highest of their panels' drawn tops; the letters of a
     column (each string of ``columns``, such as ``"dh"``) share the left edge of
     the leftmost of their panels' drawn extents.
+
+    ``heights`` names, by letter, which part of its panel sets its row's
+    height in place of the panel's whole drawn extent: the axes whose drawn
+    tops count (none: the panel does not count, as when a legend above it
+    would lift the row's letters away from the others), or the letter's own
+    height in figure coordinates.
     """
-    extents = {name: panel_extent(fig, renderer, axes) for name, axes in panels.items()}
-    y = {
-        name: min(max(extents[n].y1 for n in row) + 0.002, 0.985)
-        for row in rows
-        for name in row
-    }
+    heights = heights or {}
+    y = {}
+    for row in rows:
+        tops = [
+            panel_extent(fig, renderer, axes).y1
+            for axes in (heights.get(name, panels[name]) for name in row)
+            if not isinstance(axes, Real) and len(axes) > 0
+        ]
+        for name in row:
+            given = heights.get(name)
+            y[name] = (
+                given if isinstance(given, Real) else min(max(tops) + 0.002, 0.985)
+            )
     x = {
-        name: max(min(extents[n].x0 for n in column) - 0.004, 0.0)
+        name: max(
+            min(panel_extent(fig, renderer, panels[n]).x0 for n in column) - 0.004,
+            0.0,
+        )
         for column in columns
         for name in column
     }
@@ -1709,20 +1727,15 @@ def generate_figure(
         },
         rows=["a", "b", "cdef", "ghij"],
         columns=LETTER_COLUMNS,
+        heights={
+            # panel a's letter sits at the top of its decode, not of the track
+            # drawing
+            "a": ax_a_top.get_position().y1 + 0.004,
+            # the legend drawn above panel i's axes would lift the last row's
+            # letters away from panels g, h and j
+            "i": [],
+        },
     )
-    # panel a's letter sits at the top of its decode, not of the track drawing
-    positions["a"] = (positions["a"][0], ax_a_top.get_position().y1 + 0.004)
-    # the last row's letters sit just above panels g, h and j: the legend drawn
-    # above panel i's axes would lift the whole row's letters away from them
-    last_row_top = (
-        max(
-            panel_extent(fig, renderer, axes).y1
-            for axes in ([ax_g, ax_g2], [ax_h], [ax_j, ax_j2])
-        )
-        + 0.002
-    )
-    for name in "ghij":
-        positions[name] = (positions[name][0], last_row_top)
     for name, (x, y) in positions.items():
         fig.text(
             x, y, name, fontsize=PANEL_LETTER_SIZE, fontweight="bold", ha="left",

@@ -1748,6 +1748,46 @@ def test_figure03_letters_share_a_height_by_row_and_a_left_edge_by_column(offlin
     plt.close(fig)
 
 
+def test_figure02_letters_share_a_row_height_from_the_named_parts(offline):
+    """A row's letters sit just above its panels' highest drawn top; a panel
+    named with no axes does not count (its title would lift the row), and a
+    letter given a height sits there; columns share the leftmost edge."""
+    import matplotlib.pyplot as plt
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    fig, grid = plt.subplots(2, 3)
+    panels = {
+        "a": [grid[0, 0]],
+        "b": [grid[0, 1]],
+        "c": [grid[0, 2]],
+        "d": [grid[1, 0]],
+        "e": [grid[1, 1]],
+        "f": [grid[1, 2]],
+    }
+    grid[0, 2].set_title("a title\nof two lines")
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    extent = {
+        name: figure02.panel_extent(fig, renderer, axes)
+        for name, axes in panels.items()
+    }
+    rows, columns = ["abc", "def"], ["ad", "be", "c", "f"]
+    plain = figure02.place_letters(fig, renderer, panels, rows, columns)
+    named = figure02.place_letters(
+        fig, renderer, panels, rows, columns, heights={"c": [], "d": 0.3}
+    )
+    # by default the title of c sets its row's height
+    assert {plain[n][1] for n in "abc"} == {extent["c"].y1 + 0.002}
+    # named: c does not count, so a and b set it; d sits where it is given
+    top = max(extent[n].y1 for n in "ab") + 0.002
+    assert top < extent["c"].y1
+    assert {named[n][1] for n in "abc"} == {top}
+    assert named["d"][1] == 0.3
+    assert {named[n][1] for n in "ef"} == {max(extent[n].y1 for n in "ef") + 0.002}
+    assert named["a"][0] == named["d"][0] == min(extent[n].x0 for n in "ad") - 0.004
+    plt.close(fig)
+
+
 def _gain_statistics(no_swr: list[float], swr: list[float]) -> pd.DataFrame:
     """Statistics indexed by group, as ``likelihood_advantage_statistics``
     gives them, with each group's mean as its estimate and an interval of
