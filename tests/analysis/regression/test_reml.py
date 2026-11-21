@@ -334,10 +334,15 @@ def test_gaussian_scale_matches_closed_form() -> None:
     assert session.score == pytest.approx(
         laplace_score(np.log(session.scale)), rel=1e-12
     )
+    # The intercept's covariance with the sum-to-zero smooth is zero but for
+    # rounding (about 1e-18 beside entries near 1e-2), which differs between
+    # the two computations: those entries are compared to 1e-14 of the largest.
+    expected = session.scale * np.linalg.inv(X.T @ X + S_w)
     np.testing.assert_allclose(
         session.covariance,
-        session.scale * np.linalg.inv(X.T @ X + S_w),
+        expected,
         rtol=1e-10,
+        atol=1e-14 * np.max(np.abs(expected)),
     )
     # The search stopped at a stationary point of the profiled score.
     assert np.max(np.abs(result.gradient)) < 1e-6 * max(1.0, abs(result.score))
@@ -376,7 +381,13 @@ def test_at_boundary() -> None:
 def test_shrunk_to_null_space() -> None:
     """A straight-line truth whose search stops on the plateau, short of the
     bound, is flagged by its edf (one, the line); at_boundary misses it. A
-    curved truth on the same rows is not flagged."""
+    curved truth on the same rows is not flagged.
+
+    The score of the line falls toward its limit at the bound as
+    ``c exp(-rho)``; Newton from the grid's center climbs the plateau and
+    stops once the gain left, about ``|gradient|``, is below the decrement
+    rule's reach (near log penalty 17.5 here). The grid start would begin at
+    the bound itself, the lowest grid point of a score that falls to it."""
     rng = np.random.default_rng(2)
     n_rows = 400
     x = rng.uniform(size=n_rows)
@@ -388,7 +399,7 @@ def test_shrunk_to_null_space() -> None:
     line_y = (x - 0.5) + rng.normal(size=n_rows)
     curve_y = np.sin(2 * np.pi * x) + rng.normal(size=n_rows)
 
-    line = select_penalties(Gaussian(), [SessionData(X, line_y)], blocks)
+    line = refine_penalties(Gaussian(), [SessionData(X, line_y)], blocks, [6.0])
     curve = select_penalties(Gaussian(), [SessionData(X, curve_y)], blocks)
 
     assert line.sessions[0].edf[0] - 1.0 <= NULL_SPACE_EDF_TOL
@@ -586,7 +597,9 @@ def test_grid_points_that_fail_are_counted_by_status(
 
     def fails_when_weak(*args, **kwargs):
         fit = newton_fit(*args, **kwargs)
-        weak = np.max(np.abs(args[4])) < np.exp(-4.5) * np.max(np.abs(blocks[0].S))
+        # The penalty's largest eigenvalue, whatever basis it is given in.
+        strength = np.linalg.eigvalsh(args[4])[-1] / blocks[0].eigenvalues[-1]
+        weak = strength < np.exp(-4.5)
         return replace(fit, status=STEP_LIMIT) if weak else fit
 
     monkeypatch.setattr(reml, "penalized_newton", fails_when_weak)
@@ -746,3 +759,66 @@ def test_no_penalty_fit_at_penalties() -> None:
     assert result.score == pytest.approx(expected, rel=1e-12)
     assert session.edf.shape == (0,)
     assert session.edf_total == pytest.approx(p, rel=1e-10)
+
+
+def _content_session(
+    seed: int, n_events: int = 140, n_arms: int = 6
+) -> tuple[SessionData, list[PenaltyBlock]]:
+    """A grouped-softmax session of the content model's shape.
+
+    Each event has ``n_arms`` candidate rows and one 0/1 response; a cubic
+    P-spline of a clock in [0, 5] (10 basis functions, 9 after the
+    sum-to-zero constraint) with a linear truth of slope -1.2, so the fit at
+    a strong penalty has null-space coefficients of several units, and two
+    unpenalized 0/1 role columns (the first row of each event; one other row).
+    """
+    rng = np.random.default_rng(seed)
+    n_rows = n_events * n_arms
+    x = rng.uniform(0.0, 5.0, n_rows)
+    basis = PSplineBasis(0.0, 5.0, 10)
+    B = basis.design(x)
+    Z = sum_to_zero_constraint(B)
+    role = np.zeros((n_rows, 2))
+    first = np.arange(n_events) * n_arms
+    role[first, 0] = 1.0
+    role[first + 1 + rng.integers(0, n_arms - 1, n_events), 1] = 1.0
+    X = np.column_stack([B @ Z, role])
+    eta = -1.2 * x + role @ np.array([1.0, -0.5])
+    weight = np.exp(eta).reshape(n_events, n_arms)
+    p = weight / weight.sum(axis=1, keepdims=True)
+    y = np.zeros((n_events, n_arms))
+    y[np.arange(n_events), [rng.choice(n_arms, p=row) for row in p]] = 1.0
+    groups = np.repeat(np.arange(n_events), n_arms)
+    blocks = [PenaltyBlock(np.arange(9), Z.T @ basis.penalty() @ Z)]
+    return SessionData(X, y.ravel(), groups), blocks
+
+
+def test_inner_fits_converge_at_strong_penalties() -> None:
+    """At log penalties 15 to 20 every inner fit converges, and at 20 the fit
+    is the fit in the penalty's null space (the smooth a straight line) to
+    1e-6 in the linear predictor; the difference is of order exp(-20).
+
+    Computed with the penalty matrix as given, ``b' S b`` loses
+    ``eps |S| |b|^2`` to rounding, more than the gain of the last Newton steps,
+    and some of these fits stopped as "step halving failed"."""
+    for seed in range(10):
+        data, blocks = _content_session(seed)
+        for rho in np.arange(15.0, 21.0):
+            pooled = pooled_reml(GroupedSoftmax(), [data], blocks, [rho])
+            assert np.isfinite(pooled.score), (seed, rho, pooled.failure)
+        strong = pooled.sessions[0].fit
+        null = blocks[0].null_space
+        X_null = np.column_stack([data.X[:, :9] @ null, data.X[:, 9:]])
+        p = X_null.shape[1]
+        line = penalized_newton(
+            GroupedSoftmax(),
+            X_null,
+            data.y,
+            data.aux,
+            np.zeros((p, p)),
+            np.zeros(p),
+        )
+        assert line.converged
+        np.testing.assert_allclose(
+            data.X @ strong.beta, X_null @ line.beta, rtol=0, atol=1e-6
+        )

@@ -21,6 +21,11 @@ mgcv's ``sp``), the scale is ``phi = D_p / (n - M_p)`` with ``D_p`` that
 minimum, and ``V`` is Wood (2011, eq. 4) at that scale; it equals the Laplace
 score above at the penalty ``S / phi``.
 
+Each session's fit and score are computed with every block's coefficients in
+the eigenbasis of its penalty, where the penalty is diagonal and exactly zero on
+its null space (:func:`reml_and_derivatives`), so that the fit at a very strong
+penalty is the fit in the null space rather than a casualty of rounding.
+
 Pooled REML shares the strengths across sessions, each with its own
 coefficients: the pooled score, gradient and Hessian are the sums over
 sessions, and one session whose inner fit fails makes the pooled score
@@ -98,6 +103,14 @@ class PenaltyBlock:
     null_space : np.ndarray, shape (k, k - rank)
         An orthonormal basis of the null space of ``S`` (for a P-spline, the
         straight lines), set on construction.
+    eigenvalues : np.ndarray, shape (k,)
+        The eigenvalues of ``S``, ascending, with the ``k - rank`` smallest
+        set to zero: ``S`` as its null space and ``rank`` define it (a matrix
+        computed in floating point, such as ``Z' D' D Z``, has rounding there,
+        about ``1e-16`` of its largest eigenvalue). Set on construction.
+    eigenvectors : np.ndarray, shape (k, k)
+        The orthonormal eigenvectors, in the order of ``eigenvalues``; the
+        first ``k - rank`` are ``null_space``. Set on construction.
     """
 
     columns: np.ndarray
@@ -105,6 +118,8 @@ class PenaltyBlock:
     rank: int = field(init=False)
     log_pdet: float = field(init=False)
     null_space: np.ndarray = field(init=False)
+    eigenvalues: np.ndarray = field(init=False)
+    eigenvectors: np.ndarray = field(init=False)
 
     def __post_init__(self) -> None:
         columns = np.asarray(self.columns, dtype=int)
@@ -131,7 +146,14 @@ class PenaltyBlock:
             "log_pdet",
             float(np.log(eigenvalues[eigenvalues.size - rank :]).sum()),
         )
-        object.__setattr__(self, "null_space", vectors[:, : eigenvalues.size - rank])
+        n_null = eigenvalues.size - rank
+        object.__setattr__(self, "null_space", vectors[:, :n_null])
+        object.__setattr__(
+            self,
+            "eigenvalues",
+            np.concatenate([np.zeros(n_null), eigenvalues[n_null:]]),
+        )
+        object.__setattr__(self, "eigenvectors", vectors)
 
 
 @dataclass(frozen=True)
@@ -194,6 +216,14 @@ class RemlScore:
         ``loglik`` is at the profiled scale.
     scale : float
         The profiled Gaussian scale; 1 for the other families.
+    covariance : np.ndarray or None, shape (p, p)
+        ``A^-1``, computed in the penalties' eigenbasis (see
+        :func:`reml_and_derivatives`); None when the score is infinite.
+    edf : np.ndarray or None, shape (m,)
+        Per block, the trace of the block's rows and columns of ``A^-1 H``;
+        None when the score is infinite.
+    edf_total : float
+        ``tr(A^-1 H)``; NaN when the score is infinite.
     """
 
     score: float
@@ -201,6 +231,9 @@ class RemlScore:
     hessian: np.ndarray | None
     fit: NewtonFit
     scale: float
+    covariance: np.ndarray | None = None
+    edf: np.ndarray | None = None
+    edf_total: float = np.nan
 
 
 @dataclass(frozen=True)
@@ -396,6 +429,53 @@ def _log_pdet(blocks: Sequence[PenaltyBlock], rho: np.ndarray) -> float:
     return float(sum(b.rank * r + b.log_pdet for b, r in zip(blocks, rho, strict=True)))
 
 
+def _eigenbasis(
+    blocks: Sequence[PenaltyBlock], n_columns: int
+) -> tuple[list[np.ndarray], list[PenaltyBlock]]:
+    """Each block's eigenvectors, and the blocks in that basis (diagonal).
+
+    The coefficients ``gamma = V_j' beta_j`` of a block are an orthogonal
+    change of its coefficients in which its penalty is
+    ``diag(PenaltyBlock.eigenvalues)``, exactly zero on its null space.
+    """
+    _check_blocks(blocks, n_columns)
+    vectors = [block.eigenvectors for block in blocks]
+    rotated = [
+        PenaltyBlock(block.columns, np.diag(block.eigenvalues)) for block in blocks
+    ]
+    return vectors, rotated
+
+
+def _rotate(
+    blocks: Sequence[PenaltyBlock], vectors: Sequence[np.ndarray], M: np.ndarray
+) -> np.ndarray:
+    """``Q M`` with ``Q`` the block-diagonal rotation (identity off the blocks).
+
+    ``M`` has shape ``(p,)`` or ``(p, k)``.
+    """
+    out = np.array(M, dtype=float)
+    for block, V in zip(blocks, vectors, strict=True):
+        out[block.columns] = V @ M[block.columns]
+    return out
+
+
+def _covariance_and_edf(
+    factor: tuple[np.ndarray, bool],
+    A: np.ndarray,
+    S: np.ndarray,
+    blocks: Sequence[PenaltyBlock],
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """``A^-1``, the edf per block and in all, from the Cholesky ``factor`` of ``A``.
+
+    ``A - S`` is ``H``; the edf of a block is the trace of its rows and
+    columns of ``A^-1 H``.
+    """
+    covariance = scipy.linalg.cho_solve(factor, np.eye(A.shape[0]))
+    F = covariance @ (A - S)
+    edf = np.array([np.trace(F[np.ix_(b.columns, b.columns)]) for b in blocks])
+    return covariance, edf, float(np.trace(F))
+
+
 def reml_and_derivatives(
     lik: Likelihood,
     X: np.ndarray,
@@ -408,6 +488,19 @@ def reml_and_derivatives(
     derivatives: bool = True,
 ) -> RemlScore:
     """One session's REML score at ``rho``, with its gradient and Hessian.
+
+    The fit, score and derivatives are computed with each block's
+    coefficients in the eigenbasis of its penalty (:func:`_eigenbasis`), an
+    orthogonal change of coefficients that leaves the score, its derivatives
+    and the edf unchanged, and the coefficients, ``A`` and the covariance are
+    rotated back. In that basis the penalty is diagonal and exactly zero on
+    its null space, so ``b' S b`` is a sum of positive terms and ``A`` is
+    well conditioned after scaling by its diagonal. Computed with ``S`` as
+    given, at a log penalty of 16 and above, ``b' S b`` (near ``1e-7``) was
+    off by ``eps |S| |b|^2`` (``3e-7``), more than the gain of the fit's last
+    steps (``3e-8``), and the Newton fit stopped as "step halving failed";
+    the rounding of ``S`` on its null space, ``exp(rho)`` times ``1e-16`` of
+    its largest eigenvalue, also penalized the null space.
 
     Parameters
     ----------
@@ -440,11 +533,44 @@ def reml_and_derivatives(
     """
     rho = np.asarray(rho, dtype=float)
     n_columns = X.shape[1]
+    if isinstance(lik, Gaussian) and aux is not None:
+        raise ValueError("the Gaussian scale is profiled; pass aux=None")
+    vectors, rotated = _eigenbasis(blocks, n_columns)
+    X_rotated = X.copy()
+    for block, V in zip(blocks, vectors, strict=True):
+        X_rotated[:, block.columns] = X[:, block.columns] @ V
+    start = np.zeros(n_columns) if beta0 is None else np.asarray(beta0, dtype=float)
+    start_rotated = start.copy()
+    for block, V in zip(blocks, vectors, strict=True):
+        start_rotated[block.columns] = V.T @ start[block.columns]
+    session = _reml_in_basis(
+        lik, X_rotated, y, aux, rotated, rho, start_rotated, derivatives
+    )
+    fit = session.fit
+    beta = _rotate(blocks, vectors, fit.beta)
+    A = _rotate(blocks, vectors, _rotate(blocks, vectors, fit.A).T)
+    covariance = (
+        None
+        if session.covariance is None
+        else _rotate(blocks, vectors, _rotate(blocks, vectors, session.covariance).T)
+    )
+    return replace(session, fit=replace(fit, beta=beta, A=A), covariance=covariance)
+
+
+def _reml_in_basis(
+    lik: Likelihood,
+    X: np.ndarray,
+    y: np.ndarray,
+    aux: object,
+    blocks: Sequence[PenaltyBlock],
+    rho: np.ndarray,
+    start: np.ndarray,
+    derivatives: bool,
+) -> RemlScore:
+    """:func:`reml_and_derivatives` in the basis of ``X`` and ``blocks`` as given."""
+    n_columns = X.shape[1]
     S = assemble_penalty(blocks, rho, n_columns)
-    start = np.zeros(n_columns) if beta0 is None else beta0
     if isinstance(lik, Gaussian):
-        if aux is not None:
-            raise ValueError("the Gaussian scale is profiled; pass aux=None")
         return _gaussian_profiled(X, y, blocks, rho, S, start, derivatives)
 
     fit = penalized_newton(
@@ -454,6 +580,7 @@ def reml_and_derivatives(
         return RemlScore(np.inf, None, None, fit, 1.0)
     b, A = fit.beta, fit.A
     factor = scipy.linalg.cho_factor(A, lower=True)
+    covariance, edf, edf_total = _covariance_and_edf(factor, A, S, blocks)
     null_dim = n_columns - sum(block.rank for block in blocks)
     score = (
         -fit.loglik
@@ -462,8 +589,9 @@ def reml_and_derivatives(
         + float(np.log(np.diag(factor[0])).sum())
         - 0.5 * null_dim * _LOG_2PI
     )
+    summary = {"covariance": covariance, "edf": edf, "edf_total": edf_total}
     if not derivatives:
-        return RemlScore(float(score), None, None, fit, 1.0)
+        return RemlScore(float(score), None, None, fit, 1.0, **summary)
 
     eta = X @ b
     m = len(blocks)
@@ -498,7 +626,7 @@ def reml_and_derivatives(
                 - np.sum(Ainv_A_j[k] * Ainv_A_j[j].T)
                 + np.trace(scipy.linalg.cho_solve(factor, A_jk))
             )
-    return RemlScore(float(score), gradient, hessian, fit, 1.0)
+    return RemlScore(float(score), gradient, hessian, fit, 1.0, **summary)
 
 
 def _gaussian_profiled(
@@ -556,8 +684,10 @@ def _gaussian_profiled(
         newton_decrement=pls.newton_decrement * working / scale,
         loglik=Gaussian().loglik(X @ b, y, scale),
     )
+    covariance, edf, edf_total = _covariance_and_edf(factor, gram, S, blocks)
+    summary = {"covariance": scale * covariance, "edf": edf, "edf_total": edf_total}
     if not derivatives:
-        return RemlScore(float(score), None, None, fit, scale)
+        return RemlScore(float(score), None, None, fit, scale, **summary)
 
     m = len(blocks)
     S_j = [
@@ -581,7 +711,7 @@ def _gaussian_profiled(
     hessian = 0.5 * (
         dof * (D_jk / D_p - np.outer(D_j, D_j) / D_p**2) + np.diag(trace_j) - trace_jk
     )
-    return RemlScore(float(score), gradient, hessian, fit, scale)
+    return RemlScore(float(score), gradient, hessian, fit, scale, **summary)
 
 
 def _label(data: SessionData, index: int) -> str:
@@ -638,7 +768,13 @@ def _session_score(
     beta[active] = session.fit.beta
     A = np.full((p, p), np.nan)
     A[np.ix_(active, active)] = session.fit.A
-    return replace(session, fit=replace(session.fit, beta=beta, A=A))
+    covariance = None
+    if session.covariance is not None:
+        covariance = np.full((p, p), np.nan)
+        covariance[np.ix_(active, active)] = session.covariance
+    return replace(
+        session, fit=replace(session.fit, beta=beta, A=A), covariance=covariance
+    )
 
 
 def pooled_reml(
@@ -907,7 +1043,6 @@ def _search(
 
 
 def _pooled_fit(
-    data: Sequence[SessionData],
     rho: np.ndarray,
     pooled: PooledScore,
     blocks: Sequence[PenaltyBlock],
@@ -918,37 +1053,20 @@ def _pooled_fit(
     A session's covariance is NaN in the rows and columns of its inactive
     columns; its edf counts the active ones.
     """
-    sessions = []
-    for session_data, session in zip(data, pooled.sessions, strict=True):
-        p = session.fit.beta.size
-        active = (
-            np.ones(p, dtype=bool)
-            if session_data.active is None
-            else session_data.active
+    null_dim = np.array([b.columns.size - b.rank for b in blocks])
+    sessions = tuple(
+        SessionFit(
+            session.fit,
+            session.covariance,
+            session.edf,
+            session.edf_total,
+            session.scale,
+            session.score,
+            session.edf - null_dim <= NULL_SPACE_EDF_TOL,
         )
-        A = session.fit.A[np.ix_(active, active)]
-        factor = scipy.linalg.cho_factor(A, lower=True)
-        S = assemble_penalty(blocks, rho, p)[np.ix_(active, active)] / session.scale
-        covariance = np.full((p, p), np.nan)
-        covariance[np.ix_(active, active)] = scipy.linalg.cho_solve(
-            factor, np.eye(A.shape[0])
-        )
-        F = np.full((p, p), np.nan)
-        F[np.ix_(active, active)] = covariance[np.ix_(active, active)] @ (A - S)
-        edf = np.array([np.trace(F[np.ix_(b.columns, b.columns)]) for b in blocks])
-        null_dim = np.array([b.columns.size - b.rank for b in blocks])
-        sessions.append(
-            SessionFit(
-                session.fit,
-                covariance,
-                edf,
-                float(np.trace(F[np.ix_(active, active)])),
-                session.scale,
-                session.score,
-                edf - null_dim <= NULL_SPACE_EDF_TOL,
-            )
-        )
-    return PooledFit(rho, pooled.score, pooled.gradient, tuple(sessions), search)
+        for session in pooled.sessions
+    )
+    return PooledFit(rho, pooled.score, pooled.gradient, sessions, search)
 
 
 def refine_penalties(
@@ -970,7 +1088,7 @@ def refine_penalties(
     evaluate = _Evaluator(lik, sessions, blocks)
     rho0 = np.asarray(rho0, dtype=float)
     rho, pooled, search = _search(evaluate, rho0, 0, Counter())
-    return _pooled_fit(sessions, rho, pooled, blocks, search)
+    return _pooled_fit(rho, pooled, blocks, search)
 
 
 def select_penalties(
@@ -1006,7 +1124,7 @@ def select_penalties(
     evaluate = _Evaluator(lik, sessions, blocks)
     start, n_points, failures = _grid_start(evaluate, len(blocks))
     rho, pooled, search = _search(evaluate, start, n_points, failures)
-    return _pooled_fit(sessions, rho, pooled, blocks, search)
+    return _pooled_fit(rho, pooled, blocks, search)
 
 
 def fit_at_penalties(
@@ -1031,4 +1149,4 @@ def fit_at_penalties(
         raise ValueError(
             f"an inner fit did not converge at log penalties {rho}: {pooled.failure}"
         )
-    return _pooled_fit(sessions, rho, pooled, blocks, None)
+    return _pooled_fit(rho, pooled, blocks, None)

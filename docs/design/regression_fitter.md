@@ -109,6 +109,28 @@ and the reason. The gradient and Hessian in the log strengths are exact. The pen
 blocks must be disjoint (each smooth has its own columns); the code refuses overlapping
 blocks.
 
+**Strong penalties.** The fit, the score and its derivatives are computed with each
+block's coefficients in the eigenbasis of its penalty (`reml_and_derivatives`): an
+orthogonal change of coefficients `gamma_j = V_j' beta_j`, which leaves the score, its
+derivatives and the edf as they are, and in which the penalty is
+`diag(PenaltyBlock.eigenvalues)`, exactly zero on the `k - rank` null-space directions
+that `rank` defines. The coefficients, `A` and the covariance (computed in that basis)
+are rotated back. With `S` as given, two rounding errors grow with `exp(rho)`: `b' S b`
+is a difference of terms of size `|S| |b|^2` (at log penalty 16 on a content session it
+came out -8.4e-8 where it is 2.1e-7, an error ten times the last Newton step's predicted
+gain of 3.4e-8, and the fit stopped as "step halving failed"), and the stored `S_j` has
+rounding of about `1e-16` of its largest eigenvalue on its null space, which `exp(rho)`
+turns into a penalty on the straight lines (on 242 content sessions the pooled score was
+3.4e-6 too high at log penalty 10, 1.1e-4 at 14, and rose from 14 to 16 where it should
+fall). In the eigenbasis `b' S b` is a sum of positive terms and the fit at a very
+strong penalty is the fit in the penalty's null space: at log penalty 20 the linear
+predictor equals that fit's to 1e-6 (`test_inner_fits_converge_at_strong_penalties`).
+On a simulated content model (242 sessions of each of two kinds, log penalties 14 to
+20, 3,388 fits) 47 fits stopped as "step halving failed" at ef98019d; in the eigenbasis
+41 of them converge and 6 stop as "no finite maximum", in the sessions whose unpenalized
+columns separate (below); none fails otherwise. The bounds `[-10, 20]` are kept: the
+fit at 20 is obtainable, and the score there is within its last few `1e-8` of the limit.
+
 A session may lack support for an unpenalized term (a 0/1 term none of its rows has):
 `SessionData.active`, a boolean mask over the columns, marks the columns the session
 estimates. Its fit, score and derivatives are those of its design built without the
