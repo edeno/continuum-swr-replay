@@ -148,7 +148,7 @@ The design's section 4. In short, with the phase that implements each piece:
 | 4. Folds | Five folds of whole trials balanced by destination well, long stays cut into pieces (one function); used to compare designs and check over-fitting only; held-out claims summed over sessions | Phase 2 |
 | 5. Inference | Session to recording day to animal; animal-balanced estimate with the nested bootstrap interval (t-corrected); animals with the estimate's sign; recording-day-level test; one declared family with FDR; simultaneous bands for curves | Phases 2, 9 |
 | 6. Report | Rate effects as rate ratios, content effects as ratios of shares, each with an interval; every fit carries the record of C7; each statistic lives in `analysis/` and the figure calls the function the summary reads | every family phase |
-| Collinearity | Before a coefficient is read: VIF for one-column terms, concurvity for smooths, on the quantity the likelihood sees; a term the others explain at R² ≥ 0.8 (VIF ≥ 5) is reported only jointly with its partner, or leaves by a rule written before the fit; a planted-effect simulation over the real design must not move to another term | Phase 2 (measures), each family phase (rule) |
+| Collinearity | Before a coefficient is read: VIF for one-column terms, concurvity for smooths, on the quantity the likelihood sees; a term the others explain at R² ≥ 0.8 (VIF ≥ 5) is reported only jointly with its partner, or leaves by a rule written before the fit; a planted-effect simulation over the real design must not move to another term. A declared term that fails the rule **by design** (the question is what it adds beyond its partner, as the belief variance beyond recency) is not dropped: it is reported as a conditional effect, "beyond <partner>", with its VIF, the partner's curve fitted flexibly as the simulation requires, the simulated false-positive rate and power on the real design, and a null stated as "no evidence beyond <partner>; the design cannot detect an effect of this size". Which terms fall under this, and how they are reported, is written before the fit | Phase 2 (measures), each family phase (rule) |
 
 Shared numerical constants (one home, new module `analysis/regression/constants.py`): Newton decrement
 tolerance `1e-8` (the value of `analysis/replay_models/fitting.py:78`), at most 100 Newton steps and 30
@@ -209,12 +209,11 @@ scalar estimand, tested for SWR, for No SWR and for their difference. The design
 | Q2 | log rate ratio, rewarded against omitted last outcome | model A (5a) |
 | Q3a | log share ratio, current arm against another leaf arm | content (6a) |
 | Q3b | log share ratio, previous arm against another leaf arm | content (6a) |
-| Q4a | slope of the current arm's log share on its reward fraction (per pooled SD) | content (6a) |
+| Q4a | change of the current arm's log share over one pooled SD of its reward fraction, read from the role's reward-fraction smooth | content (6a) |
 | Q4b | slope of another arm's log share on its value (per pooled SD) | content (6a) |
 | Q5a | log share ratio of an arm 20 trials since its last visit against one 3 trials since | content, recency smooth (6a) |
-| Q5b-var | slope on the belief variance with recency in the model (per pooled SD) | content, uncertainty model 1 (6a) |
-| Q5b-rew | slope on the reward variability (variance of the arm's 0/1 outcomes over the last 10 visits to its well) with recency in the model | content, uncertainty model 2 (6a) |
-| Q5b-n | slope on the sample count (log of one plus the visits to the well earlier in the epoch) with recency in the model | content, uncertainty model 3 (6a) |
+| Q5b-var | slope on the belief variance (per pooled SD), in the one uncertainty model (recency smooth, smooth reward fraction, trial number, and the sample count beside it) | content, uncertainty model (6a) |
+| Q5b-n | slope on the sample count (log of one plus the visits to the well with a known outcome earlier in the epoch; per pooled SD), in the same model | content, uncertainty model (6a) |
 | Q6 | log share ratio, next arm against an arm that is neither current nor previous | content with a next-arm role (7) |
 | Q7a | log rate in the last 0.25 s before the last poke-out minus log rate 1 to 2 s before | visit rate, smooth of time until leaving (5a) |
 | Q7b | the same for the current-arm log share | content (6a) |
@@ -223,12 +222,15 @@ A curve-derived estimand is a linear functional of the coefficients (the mean of
 of the clock minus its mean over another, on a 0.01 s or 0.01-log-unit grid), so its session variance is
 exact.
 
-**Settled (lead, 2026-11-20, L1: "Ok").** Thirteen estimands, each for SWR, No SWR and their difference:
-**39 tests**. (The design's "ten estimands ... 30 tests" predates the Q3, Q4 and Q7 splits and the two added
-uncertainty measures.) The code reads the list from one place (new `analysis/regression/declared_tests.py`,
-Phase 2), so the count is not hard-coded anywhere else. If Phase 6a's uncertainty gate changes a measure's
-definition, the member keeps its id and the change is made before any real fit (the family is still
-declared before the fits).
+**Settled (lead, 2026-11-20).** L1 ("Ok") settled the list; after the uncertainty simulation the lead dropped
+the reward variability ("Yes"), so the family is **twelve estimands, each for SWR, No SWR and their
+difference: 36 tests**. Q5b has two members, the belief variance and the sample count, tested together in one
+model with the trial number and the smooth reward fraction ("Yes"). Q4a is read from the smooth reward
+fraction ([designs.md#content-design](designs.md#content-design)). (The design's "ten estimands ... 30 tests"
+predates the Q3, Q4 and Q7 splits and the uncertainty changes.) The code reads the list from one place (new
+`analysis/regression/declared_tests.py`, Phase 2), so the count is not hard-coded anywhere else. If Phase
+6a's gate changes how a member is fitted, the member keeps its id and the change is made before any real
+fit (the family is still declared before the fits).
 
 ## C9. Where new fits are stored
 

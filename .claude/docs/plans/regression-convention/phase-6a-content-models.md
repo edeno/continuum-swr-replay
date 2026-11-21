@@ -40,20 +40,37 @@ Branch: `role-content-models` from master after Phases 2 and 3. CPU only. Can ru
 **Designs referenced:** [content design](designs.md#content-design), [likelihoods](designs.md#likelihoods)
 (grouped softmax), [collinearity](designs.md#collinearity-measures), [support rule](designs.md#support-rule).
 
-**Decisions this phase applies** (settled 2026-11-20): L1 (thirteen estimands; Q5b once per uncertainty
-measure), L2 (the three uncertainty measures, [designs.md#content-design](designs.md#content-design)), L4
+**Decisions this phase applies** (settled 2026-11-20): the declared family of twelve estimands, 36 tests
+(C8; Q5b-var and Q5b-n); after the uncertainty simulation (lead, 20:39, "Yes" twice) the reward variability
+is dropped, the reward fraction gets a smooth per role, and the belief variance and the sample count are
+tested together in one model with the trial number
+([designs.md#content-design](designs.md#content-design)); L4
 (the event set: events that start inside a visit, C3; a `spans_visit_end` event's current arm is the visit's
 well's arm), ASK-1 (lead: "Move them": the ContFrag SWR- and MUA-sourced events are two more event sources of
 this runner), C14.
 
-**Gate before any real fit: the uncertainty-measure study.** A semi-synthetic identifiability study of the
-three uncertainty measures on the real data structure is running in scratch
-(`/cumulus/edeno/continuum-swr-replay/.claude/research/2026-11-20-regression-prototypes/proto_uncertainty_measures/`,
-its result in `REPORT.md` there when done): false positives and power of each measure against recency, the
-reward fraction and a drift over the epoch. Read `REPORT.md` first. Its result goes to the lead before any
-real fit of this phase; the definitions (Phase 3's columns) or the content model may change with it, and any
-change is made before the first real fit (C8). The phase turns the study into a committed simulation test
-(task "Uncertainty-measure identifiability test" below), since scratch is not kept.
+**Gate before any real fit: the uncertainty simulations.** Two semi-synthetic studies on the real data
+structure, in scratch (`/cumulus/edeno/continuum-swr-replay/.claude/research/2026-11-20-regression-prototypes/proto_uncertainty_measures/`):
+
+1. The first is done (`REPORT.md`, `sim_main_key_table.csv`, `sim_control_table.csv`; six leaf arms, 100 data
+   sets per truth). It gave the decisions above: the belief variance is about 90 % predicted by recency
+   within a session (VIF 30 to 43) and its test is calibrated only with a flexible, unshrunk recency curve;
+   the reward variability cannot be told from reward-fraction curvature; the sample count is a drift with the
+   trial number unless the trial number is in the model; with all three and the trial number every
+   false-positive rate is 1 to 9 % except the reward variability under curvature; the belief variance's power
+   is 30 to 50 % at 0.25 per SD with a t test over five animals. (Simulation results, not summary values.)
+2. The repeat with the shared fitter's REML-penalized recency smooth (call; running in the same folder). Read
+   its result before any real fit. If the selected penalty moves recency into the belief variance, the
+   uncertainty model's recency curve is fitted unpenalized, or with the penalty selected in the model without
+   the uncertainty terms and then held (`Smooth(..., penalty=...)`, Phase 2); write which one into the
+   phase's PR and `docs/regression_models.md` before the first real fit.
+
+Both results go to the lead before any real fit of this phase. The statements that must be written before the
+fits (C5's rule for a term that fails the collinearity rule by design): the belief variance is reported
+beyond recency, with its VIF, the recency curve as fitted, and the simulated false-positive rate and power; a
+null is reported as "no evidence beyond recency; the design cannot detect an effect of this size", with the
+simulated power beside it. The phase commits the studies as its slow simulation test (task "Uncertainty
+identifiability test" below), since scratch is not kept.
 
 ## Tasks
 
@@ -72,32 +89,36 @@ change is made before the first real fit (C8). The phase turns the study into a 
   `select_visit_context` (default `STARTS_IN_WELL_VISIT`) -> nine candidate rows per event -> roles (current, previous,
   other_leaf, trunk; exclusive; the previous role only when it differs from the current) -> drop rows with a
   missing covariate in the cohort step (counted per kind) -> terms:
-  `Category(arm)` (arm fixed effects) + `Category(role)` + `Slope(reward_fraction, by=role)` +
+  `Category(arm)` (arm fixed effects) + `Category(role)` + `Smooth(reward_fraction, 0, 1, 6, by=role)` +
   `Slope(value, by=role)` + `Smooth(log_recency, log 1, log 200)` on leaf rows + never-visited indicator +
   `Smooth(u, 0, 3)` for the current role (Q7b). Two variants per model: length-unadjusted, and
   length-adjusted (every role term and role slope interacting with `log(duration) - L0`, `L0` the pooled
-  median, stored). Three uncertainty models, each adding one measure's role slopes (belief variance,
-  reward variability, sample count; the last two are Phase 3's columns).
+  median, stored). One uncertainty model: the main design plus, on the leaf roles, the belief variance,
+  the sample count (Phase 3's column) and the trial number in the epoch (Phase 3's `n_visits_arrived`), each
+  a pooled-SD slope per role, with the recency curve fitted as the gate decides.
 - **Nine-arm simulation first** (design 4.2: "the nine-arm design goes through the same simulations
   before it is used"): stored analysis `scripts/replay_models/content/simulate_role_content.py` (new, from
   `S/proto_content/sim_lib.py` and `content/simulation.py`) on the real nine-arm design of every session:
   (a) opposite true slopes by role, where a pooled slope returns about zero and the role slopes recover
   both; (b) recency-only truth, where the uncertainty slope's false-positive rate is near nominal with the
   uncentered smooth and above it with the shipped centered spline; (c) a curved recency truth, which a
-  straight-line recency term misfits; (d) a planted uncertainty slope, recovered; (e) a planted rise of the
+  straight-line recency term misfits; (d) a planted belief-variance slope and a planted sample-count slope,
+  each recovered in the one uncertainty model; (e) a planted rise of the
   current-arm share toward leaving, recovered on `u` and not on the role slopes. Twenty data sets each;
   output `models_convention/simulations/role_content.parquet`. Do not fit the real data until (a) to (e)
   pass.
-- **Uncertainty-measure identifiability test** (committed form of the gate study): a slow test
+- **Uncertainty identifiability test** (committed form of the gate studies): a slow test
   `tests/analysis/replay_models/content/test_uncertainty_measures_identifiable.py` and a stored analysis
   `scripts/replay_models/content/simulate_uncertainty_measures.py` (new, from the scratch study's scripts:
-  `build_measures.py`, `check_measures.py`, `collinearity.py` and what `REPORT.md` names). On content
-  simulated over the real nine-arm design (or, in the test, over a synthetic design with the real data's
-  structure: visit sequences, 0/1 outcomes, epoch time), with truths of recency only, reward fraction only, a
-  drift over the epoch only, and each measure alone: each measure's slope is significant at the nominal
-  rate (3 to 7 %) when its truth is absent, and is recovered when planted. Output
-  `models_convention/simulations/uncertainty_measures.parquet`. A measure that fails is reported with its
-  collinear partner only (C5), or redefined, as the lead decides at the gate.
+  `sim.py`, `fit_lib.py`, `build_measures.py`, `check_measures.py`, `collinearity.py` and what `REPORT.md`
+  names), fit with the shared fitter and the uncertainty model as it will be fit to the real data (the
+  recency curve as the gate decides). Truths: recency only; the belief variance; the sample count; a drift
+  with the trial number; a curved reward-fraction effect. Asserts: under each truth without a measure's
+  effect, that measure's slope is significant in 3 to 7 % of data sets (100 in the stored analysis, fewer in
+  the test with a wider band); a planted measure is recovered without bias; the stored analysis records the
+  power of each test at the planted size, which the summary's description of Q5b-var and Q5b-n quotes from
+  `models_convention/simulations/uncertainty_measures.parquet`. A planted curvature of the reward fraction
+  must not appear on either measure (the reason the variability measure was dropped).
 - **ContFrag event sources** (ASK-1): the same role design fit to the SWR- and MUA-sourced ContFrag events
   of the rebuilt ContFrag event-arm tables, as two more event sources (`event_source` in the fit-row
   record; each source is one stream, without an SWR and No SWR split, call). Their values are a
@@ -106,21 +127,25 @@ change is made before the first real fit (C8). The phase turns the study into a 
   and role category; one pooled REML selection per smooth, model and kind; collinearity per term (recency
   against uncertainty is the known concern, design 2.3); records.
 - **Estimands** (`analysis/replay_models/content/role_content_statistics.py`, new): Q3a (current role
-  minus other_leaf), Q3b (previous minus other_leaf), Q4a (reward-fraction slope on the current role), Q4b
+  minus other_leaf), Q3b (previous minus other_leaf), Q4a (the current role's reward-fraction smooth,
+  `f(m + sd/2) - f(m - sd/2)`, designs.md), Q4b
   (value slope on the other_leaf role), Q5a (recency smooth at log 20 minus at log 3, other_leaf rows),
-  Q5b-var, Q5b-rew, Q5b-n (the uncertainty slope on other_leaf, one per measure, each from its own model),
+  Q5b-var and Q5b-n (the belief-variance and sample-count slopes on other_leaf, both from the one
+  uncertainty model),
   Q7b (mean of the current role's `f_u` over
   `[0, 0.25] s` minus over `[1, 2] s`), each per kind and difference, length-adjusted and unadjusted, with
-  `estimand_summary`. A term over the collinearity threshold is reported jointly with its partner (for
-  example, recency and uncertainty) and its single value is not reported (C5).
+  `estimand_summary`. A term over the collinearity threshold is reported jointly with its partner, except a
+  declared term that fails the rule by design: the belief variance is reported beyond recency as C5 says,
+  with its simulated power.
 - **Runner** `scripts/replay_models/content/fit_role_content_models.py` (new; event sources non-local,
   ContFrag SWR, ContFrag MUA), registered in `run_refits.py`.
 - **Summary values** (`reported/behavior/role_content.py`, new, called from
   `reported/behavior/__init__.py`): per estimand, kind and difference, as ratios of shares with intervals,
   animals with the sign, day-level p, sessions kept and left out, cohort counts; tagged with the new
   questions of Phase 5a.
-- **Docs**: `docs/regression_models.md` (the role design, nine arms, recency form, the three uncertainty
-  measures declared before the fit, the length-adjusted and unadjusted comparisons), with value markers;
+- **Docs**: `docs/regression_models.md` (the role design, nine arms, recency form, the smooth reward fraction,
+  the uncertainty model with its two measures and the trial number, the recency penalty rule and the power
+  statement, all written before the fit, the length-adjusted and unadjusted comparisons), with value markers;
   the model table.
 
 - **Retire what this phase replaced** (C13; the items are the REMOVE rows of
@@ -160,7 +185,7 @@ change is made before the first real fit (C8). The phase turns the study into a 
 | `test_role_content.py::test_current_share_toward_leaving_on_u` | a planted rise on `u` is recovered by `f_u` and not by the role slopes |
 | `test_role_content.py::test_length_adjusted_at_reference` | with a planted length interaction, the adjusted per-kind estimate equals the truth at `L0` |
 | `test_role_content_statistics.py::test_share_ratio_from_softmax` | `exp(beta_current - beta_other)` equals the ratio of fitted shares within an event |
-| `tests/analysis/replay_models/content/test_uncertainty_measures_identifiable.py` (slow) | each of the three measures: false positives at 3 to 7 % under recency-only, reward-fraction-only and epoch-drift truths; a planted slope recovered |
+| `tests/analysis/replay_models/content/test_uncertainty_measures_identifiable.py` (slow) | in the one uncertainty model: false positives of each measure at 3 to 7 % under recency-only, the other measure, trial-number drift and reward-fraction curvature truths; each planted measure recovered |
 | `test_role_content.py::test_spans_visit_end_events_in_cohort` | events labeled `spans_visit_end` are in the cohort with the visit's well's arm as current |
 | `tests/reported/behavior/test_role_content_values.py::test_values_and_joint_reporting` | an estimand over the collinearity threshold gives a joint value and no single one |
 
@@ -174,7 +199,7 @@ seeds; the synthetic visit helpers of Phase 3 for `u`.
 - Simulated first (tests, then the stored nine-arm simulation over the real designs), then five sessions,
   then 242.
 - The design measured about 0.03 s per content fit and session; a pooled selection with two smooths (25 grid
-  points plus Newton steps) over 242 sessions is minutes; three uncertainty models, two length variants and
+  points plus Newton steps) over 242 sessions is minutes; one uncertainty model, two length variants and
   two kinds make about twelve selections. Time the smoke test; run the full fits in `tmux`
   (`csr-6a-content`).
 - Compare with the model-free references: Q3a's direction and Q4a's sign (negative for SWR on the current arm
@@ -189,9 +214,12 @@ seeds; the synthetic visit helpers of Phase 3 for `u`.
 
 ## Exit criteria
 
-The lead has seen the uncertainty-measure study and its committed test passes; the nine-arm simulations pass
-before any real fit; the full fits are stored with records; Q3, Q4, Q5 (three
-uncertainty measures) and Q7b values are in the summary, with any collinear pair reported jointly.
+The lead has seen both uncertainty simulations (the first and its repeat with the shared fitter's recency
+penalty) and the recency rule and power statement were written before the first real fit; the committed
+identifiability test passes; the nine-arm simulations pass before any real fit; the full fits are stored with
+records; Q3, Q4 (from the smooth reward fraction), Q5a, Q5b-var, Q5b-n and Q7b values are in the summary, the
+belief variance reported beyond recency with its simulated power, and any other collinear pair reported
+jointly.
 
 ## Review
 

@@ -40,7 +40,8 @@ so it can run beside them. Ends with one rebuild of the canonical tables.
 (the uncertainty measures).
 
 **Decisions this phase applies** (all settled by the lead on 2026-11-20; [overview.md](overview.md#decisions-for-the-lead)):
-L2 (the two uncertainty measures, defined in [designs.md#content-design](designs.md#content-design)), L3
+L2 and the twelfth design round (only the sample count is built; the reward variability is dropped;
+the trial number is added; [designs.md#content-design](designs.md#content-design)), L3
 (arrival is the first poke-in; `last_well_arrival_time_s` equals it wherever both exist), L4 (the event set
 is the events that start inside a visit; a stop crossing the final poke-out counts up to it), ASK-1 (the
 ContFrag tables get the same new columns), ASK-4 (the dense stop time-bin table is removed), and C14 (one
@@ -77,18 +78,22 @@ unit, one event set, one set of clocks).
   `is_current_arm` and the current patch are the visit's well's arm and patch (check what the builder gives
   today; it reads position at the event; set it from the visit if they differ, and count the changed rows in
   the PR).
-- **Event-arm table: the two new uncertainty covariates** (L2, lead: "Do your rec"), computed in
-  `_history_by_event` (`candidate_arm.py:76`) beside the reward count and fraction, from outcomes known
-  before the event (the same rule as `recent_reward_rate_all_events`, `reward_history.py:97`):
-  `reward_outcome_variance_candidate_arm_last10_visits` (the variance, `ddof = 0`, of the arm's 0/1
-  outcomes over the last 10 visits to its well) and `log1p_n_visits_candidate_arm` (log of one plus the
-  visits to the well earlier in the epoch). Trunk arms get the rule `attach_arm_uncertainty` uses
-  (`value_block.py:206`: 0 where the stop is present, NaN where absent). Names are calls; Phase 6a's gate may
-  change a definition, in which case it changes here in a follow-up rebuild of the same phase family, not by
-  a second column.
+- **Event-arm table: the sample-count covariate** (L2 and the twelfth round of the design: the reward
+  variability is dropped, lead: "Yes", and is not built), computed in `_history_by_event`
+  (`candidate_arm.py:76`) beside the reward count and fraction, from outcomes known before the event (the
+  same rule as `recent_reward_rate_all_events`, `reward_history.py:97`): `log1p_n_known_visits_candidate_arm`
+  (log of one plus the visits to the arm's well with a known outcome earlier in the epoch). Trunk arms get
+  the rule `attach_arm_uncertainty` uses (`value_block.py:206`: 0 where the stop is present, NaN where
+  absent). The name is a call.
+- **Event table: the trial number in the epoch**, `n_visits_arrived` (the port experiences whose
+  `arrival_time` is at or before the event start, the quantity the uncertainty simulation used), as an event
+  context column carried to the event-arm table. The tables have `completed_trial_id`
+  (`behavior/covariates/context.py:452`, a zero-based completion-order id, missing before the first
+  completed trial), which counts trials, not visits; the visit count is used so the unit is the visit
+  everywhere (C14). The content model enters it as a role interaction (it is constant within an event).
 - **The same columns in the ContFrag tables** (ASK-1, lead: "Move them"): the ContFrag stop, event and
   event-arm tables (`scripts/tables/prepare_contfrag_replay_content_data.py`, `analysis/contfrag/`) gain
-  `well_visit_id`, the visit clocks, the current-arm rule above and the two uncertainty covariates through
+  `well_visit_id`, the visit clocks, the current-arm rule above, the sample count and the trial number through
   the same functions, so Phases 5a and 6a can fit the SWR- and MUA-sourced events as two more event sources.
   The visit labels themselves come from the labels branch (lead: "Label them now").
 - **Register and document**: every new column in `tables/covariate_registry.py` (producer, table, timing)
@@ -161,11 +166,11 @@ unit, one event set, one set of clocks).
 | `tests/analysis/event_tables/test_visit_columns.py::test_stop_end_kind_on_synthetic_visits` | three visits, one with three stops (two small movements, one leaves), one with one stop that crosses the last poke-out (`leaves`, `spans_visit_end`, `well_visit_id` set), one with a stop that starts before the first poke-in (`spans_visit_start`, `overlapping_visit_id` set, `well_visit_id` missing), one stop between visits (`outside_visit`) |
 | `test_visit_columns.py::test_well_visit_id_for_rows_starting_inside` | events and stops labeled `in_visit` or `spans_visit_end` carry `well_visit_id`; others do not |
 | `test_visit_columns.py::test_spans_visit_end_current_arm_is_the_visit_well` | an event crossing the final poke-out has the visit's well's arm as its current arm |
-| `test_visit_columns.py::test_uncertainty_definitions` | on a hand outcome sequence, the variance equals `p(1 - p)` over the last 10 visits and the count equals `log1p` of the earlier visits |
+| `test_visit_columns.py::test_sample_count_and_trial_number` | on a hand visit sequence, the sample count equals `log1p` of the earlier visits with a known outcome, and the trial number counts the visits arrived at by the event start |
 | `tests/analysis/contfrag/` (updated) | the ContFrag tables carry the same new columns |
 | `test_visit_columns.py::test_in_visit_immobile_seconds` | a stop crossing the poke-out counts only the seconds before it; excluded time is subtracted |
 | `test_visit_columns.py::test_event_visit_clocks` | `time_since_visit_start_s`, `time_until_visit_end_s`, `time_until_stretch_end_s` on hand events; missing outside a visit |
-| `test_visit_columns.py::test_new_uncertainty_covariates_use_known_outcomes_only` | an outcome known after the event start does not enter either covariate; trunk arms follow the stated rule |
+| `test_visit_columns.py::test_sample_count_uses_known_outcomes_only` | an outcome known after the event start does not enter the sample count; trunk arms follow the stated rule |
 | `tests/analysis/replay_models/test_visit_design.py::test_clocks_and_labels_per_bin` | `s + u` constant within a visit; `m = u` in the last stretch; bins outside visits labeled by their stop and with missing clocks; `select_visit_context` keeps exactly the in-visit bins |
 | `test_visit_design.py::test_at_risk_excludes_ongoing_events` | a bin half covered by an ongoing event of the kind has half its exposure; an event of the other kind changes nothing |
 | `test_visit_design.py::test_outcome_shift` | lag 1 switches to the current trial's outcome at `outcome_known_time_s`, not before |
