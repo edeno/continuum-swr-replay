@@ -6,7 +6,7 @@
 
 # Everything main.tex reads. reported_values.tex is generated
 # (`make reported-values` from the repository root) but not regenerated here.
-FIGURES := $(wildcard figures/figure0*/figure0*.pdf)
+FIGURES := $(wildcard figures/figure0*/figure0*.pdf) $(wildcard figures/supp_*/supp_*.pdf)
 TABLES := $(wildcard tables/*.tex)
 
 all: main.pdf
