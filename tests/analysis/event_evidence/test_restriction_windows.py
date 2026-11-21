@@ -195,6 +195,18 @@ def test_bin_fact_sums_count_spikes_outside_swrs_and_inside_a_visit():
     assert facts["swr_two_sided_outside_swr_in_visit"].dtype == np.float64
 
 
+def test_the_window_table_joins_the_sums_the_spikes_and_the_bin_fact_sums():
+    table = rw.window_table(_bins(), _facts(), _windows())
+    sums = rw.restriction_window_sums(_bins(), _windows())
+    facts = rw.window_bin_fact_sums(_bins(), _facts(), _windows())
+    assert list(table.columns) == [*sums.columns, "n_spikes", *rw.BIN_FACT_COLUMNS]
+    pd.testing.assert_frame_equal(table[list(sums.columns)], sums)
+    np.testing.assert_array_equal(table["n_spikes"], facts["n_spikes_bins"])
+    pd.testing.assert_frame_equal(
+        table[list(rw.BIN_FACT_COLUMNS)], facts[list(rw.BIN_FACT_COLUMNS)]
+    )
+
+
 def test_bin_facts_on_another_time_grid_raise():
     facts = _facts().assign(time=lambda f: f["time"] + 1.0)
     with pytest.raises(ValueError, match="time"):
