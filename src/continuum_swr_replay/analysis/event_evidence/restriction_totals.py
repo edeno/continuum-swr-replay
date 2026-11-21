@@ -76,6 +76,8 @@ from continuum_swr_replay.analysis.event_evidence.nonlocal_restriction import (
 )
 from continuum_swr_replay.analysis.event_evidence.restriction_windows import (
     IN_VISIT_SUFFIX,
+    _check_facts_time,
+    _window_bounds,
 )
 from continuum_swr_replay.analysis.event_evidence.state_evidence.windows import (
     SWR_LABELS,
@@ -145,18 +147,11 @@ def restriction_time_sums(
         If the facts' time is not the per-bin table's, a bin's category is not
         one of the categories, or a window reaches outside ``bins``.
     """
-    if not np.array_equal(
-        facts["time"].to_numpy(dtype=float), bins["time"].to_numpy(dtype=float)
-    ):
-        raise ValueError("the per-bin facts' time is not the per-bin table's")
+    _check_facts_time(bins, facts)
     category = bins["category"].astype(str).to_numpy()
     if unknown := sorted(set(category) - set(CATEGORIES)):
         raise ValueError(f"bins in unknown categories: {unknown}")
-    events = windows[windows["kind"] == "event"]
-    s = events["s"].to_numpy(dtype=np.int64)
-    e = events["e"].to_numpy(dtype=np.int64)
-    if (e < s).any() or (s < 0).any() or (e >= len(bins)).any():
-        raise ValueError("a window is empty or reaches outside the per-bin table")
+    s, e = _window_bounds(windows[windows["kind"] == "event"], len(bins))
     in_event = np.zeros(len(bins), dtype=bool)
     in_event[window_rows(s, e)] = True
     frame = bins[list(SCORE_COLUMNS)].astype(np.float64)

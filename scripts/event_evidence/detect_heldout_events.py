@@ -14,7 +14,7 @@ than ``tetrode_holdout.MAX_SEGMENT_S`` (30 s) is cut into pieces of at most
 30 s that can fall in different folds, so a small share of the events span two
 folds: their probability trace and per-bin scores come from two fits, each bin
 still scored under a fit that did not see it. Then sum the restriction scores over each event
-(``restriction_windows.restriction_window_sums``, ``window_bin_fact_sums``),
+(``restriction_windows.window_table``),
 say which held-out and which canonical events share a bin
 (``heldout_events.shared_bin_events``), and sum the epoch's bins by category,
 well visit and held-out event window (``restriction_totals.restriction_time_sums``).
@@ -242,11 +242,7 @@ def run_epoch(
         event_id=[f"{epoch_id}:{label}" for label in events["label"]],
         kind="event",
     )
-    sums = rw.restriction_window_sums(bins, windows)
-    from_facts = rw.window_bin_fact_sums(bins, facts, windows)
-    sums["n_spikes"] = from_facts["n_spikes_bins"].to_numpy()
-    for column in rw.BIN_FACT_COLUMNS:
-        sums[column] = from_facts[column].to_numpy()
+    sums = rw.window_table(bins, facts, windows)
     found = he.shared_bin_events(heldout, canonical)
     rows = pd.concat(
         [

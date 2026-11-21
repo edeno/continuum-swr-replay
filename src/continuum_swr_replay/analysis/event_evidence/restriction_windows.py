@@ -71,10 +71,11 @@ bins the restriction run scored finite (its sums raise otherwise).
 
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.event_evidence.likelihood_advantage import (
     likelihood_advantage_statistics,
@@ -172,69 +173,59 @@ def restriction_window_sums(bins: pd.DataFrame, windows: pd.DataFrame) -> pd.Dat
     ValueError
         If a window is empty or reaches outside ``bins``.
     """
-    s = windows["s"].to_numpy(dtype=np.int64)
-    e = windows["e"].to_numpy(dtype=np.int64)
-    if (e < s).any() or (s < 0).any() or (e >= len(bins)).any():
-        raise ValueError("a window is empty or reaches outside the per-bin table")
+    s, e = _window_bounds(windows, len(bins))
     rows = window_rows(s, e)
     scores = bins[list(SCORE_COLUMNS)].to_numpy(dtype=np.float64)[rows]
     finite = np.isfinite(scores)
-    category = bins["category"].astype(str).to_numpy()[rows]
-    outside = (category == IMMOBILE_OUTSIDE_SWR)[:, np.newaxis]
-    count_names = [
-        "n_bins_in_swr",
-        "n_bins_immobile",
-        "n_bins_excluded",
-        "n_bins_not_finite",
-        "n_bins_outside_swr",
-    ]
-    counts = np.column_stack(
-        [
-            bins["in_swr"].to_numpy(dtype=bool)[rows],
-            np.isin(category, [IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR]),
-            category == "excluded",
-            ~finite.all(axis=1),
-            outside[:, 0],
-        ]
-    ).astype(np.float64)
-    # every bin, then the bins outside SWRs only: each block is the bins with
-    # a score not finite, then the scores summed over the finite ones
-    blocks = [
-        (~finite, np.where(finite, scores, 0.0)),
-        (~finite & outside, np.where(finite & outside, scores, 0.0)),
-    ]
-    summed = window_sums(
-        np.column_stack([counts, *(part for block in blocks for part in block)]),
+    category = bins["category"].iloc[rows].astype(str).to_numpy()
+    outside = category == IMMOBILE_OUTSIDE_SWR
+    counts = {
+        "n_bins_in_swr": bins["in_swr"].to_numpy(dtype=bool)[rows],
+        "n_bins_immobile": np.isin(category, [IMMOBILE_IN_SWR, IMMOBILE_OUTSIDE_SWR]),
+        "n_bins_excluded": category == "excluded",
+        "n_bins_not_finite": ~finite.all(axis=1),
+        "n_bins_outside_swr": outside,
+    }
+    # every bin, then the bins outside SWRs only: the bins with a score not
+    # finite, and the scores summed over the finite ones
+    within = outside[:, np.newaxis]
+    summed = _block_sums(
+        {
+            **counts,
+            "not_finite": ~finite,
+            "scores": np.where(finite, scores, 0.0),
+            "not_finite_outside_swr": ~finite & within,
+            "scores_outside_swr": np.where(finite & within, scores, 0.0),
+        },
         rows,
         s,
         e,
     )
+    counted = {name: np.rint(summed[name][:, 0]).astype(np.int64) for name in counts}
+    whole = summed["scores"]
+    whole[summed["not_finite"] > 0] = np.nan
+    outside_sums = summed["scores_outside_swr"]
+    outside_sums[summed["not_finite_outside_swr"] > 0] = np.nan
     n_bins = e - s + 1
     step = sample_step(bins["time"].to_numpy(dtype=float))
-    counted = {
-        name: np.rint(summed[:, j]).astype(np.int64)
-        for j, name in enumerate(count_names)
-    }
-    n_scores = len(SCORE_COLUMNS)
-    block_sums = []
-    for b in range(len(blocks)):
-        start = len(count_names) + 2 * b * n_scores
-        sums = summed[:, start + n_scores : start + 2 * n_scores]
-        sums[summed[:, start : start + n_scores] > 0] = np.nan
-        block_sums.append(sums)
-    # the columns of the whole window first, as they were before the bins
-    # outside SWRs were summed, then those
+    # the columns of the whole window first, then those over the bins outside
+    # SWRs
     out = windows[[*WINDOW_KEYS, "s", "e"]].reset_index(drop=True)
     out["n_bins"] = n_bins
-    for name in count_names[:-1]:
+    for name in (
+        "n_bins_in_swr",
+        "n_bins_immobile",
+        "n_bins_excluded",
+        "n_bins_not_finite",
+    ):
         out[name] = counted[name]
     out["duration_s"] = n_bins * step
     for j, column in enumerate(SCORE_COLUMNS):
-        out[column] = block_sums[0][:, j]
+        out[column] = whole[:, j]
     out["n_bins_outside_swr"] = counted["n_bins_outside_swr"]
     out["duration_outside_swr_s"] = counted["n_bins_outside_swr"] * step
     for j, column in enumerate(SCORE_COLUMNS):
-        out[f"{column}{OUTSIDE_SWR_SUFFIX}"] = block_sums[1][:, j]
+        out[f"{column}{OUTSIDE_SWR_SUFFIX}"] = outside_sums[:, j]
     return out
 
 
@@ -274,42 +265,116 @@ def window_bin_fact_sums(
         If the facts' time is not the per-bin table's, or a window is empty or
         reaches outside ``bins``.
     """
-    if not np.array_equal(
-        facts["time"].to_numpy(dtype=float), bins["time"].to_numpy(dtype=float)
-    ):
-        raise ValueError("the per-bin facts' time is not the per-bin table's")
-    s = windows["s"].to_numpy(dtype=np.int64)
-    e = windows["e"].to_numpy(dtype=np.int64)
-    if (e < s).any() or (s < 0).any() or (e >= len(bins)).any():
-        raise ValueError("a window is empty or reaches outside the per-bin table")
+    _check_facts_time(bins, facts)
+    s, e = _window_bounds(windows, len(bins))
     rows = window_rows(s, e)
     spikes = facts["n_spikes"].to_numpy(dtype=np.float64)[rows]
-    outside = bins["category"].astype(str).to_numpy()[rows] == IMMOBILE_OUTSIDE_SWR
+    category = bins["category"].iloc[rows].astype(str).to_numpy()
+    outside = category == IMMOBILE_OUTSIDE_SWR
     in_visit = outside & facts["in_well_visit"].to_numpy(dtype=bool)[rows]
     scores = bins[list(SCORE_COLUMNS)].to_numpy(dtype=np.float64)[rows]
-    summed = window_sums(
-        np.column_stack(
-            [
-                spikes,
-                spikes * outside,
-                in_visit,
-                spikes * in_visit,
-                np.where(in_visit[:, np.newaxis], scores, 0.0),
-            ]
-        ),
+    counts = {
+        "n_spikes_bins": spikes,
+        "n_spikes_outside_swr": spikes * outside,
+        "n_bins_outside_swr_in_visit": in_visit,
+        "n_spikes_outside_swr_in_visit": spikes * in_visit,
+    }
+    summed = _block_sums(
+        {
+            **counts,
+            "scores_in_visit": np.where(in_visit[:, np.newaxis], scores, 0.0),
+        },
         rows,
         s,
         e,
     )
     out = pd.DataFrame(
-        {
-            name: np.rint(summed[:, j]).astype(np.int64)
-            for j, name in enumerate(["n_spikes_bins", *BIN_FACT_COLUMNS[:3]])
-        }
+        {name: np.rint(summed[name][:, 0]).astype(np.int64) for name in counts}
     )
     for j, column in enumerate(SCORE_COLUMNS):
-        out[f"{column}{IN_VISIT_SUFFIX}"] = summed[:, 4 + j]
+        out[f"{column}{IN_VISIT_SUFFIX}"] = summed["scores_in_visit"][:, j]
     return out
+
+
+def window_table(
+    bins: pd.DataFrame, facts: pd.DataFrame, windows: pd.DataFrame
+) -> pd.DataFrame:
+    """Each window's summed scores (:func:`restriction_window_sums`), its
+    spikes and its sums from the per-bin facts (:func:`window_bin_fact_sums`).
+
+    Parameters
+    ----------
+    bins, facts, windows : pd.DataFrame
+        As :func:`window_bin_fact_sums` takes them.
+
+    Returns
+    -------
+    pd.DataFrame
+        :func:`restriction_window_sums`' columns, then ``n_spikes`` (the
+        window's spikes over all its bins, from the per-bin facts) and
+        :data:`BIN_FACT_COLUMNS`.
+
+    Raises
+    ------
+    ValueError
+        As :func:`restriction_window_sums` and :func:`window_bin_fact_sums`.
+    """
+    table = restriction_window_sums(bins, windows)
+    from_facts = window_bin_fact_sums(bins, facts, windows)
+    table["n_spikes"] = from_facts["n_spikes_bins"].to_numpy()
+    for column in BIN_FACT_COLUMNS:
+        table[column] = from_facts[column].to_numpy()
+    return table
+
+
+def _window_bounds(windows: pd.DataFrame, n_bins: int) -> tuple[NDArray, NDArray]:
+    """The windows' first and last bins, ``s`` and ``e`` (int64).
+
+    Raises
+    ------
+    ValueError
+        If a window is empty or reaches outside a per-bin table of ``n_bins``
+        rows.
+    """
+    s = windows["s"].to_numpy(dtype=np.int64)
+    e = windows["e"].to_numpy(dtype=np.int64)
+    if (e < s).any() or (s < 0).any() or (e >= n_bins).any():
+        raise ValueError("a window is empty or reaches outside the per-bin table")
+    return s, e
+
+
+def _check_facts_time(bins: pd.DataFrame, facts: pd.DataFrame) -> None:
+    """Raise a ValueError unless the per-bin facts' time is the per-bin table's."""
+    if not np.array_equal(
+        facts["time"].to_numpy(dtype=float), bins["time"].to_numpy(dtype=float)
+    ):
+        raise ValueError("the per-bin facts' time is not the per-bin table's")
+
+
+def _block_sums(
+    blocks: Mapping[str, NDArray], rows: NDArray, starts: NDArray, ends: NDArray
+) -> dict[str, NDArray]:
+    """Each window's sums of each named block of per-bin columns.
+
+    The blocks, each aligned with ``rows`` and of one column (shape
+    ``(n_rows,)``) or several (``(n_rows, n_columns)``), are summed side by side,
+    in the order given, in one :func:`~.tetrode_holdout.window_sums` call.
+
+    Returns
+    -------
+    dict
+        Each block's window sums, float64, shape ``(n_windows, n_columns)``.
+    """
+    columns = [
+        block if block.ndim == 2 else block[:, np.newaxis]
+        for block in map(np.asarray, blocks.values())
+    ]
+    summed = window_sums(np.column_stack(columns), rows, starts, ends)
+    edges = np.cumsum([0, *(column.shape[1] for column in columns)])
+    return {
+        name: summed[:, first:last]
+        for name, first, last in zip(blocks, edges[:-1], edges[1:], strict=True)
+    }
 
 
 def outside_swr_window_counts(windows: pd.DataFrame) -> pd.DataFrame:

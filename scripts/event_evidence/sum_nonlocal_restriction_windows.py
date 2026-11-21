@@ -179,20 +179,17 @@ def run_epoch(
     windows = epoch_windows(
         time, read_swr_table(event_table), pd.read_parquet(participation_path)
     )
-    table = rw.restriction_window_sums(bins, windows)
-    table["n_spikes"] = rw.window_spike_counts(
+    facts = pd.read_parquet(facts_path)
+    table = rw.window_table(bins, facts, windows)
+    held_out_spikes = rw.window_spike_counts(
         pd.read_parquet(holdout_path, columns=HOLDOUT_COLUMNS), windows
     ).to_numpy()
-    facts = pd.read_parquet(facts_path)
-    from_facts = rw.window_bin_fact_sums(bins, facts, windows)
-    differ = from_facts["n_spikes_bins"].to_numpy() != table["n_spikes"].to_numpy()
+    differ = table["n_spikes"].to_numpy() != held_out_spikes
     if differ.any():
         raise ValueError(
             f"{int(differ.sum())} windows' spikes in the per-bin facts are not the "
             "held-out tetrode run's"
         )
-    for column in rw.BIN_FACT_COLUMNS:
-        table[column] = from_facts[column].to_numpy()
     animal = parse_epoch_identifier(epoch_id).animal
     table.insert(0, "animal", animal)
     table.insert(0, "epoch_id", epoch_id)
