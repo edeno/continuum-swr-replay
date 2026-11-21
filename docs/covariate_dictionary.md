@@ -548,8 +548,10 @@ mean/variance, RPE, relative value, entropy, and choice probability) are in
   end) are defined only for windows wholly outside a visit and missing for
   `in_visit`, `spans_*` and `no_analyzed_samples` rows. The tables keep every
   row; an analysis selects with
-  `event_definition.cohort_selection.select_visit_context` (default `in_visit`)
-  and records the kept and dropped counts with `count_visit_context`.
+  `event_definition.cohort_selection.select_visit_context`, whose default keeps
+  the rows that start inside a well visit (`in_visit` and `spans_visit_end`,
+  `STARTS_IN_WELL_VISIT`), and records the kept and dropped counts with
+  `count_visit_context`.
 - `is_current_arm`, `is_prev_arm`, `is_next_arm` — candidate arm equals the
   animal's at-well / previous-trip-origin / upcoming-trip-destination arm.
   `is_next_arm` is **future-referenced**

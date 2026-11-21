@@ -307,12 +307,16 @@ The event, event × arm, event × patch and stop tables carry it, the non-local 
 and the ContFrag tables (SWR and MUA events) alike, with the visit's id and the times
 since the last poke-out and until the next poke-in; the table contract
 (`table_contracts.require_visit_context_labels`) refuses a table without it. No row
-is dropped for its label: an analysis that reads only the events inside a well visit calls
-`analysis/event_definition/cohort_selection.py:select_visit_context` (default
-`in_visit`), and `count_visit_context` gives the rows kept and dropped per label.
+is dropped for its label: the analyses read the events and stops that start inside a well
+visit (`in_visit` and `spans_visit_end`, `analysis/constants.py:STARTS_IN_WELL_VISIT`;
+an event belongs to the time when it starts, and the rate and the content models
+analyze the same events), selected by
+`analysis/event_definition/cohort_selection.py:select_visit_context`, whose default
+is that subset, and `count_visit_context` gives the rows kept and dropped per label.
 Do not re-implement the filter. At the stop grain the label is about the whole stop:
 most `mixed` stops start inside a visit and run past its final poke-out
-(`spans_visit_end`), so selecting stops by `in_visit` drops their in-visit seconds.
+(`spans_visit_end`): the default selection keeps them, and selecting stops by
+`in_visit` alone would drop their in-visit seconds.
 
 ### Spatial Variables
 

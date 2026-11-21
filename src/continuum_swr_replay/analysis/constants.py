@@ -59,8 +59,8 @@ evidence over remote bins (``detector_comparison.evidence``,
 IN_WELL_VISIT = "in_visit"
 """The ``visit_context`` of an event or stop wholly inside one well visit: from
 the animal's first nose-poke in at a reward well to its final poke-out there
-(``occupancy_state == "at_well"``). The default subset of the analyses
-(``event_definition.cohort_selection.select_visit_context``)."""
+(``occupancy_state == "at_well"``). One of the two labels of
+:data:`STARTS_IN_WELL_VISIT`, the analyses' subset."""
 
 VISIT_CONTEXTS: tuple[str, ...] = (
     IN_WELL_VISIT,
@@ -96,6 +96,18 @@ Made by ``event_tables.visit_context.window_visit_context``:
 - ``before_first_visit``: before the epoch's first poke-in.
 - ``no_analyzed_samples``: a stop wholly inside excluded time (no event is).
 """
+
+STARTS_IN_WELL_VISIT: tuple[str, ...] = (IN_WELL_VISIT, "spans_visit_end")
+"""The ``visit_context`` values of an event or stop that starts inside a well
+visit: wholly inside it (``in_visit``), or starting inside it and ending after
+its final poke-out (``spans_visit_end``). The one data subset of the analyses
+and the default of ``event_definition.cohort_selection.select_visit_context``.
+
+An event belongs to the time when it starts. Keeping only ``in_visit`` would
+drop the events that start just before the final poke-out and run past it, so
+the rate models would undercount the event starts at the end of a visit (a
+counting artifact), and the rate and the content models must analyze the same
+events."""
 
 VISIT_WELL_RADIUS_CM = 10.0
 """How near (cm, projected position to the well node) the animal must be to be

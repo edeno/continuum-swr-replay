@@ -5,7 +5,10 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.constants import VISIT_CONTEXTS
+from continuum_swr_replay.analysis.constants import (
+    STARTS_IN_WELL_VISIT,
+    VISIT_CONTEXTS,
+)
 from continuum_swr_replay.analysis.event_definition.cohort_selection import (
     count_visit_context,
     select_visit_context,
@@ -28,12 +31,24 @@ def _events() -> pd.DataFrame:
     )
 
 
-def test_default_keeps_only_rows_inside_a_visit():
+def test_default_keeps_the_rows_that_start_inside_a_visit():
     events = _events()
     selected = select_visit_context(events)
-    assert selected["event_id"].tolist() == [11, 13]
-    assert selected.index.tolist() == [0, 1]
+    # in_visit (11, 13) and spans_visit_end (15) are kept; the rows that
+    # start outside a visit (12, 14) are dropped.
+    assert selected["event_id"].tolist() == [11, 13, 15]
+    assert selected.index.tolist() == [0, 1, 2]
+    assert set(STARTS_IN_WELL_VISIT) == {"in_visit", "spans_visit_end"}
     assert len(events) == 5  # the input is not changed
+
+
+def test_a_caller_can_keep_only_the_rows_wholly_inside_a_visit():
+    assert select_visit_context(_events(), "in_visit")["event_id"].tolist() == [
+        11,
+        13,
+    ]
+    counts = count_visit_context(_events(), "in_visit")
+    assert counts.loc[counts["kept"]].index.tolist() == ["in_visit"]
 
 
 def test_named_contexts_are_kept_together():
@@ -59,7 +74,10 @@ def test_counts_every_label_kept_and_dropped():
     assert counts.loc["before_first_visit", "n"] == 0
     assert counts["n"].sum() == 5
     assert counts.loc[counts["kept"], "n"].sum() == len(select_visit_context(_events()))
-    assert counts["kept"].sum() == 1
+    assert counts.loc[counts["kept"]].index.tolist() == [
+        "in_visit",
+        "spans_visit_end",
+    ]
 
 
 def test_counts_units_on_a_candidate_row_table():

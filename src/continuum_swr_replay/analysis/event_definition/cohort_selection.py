@@ -13,8 +13,10 @@ rate and the content families route their occupancy restriction through it, so
 one rule -- stated once, here -- decides the stops both families describe.
 
 :func:`select_visit_context` selects rows by their well-visit label
-(``visit_context``): by default the events and stops inside a well visit, the
-one subset the analyses of Figures 2 to 5 read. :func:`count_visit_context`
+(``visit_context``): by default the events and stops that start inside a well
+visit (``analysis.constants.STARTS_IN_WELL_VISIT``: ``in_visit`` and
+``spans_visit_end``), the one subset the analyses of Figures 2 to 5 read.
+:func:`count_visit_context`
 counts the rows per label, kept and dropped, for a summary to record.
 """
 
@@ -27,7 +29,10 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
-from continuum_swr_replay.analysis.constants import IN_WELL_VISIT, VISIT_CONTEXTS
+from continuum_swr_replay.analysis.constants import (
+    STARTS_IN_WELL_VISIT,
+    VISIT_CONTEXTS,
+)
 from continuum_swr_replay.tables.columns import require_columns
 
 
@@ -559,15 +564,19 @@ def _visit_contexts(contexts: str | Sequence[str]) -> tuple[str, ...]:
 
 
 def select_visit_context(
-    table: pd.DataFrame, contexts: str | Sequence[str] = (IN_WELL_VISIT,)
+    table: pd.DataFrame, contexts: str | Sequence[str] = STARTS_IN_WELL_VISIT
 ) -> pd.DataFrame:
     """Keep the rows of a table whose ``visit_context`` is one of ``contexts``.
 
     Every event and stop carries a well-visit label (``visit_context``, made by
     ``event_tables.visit_context``); the tables keep the rows outside a visit,
-    and this is where an analysis drops them. The default keeps only the rows
-    inside a well visit (``in_visit``: from the first nose-poke in at a well to
-    the final poke-out there).
+    and this is where an analysis drops them. The default keeps the rows that
+    start inside a well visit (from the first nose-poke in at a well to the
+    final poke-out there): ``analysis.constants.STARTS_IN_WELL_VISIT``, the
+    rows wholly inside one (``in_visit``) and those that start inside one and
+    end after its final poke-out (``spans_visit_end``), because an event
+    belongs to the time when it starts. Pass ``"in_visit"`` for the rows wholly
+    inside a visit only.
 
     Parameters
     ----------
@@ -575,7 +584,8 @@ def select_visit_context(
         Any canonical table carrying ``visit_context`` (event, stop,
         event-arm or event-patch grain).
     contexts : str or sequence of str
-        The labels to keep, from ``analysis.constants.VISIT_CONTEXTS``.
+        The labels to keep, from ``analysis.constants.VISIT_CONTEXTS``;
+        default ``STARTS_IN_WELL_VISIT``.
 
     Returns
     -------
@@ -596,7 +606,7 @@ def select_visit_context(
 
 def count_visit_context(
     table: pd.DataFrame,
-    contexts: str | Sequence[str] = (IN_WELL_VISIT,),
+    contexts: str | Sequence[str] = STARTS_IN_WELL_VISIT,
     *,
     unit_col: str | None = None,
 ) -> pd.DataFrame:
@@ -610,7 +620,8 @@ def count_visit_context(
     table : pandas.DataFrame
         A table carrying ``visit_context``.
     contexts : str or sequence of str
-        The labels :func:`select_visit_context` would keep.
+        The labels :func:`select_visit_context` would keep; default
+        ``STARTS_IN_WELL_VISIT``.
     unit_col : str, optional
         Count distinct values of this column (``event_id`` on a candidate-row
         table) instead of rows.
