@@ -617,8 +617,9 @@ of 95 %. Whether it reaches that level depends on the curve; what was measured i
 - One fit's curve: `f = C beta` on a grid, with pointwise standard error
   `se = sqrt(diag(C V C'))`. From `BAND_DRAWS = 10,000` draws `z ~ N(0, V)` with a stored
   seed, the critical value `c` is the 0.95 quantile of `max |C z| / se`, and the band is
-  `f ± c se`. Over 500 simulated Poisson fits of a P-spline curve it held the whole true
-  curve in 94.6 % of them (`tests/analysis/regression/test_bands.py`).
+  `f ± c se`. A slow test simulates 500 Poisson fits of a P-spline curve and requires that
+  the band holds the whole true curve in 93 to 97 % of them
+  (`tests/analysis/regression/test_bands.py`).
 - The animal-balanced curve across sessions: the per-session curves on one grid are
   taken session to recording day to animal as a mean of means, with nested bootstrap
   draws of that curve (animals, then their sessions). With `sd` the draws' standard
