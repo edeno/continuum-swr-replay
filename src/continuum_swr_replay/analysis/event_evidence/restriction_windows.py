@@ -23,7 +23,7 @@ score less its sum of ``b``'s, in nats, for each score family
 - per second: divided by the window's duration, its bins times the decode's
   time step (``intervals.sample_step`` of the per-bin table's time).
 
-A contrast is also read over a part of the window (:data:`PART_UNITS`): its bins
+A contrast is also read over a part of the window (:data:`PARTS`): its bins
 in the category ``immobile_outside_swr`` only, per spike in them (the spikes of
 every tetrode the decoder put in those bins, from the per-bin facts,
 :mod:`.bin_facts`; NaN without spikes) and per second of them (the window
@@ -71,7 +71,7 @@ bins the restriction run scored finite (its sums raise otherwise).
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Sequence
 
 import numpy as np
 import pandas as pd
@@ -112,8 +112,8 @@ OUTSIDE_SWR_COLUMNS = (
 )
 """The window table's columns over the bins outside SWRs."""
 
-PART_UNITS = {"whole": tuple(UNITS), "outside_swr": tuple(UNITS)}
-"""Each part of a window a contrast is read over and its units: the whole
+PARTS = ("whole", "outside_swr")
+"""Each part of a window a contrast is read over, in both units: the whole
 window, or only its bins in the category ``immobile_outside_swr``, per spike in
 them (``n_spikes_outside_swr``) and per second of them."""
 
@@ -423,7 +423,7 @@ def contrast_column(contrast: str, family: str, unit: str, part: str = "whole") 
 
 
 def window_contrasts(
-    windows: pd.DataFrame, parts: Sequence[str] = tuple(PART_UNITS)
+    windows: pd.DataFrame, parts: Sequence[str] = PARTS
 ) -> pd.DataFrame:
     """Each window's contrasts, per spike and per second, in both families,
     over the whole window and over its bins outside SWRs.
@@ -433,7 +433,7 @@ def window_contrasts(
     windows : pd.DataFrame
         :func:`restriction_window_sums`' rows with ``n_spikes``.
     parts : sequence of str, optional
-        The parts of the window (:data:`PART_UNITS`); by default both. The part
+        The parts of the window (:data:`PARTS`); by default both. The part
         ``"outside_swr"`` reads the columns :data:`OUTSIDE_SWR_COLUMNS` and
         :data:`BIN_FACT_COLUMNS`.
 
@@ -455,7 +455,7 @@ def window_contrasts(
     """
     out = windows.copy()
     kept = out["n_bins_excluded"].to_numpy() == 0
-    for part in _chosen(parts, PART_UNITS, "part"):
+    for part in _chosen(parts, PARTS, "part"):
         if part == "outside_swr":
             seconds = out["duration_outside_swr_s"]
             spikes = out["n_spikes_outside_swr"]
@@ -476,7 +476,7 @@ def window_contrasts(
                     out[f"{a}{suffix}{where}"].to_numpy()
                     - out[f"{b}{suffix}{where}"].to_numpy()
                 )
-                for unit in PART_UNITS[part]:
+                for unit in UNITS:
                     out[contrast_column(contrast, family, unit, part)] = np.where(
                         kept, difference / divisors[unit], np.nan
                     )
@@ -519,7 +519,7 @@ def restriction_window_statistics(
         each defaults to all of them. Each row's bootstrap starts from ``seed``
         on its own, so a row is the same whichever others are computed.
     parts : sequence of str, optional
-        The parts of the window (:data:`PART_UNITS`): ``"whole"`` (the
+        The parts of the window (:data:`PARTS`): ``"whole"`` (the
         default) and ``"outside_swr"``, the window's bins in the category
         ``immobile_outside_swr``, read per spike in them and per second. A
         window with no such bin, or (per spike) no spike in them, has no value
@@ -543,7 +543,7 @@ def restriction_window_statistics(
     families = _chosen(families, FAMILY_SUFFIX, "family")
     contrasts = _chosen(contrasts, CONTRASTS, "contrast")
     units = _chosen(units, UNITS, "unit")
-    parts = _chosen(parts, PART_UNITS, "part")
+    parts = _chosen(parts, PARTS, "part")
     scored = window_contrasts(windows, parts)
     if kinds is not None:
         missing = set(kinds) - set(scored["kind"])
@@ -554,7 +554,7 @@ def restriction_window_statistics(
     for part in parts:
         for family in families:
             for contrast in contrasts:
-                for unit in (u for u in units if u in PART_UNITS[part]):
+                for unit in units:
                     column = contrast_column(contrast, family, unit, part)
                     for kind, mine in scored.groupby("kind", sort=True):
                         statistics = likelihood_advantage_statistics(
@@ -576,7 +576,7 @@ def restriction_window_statistics(
 
 
 def _chosen(
-    chosen: Sequence[str] | None, known: Mapping[str, object], name: str
+    chosen: Sequence[str] | None, known: Collection[str], name: str
 ) -> list[str]:
     """``chosen`` in ``known``'s order, or all of ``known`` when None.
 
