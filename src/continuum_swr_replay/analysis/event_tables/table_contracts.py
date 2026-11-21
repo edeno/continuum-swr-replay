@@ -37,6 +37,7 @@ from continuum_swr_replay.tables.standardization import (
     load_reference,
 )
 
+from ..constants import IN_WELL_VISIT, VISIT_CONTEXTS
 from ._common import EVENT_ARM_STANDARDIZED_COLS
 from .content_response import validate_fraction_response
 from .summaries import PROBABILITY_ROW_SUM_ATOL
@@ -90,6 +91,40 @@ def _require_stable_event_context(frame: pd.DataFrame, columns: Iterable[str]) -
         bad = varying.index[varying.any(axis=1)].tolist()[:5]
         raise ValueError(
             f"event_arm has candidate-row-varying event context for event_id(s) {bad}"
+        )
+
+
+def require_visit_context_labels(frame: pd.DataFrame, table_name: str) -> None:
+    """Check ``visit_context`` against its vocabulary and ``occupancy_state``.
+
+    A table without ``visit_context`` (built before the label existed) is not
+    checked. Where it is present every value is one of
+    ``analysis.constants.VISIT_CONTEXTS``, and a row is ``in_visit`` exactly
+    when its ``occupancy_state`` is ``at_well``.
+
+    Raises
+    ------
+    ValueError
+        If a label is missing or unknown, or disagrees with ``occupancy_state``.
+    """
+    if "visit_context" not in frame.columns or frame.empty:
+        return
+    labels = frame["visit_context"]
+    unknown = sorted(set(labels.dropna().unique()) - set(VISIT_CONTEXTS))
+    if labels.isna().any() or unknown:
+        raise ValueError(
+            f"{table_name} has missing or unknown visit_context values {unknown}"
+        )
+    if (
+        "occupancy_state" in frame.columns
+        and not (
+            labels.eq(IN_WELL_VISIT).to_numpy()
+            == frame["occupancy_state"].astype(object).eq("at_well").to_numpy()
+        ).all()
+    ):
+        raise ValueError(
+            f"{table_name} has visit_context in_visit rows that are not at_well, "
+            "or at_well rows that are not in_visit"
         )
 
 
@@ -327,8 +362,10 @@ def validate_event_arm_table(
             "current_patch",
             "event_start_s",
             "event_end_s",
+            "visit_context",
         ),
     )
+    require_visit_context_labels(frame, "event_arm")
     if event_table is not None:
         _require_event_set_matches(frame, event_table, table_name="event_arm")
     _require_response_conservation(frame)
@@ -353,7 +390,8 @@ def validate_event_patch_table(
         expected=_PATCHES,
         label="event_patch patch set",
     )
-    _require_stable_event_context(frame, SESSION_COLUMNS)
+    _require_stable_event_context(frame, (*SESSION_COLUMNS, "visit_context"))
+    require_visit_context_labels(frame, "event_patch")
     if event_table is not None:
         _require_event_set_matches(frame, event_table, table_name="event_patch")
     if "patch_count_hard" in frame:
