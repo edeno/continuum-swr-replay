@@ -241,14 +241,22 @@ EVENTS_SUBSET = (
 )
 """What the values of the events are over, as their descriptions say."""
 
+CONTROL_SUBSET = (
+    f"{EVENTS_SUBSET}, against Local-rest control windows of each event's length "
+    "drawn from the whole epoch (not only inside a well visit)"
+)
+"""What the values of the per-event runs with Local-rest controls are over."""
+
 TIME_SUBSET = (
     "time inside a well visit (from the first poke-in at a well to the final poke-out)"
 )
 """What the values of time (rest, immobile bins) are over."""
 
 DETECTOR_SUBSET = (
-    "the other detectors' events whose first sample is inside a well visit, "
-    "against the non-local events that start inside one"
+    "the other detectors' events whose first sample is inside a well visit and "
+    "the non-local events that start inside one, each selected by its own start; "
+    "whether an event overlaps an event of the other side is read against all of "
+    "that side's events, so its partner may start outside a visit"
 )
 """What the values of the detector comparison are over."""
 
@@ -2706,7 +2714,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 ),
                 stale(inputs.event_participation),
             ),
-            EVENTS_SUBSET,
+            CONTROL_SUBSET,
         )
     )
     summary.add(
@@ -2734,7 +2742,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
                 stale(inputs.tetrode_holdout),
                 participation_staleness(inputs.tetrode_holdout),
             ),
-            EVENTS_SUBSET,
+            CONTROL_SUBSET,
         )
     )
     summary.inputs += [
@@ -2757,14 +2765,14 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     folder = inputs.decoder_quality
     quality_sessions = pd.read_parquet(folder / "sessions.parquet")
     calibration = pd.read_parquet(folder / "calibration.parquet")
-    for name, table in (
+    for name, quality_table in (
         ("sessions.parquet", quality_sessions),
         ("calibration.parquet", calibration),
     ):
-        if set(table["epoch_id"]) != set(analyzed_epoch_ids()):
+        if set(quality_table["epoch_id"]) != set(analyzed_epoch_ids()):
             raise ValueError(
-                f"{folder / name} holds {table['epoch_id'].nunique()} epochs, not "
-                f"the {n_epochs} analyzed ones"
+                f"{folder / name} holds {quality_table['epoch_id'].nunique()} "
+                f"epochs, not the {n_epochs} analyzed ones"
             )
     quality_source = (
         f"{rel(folder)} (scripts/decoding/measure_decoder_quality.py: each analyzed "
