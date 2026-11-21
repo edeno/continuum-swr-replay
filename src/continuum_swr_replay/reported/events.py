@@ -444,29 +444,41 @@ def window_run_note_staleness(manifest: dict, what: str) -> str | None:
 
 
 def require_fold_fit(manifest: dict, what: str) -> None:
-    """Refuse a restriction run that is not the fold fit.
+    """Refuse a restriction run that is not the fold fit on folds of whole trials.
 
-    The values describe scores under the whole decoder fit on the other folds;
-    the fold-fit run's settings record ``"fit": "folds"``, and a run of the
-    earlier design, which held out only the encodings and ran the models with
-    the transitions fit on the whole epoch, records no ``fit``. That run cannot
-    give these values.
+    The values describe scores under a decoder fit on the other folds, five
+    folds of whole trials balanced by destination well; the fold-fit run's
+    settings record ``"fit": "folds"`` and ``"fold_design": "trials"``. A run of
+    the earlier design, which held out only the encodings and ran the models
+    with the transitions fit on the whole epoch, records no ``fit``; a fold fit
+    on contiguous blocks of time records ``"fold_design": "contiguous"``.
+    Neither can give these values.
 
     Raises
     ------
     ValueError
-        If ``manifest``'s settings do not record ``"fit": "folds"``.
+        If ``manifest``'s settings do not record ``"fit": "folds"`` and
+        ``"fold_design": "trials"``.
     """
-    fit = manifest.get("settings", {}).get("fit")
+    settings = manifest.get("settings", {})
+    fit, design = settings.get("fit"), settings.get("fold_design")
+    rerun = (
+        "scripts/event_evidence/score_nonlocal_restriction.py) in this folder, "
+        "then rerun scripts/event_evidence/measure_bin_facts.py, "
+        "scripts/event_evidence/detect_heldout_events.py and "
+        "scripts/event_evidence/sum_nonlocal_restriction_windows.py on it."
+    )
     if fit != "folds":
         raise ValueError(
             f"{what} is not the fold fit (its settings record fit {fit!r}, not "
             "'folds'): it is the earlier design, which held out only the "
-            "encodings. Put the fold-fit run (scripts/event_evidence/"
-            "score_nonlocal_restriction.py) in this folder, then rerun "
-            "scripts/event_evidence/measure_bin_facts.py, "
-            "scripts/event_evidence/detect_heldout_events.py and "
-            "scripts/event_evidence/sum_nonlocal_restriction_windows.py on it."
+            f"encodings. Put the fold-fit run ({rerun}"
+        )
+    if design != "trials":
+        raise ValueError(
+            f"{what} is not the fold fit on folds of whole trials (its settings "
+            f"record fold_design {design!r}, not 'trials'). Put the fold-fit run "
+            f"with --fold-design trials ({rerun}"
         )
 
 

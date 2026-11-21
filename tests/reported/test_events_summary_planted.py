@@ -245,7 +245,12 @@ class _Run:
         (root / EVENT_NONLOCAL_RESTRICTION_DIR).mkdir(parents=True, exist_ok=True)
         self.manifests[EVENT_NONLOCAL_RESTRICTION_DIR] = {
             **json.loads(json.dumps(fresh)),
-            "settings": {"n_folds": 5, "fit": "folds", "em": {"max_iter": 20}},
+            "settings": {
+                "n_folds": 5,
+                "fit": "folds",
+                "fold_design": "trials",
+                "em": {"max_iter": 20},
+            },
         }
         for folder, (key, value) in (changes or {}).items():
             if value is None:
@@ -662,19 +667,28 @@ def test_a_table_whose_labels_disagree_with_the_visits_is_refused(
 
 
 @pytest.mark.parametrize(
-    "settings",
-    [{"n_folds": 5}, {"n_folds": 5, "fit": "shared"}],
-    ids=["no fit", "another fit"],
+    ("settings", "message"),
+    [
+        ({"n_folds": 5, "fold_design": "trials"}, "is not the fold fit \\("),
+        ({"n_folds": 5, "fit": "shared"}, "is not the fold fit \\("),
+        ({"n_folds": 5, "fit": "folds"}, "fold_design None, not 'trials'"),
+        (
+            {"n_folds": 5, "fit": "folds", "fold_design": "contiguous"},
+            "fold_design 'contiguous', not 'trials'",
+        ),
+    ],
+    ids=["no fit", "another fit", "no fold design", "contiguous blocks"],
 )
-def test_a_restriction_run_that_is_not_the_fold_fit_is_refused(
-    processed_data_root, monkeypatch, settings
+def test_a_restriction_run_that_is_not_the_fold_fit_on_trials_is_refused(
+    processed_data_root, monkeypatch, settings, message
 ):
-    """A run of the earlier design (its settings record no fit) cannot give
-    values that describe the fold fit."""
+    """A run of the earlier design (its settings record no fit), or a fold fit
+    on contiguous blocks of time, cannot give values that describe the fold fit
+    on folds of whole trials."""
     run = _Run(
         processed_data_root,
         monkeypatch,
         {EVENT_NONLOCAL_RESTRICTION_DIR: ("settings", settings)},
     )
-    with pytest.raises(ValueError, match="is not the fold fit"):
+    with pytest.raises(ValueError, match=message):
         run.summarize()
